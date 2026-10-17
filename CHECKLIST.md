@@ -1,12 +1,12 @@
-# PhotoCraft Mac test — `next` 121765dd5
+# PhotoCraft Mac test — `next` 27a995097
 
-Report results by number ("1–9 pass, 14 skipped, 21 fails: …"). Items 1–13 are the context-menu scroll arrows, Image Size on Indexed Color, Window › Arrange and the filter previews: test those first.
+Report results by number ("1–9 pass, 14 skipped, 21 fails: …"). The numbers match the inbox threads; 11, 17 and 18 are gone because their PRs (#6351, #6503) merged upstream. Items 1–13 are the context-menu scroll arrows, Image Size on Indexed Color, Window › Arrange and the filter previews: test those first.
 
 ## 1. Build (give this to the Mac agent)
 
 ```
 In ~/aiongg/photocraft, build the PhotoCraft test app from the fork's `next` branch. Don't launch the app.
-1. git fetch origin && git checkout next && git reset --hard origin/next; confirm HEAD is 121765dd5.
+1. git fetch origin && git checkout next && git reset --hard origin/next; confirm HEAD is 27a995097.
 2. CRAFT_FONTS_DIR=$HOME/aiongg/craft-fonts packaging/macos/package.sh --arch aarch64
 3. mkdir -p ~/aiongg/photocraft-test && /bin/cp -Rf target/macos-package/PhotoCraft.app target/macos-package/photocraft-cli-*-macos-aarch64/photocraft-cli ~/aiongg/photocraft-test/
 4. /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/aiongg/photocraft-test/PhotoCraft.app
@@ -33,19 +33,16 @@ Then open `~/aiongg/photocraft-test/PhotoCraft.app`.
 - [ ] 9. View › Rulers (⌘R): every tile shows rulers for its own document. Drag a guide out of the active tile's ruler: it lands in that document.
 - [ ] 10. Window › Arrange › 2-up Vertical with three documents open, activate the third from the Window menu: the tiles slide to show it, and the other two don't swap.
 
-### Filter previews — #6351, #6338
-- [ ] 11. A photo at View › 100% (⌘1), Filter › Blur › Gaussian Blur…, Preview on, change Radius: the canvas preview is sharp at the pixel level, never blocky. OK: the result matches the preview.
+### Filter previews — #6338
 - [ ] 12. Filter › Convert for Smart Filters, then Gaussian Blur at radius 5, OK. Double-click "Gaussian Blur" under the layer in Layers: the dialog has its Preview box, and a new radius updates the canvas.
 - [ ] 13. OK: Layers lists one Gaussian Blur with the new radius, not two. Reopen, change the radius, Cancel: the image is back at the previous radius.
 
 ### Help › Search — #6030
 - [ ] 14. Quit, then in Terminal: `open ~/aiongg/photocraft-test/PhotoCraft.app --args --in-window-menus`. Click Help in the window's menu bar, type "Deselect": the field holds the whole word, Help stays open, nothing else opens. Quit and open normally afterwards.
 
-### Tools and selection — #6364, #6503
+### Tools and selection — #6364
 - [ ] 15. Pen tool (P): draw a closed path. Path Selection tool (A), right-click the canvas: the path menu opens (Delete Path, Make Selection…, Fill Path…, Stroke Path…, Free Transform Path). Make Selection…, OK: a selection follows the path.
 - [ ] 16. Direct Selection (⇧A cycles to it), right-click: the same menu. Right-click the pasteboard outside the image with either tool: the same path menu, not the pasteboard menu.
-- [ ] 17. Crop tool (C), preset dropdown Ratio, type 1.414 and 1 in the two fields, click elsewhere: the field still reads 1.414. ⇄ (or X): the fields read 1 and 1.414.
-- [ ] 18. Preset dropdown › New Crop Preset…: the proposed Name is "1.414 : 1". A 16 : 9 ratio still reads "16 : 9".
 
 ### Type — #6366, #6038, #6453, #6505
 - [ ] 19. Type tool (T), click into a white area: the caret is a black line with a white edge, easy to see, and blinks. On a black area it is visible too.
@@ -74,5 +71,5 @@ Then open `~/aiongg/photocraft-test/PhotoCraft.app`.
 
 ### Also note
 - Any crash, freeze or spinning beachball, and what you did just before it.
-- Not testable on the Mac: #6412 (Windows recovery folder), #6394 (Linux AppImage launcher), #6422 (Linux file dialog portal), #6414 (web download and its close prompt).
+- Not testable on the Mac: #6412 (Windows recovery folder), #6422 (Linux file dialog portal), #6414 (web download and its close prompt).
 - Non-UI changes with no Mac check: #6476, #6510 (automation token case, root aliases), #6502 (engine number overflow), #6506 (Affinity nested spot colours), #6485 (CSV data set BOM), #5992 (retouch stroke bounds), #5671 (SVG raster budget).
