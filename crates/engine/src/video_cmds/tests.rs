@@ -301,6 +301,42 @@ fn tga_sequence_frames_keep_their_transparency() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// #6307: a DDS with alpha opens with an "Alpha 1" channel too, so a DDS used as footage gets
+/// its alpha back as transparency, as a Targa does.
+#[test]
+fn a_dds_frame_keeps_its_transparency() {
+    let dir = tmpdir("dds");
+    let path = format!("{dir}/f.dds");
+    // An uncompressed 32-bit BGRA DDS, 16x12: opaque red on the left half, transparent on the right.
+    let mut b = vec![0u8; 128];
+    b[0..4].copy_from_slice(b"DDS ");
+    let mut put = |at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    put(4, 124);
+    put(8, 0x1007); // CAPS | HEIGHT | WIDTH | PIXELFORMAT
+    put(12, 12);
+    put(16, 16);
+    put(76, 32);
+    put(80, 0x41); // DDPF_RGB | DDPF_ALPHAPIXELS
+    put(88, 32);
+    put(92, 0x00ff_0000);
+    put(96, 0x0000_ff00);
+    put(100, 0x0000_00ff);
+    put(104, 0xff00_0000);
+    put(108, 0x1000); // DDSCAPS_TEXTURE
+    for _y in 0..12 {
+        for x in 0..16 {
+            b.extend_from_slice(&[0, 0, 255, if x < 8 { 255 } else { 0 }]);
+        }
+    }
+    std::fs::write(&path, b).unwrap();
+    let frames =
+        load_frames(&path, photocraft_color::PixelFormat::new(photocraft_color::ColorMode::Rgb, photocraft_color::SampleType::U8, true)).unwrap().frames;
+    let [f] = &frames[..] else { panic!("one frame, got {}", frames.len()) };
+    assert_eq!(f.pixel(2, 6), vec![1.0, 0.0, 0.0, 1.0]);
+    assert_eq!(f.pixel(12, 6)[3], 0.0, "the right half stays transparent");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 // ------------------------------------------------------------------ animated GIF footage
 
 /// An animated GIF of solid `w`x`h` frames: one `(colour, delay in centiseconds)` each.
