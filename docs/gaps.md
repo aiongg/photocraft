@@ -1,6 +1,6 @@
 # Where PhotoCraft falls short of Photoshop
 
-> **Last reviewed:** 2026-10-17 · **Last updated:** 2026-10-17 · **Change:** minor (Classical Object Finder improvement; learned segmentation remains open) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-17 · **Change:** minor (Classical Object Finder improvement; learned segmentation remains open) · **Target:** Adobe Photoshop 2026
 
 Every known shortfall against Photoshop 2026 (27.11.0), one entry each, ranked by user impact
 on the way to beta. This is the work list agents pick from: take the highest-ranked entry that
