@@ -367,8 +367,7 @@ pub const DROPLET_FROM_AUTOMATION: &str =
 pub(crate) fn mark_automation_edits(list: &mut [Action], before: &[Action]) {
     for action in list {
         let old = before.iter().find(|b| b.name == action.name);
-        action.automation |=
-            old.is_none_or(|b| b.automation || b.steps != action.steps || b.disabled != action.disabled || b.dialogs != action.dialogs);
+        action.automation |= old.is_none_or(|b| b.automation || b.steps != action.steps || b.disabled != action.disabled || b.dialogs != action.dialogs);
     }
 }
 

@@ -2426,7 +2426,8 @@ mod tests {
         app.ui.actions.selected = app.session.actions.list.iter().position(|a| a.name == "Place");
         let droplet = crate::menus::invoke(&mut app, &ctx, "file.automate.createDroplet", json!({}));
         assert!(droplet.is_err_and(|e| e.contains("can't become a droplet")));
-        let droplet = app.run("file.automate.createDroplet", json!({"path": "/outside/place.pcdroplet", "action": "Place", "steps": [["layer.new.layer", {}]]}));
+        let droplet =
+            app.run("file.automate.createDroplet", json!({"path": "/outside/place.pcdroplet", "action": "Place", "steps": [["layer.new.layer", {}]]}));
         assert!(droplet.is_err_and(|e| e.contains("can't become a droplet")));
     }
 
@@ -2492,7 +2493,9 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let id = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about"}))["result"]["dialog"].as_u64().unwrap();
-        let set = |app: &mut PhotocraftApp, field: &str| call(app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": field, "value": {"action": "A", "from": 0}}))["ok"].clone();
+        let set = |app: &mut PhotocraftApp, field: &str| {
+            call(app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": field, "value": {"action": "A", "from": 0}}))["ok"].clone()
+        };
         assert_eq!(set(&mut app, crate::actions::RESUME), false);
         assert_eq!(set(&mut app, "__command"), false);
         assert!(!app.ui.dialogs.iter().any(|d| d.fields.contains_key(crate::actions::RESUME)));
