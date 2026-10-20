@@ -2422,6 +2422,12 @@ mod tests {
         // Batch checks the steps of a marked action too.
         let batch = app.run("file.automate.batch", json!({"action": "Place", "steps": [["file.placeEmbedded", {"path": "/outside/photocraft-probe.png"}]], "input": "/outside/in", "output": "/outside/out"}));
         assert!(batch.is_err_and(|e| e.contains("denied to automation")));
+        // A droplet file would run without the mark.
+        app.ui.actions.selected = app.session.actions.list.iter().position(|a| a.name == "Place");
+        let droplet = crate::menus::invoke(&mut app, &ctx, "file.automate.createDroplet", json!({}));
+        assert!(droplet.is_err_and(|e| e.contains("can't become a droplet")));
+        let droplet = app.run("file.automate.createDroplet", json!({"path": "/outside/place.pcdroplet", "action": "Place", "steps": [["layer.new.layer", {}]]}));
+        assert!(droplet.is_err_and(|e| e.contains("can't become a droplet")));
     }
 
     #[test]

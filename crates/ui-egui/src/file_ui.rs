@@ -93,13 +93,16 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
             let Some(action) = crate::actions::selected_action(app) else {
                 return Some(Err("record an action in the Actions panel first".into()));
             };
+            if photocraft_engine::actions_cmds::uses_automation_actions(&app.session.actions.list, action) {
+                return Some(Err(photocraft_engine::actions_cmds::DROPLET_FROM_AUTOMATION.into()));
+            }
             let steps = crate::actions::action_steps(action);
             let name = action.name.clone();
             form(
                 app,
                 id,
                 tl!("Create Droplet"),
-                json!({"path": format!("{dir}/{name}.pcdroplet"), "name": name, "steps": steps, "output": format!("{dir}/droplet-output"), "format": "same"}),
+                json!({"path": format!("{dir}/{name}.pcdroplet"), "name": name, "action": name, "steps": steps, "output": format!("{dir}/droplet-output"), "format": "same"}),
                 json!({"format": ["same", "png", "jpg", "psd", "tiff"]}),
             )
         }

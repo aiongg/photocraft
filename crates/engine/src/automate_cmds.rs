@@ -320,6 +320,10 @@ fn create_droplet(s: &mut Session, p: &Value) -> Result<Value> {
     // Play Action steps need their actions when the droplet runs on its own (#2794). Not under
     // `actions`: the CLI reads that key as an action set.
     let called = crate::actions_cmds::called_actions(&s.actions.list, &mut steps);
+    let named = p.get("action").and_then(|_| crate::actions_cmds::resolve(&s.actions.list, p, cmd).ok()).and_then(|i| s.actions.list.get(i));
+    if called.iter().any(|a| a.automation) || named.is_some_and(|a| crate::actions_cmds::uses_automation_actions(&s.actions.list, a)) {
+        return Err(bad(cmd, crate::actions_cmds::DROPLET_FROM_AUTOMATION));
+    }
     let path = if path.ends_with(".pcdroplet") || path.ends_with(".json") { path.to_string() } else { format!("{path}.pcdroplet") };
     let name = p.get("name").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| stem(&path));
     let steps_json: Vec<Value> = steps.iter().map(|(id, pr)| json!([id, pr])).collect();

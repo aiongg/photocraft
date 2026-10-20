@@ -352,6 +352,16 @@ fn refuse_without_policy(id: &str, _: &Value) -> Result<()> {
     Err(EngineError::Other(format!("`{id}` is a step of an action loaded through automation, and this session has no automation policy to check it")))
 }
 
+/// Whether `action`, or an action it calls, was loaded or edited through automation.
+pub fn uses_automation_actions(list: &[Action], action: &Action) -> bool {
+    action.automation || called_actions(list, &mut action.steps.clone()).iter().any(|called| called.automation)
+}
+
+/// Create Droplet's refusal for an action [`uses_automation_actions`]: a droplet file runs
+/// without the mark, so it would drop automation's file rules.
+pub const DROPLET_FROM_AUTOMATION: &str =
+    "this action, or an action it plays, was loaded or edited through automation, so it can't become a droplet; record or load it yourself first";
+
 /// After an `actions.*` command ran under [`Session::authorize`]: mark the actions it added or
 /// changed, and keep the mark on actions that had it. `before` is the list before the command.
 pub(crate) fn mark_automation_edits(list: &mut [Action], before: &[Action]) {
