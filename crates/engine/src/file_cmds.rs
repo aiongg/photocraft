@@ -1204,10 +1204,11 @@ fn batch(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some((id, _)) = steps.iter().find(|(id, _)| crate::commands::find(id).is_none()) {
         return Err(EngineError::BadParams { cmd: cmd.into(), msg: format!("unknown command `{id}` in the action") });
     }
-    // Steps of an action loaded through automation keep its check; Batch opens and saves the
-    // files itself, so only the steps are checked.
+    // Steps of an action loaded through automation keep its check, also for the commands they
+    // run on their own behalf. Batch opens and saves the files itself, outside the check.
     let named = p.get("action").and_then(|_| crate::actions_cmds::resolve(&s.actions.list, p, cmd).ok()).and_then(|i| s.actions.list.get(i));
-    if let Some(gate) = named.and_then(|action| crate::actions_cmds::playback_gate(s, action)) {
+    let gate = named.and_then(|action| crate::actions_cmds::playback_gate(s, action));
+    if let Some(gate) = gate {
         for (id, params) in &steps {
             gate(id, params)?;
         }
@@ -1236,14 +1237,18 @@ fn batch(s: &mut Session, p: &Value) -> Result<Value> {
     let run = |scratch: &mut Session| {
         scratch.actions = actions.clone();
         scratch.automation_policy = policy;
-        for (id, params) in &steps {
+        let saved = scratch.authorize;
+        scratch.authorize = gate.or(saved);
+        let ran = steps.iter().try_for_each(|(id, params)| {
             let r = scratch.execute(id, params.clone())?;
             // A failed step inside a called action makes this file an error, not a saved result.
-            if let Some(error) = crate::actions_cmds::nested_failure(id, &r) {
-                return Err(EngineError::Other(error));
+            match crate::actions_cmds::nested_failure(id, &r) {
+                Some(error) => Err(EngineError::Other(error)),
+                None => Ok(()),
             }
-        }
-        Ok(())
+        });
+        scratch.authorize = saved;
+        ran
     };
     let r = match names {
         Some(names) => process_outputs(inputs.iter().map(|i| i.path.as_str()).zip(names), save, &run),
