@@ -97,6 +97,13 @@ pub(crate) fn assign_shortcut(app: &mut PhotocraftApp, name: &str, shortcut: &st
 pub(crate) fn play(app: &mut PhotocraftApp, params: &Value) -> Result<Value, String> {
     let (action, from) = actions_cmds::playback_plan(&app.session, params).map_err(|e| e.to_string())?;
     let recording = actions_cmds::begin_playback(&mut app.session, &action).map_err(|e| e.to_string())?;
+    // An action loaded or edited through automation plays under the automation check however
+    // it was started; installed for the whole playback, it also covers the commands a step
+    // runs on its own behalf and the actions it calls.
+    let scoped = if app.session.authorize.is_none() { actions_cmds::playback_gate(&app.session, &action) } else { None };
+    if scoped.is_some() {
+        app.session.authorize = scoped;
+    }
     let mut ran = 0u64;
     let mut failed = None;
     let mut paused = None;
@@ -104,6 +111,12 @@ pub(crate) fn play(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Str
         // The dialog toggle: show the step's dialog with its recorded values and continue
         // from the next step when it is confirmed (`resume`). Agents play headlessly.
         if action.dialogs.contains(&i) && !app.automation_input && (crate::filter_dialog::has_dialog(id) || crate::adjust_dialog::has_dialog(id)) {
+            // The dialog's OK runs the step after playback has returned, so check its recorded
+            // values now.
+            if let Some(Err(error)) = app.session.authorize.map(|auth| auth(id, p)) {
+                failed = Some(json!({"step": i, "id": id, "error": error.to_string()}));
+                break;
+            }
             let label = label_of(id);
             let dialog = crate::dialogs::open_command_dialog(app, id, &label);
             if let Some(d) = app.ui.dialog_mut(dialog) {
@@ -153,6 +166,9 @@ pub(crate) fn play(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Str
                 break;
             }
         }
+    }
+    if scoped.is_some() {
+        app.session.authorize = None;
     }
     actions_cmds::finish_playback(&mut app.session, recording, &action, from);
     Ok(match (failed, paused) {

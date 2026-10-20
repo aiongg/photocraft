@@ -758,6 +758,7 @@ impl Session {
         // being recorded, nor move the recording mark past the entries it is about to replace.
         let recording = if spec.journal && crate::actions_cmds::replayable(id) { self.actions.recording.take() } else { None };
         let before = self.active().map(|st| st.doc.clone());
+        let actions_before = (self.authorize.is_some() && id.starts_with("actions.")).then(|| self.actions.list.clone());
         // Last-resort guard (AGENTS.md, Never crash): a command that panics anyway fails with an
         // error instead of taking the app down. `edit` only commits a document after its closure
         // returns, so the documents are unchanged.
@@ -765,6 +766,9 @@ impl Session {
             .unwrap_or_else(|_| Err(EngineError::Other(format!("`{id}` failed with an internal error (logged); the document is unchanged"))));
         if self.actions.recording.is_none() {
             self.actions.recording = recording;
+        }
+        if let Some(actions_before) = actions_before {
+            crate::actions_cmds::mark_automation_edits(&mut self.actions.list, &actions_before);
         }
         self.jobs.spawn = false;
         self.coalesce_request = None;

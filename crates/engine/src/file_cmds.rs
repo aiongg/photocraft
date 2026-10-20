@@ -1204,6 +1204,14 @@ fn batch(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some((id, _)) = steps.iter().find(|(id, _)| crate::commands::find(id).is_none()) {
         return Err(EngineError::BadParams { cmd: cmd.into(), msg: format!("unknown command `{id}` in the action") });
     }
+    // Steps of an action loaded through automation keep its check; Batch opens and saves the
+    // files itself, so only the steps are checked.
+    let named = p.get("action").and_then(|_| crate::actions_cmds::resolve(&s.actions.list, p, cmd).ok()).and_then(|i| s.actions.list.get(i));
+    if let Some(gate) = named.and_then(|action| crate::actions_cmds::playback_gate(s, action)) {
+        for (id, params) in &steps {
+            gate(id, params)?;
+        }
+    }
     let output = str_param(p, "output", cmd)?.to_string();
     let inputs = batch_inputs_tree(p, cmd, &output)?;
     let format = p.get("format").and_then(Value::as_str).unwrap_or("same").to_string();
@@ -1224,8 +1232,10 @@ fn batch(s: &mut Session, p: &Value) -> Result<Value> {
     let actions = crate::actions_cmds::ActionState { list, playing: s.actions.playing, playback_stack: s.actions.playback_stack.clone(), ..Default::default() };
     let names = batch_naming::plan(&inputs, &output, &format, p)?;
     let save = SaveOpts::from_params(s, p, cmd)?;
+    let policy = s.automation_policy;
     let run = |scratch: &mut Session| {
         scratch.actions = actions.clone();
+        scratch.automation_policy = policy;
         for (id, params) in &steps {
             let r = scratch.execute(id, params.clone())?;
             // A failed step inside a called action makes this file an error, not a saved result.

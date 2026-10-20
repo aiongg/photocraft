@@ -48,6 +48,11 @@ pub struct Action {
     /// Button Mode colour. Empty is none; otherwise one of [`BUTTON_COLORS`].
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub color: String,
+    /// Loaded or edited by a session with [`Session::authorize`] installed (the control channel,
+    /// MCP). Its steps keep that check wherever playback starts: an F-key, the Actions panel, a
+    /// step dialog's OK or Batch ([`playback_gate`]).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub automation: bool,
 }
 
 /// Button Mode colours, in Photoshop's order. Empty is no colour.
@@ -55,7 +60,7 @@ pub const BUTTON_COLORS: [&str; 8] = ["", "red", "orange", "yellow", "green", "b
 
 impl Action {
     pub fn new(name: impl Into<String>, steps: Vec<(String, Value)>) -> Self {
-        Self { name: name.into(), steps, disabled: BTreeSet::new(), dialogs: BTreeSet::new(), set: None, color: String::new() }
+        Self { name: name.into(), steps, disabled: BTreeSet::new(), dialogs: BTreeSet::new(), set: None, color: String::new(), automation: false }
     }
 
     /// Apply `f` to every per-step index set (`disabled`, `dialogs`) after steps moved.
@@ -334,6 +339,29 @@ fn run_recorded(s: &mut Session, action: &Action, from: usize) -> (u64, Option<V
     (ran, failed)
 }
 
+/// A check on one command, as [`Session::authorize`] stores it.
+pub type Gate = fn(&str, &Value) -> Result<()>;
+
+/// The check that playback of `action` runs its steps under: the session's own, else the
+/// automation policy for an action loaded or edited through automation.
+pub fn playback_gate(s: &Session, action: &Action) -> Option<Gate> {
+    s.authorize.or_else(|| action.automation.then(|| s.automation_policy.unwrap_or(refuse_without_policy)))
+}
+
+fn refuse_without_policy(id: &str, _: &Value) -> Result<()> {
+    Err(EngineError::Other(format!("`{id}` is a step of an action loaded through automation, and this session has no automation policy to check it")))
+}
+
+/// After an `actions.*` command ran under [`Session::authorize`]: mark the actions it added or
+/// changed, and keep the mark on actions that had it. `before` is the list before the command.
+pub(crate) fn mark_automation_edits(list: &mut [Action], before: &[Action]) {
+    for action in list {
+        let old = before.iter().find(|b| b.name == action.name);
+        action.automation |=
+            old.is_none_or(|b| b.automation || b.steps != action.steps || b.disabled != action.disabled || b.dialogs != action.dialogs);
+    }
+}
+
 /// Suspend recording while a called action executes. Keep its commands in the journal
 /// for diagnostics, but record just the named call in the parent action.
 pub fn begin_playback(s: &mut Session, action: &Action) -> Result<Option<(usize, usize)>> {
@@ -373,7 +401,16 @@ pub fn nested_failure(id: &str, value: &Value) -> Option<String> {
 fn play(s: &mut Session, p: &Value) -> Result<Value> {
     let (action, from) = playback_plan(s, p)?;
     let recording = begin_playback(s, &action)?;
+    // Installed for the whole playback, so the commands a step runs on its own behalf and the
+    // actions it calls get the same check.
+    let scoped = if s.authorize.is_none() { playback_gate(s, &action) } else { None };
+    if scoped.is_some() {
+        s.authorize = scoped;
+    }
     let (ran, failed) = run_recorded(s, &action, from);
+    if scoped.is_some() {
+        s.authorize = None;
+    }
     finish_playback(s, recording, &action, from);
     Ok(match failed {
         Some(f) => json!({"action": action.name, "ran": ran, "failed": f}),

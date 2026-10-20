@@ -2376,6 +2376,35 @@ mod tests {
     }
 
     #[test]
+    fn actions_loaded_over_control_keep_its_file_rules_when_played_later() {
+        fn deny_files(id: &str, _: &Value) -> photocraft_engine::Result<()> {
+            if id.starts_with("file.") { Err(photocraft_engine::EngineError::Other(format!("`{id}` is denied to automation"))) } else { Ok(()) }
+        }
+        let services = crate::Services { automation_authorize: Some(deny_files), ..Default::default() };
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        app.session.automation_policy = Some(deny_files);
+        let ctx = egui::Context::default();
+        app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+        let place = vec![("file.placeEmbedded".to_string(), json!({"path": "/outside/photocraft-probe.png"}))];
+        app.session.actions.list.push(photocraft_engine::actions_cmds::Action::new("Place", place));
+        let data = app.run("actions.save", json!({"action": "Place"})).unwrap()["data"].clone();
+        app.run("actions.rename", json!({"action": "Place", "name": "Mine"})).unwrap();
+        let reply = call(&mut app, &ctx, "engine.execute", json!({"command": "actions.load", "params": {"data": data, "set": "Theirs"}}));
+        assert_eq!(reply["ok"], true, "{reply}");
+        let marked: Vec<_> = app.session.actions.list.iter().map(|a| (a.name.as_str(), a.automation)).collect();
+        assert_eq!(marked, [("Mine", false), ("Place", true)]);
+        // Played outside any control request (Actions panel, F-key, a step dialog's OK).
+        let played = app.run("actions.play", json!({"action": "Place"})).unwrap();
+        assert!(played["failed"]["error"].as_str().unwrap().contains("denied to automation"), "{played}");
+        assert!(app.session.authorize.is_none());
+        let mine = app.run("actions.play", json!({"action": "Mine"})).unwrap();
+        assert!(!mine["failed"]["error"].as_str().unwrap_or_default().contains("denied to automation"), "{mine}");
+        // Batch checks the steps of a marked action too.
+        let batch = app.run("file.automate.batch", json!({"action": "Place", "steps": [["file.placeEmbedded", {"path": "/outside/photocraft-probe.png"}]], "input": "/outside/in", "output": "/outside/out"}));
+        assert!(batch.is_err_and(|e| e.contains("denied to automation")));
+    }
+
+    #[test]
     fn preferences_apply_respects_the_automation_command_policy() {
         let services = crate::Services {
             automation_command: Some(Box::new(|id, _| if id == "prefs.set" { Err("preference changes denied".into()) } else { Ok(()) })),

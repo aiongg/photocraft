@@ -730,6 +730,9 @@ fn main() -> eframe::Result {
             #[cfg(not(target_os = "linux"))]
             let session = Session::new();
             let mut app = PhotocraftApp::new(session, services);
+            // Actions loaded through automation keep its check when played later, also in a
+            // launch without the control channel.
+            app.session.automation_policy = Some(photocraft_automation::workspace::authorize_desktop_engine_step);
             app.min_frame_ms = uncapped.then_some(1000.0 / 240.0);
             app.integrated_titlebar = cfg!(target_os = "macos");
             app.custom_titlebar = custom_titlebar;

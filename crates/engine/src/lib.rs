@@ -486,6 +486,10 @@ pub struct Session {
     /// the same check a top-level request sees. `None` runs everything, which is what a local
     /// UI and `photocraft-cli run` do.
     pub authorize: Option<fn(&str, &serde_json::Value) -> Result<()>>,
+    /// The automation check that the steps of an action loaded or edited through automation
+    /// ([`actions_cmds::Action::automation`]) run under when `authorize` is not installed. The
+    /// desktop app installs the control channel's policy; without one such steps are refused.
+    pub automation_policy: Option<fn(&str, &serde_json::Value) -> Result<()>>,
     /// A further route for File › Print when neither `lp` nor a CUPS server over IPP is
     /// reachable (the XDG Print portal in a Flatpak); see `print_cmds::Spooler`.
     pub print_spooler: Option<print_cmds::Spooler>,
