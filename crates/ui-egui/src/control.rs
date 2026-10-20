@@ -359,6 +359,17 @@ fn modifiers_from(p: &Value) -> egui::Modifiers {
 /// The `dialog` id of the shell's own dialog (`workspace_ui`) in `ui.inspect` and `ui.dialog.*`.
 const SHELL_DIALOG: &str = "shell";
 
+/// A dialog field `ui.dialog.set` and `ui.dialog.open` don't write: the `__` fields hold what a
+/// dialog's OK runs and resumes (`__command`, `__resumeAction`…). The preview and page state
+/// that automation drives (`docs/control-protocol.md`) stays settable.
+fn internal_field(name: &str) -> bool {
+    name.starts_with("__") && !matches!(name, "__view" | "__zoom" | "__center" | "__showOriginal" | "__hideView" | "__page" | "__variables")
+}
+
+fn internal_field_error(name: &str) -> String {
+    format!("dialog field `{name}` is internal and can't be set")
+}
+
 pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
     let saved = app.session.authorize;
     if let Some(gate) = app.services.automation_authorize {
@@ -879,12 +890,16 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             };
             let mut fields = if kind == DialogKind::NewDocument { app.new_document_fields() } else { Default::default() };
             if let Some(f) = p.get("fields").and_then(Value::as_object) {
+                if let Some(name) = f.keys().find(|name| internal_field(name)) {
+                    return err(internal_field_error(name));
+                }
                 fields.extend(f.clone());
             }
             ok(json!({"dialog": app.ui.open_dialog(kind, fields)}))
         }
         // The shell's own dialog (Window › Workspace, View › Pixel Aspect Ratio › Custom, Show
         // Extras Options, 32-bit Preview Options), listed by ui.inspect with the id "shell".
+        "ui.dialog.set" if s("field").is_some_and(internal_field) => err(internal_field_error(s("field").unwrap_or_default())),
         "ui.dialog.set" if s("dialog") == Some(SHELL_DIALOG) => {
             let Some(field) = s("field") else { return err("need `dialog` and `field`") };
             let value = p.get("value").cloned().unwrap_or(Value::Null);
@@ -2402,6 +2417,21 @@ mod tests {
         // Batch checks the steps of a marked action too.
         let batch = app.run("file.automate.batch", json!({"action": "Place", "steps": [["file.placeEmbedded", {"path": "/outside/photocraft-probe.png"}]], "input": "/outside/in", "output": "/outside/out"}));
         assert!(batch.is_err_and(|e| e.contains("denied to automation")));
+    }
+
+    #[test]
+    fn dialog_bookkeeping_fields_are_not_settable_over_control() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = egui::Context::default();
+        let id = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about"}))["result"]["dialog"].as_u64().unwrap();
+        let set = |app: &mut PhotocraftApp, field: &str| call(app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": field, "value": {"action": "A", "from": 0}}))["ok"].clone();
+        assert_eq!(set(&mut app, crate::actions::RESUME), false);
+        assert_eq!(set(&mut app, "__command"), false);
+        assert!(!app.ui.dialogs.iter().any(|d| d.fields.contains_key(crate::actions::RESUME)));
+        assert_eq!(set(&mut app, "__view"), true);
+        assert_eq!(set(&mut app, "tab"), true);
+        let opened = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about", "fields": {"__resumeAction": {"action": "A", "from": 0}}}));
+        assert_eq!(opened["ok"], false);
     }
 
     #[test]
