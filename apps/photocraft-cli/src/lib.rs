@@ -533,6 +533,8 @@ fn droplet(a: &Args, out: &mut dyn Write, err: &mut dyn Write) -> R {
         p["output"] = json!(o);
     }
     let mut s = photocraft_engine::Session::new();
+    // A droplet's called actions that were loaded through automation keep its check.
+    s.automation_policy = Some(photocraft_automation::workspace::authorize_engine_step);
     let r = s.execute("file.automate.runDroplet", p).map_err(|e| e.to_string())?;
     for f in r["files"].as_array().into_iter().flatten() {
         let _ = writeln!(out, "ok    {}", f.as_str().unwrap_or_default());

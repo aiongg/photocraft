@@ -46,9 +46,12 @@ impl Headless {
 
     /// Create a session for an explicit local CLI invocation. The CLI caller,
     /// not a remote automation client, supplies these host paths. Nested
-    /// `actions.play` steps are not re-checked: this caller is already trusted.
+    /// `actions.play` steps are not re-checked: this caller is already trusted. Actions loaded
+    /// through automation keep [`authorize_engine_step`] for their steps.
     pub fn trusted_local() -> Self {
-        Self { session: Session::new(), writers: HashMap::new(), filesystem: Filesystem::TrustedLocal }
+        let mut session = Session::new();
+        session.automation_policy = Some(authorize_engine_step);
+        Self { session, writers: HashMap::new(), filesystem: Filesystem::TrustedLocal }
     }
 
     /// Create an automation session with capability-scoped file access.
