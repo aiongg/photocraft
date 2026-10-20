@@ -375,12 +375,10 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest
     if let Some(gate) = app.services.automation_authorize {
         app.session.authorize = Some(gate);
     }
-    let before: Vec<u64> = if req.method == "ui.dialog.open" { app.ui.dialogs.iter().map(|d| d.id).collect() } else { Vec::new() };
+    let before: Vec<u64> = app.ui.dialogs.iter().map(|d| d.id).collect();
     let outcome = dispatch(app, ctx, req);
-    if req.method == "ui.dialog.open" {
-        for dialog in app.ui.dialogs.iter_mut().filter(|d| !before.contains(&d.id)) {
-            dialog.automation = true;
-        }
+    for dialog in app.ui.dialogs.iter_mut().filter(|d| !before.contains(&d.id)) {
+        dialog.automation = true;
     }
     app.session.authorize = saved;
     outcome
@@ -2451,6 +2449,36 @@ mod tests {
         app.ui.dialog_mut(mine).unwrap().fields.insert("path".into(), path);
         let result = crate::dialogs::confirm(&mut app, mine);
         assert!(!result.is_err_and(|e| e.contains("denied to automation")));
+    }
+
+    #[test]
+    fn dialogs_opened_by_a_control_request_or_under_synthetic_input_confirm_under_its_policy() {
+        fn deny_outside(id: &str, params: &Value) -> photocraft_engine::Result<()> {
+            let outside = params.as_object().is_some_and(|p| p.values().any(|v| v.as_str().is_some_and(|v| v.starts_with("/outside"))));
+            if outside { Err(photocraft_engine::EngineError::Other(format!("`{id}` is denied to automation"))) } else { Ok(()) }
+        }
+        let services = crate::Services {
+            automation_authorize: Some(deny_outside),
+            automation_command: Some(Box::new(|id, p| deny_outside(id, p).map_err(|e| e.to_string()))),
+            ..Default::default()
+        };
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let ctx = egui::Context::default();
+        app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+        // A menu click over control opens the dialog; synthetic typing then fills its path.
+        let reply = call(&mut app, &ctx, "ui.menu.invoke", json!({"id": "file.scripts.imageProcessor"}));
+        assert_eq!(reply["ok"], true, "{reply}");
+        let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
+        app.ui.dialog_mut(id).unwrap().fields.insert("output".into(), json!("/outside/out"));
+        let error = crate::dialogs::confirm(&mut app, id).unwrap_err();
+        assert!(error.contains("denied to automation"), "{error}");
+        // A dialog the user opened is marked once synthetic input reaches the window.
+        let mine = crate::dialogs::open_command_dialog(&mut app, "image.imageSize", "Image Size");
+        assert!(!app.ui.dialogs.iter().any(|d| d.id == mine && d.automation));
+        let (req, _rx) = ControlRequest::new("ui.type", json!({"text": "/outside"}));
+        let _ = handle(&mut app, &ctx, &req);
+        assert!(!app.take_synthetic_step().is_empty());
+        assert!(app.ui.dialogs.iter().any(|d| d.id == mine && d.automation));
     }
 
     #[test]

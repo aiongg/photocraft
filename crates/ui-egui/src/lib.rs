@@ -2182,6 +2182,12 @@ impl eframe::App for PhotocraftApp {
         tool_memory::persist(self, &ctx);
         // So are View › Extras, Show and Snap To (#3762).
         view_cmds::persist(self, &ctx);
+        if self.automation_input {
+            // Dialogs that synthetic input opened this frame.
+            for dialog in &mut self.ui.dialogs {
+                dialog.automation = true;
+            }
+        }
         self.automation_input = false;
         shape_stroke_ui::finish_frame(self, &ctx);
         native_menu::sync(self, &ctx);
@@ -2517,6 +2523,10 @@ impl PhotocraftApp {
         let events: Vec<_> = self.synthetic.drain(..n).collect();
         if !events.is_empty() {
             self.automation_input = true;
+            // Synthetic typing and clicks can write into any open dialog.
+            for dialog in &mut self.ui.dialogs {
+                dialog.automation = true;
+            }
         }
         events
     }

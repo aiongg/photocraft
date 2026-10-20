@@ -449,8 +449,9 @@ pub struct Dialog {
     pub kind: DialogKind,
     /// Field values by name. Dialog widgets read and write these; so can automation.
     pub fields: serde_json::Map<String, serde_json::Value>,
-    /// Opened or written by the control channel (`ui.dialog.open`, `ui.dialog.set`): its OK runs
-    /// under the automation policy, also when the user presses it.
+    /// Opened during a control request, written by `ui.dialog.set`, or open while synthetic
+    /// input (`ui.type`, `ui.click`, `ui.key`) ran: its OK runs under the automation policy,
+    /// also when the user presses it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub automation: bool,
 }
