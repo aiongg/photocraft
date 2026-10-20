@@ -375,7 +375,13 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest
     if let Some(gate) = app.services.automation_authorize {
         app.session.authorize = Some(gate);
     }
+    let before: Vec<u64> = if req.method == "ui.dialog.open" { app.ui.dialogs.iter().map(|d| d.id).collect() } else { Vec::new() };
     let outcome = dispatch(app, ctx, req);
+    if req.method == "ui.dialog.open" {
+        for dialog in app.ui.dialogs.iter_mut().filter(|d| !before.contains(&d.id)) {
+            dialog.automation = true;
+        }
+    }
     app.session.authorize = saved;
     outcome
 }
@@ -949,6 +955,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             match app.ui.dialog_mut(id) {
                 Some(d) => {
                     d.fields.insert(field.to_string(), value);
+                    d.automation = true;
                     ok(Value::Null)
                 }
                 None => err(format!("no dialog {id}")),
@@ -2417,6 +2424,33 @@ mod tests {
         // Batch checks the steps of a marked action too.
         let batch = app.run("file.automate.batch", json!({"action": "Place", "steps": [["file.placeEmbedded", {"path": "/outside/photocraft-probe.png"}]], "input": "/outside/in", "output": "/outside/out"}));
         assert!(batch.is_err_and(|e| e.contains("denied to automation")));
+    }
+
+    #[test]
+    fn a_dialog_written_over_control_confirms_under_its_policy_on_the_users_ok() {
+        fn deny_files(id: &str, _: &Value) -> photocraft_engine::Result<()> {
+            if id.starts_with("file.") { Err(photocraft_engine::EngineError::Other(format!("`{id}` is denied to automation"))) } else { Ok(()) }
+        }
+        let services = crate::Services {
+            automation_authorize: Some(deny_files),
+            automation_command: Some(Box::new(|id, p| deny_files(id, p).map_err(|e| e.to_string()))),
+            ..Default::default()
+        };
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let ctx = egui::Context::default();
+        app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+        let path = json!("/outside/photocraft-probe.png");
+        let id = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "command", "command": "file.placeEmbedded"}))["result"]["dialog"].as_u64().unwrap();
+        assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": "path", "value": path}))["ok"], true);
+        // The user presses OK after the request has ended.
+        let error = crate::dialogs::confirm(&mut app, id).unwrap_err();
+        assert!(error.contains("denied to automation"), "{error}");
+        assert!(!app.automation_input);
+        // The same dialog opened and filled by the user runs with the user's authority.
+        let mine = crate::dialogs::open_command_dialog(&mut app, "file.placeEmbedded", "Place Embedded");
+        app.ui.dialog_mut(mine).unwrap().fields.insert("path".into(), path);
+        let result = crate::dialogs::confirm(&mut app, mine);
+        assert!(!result.is_err_and(|e| e.contains("denied to automation")));
     }
 
     #[test]

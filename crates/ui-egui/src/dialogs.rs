@@ -603,6 +603,19 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
         crate::guide_layout_ui::validate(app, &d.fields)?;
     }
     let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
+    // Values the control channel chose keep its policy when the user presses OK.
+    let gated = d.automation && !app.automation_input;
+    if gated {
+        app.automation_input = true;
+    }
+    let result = confirm_closed(app, d);
+    if gated {
+        app.automation_input = false;
+    }
+    result
+}
+
+fn confirm_closed(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> {
     match d.kind {
         DialogKind::NewDocument => {
             let r = app.run("file.new", crate::new_doc_ui::command_params(&d.fields));

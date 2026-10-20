@@ -449,6 +449,10 @@ pub struct Dialog {
     pub kind: DialogKind,
     /// Field values by name. Dialog widgets read and write these; so can automation.
     pub fields: serde_json::Map<String, serde_json::Value>,
+    /// Opened or written by the control channel (`ui.dialog.open`, `ui.dialog.set`): its OK runs
+    /// under the automation policy, also when the user presses it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub automation: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1470,7 +1474,7 @@ impl UiState {
 
     pub fn open_dialog(&mut self, kind: DialogKind, fields: serde_json::Map<String, serde_json::Value>) -> u64 {
         let id = self.alloc_id();
-        self.dialogs.push(Dialog { id, kind, fields });
+        self.dialogs.push(Dialog { id, kind, fields, automation: false });
         id
     }
 
