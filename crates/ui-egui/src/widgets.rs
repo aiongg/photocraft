@@ -1441,13 +1441,13 @@ pub fn dropdown<T: PartialEq + Clone>(ui: &mut Ui, id: &str, current: &mut T, op
 /// [`dropdown`] whose option labels are shown exactly as given: names the user typed (a channel
 /// or layer name) must not be translated, unlike the built-in labels [`dropdown`] translates (#5335).
 pub fn dropdown_literal<T: PartialEq + Clone>(ui: &mut Ui, id: &str, current: &mut T, options: &[(T, &str)], width: f32) -> bool {
-    let (chosen, _) = dropdown_with(ui, id, current, options, width, false, false);
+    let (chosen, _) = dropdown_with(ui, id, current, options, width, false, false, &|_| false);
     !chosen.is_empty()
 }
 
 /// [`dropdown`], also returning the option under the pointer in its open list (live previews).
 pub fn dropdown_hovered<T: PartialEq + Clone>(ui: &mut Ui, id: &str, current: &mut T, options: &[(T, &str)], width: f32) -> (bool, Option<T>) {
-    let (chosen, hovered) = dropdown_with(ui, id, current, options, width, false, true);
+    let (chosen, hovered) = dropdown_with(ui, id, current, options, width, false, true, &|_| false);
     (!chosen.is_empty(), hovered)
 }
 
@@ -1458,7 +1458,21 @@ pub fn dropdown_hovered<T: PartialEq + Clone>(ui: &mut Ui, id: &str, current: &m
 /// in order (one per notch; the last is `current`) and the option under the pointer in the open
 /// list, none while the pointer rests where the wheel last stepped.
 pub fn dropdown_wheel_hovered<T: PartialEq + Clone>(ui: &mut Ui, id: &str, current: &mut T, options: &[(T, &str)], width: f32) -> (Vec<T>, Option<T>) {
-    dropdown_with(ui, id, current, options, width, true, true)
+    dropdown_with(ui, id, current, options, width, true, true, &|_| false)
+}
+
+/// [`dropdown_wheel_hovered`] whose open list draws a line above each option (but the first) that
+/// `starts_group`: Photoshop's blend mode lists group their modes (#5532). The lines are only
+/// drawn: the options, their order and how the wheel, the keys and the pointer pick them stay.
+pub fn dropdown_wheel_grouped<T: PartialEq + Clone>(
+    ui: &mut Ui,
+    id: &str,
+    current: &mut T,
+    options: &[(T, &str)],
+    width: f32,
+    starts_group: impl Fn(&T) -> bool,
+) -> (Vec<T>, Option<T>) {
+    dropdown_with(ui, id, current, options, width, true, true, &starts_group)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1470,6 +1484,7 @@ fn dropdown_with<T: PartialEq + Clone>(
     width: f32,
     wheel: bool,
     translate: bool,
+    starts_group: &dyn Fn(&T) -> bool,
 ) -> (Vec<T>, Option<T>) {
     let shown = |l: &str| if translate { tl!(l).to_string() } else { l.to_string() };
     let label = options.iter().find(|(v, _)| v == current).map(|(_, l)| shown(l)).unwrap_or_else(|| "—".into());
@@ -1507,7 +1522,10 @@ fn dropdown_with<T: PartialEq + Clone>(
         // The row nearest the pointer, by its distance to each row.
         let pointer = ui.ctx().pointer_hover_pos().filter(|_| ui.rect_contains_pointer(ui.clip_rect()));
         let mut nearest: Option<(f32, &T)> = None;
-        for ((v, _), text) in options.iter().zip(texts.iter()) {
+        for (i, ((v, _), text)) in options.iter().zip(texts.iter()).enumerate() {
+            if i > 0 && starts_group(v) {
+                list_separator(ui);
+            }
             let item = ui.selectable_label(v == current, text.as_str());
             if reveal && v == current {
                 item.scroll_to_me(None);
@@ -1549,6 +1567,15 @@ fn dropdown_with<T: PartialEq + Clone>(
         hovered = None;
     }
     (chosen, hovered)
+}
+
+/// A line between two groups of an open dropdown list's options, as wide as the list. Like egui's
+/// separator it takes no width while egui sizes the list, so it never widens it.
+fn list_separator(ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let width = if ui.is_sizing_pass() { 0.0 } else { ui.available_width() };
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 1.0), Sense::hover());
+    ui.painter().hline(rect.x_range(), rect.center().y, Stroke::new(1.0, t.separator));
 }
 
 /// Makes an open dropdown list as wide as its widest option is when hovered, from the start. egui
@@ -2653,6 +2680,17 @@ mod tests {
         assert!(list.top() >= 0.0 && list.bottom() <= 300.0, "the list {list:?} stays in the window");
         assert!(list.height() > 200.0, "the list {list:?} uses the window's height");
         assert!(rows.last().is_some_and(|r| !list.contains_rect(*r)), "the last rows scroll: {rows:?}");
+    }
+
+    /// A dropdown not given groups draws no lines between its options: the rows are evenly spaced
+    /// (#5532, only blend mode lists group theirs).
+    #[test]
+    fn dropdown_list_without_groups_has_no_separators() {
+        let h = open_blend_modes(1000.0, 0.0);
+        let rows = mode_rows(&h);
+        let gaps: Vec<f32> = rows.windows(2).map(|w| w[1].top() - w[0].bottom()).collect();
+        let (lo, hi) = gaps.iter().fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), g| (lo.min(*g), hi.max(*g)));
+        assert!(hi - lo < 1.0, "even row gaps: {gaps:?}");
     }
 
     /// The open list opens at the button's left edge, below it or moved up over it to fit, and
