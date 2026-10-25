@@ -9,8 +9,9 @@
 //! [`RecoveryStore`] is the app-facing lifecycle: an entry is only deleted once
 //! the document is saved or closed, never just because it was recovered.
 
+use std::collections::BTreeSet;
 #[cfg(not(target_arch = "wasm32"))]
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
