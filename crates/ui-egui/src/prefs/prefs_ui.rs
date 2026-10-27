@@ -33,11 +33,10 @@ pub struct Runtime {
     /// This instance's preferences as of `saved_rev`: the base of the three-way merge on save.
     saved_value: Option<Value>,
     save_retry: SaveRetry,
-    /// Why the stored preferences couldn't be read at load. While set, nothing is written: this
-    /// session runs on defaults, and a write would replace the user's file with them.
+    /// Why the stored preferences couldn't be read, at load and at every write since. While set,
+    /// nothing is written: this session runs on defaults, and a write would replace the user's
+    /// file with them. Each write reads the file again and goes ahead once that succeeds.
     unreadable: Option<String>,
-    /// The status line has said that changes aren't saved.
-    unreadable_reported: bool,
     next_autosave_ms: f64,
     /// Last revision whose recovery file was actually written successfully.
     autosaved: HashMap<DocId, u64>,

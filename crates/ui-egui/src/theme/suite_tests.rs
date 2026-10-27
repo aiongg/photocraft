@@ -161,15 +161,19 @@ fn saved_preferences_keep_their_look_and_a_fresh_install_starts_on_artcraft() {
 
 #[test]
 fn unreadable_preferences_keep_photocraft_s_own_themes_and_are_not_overwritten() {
+    use egui_kittest::kittest::Queryable;
     let written: Store = Arc::default();
     let w = written.clone();
+    // The preferences file, unreadable (`None`: locked at launch) until the test unlocks it.
+    let file: Arc<Mutex<Option<String>>> = Arc::default();
+    let f = file.clone();
     let folder = tempfile::tempdir().unwrap();
     // Another Craft app has chosen a suite theme, which this one would otherwise keep as lastSuite.
     let mut other = craft_theme_store::Store::open(&craft_theme_store::SuiteDir::at(folder.path()), craft_theme_store::StoreOptions::new("other app"));
     other.update(&craft_theme_store::Accepted::default(), SelectionChange::theme(id("craft.graphite"))).unwrap();
     let dir = craft_theme_store::SuiteDir::at(folder.path());
     let services = crate::Services {
-        load_prefs: Some(Box::new(|| Err("permission denied".into()))),
+        load_prefs: Some(Box::new(move || f.lock().unwrap().clone().map(Some).ok_or_else(|| "permission denied".to_string()))),
         save_prefs: Some(Box::new(move |s: &str| {
             *w.lock().unwrap() = Some(s.to_string());
             Ok(())
@@ -185,14 +189,30 @@ fn unreadable_preferences_keep_photocraft_s_own_themes_and_are_not_overwritten()
     }
     assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::Own(craft_theme::Selection { theme: ThemeId::app_default(), mode: Mode::Dark }));
     assert!(app.ui.status.contains("permission denied"), "{}", app.ui.status);
-    // A setting changed by the user is kept for this session only.
+    // A setting changed by the user: the write reads the file again, which still fails.
     app.run("prefs.set", json!({"path": "general.animatedZoom", "value": false})).unwrap();
     for _ in 0..3 {
         frame(&mut app, &ctx, Some(egui::Theme::Dark));
     }
-    assert!(app.ui.status.contains("aren't saved"), "{}", app.ui.status);
+    assert!(app.ui.status.contains("couldn't be read"), "{}", app.ui.status);
     assert!(crate::prefs_ui::save_preferences(&mut app).is_err());
     assert_eq!(*written.lock().unwrap(), None, "the unreadable file is left alone");
+    // Preferences › Interface says so for as long as it lasts.
+    let notice = "Preferences couldn't be read, so changes aren't saved (permission denied).";
+    crate::prefs_ui::open_preferences(&mut app, "interface");
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 900.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    assert!(h.query_by_label(notice).is_some());
+    // The file reads again: the change is merged into it, and the rest of it is kept.
+    *file.lock().unwrap() = Some(json!({"interface": {"appearanceMode": "light"}}).to_string());
+    crate::prefs_ui::save_preferences(h.state_mut()).unwrap();
+    let saved: serde_json::Value = serde_json::from_str(written.lock().unwrap().as_deref().unwrap()).unwrap();
+    assert_eq!((saved["interface"]["appearanceMode"].clone(), saved["general"]["animatedZoom"].clone()), (json!("light"), json!(false)));
+    h.run_steps(2);
+    assert!(h.query_by_label(notice).is_none());
 }
 
 #[test]

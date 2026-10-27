@@ -376,7 +376,7 @@ pub(crate) fn own_themes_shown(app: &PhotocraftApp) -> bool {
 /// Keep the suite selection PhotoCraft last saw in its preferences (`lastSuite`), so a damaged
 /// or unreadable suite folder at the next start still shows the same look.
 fn remember_last_suite(app: &mut PhotocraftApp) {
-    // Unreadable preferences are never written, so there is nothing to keep it in.
+    // Nothing is written while the preferences file can't be read, so there is nothing to keep it in.
     if app.prefs_rt.unreadable.is_some() {
         return;
     }
@@ -559,6 +559,10 @@ pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>, p
         })
         .collect();
     let mut notices = Vec::new();
+    if let Some(e) = &app.prefs_rt.unreadable {
+        let line = crate::i18n::fmt(tl!("Preferences couldn't be read, so changes aren't saved ({error})."), &[("error", e)]);
+        notices.push((line, Vec::new()));
+    }
     if let Some((disk, mine)) = suite.conflict() {
         let shown = disk.suite.with_defaults(&crate::theme::suite::app_defaults());
         let line = if mine.theme.is_some() {
@@ -585,7 +589,9 @@ pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>, p
 /// Applies what was clicked in the suite rows to the suite, and keeps the picks held for OK in
 /// the dialog's fields `f`.
 pub(super) fn apply_suite_clicks(app: &mut PhotocraftApp, ctx: &egui::Context, rows: SuiteRows, f: &mut Map<String, Value>) {
-    if rows.pending.is_empty() {
+    // Once PhotoCraft follows the suite (Window › Theme › Follow suite while the dialog is open),
+    // the cards show the live suite theme: a pick held from before would apply unseen on OK.
+    if rows.pending.is_empty() || rows.live_follows {
         f.remove(SUITE_PENDING);
     } else {
         f.insert(SUITE_PENDING.into(), serde_json::to_value(&rows.pending).unwrap_or_default());

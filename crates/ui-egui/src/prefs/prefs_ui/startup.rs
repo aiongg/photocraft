@@ -31,7 +31,7 @@ pub fn load(app: &mut PhotocraftApp) {
     let text = app.services.load_prefs.as_mut().map(|f| f());
     if let Some(Err(e)) = &text {
         // Saved preferences that can't be read are not a fresh install: the defaults show (with
-        // PhotoCraft's own themes) and this session writes nothing over the file (`write_prefs`).
+        // PhotoCraft's own themes) and nothing is written until the file reads again (`write_prefs`).
         let template = "Preferences couldn't be read: {error}";
         app.ui.status = crate::i18n::fmt(tl!(template), &[("error", e)]);
         app.ui.status_error = true;

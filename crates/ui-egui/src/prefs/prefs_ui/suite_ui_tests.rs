@@ -322,3 +322,26 @@ fn appearance_changes_made_while_preferences_is_open_are_not_written_back_stale(
     h.run_steps(2);
     assert_eq!(h.state().session.prefs().to_json()["interface"], before);
 }
+
+/// A pick held in the draft is dropped once PhotoCraft follows the suite some other way (Window ›
+/// Theme › Follow suite) while Preferences is open: OK doesn't send it.
+#[test]
+fn a_held_pick_is_dropped_once_the_app_follows_the_suite() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut app = app(Some(folder.path()));
+    let ctx = egui::Context::default();
+    choose_suite_appearance(&mut app, &ctx, Some(false), None);
+    let mut h = harness(app);
+    h.get_by_label("Follow suite").click();
+    h.run_steps(2);
+    h.get_by_label("Graphite").click();
+    h.run_steps(2);
+    assert!(preferences_fields(&h).contains_key(super::appearance::SUITE_PENDING), "held in the draft");
+    crate::menus::invoke(h.state_mut(), &ctx, crate::menus::FOLLOW_SUITE_ITEM, json!({})).unwrap();
+    h.run_steps(2);
+    assert_eq!(app_choice(h.state()), AppChoice::FollowSuite);
+    assert!(!preferences_fields(&h).contains_key(super::appearance::SUITE_PENDING));
+    h.get_by_label("OK").click();
+    h.run_steps(2);
+    assert_eq!(h.state().suite.shown(), Default::default(), "the suite is unchanged");
+}
