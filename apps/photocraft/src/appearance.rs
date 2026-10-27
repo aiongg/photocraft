@@ -8,7 +8,7 @@ pub(crate) fn portal_proxy() -> Option<zbus::blocking::Proxy<'static>> {
 
 /// Platforms where craft-platform watches the desktop settings portal.
 #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
-pub(crate) use portal::{PortalTheme, start_watcher, wait_for_first_answer};
+pub(crate) use portal::{PortalTheme, start_watcher};
 
 #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
 mod portal {
@@ -40,6 +40,12 @@ mod portal {
         pub(crate) fn new(watcher: Watcher) -> Self {
             Self(std::sync::Mutex::new(watcher))
         }
+
+        /// Waits for the watcher's first answer, at most `remaining` of the startup budget, so the
+        /// first frame already uses the desktop's appearance.
+        pub(crate) fn wait_first(&self, remaining: std::time::Duration) {
+            self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).wait_first(remaining);
+        }
     }
 
     impl eframe::ViewportHooks for PortalTheme {
@@ -59,10 +65,6 @@ mod portal {
             }
         })
     }
-
-    /// Where startup waits for the watcher's first answer, so the first frame uses the desktop's
-    /// appearance (at most `remaining` of the 250 ms budget).
-    pub(crate) fn wait_for_first_answer(_remaining: std::time::Duration) {}
 
     #[cfg(test)]
     mod tests {

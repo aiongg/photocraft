@@ -451,8 +451,10 @@ fn main() -> eframe::Result {
     #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
     let watcher_start = std::time::Instant::now();
     #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
-    if let Some(watcher) = appearance::start_watcher(context_cell.clone()) {
-        options.viewport_hooks = Some(std::sync::Arc::new(appearance::PortalTheme::new(watcher)));
+    let portal_theme = appearance::start_watcher(context_cell.clone()).map(|watcher| std::sync::Arc::new(appearance::PortalTheme::new(watcher)));
+    #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+    if let Some(portal) = &portal_theme {
+        options.viewport_hooks = Some(portal.clone());
     }
     let result = eframe::run_native(
         "PhotoCraft",
@@ -462,7 +464,9 @@ fn main() -> eframe::Result {
             #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
             {
                 let _ = context_cell.set(cc.egui_ctx.clone());
-                appearance::wait_for_first_answer(std::time::Duration::from_millis(250).saturating_sub(watcher_start.elapsed()));
+                if let Some(portal) = &portal_theme {
+                    portal.wait_first(std::time::Duration::from_millis(250).saturating_sub(watcher_start.elapsed()));
+                }
             }
             let automation = control.as_ref().map(|(_, _, workspace)| workspace.clone());
             let mut services = services::native(automation);
