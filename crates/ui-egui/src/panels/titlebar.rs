@@ -547,4 +547,6 @@ pub fn resize_zones(ui: &mut Ui) {
 }
 
 #[cfg(test)]
+mod golden_tests;
+#[cfg(test)]
 mod tests;

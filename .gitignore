@@ -11,3 +11,8 @@ target/
 /craft-fonts
 *.log
 __pycache__/
+
+# egui_kittest writes these beside a snapshot that fails or is updated.
+*.new.png
+*.diff.png
+*.old.png
