@@ -698,7 +698,7 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     ui.painter().rect_filled(cell.shrink(1.0), 0.0, t.hover);
                 }
                 let tex = glyph_texture(&ctx, &family, &style, c, px);
-                let tint = if is_sel { Color32::WHITE } else { t.text };
+                let tint = if is_sel { t.accent_ink() } else { t.text };
                 ui.painter().image(tex.id(), cell.shrink(3.0), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), tint);
                 let resp = resp.on_hover_text(format!("U+{:04X}", c as u32));
                 if resp.double_clicked() {

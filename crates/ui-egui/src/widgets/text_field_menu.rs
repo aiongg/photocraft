@@ -229,7 +229,7 @@ fn draw(ctx: &Context, open: &Open) -> Option<Action> {
             v.widgets.hovered.weak_bg_fill = t.accent;
             v.widgets.hovered.bg_fill = t.accent;
             v.widgets.hovered.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+            v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, t.accent_ink());
             v.widgets.hovered.corner_radius = egui::CornerRadius::same(3);
             ui.spacing_mut().item_spacing.y = 0.0;
             ui.set_width(170.0);

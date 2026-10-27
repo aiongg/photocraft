@@ -18,7 +18,7 @@ pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
                 ui.painter().rect_filled(rect, 8.5, bg);
             }
             let x = egui::lerp((rect.left() + 8.5)..=(rect.right() - 8.5), how_on);
-            ui.painter().circle_filled(pos2(x, rect.center().y), 6.5, Color32::WHITE);
+            ui.painter().circle_filled(pos2(x, rect.center().y), 6.5, if *on { t.accent_ink() } else { Color32::WHITE });
             ui.label(egui::RichText::new(tl!(label)).color(if *on { t.text } else { t.text_dim }));
             resp
         })

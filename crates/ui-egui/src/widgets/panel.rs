@@ -15,7 +15,7 @@ pub fn style_spectrum_popup_menu(ui: &mut Ui) {
     let v = &mut ui.style_mut().visuals;
     v.widgets.hovered.weak_bg_fill = t.accent;
     v.widgets.hovered.bg_fill = t.accent;
-    v.widgets.hovered.fg_stroke = Stroke::new(1.0, Color32::WHITE);
+    v.widgets.hovered.fg_stroke = Stroke::new(1.0, t.accent_ink());
     v.widgets.hovered.bg_stroke = Stroke::NONE;
     v.widgets.inactive.corner_radius = CornerRadius::ZERO;
     v.widgets.hovered.corner_radius = CornerRadius::ZERO;
