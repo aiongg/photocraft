@@ -519,7 +519,7 @@ impl Default for SuiteRows {
     }
 }
 
-/// A suite theme as a card: its preview tokens for (Light, Dark), `None` while its file isn't read,
+/// A suite theme as a card: its preview tokens for (Light, Dark), `None` for one the suite doesn't list,
 /// and its contrast findings, described.
 struct ThemeCard {
     id: ThemeId,
@@ -543,20 +543,14 @@ const PROBLEMS_SHOWN: usize = 3;
 pub(super) const SUITE_PENDING: &str = "__suitePending";
 
 /// Reads the suite for the Appearance rows; `pending` is the dialog's [`SUITE_PENDING`].
-pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>, pending: Option<&Value>) -> SuiteRows {
+pub(super) fn suite_rows(app: &PhotocraftApp, system: Option<egui::Theme>, pending: Option<&Value>) -> SuiteRows {
     let live_follows = app_choice(app) == craft_theme::AppChoice::FollowSuite;
     let pending = pending.cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-    app.suite.read_previews();
     let suite = &app.suite;
     let cards = suite
         .themes()
         .into_iter()
-        .map(|(id, name)| ThemeCard {
-            preview: if suite.is_loading(&id) { None } else { suite.preview(&id) },
-            diagnostics: suite.diagnostics(&id).iter().map(describe_diagnostic).collect(),
-            id,
-            name,
-        })
+        .map(|(id, name)| ThemeCard { preview: suite.preview(&id), diagnostics: suite.diagnostics(&id).iter().map(describe_diagnostic).collect(), id, name })
         .collect();
     let mut notices = Vec::new();
     if let Some(e) = &app.prefs_rt.unreadable {
@@ -728,7 +722,7 @@ const CARD: egui::Vec2 = vec2(96.0, 64.0);
 
 /// One theme as a card: a miniature of its colours (dock, a chrome strip, a card with a text and
 /// a dim text line, an accent dot), its name under it (cut to the card's width; `tip` has it
-/// whole), outlined when chosen. Without `preview` (a library theme not read yet) the card is
+/// whole), outlined when chosen. Without `preview` (a theme the suite doesn't list) the card is
 /// blank. A radio button for accessibility.
 fn theme_card(ui: &mut egui::Ui, name: &str, preview: Option<&Tokens>, on: bool, tip: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
