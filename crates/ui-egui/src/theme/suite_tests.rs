@@ -225,4 +225,17 @@ fn the_choice_survives_a_restart_and_the_override_leaves_the_suite_alone() {
     crate::prefs_ui::choose_suite_appearance(&mut app, &ctx, Some(true), None);
     frame(&mut app, &ctx, Some(egui::Theme::Dark));
     assert_core(&slots(&ctx).1, &dark("craft.artcraft"), "following again");
+    // A library theme as the own choice: the first frame after a restart already shows it.
+    let sample = id(SAMPLE_THEME_ID);
+    app.suite.watch().request(Op::Import { bytes: Arc::from(SAMPLE_THEME_JSON.as_bytes()), as_copy: false });
+    wait_for(&mut app, &ctx, "the sample theme in the library", |app| app.suite.knows(&sample));
+    crate::prefs_ui::choose_suite_appearance(&mut app, &ctx, Some(false), Some(sample.clone()));
+    wait_for(&mut app, &ctx, "the sample theme loaded", |app| !app.suite.client().is_loading(&sample));
+    assert_core(&slots(&ctx).1, &sample_roles(Variant::Dark), "own library theme");
+    wait_for(&mut app, &ctx, "the choice saved", |_| store.lock().unwrap().as_deref().is_some_and(|s| s.contains(SAMPLE_THEME_ID)));
+    drop(app);
+    let ctx = egui::Context::default();
+    let mut app = app_on_dir(&store, folder.path());
+    frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    assert_core(&slots(&ctx).1, &sample_roles(Variant::Dark), "first frame after a restart");
 }

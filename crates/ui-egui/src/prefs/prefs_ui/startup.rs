@@ -56,8 +56,13 @@ pub fn load(app: &mut PhotocraftApp) {
             })
         });
     }
-    let last = app.session.prefs().interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
-    app.suite = crate::theme::suite::Suite::open(app.services.suite_watch.take(), last);
+    let interface = &app.session.prefs().interface;
+    let last = interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
+    let own = match interface.app_choice() {
+        craft_theme::AppChoice::Own(sel) => Some(sel.theme),
+        craft_theme::AppChoice::FollowSuite => None,
+    };
+    app.suite = crate::theme::suite::Suite::open(app.services.suite_watch.take(), last, own);
     crate::dock::restore(app);
     crate::brush_picker::restore(app);
     crate::last_brush::restore(app);

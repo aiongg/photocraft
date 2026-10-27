@@ -17,9 +17,11 @@ pub fn app_defaults() -> AppDefaults {
 /// The variant for a mode that follows the system while the OS gives no answer.
 pub const FALLBACK: Variant = Variant::Dark;
 
-/// Store options for this app: who writes, and the selection PhotoCraft saw last.
-pub fn store_options(last: Accepted) -> StoreOptions {
-    StoreOptions::new(concat!("photocraft ", env!("CARGO_PKG_VERSION"))).last_accepted(last)
+/// Store options for this app: who writes, the selection PhotoCraft saw last and the library
+/// theme of its own choice (`None` for its own themes or a built-in). With both, the watcher's
+/// first snapshot already holds the themes in use, so the first frame shows them.
+pub fn store_options(last: Accepted, app_theme: Option<ThemeId>) -> StoreOptions {
+    StoreOptions::new(concat!("photocraft ", env!("CARGO_PKG_VERSION"))).last_accepted(last).app_theme(app_theme.filter(|id| !id.is_builtin()))
 }
 
 /// Opens the suite watcher once the saved preferences are read (the shell's choice of folder and
@@ -62,8 +64,8 @@ impl Suite {
 
     /// Opens the watcher with `open` (the shared folder), or in memory without one (tests,
     /// agents, portable installs, the web build).
-    pub fn open(open: Option<OpenWatchFn>, last: Accepted) -> Self {
-        let options = store_options(last);
+    pub fn open(open: Option<OpenWatchFn>, last: Accepted, app_theme: Option<ThemeId>) -> Self {
+        let options = store_options(last, app_theme);
         match open {
             Some(open) => Suite::shared(open(options)),
             None => Suite::new(SuiteWatch::open(&craft_theme_store::SuiteDir::memory(), options, || {})),
