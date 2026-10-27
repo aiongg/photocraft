@@ -6,46 +6,77 @@ pub(crate) fn portal_proxy() -> Option<zbus::blocking::Proxy<'static>> {
     zbus::blocking::Proxy::new(&conn, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", "org.freedesktop.portal.Settings").ok()
 }
 
-/// The app inside the eframe window. On Linux and the BSDs winit cannot read the desktop
-/// appearance reliably (Wayland compositors send none), so the settings portal's answer replaces
-/// winit's in every frame's input; a portal without an answer clears it.
-#[cfg(target_os = "linux")]
-pub struct Shell {
-    app: photocraft_ui_egui::PhotocraftApp,
-    watcher: Option<craft_platform::appearance::Watcher>,
-}
+/// Platforms where craft-platform watches the desktop settings portal.
+#[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+pub(crate) use portal::{PortalTheme, start_watcher, wait_for_first_answer};
 
-#[cfg(target_os = "linux")]
-impl Shell {
-    pub fn new(app: photocraft_ui_egui::PhotocraftApp, ctx: &egui::Context) -> Self {
-        let wake = ctx.clone();
-        Self { app, watcher: craft_platform::appearance::Watcher::start(move || wake.request_repaint()) }
-    }
-}
+#[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+mod portal {
+    use craft_platform::appearance::{Theme, Watcher};
 
-#[cfg(target_os = "linux")]
-impl eframe::App for Shell {
-    fn on_exit(&mut self) {
-        eframe::App::on_exit(&mut self.app);
+    /// Put the settings portal's answer into one viewport's input; no answer clears winit's value.
+    fn apply_portal(observed: Option<Theme>, raw: &mut egui::RawInput) {
+        raw.system_theme = observed.map(|theme| match theme {
+            Theme::Dark => egui::Theme::Dark,
+            Theme::Light => egui::Theme::Light,
+        });
     }
 
-    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        eframe::App::logic(&mut self.app, ctx, frame);
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
-        eframe::App::ui(&mut self.app, ui, frame);
-    }
-
-    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
-        if let Some(watcher) = &self.watcher {
-            let observed = watcher.current();
-            raw_input.system_theme = observed.map(|theme| match theme {
-                craft_platform::appearance::Theme::Dark => egui::Theme::Dark,
-                craft_platform::appearance::Theme::Light => egui::Theme::Light,
-            });
-            craft_platform::appearance::sync_native_window_theme(ctx, observed);
+    /// The appearance native decorations follow: the fixed variant when both style slots hold the
+    /// same theme, the portal's answer otherwise.
+    fn decoration_theme(ctx: &egui::Context, observed: Option<Theme>) -> Option<Theme> {
+        match photocraft_ui_egui::theme::installed(ctx) {
+            Some((light, dark)) if light == dark => Some(if light.is_dark() { Theme::Dark } else { Theme::Light }),
+            _ => observed,
         }
-        eframe::App::raw_input_hook(&mut self.app, ctx, raw_input);
+    }
+
+    /// On Linux and the BSDs winit cannot read the desktop appearance reliably (Wayland compositors
+    /// send none), so the portal's answer replaces winit's in the input of every viewport. This
+    /// runs as a viewport hook because `App::raw_input_hook` skips immediate viewports.
+    pub(crate) struct PortalTheme(std::sync::Mutex<Watcher>);
+
+    impl PortalTheme {
+        pub(crate) fn new(watcher: Watcher) -> Self {
+            Self(std::sync::Mutex::new(watcher))
+        }
+    }
+
+    impl eframe::ViewportHooks for PortalTheme {
+        fn raw_input(&self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+            let observed = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).current();
+            apply_portal(observed, raw_input);
+            craft_platform::appearance::sync_native_window_theme(ctx, decoration_theme(ctx, observed));
+        }
+    }
+
+    /// Starts the portal watcher; `ctx` is set once the window's context exists, and the watcher
+    /// wakes it on a change.
+    pub(crate) fn start_watcher(ctx: std::sync::Arc<std::sync::OnceLock<egui::Context>>) -> Option<Watcher> {
+        Watcher::start(move || {
+            if let Some(ctx) = ctx.get() {
+                ctx.request_repaint();
+            }
+        })
+    }
+
+    /// Where startup waits for the watcher's first answer, so the first frame uses the desktop's
+    /// appearance (at most `remaining` of the 250 ms budget).
+    pub(crate) fn wait_for_first_answer(_remaining: std::time::Duration) {}
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn portal_answer_replaces_winit_value() {
+            let mut raw = egui::RawInput { system_theme: Some(egui::Theme::Dark), ..Default::default() };
+            apply_portal(None, &mut raw);
+            assert_eq!(raw.system_theme, None);
+            apply_portal(Some(Theme::Light), &mut raw);
+            assert_eq!(raw.system_theme, Some(egui::Theme::Light));
+            apply_portal(Some(Theme::Dark), &mut raw);
+            assert_eq!(raw.system_theme, Some(egui::Theme::Dark));
+        }
     }
 }

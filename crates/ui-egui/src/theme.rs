@@ -1176,9 +1176,12 @@ pub mod live {
                 Ok(v) => {
                     let (light, dark) = super::installed(ctx).unwrap_or_default();
                     super::install(ctx, light, dark);
-                    let mut t = Tokens::get(ctx);
-                    let unknown = apply_overrides(&mut t, &v);
-                    super::store_tokens(ctx, ctx.theme(), t);
+                    let mut unknown = Vec::new();
+                    for slot in [egui::Theme::Light, egui::Theme::Dark] {
+                        let mut t = Tokens::for_kind(if slot == egui::Theme::Light { light } else { dark });
+                        unknown = apply_overrides(&mut t, &v);
+                        super::store_tokens(ctx, slot, t);
+                    }
                     if !unknown.is_empty() {
                         log::warn!("unknown token keys: {unknown:?}");
                     }

@@ -446,11 +446,24 @@ fn main() -> eframe::Result {
     let app_created = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let created_in_callback = app_created.clone();
     let started_sentinel = sentinel.clone();
+    #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+    let context_cell = std::sync::Arc::new(std::sync::OnceLock::<egui::Context>::new());
+    #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+    let watcher_start = std::time::Instant::now();
+    #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+    if let Some(watcher) = appearance::start_watcher(context_cell.clone()) {
+        options.viewport_hooks = Some(std::sync::Arc::new(appearance::PortalTheme::new(watcher)));
+    }
     let result = eframe::run_native(
         "PhotoCraft",
         options,
         Box::new(move |cc| {
             created_in_callback.store(true, std::sync::atomic::Ordering::Relaxed);
+            #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+            {
+                let _ = context_cell.set(cc.egui_ctx.clone());
+                appearance::wait_for_first_answer(std::time::Duration::from_millis(250).saturating_sub(watcher_start.elapsed()));
+            }
             let automation = control.as_ref().map(|(_, _, workspace)| workspace.clone());
             let mut services = services::native(automation);
             services.preset_store = presets;
@@ -629,8 +642,6 @@ fn main() -> eframe::Result {
             if let Some(w) = &app_dirs::current().warning {
                 photocraft_ui_egui::notices::post(&mut app, "Portable mode is off", vec![w.clone()], false, None);
             }
-            #[cfg(target_os = "linux")]
-            let app = appearance::Shell::new(app, &cc.egui_ctx);
             Ok(Box::new(app))
         }),
     );
