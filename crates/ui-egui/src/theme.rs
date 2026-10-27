@@ -1104,6 +1104,8 @@ pub fn canvas_bg(t: &Tokens) -> Color32 {
 }
 
 #[cfg(test)]
+mod golden_tests;
+#[cfg(test)]
 mod tests;
 
 /// Development feature: live design-token overrides.
