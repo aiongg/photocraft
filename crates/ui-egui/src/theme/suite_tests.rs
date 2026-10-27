@@ -65,7 +65,7 @@ fn assert_core(t: &Tokens, roles: &craft_theme::CoreRoles, what: &str) {
 fn the_sample_theme_and_every_built_in_give_their_core_colours_in_both_slots() {
     let watch = SuiteWatch::memory();
     watch.request(Op::Import { bytes: Arc::from(SAMPLE_THEME_JSON.as_bytes()), as_copy: false });
-    let mut app = app_on(&Arc::default());
+    let mut app = app_on(&saved(json!({"interface": {"suiteAppearance": {"followSuite": true}}})));
     app.suite = Suite::new(watch);
     app.suite.change(SelectionChange::mode(Mode::System));
     let ctx = egui::Context::default();
@@ -89,22 +89,38 @@ fn the_sample_theme_and_every_built_in_give_their_core_colours_in_both_slots() {
         assert_eq!(app.ui.theme, l.kind);
         assert_eq!(Tokens::get(&ctx), l);
         // The ink on accent fills is on_accent, not accent_text.
-        assert_eq!(ctx.style_of(egui::Theme::Light).visuals.selection.stroke.color, l.primary_text);
+        assert_eq!(l.accent_ink(), l.primary_text);
+        // Selections use the selection colour under the normal text, not the accent.
+        let selection = ctx.style_of(egui::Theme::Light).visuals.selection;
+        assert_eq!((selection.bg_fill, selection.stroke.color), (l.row_selected, l.text), "{theme:?}");
     }
 }
 
 #[test]
-fn saved_preferences_keep_their_look_and_a_fresh_install_follows_the_suite() {
+fn saved_preferences_keep_their_look_and_a_fresh_install_starts_on_artcraft() {
     let artcraft = craft_theme::builtin(&ThemeId::suite_default()).unwrap();
-    // Fresh install: follows the suite; with no suite selection, ArtCraft in Dark.
-    let fresh: Store = Arc::default();
-    let mut app = app_on(&fresh);
+    // Fresh install with the shared suite folder: follows the suite; with no suite selection,
+    // ArtCraft in Dark.
+    let folder = tempfile::tempdir().unwrap();
+    let mut app = app_on_dir(&Arc::default(), folder.path());
+    assert!(app.suite.is_shared());
     assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::FollowSuite);
     let ctx = egui::Context::default();
     frame(&mut app, &ctx, Some(egui::Theme::Light));
     let (l, d) = slots(&ctx);
     assert_core(&l, artcraft.variant(Variant::Dark).unwrap(), "fresh light slot");
     assert_core(&d, artcraft.variant(Variant::Dark).unwrap(), "fresh dark slot");
+    drop(app);
+    // Fresh install with the suite in memory (portable, web): ArtCraft in Dark as its own choice.
+    let mut app = app_on(&Arc::default());
+    assert!(!app.suite.is_shared());
+    let own = AppChoice::Own(craft_theme::Selection { theme: ThemeId::suite_default(), mode: Mode::Dark });
+    assert_eq!(app.session.prefs().interface.app_choice(), own);
+    let ctx = egui::Context::default();
+    frame(&mut app, &ctx, Some(egui::Theme::Light));
+    let (l, d) = slots(&ctx);
+    assert_core(&l, artcraft.variant(Variant::Dark).unwrap(), "fresh light slot, in memory");
+    assert_core(&d, artcraft.variant(Variant::Dark).unwrap(), "fresh dark slot, in memory");
     // A preferences file from before suite themes: PhotoCraft's own themes in its saved mode.
     for (mode, expected, pair) in [
         ("auto", Mode::System, (ThemeKind::Classic, ThemeKind::Studio)),

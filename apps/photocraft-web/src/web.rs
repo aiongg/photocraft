@@ -94,7 +94,6 @@ pub fn start() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
                     listen_pen(&pen_target, app.stylus.feed.clone());
-                    app.set_theme(&cc.egui_ctx, ThemeKind::Pro);
                     if let Some(rs) = cc.wgpu_render_state.clone()
                         && !force_cpu
                     {

@@ -41,10 +41,20 @@ pub fn load(app: &mut PhotocraftApp) {
             }
         }
     }
-    // A fresh install (a preferences store with nothing in it) follows the suite theme. A saved
-    // file without `suiteAppearance` keeps PhotoCraft's own themes (`Interface::app_choice`).
+    // A fresh install (a preferences store with nothing in it) follows the suite theme where the
+    // shell shares the suite folder. Without it (portable, override folder, web) there is no
+    // suite to follow, so it starts on ArtCraft in Dark as its own choice. A saved file without
+    // `suiteAppearance` keeps PhotoCraft's own themes (`Interface::app_choice`).
     if let Some(None) = text {
-        app.session.prefs.edit(|p| p.interface.suite_appearance = Some(prefs::SuiteAppearance::follow_suite()));
+        let shared = app.services.suite_watch.is_some();
+        app.session.prefs.edit(|p| {
+            p.interface.suite_appearance = Some(if shared {
+                prefs::SuiteAppearance::follow_suite()
+            } else {
+                p.interface.appearance_mode = prefs::AppearanceMode::Dark;
+                prefs::SuiteAppearance { theme_id: craft_theme::ThemeId::suite_default(), ..Default::default() }
+            })
+        });
     }
     let last = app.session.prefs().interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
     app.suite = crate::theme::suite::Suite::open(app.services.suite_watch.take(), last);

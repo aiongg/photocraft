@@ -39,6 +39,7 @@ struct Key {
 pub struct Suite {
     client: SuiteClient,
     cache: Option<(Key, (Tokens, Tokens))>,
+    shared: bool,
 }
 
 impl Default for Suite {
@@ -48,17 +49,31 @@ impl Default for Suite {
 }
 
 impl Suite {
+    /// A suite only this app sees (in memory): there is nothing to follow, so the per-app
+    /// choice is the only one.
     pub fn new(watch: SuiteWatch) -> Self {
-        Suite { client: SuiteClient::new(watch), cache: None }
+        Suite { client: SuiteClient::new(watch), cache: None, shared: false }
     }
 
-    /// Opens the watcher with `open`, or in memory without one (tests, agents, the web build).
+    /// The suite folder the other Craft apps use, opened by the shell.
+    pub fn shared(watch: SuiteWatch) -> Self {
+        Suite { shared: true, ..Suite::new(watch) }
+    }
+
+    /// Opens the watcher with `open` (the shared folder), or in memory without one (tests,
+    /// agents, portable installs, the web build).
     pub fn open(open: Option<OpenWatchFn>, last: Accepted) -> Self {
         let options = store_options(last);
-        Suite::new(match open {
-            Some(open) => open(options),
-            None => SuiteWatch::open(&craft_theme_store::SuiteDir::memory(), options, || {}),
-        })
+        match open {
+            Some(open) => Suite::shared(open(options)),
+            None => Suite::new(SuiteWatch::open(&craft_theme_store::SuiteDir::memory(), options, || {})),
+        }
+    }
+
+    /// Whether the suite selection is shared with the other Craft apps (the desktop shell with
+    /// the per-user settings folder). Otherwise it is in memory and "Follow suite" is hidden.
+    pub fn is_shared(&self) -> bool {
+        self.shared
     }
 
     pub fn client(&self) -> &SuiteClient {

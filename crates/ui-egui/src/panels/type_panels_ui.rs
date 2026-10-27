@@ -683,6 +683,7 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let cols = ((width / size).floor() as usize).max(1);
     let rows = chars.len().div_ceil(cols);
     let selected = app.ui.type_panels.glyph_selected.clone();
+    let (selected_fill, selected_ink) = t.selected_fill();
     egui::ScrollArea::vertical().id_salt("glyph-grid").max_height(260.0).auto_shrink([false, false]).show_rows(ui, size, rows, |ui, range| {
         for row in range {
             let (rect, _) = ui.allocate_exact_size(vec2(width, size), Sense::hover());
@@ -693,12 +694,12 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let is_sel = selected.as_deref().and_then(|s| s.chars().next()) == Some(c);
                 ui.painter().rect_stroke(cell, 0.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Inside);
                 if is_sel {
-                    ui.painter().rect_filled(cell.shrink(1.0), 0.0, t.accent);
+                    ui.painter().rect_filled(cell.shrink(1.0), 0.0, selected_fill);
                 } else if resp.hovered() {
                     ui.painter().rect_filled(cell.shrink(1.0), 0.0, t.hover);
                 }
                 let tex = glyph_texture(&ctx, &family, &style, c, px);
-                let tint = if is_sel { t.accent_ink() } else { t.text };
+                let tint = if is_sel { selected_ink } else { t.text };
                 ui.painter().image(tex.id(), cell.shrink(3.0), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), tint);
                 let resp = resp.on_hover_text(format!("U+{:04X}", c as u32));
                 if resp.double_clicked() {

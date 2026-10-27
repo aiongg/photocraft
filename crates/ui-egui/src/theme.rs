@@ -895,6 +895,12 @@ impl Tokens {
     pub fn is_own_palette(&self) -> bool {
         *self == Tokens::for_kind(self.kind)
     }
+
+    /// A selected cell or row's fill and the ink on it. A suite theme's selection colour is a
+    /// surface-like fill under the normal text; PhotoCraft's own palettes select with the accent.
+    pub fn selected_fill(&self) -> (Color32, Color32) {
+        if self.is_own_palette() { (self.accent, self.accent_ink()) } else { (self.row_selected, self.text) }
+    }
 }
 
 /// Register Inter (UI) and JetBrains Mono (numbers) plus named weights.
@@ -1127,11 +1133,14 @@ fn style_for(t: &Tokens, mut s: egui::Style) -> egui::Style {
     v.menu_corner_radius = CornerRadius::same(t.radius as u8);
     v.window_shadow = egui::Shadow { offset: [0, 10], blur: 32, spread: 0, color: t.shadow };
     v.popup_shadow = egui::Shadow { offset: [0, 6], blur: 20, spread: 0, color: t.shadow };
-    v.selection.bg_fill = if t.bevel || t.pro { t.accent } else { t.accent_soft };
-    // A suite theme's accent_text is readable on surfaces, not on the accent fill; there its ink
-    // is on_accent. PhotoCraft's own palettes keep the selection colours they always had.
-    let selection_ink = if (t.bevel || t.pro) && !t.is_own_palette() { t.accent_ink() } else { t.accent_text };
-    v.selection.stroke = Stroke::new(1.0, selection_ink);
+    // A suite theme selects with its selection colour under the normal text (selected_fill).
+    // PhotoCraft's own palettes keep the selection colours they always had.
+    (v.selection.bg_fill, v.selection.stroke) = if t.is_own_palette() {
+        (if t.bevel || t.pro { t.accent } else { t.accent_soft }, Stroke::new(1.0, t.accent_text))
+    } else {
+        let (fill, ink) = t.selected_fill();
+        (fill, Stroke::new(1.0, ink))
+    };
     v.slider_trailing_fill = true;
     v.handle_shape = egui::style::HandleShape::Circle;
     v.striped = false;
