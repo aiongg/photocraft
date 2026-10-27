@@ -33,6 +33,11 @@ pub struct Runtime {
     /// This instance's preferences as of `saved_rev`: the base of the three-way merge on save.
     saved_value: Option<Value>,
     save_retry: SaveRetry,
+    /// Why the stored preferences couldn't be read at load. While set, nothing is written: this
+    /// session runs on defaults, and a write would replace the user's file with them.
+    unreadable: Option<String>,
+    /// The status line has said that changes aren't saved.
+    unreadable_reported: bool,
     next_autosave_ms: f64,
     /// Last revision whose recovery file was actually written successfully.
     autosaved: HashMap<DocId, u64>,
@@ -74,8 +79,8 @@ mod startup;
 #[cfg(test)]
 use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
 pub(crate) use appearance::{
-    appearance_context_menu, choose_suite_appearance, cycle_appearance, effective_selection, inspect_appearance, set_scope_mode, step_brightness,
-    sync_appearance,
+    FOLLOW_WITHOUT_SUITE, app_choice, appearance_context_menu, choose_suite_appearance, cycle_appearance, effective_selection, inspect_appearance,
+    refuse_follow_without_suite, set_scope_mode, step_brightness, sync_appearance,
 };
 pub use appearance::{canvas_style, pasteboard_color};
 pub use dialogs::{

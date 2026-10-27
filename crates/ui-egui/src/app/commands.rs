@@ -3,6 +3,9 @@ use super::*;
 impl PhotocraftApp {
     /// Run an engine command, reporting errors in the status bar.
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        if id == "prefs.set" {
+            crate::prefs_ui::refuse_follow_without_suite(self, &params)?;
+        }
         if let Some(result) = delete_layer_prompt::intercept(self, id, &params) {
             return result;
         }

@@ -352,15 +352,23 @@ impl AppearanceMode {
 }
 
 impl Interface {
-    /// PhotoCraft's appearance choice in suite terms. Without `suiteAppearance` it is
-    /// `Own(craft.app-default, appearanceMode)`, so saved looks stay as they were.
+    /// PhotoCraft's saved appearance choice in suite terms. Without `suiteAppearance` it is
+    /// `Own(craft.app-default, appearanceMode)`, so saved looks stay as they were. Following the
+    /// suite applies only where the shell shares the suite folder (`photocraft-ui-egui`'s
+    /// `app_choice`).
     pub fn app_choice(&self) -> craft_theme::AppChoice {
         match &self.suite_appearance {
             Some(s) if s.follow_suite => craft_theme::AppChoice::FollowSuite,
-            s => craft_theme::AppChoice::Own(craft_theme::Selection {
-                theme: s.as_ref().map_or_else(craft_theme::ThemeId::app_default, |s| s.theme_id.clone()),
-                mode: self.appearance_mode.suite_mode(),
-            }),
+            _ => craft_theme::AppChoice::Own(self.own_selection()),
+        }
+    }
+
+    /// PhotoCraft's own theme and mode ("Use a different theme in this app"), whether or not
+    /// it follows the suite.
+    pub fn own_selection(&self) -> craft_theme::Selection {
+        craft_theme::Selection {
+            theme: self.suite_appearance.as_ref().map_or_else(craft_theme::ThemeId::app_default, |s| s.theme_id.clone()),
+            mode: self.appearance_mode.suite_mode(),
         }
     }
 

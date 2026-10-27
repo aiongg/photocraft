@@ -64,6 +64,15 @@ pub(super) fn persist(app: &mut PhotocraftApp, now: f64) -> Option<f64> {
     if rev == app.prefs_rt.saved_rev {
         return None;
     }
+    if let Some(e) = &app.prefs_rt.unreadable {
+        if !app.prefs_rt.unreadable_reported {
+            let template = "Preference changes aren't saved: the preferences file couldn't be read ({error})";
+            app.ui.status = crate::i18n::fmt(tl!(template), &[("error", e)]);
+            app.ui.status_error = true;
+            app.prefs_rt.unreadable_reported = true;
+        }
+        return None;
+    }
     let r = &app.prefs_rt.save_retry;
     if r.failures > 0 {
         let due = if rev == r.tried_rev { r.at } else { r.at.min(r.tried_at + SAVE_RETRY_S) };
@@ -113,6 +122,9 @@ pub(super) fn persist(app: &mut PhotocraftApp, now: f64) -> Option<f64> {
 /// Write `ours` over the stored preferences, keeping what another instance (a second browser
 /// tab, another app window) changed there since this one last loaded or saved them.
 fn write_prefs(app: &mut PhotocraftApp, ours: &Value) -> Result<(), String> {
+    if let Some(e) = &app.prefs_rt.unreadable {
+        return Err(crate::i18n::fmt(tl!("the preferences file couldn't be read ({error})"), &[("error", e)]));
+    }
     let Some(save) = app.services.save_prefs.as_mut() else { return Ok(()) };
     let stored = app.services.load_prefs.as_mut().and_then(|load| load().ok().flatten()).and_then(|t| serde_json::from_str::<Value>(&t).ok());
     let text = match (stored, &app.prefs_rt.saved_value) {

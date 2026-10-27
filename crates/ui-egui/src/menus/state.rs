@@ -121,7 +121,7 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     }
     use photocraft_doc::{ColorMode, SampleType};
     if id == FOLLOW_SUITE_ITEM {
-        return Some(app.session.prefs().interface.app_choice() == craft_theme::AppChoice::FollowSuite);
+        return Some(crate::prefs_ui::app_choice(app) == craft_theme::AppChoice::FollowSuite);
     }
     if let Some(theme) = suite_theme_item(id) {
         return Some(crate::prefs_ui::effective_selection(app).theme == theme);

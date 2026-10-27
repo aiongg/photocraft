@@ -66,7 +66,7 @@ fn the_sample_theme_and_every_built_in_give_their_core_colours_in_both_slots() {
     let watch = SuiteWatch::memory();
     watch.request(Op::Import { bytes: Arc::from(SAMPLE_THEME_JSON.as_bytes()), as_copy: false });
     let mut app = app_on(&saved(json!({"interface": {"suiteAppearance": {"followSuite": true}}})));
-    app.suite = Suite::new(watch);
+    app.suite = Suite::shared(watch);
     app.suite.change(SelectionChange::mode(Mode::System));
     let ctx = egui::Context::default();
     frame(&mut app, &ctx, Some(egui::Theme::Dark));
@@ -138,6 +138,20 @@ fn saved_preferences_keep_their_look_and_a_fresh_install_starts_on_artcraft() {
     // `suiteAppearance` present: used as saved.
     let app = app_on(&saved(json!({"interface": {"suiteAppearance": {"followSuite": true}}})));
     assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::FollowSuite);
+    // In memory (a portable install with a copied desktop file) there is no suite to follow:
+    // PhotoCraft's own choice applies, as Preferences shows it.
+    assert!(!app.suite.is_shared());
+    assert_eq!(crate::prefs_ui::app_choice(&app), AppChoice::Own(app.session.prefs().interface.own_selection()));
+    // `prefs.set` can't turn following on there, in any of its forms.
+    let mut fresh = app_on(&Arc::default());
+    for params in [
+        json!({"path": "interface.suiteAppearance", "value": {"followSuite": true}}),
+        json!({"path": "", "value": {"interface": {"suiteAppearance": {"followSuite": true}}}}),
+        json!({"values": {"interface.suiteAppearance.followSuite": true}}),
+    ] {
+        assert_eq!(fresh.run("prefs.set", params.clone()).unwrap_err(), crate::prefs_ui::FOLLOW_WITHOUT_SUITE, "{params}");
+    }
+    assert!(fresh.run("prefs.set", json!({"path": "interface.suiteAppearance", "value": {"followSuite": false}})).is_ok());
     let mut app = app_on(&saved(json!({"interface": {"appearanceMode": "light", "suiteAppearance": {"followSuite": false, "themeId": "craft.graphite"}}})));
     let ctx = egui::Context::default();
     frame(&mut app, &ctx, Some(egui::Theme::Dark));
@@ -150,6 +164,9 @@ fn unreadable_preferences_keep_photocraft_s_own_themes_and_are_not_overwritten()
     let written: Store = Arc::default();
     let w = written.clone();
     let folder = tempfile::tempdir().unwrap();
+    // Another Craft app has chosen a suite theme, which this one would otherwise keep as lastSuite.
+    let mut other = craft_theme_store::Store::open(&craft_theme_store::SuiteDir::at(folder.path()), craft_theme_store::StoreOptions::new("other app"));
+    other.update(&craft_theme_store::Accepted::default(), SelectionChange::theme(id("craft.graphite"))).unwrap();
     let dir = craft_theme_store::SuiteDir::at(folder.path());
     let services = crate::Services {
         load_prefs: Some(Box::new(|| Err("permission denied".into()))),
@@ -162,17 +179,34 @@ fn unreadable_preferences_keep_photocraft_s_own_themes_and_are_not_overwritten()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     let ctx = egui::Context::default();
-    frame(&mut app, &ctx, Some(egui::Theme::Dark));
-    frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    wait_for(&mut app, &ctx, "the other app's selection", |app| suite_theme_is(app, "craft.graphite"));
+    for _ in 0..3 {
+        frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    }
     assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::Own(craft_theme::Selection { theme: ThemeId::app_default(), mode: Mode::Dark }));
     assert!(app.ui.status.contains("permission denied"), "{}", app.ui.status);
+    // A setting changed by the user is kept for this session only.
+    app.run("prefs.set", json!({"path": "general.animatedZoom", "value": false})).unwrap();
+    for _ in 0..3 {
+        frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    }
+    assert!(app.ui.status.contains("aren't saved"), "{}", app.ui.status);
+    assert!(crate::prefs_ui::save_preferences(&mut app).is_err());
     assert_eq!(*written.lock().unwrap(), None, "the unreadable file is left alone");
+}
+
+#[test]
+fn photocraft_s_own_palettes_draw_white_on_accent_fills() {
+    for kind in ThemeKind::ALL {
+        assert_eq!(Tokens::for_kind(kind).accent_ink(), egui::Color32::WHITE, "{kind:?}");
+    }
 }
 
 #[test]
 fn picking_a_photocraft_theme_leaves_the_suite_theme() {
     let ctx = egui::Context::default();
-    let mut app = app_on(&Arc::default());
+    let folder = tempfile::tempdir().unwrap();
+    let mut app = app_on_dir(&Arc::default(), folder.path());
     let follow = |app: &mut PhotocraftApp| crate::prefs_ui::choose_suite_appearance(app, &ctx, Some(true), Some(id("craft.graphite")));
     follow(&mut app);
     assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::FollowSuite);

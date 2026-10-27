@@ -292,7 +292,7 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             Ok(Value::Null)
         }
         crate::menus::FOLLOW_SUITE_ITEM => {
-            let following = app.session.prefs().interface.app_choice() == craft_theme::AppChoice::FollowSuite;
+            let following = crate::prefs_ui::app_choice(app) == craft_theme::AppChoice::FollowSuite;
             crate::prefs_ui::choose_suite_appearance(app, ctx, Some(!following), None);
             Ok(Value::Null)
         }

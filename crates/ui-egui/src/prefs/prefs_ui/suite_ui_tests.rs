@@ -4,7 +4,9 @@
 use super::*;
 use craft_theme::{AppChoice, Mode, Selection, ThemeId};
 use craft_theme_store::{Op, SelectionChange, SuiteWatch};
-use egui_kittest::{Harness, kittest::Queryable};
+use egui::accesskit::Role;
+use egui_kittest::Harness;
+use egui_kittest::kittest::{NodeT, Queryable};
 use std::sync::{Arc, Mutex};
 
 type Store = Arc<Mutex<Option<String>>>;
@@ -163,7 +165,7 @@ fn a_low_contrast_library_theme_shows_its_warning_and_keeps_its_colours() {
     assert!(h.query_by_label_contains("has low contrast").is_none(), "only for the chosen theme");
     h.get_by_label("Murky").click();
     h.run_steps(2);
-    assert!(h.query_by_label_contains("Murky has low contrast: text on").is_some());
+    assert!(h.query_by_label_contains("Murky has low contrast: Text on").is_some());
     h.get_by_label("OK").click();
     h.run_steps(4);
     assert_eq!(h.state().session.prefs().interface.app_choice(), own("test.murky", Mode::Dark));
@@ -229,4 +231,94 @@ fn window_theme_lists_the_suite_themes_and_hides_follow_suite_in_memory() {
     let after = crate::menus::native_menu::structure_key(&crate::menus::native_menu::from_items(&crate::menus::TOP_MENUS, &crate::menus::menu_items(&shared)));
     assert!(ids(&shared).iter().any(|i| i == "window.theme.suite.test.murky"));
     assert_ne!(before, after);
+}
+
+/// Opens the Appearance Mode dropdown showing `shown` and steps it to the next mode with ↓.
+fn next_mode_in_dropdown(h: &mut Harness<'_, PhotocraftApp>, shown: &str) {
+    let named = |n: &egui_kittest::Node<'_>| {
+        let a = n.accesskit_node();
+        a.value().as_deref() == Some(shown) || a.label().as_deref() == Some(shown)
+    };
+    h.query_all_by_role(Role::ComboBox).find(|n| named(n)).expect("the Appearance Mode dropdown").click();
+    h.run_steps(2);
+    h.key_press(egui::Key::ArrowDown);
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+}
+
+fn preferences_fields(h: &Harness<'_, PhotocraftApp>) -> Map<String, Value> {
+    h.state().ui.dialogs.iter().find(|d| is_preferences(&d.fields)).map(|d| d.fields.clone()).expect("Preferences is open")
+}
+
+#[test]
+fn the_mode_row_sets_the_suite_mode_while_following() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut h = harness(app(Some(folder.path())));
+    let before = h.state().session.prefs().interface.appearance_mode;
+    next_mode_in_dropdown(&mut h, "Dark");
+    assert_eq!(h.state().suite.shown().mode, Some(Mode::Light), "the suite's mode, at once");
+    assert_eq!(h.state().session.prefs().interface.appearance_mode, before);
+    h.get_by_label("OK").click();
+    h.run_steps(2);
+    assert_eq!(h.state().session.prefs().interface.appearance_mode, before, "not appearanceMode");
+    assert_eq!(effective_selection(h.state()).mode, Mode::Light);
+}
+
+#[test]
+fn while_only_the_draft_follows_the_suite_its_picks_wait_for_ok() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut app = app(Some(folder.path()));
+    choose_suite_appearance(&mut app, &egui::Context::default(), Some(false), None);
+    let mut h = harness(app);
+    let suite = |h: &Harness<'_, PhotocraftApp>| h.state().suite.shown();
+    // The other apps keep the suite as it is until OK, and after Cancel.
+    h.get_by_label("Follow suite").click();
+    h.run_steps(2);
+    h.get_by_label("Graphite").click();
+    h.run_steps(2);
+    next_mode_in_dropdown(&mut h, "Dark");
+    assert_eq!(suite(&h), Default::default());
+    assert_eq!(h.get_by_label("Graphite").accesskit_node().toggled(), Some(egui::accesskit::Toggled::True), "the card shows the pick");
+    h.get_by_label("Cancel").click();
+    h.run_steps(2);
+    assert_eq!(suite(&h), Default::default());
+    assert_ne!(app_choice(h.state()), AppChoice::FollowSuite);
+    // OK: PhotoCraft follows the suite, and the picks go to it.
+    open_preferences(h.state_mut(), "interface");
+    h.run_steps(4);
+    h.get_by_label("Follow suite").click();
+    h.run_steps(2);
+    h.get_by_label("Graphite").click();
+    h.run_steps(2);
+    next_mode_in_dropdown(&mut h, "Dark");
+    h.get_by_label("OK").click();
+    h.run_steps(2);
+    assert_eq!(app_choice(h.state()), AppChoice::FollowSuite);
+    assert_eq!((suite_theme(h.state()), suite(&h).mode), (Some(id("craft.graphite")), Some(Mode::Light)));
+    wait_for(&mut h, "the suite selection written", |app| !app.suite.client().is_pending());
+    assert_eq!(h.state().suite.accepted().suite.theme, Some(id("craft.graphite")));
+}
+
+/// Window › Theme, the mode cycle and `ui.set` change the appearance while Preferences is open:
+/// its draft takes their values, so Apply stays off and OK writes nothing stale over them.
+#[test]
+fn appearance_changes_made_while_preferences_is_open_are_not_written_back_stale() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut h = harness(app(Some(folder.path())));
+    let ctx = h.ctx.clone();
+    choose_suite_appearance(h.state_mut(), &ctx, Some(false), Some(id("craft.graphite")));
+    h.run_steps(2);
+    crate::menus::invoke(h.state_mut(), &ctx, "window.theme.studio", json!({})).unwrap();
+    cycle_appearance(h.state_mut(), &ctx);
+    h.run_steps(2);
+    assert!(!preferences_changed(h.state(), &preferences_fields(&h)), "Apply stays off");
+    wait_for(&mut h, "the suite settled", |app| !app.suite.client().is_pending());
+    h.run_steps(2);
+    let before = h.state().session.prefs().to_json()["interface"].clone();
+    assert!(matches!(h.state().session.prefs().interface.app_choice(), AppChoice::Own(sel) if sel.theme.is_app_default() && sel.mode == Mode::System));
+    assert_eq!(h.state().session.prefs().interface.theme, Theme::Studio);
+    h.get_by_label("OK").click();
+    h.run_steps(2);
+    assert_eq!(h.state().session.prefs().to_json()["interface"], before);
 }

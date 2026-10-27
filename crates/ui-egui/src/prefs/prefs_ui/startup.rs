@@ -31,9 +31,11 @@ pub fn load(app: &mut PhotocraftApp) {
     let text = app.services.load_prefs.as_mut().map(|f| f());
     if let Some(Err(e)) = &text {
         // Saved preferences that can't be read are not a fresh install: the defaults show (with
-        // PhotoCraft's own themes) and nothing is written until the user changes a setting.
+        // PhotoCraft's own themes) and this session writes nothing over the file (`write_prefs`).
         let template = "Preferences couldn't be read: {error}";
         app.ui.status = crate::i18n::fmt(tl!(template), &[("error", e)]);
+        app.ui.status_error = true;
+        app.prefs_rt.unreadable = Some(e.clone());
     }
     if let Some(Ok(Some(text))) = &text {
         match app.session.load_prefs_json(text) {
@@ -51,8 +53,8 @@ pub fn load(app: &mut PhotocraftApp) {
     // shell shares the suite folder. Without it (portable, override folder, web) there is no
     // suite to follow, so it starts on ArtCraft in Dark as its own choice. A saved file without
     // `suiteAppearance` keeps PhotoCraft's own themes (`Interface::app_choice`).
+    let shared = app.services.suite_watch.is_some();
     if let Some(Ok(None)) = text {
-        let shared = app.services.suite_watch.is_some();
         app.session.prefs.edit(|p| {
             p.interface.suite_appearance = Some(if shared {
                 prefs::SuiteAppearance::follow_suite()
@@ -65,8 +67,8 @@ pub fn load(app: &mut PhotocraftApp) {
     let interface = &app.session.prefs().interface;
     let last = interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
     let own = match interface.app_choice() {
-        craft_theme::AppChoice::Own(sel) => Some(sel.theme),
-        craft_theme::AppChoice::FollowSuite => None,
+        craft_theme::AppChoice::FollowSuite if shared => None,
+        _ => Some(interface.own_selection().theme),
     };
     app.suite = crate::theme::suite::Suite::open(app.services.suite_watch.take(), last, own);
     crate::dock::restore(app);

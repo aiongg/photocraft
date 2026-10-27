@@ -450,9 +450,12 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
         inbox: Some(inbox),
         place_inbox: Some(place_inbox),
         cursor_pos: Some(cursor_pos),
-        // Preferences live in the browser's localStorage.
-        load_prefs: Some(Box::new(|| {
-            local_storage().ok_or("browser storage is unavailable")?.get_item(PREFS_KEY).map_err(|_| "browser storage can't be read".to_string())
+        // Preferences live in the browser's localStorage. Blocked or missing storage holds nothing
+        // to overwrite, so it starts like a fresh install; a key that exists but can't be read is
+        // an error.
+        load_prefs: Some(Box::new(|| match local_storage() {
+            Some(storage) => storage.get_item(PREFS_KEY).map_err(|_| "browser storage can't be read".to_string()),
+            None => Ok(None),
         })),
         save_prefs: Some(Box::new(|text: &str| local_storage().ok_or("no localStorage")?.set_item(PREFS_KEY, text).map_err(|e| format!("{e:?}")))),
         ..Default::default()

@@ -259,7 +259,7 @@ pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &Contr
                 };
                 let follow_suite = bool_field(p, "followSuite")?;
                 if follow_suite == Some(true) && !app.suite.is_shared() {
-                    return Err("followSuite: the Craft suite's theme isn't shared here (portable or web); pick a themeId for PhotoCraft".into());
+                    return Err(crate::prefs_ui::FOLLOW_WITHOUT_SUITE.into());
                 }
                 let theme_id = match p.get("themeId") {
                     Some(v) => {

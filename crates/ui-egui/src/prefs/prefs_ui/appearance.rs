@@ -2,7 +2,7 @@ use super::dialogs::open_preferences;
 use super::fields::{choice_label, color_of, preference_matches};
 use super::*;
 use craft_theme::{Mode, ThemeId};
-use craft_theme_store::SelectionChange;
+use craft_theme_store::{SelectionChange, SuiteChoice};
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
@@ -98,7 +98,7 @@ pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// Sets the appearance mode of the choice that applies: the suite's while following it (shared
 /// with the other Craft apps), otherwise PhotoCraft's own (`appearanceMode`).
 pub(crate) fn set_scope_mode(app: &mut PhotocraftApp, ctx: &egui::Context, mode: craft_theme::Mode) -> Result<(), String> {
-    if app.session.prefs().interface.app_choice() == craft_theme::AppChoice::FollowSuite {
+    if app_choice(app) == craft_theme::AppChoice::FollowSuite {
         app.suite.change(SelectionChange::mode(mode));
     } else {
         app.run("prefs.set", json!({"path": "interface.appearanceMode", "value": mode_name(mode)}))?;
@@ -256,7 +256,7 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     app.suite.sync();
     remember_last_suite(app);
     let interface = &app.session.prefs().interface;
-    let slots = app.suite.slots(&interface.app_choice(), own_themes(interface));
+    let slots = app.suite.slots(&choice_where(interface, app.suite.is_shared()), own_themes(interface));
     if crate::theme::installed_tokens(ctx) != Some(slots) {
         crate::theme::install_tokens(ctx, slots.0, slots.1);
         app.checker = None;
@@ -296,7 +296,7 @@ pub(crate) fn choose_suite_appearance(app: &mut PhotocraftApp, ctx: &egui::Conte
 /// that applies, PhotoCraft's own choice and the suite's.
 pub(crate) fn inspect_appearance(app: &PhotocraftApp) -> Value {
     let interface = &app.session.prefs().interface;
-    let choice = interface.app_choice();
+    let choice = choice_where(interface, app.suite.is_shared());
     let effective = app.suite.effective(&choice);
     let own = match &choice {
         craft_theme::AppChoice::Own(sel) => sel.theme.clone(),
@@ -322,7 +322,49 @@ pub(crate) fn inspect_appearance(app: &PhotocraftApp) -> Value {
 
 /// The theme and mode that apply now: PhotoCraft's own choice, or the suite's while following it.
 pub(crate) fn effective_selection(app: &PhotocraftApp) -> craft_theme::Selection {
-    app.suite.effective(&app.session.prefs().interface.app_choice())
+    app.suite.effective(&app_choice(app))
+}
+
+/// PhotoCraft's appearance choice as it applies here: the saved one, except that following the
+/// suite needs a shared suite folder. Without one (a portable install with a copied desktop
+/// file, `prefs.set`) the saved `followSuite` is ignored and PhotoCraft's own choice applies,
+/// as Preferences shows it.
+pub(crate) fn app_choice(app: &PhotocraftApp) -> craft_theme::AppChoice {
+    choice_where(&app.session.prefs().interface, app.suite.is_shared())
+}
+
+fn choice_where(interface: &prefs::Interface, shared: bool) -> craft_theme::AppChoice {
+    match interface.app_choice() {
+        craft_theme::AppChoice::FollowSuite if !shared => craft_theme::AppChoice::Own(interface.own_selection()),
+        choice => choice,
+    }
+}
+
+/// The error for turning on `followSuite` where the suite isn't shared (`ui.set`, `prefs.set`).
+pub(crate) const FOLLOW_WITHOUT_SUITE: &str = "followSuite: the Craft suite's theme isn't shared here (portable or web); pick a themeId for PhotoCraft";
+
+/// `prefs.set` may not turn on `followSuite` where the suite isn't shared: Preferences hides the
+/// choice there, and it would not apply. A value already saved (a copied file) may stay.
+pub(crate) fn refuse_follow_without_suite(app: &PhotocraftApp, params: &Value) -> Result<(), String> {
+    const KEY: [&str; 3] = ["interface", "suiteAppearance", "followSuite"];
+    let following = app.session.prefs().interface.suite_appearance.as_ref().is_some_and(|s| s.follow_suite);
+    if app.suite.is_shared() || following {
+        return Ok(());
+    }
+    let mut changes: Vec<(&str, &Value)> = Vec::new();
+    if let (Some(path), Some(value)) = (params.get("path").and_then(Value::as_str), params.get("value")) {
+        changes.push((path, value));
+    }
+    if let Some(values) = params.get("values").and_then(Value::as_object) {
+        changes.extend(values.iter().map(|(k, v)| (k.as_str(), v)));
+    }
+    let turns_on = changes.into_iter().any(|(path, value)| {
+        let keys: Vec<&str> = path.split('.').filter(|k| !k.is_empty()).collect();
+        keys.len() <= KEY.len()
+            && keys.iter().zip(KEY).all(|(a, b)| *a == b)
+            && KEY[keys.len()..].iter().try_fold(value, |v, k| v.get(*k)) == Some(&Value::Bool(true))
+    });
+    if turns_on { Err(FOLLOW_WITHOUT_SUITE.into()) } else { Ok(()) }
 }
 
 /// One of PhotoCraft's own themes is on screen (`craft.app-default`), not a suite theme on its
@@ -334,6 +376,10 @@ pub(crate) fn own_themes_shown(app: &PhotocraftApp) -> bool {
 /// Keep the suite selection PhotoCraft last saw in its preferences (`lastSuite`), so a damaged
 /// or unreadable suite folder at the next start still shows the same look.
 fn remember_last_suite(app: &mut PhotocraftApp) {
+    // Unreadable preferences are never written, so there is nothing to keep it in.
+    if app.prefs_rt.unreadable.is_some() {
+        return;
+    }
     let accepted = app.suite.accepted();
     let saved = app.session.prefs().interface.suite_appearance.as_ref().map(|s| &s.last_suite);
     if saved.unwrap_or(&Default::default()) == accepted {
@@ -437,12 +483,18 @@ impl AppearanceRows {
 
 /// What Preferences › Interface shows of the suite, read from the app before the dialog draws
 /// (its rows edit only the draft), and the suite changes clicked while it drew. Those are shared
-/// with the other Craft apps, so they apply at once, not on OK, and Cancel keeps them.
+/// with the other Craft apps: while PhotoCraft follows the suite they apply at once, not on OK,
+/// and Cancel keeps them. While only the draft follows it, they wait in the draft
+/// ([`SUITE_PENDING`]) and apply on OK or Apply, so Cancel leaves the other apps alone.
 pub(super) struct SuiteRows {
     /// The OS appearance answer.
     pub(super) system: Option<egui::Theme>,
     /// The suite folder is shared (otherwise in memory, and "Follow suite" is hidden).
     shared: bool,
+    /// PhotoCraft follows the suite now (not only in the draft).
+    live_follows: bool,
+    /// Suite picks held in the draft until OK or Apply.
+    pending: SuiteChoice,
     cards: Vec<ThemeCard>,
     /// The suite's selection as shown, with PhotoCraft's defaults filled in.
     suite: craft_theme::Selection,
@@ -457,6 +509,8 @@ impl Default for SuiteRows {
         SuiteRows {
             system: None,
             shared: false,
+            live_follows: false,
+            pending: SuiteChoice::default(),
             cards: Vec::new(),
             suite: craft_theme::Selection { theme: defaults.theme, mode: defaults.mode },
             notices: Vec::new(),
@@ -485,8 +539,13 @@ pub(super) enum SuiteClick {
 /// Store problems listed under the theme cards before the rest are counted.
 const PROBLEMS_SHOWN: usize = 3;
 
-/// Reads the suite for the Appearance rows.
-pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>) -> SuiteRows {
+/// Where the Preferences dialog holds suite picks made while only its draft follows the suite.
+pub(super) const SUITE_PENDING: &str = "__suitePending";
+
+/// Reads the suite for the Appearance rows; `pending` is the dialog's [`SUITE_PENDING`].
+pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>, pending: Option<&Value>) -> SuiteRows {
+    let live_follows = app_choice(app) == craft_theme::AppChoice::FollowSuite;
+    let pending = pending.cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
     app.suite.read_previews();
     let suite = &app.suite;
     let cards = suite
@@ -520,11 +579,17 @@ pub(super) fn suite_rows(app: &mut PhotocraftApp, system: Option<egui::Theme>) -
         notices.push((crate::i18n::fmt(tl!("and {n} more"), &[("n", &more)]), Vec::new()));
     }
     let shown = suite.shown().with_defaults(&crate::theme::suite::app_defaults());
-    SuiteRows { system, shared: suite.is_shared(), cards, suite: shown, notices, clicked: Vec::new() }
+    SuiteRows { system, shared: suite.is_shared(), live_follows, pending, cards, suite: shown, notices, clicked: Vec::new() }
 }
 
-/// Applies what was clicked in the suite rows to the suite.
-pub(super) fn apply_suite_clicks(app: &mut PhotocraftApp, ctx: &egui::Context, rows: SuiteRows) {
+/// Applies what was clicked in the suite rows to the suite, and keeps the picks held for OK in
+/// the dialog's fields `f`.
+pub(super) fn apply_suite_clicks(app: &mut PhotocraftApp, ctx: &egui::Context, rows: SuiteRows, f: &mut Map<String, Value>) {
+    if rows.pending.is_empty() {
+        f.remove(SUITE_PENDING);
+    } else {
+        f.insert(SUITE_PENDING.into(), serde_json::to_value(&rows.pending).unwrap_or_default());
+    }
     if rows.clicked.is_empty() {
         return;
     }
@@ -539,31 +604,54 @@ pub(super) fn apply_suite_clicks(app: &mut PhotocraftApp, ctx: &egui::Context, r
     sync_appearance(app, ctx);
 }
 
-/// Where the Preferences dialog keeps `suiteAppearance` as it was when the draft last took it.
-pub(super) const SUITE_DRAFT_BASE: &str = "__suiteAppearance";
+/// OK or Apply in Preferences: the suite picks held in the draft (`pending`, the dialog's
+/// [`SUITE_PENDING`]) go to the suite once PhotoCraft follows it.
+pub(super) fn apply_suite_pending(app: &mut PhotocraftApp, pending: Option<&Value>) {
+    let Some(pending) = pending.cloned().and_then(|v| serde_json::from_value::<SuiteChoice>(v).ok()) else { return };
+    if !pending.is_empty() && app_choice(app) == craft_theme::AppChoice::FollowSuite {
+        app.suite.change(SelectionChange { theme: pending.theme, mode: pending.mode });
+    }
+}
 
-/// `suiteAppearance` can change while Preferences is open (the menu, `ui.set`, the suite's
-/// `lastSuite`). Until the user edits it in the dialog (the draft still equals `base`), the draft
-/// takes the live value, so Apply stays off and OK writes nothing stale. An edited draft keeps
-/// the user's choice with the live `lastSuite`, which is never an edit. Returns the next base.
-pub(super) fn sync_suite_draft(app: &PhotocraftApp, base: Option<&Value>, values: &mut Value) -> Value {
-    let live = app.session.prefs().interface.suite_appearance.clone();
-    let live_value = serde_json::to_value(&live).unwrap_or_default();
-    let Some(interface) = values.get_mut("interface").and_then(Value::as_object_mut) else { return live_value };
-    let draft = interface.get("suiteAppearance").cloned().unwrap_or_default();
-    if base.is_none_or(|base| *base == draft) {
-        if draft != live_value {
-            interface.insert("suiteAppearance".into(), live_value.clone());
+/// Where the Preferences dialog keeps the [`LIVE_KEYS`] as they were when the draft last took
+/// them.
+pub(super) const DRAFT_BASE: &str = "__liveAppearance";
+
+/// Interface keys that change outside Preferences while it is open: Window › Theme, the mode
+/// button and its commands, `ui.set`, and the suite's `lastSuite`.
+const LIVE_KEYS: [&str; 5] = ["suiteAppearance", "appearanceMode", "theme", "darkTheme", "lightTheme"];
+
+/// Until the user edits one of the [`LIVE_KEYS`] in the dialog (its draft still equals `base`),
+/// the draft takes the live value, so Apply stays off and OK writes nothing stale. An edited
+/// draft keeps the user's choice; an edited `suiteAppearance` takes the live `lastSuite`, which is
+/// never an edit. Returns the next base.
+pub(super) fn sync_live_draft(app: &PhotocraftApp, base: Option<&Value>, values: &mut Value) -> Value {
+    let live_prefs = app.session.prefs().to_json();
+    let live_interface = live_prefs.get("interface");
+    let mut next = Map::new();
+    let Some(interface) = values.get_mut("interface").and_then(Value::as_object_mut) else { return Value::Object(next) };
+    for key in LIVE_KEYS {
+        let live = live_interface.and_then(|i| i.get(key)).cloned().unwrap_or_default();
+        let draft = interface.get(key).cloned().unwrap_or_default();
+        let key_base = base.and_then(|b| b.get(key));
+        if key_base.is_none_or(|b| *b == draft) {
+            if draft != live {
+                interface.insert(key.into(), live.clone());
+            }
+            next.insert(key.into(), live);
+            continue;
         }
-        return live_value;
-    }
-    if let Some(draft) = interface.get_mut("suiteAppearance").and_then(Value::as_object_mut) {
-        let last = serde_json::to_value(live.map(|s| s.last_suite).unwrap_or_default()).unwrap_or_default();
-        if draft.get("lastSuite") != Some(&last) {
-            draft.insert("lastSuite".into(), last);
+        if key == "suiteAppearance"
+            && let Some(draft) = interface.get_mut(key).and_then(Value::as_object_mut)
+        {
+            let last = live.get("lastSuite").cloned().unwrap_or_else(|| serde_json::to_value(craft_theme_store::Accepted::default()).unwrap_or_default());
+            if draft.get("lastSuite") != Some(&last) {
+                draft.insert("lastSuite".into(), last);
+            }
         }
+        next.insert(key.into(), key_base.cloned().unwrap_or_default());
     }
-    base.cloned().unwrap_or_default()
+    Value::Object(next)
 }
 
 fn mode_label(mode: Mode) -> &'static str {
@@ -574,13 +662,46 @@ fn mode_label(mode: Mode) -> &'static str {
     }
 }
 
-/// "text on surface is 2.10:1, needs 4.5:1 (dark)".
-fn describe_diagnostic(d: &craft_theme::contrast::Diagnostic) -> String {
+/// A theme colour as the contrast findings name it: a core role of craft-theme's role list, or
+/// one of the states derived from them.
+fn paint_label(p: craft_theme::contrast::Paint) -> String {
+    use craft_theme::Role;
     use craft_theme::contrast::Paint;
-    let paint = |p: Paint| match p {
-        Paint::Role(role) => role.key().replace('_', " "),
-        Paint::Derived(name) => name.replace('_', " "),
+    let label = match p {
+        Paint::Role(role) => match role {
+            Role::Background => tl!("Background"),
+            Role::Surface => tl!("Surface"),
+            Role::Raised => tl!("Raised surface"),
+            Role::Text => tl!("Text"),
+            Role::TextMuted => tl!("Muted text"),
+            Role::Line => tl!("Lines"),
+            Role::Accent => tl!("Accent"),
+            Role::OnAccent => tl!("Text on accent"),
+            Role::Selection => tl!("Selection"),
+            Role::Focus => tl!("Focus ring"),
+            Role::Good => tl!("Success"),
+            Role::Warn => tl!("Warning"),
+            Role::Bad => tl!("Error"),
+        },
+        Paint::Derived(name) => match name {
+            "hover" => tl!("Hover"),
+            "pressed" => tl!("Pressed"),
+            "selected_hover" => tl!("Selected hover"),
+            "accent_hover" => tl!("Accent hover"),
+            "accent_pressed" => tl!("Accent pressed"),
+            "accent_text" => tl!("Accent text"),
+            "accent_soft" => tl!("Soft accent"),
+            "text_faint" => tl!("Faint text"),
+            "control_edge" => tl!("Control edges"),
+            other => return other.replace('_', " "),
+        },
     };
+    label.to_string()
+}
+
+/// "Text on Surface is 2.10:1, needs 4.5:1 (dark)".
+fn describe_diagnostic(d: &craft_theme::contrast::Diagnostic) -> String {
+    let paint = paint_label;
     let variant = match d.variant {
         craft_theme::Variant::Light => tl!("light"),
         craft_theme::Variant::Dark => tl!("dark"),
@@ -639,12 +760,15 @@ fn theme_card(ui: &mut egui::Ui, name: &str, preview: Option<&Tokens>, on: bool,
     resp.on_hover_text(tip)
 }
 
-/// A notice line under the theme cards, in the dialog's warning colour, with its buttons.
+/// A notice line under the theme cards, marked with a warning sign, with its buttons.
 fn notice_row(ui: &mut egui::Ui, line: &str, tip: Option<&str>, buttons: &[(&'static str, SuiteClick)], clicked: &mut Vec<SuiteClick>) {
     let t = Tokens::get(ui.ctx());
     ui.label("");
     ui.horizontal_wrapped(|ui| {
-        let label = ui.label(RichText::new(line).color(t.warning));
+        // The warning colour marks the line; the text stays in the text colour, since warning
+        // fills don't reach text contrast on every theme.
+        ui.add(crate::icons::image("triangle-alert", 12.0, t.warning));
+        let label = ui.label(RichText::new(line).color(t.text));
         if let Some(tip) = tip {
             label.on_hover_text(tip);
         }
@@ -682,8 +806,18 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
             own.get_or_insert_with(Default::default).follow_suite = following;
         }
     }
+    // Suite picks wait in the draft while only the draft follows the suite.
+    let hold = following && !suite.live_follows;
+    let shown_suite = if hold {
+        craft_theme::Selection {
+            theme: suite.pending.theme.clone().unwrap_or_else(|| suite.suite.theme.clone()),
+            mode: suite.pending.mode.unwrap_or(suite.suite.mode),
+        }
+    } else {
+        suite.suite.clone()
+    };
     let draft_mode = obj.get("appearanceMode").and_then(Value::as_str).unwrap_or("auto").to_string();
-    let mode = if following { suite.suite.mode } else { mode_of(&draft_mode) };
+    let mode = if following { shown_suite.mode } else { mode_of(&draft_mode) };
     let light_shown = match mode {
         Mode::Light => true,
         Mode::Dark => false,
@@ -691,7 +825,7 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
     };
     let pick = |pair: (Tokens, Tokens)| if light_shown { pair.0 } else { pair.1 };
     let own_theme = own.as_ref().map_or_else(ThemeId::app_default, |s| s.theme_id.clone());
-    let chosen = if following { suite.suite.theme.clone() } else { own_theme };
+    let chosen = if following { shown_suite.theme.clone() } else { own_theme };
     let mut light = obj.get("lightTheme").and_then(Value::as_str).unwrap_or("studioLight").to_string();
     let mut dark = obj.get("darkTheme").and_then(Value::as_str).unwrap_or("proMedium").to_string();
     if rows.themes {
@@ -719,6 +853,7 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
         });
         ui.end_row();
         match picked {
+            Some(id) if hold => suite.pending.theme = Some(id),
             Some(id) if following => suite.clicked.push(SuiteClick::Change(SelectionChange::theme(id))),
             Some(id) => {
                 let own = own.get_or_insert_with(Default::default);
@@ -741,12 +876,16 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
         ui.label(RichText::new(tl!("Appearance Mode")).color(t.text_dim));
         let choices: [(String, &str); 3] = [("auto".into(), tl!("Sync with system")), ("dark".into(), tl!("Dark")), ("light".into(), tl!("Light"))];
         let pairs: Vec<(String, &str)> = choices.iter().map(|(id, label)| (id.clone(), *label)).collect();
-        let mut shown = if following { mode_name(suite.suite.mode).to_string() } else { draft_mode.clone() };
+        let mut shown = if following { mode_name(shown_suite.mode).to_string() } else { draft_mode.clone() };
         crate::widgets::dropdown(ui, "appearance-mode", tl!("Appearance Mode"), &mut shown, &pairs, 220.0);
         ui.end_row();
         if following {
-            if shown != mode_name(suite.suite.mode) {
-                suite.clicked.push(SuiteClick::Change(SelectionChange::mode(mode_of(&shown))));
+            if shown != mode_name(shown_suite.mode) {
+                if hold {
+                    suite.pending.mode = Some(mode_of(&shown));
+                } else {
+                    suite.clicked.push(SuiteClick::Change(SelectionChange::mode(mode_of(&shown))));
+                }
             }
         } else if shown != draft_mode {
             obj.insert("appearanceMode".into(), json!(shown));
