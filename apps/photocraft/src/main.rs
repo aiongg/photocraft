@@ -629,6 +629,8 @@ fn main() -> eframe::Result {
             if let Some(w) = &app_dirs::current().warning {
                 photocraft_ui_egui::notices::post(&mut app, "Portable mode is off", vec![w.clone()], false, None);
             }
+            #[cfg(target_os = "linux")]
+            let app = appearance::Shell::new(app, &cc.egui_ctx);
             Ok(Box::new(app))
         }),
     );
