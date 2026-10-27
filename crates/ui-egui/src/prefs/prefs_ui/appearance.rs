@@ -251,9 +251,10 @@ pub(super) fn sync_animations(app: &PhotocraftApp, ctx: &egui::Context) {
 pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A restored or embedding-supplied pin must not suppress native appearance events.
     ctx.set_theme(egui::ThemePreference::System);
-    if app.suite.sync() {
-        remember_last_suite(app);
-    }
+    // Every frame, not only when this sync saw a change: `Suite::slots` syncs again and may be
+    // the one that takes a new snapshot.
+    app.suite.sync();
+    remember_last_suite(app);
     let interface = &app.session.prefs().interface;
     let slots = app.suite.slots(&interface.app_choice(), own_themes(interface));
     if crate::theme::installed_tokens(ctx) != Some(slots) {
@@ -538,15 +539,31 @@ pub(super) fn apply_suite_clicks(app: &mut PhotocraftApp, ctx: &egui::Context, r
     sync_appearance(app, ctx);
 }
 
-/// The Preferences draft carries `suiteAppearance` whole; its `lastSuite` is what the app saw of
-/// the suite, never an edit, so the draft keeps the current one (and OK doesn't write an old one).
-pub(super) fn keep_last_suite(app: &PhotocraftApp, values: &mut Value) {
-    let Some(draft) = values.pointer_mut("/interface/suiteAppearance").and_then(Value::as_object_mut) else { return };
-    let last = app.session.prefs().interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
-    let last = serde_json::to_value(last).unwrap_or_default();
-    if draft.get("lastSuite") != Some(&last) {
-        draft.insert("lastSuite".into(), last);
+/// Where the Preferences dialog keeps `suiteAppearance` as it was when the draft last took it.
+pub(super) const SUITE_DRAFT_BASE: &str = "__suiteAppearance";
+
+/// `suiteAppearance` can change while Preferences is open (the menu, `ui.set`, the suite's
+/// `lastSuite`). Until the user edits it in the dialog (the draft still equals `base`), the draft
+/// takes the live value, so Apply stays off and OK writes nothing stale. An edited draft keeps
+/// the user's choice with the live `lastSuite`, which is never an edit. Returns the next base.
+pub(super) fn sync_suite_draft(app: &PhotocraftApp, base: Option<&Value>, values: &mut Value) -> Value {
+    let live = app.session.prefs().interface.suite_appearance.clone();
+    let live_value = serde_json::to_value(&live).unwrap_or_default();
+    let Some(interface) = values.get_mut("interface").and_then(Value::as_object_mut) else { return live_value };
+    let draft = interface.get("suiteAppearance").cloned().unwrap_or_default();
+    if base.is_none_or(|base| *base == draft) {
+        if draft != live_value {
+            interface.insert("suiteAppearance".into(), live_value.clone());
+        }
+        return live_value;
     }
+    if let Some(draft) = interface.get_mut("suiteAppearance").and_then(Value::as_object_mut) {
+        let last = serde_json::to_value(live.map(|s| s.last_suite).unwrap_or_default()).unwrap_or_default();
+        if draft.get("lastSuite") != Some(&last) {
+            draft.insert("lastSuite".into(), last);
+        }
+    }
+    base.cloned().unwrap_or_default()
 }
 
 fn mode_label(mode: Mode) -> &'static str {

@@ -114,7 +114,7 @@ pub(super) fn persist(app: &mut PhotocraftApp, now: f64) -> Option<f64> {
 /// tab, another app window) changed there since this one last loaded or saved them.
 fn write_prefs(app: &mut PhotocraftApp, ours: &Value) -> Result<(), String> {
     let Some(save) = app.services.save_prefs.as_mut() else { return Ok(()) };
-    let stored = app.services.load_prefs.as_mut().and_then(|load| load()).and_then(|t| serde_json::from_str::<Value>(&t).ok());
+    let stored = app.services.load_prefs.as_mut().and_then(|load| load().ok().flatten()).and_then(|t| serde_json::from_str::<Value>(&t).ok());
     let text = match (stored, &app.prefs_rt.saved_value) {
         (Some(mut theirs @ Value::Object(_)), Some(base)) => {
             let base = &without_stale_migration(base, &theirs);

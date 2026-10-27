@@ -630,7 +630,7 @@ fn app_with_saved(text: Option<String>) -> (PhotocraftApp, Arc<Mutex<Option<Stri
 fn app_on(store: &Arc<Mutex<Option<String>>>, fail: Arc<std::sync::atomic::AtomicBool>) -> PhotocraftApp {
     let (a, b) = (store.clone(), store.clone());
     let services = crate::Services {
-        load_prefs: Some(Box::new(move || a.lock().unwrap().clone())),
+        load_prefs: Some(Box::new(move || Ok(a.lock().unwrap().clone()))),
         save_prefs: Some(Box::new(move |s: &str| {
             if fail.load(std::sync::atomic::Ordering::Relaxed) {
                 return Err("storage is full".into());

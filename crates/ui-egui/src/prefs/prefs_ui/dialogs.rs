@@ -106,6 +106,7 @@ pub fn apply(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
     if let Some(d) = app.ui.dialog_mut(id) {
         // Use the validated values as the next draft, including any normalisation by prefs.set.
         d.fields.insert("values".into(), values);
+        d.fields.remove(super::appearance::SUITE_DRAFT_BASE);
     }
     Ok(result)
 }
@@ -323,7 +324,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
         "prefs" => {
             let mut values = f.get("values").cloned().unwrap_or(Value::Null);
-            super::appearance::keep_last_suite(app, &mut values);
+            super::appearance::sync_suite_draft(app, f.get(super::appearance::SUITE_DRAFT_BASE), &mut values);
             app.run("prefs.set", json!({"path": "", "value": values}))
         }
         "shortcuts" => {

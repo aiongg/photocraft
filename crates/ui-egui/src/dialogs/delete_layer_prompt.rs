@@ -117,7 +117,7 @@ mod tests {
         let mut session = photocraft_engine::Session::new();
         session.execute("file.new", json!({"width":8,"height":8})).unwrap();
         session.execute("layer.new.layer", json!({"name":"Fresh"})).unwrap();
-        let mut fresh = PhotocraftApp::new(session, crate::Services { load_prefs: Some(Box::new(move || Some(text.clone()))), ..Default::default() });
+        let mut fresh = PhotocraftApp::new(session, crate::Services { load_prefs: Some(Box::new(move || Ok(Some(text.clone())))), ..Default::default() });
         fresh.run("layer.delete", json!({"__trash":true})).unwrap();
         assert!(fresh.ui.dialogs.is_empty());
     }

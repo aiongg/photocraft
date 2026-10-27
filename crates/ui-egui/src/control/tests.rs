@@ -2055,9 +2055,17 @@ fn ui_set_mask_target_ends_a_filter_mask_view() {
 
 #[test]
 fn ui_set_follows_the_suite_theme_or_picks_photocraft_s_own_and_inspect_reads_it_back() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     let appearance = |app: &mut PhotocraftApp| call(app, &ctx, "ui.inspect", json!({}))["result"]["appearance"].clone();
+    // A suite in memory (portable, web) has nothing to follow.
+    let mut memory = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    assert_eq!(call(&mut memory, &ctx, "ui.set", json!({"followSuite": true}))["ok"], false);
+    assert_eq!(appearance(&mut memory)["followSuite"], false);
+    let folder = tempfile::tempdir().unwrap();
+    let dir = craft_theme_store::SuiteDir::at(folder.path());
+    let services =
+        crate::Services { suite_watch: Some(Box::new(move |options| craft_theme_store::SuiteWatch::open(&dir, options, || {}))), ..Default::default() };
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     // The constructor keeps PhotoCraft's own themes, as saved preferences from before suite themes do.
     let a = appearance(&mut app);
     assert_eq!((a["followSuite"].clone(), a["themeId"].clone(), a["mode"].clone()), (json!(false), json!("craft.app-default"), json!("dark")));

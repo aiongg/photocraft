@@ -431,7 +431,7 @@ fn rulers_open_as_last_set_after_a_restart() {
         PhotocraftApp::new(
             photocraft_engine::Session::new(),
             crate::Services {
-                load_prefs: Some(Box::new(move || load.borrow().clone())),
+                load_prefs: Some(Box::new(move || Ok(load.borrow().clone()))),
                 save_prefs: Some(Box::new(move |text| {
                     *store.borrow_mut() = Some(text.to_string());
                     Ok(())

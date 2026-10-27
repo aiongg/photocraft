@@ -320,7 +320,7 @@ mod dialog {
     fn harness_with_store(store: &Arc<Mutex<Option<String>>>) -> Harness<'static, PhotocraftApp> {
         let (read, write) = (store.clone(), store.clone());
         let services = crate::Services {
-            load_prefs: Some(Box::new(move || read.lock().unwrap().clone())),
+            load_prefs: Some(Box::new(move || Ok(read.lock().unwrap().clone()))),
             save_prefs: Some(Box::new(move |text| {
                 *write.lock().unwrap() = Some(text.to_string());
                 Ok(())

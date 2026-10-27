@@ -29,7 +29,13 @@ pub fn load(app: &mut PhotocraftApp) {
     let mut invalid = Vec::new();
     let mut stored = None;
     let text = app.services.load_prefs.as_mut().map(|f| f());
-    if let Some(Some(text)) = &text {
+    if let Some(Err(e)) = &text {
+        // Saved preferences that can't be read are not a fresh install: the defaults show (with
+        // PhotoCraft's own themes) and nothing is written until the user changes a setting.
+        let template = "Preferences couldn't be read: {error}";
+        app.ui.status = crate::i18n::fmt(tl!(template), &[("error", e)]);
+    }
+    if let Some(Ok(Some(text))) = &text {
         match app.session.load_prefs_json(text) {
             Ok(found) => {
                 invalid = found;
@@ -45,7 +51,7 @@ pub fn load(app: &mut PhotocraftApp) {
     // shell shares the suite folder. Without it (portable, override folder, web) there is no
     // suite to follow, so it starts on ArtCraft in Dark as its own choice. A saved file without
     // `suiteAppearance` keeps PhotoCraft's own themes (`Interface::app_choice`).
-    if let Some(None) = text {
+    if let Some(Ok(None)) = text {
         let shared = app.services.suite_watch.is_some();
         app.session.prefs.edit(|p| {
             p.interface.suite_appearance = Some(if shared {

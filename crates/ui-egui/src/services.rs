@@ -250,8 +250,9 @@ pub type ClipboardUnreadableFn = Box<dyn Fn() -> bool>;
 /// Shared queue of (file name, bytes) delivered asynchronously.
 pub type Inbox = std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<u8>)>>>;
 
-/// Read the saved preferences text (`None` when there is none yet).
-pub type LoadTextFn = Box<dyn FnMut() -> Option<String>>;
+/// Read the saved preferences text: `Ok(None)` when none is saved yet (a fresh install), an error
+/// when saved preferences exist but can't be read (permissions, encoding, no settings folder).
+pub type LoadPrefsFn = Box<dyn FnMut() -> Result<Option<String>, String>>;
 
 /// Persist the preferences text.
 pub type SaveTextFn = Box<dyn FnMut(&str) -> Result<(), String>>;
@@ -379,7 +380,7 @@ pub struct Services {
     pub clipboard_unreadable: Option<ClipboardUnreadableFn>,
     /// Preferences persistence: the platform config directory on native, browser storage on
     /// the web (see `prefs_ui`).
-    pub load_prefs: Option<LoadTextFn>,
+    pub load_prefs: Option<LoadPrefsFn>,
     /// Opens the Craft suite's theme folder, once the preferences are read (desktop with the
     /// per-user settings folder). Without one the suite selection is in memory: tests, agents,
     /// portable installs and the web build never touch the shared folder.

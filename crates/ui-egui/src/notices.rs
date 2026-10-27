@@ -384,7 +384,7 @@ mod tests {
         let save_store = saved.clone();
         let services = Services {
             is_wayland: true,
-            load_prefs: Some(Box::new(move || load_store.lock().unwrap_or_else(|e| e.into_inner()).clone())),
+            load_prefs: Some(Box::new(move || Ok(load_store.lock().unwrap_or_else(|e| e.into_inner()).clone()))),
             save_prefs: Some(Box::new(move |text| {
                 *save_store.lock().unwrap_or_else(|e| e.into_inner()) = Some(text.to_owned());
                 Ok(())
@@ -396,8 +396,11 @@ mod tests {
         dismiss(&mut app, id);
         crate::prefs_ui::tick(&mut app, &egui::Context::default());
 
-        let services =
-            Services { is_wayland: true, load_prefs: Some(Box::new(move || saved.lock().unwrap_or_else(|e| e.into_inner()).clone())), ..Default::default() };
+        let services = Services {
+            is_wayland: true,
+            load_prefs: Some(Box::new(move || Ok(saved.lock().unwrap_or_else(|e| e.into_inner()).clone()))),
+            ..Default::default()
+        };
         let app = PhotocraftApp::new(Session::new(), services);
         assert!(app.ui.notices.is_empty());
     }

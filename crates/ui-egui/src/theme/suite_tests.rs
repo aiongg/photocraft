@@ -18,7 +18,7 @@ type Store = Arc<Mutex<Option<String>>>;
 fn app_on(store: &Store) -> PhotocraftApp {
     let (a, b) = (store.clone(), store.clone());
     let services = crate::Services {
-        load_prefs: Some(Box::new(move || a.lock().unwrap().clone())),
+        load_prefs: Some(Box::new(move || Ok(a.lock().unwrap().clone()))),
         save_prefs: Some(Box::new(move |s: &str| {
             *b.lock().unwrap() = Some(s.to_string());
             Ok(())
@@ -146,6 +146,30 @@ fn saved_preferences_keep_their_look_and_a_fresh_install_starts_on_artcraft() {
 }
 
 #[test]
+fn unreadable_preferences_keep_photocraft_s_own_themes_and_are_not_overwritten() {
+    let written: Store = Arc::default();
+    let w = written.clone();
+    let folder = tempfile::tempdir().unwrap();
+    let dir = craft_theme_store::SuiteDir::at(folder.path());
+    let services = crate::Services {
+        load_prefs: Some(Box::new(|| Err("permission denied".into()))),
+        save_prefs: Some(Box::new(move |s: &str| {
+            *w.lock().unwrap() = Some(s.to_string());
+            Ok(())
+        })),
+        suite_watch: Some(Box::new(move |options| SuiteWatch::open(&dir, options, || {}))),
+        ..Default::default()
+    };
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+    let ctx = egui::Context::default();
+    frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    frame(&mut app, &ctx, Some(egui::Theme::Dark));
+    assert_eq!(app.session.prefs().interface.app_choice(), AppChoice::Own(craft_theme::Selection { theme: ThemeId::app_default(), mode: Mode::Dark }));
+    assert!(app.ui.status.contains("permission denied"), "{}", app.ui.status);
+    assert_eq!(*written.lock().unwrap(), None, "the unreadable file is left alone");
+}
+
+#[test]
 fn picking_a_photocraft_theme_leaves_the_suite_theme() {
     let ctx = egui::Context::default();
     let mut app = app_on(&Arc::default());
@@ -168,7 +192,7 @@ fn app_on_dir(store: &Store, dir: &std::path::Path) -> PhotocraftApp {
     let (a, b) = (store.clone(), store.clone());
     let dir = craft_theme_store::SuiteDir::at(dir);
     let services = crate::Services {
-        load_prefs: Some(Box::new(move || a.lock().unwrap().clone())),
+        load_prefs: Some(Box::new(move || Ok(a.lock().unwrap().clone()))),
         save_prefs: Some(Box::new(move |s: &str| {
             *b.lock().unwrap() = Some(s.to_string());
             Ok(())

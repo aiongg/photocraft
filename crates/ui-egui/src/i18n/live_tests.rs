@@ -260,7 +260,7 @@ fn missing_or_unsupported_system_languages_render_english() {
 fn older_preferences_without_a_language_follow_the_system() {
     system::with_system_tags(&["fr-CA"], || {
         with_language(Lang::EN, || {
-            let services = Services { load_prefs: Some(Box::new(|| Some(r#"{"interface":{"uiScale":"125"}}"#.into()))), ..Default::default() };
+            let services = Services { load_prefs: Some(Box::new(|| Ok(Some(r#"{"interface":{"uiScale":"125"}}"#.into())))), ..Default::default() };
             let h = harness_with_services(services);
             assert_eq!(h.state().session.prefs().interface.language, "auto");
             assert_eq!(h.state().session.prefs().interface.ui_scale, photocraft_engine::prefs::UiScale::P125);
@@ -283,7 +283,7 @@ fn an_explicit_language_survives_restart_on_a_different_system_language() {
     });
     system::with_system_tags(&["fr-FR"], || {
         with_language(Lang::EN, || {
-            let services = Services { load_prefs: Some(Box::new(move || Some(saved.clone()))), ..Default::default() };
+            let services = Services { load_prefs: Some(Box::new(move || Ok(Some(saved.clone())))), ..Default::default() };
             let h = harness_with_services(services);
             assert_eq!(h.state().session.prefs().interface.language, "ko");
             assert_eq!(current(), lang("ko"));

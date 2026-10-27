@@ -223,7 +223,7 @@ fn with_photoshop(set: &'static str, saved_prefs: Option<&'static str>) -> (Phot
         photoshop_shortcuts: Some(Box::new(move || {
             Some(("/Users/me/Library/Preferences/Adobe Photoshop 2026 Settings/Keyboard Shortcuts.psp".into(), set.into()))
         })),
-        load_prefs: Some(Box::new(move || saved_prefs.map(str::to_string))),
+        load_prefs: Some(Box::new(move || Ok(saved_prefs.map(str::to_string)))),
         save_prefs: Some(Box::new(move |text: &str| {
             *written.lock().unwrap() = Some(text.to_string());
             Ok(())

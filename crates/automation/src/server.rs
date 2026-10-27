@@ -331,7 +331,7 @@ pub struct UiSetParams {
     /// ({background: bool} picks which swatch the Color panel edits), maskTarget,
     /// vectorMaskTarget, filterMaskTarget (paint the active smart object's filter mask), selectionMode, zoom, center, rotation (view angle in degrees), fit, theme (pro, proMedium, studio,
     /// studioLight, classic, solarizedDark, adwaita, adwaitaDark, breezeLight, breezeDark, softLight, softDark; one of PhotoCraft's own
-    /// themes, which stops following the suite theme), followSuite (bool: use the Craft suite's theme), themeId (a suite theme id such as
+    /// themes, which stops following the suite theme), followSuite (bool: use the Craft suite's theme; refused where the suite isn't shared, as in portable and web builds), themeId (a suite theme id such as
     /// craft.artcraft, craft.graphite, craft.high-contrast, a library theme, or craft.app-default for PhotoCraft's own themes; the
     /// suite's theme while following the suite, else PhotoCraft's own; `ui.inspect` reports both under `appearance`), brushSection, brushTab,
     /// brushesView, brushPicker ([x, y] opens the Brush Preset picker there, null closes it),

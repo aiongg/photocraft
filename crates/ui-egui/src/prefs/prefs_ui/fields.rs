@@ -1,4 +1,4 @@
-use super::appearance::{AppearanceRows, SuiteRows, appearance_rows, apply_suite_clicks, keep_last_suite, suite_rows};
+use super::appearance::{AppearanceRows, SUITE_DRAFT_BASE, SuiteRows, appearance_rows, apply_suite_clicks, suite_rows, sync_suite_draft};
 use super::dialogs::{mismatch_body, presets_body, presets_io_body, settings_height};
 use super::graphics::{gpu_memory_lines, gpu_status_rows, memory_usage_row, read_at_launch, rendering_mode_row};
 use super::shortcuts::shortcuts_body;
@@ -14,8 +14,10 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             info.extend(gpu_memory_lines(app));
             f.insert("__gpuInfo".into(), json!(info));
             f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
+            let base = f.get(SUITE_DRAFT_BASE).cloned();
             if let Some(values) = f.get_mut("values") {
-                keep_last_suite(app, values);
+                let next = sync_suite_draft(app, base.as_ref(), values);
+                f.insert(SUITE_DRAFT_BASE.into(), next);
             }
             let mut suite = suite_rows(app, Some(ui.ctx().theme()));
             prefs_body(ui, f, &mut suite);

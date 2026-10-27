@@ -445,7 +445,7 @@ mod tests {
         // Restart.
         let text = saved.borrow().clone();
         assert!(text.contains("Poster"));
-        let mut fresh = app_with(crate::Services { load_prefs: Some(Box::new(move || Some(text.clone()))), ..Default::default() });
+        let mut fresh = app_with(crate::Services { load_prefs: Some(Box::new(move || Ok(Some(text.clone())))), ..Default::default() });
         assert_eq!(names(&fresh), ["Poster", "3 : 2"]);
         whr(&mut fresh, "", "", "", PX_PER_CM);
         select(&mut fresh, "Poster");

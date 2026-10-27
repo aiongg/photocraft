@@ -884,11 +884,10 @@ impl Tokens {
     }
 
     /// Text and marks drawn on an `accent` fill (a hovered menu row, a selected cell, a switch
-    /// that is on). Where the primary button is the accent (every suite theme, and the Pro,
-    /// Adwaita and Solarized palettes) that is the button's text (`on_accent`); the other
-    /// PhotoCraft palettes draw white.
+    /// that is on): a suite theme's `on_accent`. PhotoCraft's own palettes draw white, as they
+    /// always have.
     pub fn accent_ink(&self) -> Color32 {
-        if self.primary_bg == self.accent { self.primary_text } else { Color32::WHITE }
+        if self.is_own_palette() { Color32::WHITE } else { self.primary_text }
     }
 
     /// One of PhotoCraft's own palettes, unchanged (not a suite theme on its base layout).

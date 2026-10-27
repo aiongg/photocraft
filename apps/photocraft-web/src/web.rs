@@ -451,7 +451,9 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
         place_inbox: Some(place_inbox),
         cursor_pos: Some(cursor_pos),
         // Preferences live in the browser's localStorage.
-        load_prefs: Some(Box::new(|| local_storage()?.get_item(PREFS_KEY).ok().flatten())),
+        load_prefs: Some(Box::new(|| {
+            local_storage().ok_or("browser storage is unavailable")?.get_item(PREFS_KEY).map_err(|_| "browser storage can't be read".to_string())
+        })),
         save_prefs: Some(Box::new(|text: &str| local_storage().ok_or("no localStorage")?.set_item(PREFS_KEY, text).map_err(|e| format!("{e:?}")))),
         ..Default::default()
     }

@@ -18,7 +18,7 @@ fn app(dir: Option<&std::path::Path>) -> PhotocraftApp {
         Box::new(move |options| SuiteWatch::open(&dir, options, || {})) as crate::theme::suite::OpenWatchFn
     });
     let services = crate::Services {
-        load_prefs: Some(Box::new(move || a.lock().unwrap().clone())),
+        load_prefs: Some(Box::new(move || Ok(a.lock().unwrap().clone()))),
         save_prefs: Some(Box::new(move |s: &str| {
             *b.lock().unwrap() = Some(s.to_string());
             Ok(())
@@ -117,27 +117,30 @@ fn the_photocraft_themes_card_shows_the_swatch_rows_that_set_photocrafts_own_the
 #[test]
 fn the_mode_button_and_menu_change_the_mode_of_the_choice_that_applies() {
     let ctx = egui::Context::default();
-    let mut app = app(None);
-    choose_suite_appearance(&mut app, &ctx, Some(true), None);
-    let mode = |app: &PhotocraftApp| (app.suite.shown().mode, app.session.prefs().interface.appearance_mode);
-    // Following: the suite's mode, starting from PhotoCraft's default (Dark).
+    let folder = tempfile::tempdir().unwrap();
+    // A fresh install follows the suite, which starts in PhotoCraft's default mode (Dark).
+    let mut app = app(Some(folder.path()));
+    let mode = |app: &PhotocraftApp| (effective_selection(app).mode, app.suite.shown().mode, app.session.prefs().interface.appearance_mode);
+    let system_checked = |app: &PhotocraftApp| crate::menus::menu_items(app).into_iter().find(|i| i.id == "window.theme.system").and_then(|i| i.checked);
+    assert_eq!(system_checked(&app), Some(false));
+    // Following: the title-bar cycle sets the suite's mode.
     cycle_appearance(&mut app, &ctx);
-    assert_eq!(mode(&app), (Some(Mode::System), AppearanceMode::Dark));
+    assert_eq!(mode(&app), (Mode::System, Some(Mode::System), AppearanceMode::Dark));
+    assert_eq!(system_checked(&app), Some(true));
     cycle_appearance(&mut app, &ctx);
-    assert_eq!(mode(&app), (Some(Mode::Light), AppearanceMode::Dark));
-    assert_eq!(effective_selection(&app).mode, Mode::Light);
-    // The per-app choice: `appearanceMode`.
+    assert_eq!(mode(&app), (Mode::Light, Some(Mode::Light), AppearanceMode::Dark));
+    assert_eq!(system_checked(&app), Some(false));
+    crate::menus::invoke(&mut app, &ctx, "window.theme.system", json!({})).unwrap();
+    assert_eq!(mode(&app), (Mode::System, Some(Mode::System), AppearanceMode::Dark));
+    // The per-app choice: `appearanceMode`; the suite keeps its mode.
     choose_suite_appearance(&mut app, &ctx, Some(false), None);
     cycle_appearance(&mut app, &ctx);
-    assert_eq!(mode(&app), (Some(Mode::Light), AppearanceMode::Auto));
+    assert_eq!(mode(&app), (Mode::System, Some(Mode::System), AppearanceMode::Auto));
     cycle_appearance(&mut app, &ctx);
-    assert_eq!(mode(&app), (Some(Mode::Light), AppearanceMode::Light));
-    // Window › Theme › Sync with system, in both.
+    assert_eq!(mode(&app), (Mode::Light, Some(Mode::System), AppearanceMode::Light));
+    assert_eq!(system_checked(&app), Some(false));
     crate::menus::invoke(&mut app, &ctx, "window.theme.system", json!({})).unwrap();
-    assert_eq!(mode(&app), (Some(Mode::Light), AppearanceMode::Auto));
-    choose_suite_appearance(&mut app, &ctx, Some(true), None);
-    crate::menus::invoke(&mut app, &ctx, "window.theme.system", json!({})).unwrap();
-    assert_eq!(mode(&app), (Some(Mode::System), AppearanceMode::Auto));
+    assert_eq!(mode(&app), (Mode::System, Some(Mode::System), AppearanceMode::Auto));
 }
 
 /// A library theme whose dark text is nearly the colour of its surface.
