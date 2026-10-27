@@ -262,6 +262,10 @@ pub struct Interface {
     pub light_theme: LightTheme,
     /// Theme shortcuts shown in the appearance button's context menu.
     pub favorite_themes: Vec<Theme>,
+    /// Whether PhotoCraft follows the Craft suite's theme or uses its own. `None` (files from
+    /// before suite themes, and the app constructor) is PhotoCraft's own themes in
+    /// `appearanceMode`; see [`Interface::app_choice`].
+    pub suite_appearance: Option<SuiteAppearance>,
     /// Pasteboard colour in standard screen mode (`canvasCustomColor` when "custom").
     pub canvas_color: CanvasColor,
     pub canvas_custom_color: String,
@@ -308,6 +312,68 @@ pub struct Interface {
     pub notification_duration_seconds: u32,
 }
 
+/// `interface.suiteAppearance`: the suite-theme part of the appearance choice. The mode of
+/// PhotoCraft's own choice stays in `appearanceMode`, and `darkTheme` / `lightTheme` stay the pair
+/// `craft.app-default` stands for, so older builds still read the look.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SuiteAppearance {
+    /// Use the theme chosen for every Craft app.
+    pub follow_suite: bool,
+    /// The theme of PhotoCraft's own choice ("Use a different theme in this app"):
+    /// `craft.app-default` (PhotoCraft's own themes), a built-in or a library theme.
+    pub theme_id: craft_theme::ThemeId,
+    /// The suite selection as last read or written, shown at startup while the suite folder is
+    /// unreadable or not read yet.
+    pub last_suite: craft_theme_store::Accepted,
+}
+
+impl SuiteAppearance {
+    /// What a fresh install starts with.
+    pub fn follow_suite() -> Self {
+        SuiteAppearance { follow_suite: true, ..Default::default() }
+    }
+}
+
+impl Default for SuiteAppearance {
+    fn default() -> Self {
+        SuiteAppearance { follow_suite: false, theme_id: craft_theme::ThemeId::app_default(), last_suite: Default::default() }
+    }
+}
+
+impl AppearanceMode {
+    pub fn suite_mode(self) -> craft_theme::Mode {
+        match self {
+            AppearanceMode::Auto => craft_theme::Mode::System,
+            AppearanceMode::Dark => craft_theme::Mode::Dark,
+            AppearanceMode::Light => craft_theme::Mode::Light,
+        }
+    }
+}
+
+impl Interface {
+    /// PhotoCraft's appearance choice in suite terms. Without `suiteAppearance` it is
+    /// `Own(craft.app-default, appearanceMode)`, so saved looks stay as they were.
+    pub fn app_choice(&self) -> craft_theme::AppChoice {
+        match &self.suite_appearance {
+            Some(s) if s.follow_suite => craft_theme::AppChoice::FollowSuite,
+            s => craft_theme::AppChoice::Own(craft_theme::Selection {
+                theme: s.as_ref().map_or_else(craft_theme::ThemeId::app_default, |s| s.theme_id.clone()),
+                mode: self.appearance_mode.suite_mode(),
+            }),
+        }
+    }
+
+    /// Picking one of PhotoCraft's own themes makes them this app's choice:
+    /// `Own(craft.app-default, appearanceMode)`.
+    pub fn use_own_themes(&mut self) {
+        if let Some(s) = &mut self.suite_appearance {
+            s.follow_suite = false;
+            s.theme_id = craft_theme::ThemeId::app_default();
+        }
+    }
+}
+
 impl Default for Interface {
     fn default() -> Self {
         Self {
@@ -316,6 +382,7 @@ impl Default for Interface {
             dark_theme: DarkTheme::ProMedium,
             light_theme: LightTheme::ProLight,
             favorite_themes: Vec::new(),
+            suite_appearance: None,
             canvas_color: CanvasColor::Default,
             canvas_custom_color: "#282828".into(),
             show_canvas_dots: true,
@@ -1439,6 +1506,15 @@ impl Session {
             }
         } else {
             next.set(path, value)?;
+        }
+        // Picking one of PhotoCraft's own themes, by any path, leaves the suite theme.
+        let prev = &self.prefs().interface;
+        if path == "interface.theme"
+            || next.interface.theme != prev.theme
+            || next.interface.dark_theme != prev.dark_theme
+            || next.interface.light_theme != prev.light_theme
+        {
+            next.interface.use_own_themes();
         }
         // Old `prefs.set interface.theme` clients (by path or inside a section object) still
         // select a visible theme.

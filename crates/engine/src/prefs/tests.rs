@@ -145,6 +145,47 @@ fn appearance_choices_validate_and_legacy_theme_still_selects() {
 }
 
 #[test]
+fn suite_appearance_round_trips_and_picking_a_photocraft_theme_leaves_the_suite() {
+    use craft_theme::{AppChoice, Mode, Selection, ThemeId};
+    let own = |theme: &str, mode| AppChoice::Own(Selection { theme: ThemeId::parse(theme).unwrap(), mode });
+    // Files from before suite themes, and the constructor: PhotoCraft's own themes in the saved mode.
+    let mut s = Session::new();
+    assert_eq!(s.prefs().interface.app_choice(), own("craft.app-default", Mode::Dark));
+    for (mode, expected) in [("auto", Mode::System), ("dark", Mode::Dark), ("light", Mode::Light)] {
+        let mut legacy = Session::new();
+        legacy.load_prefs_json(&json!({"interface": {"appearanceMode": mode, "darkTheme": "studio"}}).to_string()).unwrap();
+        assert_eq!(legacy.prefs().interface.app_choice(), own("craft.app-default", expected), "{mode}");
+        assert_eq!(legacy.prefs().interface.dark_theme, DarkTheme::Studio);
+    }
+    // Following the suite survives a restart, with the last suite selection seen.
+    let last = json!({"suite": {"theme": "craft.graphite", "mode": "light"}, "revision": 4, "library_revision": 1});
+    s.execute("prefs.set", json!({"path": "interface.suiteAppearance", "value": {"followSuite": true, "themeId": "craft.high-contrast", "lastSuite": last}}))
+        .unwrap();
+    assert_eq!(s.prefs().interface.app_choice(), AppChoice::FollowSuite);
+    let mut restarted = Session::new();
+    restarted.load_prefs_json(&s.prefs_to_json()).unwrap();
+    assert_eq!(restarted.prefs().interface, s.prefs().interface);
+    let saved = restarted.prefs().interface.suite_appearance.clone().unwrap();
+    assert_eq!(saved.last_suite.revision, 4);
+    assert_eq!(saved.last_suite.suite.theme, Some(ThemeId::parse("craft.graphite").unwrap()));
+    // Override off: the app's own suite theme, in appearanceMode.
+    s.execute("prefs.set", json!({"path": "interface.suiteAppearance.followSuite", "value": false})).unwrap();
+    assert_eq!(s.prefs().interface.app_choice(), own("craft.high-contrast", Mode::Dark));
+    assert!(s.execute("prefs.set", json!({"path": "interface.suiteAppearance.themeId", "value": "Not An Id"})).is_err());
+    // Picking one of PhotoCraft's own themes, by any of its paths, makes them the choice again.
+    for (path, value) in [("interface.theme", "studio"), ("interface.darkTheme", "pro"), ("interface.lightTheme", "classic")] {
+        s.execute("prefs.set", json!({"path": "interface.suiteAppearance", "value": {"followSuite": true}})).unwrap();
+        s.execute("prefs.set", json!({"path": path, "value": value})).unwrap();
+        let choice = s.prefs().interface.app_choice();
+        assert!(matches!(&choice, AppChoice::Own(sel) if sel.theme.is_app_default()), "{path}: {choice:?}");
+    }
+    // The mode alone doesn't.
+    s.execute("prefs.set", json!({"path": "interface.suiteAppearance", "value": {"followSuite": true}})).unwrap();
+    s.execute("prefs.set", json!({"path": "interface.appearanceMode", "value": "light"})).unwrap();
+    assert_eq!(s.prefs().interface.app_choice(), AppChoice::FollowSuite);
+}
+
+#[test]
 fn favorite_themes_persist_and_reject_invalid_lists() {
     let mut s = Session::new();
     assert!(s.prefs().interface.favorite_themes.is_empty());
