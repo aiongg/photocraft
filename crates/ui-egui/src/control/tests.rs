@@ -2078,6 +2078,17 @@ fn ui_set_follows_the_suite_theme_or_picks_photocraft_s_own_and_inspect_reads_it
     let graphite = craft_theme::builtin(&craft_theme::ThemeId::parse("craft.graphite").unwrap()).unwrap();
     let roles = graphite.variant(craft_theme::Variant::Dark).unwrap();
     assert_eq!(crate::theme::Tokens::get(&ctx).dock, craft_ui::theme::color32(roles.background));
+    // A suite theme names no PhotoCraft theme, and `shown` is the variant on screen.
+    let inspect = call(&mut app, &ctx, "ui.inspect", json!({}))["result"].clone();
+    assert_eq!((inspect["theme"].clone(), inspect["appearance"]["shown"].clone()), (Value::Null, json!("dark")));
+    // Sync with system and no OS answer: the mode is the choice, `shown` the Dark fallback.
+    let toggle = |app: &mut PhotocraftApp| assert_eq!(call(app, &ctx, "ui.menu.invoke", json!({"id": "window.theme.toggle"}))["ok"], true);
+    toggle(&mut app);
+    let a = appearance(&mut app);
+    assert_eq!((a["mode"].clone(), a["shown"].clone()), (json!("system"), json!("dark")));
+    toggle(&mut app);
+    let a = appearance(&mut app);
+    assert_eq!((a["mode"].clone(), a["shown"].clone()), (json!("light"), json!("light")));
     // Off: PhotoCraft's own choice; the suite keeps its theme.
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"followSuite": false, "themeId": "craft.high-contrast"}))["ok"], true);
     let a = appearance(&mut app);
@@ -2099,4 +2110,5 @@ fn ui_set_follows_the_suite_theme_or_picks_photocraft_s_own_and_inspect_reads_it
     let a = appearance(&mut app);
     assert_eq!((a["followSuite"].clone(), a["themeId"].clone()), (json!(false), json!("craft.app-default")));
     assert_eq!(app.ui.theme, crate::theme::ThemeKind::Studio);
+    assert_eq!(call(&mut app, &ctx, "ui.inspect", json!({}))["result"]["theme"], json!(crate::theme::ThemeKind::Studio));
 }

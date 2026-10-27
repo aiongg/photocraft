@@ -79,7 +79,7 @@ mod startup;
 use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
 pub(crate) use appearance::{
     FOLLOW_WITHOUT_SUITE, app_choice, appearance_context_menu, choose_suite_appearance, cycle_appearance, effective_selection, inspect_appearance,
-    refuse_follow_without_suite, set_scope_mode, step_brightness, sync_appearance,
+    own_themes_shown, refuse_follow_without_suite, set_scope_mode, step_brightness, sync_appearance,
 };
 pub use appearance::{canvas_style, pasteboard_color};
 pub use dialogs::{

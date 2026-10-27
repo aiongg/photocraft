@@ -294,7 +294,7 @@ pub(crate) fn choose_suite_appearance(app: &mut PhotocraftApp, ctx: &egui::Conte
 
 /// The appearance choice for `ui.inspect`: whether PhotoCraft follows the suite, the selection
 /// that applies, PhotoCraft's own choice and the suite's.
-pub(crate) fn inspect_appearance(app: &PhotocraftApp) -> Value {
+pub(crate) fn inspect_appearance(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let interface = &app.session.prefs().interface;
     let choice = choice_where(interface, app.suite.is_shared());
     let effective = app.suite.effective(&choice);
@@ -307,6 +307,8 @@ pub(crate) fn inspect_appearance(app: &PhotocraftApp) -> Value {
         "followSuite": matches!(choice, craft_theme::AppChoice::FollowSuite),
         "themeId": effective.theme,
         "mode": effective.mode,
+        // The variant on screen: `mode` is the choice, which may be System.
+        "shown": if Tokens::get(ctx).dark() { "dark" } else { "light" },
         "ownThemeId": own,
         "suite": {
             "themeId": suite.theme,

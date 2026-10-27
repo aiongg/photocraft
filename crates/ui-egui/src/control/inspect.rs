@@ -77,8 +77,9 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "views": app.ui.views,
         "dialogs": dialogs,
         "windows": app.ui.windows,
-        "theme": app.ui.theme,
-        "appearance": crate::prefs_ui::inspect_appearance(app),
+        // A suite theme draws on a PhotoCraft base layout; only PhotoCraft's own palette names a theme here.
+        "theme": crate::prefs_ui::own_themes_shown(app).then_some(app.ui.theme),
+        "appearance": crate::prefs_ui::inspect_appearance(app, ctx),
         "status": app.ui.status,
         "statusError": app.ui.status_error,
         "notices": app.ui.notices,
