@@ -31,11 +31,16 @@ pub fn pasteboard_color(app: &PhotocraftApp) -> Option<Color32> {
     })
 }
 
-/// The themes for egui's Light and Dark style slots. A fixed mode puts its theme in both, so the
-/// OS appearance cannot change what is drawn.
+/// PhotoCraft's own (Light, Dark) themes: what `craft.app-default` stands for.
+pub(super) fn own_themes(interface: &prefs::Interface) -> (ThemeKind, ThemeKind) {
+    (light_kind(interface.light_theme), dark_kind(interface.dark_theme))
+}
+
+/// PhotoCraft's own themes for egui's Light and Dark style slots. A fixed mode puts its theme in
+/// both, so the OS appearance cannot change what is drawn.
+#[cfg(test)]
 pub(super) fn slot_themes(interface: &prefs::Interface) -> (ThemeKind, ThemeKind) {
-    let light = light_kind(interface.light_theme);
-    let dark = dark_kind(interface.dark_theme);
+    let (light, dark) = own_themes(interface);
     match interface.appearance_mode {
         AppearanceMode::Light => (light, light),
         AppearanceMode::Dark => (dark, dark),
@@ -44,6 +49,7 @@ pub(super) fn slot_themes(interface: &prefs::Interface) -> (ThemeKind, ThemeKind
 }
 
 /// The theme on screen when the OS reports `system`.
+#[cfg(test)]
 pub(super) fn selected_theme(interface: &prefs::Interface, system: Option<egui::Theme>) -> ThemeKind {
     let (light, dark) = slot_themes(interface);
     if system == Some(egui::Theme::Light) { light } else { dark }
@@ -140,12 +146,13 @@ pub(crate) fn appearance_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui
         ui.close();
     }
     let (light, dark) = favorite_theme_groups(&app.session.prefs().interface.favorite_themes);
+    let own = own_themes_shown(app);
     let has_light = !light.is_empty();
     if !light.is_empty() || !dark.is_empty() {
         ui.separator();
     }
     for kind in light {
-        if ui.selectable_label(app.ui.theme == kind, tl!(kind.label())).clicked() {
+        if ui.selectable_label(own && app.ui.theme == kind, tl!(kind.label())).clicked() {
             app.set_theme(ui.ctx(), kind);
             ui.close();
         }
@@ -154,7 +161,7 @@ pub(crate) fn appearance_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui
         ui.separator();
     }
     for kind in dark {
-        if ui.selectable_label(app.ui.theme == kind, tl!(kind.label())).clicked() {
+        if ui.selectable_label(own && app.ui.theme == kind, tl!(kind.label())).clicked() {
             app.set_theme(ui.ctx(), kind);
             ui.close();
         }
@@ -206,22 +213,101 @@ pub(super) fn sync_animations(app: &PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// Resolve the saved appearance mode without changing it or either theme slot. The styles are
-/// rebuilt only when a slot's theme changed; an OS appearance change only moves the layout to the
-/// theme of the slot egui now draws.
+/// Resolve the appearance choice (PhotoCraft's own themes or a suite theme) and the suite's
+/// selection without changing either. The styles are rebuilt only when a slot's tokens changed;
+/// an OS appearance change only moves the layout to the theme of the slot egui now draws.
 pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A restored or embedding-supplied pin must not suppress native appearance events.
     ctx.set_theme(egui::ThemePreference::System);
+    if app.suite.sync() {
+        remember_last_suite(app);
+    }
     let interface = &app.session.prefs().interface;
-    let (light, dark) = slot_themes(interface);
-    let selected = selected_theme(interface, Some(ctx.theme()));
-    if crate::theme::installed(ctx) != Some((light, dark)) {
-        crate::theme::install(ctx, light, dark);
+    let slots = app.suite.slots(&interface.app_choice(), own_themes(interface));
+    if crate::theme::installed_tokens(ctx) != Some(slots) {
+        crate::theme::install_tokens(ctx, slots.0, slots.1);
         app.checker = None;
     }
+    let selected = if ctx.theme() == egui::Theme::Light { slots.0.kind } else { slots.1.kind };
     if app.ui.theme != selected {
         app.sync_layout_theme(selected);
     }
+}
+
+/// `ui.set` `followSuite` and `themeId`: turn following the suite on or off, then pick `theme`
+/// for the suite while following, or for PhotoCraft's own choice otherwise. `theme` must be one
+/// [`crate::theme::suite::Suite::knows`].
+pub(crate) fn choose_suite_appearance(app: &mut PhotocraftApp, ctx: &egui::Context, follow: Option<bool>, theme: Option<craft_theme::ThemeId>) {
+    let current = app.session.prefs().interface.suite_appearance.clone();
+    let mut next = current.clone().unwrap_or_default();
+    if let Some(follow) = follow {
+        next.follow_suite = follow;
+    }
+    if let Some(id) = theme {
+        if next.follow_suite {
+            app.suite.set_theme(id);
+        } else {
+            next.theme_id = id;
+        }
+    }
+    if current.as_ref() != Some(&next) {
+        let value = serde_json::to_value(&next).unwrap_or_default();
+        if let Err(e) = app.run("prefs.set", json!({"path": "interface.suiteAppearance", "value": value})) {
+            app.ui.status = e;
+        }
+    }
+    sync_appearance(app, ctx);
+}
+
+/// The appearance choice for `ui.inspect`: whether PhotoCraft follows the suite, the selection
+/// that applies, PhotoCraft's own choice and the suite's.
+pub(crate) fn inspect_appearance(app: &PhotocraftApp) -> Value {
+    let interface = &app.session.prefs().interface;
+    let choice = interface.app_choice();
+    let effective = app.suite.effective(&choice);
+    let own = match &choice {
+        craft_theme::AppChoice::Own(sel) => sel.theme.clone(),
+        craft_theme::AppChoice::FollowSuite => interface.suite_appearance.as_ref().map_or_else(craft_theme::ThemeId::app_default, |s| s.theme_id.clone()),
+    };
+    let suite = app.suite.shown();
+    json!({
+        "followSuite": matches!(choice, craft_theme::AppChoice::FollowSuite),
+        "themeId": effective.theme,
+        "mode": effective.mode,
+        "ownThemeId": own,
+        "suite": {
+            "themeId": suite.theme,
+            "mode": suite.mode,
+            "revision": app.suite.accepted().revision,
+            "pending": app.suite.client().is_pending(),
+            "conflict": app.suite.conflict().map(|(disk, _)| json!({"themeId": disk.suite.theme, "mode": disk.suite.mode})),
+            "failure": app.suite.failure().map(|(_, e)| e.to_string()),
+            "problems": app.suite.problems().iter().map(|p| p.to_string()).collect::<Vec<_>>(),
+        },
+    })
+}
+
+/// The theme and mode that apply now: PhotoCraft's own choice, or the suite's while following it.
+pub(crate) fn effective_selection(app: &PhotocraftApp) -> craft_theme::Selection {
+    app.suite.effective(&app.session.prefs().interface.app_choice())
+}
+
+/// One of PhotoCraft's own themes is on screen (`craft.app-default`), not a suite theme on its
+/// base layout: only then does a PhotoCraft theme show as chosen.
+pub(crate) fn own_themes_shown(app: &PhotocraftApp) -> bool {
+    effective_selection(app).theme.is_app_default()
+}
+
+/// Keep the suite selection PhotoCraft last saw in its preferences (`lastSuite`), so a damaged
+/// or unreadable suite folder at the next start still shows the same look.
+fn remember_last_suite(app: &mut PhotocraftApp) {
+    let accepted = app.suite.accepted();
+    let saved = app.session.prefs().interface.suite_appearance.as_ref().map(|s| &s.last_suite);
+    if saved.unwrap_or(&Default::default()) == accepted {
+        return;
+    }
+    let accepted = accepted.clone();
+    app.session.prefs.edit(|p| p.interface.suite_appearance.get_or_insert_with(Default::default).last_suite = accepted);
 }
 
 /// One theme as a Color Theme swatch: its panel colour under a chrome strip with an accent dot,

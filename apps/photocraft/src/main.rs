@@ -471,6 +471,13 @@ fn main() -> eframe::Result {
             let automation = control.as_ref().map(|(_, _, workspace)| workspace.clone());
             let mut services = services::native(automation);
             services.preset_store = presets;
+            // The Craft suite's shared theme folder, only with the per-user settings folder: an
+            // override folder (tests, agents) or a portable copy keeps its suite theme in memory.
+            let suite_dir = craft_theme_store::SuiteDir::resolve(app_dirs::current().mode != app_dirs::Mode::Platform);
+            if !suite_dir.is_memory() {
+                let ctx = cc.egui_ctx.clone();
+                services.suite_watch = Some(Box::new(move |options| craft_theme_store::SuiteWatch::open(&suite_dir, options, move || ctx.request_repaint())));
+            }
             #[cfg(target_os = "linux")]
             let display = tablet::DisplayKind::of(cc);
             #[cfg(target_os = "linux")]

@@ -380,6 +380,10 @@ pub struct Services {
     /// Preferences persistence: the platform config directory on native, browser storage on
     /// the web (see `prefs_ui`).
     pub load_prefs: Option<LoadTextFn>,
+    /// Opens the Craft suite's theme folder, once the preferences are read (desktop with the
+    /// per-user settings folder). Without one the suite selection is in memory: tests, agents,
+    /// portable installs and the web build never touch the shared folder.
+    pub suite_watch: Option<crate::theme::suite::OpenWatchFn>,
     pub save_prefs: Option<SaveTextFn>,
     /// Photoshop's live keyboard shortcut set, imported once at first launch (`kys_import`).
     pub photoshop_shortcuts: Option<PhotoshopShortcutsFn>,

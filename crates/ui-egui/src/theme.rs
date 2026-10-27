@@ -17,6 +17,9 @@
 //!   levels (#B8B8B8 and #F0F0F0 panels) with the Pro layout (#2661).
 //!
 //! Widgets read [`Tokens::get`] instead of hard-coding colours, so every theme applies everywhere.
+//!
+//! Suite themes (`craft_theme`) map onto the same tokens through [`Tokens::from_resolved`];
+//! [`suite`] picks the token sets for egui's two style slots.
 
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle, Visuals};
 use photocraft_engine::prefs::UiFontSize;
@@ -762,7 +765,45 @@ impl Tokens {
         }
     }
 
-    /// Tokens for the active theme (stored in egui's context data by [`apply`]).
+    /// A resolved suite theme on PhotoCraft's tokens. The base is Pro (Medium Gray) for a dark
+    /// variant and Pro (Light) for a light one: `kind` stays that base, so the layout flags,
+    /// radii, canvas, scope and caption colours are the base's (app-owned, not part of a theme).
+    pub fn from_resolved(r: &craft_theme::Resolved) -> Tokens {
+        use craft_ui::theme::color32 as c;
+        let base = match r.variant {
+            craft_theme::Variant::Dark => ThemeKind::ProMedium,
+            craft_theme::Variant::Light => ThemeKind::ProLight,
+        };
+        let (roles, d) = (&r.roles, &r.derived);
+        Tokens {
+            dock: c(roles.background),
+            chrome: c(roles.surface),
+            card: c(roles.surface),
+            field: c(roles.raised),
+            card_border: c(roles.line),
+            separator: c(roles.line),
+            field_border: c(d.control_edge),
+            hover: c(d.hover),
+            pressed: c(d.pressed),
+            text: c(roles.text),
+            text_dim: c(roles.text_muted),
+            text_faint: c(d.text_faint),
+            icon: c(roles.text.lerp_gamma(roles.text_muted, 0.25)),
+            accent: c(roles.accent),
+            primary_bg: c(roles.accent),
+            accent_border: c(roles.focus),
+            primary_text: c(roles.on_accent),
+            accent_text: c(d.accent_text),
+            accent_soft: c(roles.selection),
+            row_selected: c(roles.selection),
+            tab_strip: c(roles.background),
+            danger: c(roles.bad),
+            warning: c(roles.warn),
+            ..Tokens::for_kind(base)
+        }
+    }
+
+    /// Tokens for the active theme (stored in egui's context data by [`install`]).
     pub fn get(ctx: &egui::Context) -> Tokens {
         ctx.data(|d| d.get_temp::<Tokens>(tokens_id(ctx.theme()))).unwrap_or_else(|| Tokens::for_kind(ThemeKind::Studio))
     }
@@ -840,6 +881,19 @@ impl Tokens {
 
     pub fn dark(&self) -> bool {
         self.kind.is_dark()
+    }
+
+    /// Text and marks drawn on an `accent` fill (a hovered menu row, a selected cell, a switch
+    /// that is on). Where the primary button is the accent (every suite theme, and the Pro,
+    /// Adwaita and Solarized palettes) that is the button's text (`on_accent`); the other
+    /// PhotoCraft palettes draw white.
+    pub fn accent_ink(&self) -> Color32 {
+        if self.primary_bg == self.accent { self.primary_text } else { Color32::WHITE }
+    }
+
+    /// One of PhotoCraft's own palettes, unchanged (not a suite theme on its base layout).
+    pub fn is_own_palette(&self) -> bool {
+        *self == Tokens::for_kind(self.kind)
     }
 }
 
@@ -1013,15 +1067,25 @@ fn tokens_id(theme: egui::Theme) -> egui::Id {
     })
 }
 
+fn installed_id() -> egui::Id {
+    egui::Id::unique("photocraft-theme-installed")
+}
+
 /// Replace the tokens one style slot reads through [`Tokens::get`].
 pub(crate) fn store_tokens(ctx: &egui::Context, theme: egui::Theme, tokens: Tokens) {
     ctx.data_mut(|d| d.insert_temp(tokens_id(theme), tokens));
 }
 
-/// The themes in egui's Light and Dark style slots, if [`install`] ran on this context.
+/// The token sets [`install_tokens`] put in egui's Light and Dark style slots, before any
+/// debug-only override (`live`) changed what [`Tokens::get`] returns.
+pub fn installed_tokens(ctx: &egui::Context) -> Option<(Tokens, Tokens)> {
+    ctx.data(|d| d.get_temp::<(Tokens, Tokens)>(installed_id()))
+}
+
+/// The themes in egui's Light and Dark style slots, if [`install`] ran on this context. A suite
+/// theme reports its base ([`Tokens::from_resolved`]).
 pub fn installed(ctx: &egui::Context) -> Option<(ThemeKind, ThemeKind)> {
-    let kind = |theme| ctx.data(|d| d.get_temp::<Tokens>(tokens_id(theme))).map(|t| t.kind);
-    Some((kind(egui::Theme::Light)?, kind(egui::Theme::Dark)?))
+    installed_tokens(ctx).map(|(light, dark)| (light.kind, dark.kind))
 }
 
 /// Apply one theme to both of egui's style slots and publish its tokens.
@@ -1032,14 +1096,19 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
 /// Put `light` in egui's Light style slot and `dark` in its Dark slot, and publish both token
 /// sets. egui picks the slot from the OS appearance, so a system change needs no rebuild.
 pub fn install(ctx: &egui::Context, light: ThemeKind, dark: ThemeKind) {
-    // Keep native windows at SystemDefault so macOS continues reporting OS appearance changes,
-    // including when an integration or restored egui state pinned its own theme preference.
-    ctx.set_theme(egui::ThemePreference::System);
-    for (slot, kind) in [(egui::Theme::Light, light), (egui::Theme::Dark, dark)] {
-        let t = Tokens::for_kind(kind);
-        store_tokens(ctx, slot, t);
-        ctx.set_style_of(slot, style_for(&t, (*ctx.style_of(slot)).clone()));
-    }
+    install_tokens(ctx, Tokens::for_kind(light), Tokens::for_kind(dark));
+}
+
+/// [`install`] for token sets, which may come from a suite theme ([`Tokens::from_resolved`]).
+pub fn install_tokens(ctx: &egui::Context, light: Tokens, dark: Tokens) {
+    let style = |slot, t: &Tokens| style_for(t, (*ctx.style_of(slot)).clone());
+    let (light_style, dark_style) = (style(egui::Theme::Light, &light), style(egui::Theme::Dark, &dark));
+    store_tokens(ctx, egui::Theme::Light, light);
+    store_tokens(ctx, egui::Theme::Dark, dark);
+    ctx.data_mut(|d| d.insert_temp(installed_id(), (light, dark)));
+    // Also keeps native windows at SystemDefault, so macOS continues reporting OS appearance
+    // changes, including when an integration or restored egui state pinned its own preference.
+    craft_ui::theme::install(ctx, light_style, dark_style);
 }
 
 fn style_for(t: &Tokens, mut s: egui::Style) -> egui::Style {
@@ -1059,7 +1128,10 @@ fn style_for(t: &Tokens, mut s: egui::Style) -> egui::Style {
     v.window_shadow = egui::Shadow { offset: [0, 10], blur: 32, spread: 0, color: t.shadow };
     v.popup_shadow = egui::Shadow { offset: [0, 6], blur: 20, spread: 0, color: t.shadow };
     v.selection.bg_fill = if t.bevel || t.pro { t.accent } else { t.accent_soft };
-    v.selection.stroke = Stroke::new(1.0, t.accent_text);
+    // A suite theme's accent_text is readable on surfaces, not on the accent fill; there its ink
+    // is on_accent. PhotoCraft's own palettes keep the selection colours they always had.
+    let selection_ink = if (t.bevel || t.pro) && !t.is_own_palette() { t.accent_ink() } else { t.accent_text };
+    v.selection.stroke = Stroke::new(1.0, selection_ink);
     v.slider_trailing_fill = true;
     v.handle_shape = egui::style::HandleShape::Circle;
     v.striped = false;
@@ -1127,8 +1199,12 @@ pub fn canvas_bg(t: &Tokens) -> Color32 {
     t.canvas
 }
 
+pub mod suite;
+
 #[cfg(test)]
 mod golden_tests;
+#[cfg(test)]
+mod suite_tests;
 #[cfg(test)]
 mod tests;
 
@@ -1174,11 +1250,12 @@ pub mod live {
             let Ok(text) = std::fs::read_to_string(path) else { return false };
             match serde_json::from_str::<serde_json::Value>(&text) {
                 Ok(v) => {
-                    let (light, dark) = super::installed(ctx).unwrap_or_default();
-                    super::install(ctx, light, dark);
+                    let (light, dark) =
+                        super::installed_tokens(ctx).unwrap_or_else(|| (Tokens::for_kind(Default::default()), Tokens::for_kind(Default::default())));
+                    super::install_tokens(ctx, light, dark);
                     let mut unknown = Vec::new();
                     for slot in [egui::Theme::Light, egui::Theme::Dark] {
-                        let mut t = Tokens::for_kind(if slot == egui::Theme::Light { light } else { dark });
+                        let mut t = if slot == egui::Theme::Light { light } else { dark };
                         unknown = apply_overrides(&mut t, &v);
                         super::store_tokens(ctx, slot, t);
                     }

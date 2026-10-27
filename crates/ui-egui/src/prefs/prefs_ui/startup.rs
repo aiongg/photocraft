@@ -28,11 +28,12 @@ pub fn load(app: &mut PhotocraftApp) {
     app.prefs_rt.loaded = true;
     let mut invalid = Vec::new();
     let mut stored = None;
-    if let Some(text) = app.services.load_prefs.as_mut().and_then(|f| f()) {
-        match app.session.load_prefs_json(&text) {
+    let text = app.services.load_prefs.as_mut().map(|f| f());
+    if let Some(Some(text)) = &text {
+        match app.session.load_prefs_json(text) {
             Ok(found) => {
                 invalid = found;
-                stored = serde_json::from_str::<Value>(&text).ok();
+                stored = serde_json::from_str::<Value>(text).ok();
             }
             Err(e) => {
                 let template = "Preferences were reset: {error}";
@@ -40,6 +41,13 @@ pub fn load(app: &mut PhotocraftApp) {
             }
         }
     }
+    // A fresh install (a preferences store with nothing in it) follows the suite theme. A saved
+    // file without `suiteAppearance` keeps PhotoCraft's own themes (`Interface::app_choice`).
+    if let Some(None) = text {
+        app.session.prefs.edit(|p| p.interface.suite_appearance = Some(prefs::SuiteAppearance::follow_suite()));
+    }
+    let last = app.session.prefs().interface.suite_appearance.as_ref().map(|s| s.last_suite.clone()).unwrap_or_default();
+    app.suite = crate::theme::suite::Suite::open(app.services.suite_watch.take(), last);
     crate::dock::restore(app);
     crate::brush_picker::restore(app);
     crate::last_brush::restore(app);

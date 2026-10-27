@@ -2052,3 +2052,43 @@ fn ui_set_mask_target_ends_a_filter_mask_view() {
     let photocraft_doc::LayerContent::Smart(sm) = &l.content else { panic!("smart object") };
     assert_eq!(sm.filter_mask.as_ref().unwrap().value(20, 20), 1.0, "not into the filter mask");
 }
+
+#[test]
+fn ui_set_follows_the_suite_theme_or_picks_photocraft_s_own_and_inspect_reads_it_back() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    let appearance = |app: &mut PhotocraftApp| call(app, &ctx, "ui.inspect", json!({}))["result"]["appearance"].clone();
+    // The constructor keeps PhotoCraft's own themes, as saved preferences from before suite themes do.
+    let a = appearance(&mut app);
+    assert_eq!((a["followSuite"].clone(), a["themeId"].clone(), a["mode"].clone()), (json!(false), json!("craft.app-default"), json!("dark")));
+    assert_eq!(call(&mut app, &ctx, "ui.set", json!({"followSuite": true, "themeId": "craft.graphite"}))["ok"], true);
+    let a = appearance(&mut app);
+    assert_eq!(
+        (a["followSuite"].clone(), a["themeId"].clone(), a["suite"]["themeId"].clone()),
+        (json!(true), json!("craft.graphite"), json!("craft.graphite"))
+    );
+    let graphite = craft_theme::builtin(&craft_theme::ThemeId::parse("craft.graphite").unwrap()).unwrap();
+    let roles = graphite.variant(craft_theme::Variant::Dark).unwrap();
+    assert_eq!(crate::theme::Tokens::get(&ctx).dock, craft_ui::theme::color32(roles.background));
+    // Off: PhotoCraft's own choice; the suite keeps its theme.
+    assert_eq!(call(&mut app, &ctx, "ui.set", json!({"followSuite": false, "themeId": "craft.high-contrast"}))["ok"], true);
+    let a = appearance(&mut app);
+    assert_eq!(
+        (a["followSuite"].clone(), a["themeId"].clone(), a["ownThemeId"].clone()),
+        (json!(false), json!("craft.high-contrast"), json!("craft.high-contrast"))
+    );
+    assert_eq!(a["suite"]["themeId"], "craft.graphite");
+    // A rejected call applies none of its fields.
+    for bad in [json!({"followSuite": true, "themeId": "nobody.theme"}), json!({"followSuite": true, "themeId": "Bad Id"}), json!({"followSuite": "yes"})] {
+        let r = call(&mut app, &ctx, "ui.set", bad.clone());
+        assert_eq!(r["ok"], false, "{bad}");
+        assert_eq!(appearance(&mut app)["followSuite"], false, "{bad}");
+    }
+    assert!(call(&mut app, &ctx, "ui.set", json!({"themeId": "nobody.theme"}))["error"].as_str().unwrap().contains("craft.artcraft"));
+    // `theme` picks one of PhotoCraft's own themes, which leaves the suite theme.
+    call(&mut app, &ctx, "ui.set", json!({"followSuite": true}));
+    assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": "studio"}))["ok"], true);
+    let a = appearance(&mut app);
+    assert_eq!((a["followSuite"].clone(), a["themeId"].clone()), (json!(false), json!("craft.app-default")));
+    assert_eq!(app.ui.theme, crate::theme::ThemeKind::Studio);
+}

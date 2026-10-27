@@ -390,7 +390,8 @@ fn manual_theme_tokens_and_global_styles_stay_fixed_across_os_changes() {
 #[test]
 fn fixed_dark_draws_dark_under_a_light_os_and_fixed_light_under_a_dark_one() {
     for (mode, os, kind) in [("dark", egui::Theme::Light, ThemeKind::ProMedium), ("light", egui::Theme::Dark, ThemeKind::ProLight)] {
-        let (mut app, _) = app_with_store();
+        // Saved preferences: PhotoCraft's own themes (a fresh install follows the suite theme).
+        let (mut app, _) = app_with_saved(Some("{}".into()));
         let ctx = egui::Context::default();
         PhotocraftApp::setup_context(&ctx, Default::default());
         app.run("prefs.set", json!({"values": {"interface.appearanceMode": mode, "interface.darkTheme": "proMedium", "interface.lightTheme": "proLight"}}))

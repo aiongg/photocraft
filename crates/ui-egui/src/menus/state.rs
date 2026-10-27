@@ -121,8 +121,11 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     }
     use photocraft_doc::{ColorMode, SampleType};
     if let Some(name) = id.strip_prefix("window.theme.").filter(|n| *n != "toggle") {
-        let auto = app.session.prefs().interface.appearance_mode == photocraft_engine::prefs::AppearanceMode::Auto;
-        return Some(if name == "system" { auto } else { !auto && crate::theme::ThemeKind::from_name(name) == Some(app.ui.theme) });
+        let selection = crate::prefs_ui::effective_selection(app);
+        let auto = selection.mode == craft_theme::Mode::System;
+        // A suite theme draws on a PhotoCraft base layout, which is not a PhotoCraft theme choice.
+        let own = selection.theme.is_app_default();
+        return Some(if name == "system" { auto } else { !auto && own && crate::theme::ThemeKind::from_name(name) == Some(app.ui.theme) });
     }
     if let Some(c) = crate::view_cmds::checked(app, id) {
         return Some(c);

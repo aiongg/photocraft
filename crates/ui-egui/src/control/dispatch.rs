@@ -257,6 +257,21 @@ pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &Contr
                     }
                     None => None,
                 };
+                let follow_suite = bool_field(p, "followSuite")?;
+                let theme_id = match p.get("themeId") {
+                    Some(v) => {
+                        let name = v.as_str().ok_or("themeId must be a theme id string")?;
+                        let id = craft_theme::ThemeId::parse(name).map_err(|e| format!("themeId `{name}`: {e}"))?;
+                        if !app.suite.knows(&id) {
+                            let mut known = vec![craft_theme::APP_DEFAULT.to_string()];
+                            known.extend(craft_theme::builtins().iter().map(|t| t.id.as_str().to_string()));
+                            known.extend(app.suite.client().snapshot().index.iter().map(|e| e.id.as_str().to_string()));
+                            return Err(format!("unknown theme id `{name}` ({})", known.join(", ")));
+                        }
+                        Some(id)
+                    }
+                    None => None,
+                };
                 let brush_section = uint_field(p, "brushSection")?;
                 let brush_tab = uint_field(p, "brushTab")?;
                 let brushes_view = match p.get("brushesView") {
@@ -416,6 +431,10 @@ pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &Contr
                 }
                 if let Some(k) = theme {
                     app.set_theme(ctx, k);
+                }
+                // After `theme`, which picks one of PhotoCraft's own themes.
+                if follow_suite.is_some() || theme_id.is_some() {
+                    crate::prefs_ui::choose_suite_appearance(app, ctx, follow_suite, theme_id);
                 }
                 if let Some(v) = dock_tabs {
                     app.ui.dock_tabs = v;

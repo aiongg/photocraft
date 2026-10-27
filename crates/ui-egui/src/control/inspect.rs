@@ -78,6 +78,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "dialogs": dialogs,
         "windows": app.ui.windows,
         "theme": app.ui.theme,
+        "appearance": crate::prefs_ui::inspect_appearance(app),
         "status": app.ui.status,
         "statusError": app.ui.status_error,
         "notices": app.ui.notices,

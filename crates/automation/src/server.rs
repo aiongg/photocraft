@@ -330,7 +330,10 @@ pub struct UiSetParams {
     /// Fields for the control method `ui.set`: tool, panels, dock, dockTabs, dockWidth, colorPanel
     /// ({background: bool} picks which swatch the Color panel edits), maskTarget,
     /// vectorMaskTarget, filterMaskTarget (paint the active smart object's filter mask), selectionMode, zoom, center, rotation (view angle in degrees), fit, theme (pro, proMedium, studio,
-    /// studioLight, classic, solarizedDark, adwaita, adwaitaDark, breezeLight, breezeDark, softLight, softDark), brushSection, brushTab,
+    /// studioLight, classic, solarizedDark, adwaita, adwaitaDark, breezeLight, breezeDark, softLight, softDark; one of PhotoCraft's own
+    /// themes, which stops following the suite theme), followSuite (bool: use the Craft suite's theme), themeId (a suite theme id such as
+    /// craft.artcraft, craft.graphite, craft.high-contrast, a library theme, or craft.app-default for PhotoCraft's own themes; the
+    /// suite's theme while following the suite, else PhotoCraft's own; `ui.inspect` reports both under `appearance`), brushSection, brushTab,
     /// brushesView, brushPicker ([x, y] opens the Brush Preset picker there, null closes it),
     /// brushPickerName, brushPickerStroke, brushPickerTip (the picker card's parts, at least one
     /// on), brushPickerScale (the picker footer's card-scale slider, 0.15 to 2, 1 the standard),
@@ -1003,7 +1006,7 @@ impl PhotocraftMcp {
     }
 
     #[tool(
-        description = "Bridge mode: change UI state (tool, panels, dock, zoom, center, fit, theme, brush settings; see `fields`). Unknown fields are an error."
+        description = "Bridge mode: change UI state (tool, panels, dock, zoom, center, fit, theme, suite theme, brush settings; see `fields`). Unknown fields are an error."
     )]
     async fn ui_set(&self, Parameters(p): Parameters<UiSetParams>) -> Result<CallToolResult, McpError> {
         match self.bridge_client() {
