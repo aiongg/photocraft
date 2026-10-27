@@ -111,10 +111,10 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     {
                         app.ui.palette_open = !app.ui.palette_open;
                     }
-                    let (theme_icon, appearance_label) = match app.session.prefs().interface.appearance_mode {
-                        photocraft_engine::prefs::AppearanceMode::Auto => ("monitor", tl!("Auto")),
-                        photocraft_engine::prefs::AppearanceMode::Dark => ("moon", tl!("Dark")),
-                        photocraft_engine::prefs::AppearanceMode::Light => ("sun", tl!("Light")),
+                    let (theme_icon, appearance_label) = match crate::prefs_ui::effective_selection(app).mode {
+                        craft_theme::Mode::System => ("monitor", tl!("Auto")),
+                        craft_theme::Mode::Dark => ("moon", tl!("Dark")),
+                        craft_theme::Mode::Light => ("sun", tl!("Light")),
                     };
                     let appearance_tip = format!("{}: {}", tl!("Appearance Mode"), appearance_label);
                     if icons_shown >= 2 {

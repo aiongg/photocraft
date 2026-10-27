@@ -136,6 +136,8 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) -> u64 {
     let section = if SECTIONS.iter().any(|(id, _)| *id == section) { section } else { "general" };
     let working = preference_values(app.session.prefs());
     let order = field_order(app.session.prefs(), &working);
+    // The theme cards list the suite library as it is now.
+    app.suite.rescan();
     open_kind(app, "prefs", "Preferences", json!({"section": section, "values": working, "__order": order}))
 }
 
@@ -320,7 +322,8 @@ pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value, String> {
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
         "prefs" => {
-            let values = f.get("values").cloned().unwrap_or(Value::Null);
+            let mut values = f.get("values").cloned().unwrap_or(Value::Null);
+            super::appearance::keep_last_suite(app, &mut values);
             app.run("prefs.set", json!({"path": "", "value": values}))
         }
         "shortcuts" => {

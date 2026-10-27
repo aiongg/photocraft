@@ -165,6 +165,17 @@ pub fn menu_items(app: &PhotocraftApp) -> Vec<MenuItem> {
             items.insert(after + 1 + k, it);
         }
     }
+    // Window › Theme: Follow suite (where the suite is shared) and the suite themes, built-ins
+    // first, above PhotoCraft's own themes.
+    if let Some(at) = items.iter().position(|i| i.path.len() >= 2 && i.path[0] == "Window" && i.path[1] == "Theme") {
+        let tp: Vec<String> = vec!["Window".into(), "Theme".into()];
+        let item = |id: String, label: String| MenuItem { checked: checked(app, &id), id, label, path: tp.clone(), shortcut: None, enabled: true, color: None };
+        let follow = app.suite.is_shared().then(|| item(crate::menus::FOLLOW_SUITE_ITEM.into(), "Follow suite".into()));
+        let themes = app.suite.themes().into_iter().map(|(id, name)| item(format!("{}{}", crate::menus::SUITE_THEME_ITEM, id.as_str()), name));
+        let separator = MenuItem { id: "---".into(), label: "---".into(), path: tp.clone(), shortcut: None, enabled: false, checked: None, color: None };
+        let rows: Vec<MenuItem> = follow.into_iter().chain(themes).chain(std::iter::once(separator)).collect();
+        items.splice(at..at, rows);
+    }
     // Window › Workspace: saved workspaces follow the presets, checked while current.
     let saved = crate::workspace_ui::saved_names(app);
     if !saved.is_empty()

@@ -6,8 +6,12 @@
 //! [`Tokens::from_resolved`].
 
 use super::{ThemeKind, Tokens};
+use craft_theme::contrast::Diagnostic;
 use craft_theme::{AppChoice, AppDefaults, Mode, Resolution, Selection, SuiteTheme, ThemeId, Variant};
-use craft_theme_store::{Accepted, Problem, SelectionChange, StoreError, StoreOptions, SuiteChoice, SuiteClient, SuiteWatch};
+use craft_theme_store::{
+    Accepted, FileStamp, Op, OpOutput, Problem, SelectionChange, StoreError, StoreOptions, SuiteChoice, SuiteClient, SuiteWatch, ThemeRecord,
+};
+use std::collections::HashMap;
 
 /// What PhotoCraft shows while it follows the suite and no suite theme has been picked.
 pub fn app_defaults() -> AppDefaults {
@@ -42,6 +46,15 @@ pub struct Suite {
     client: SuiteClient,
     cache: Option<(Key, (Tokens, Tokens))>,
     shared: bool,
+    /// Library themes read for a theme picker's previews, by id.
+    previews: HashMap<ThemeId, Preview>,
+}
+
+/// A library theme's file, read for its preview: asked for (the request id), or read (`None` when
+/// it didn't parse). Read again when the library lists a new stamp.
+enum Preview {
+    Requested(u64, FileStamp),
+    Read(FileStamp, Option<Box<ThemeRecord>>),
 }
 
 impl Default for Suite {
@@ -54,7 +67,7 @@ impl Suite {
     /// A suite only this app sees (in memory): there is nothing to follow, so the per-app
     /// choice is the only one.
     pub fn new(watch: SuiteWatch) -> Self {
-        Suite { client: SuiteClient::new(watch), cache: None, shared: false }
+        Suite { client: SuiteClient::new(watch), cache: None, shared: false, previews: HashMap::new() }
     }
 
     /// The suite folder the other Craft apps use, opened by the shell.
@@ -149,6 +162,88 @@ impl Suite {
     /// A theme PhotoCraft can show by this id: its own themes, a built-in or a library theme.
     pub fn knows(&self, id: &ThemeId) -> bool {
         id.is_app_default() || craft_theme::builtin(id).is_some() || self.client.snapshot().index.iter().any(|e| e.id == *id)
+    }
+
+    /// The suite themes a theme picker lists: the built-ins in their order, then the library
+    /// themes by name.
+    pub fn themes(&self) -> Vec<(ThemeId, String)> {
+        let mut library: Vec<(ThemeId, String)> = self.client.snapshot().index.iter().map(|e| (e.id.clone(), e.name.clone())).collect();
+        library.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()).then_with(|| a.0.cmp(&b.0)));
+        craft_theme::builtins().iter().map(|t| (t.id.clone(), t.name.clone())).chain(library).collect()
+    }
+
+    /// A theme's name as a picker shows it; the id for one PhotoCraft doesn't know.
+    pub fn name(&self, id: &ThemeId) -> String {
+        craft_theme::builtin(id)
+            .map(|t| t.name.clone())
+            .or_else(|| self.client.snapshot().index.iter().find(|e| e.id == *id).map(|e| e.name.clone()))
+            .unwrap_or_else(|| id.as_str().to_owned())
+    }
+
+    /// True while `id` is a library theme just picked that the watcher hasn't read yet.
+    pub fn is_loading(&self, id: &ThemeId) -> bool {
+        self.client.is_loading(id)
+    }
+
+    /// A theme picker opened: re-list the library and read every library theme's file that
+    /// changed for its preview. Call each frame the picker shows; files already read are not
+    /// read again.
+    pub fn read_previews(&mut self) {
+        let latest = self.client.watch().snapshot();
+        let index = self.client.snapshot().index.clone();
+        for e in index.iter() {
+            let ask = match self.previews.get(&e.id) {
+                Some(Preview::Read(stamp, _)) => *stamp != e.stamp,
+                Some(Preview::Requested(request, stamp)) if *stamp == e.stamp => match latest.result(*request) {
+                    Some(result) => {
+                        let record = match result {
+                            Ok(OpOutput::Exported(bytes)) => craft_theme_store::parse_theme(bytes).ok().map(Box::new),
+                            _ => None,
+                        };
+                        self.previews.insert(e.id.clone(), Preview::Read(e.stamp, record));
+                        false
+                    }
+                    // Only the latest results are kept: ask again once this one has dropped out.
+                    None => latest.results.first().is_some_and(|(oldest, _)| oldest > request),
+                },
+                _ => true,
+            };
+            if ask {
+                let request = self.client.watch().request(Op::Export(e.id.clone()));
+                self.previews.insert(e.id.clone(), Preview::Requested(request, e.stamp));
+            }
+        }
+        self.previews.retain(|id, _| index.iter().any(|e| e.id == *id));
+    }
+
+    /// Asks the watcher to list the library again now (a theme picker opened).
+    pub fn rescan(&self) {
+        self.client.watch().request(Op::Rescan);
+    }
+
+    /// The library theme's record, when one is read: the suite's or PhotoCraft's theme in use,
+    /// or one read for its preview.
+    fn record(&self, id: &ThemeId) -> Option<&ThemeRecord> {
+        let snapshot = self.client.snapshot();
+        [&snapshot.active, &snapshot.app_theme].into_iter().flatten().find(|r| r.theme.id == *id).or_else(|| match self.previews.get(id) {
+            Some(Preview::Read(_, record)) => record.as_deref(),
+            _ => None,
+        })
+    }
+
+    /// The tokens a theme picker previews `id` with, for (Light, Dark): `None` until a library
+    /// theme's file is read.
+    pub fn preview(&self, id: &ThemeId) -> Option<(Tokens, Tokens)> {
+        let theme = craft_theme::builtin(id).cloned().or_else(|| self.record(id).map(|r| r.theme.clone()))?;
+        let selection = Selection { theme: id.clone(), mode: Mode::System };
+        let own = (ThemeKind::ProLight, ThemeKind::ProMedium);
+        Some(resolve_slots(&selection, &|wanted| (*wanted == theme.id).then(|| theme.clone()), own))
+    }
+
+    /// A library theme's contrast findings (advisory: its colours are used as they are).
+    /// Built-ins have none.
+    pub fn diagnostics(&self, id: &ThemeId) -> &[Diagnostic] {
+        self.record(id).map_or(&[], |r| &r.diagnostics)
     }
 
     /// The token sets for egui's Light and Dark slots under `choice`, with `own` as PhotoCraft's

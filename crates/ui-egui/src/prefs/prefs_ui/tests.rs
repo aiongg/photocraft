@@ -3,9 +3,10 @@ fn memory_usage_has_a_dedicated_explanation_and_keeps_its_value() {
     use egui_kittest::{Harness, kittest::Queryable};
     let values = json!({"memoryUsageMb":50000}).as_object().unwrap().clone();
     assert!(!field_visible("performance", &values, "memoryUsageMb", ""));
-    let mut h = Harness::builder()
-        .with_size(vec2(680.0, 350.0))
-        .build_ui_state(|ui, values| section_fields(ui, "performance", values, &["memoryUsageMb".into()], crate::i18n::Lang::EN, None, ""), values);
+    let mut h = Harness::builder().with_size(vec2(680.0, 350.0)).build_ui_state(
+        |ui, values| section_fields(ui, "performance", values, &["memoryUsageMb".into()], crate::i18n::Lang::EN, &mut Default::default(), ""),
+        values,
+    );
     h.run_steps(2);
     h.get_by_label("Memory Usage");
     h.get_by_label("Per-document RAM limit (MB)");
@@ -22,7 +23,7 @@ fn the_generator_checkbox_reads_enable_generator() {
     let keys: Vec<String> = values.keys().cloned().collect();
     let mut h = Harness::builder()
         .with_size(vec2(680.0, 350.0))
-        .build_ui_state(move |ui, values| section_fields(ui, "plugIns", values, &keys, crate::i18n::Lang::EN, None, ""), values);
+        .build_ui_state(move |ui, values| section_fields(ui, "plugIns", values, &keys, crate::i18n::Lang::EN, &mut Default::default(), ""), values);
     h.run_steps(2);
     assert!(h.query_by_label("Generator enabled").is_none());
     h.get_by_label("Enable Generator").click();
@@ -508,7 +509,7 @@ fn preferences_interface_offers_and_applies_sync_with_system() {
 #[test]
 fn theme_star_saves_favorite_and_menu_groups_it() {
     use egui_kittest::{Harness, kittest::Queryable};
-    let (mut app, _) = app_with_store();
+    let (mut app, _) = app_with_own_themes();
     open_preferences(&mut app, "interface");
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
@@ -533,7 +534,7 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
 #[test]
 fn theme_star_badge_on_hover_does_not_move_the_next_swatch() {
     use egui_kittest::{Harness, kittest::Queryable};
-    let (mut app, _) = app_with_store();
+    let (mut app, _) = app_with_own_themes();
     open_preferences(&mut app, "interface");
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
@@ -554,7 +555,7 @@ fn preferences_interface_shows_language_without_scrolling() {
     // #2532: in a small window the theme cards filled the page and Language sat out of view
     // below them. Like Photoshop, Presentation follows Appearance and both fit.
     use egui_kittest::{Harness, kittest::Queryable};
-    let (mut app, _) = app_with_store();
+    let (mut app, _) = app_with_own_themes();
     app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
     open_preferences(&mut app, "interface");
     let mut h = Harness::builder().with_size(vec2(1000.0, 750.0)).build_eframe(move |cc| {
@@ -579,7 +580,7 @@ fn preferences_interface_shows_language_without_scrolling() {
 fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
     use egui_kittest::{Harness, kittest::Queryable};
     let render = |search: &str| {
-        let (mut app, _) = app_with_store();
+        let (mut app, _) = app_with_own_themes();
         app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
         let id = open_preferences(&mut app, "interface");
         app.ui.dialog_mut(id).unwrap().fields.insert("__search".into(), json!(search));
@@ -612,6 +613,12 @@ fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
 
 fn app_with_store() -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
     app_with_saved(None)
+}
+
+/// A saved preferences file from before suite themes: PhotoCraft's own themes are the choice, so
+/// the Light Theme and Dark Theme swatch rows show.
+fn app_with_own_themes() -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
+    app_with_saved(Some("{}".into()))
 }
 
 fn app_with_saved(text: Option<String>) -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
@@ -1699,7 +1706,7 @@ fn rendering_mode_explains_next_launch() {
     use egui_kittest::{Harness, kittest::Queryable};
     let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
     let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""),
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), &mut Default::default(), ""),
         obj,
     );
     h.run_steps(4);
@@ -1708,7 +1715,7 @@ fn rendering_mode_explains_next_launch() {
     // A search that leaves Rendering Mode out leaves its notice out too.
     let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
     let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, "history"),
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), &mut Default::default(), "history"),
         obj,
     );
     h.run_steps(4);
@@ -1721,7 +1728,7 @@ fn integrations_explain_next_launch() {
     use egui_kittest::{Harness, kittest::Queryable};
     let obj = json!({"allowAgentControl": true, "controlPort": 0}).as_object().unwrap().clone();
     let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "integrations", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""),
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "integrations", obj, &[], crate::i18n::Lang::from_pref("en"), &mut Default::default(), ""),
         obj,
     );
     h.run_steps(4);
@@ -1733,8 +1740,10 @@ fn integrations_explain_next_launch() {
 fn next_launch_notice_does_not_mark_unrelated_interface_preferences() {
     use egui_kittest::{Harness, kittest::Queryable};
     let obj = json!({"showTooltips": true}).as_object().unwrap().clone();
-    let mut h =
-        Harness::new_ui_state(|ui, obj: &mut Map<String, Value>| section_fields(ui, "interface", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""), obj);
+    let mut h = Harness::new_ui_state(
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "interface", obj, &[], crate::i18n::Lang::from_pref("en"), &mut Default::default(), ""),
+        obj,
+    );
     h.run_steps(4);
     assert!(h.query_by_label("Applies at next launch.").is_none());
     h.get_by_label("Show tooltips").click();

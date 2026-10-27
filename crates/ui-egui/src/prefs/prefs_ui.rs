@@ -13,8 +13,10 @@ use egui::{Color32, RichText, Sense, vec2};
 use photocraft_doc::DocId;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
 #[cfg(test)]
+use photocraft_engine::prefs::AppearanceMode;
+#[cfg(test)]
 use photocraft_engine::prefs::Theme;
-use photocraft_engine::prefs::{self, AppearanceMode, DarkTheme, LightTheme, SECTIONS, Theme as SavedTheme};
+use photocraft_engine::prefs::{self, DarkTheme, LightTheme, SECTIONS, Theme as SavedTheme};
 use photocraft_engine::snap::{SnapLine, SnapOptions, SnapTargets};
 use serde_json::{Map, Value, json};
 
@@ -72,7 +74,8 @@ mod startup;
 #[cfg(test)]
 use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
 pub(crate) use appearance::{
-    appearance_context_menu, choose_suite_appearance, cycle_appearance, effective_selection, inspect_appearance, step_brightness, sync_appearance,
+    appearance_context_menu, choose_suite_appearance, cycle_appearance, effective_selection, inspect_appearance, set_scope_mode, step_brightness,
+    sync_appearance,
 };
 pub use appearance::{canvas_style, pasteboard_color};
 pub use dialogs::{
@@ -107,6 +110,8 @@ mod recovery_tests;
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
+#[cfg(test)]
+mod suite_ui_tests;
 
 #[cfg(test)]
 mod tests;

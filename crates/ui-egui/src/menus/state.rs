@@ -120,6 +120,12 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         return Some(checked);
     }
     use photocraft_doc::{ColorMode, SampleType};
+    if id == FOLLOW_SUITE_ITEM {
+        return Some(app.session.prefs().interface.app_choice() == craft_theme::AppChoice::FollowSuite);
+    }
+    if let Some(theme) = suite_theme_item(id) {
+        return Some(crate::prefs_ui::effective_selection(app).theme == theme);
+    }
     if let Some(name) = id.strip_prefix("window.theme.").filter(|n| *n != "toggle") {
         let selection = crate::prefs_ui::effective_selection(app);
         let auto = selection.mode == craft_theme::Mode::System;
@@ -220,8 +226,7 @@ pub(crate) fn reveal_label() -> &'static str {
 /// Translate the fixed command label and substitute the currently configured export format.
 /// Reuse the existing translated PNG sentence, so dynamic formats work in every UI language.
 pub(super) fn translated_menu_label(lang: crate::i18n::Lang, item: &MenuItem) -> String {
-    // A document's name is shown as it is.
-    if item.id.starts_with(DOCUMENT_ITEM) {
+    if verbatim_label(&item.id) {
         return item.label.clone();
     }
     if item.id == "file.export.quickExportAsPng"

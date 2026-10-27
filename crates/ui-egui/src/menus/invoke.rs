@@ -288,8 +288,19 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             Ok(json!({"theme": app.ui.theme.id()}))
         }
         "window.theme.system" => {
-            app.run("prefs.set", json!({"path": "interface.appearanceMode", "value": "auto"}))?;
-            crate::prefs_ui::sync_appearance(app, ctx);
+            crate::prefs_ui::set_scope_mode(app, ctx, craft_theme::Mode::System)?;
+            Ok(Value::Null)
+        }
+        crate::menus::FOLLOW_SUITE_ITEM => {
+            let following = app.session.prefs().interface.app_choice() == craft_theme::AppChoice::FollowSuite;
+            crate::prefs_ui::choose_suite_appearance(app, ctx, Some(!following), None);
+            Ok(Value::Null)
+        }
+        i if i.starts_with(crate::menus::SUITE_THEME_ITEM) => {
+            let theme = crate::menus::suite_theme_item(i).filter(|t| app.suite.knows(t)).ok_or_else(|| format!("unknown suite theme: {i}"))?;
+            // Like its card in Preferences: the suite's theme while following it, else this app's.
+            let follow = (!app.suite.is_shared()).then_some(false);
+            crate::prefs_ui::choose_suite_appearance(app, ctx, follow, Some(theme));
             Ok(Value::Null)
         }
         "window.theme.pro"

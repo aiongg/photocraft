@@ -1,4 +1,4 @@
-use super::appearance::{AppearanceRows, appearance_rows};
+use super::appearance::{AppearanceRows, SuiteRows, appearance_rows, apply_suite_clicks, keep_last_suite, suite_rows};
 use super::dialogs::{mismatch_body, presets_body, presets_io_body, settings_height};
 use super::graphics::{gpu_memory_lines, gpu_status_rows, memory_usage_row, read_at_launch, rendering_mode_row};
 use super::shortcuts::shortcuts_body;
@@ -14,8 +14,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             info.extend(gpu_memory_lines(app));
             f.insert("__gpuInfo".into(), json!(info));
             f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
-            let system = Some(ui.ctx().theme());
-            prefs_body(ui, f, system);
+            if let Some(values) = f.get_mut("values") {
+                keep_last_suite(app, values);
+            }
+            let mut suite = suite_rows(app, Some(ui.ctx().theme()));
+            prefs_body(ui, f, &mut suite);
+            apply_suite_clicks(app, ui.ctx(), suite);
         }
         "shortcuts" => shortcuts_body(app, ui, f),
         "presets" => presets_body(app, ui, f),
@@ -30,6 +34,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
 pub(super) fn humanize(key: &str) -> String {
     match key {
         "appearanceMode" => return "Appearance Mode".into(),
+        "suiteAppearance" => return "Theme".into(),
         "exrAcesCg" => return "Open color-less EXR as ACEScg".into(),
         "darkTheme" => return "Dark Theme".into(),
         "lightTheme" => return "Light Theme".into(),
@@ -162,7 +167,7 @@ pub(super) fn preference_sections(values: &Value, search: &str) -> Vec<(&'static
 }
 
 /// Preferences: section list on the left, the section's settings on the right.
-fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui::Theme>) {
+fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, suite: &mut SuiteRows) {
     let t = Tokens::get(ui.ctx());
     let mut section = f.get("section").and_then(Value::as_str).unwrap_or("general").to_string();
     let mut values = f.get("values").cloned().unwrap_or(Value::Null);
@@ -234,7 +239,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                     ui.add_space(4.0);
                     ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
                 } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
-                    section_fields(ui, &section, obj, &order, lang, system, filter);
+                    section_fields(ui, &section, obj, &order, lang, suite, filter);
                     if section == "fileHandling" {
                         ui.label(
                             RichText::new(tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized."))
@@ -304,7 +309,7 @@ fn pref_group(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
 /// language, font size and scaling, then everything else. Compact enough that the language
 /// shows without scrolling in a small window (#2532). A search (`query`, lowercased) hides the
 /// rows that don't match and skips a group left empty.
-fn interface_groups(ui: &mut egui::Ui, obj: &mut Map<String, Value>, keys: &[String], lang: crate::i18n::Lang, system: Option<egui::Theme>, query: &str) {
+fn interface_groups(ui: &mut egui::Ui, obj: &mut Map<String, Value>, keys: &[String], lang: crate::i18n::Lang, suite: &mut SuiteRows, query: &str) {
     const APPEARANCE: [&str; 3] = ["canvasColor", "canvasCustomColor", "canvasBorder"];
     const PRESENTATION: [&str; 3] = ["language", "uiFontSize", "uiScale"];
     let shown = |k: &str| keys.iter().any(|key| key == k) && field_visible("interface", obj, k, query);
@@ -320,7 +325,7 @@ fn interface_groups(ui: &mut egui::Ui, obj: &mut Map<String, Value>, keys: &[Str
     if rows.any() || !appearance.is_empty() {
         pref_group(ui, "Appearance", |ui| {
             grid("interface-appearance").show(ui, |ui| {
-                appearance_rows(ui, obj, system, rows);
+                appearance_rows(ui, obj, suite, rows);
                 field_rows(ui, "interface", obj, appearance, lang);
             });
         });
@@ -374,14 +379,14 @@ pub(super) fn section_fields(
     obj: &mut Map<String, Value>,
     order: &[String],
     lang: crate::i18n::Lang,
-    system: Option<egui::Theme>,
+    suite: &mut SuiteRows,
     search: &str,
 ) {
     let query = search.to_lowercase();
     let mut keys: Vec<String> = order.iter().filter(|k| obj.contains_key(*k)).cloned().collect();
     keys.extend(obj.keys().filter(|k| !order.contains(k)).cloned());
     if section == "interface" {
-        interface_groups(ui, obj, &keys, lang, system, &query);
+        interface_groups(ui, obj, &keys, lang, suite, &query);
         return;
     }
     if section == "performance" && (query.is_empty() || preference_matches(section, "renderingMode", &query)) {

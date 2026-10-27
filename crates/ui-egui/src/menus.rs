@@ -62,6 +62,22 @@ pub const UI_COMMANDS: &[(&str, &str, &[&str], Option<&str>)] = photocraft_engin
 /// The id ends in the document's index, which is its tab's position.
 pub(crate) const DOCUMENT_ITEM: &str = "window.document.";
 
+/// Window › Theme › Follow suite (shown only where the suite folder is shared).
+pub(crate) const FOLLOW_SUITE_ITEM: &str = "window.theme.followSuite";
+
+/// Window › Theme › <suite theme>: the id ends in the theme's id.
+pub(crate) const SUITE_THEME_ITEM: &str = "window.theme.suite.";
+
+/// The suite theme a Window › Theme item picks.
+pub(crate) fn suite_theme_item(id: &str) -> Option<craft_theme::ThemeId> {
+    id.strip_prefix(SUITE_THEME_ITEM).and_then(|t| craft_theme::ThemeId::parse(t).ok())
+}
+
+/// A label shown as it is, untranslated: a document's or a library theme's name.
+pub(crate) fn verbatim_label(id: &str) -> bool {
+    id.starts_with(DOCUMENT_ITEM) || suite_theme_item(id).is_some_and(|t| !t.is_builtin())
+}
+
 #[cfg(test)]
 mod tests;
 
