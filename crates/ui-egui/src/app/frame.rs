@@ -23,6 +23,9 @@ impl PhotocraftApp {
         // cursor block needs it before the frame renders. `None` (Wayland/web) keeps `false`.
         self.caps_lock = self.services.caps_lock.as_mut().is_some_and(|f| f());
         tool_cursor::set_wayland(ctx, self.services.is_wayland);
+        if let Some(restore) = self.services.window_restore.as_mut() {
+            restore(ctx);
+        }
         if !self.styled {
             Self::setup_context(ctx, self.ui.theme);
             self.styled = true;

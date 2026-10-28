@@ -1423,6 +1423,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-settings"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=e25ebfafd6033d5c1fa2355feddce1ece864748c#e25ebfafd6033d5c1fa2355feddce1ece864748c"
+dependencies = [
+ "craft-atomic",
+ "dirs",
+ "serde",
+ "toml_edit",
+]
+
+[[package]]
 name = "craft-theme"
 version = "0.1.0"
 source = "git+https://github.com/aiongg/craft-libs?rev=e25ebfafd6033d5c1fa2355feddce1ece864748c#e25ebfafd6033d5c1fa2355feddce1ece864748c"
@@ -1495,11 +1506,17 @@ name = "craft-window"
 version = "0.1.0"
 source = "git+https://github.com/aiongg/craft-libs?rev=e25ebfafd6033d5c1fa2355feddce1ece864748c#e25ebfafd6033d5c1fa2355feddce1ece864748c"
 dependencies = [
+ "craft-atomic",
+ "craft-settings",
+ "eframe",
  "egui",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "serde",
+ "serde_json",
  "wayland-client",
+ "winit",
 ]
 
 [[package]]
@@ -7744,8 +7761,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1340ea94a5856333492c9064b02c778b191dd2c853778d9609debdcdfea3a614"
 dependencies = [
  "indexmap",
+ "serde_core",
+ "serde_spanned",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 
