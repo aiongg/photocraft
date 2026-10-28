@@ -81,6 +81,7 @@ impl PhotocraftApp {
             styled: false,
             integrated_titlebar: false,
             custom_titlebar: false,
+            native_frame: false,
             traffic_lights: craft_window::mac::TrafficLights::new(),
             #[cfg(target_os = "macos")]
             titlebar_movable: None,

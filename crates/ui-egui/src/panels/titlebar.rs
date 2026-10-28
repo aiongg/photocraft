@@ -35,6 +35,7 @@ impl CaptionStyle {
     /// `family` with the buttons a GTK decoration layout names (`gtk-decoration-layout`, GNOME's
     /// `button-layout`, e.g. `appmenu:minimize,maximize,close`), as [`craft_window::Layout::parse`]
     /// reads it.
+    #[cfg(test)]
     pub fn from_gtk_layout(family: CaptionFamily, layout: &str) -> Self {
         Self { captions: Captions { family, layout: craft_window::Layout::parse(layout) }, icons: None }
     }
@@ -61,6 +62,13 @@ pub(crate) fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, style: &Captio
     } else {
         Frame::Native
     }
+}
+
+/// The edge resize zones of the undecorated window when the menu bar, and with it the title bar,
+/// is hidden.
+pub(crate) fn edge_zones_without_bar(app: &PhotocraftApp, ui: &mut egui::Ui) {
+    let style = style(app, ui.ctx());
+    craft_ui::title_bar::resize_zones_only(ui, &Frame::Integrated(style.captions), false);
 }
 
 /// The caption buttons' colours: a suite theme's from its roles; PhotoCraft's own palettes give

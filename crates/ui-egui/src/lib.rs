@@ -232,7 +232,7 @@ pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
     CaptionStyleFn, ClipboardGetFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, EncodePngFn, ExportFn, ExportSettings, FileStamp,
     FileStampFn, FormatChoices, ImportFn, Inbox, LoadPrefsFn, OpenUrlFn, OsEventsFn, PhotoshopShortcutsFn, QuitFn, RecoverFn, Recoverable, RightButtonDownFn,
-    SameFileFn, SaveFileFn, SaveTextFn, Services, WindowFrameFn, WriteFn,
+    SameFileFn, SaveFileFn, SaveTextFn, Services, SetMovableFn, WindowFrameFn, WriteFn,
 };
 pub use text::bidi_text;
 pub use text::cjk_fonts;
@@ -425,6 +425,10 @@ pub struct PhotocraftApp {
     /// Windows and Linux: the window has no OS decorations and the app's top bar is the title bar
     /// (caption buttons, window dragging and edge resizing, `titlebar`).
     pub custom_titlebar: bool,
+    /// The shell decided on the OS's own frame (the preference, a tiling compositor, macOS with
+    /// the System Title Bar preference): the OS draws the title, so the in-app bar omits the
+    /// brand mark and the centred title. False for embedders, tests and the web.
+    pub native_frame: bool,
     /// macOS: the traffic lights, measured for the integrated title bar's leading inset.
     pub(crate) traffic_lights: craft_window::mac::TrafficLights,
     /// macOS: the window's `movable` flag as last set (`craft_window::title_bar::sync_movable`).

@@ -61,7 +61,7 @@ fn load_icons(theme: &str) -> Option<CaptionIcons> {
     Some(CaptionIcons { theme: theme.to_string(), render: std::sync::Arc::new(render) })
 }
 
-/// [`load_icons`] for the last theme asked for, kept, so a layout change doesn't reread it.
+/// [`load_icons`] for the last theme asked for, kept, so a repeated publish of the same theme (the portal re-sends its setting) doesn't reread its files.
 #[cfg(target_os = "linux")]
 #[derive(Default)]
 struct IconCache(std::sync::Mutex<Option<(String, Option<CaptionIcons>)>>);

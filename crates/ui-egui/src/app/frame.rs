@@ -213,6 +213,9 @@ impl PhotocraftApp {
         let tabbed_in = !chrome && self.ui.panels.full_screen_chrome;
         if (chrome || tabbed_in) && self.ui.panels.menu_bar {
             panels::title_bar(self, ui);
+        } else if self.custom_titlebar && !self.ui.panels.menu_bar {
+            // The undecorated window keeps its edge resizing without the bar.
+            titlebar::edge_zones_without_bar(self, ui);
         }
         if (chrome && self.ui.panels.options_bar) || tabbed_in {
             panels::options_bar(self, ui);
@@ -263,10 +266,18 @@ impl PhotocraftApp {
         if self.titlebar_modal_drag(chrome) {
             titlebar::modal_drag_overlay(&ctx);
         }
-        // TitleBar sets the window's `movable` flag from where the pointer is.
+        // TitleBar sets the window's `movable` flag from where the pointer is. Without the bar the
+        // transparent strip is no title bar, and AppKit would still drag the window from it.
         #[cfg(target_os = "macos")]
         if self.integrated_titlebar {
-            craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
+            if self.ui.panels.menu_bar {
+                craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
+            } else if let Some(set_movable) = self.services.set_movable.as_ref()
+                && self.titlebar_movable != Some(false)
+            {
+                set_movable(false);
+                self.titlebar_movable = Some(false);
+            }
         }
         if cfg!(target_os = "windows") && !self.custom_titlebar {
             titlebar::sync_native_caption_theme(&ctx);

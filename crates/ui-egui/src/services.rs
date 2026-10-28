@@ -308,6 +308,9 @@ pub type CapsLockFn = Box<dyn FnMut() -> bool>;
 /// Called once per frame; `None` when the window is decorated or the platform needs no fixing.
 pub type WindowFrameFn = Box<dyn FnMut()>;
 
+/// Sets whether AppKit may move the window by a drag in its title-bar band (macOS).
+pub type SetMovableFn = Box<dyn Fn(bool)>;
+
 /// The caption buttons' current style ([`Services::caption_style`]).
 pub type CaptionStyleFn = Box<dyn Fn(&egui::Context) -> CaptionStyle>;
 
@@ -419,6 +422,9 @@ pub struct Services {
     /// (Windows custom title bar, #2246). Called once per frame; `None` when the window is
     /// decorated or the platform needs no fixing.
     pub window_frame: Option<WindowFrameFn>,
+    /// macOS: sets the window's `movable` flag, for the frames in which the app draws no title
+    /// bar over the transparent strip (`None` elsewhere).
+    pub set_movable: Option<SetMovableFn>,
     /// How the custom title bar's caption buttons look and where they sit (Linux: the desktop's
     /// style and button layout). Read every frame, with the context to wake when it changes;
     /// `None` keeps Windows' buttons at the right end.

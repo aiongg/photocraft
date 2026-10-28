@@ -1658,7 +1658,7 @@ fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_value
     assert_eq!(restarted.session.prefs().interface.ui_font_size, prefs::UiFontSize::Large);
 }
 
-#[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn system_title_bar_explains_next_launch_and_preserves_apply_and_cancel() {
     use egui_kittest::{Harness, kittest::Queryable};

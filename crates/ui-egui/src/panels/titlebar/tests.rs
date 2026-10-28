@@ -57,7 +57,11 @@ impl Win {
         release_after_os_resize(&self.ctx, &mut input);
         let app = &mut self.app;
         let mut out = self.ctx.run_ui(input, |ui| {
-            crate::panels::title_bar(app, ui);
+            if app.ui.panels.menu_bar {
+                crate::panels::title_bar(app, ui);
+            } else {
+                edge_zones_without_bar(app, ui);
+            }
             if modal {
                 egui::Modal::new(Id::unique("titlebar-drag-test-modal")).backdrop_color(Color32::TRANSPARENT).show(ui.ctx(), |ui| {
                     ui.label("Modal dialog");
@@ -350,6 +354,17 @@ fn after_an_os_move_the_bar_and_the_edges_take_the_next_press() {
     assert_eq!(moves(&handed_off(&mut w, &drag)), 1);
     let edge = pos2(3.0, 300.0);
     assert!(w.gesture(&[edge, edge + vec2(6.0, 0.0)]).contains(&ViewportCommand::BeginResize(ResizeDirection::West)), "a resize after a move");
+}
+
+#[test]
+fn a_hidden_menu_bar_keeps_the_edges_resizing() {
+    let mut w = Win::new(1000.0);
+    w.app.ui.panels.menu_bar = false;
+    w.frame(vec![]);
+    let p = pos2(1.0, 300.0);
+    let out = w.frame(vec![Event::PointerMoved(p)]);
+    assert_eq!(out.platform_output.cursor_icon, CursorIcon::ResizeWest);
+    assert_eq!(w.gesture(&[p, p + vec2(6.0, 0.0)]), vec![ViewportCommand::BeginResize(ResizeDirection::West)]);
 }
 
 #[test]

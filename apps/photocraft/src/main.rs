@@ -505,6 +505,7 @@ fn main() -> eframe::Result {
             app.min_frame_ms = uncapped.then_some(1000.0 / 240.0);
             app.integrated_titlebar = matches!(decision.frame, craft_window::policy::Frame::Inset(_));
             app.custom_titlebar = custom_titlebar;
+            app.native_frame = matches!(decision.frame, craft_window::policy::Frame::Native);
             // Long commands and file opens run as background jobs with progress and Cancel (#210).
             app.background_jobs = std::env::var_os("PHOTOCRAFT_INLINE_JOBS").is_none();
             // Displays and their profiles (#569): wait briefly so the first frames already use
@@ -601,6 +602,7 @@ fn main() -> eframe::Result {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
                 // Quit through AppKit, not by closing the window (Touch Bar Macs, #1575, #1458).
                 app.services.quit = Some(Box::new(mac_window::terminate_later));
+                app.services.set_movable = Some(Box::new(mac_window::set_movable));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
                     app.services.native_menu = mac_menu::install(&cc.egui_ctx, &app);
@@ -923,6 +925,16 @@ mod tests {
         let integrated = Frame::Integrated(photocraft_ui_egui::CaptionStyle::default().captions);
         assert_eq!(super::native_options(&integrated).viewport.decorations, Some(false));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_macos_inset_frame_has_a_full_size_content_view_and_no_visible_title() {
+        use craft_window::policy::{Frame, MacInset};
+        let viewport = super::native_options(&Frame::Inset(MacInset::default())).viewport;
+        assert_eq!(viewport.decorations, Some(true));
+        assert_eq!(viewport.fullsize_content_view, Some(true));
+        assert_eq!(viewport.title_shown, Some(false));
+        assert_eq!(viewport.titlebar_shown, Some(false));
     }
 
     #[test]

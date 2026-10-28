@@ -1,5 +1,5 @@
 //! Golden renders of the title bar in every caption family, at rest, with a button under the
-//! pointer and maximized, in a dark and a light theme. `UPDATE_SNAPSHOTS=1` rewrites them
+//! pointer, Close pressed and maximized, in a dark and a light theme. `UPDATE_SNAPSHOTS=1` rewrites them
 //! (`crates/ui-egui/tests/snapshots/title-bar/`).
 
 use super::*;
@@ -19,17 +19,19 @@ enum State {
     Rest,
     HoverMinimize,
     HoverClose,
+    PressClose,
     Maximized,
 }
 
 impl State {
-    const ALL: [State; 4] = [State::Rest, State::HoverMinimize, State::HoverClose, State::Maximized];
+    const ALL: [State; 5] = [State::Rest, State::HoverMinimize, State::HoverClose, State::PressClose, State::Maximized];
 
     fn name(self) -> &'static str {
         match self {
             State::Rest => "rest",
             State::HoverMinimize => "hover-minimize",
             State::HoverClose => "hover-close",
+            State::PressClose => "pressed-close",
             State::Maximized => "maximized",
         }
     }
@@ -93,7 +95,7 @@ fn render(kind: ThemeKind, style: CaptionStyle, state: State) -> Harness<'static
     h.run_steps(4);
     let hover = match state {
         State::HoverMinimize => Some("Minimize"),
-        State::HoverClose => Some("Close"),
+        State::HoverClose | State::PressClose => Some("Close"),
         State::Rest | State::Maximized => None,
     };
     if let Some(label) = hover {
@@ -101,6 +103,10 @@ fn render(kind: ThemeKind, style: CaptionStyle, state: State) -> Harness<'static
         let rect = h.get_by_label(label).rect();
         let at = egui::pos2(rect.center().x, rect.top() + 12.0);
         h.event(egui::Event::PointerMoved(at));
+        if matches!(state, State::PressClose) {
+            h.run_steps(2);
+            h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+        }
     }
     // Past libadwaita's 0.2 s disc animation, short of the 0.5 s tooltip delay.
     h.run_steps(20);
