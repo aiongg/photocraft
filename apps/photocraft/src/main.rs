@@ -154,10 +154,11 @@ fn window_defaults(wayland: bool) -> craft_window::restore::Defaults {
 /// each new window from the top-left corner, so it opened at a different offset every launch
 /// (#419); `main` turns `centered` off once the store holds a position (#4826).
 fn native_options(frame: &craft_window::policy::Frame) -> eframe::NativeOptions {
+    let defaults = window_defaults(false);
     let viewport = egui::ViewportBuilder::default().with_icon(app_icon::viewport_icon(std::env::current_exe().ok().as_deref()));
     eframe::NativeOptions {
         viewport: craft_window::policy::apply(
-            viewport.with_app_id(APP_ID).with_title("PhotoCraft").with_inner_size([1440.0, 900.0]).with_min_inner_size([760.0, 480.0]).with_drag_and_drop(true),
+            viewport.with_app_id(APP_ID).with_title("PhotoCraft").with_inner_size(defaults.size).with_min_inner_size(defaults.min).with_drag_and_drop(true),
             frame,
         ),
         centered: true,
@@ -450,7 +451,7 @@ fn main() -> eframe::Result {
         &mut options,
         &window_store,
         craft_window::restore::MAIN,
-        &window_defaults(backend == craft_window::policy::Backend::Wayland),
+        &window_defaults(cfg!(all(unix, not(target_os = "macos"))) && backend == craft_window::policy::Backend::Wayland),
     );
     let result = eframe::run_native(
         "PhotoCraft",

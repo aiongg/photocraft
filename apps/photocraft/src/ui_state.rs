@@ -37,8 +37,10 @@ pub fn open_window_store(config_dir: Option<&Path>) -> Store {
 }
 
 /// Moves the `"window"` entry of the eframe file at `ui` into `store` when `store` has no main
-/// placement, then removes the entry from the file. The entry stays when the store could not
-/// save the import: it is then the only copy.
+/// placement, then removes the entry from the file. The entry stays only when saving the import
+/// failed: it is then the only copy. An entry that gives no usable placement, or a store that
+/// cannot be written (a newer schema), is dropped anyway, because eframe would re-apply its
+/// maximized and full-screen state on every start.
 fn import_window(store: &mut Store, ui: &Path) {
     let Ok(text) = std::fs::read_to_string(ui) else { return };
     let Ok(mut kv) = ron::from_str::<HashMap<String, String>>(&text) else { return };
@@ -49,9 +51,9 @@ fn import_window(store: &mut Store, ui: &Path) {
         && let Some(placement) = legacy::eframe_app_ron(&text)
     {
         store.set(MAIN, &placement);
-        if !matches!(store.save(), Ok(true)) {
+        if let Err(e) = store.save() {
             log::warn!(
-                "could not save the window placement to {}; keeping it in {}",
+                "could not save the window placement to {}: {e}; keeping it in {}",
                 store.path().map_or_else(String::new, |p| p.display().to_string()),
                 ui.display()
             );
@@ -66,12 +68,23 @@ fn import_window(store: &mut Store, ui: &Path) {
 }
 
 /// Writes `text` to a temporary file beside `path` and renames it over `path`, so a crash never
-/// leaves half a file for eframe to read.
+/// leaves half a file for eframe to read. The file keeps its mode.
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
     let mut name = path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_else(|| "ui.ron".into());
     name.push(format!(".tmp{}", std::process::id()));
     let temp = path.with_file_name(name);
-    let result = std::fs::write(&temp, text).and_then(|()| std::fs::rename(&temp, path));
+    let write = || -> std::io::Result<()> {
+        let mut file = std::fs::File::create(&temp)?;
+        file.write_all(text.as_bytes())?;
+        if let Ok(meta) = std::fs::metadata(path) {
+            file.set_permissions(meta.permissions())?;
+        }
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, path)
+    };
+    let result = write();
     if result.is_err() {
         let _ = std::fs::remove_file(&temp);
     }
@@ -246,6 +259,25 @@ mod tests {
         first.set(MAIN, &placement);
         assert!(matches!(first.save(), Ok(true)));
         assert_eq!(open_window_store(Some(dir.path())).get(MAIN), Some(placement));
+    }
+
+    #[test]
+    fn an_unusable_window_entry_or_store_still_loses_the_key() {
+        let window = "(normal_geometry:(outer_position_pixels:None,scale_factor:1.0,inner_size_points:(x:500000.0,y:900.0)),fullscreen:true,maximized:true)";
+        let text = format!("{{\"window\":{window:?},\"egui\":\"()\"}}");
+        // A size the store refuses.
+        let dir = tempfile::tempdir().unwrap();
+        let ui = dir.path().join("ui.ron");
+        std::fs::write(&ui, &text).unwrap();
+        assert_eq!(open_window_store(Some(dir.path())).get(MAIN), None);
+        assert!(!entries(&std::fs::read_to_string(&ui).unwrap()).contains_key("window"));
+        // A window.json from a newer version, which is never written.
+        let dir = tempfile::tempdir().unwrap();
+        let ui = dir.path().join("ui.ron");
+        std::fs::write(&ui, file(WINDOW, "1.0")).unwrap();
+        std::fs::write(dir.path().join(FILE_NAME), r#"{"schema_version":999,"windows":{}}"#).unwrap();
+        open_window_store(Some(dir.path()));
+        assert!(!entries(&std::fs::read_to_string(&ui).unwrap()).contains_key("window"));
     }
 
     #[test]
