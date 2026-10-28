@@ -11,36 +11,69 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let custom = app.custom_titlebar;
     let system = system_title_bar(app);
-    // The caption buttons' room at each end (`titlebar`); a side with buttons has no margin.
-    let (caption_left, caption_right) = crate::titlebar::reserved(app, ui.ctx());
-    let left = if cfg!(target_os = "macos") && app.integrated_titlebar {
-        78
-    } else if caption_left > 0.0 {
-        0
-    } else {
-        10
-    };
-    let right = if caption_right > 0.0 { 0 } else { 10 };
-    let bar = egui::Panel::top("title_bar")
-        .exact_size(crate::titlebar::bar_height(app, ui.ctx(), if t.pro { 32.0 } else { 38.0 }))
-        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left, right, top: 0, bottom: 0 }))
-        .show(ui, |ui| {
-            let full = ui.max_rect();
-            // Only the free gap between the menus and the far-end controls drags the window: a
-            // press on a menu title must open the menu, never move the window. The gap is last
-            // frame's, as the menus are laid out after this.
+    let style = crate::titlebar::style(app, ui.ctx());
+    let frame = crate::titlebar::frame(app, ui.ctx(), &style);
+    let family = style.captions.family;
+    let colors = crate::titlebar::caption_colors(&t, family);
+    let labels = crate::titlebar::caption_labels();
+    let mut close = false;
+    let bar_height = crate::titlebar::bar_height(app, ui.ctx(), if t.pro { 32.0 } else { 38.0 });
+    egui::Panel::top("title_bar").exact_size(bar_height).frame(egui::Frame::NONE.fill(t.chrome)).show(ui, |ui| {
+        // Above the panel's 1 pt separator.
+        let panel = ui.max_rect();
+        // Windows' buttons stop above the separator, which their fills would cover; the round
+        // buttons centre on the whole bar.
+        let height = if custom && family == craft_ui::title_bar::CaptionFamily::Windows { panel.height() } else { bar_height };
+        let bar = craft_ui::title_bar::TitleBar::new(&frame, height, colors).labels(&labels).icons(style.icons.as_ref());
+        // The bar's resize zones run along the whole window and inherit this clip rect; the
+        // bar's own contents keep the panel's.
+        let panel_clip = ui.clip_rect();
+        ui.set_clip_rect(ui.ctx().content_rect());
+        let response = bar.show(ui, |ui, slots| {
+            // The caption buttons' room at each end, from the window's edge, or the traffic
+            // lights' at the leading one; a side with buttons has no margin.
+            let window = ui.ctx().content_rect();
+            let inset = matches!(frame, craft_ui::title_bar::Frame::Inset(_));
+            let lead = slots.content.left() - panel.left();
+            let caption = |room: bool, width: f32| if room && !inset { width } else { 0.0 };
+            let caption_left = caption(lead > 0.0, slots.content.left() - window.left());
+            let caption_right = caption(slots.content.right() < panel.right(), window.right() - slots.content.right());
+            let left = if inset {
+                lead
+            } else if caption_left > 0.0 {
+                0.0
+            } else {
+                10.0
+            };
+            let right = if caption_right > 0.0 { 0.0 } else { 10.0 };
+            // Under the traffic lights the bar's contents centre on their centre line.
+            let centre = if inset { slots.centre_line } else { panel.center().y };
+            let half = panel.height() / 2.0;
+            let full = egui::Rect::from_x_y_ranges(panel.left() + left..=panel.right() - right, centre - half..=centre + half);
+            let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(full).layout(egui::Layout::top_down(egui::Align::Min)));
+            ui.set_clip_rect(panel_clip);
+            bar_contents(app, ui, full, system, (caption_left, caption_right));
+        });
+        close = response.close_requested;
+    });
+    if close {
+        let ctx = ui.ctx().clone();
+        let _ = crate::menus::invoke(app, &ctx, "file.exit", serde_json::json!({}));
+    }
+}
+
+/// The bar's brand mark, menus, far-end controls and centred title in `full`, with the caption
+/// buttons' room at its (left, right) ends.
+fn bar_contents(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: egui::Rect, system: bool, (caption_left, caption_right): (f32, f32)) {
+    let t = Tokens::get(ui.ctx());
+    {
+        {
+            // The gap between the menus and the far-end controls, last frame's as the menus are
+            // laid out after this: the drag area while a modal blocks the bar.
             let span_id = ui.scope_id().with("titledrag-span");
             let (gap_l, gap_r) = ui.ctx().data(|d| d.get_temp::<(f32, f32)>(span_id)).unwrap_or((full.right(), full.right()));
             let gap = egui::Rect::from_x_y_ranges(gap_l.max(full.left())..=gap_r.min(full.right()).max(gap_l), full.y_range());
             ui.ctx().data_mut(|d| d.insert_temp(crate::titlebar::modal_drag_area_id(), gap));
-            let drag = ui.interact(gap, ui.scope_id().with("titledrag"), Sense::click_and_drag());
-            if drag.drag_started_by(egui::PointerButton::Primary) {
-                crate::titlebar::start_os_move(ui.ctx());
-            }
-            if drag.double_clicked() {
-                let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
-            }
             // Preferences › Interface › Show File Name In Title: with it off the bar keeps the
             // app name and the unsaved dot, since the tabs already name the file (#5037).
             let show_name = app.session.prefs().interface.show_file_name_in_title;
@@ -149,9 +182,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let x = if rtl { free.1 - TITLE_GAP - g.size().x } else { free.0 + TITLE_GAP };
                 ui.painter().galley(egui::pos2(x, full.center().y - g.size().y / 2.0), g, t.text_dim);
             }
-        });
-    if custom {
-        crate::titlebar::caption_buttons(app, ui, bar.response.rect);
+        }
     }
 }
 

@@ -365,5 +365,6 @@ Tokens {
     histogram_level: 240,
     caption_close: #D5_33_3C_FF,
     caption_close_text: #FF_FF_FF_FF,
+    suite_caption: None,
     scrim: #00_00_00_6E,
 }

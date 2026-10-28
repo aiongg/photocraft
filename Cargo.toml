@@ -43,6 +43,7 @@ craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67
 craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6" }
 craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6" }
 craft-platform = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6", features = ["appearance", "egui"] }
+craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6", features = ["egui"] }
 craft-update = { git = "https://github.com/aiongg/craft-libs", version = "=0.1.0", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6", features = ["egui"] }
 craft-theme = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6", features = ["serde"] }
 craft-theme-store = { git = "https://github.com/aiongg/craft-libs", rev = "b105d7cbb67f22c6327799baba7a065737fd4fd6", features = ["serde"] }

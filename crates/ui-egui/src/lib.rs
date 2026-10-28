@@ -37,7 +37,8 @@ pub mod screenshot;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
-pub use titlebar::{Caption, CaptionFamily, CaptionIcon, CaptionIcons, CaptionStyle, RenderIconFn};
+pub use craft_ui::title_bar::{Caption, CaptionFamily, CaptionIcon, CaptionIcons, Captions, RenderIconFn};
+pub use titlebar::CaptionStyle;
 pub(crate) mod tool_memory;
 pub mod updates_ui;
 pub mod widgets;
@@ -424,6 +425,11 @@ pub struct PhotocraftApp {
     /// Windows and Linux: the window has no OS decorations and the app's top bar is the title bar
     /// (caption buttons, window dragging and edge resizing, `titlebar`).
     pub custom_titlebar: bool,
+    /// macOS: the traffic lights, measured for the integrated title bar's leading inset.
+    pub(crate) traffic_lights: craft_window::mac::TrafficLights,
+    /// macOS: the window's `movable` flag as last set (`craft_window::title_bar::sync_movable`).
+    #[cfg(target_os = "macos")]
+    pub(crate) titlebar_movable: Option<bool>,
     /// Last window title sent to the OS (`ViewportCommand::Title`, see `panels::sync_window_title`):
     /// sent again only when it changes, so idle frames don't spam the backend.
     last_window_title: String,

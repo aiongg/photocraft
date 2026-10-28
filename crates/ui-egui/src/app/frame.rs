@@ -263,8 +263,13 @@ impl PhotocraftApp {
         if self.titlebar_modal_drag(chrome) {
             titlebar::modal_drag_overlay(&ctx);
         }
-        if self.custom_titlebar {
-            titlebar::resize_zones(ui);
+        // TitleBar sets the window's `movable` flag from where the pointer is.
+        #[cfg(target_os = "macos")]
+        if self.integrated_titlebar {
+            craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
+        }
+        if cfg!(target_os = "windows") && !self.custom_titlebar {
+            titlebar::sync_native_caption_theme(&ctx);
         }
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);

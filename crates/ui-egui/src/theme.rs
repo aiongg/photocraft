@@ -212,6 +212,9 @@ pub struct Tokens {
     /// The custom title bar's Close button while hovered (Windows' red), and its glyph.
     pub caption_close: Color32,
     pub caption_close_text: Color32,
+    /// A suite theme's caption-button colours, from its roles; PhotoCraft's own palettes have
+    /// none and fill them from these tokens (`titlebar::caption_colors`).
+    pub suite_caption: Option<craft_ui::title_bar::CaptionColors>,
     /// Dims the main window behind a modal that takes all input (Camera Raw).
     pub scrim: Color32,
 }
@@ -334,6 +337,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(196, 43, 28),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             ThemeKind::Studio => Tokens {
                 kind,
@@ -374,6 +378,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(196, 43, 28),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             ThemeKind::StudioLight => Tokens {
                 kind,
@@ -414,6 +419,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(196, 43, 28),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             ThemeKind::Classic => Tokens {
                 kind,
@@ -454,6 +460,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(196, 43, 28),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             // libadwaita's named colours (window, sidebar, card, view, accent, destructive) and
             // radii (6 px buttons, 12 px cards), mapped onto the Studio layout. GNOME's close
@@ -497,6 +504,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(212, 212, 216),
                 caption_close_text: Color32::from_rgb(50, 50, 54),
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             ThemeKind::AdwaitaDark => Tokens {
                 kind,
@@ -537,6 +545,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(72, 72, 76),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             // The light counterpart, adapted the same way: our own values, chosen a few levels
             // from Breeze Light's surfaces so the app blends into a Plasma desktop without being a
@@ -583,6 +592,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(213, 51, 60),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             // An adaptation of KDE Plasma's Breeze Dark look on the Studio layout, not a copy: our
             // own values, chosen a few levels from Breeze Dark's surfaces (the darkest canvas, then
@@ -633,6 +643,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(213, 51, 60),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
             // Soft Dark: our own low-contrast palette on the Studio layout. Muted violet-grey
             // surfaces (never near-black), softened off-white text and a periwinkle accent; the
@@ -676,6 +687,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(200, 72, 86),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(100),
+                suite_caption: None,
             },
             // Soft Light: pale violet-grey surfaces, softened dark-violet text (not black) and a
             // periwinkle accent, with the same generous radii as Soft Dark.
@@ -718,6 +730,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(200, 60, 72),
                 caption_close_text: Color32::WHITE,
                 scrim: Color32::from_black_alpha(90),
+                suite_caption: None,
             },
             // Ethan Schoonover's Solarized Dark palette: base03 canvas, base02 surfaces, base0
             // body text and the Solarized blue accent. https://ethanschoonover.com/solarized/
@@ -761,6 +774,7 @@ impl Tokens {
                 caption_close: Color32::from_rgb(220, 50, 47),
                 caption_close_text: Color32::from_rgb(253, 246, 227),
                 scrim: Color32::from_black_alpha(110),
+                suite_caption: None,
             },
         }
     }
@@ -799,6 +813,7 @@ impl Tokens {
             tab_strip: c(roles.background),
             danger: c(roles.bad),
             warning: c(roles.warn),
+            suite_caption: Some(craft_ui::title_bar::CaptionColors::from_resolved(r)),
             ..Tokens::for_kind(base)
         }
     }

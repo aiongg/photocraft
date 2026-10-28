@@ -78,18 +78,21 @@ use photocraft_ui_egui::PhotocraftApp;
 /// Matches the `.desktop` file and hicolor icon name, so Wayland docks pick up the icon.
 const APP_ID: &str = "ai.storyteller.photocraft";
 
-/// Windows and Linux: no OS title bar; the app's top bar is the title bar, with its own caption
-/// buttons and edge resizing (`photocraft_ui_egui::titlebar`), as Photoshop does on Windows. macOS
-/// keeps its traffic lights over the integrated title strip.
-const CUSTOM_TITLEBAR: bool = !cfg!(target_os = "macos");
-
-/// Whether this start draws its own title bar: Windows and Linux do, unless Preferences ›
-/// Interface › System Title Bar asks for the system's (#1271, #1316). Read from the saved
-/// preferences before the window opens; a missing or unreadable file keeps the default.
-fn custom_titlebar(prefs_file: Option<&std::path::Path>) -> bool {
+/// Preferences › Interface › System Title Bar (#1271, #1316), read from the saved preferences
+/// before the window opens; a missing or unreadable file keeps the app's own title bar.
+fn title_bar_pref(prefs_file: Option<&std::path::Path>) -> craft_window::policy::TitleBarPref {
     let prefs: photocraft_engine::prefs::Preferences =
         prefs_file.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-    CUSTOM_TITLEBAR && !prefs.interface.system_title_bar
+    if prefs.interface.system_title_bar { craft_window::policy::TitleBarPref::System } else { craft_window::policy::TitleBarPref::Integrated }
+}
+
+/// Who draws the window frame this start (craft-window's policy): the app's top bar as the title
+/// bar on Windows and most Linux desktops, with its own caption buttons and edge resizing
+/// (`photocraft_ui_egui::titlebar`) as Photoshop does on Windows; the traffic lights over it on
+/// macOS; the system's frame with the preference, or on a tiling compositor.
+/// `PHOTOCRAFT_TITLEBAR=app|system` overrides both.
+fn frame_decision(prefs_file: Option<&std::path::Path>, backend: craft_window::policy::Backend) -> craft_window::policy::Decision {
+    craft_window::policy::decide_for(craft_window::Prefix::new("PHOTOCRAFT"), backend, title_bar_pref(prefs_file))
 }
 
 /// Preferences › Integrations, read before the window opens the way [`custom_titlebar`] is:
@@ -144,19 +147,13 @@ fn control_port_for(cli: Option<u16>, prefs: &photocraft_engine::prefs::Integrat
 /// `centered`, Windows cascades each new window from the top-left corner, so it opened at a
 /// different offset every launch (#419). A later launch restores the saved position instead
 /// (`main` turns `centered` off, #4826). Wayland compositors place windows themselves.
-fn native_options(custom_titlebar: bool) -> eframe::NativeOptions {
+fn native_options(frame: &craft_window::policy::Frame) -> eframe::NativeOptions {
     let viewport = egui::ViewportBuilder::default().with_icon(app_icon::viewport_icon(std::env::current_exe().ok().as_deref()));
     eframe::NativeOptions {
-        viewport: viewport
-            .with_app_id(APP_ID)
-            .with_title("PhotoCraft")
-            .with_inner_size([1440.0, 900.0])
-            .with_min_inner_size([760.0, 480.0])
-            .with_drag_and_drop(true)
-            .with_decorations(!custom_titlebar)
-            .with_fullsize_content_view(true)
-            .with_titlebar_shown(false)
-            .with_title_shown(false),
+        viewport: craft_window::policy::apply(
+            viewport.with_app_id(APP_ID).with_title("PhotoCraft").with_inner_size([1440.0, 900.0]).with_min_inner_size([760.0, 480.0]).with_drag_and_drop(true),
+            frame,
+        ),
         centered: true,
         // PhotoCraft owns its fallback fonts (`cjk_fonts`, craft-fonts): eframe's system-font
         // provider would compete with it and make glyph choice machine-dependent (#8512).
@@ -379,8 +376,13 @@ fn main() -> eframe::Result {
     let monitor = monitor_profile::detect_async();
     // Brush presets load in the background; the app attaches them when they arrive.
     let presets = services::presets_dir().map(photocraft_engine::preset_store::open_dir_async);
-    let custom_titlebar = custom_titlebar(services::prefs_file().as_deref());
-    let mut options = native_options(custom_titlebar);
+    #[cfg(target_os = "linux")]
+    let backend = if session == linux_libs::DisplaySession::X11 { craft_window::policy::Backend::X11 } else { craft_window::policy::Backend::Wayland };
+    #[cfg(not(target_os = "linux"))]
+    let backend = craft_window::policy::Backend::from_env();
+    let decision = frame_decision(services::prefs_file().as_deref(), backend);
+    let custom_titlebar = matches!(decision.frame, craft_window::policy::Frame::Integrated(_));
+    let mut options = native_options(&decision.frame);
     // winit picks Wayland whenever `WAYLAND_DISPLAY` is set; open on X11 when that was chosen.
     #[cfg(target_os = "linux")]
     if session == linux_libs::DisplaySession::X11 {
@@ -501,11 +503,8 @@ fn main() -> eframe::Result {
             PhotocraftApp::install_type_reset_hooks(&cc.egui_ctx);
             let mut app = PhotocraftApp::new(session, services);
             app.min_frame_ms = uncapped.then_some(1000.0 / 240.0);
-            app.integrated_titlebar = cfg!(target_os = "macos");
+            app.integrated_titlebar = matches!(decision.frame, craft_window::policy::Frame::Inset(_));
             app.custom_titlebar = custom_titlebar;
-            // Only the title bar's free gap drags the window, never the menus (mac_window.rs).
-            #[cfg(target_os = "macos")]
-            mac_window::disable_native_title_drag();
             // Long commands and file opens run as background jobs with progress and Cancel (#210).
             app.background_jobs = std::env::var_os("PHOTOCRAFT_INLINE_JOBS").is_none();
             // Displays and their profiles (#569): wait briefly so the first frames already use
@@ -621,7 +620,14 @@ fn main() -> eframe::Result {
             app.services.window_frame = window_frame::service(cc, custom_titlebar);
             // Linux: the desktop's caption buttons (GNOME's, KDE's) on the sides its layout puts them.
             if custom_titlebar {
-                app.services.caption_style = caption_style::service();
+                #[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+                let gnome_layout: caption_style::GnomeLayoutFn = {
+                    let portal = portal_theme.clone();
+                    Box::new(move || portal.as_ref().and_then(|p| p.button_layout()))
+                };
+                #[cfg(not(all(unix, not(target_os = "macos"), not(target_arch = "wasm32"))))]
+                let gnome_layout: caption_style::GnomeLayoutFn = Box::new(|| None);
+                app.services.caption_style = caption_style::service(&decision, gnome_layout);
             }
             // Caps Lock state (X11/Windows/macOS; `None` on native Wayland): the canvas shows the
             // precise crosshair for painting tools while it is toggled on (#1758).
@@ -724,7 +730,7 @@ pub(crate) fn no_child_spawns() -> std::sync::RwLockWriteGuard<'static, ()> {
 mod tests {
     #[test]
     fn window_and_panel_geometry_survive_a_restart() {
-        let options = super::native_options(super::CUSTOM_TITLEBAR);
+        let options = super::native_options(&craft_window::policy::Frame::Native);
         assert!(options.persist_window);
         assert_eq!(options.persistence_path, super::services::config_dir().map(|dir| dir.join("ui.ron")));
 
@@ -853,7 +859,7 @@ mod tests {
 
     #[test]
     fn the_window_opens_centred_at_its_default_size() {
-        let o = super::native_options(super::CUSTOM_TITLEBAR);
+        let o = super::native_options(&craft_window::policy::Frame::Native);
         assert!(o.centered, "#419: centred, not cascaded from the top-left corner");
         assert_eq!(o.viewport.inner_size, Some(egui::vec2(1440.0, 900.0)));
         // eframe shrinks the start size to the monitor, so the centred position is on-screen.
@@ -862,31 +868,31 @@ mod tests {
 
     #[test]
     fn a_window_saved_while_minimized_reopens_at_the_minimum_size() {
-        let hook = super::native_options(super::CUSTOM_TITLEBAR).window_builder.expect("a window builder hook");
+        let hook = super::native_options(&craft_window::policy::Frame::Native).window_builder.expect("a window builder hook");
         // Saved minimized on Windows, then centred on a 1920 × 1080 monitor by eframe.
-        let saved = super::native_options(super::CUSTOM_TITLEBAR).viewport.with_inner_size([160.0, 64.0]).with_position([880.0, 508.0]);
+        let saved = super::native_options(&craft_window::policy::Frame::Native).viewport.with_inner_size([160.0, 64.0]).with_position([880.0, 508.0]);
         let opened = hook(saved);
         assert_eq!(opened.inner_size, Some(egui::vec2(760.0, 480.0)));
         assert_eq!(opened.position, Some(egui::pos2(580.0, 300.0)), "still centred");
         // Too narrow only: only the width grows.
-        let opened = super::at_least_min_size(super::native_options(false).viewport.with_inner_size([500.0, 900.0]));
+        let opened = super::at_least_min_size(super::native_options(&craft_window::policy::Frame::Native).viewport.with_inner_size([500.0, 900.0]));
         assert_eq!(opened.inner_size, Some(egui::vec2(760.0, 900.0)));
         // A window at or above the minimum, or with no size, is left alone.
         for size in [[760.0, 480.0], [1100.0, 760.0]] {
-            let builder = super::native_options(false).viewport.with_inner_size(size).with_position([10.0, 20.0]);
+            let builder = super::native_options(&craft_window::policy::Frame::Native).viewport.with_inner_size(size).with_position([10.0, 20.0]);
             let opened = super::at_least_min_size(builder);
             assert_eq!((opened.inner_size, opened.position), (Some(egui::Vec2::from(size)), Some(egui::pos2(10.0, 20.0))));
         }
-        let mut builder = super::native_options(false).viewport;
+        let mut builder = super::native_options(&craft_window::policy::Frame::Native).viewport;
         builder.inner_size = None;
         assert_eq!(super::at_least_min_size(builder).inner_size, None);
     }
 
     #[test]
     fn a_window_saved_in_full_screen_reopens_maximized_not_full_screen() {
-        let hook = super::native_options(super::CUSTOM_TITLEBAR).window_builder.expect("a window builder hook");
+        let hook = super::native_options(&craft_window::policy::Frame::Native).window_builder.expect("a window builder hook");
         // What eframe restores from a ui.ron saved in a full-screen mode on Windows.
-        let saved = super::native_options(super::CUSTOM_TITLEBAR)
+        let saved = super::native_options(&craft_window::policy::Frame::Native)
             .viewport
             .with_inner_size([2560.0, 1392.0])
             .with_position([0.0, 0.0])
@@ -901,21 +907,21 @@ mod tests {
     #[test]
     fn the_system_title_bar_preference_keeps_the_window_decorations() {
         // #1271, #1316: Preferences › Interface › System Title Bar gives the window back its
-        // system decorations on Windows and Linux; macOS always has them.
+        // system decorations.
+        use craft_window::policy::{Frame, TitleBarPref};
         let dir = std::env::temp_dir().join(format!("pc-titlebar-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("prefs.json");
-        assert_eq!(super::custom_titlebar(None), super::CUSTOM_TITLEBAR, "no preferences file: the default");
+        assert_eq!(super::title_bar_pref(None), TitleBarPref::Integrated, "no preferences file: the default");
         std::fs::write(&file, "not json").unwrap();
-        assert_eq!(super::custom_titlebar(Some(&file)), super::CUSTOM_TITLEBAR, "an unreadable file: the default");
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::Integrated, "an unreadable file: the default");
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":true}}"#).unwrap();
-        assert!(!super::custom_titlebar(Some(&file)));
-        assert_eq!(super::native_options(false).viewport.decorations, Some(true));
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::System);
+        assert_eq!(super::native_options(&Frame::Native).viewport.decorations, Some(true));
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":false}}"#).unwrap();
-        assert_eq!(super::custom_titlebar(Some(&file)), super::CUSTOM_TITLEBAR);
-        if super::CUSTOM_TITLEBAR {
-            assert_eq!(super::native_options(true).viewport.decorations, Some(false));
-        }
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::Integrated);
+        let integrated = Frame::Integrated(photocraft_ui_egui::CaptionStyle::default().captions);
+        assert_eq!(super::native_options(&integrated).viewport.decorations, Some(false));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

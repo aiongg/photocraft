@@ -1,6 +1,11 @@
 use super::*;
-use egui::{Event, Pos2, RawInput, ViewportId};
+use craft_ui::title_bar::{Caption, WINDOWS_BUTTON_WIDTH, caption_id};
+use egui::{Color32, CursorIcon, Event, Pos2, RawInput, ResizeDirection, ViewportId, pos2, vec2};
 use photocraft_engine::Session;
+use serde_json::json;
+
+/// Windows' order, left to right.
+const CAPTIONS: [Caption; 3] = [Caption::Minimize, Caption::Maximize, Caption::Close];
 
 /// #5826: the drag overlay under a dialog doesn't depend on the custom title bar. On macOS
 /// (OS traffic lights over the app's own title strip) a dialog left the window undraggable.
@@ -59,7 +64,6 @@ impl Win {
                 });
                 modal_drag_overlay(ui.ctx());
             }
-            resize_zones(ui);
         });
         out.textures_delta.clear();
         out
@@ -93,7 +97,8 @@ impl Win {
         self.ctx.read_response(caption_id(c)).map(|r| r.rect).unwrap_or(Rect::NOTHING)
     }
 
-    /// The bar's clickable widgets other than its drag gap and the caption buttons.
+    /// The bar's clickable widgets other than its empty area (as wide as the window) and the
+    /// caption buttons.
     fn bar_widgets(&self) -> Vec<Rect> {
         let skip = CAPTIONS.map(caption_id);
         self.ctx.viewport(|v| {
@@ -102,7 +107,7 @@ impl Win {
                 .layers()
                 .filter(|(l, _)| l.order != Order::Foreground)
                 .flat_map(|(_, ws)| ws.iter())
-                .filter(|w| w.sense.senses_click() && !w.sense.senses_drag() && w.rect.top() < 30.0 && !skip.contains(&w.id))
+                .filter(|w| w.sense.senses_click() && !w.sense.senses_drag() && w.rect.top() < 30.0 && w.rect.width() < self.width && !skip.contains(&w.id))
                 .map(|w| w.rect)
                 .collect()
         })
@@ -135,7 +140,7 @@ fn caption_buttons_take_the_right_end_and_nothing_overlaps_them() {
         let [min, max, close] = CAPTIONS.map(|c| w.caption(c));
         assert_eq!((close.right(), close.top()), (width, 0.0), "Close sits in the window's corner at {width}");
         // The bar's bottom point is the panel's separator line, which the buttons leave visible.
-        assert!(close.height() >= 31.0 && [min, max, close].iter().all(|r| r.width() == BUTTON_WIDTH));
+        assert!(close.height() >= 31.0 && [min, max, close].iter().all(|r| r.width() == WINDOWS_BUTTON_WIDTH));
         assert_eq!((min.right(), max.right()), (max.left(), close.left()));
         let widgets = w.bar_widgets();
         assert!(widgets.len() >= 10, "menus, search, theme, workspace: {widgets:?}");
@@ -358,7 +363,6 @@ fn edge_zones_resize_unless_maximized() {
         (pos2(500.0, 1.0), North),
         (pos2(500.0, 598.0), South),
         (pos2(2.0, 2.0), NorthWest),
-        (pos2(997.0, 3.0), NorthEast),
         (pos2(3.0, 597.0), SouthWest),
         (pos2(998.0, 598.0), SouthEast),
     ] {
@@ -375,7 +379,6 @@ fn edge_zones_resize_unless_maximized() {
         (pos2(500.0, 7.0), CursorIcon::ResizeNorth),
         (pos2(500.0, 593.0), CursorIcon::ResizeSouth),
         (pos2(2.0, 2.0), CursorIcon::ResizeNwSe),
-        (pos2(997.0, 3.0), CursorIcon::ResizeNeSw),
         (pos2(3.0, 597.0), CursorIcon::ResizeNeSw),
         (pos2(998.0, 598.0), CursorIcon::ResizeNwSe),
     ] {
@@ -384,6 +387,8 @@ fn edge_zones_resize_unless_maximized() {
     }
     let cmds = w.gesture(&[pos2(7.0, 300.0), pos2(13.0, 306.0)]);
     assert_eq!(cmds, vec![ViewportCommand::BeginResize(West)], "the edge zone is 8 pt deep");
+    // No zone over a caption button: the top-right corner is Close.
+    assert!(w.click(pos2(997.0, 3.0)).iter().any(|c| matches!(c, ViewportCommand::Close)));
     // Clear of the zone and of egui's interact radius around it.
     let cmds = w.gesture(&[pos2(20.0, 300.0), pos2(26.0, 306.0)]);
     assert!(!cmds.iter().any(|c| matches!(c, ViewportCommand::BeginResize(_))), "{cmds:?}");
@@ -395,29 +400,23 @@ fn edge_zones_resize_unless_maximized() {
 }
 
 #[test]
-fn gtk_layouts_pick_the_buttons_and_their_sides() {
-    use Caption::*;
+fn gtk_layouts_give_the_caption_style() {
+    use craft_window::Button::{Close, Maximize, Minimize};
     let s = CaptionStyle::from_gtk_layout(CaptionFamily::Adwaita, "appmenu:minimize,maximize,close");
-    assert_eq!((s.left, s.right), (vec![], vec![Minimize, Maximize, Close]));
-    // Unknown names are skipped, spaces trimmed, a repeat placed once, a second colon is a name.
-    let s = CaptionStyle::from_gtk_layout(CaptionFamily::Adwaita, "close,close , minimize:icon,maximize:close");
-    assert_eq!((s.left, s.right), (vec![Close, Minimize], vec![]));
+    assert_eq!((s.captions.layout.left, s.captions.layout.right), (vec![], vec![Minimize, Maximize, Close]));
     let s = CaptionStyle::from_gtk_layout(CaptionFamily::Breeze, "minimize,close");
-    assert_eq!((s.left, s.right), (vec![Minimize, Close], vec![]), "no colon: GTK puts them all at the start");
-    let s = CaptionStyle::from_gtk_layout(CaptionFamily::Breeze, "");
-    assert!(s.left.is_empty() && s.right.is_empty());
-    assert_eq!(CaptionFamily::parse(" Breeze "), Some(CaptionFamily::Breeze));
-    assert_eq!(CaptionFamily::parse("aqua"), None);
-    assert_eq!(CaptionStyle::default(), CaptionStyle { family: CaptionFamily::Windows, left: vec![], right: CAPTIONS.to_vec(), icons: None });
+    assert_eq!((s.captions.family, s.captions.layout.left), (CaptionFamily::Breeze, vec![Minimize, Close]), "no colon: GTK puts them all at the start");
+    assert_eq!(CaptionStyle::default().captions, Captions { family: CaptionFamily::Windows, layout: craft_window::Layout::default() });
 }
 
 #[test]
 fn linux_buttons_sit_where_the_layout_says_and_drag_the_window() {
-    use Caption::*;
     for (family, size, gap, end) in [(CaptionFamily::Adwaita, 24.0, 6.5, 10.0), (CaptionFamily::Breeze, 18.0, 4.5, 8.0)] {
         let width = 1100.0;
         let mut w = Win::new(width);
-        w.app.services.caption_style = Some(Box::new(move |_| CaptionStyle { family, left: vec![Close], right: vec![Minimize, Maximize], icons: None }));
+        let layout =
+            craft_window::Layout { left: vec![craft_window::Button::Close], right: vec![craft_window::Button::Minimize, craft_window::Button::Maximize] };
+        w.app.services.caption_style = Some(Box::new(move |_| CaptionStyle { captions: Captions { family, layout: layout.clone() }, icons: None }));
         w.frame(vec![]);
         w.frame(vec![]);
         let [min, max, close] = CAPTIONS.map(|c| w.caption(c));
@@ -425,11 +424,12 @@ fn linux_buttons_sit_where_the_layout_says_and_drag_the_window() {
         assert_eq!((close.left(), close.width()), (0.0, end + size + gap), "{family:?}");
         assert_eq!((max.right(), max.width()), (width, gap + size + end), "{family:?}");
         assert_eq!((min.right(), min.width()), (max.left(), 2.0 * gap + size), "{family:?}");
-        // GNOME's header bars are taller than Photoshop's bar; KDE's are not.
+        // GNOME's header bars are taller than Photoshop's bar; KDE's are not. The round buttons
+        // take the whole bar, its separator included.
         if family == CaptionFamily::Adwaita {
-            assert_eq!(close.height(), 46.0);
+            assert_eq!(close.height(), 47.0);
         } else {
-            assert!((31.0..46.0).contains(&close.height()), "{close:?}");
+            assert!((32.0..46.0).contains(&close.height()), "{close:?}");
         }
         let mark = crate::brand::mark_rect(&w.ctx).expect("the brand mark is painted");
         assert!(mark.left() > close.right(), "the bar starts after the left buttons: {mark:?} {close:?}");
@@ -444,48 +444,4 @@ fn linux_buttons_sit_where_the_layout_says_and_drag_the_window() {
         assert_eq!(cmds.iter().filter(|c| matches!(c, ViewportCommand::StartDrag)).count(), 1, "{cmds:?}");
         assert!(!cmds.contains(&ViewportCommand::Minimized(true)), "{cmds:?}");
     }
-}
-
-/// A side without buttons reserves nothing; without the custom title bar, neither does any.
-#[test]
-fn only_sides_with_buttons_take_room() {
-    let mut w = Win::new(1000.0);
-    w.app.services.caption_style = Some(Box::new(|_| CaptionStyle::from_gtk_layout(CaptionFamily::Adwaita, "appmenu:close")));
-    assert_eq!(reserved(&w.app, &w.ctx), (0.0, 6.5 + 24.0 + 10.0));
-    w.app.custom_titlebar = false;
-    assert_eq!(reserved(&w.app, &w.ctx), (0.0, 0.0));
-    w.app.custom_titlebar = true;
-    w.app.services.caption_style = None;
-    assert_eq!(reserved(&w.app, &w.ctx), (0.0, 3.0 * BUTTON_WIDTH));
-}
-
-/// Theme glyphs upload once per theme and size; an icon the theme lacks, a wrong-sized mask or
-/// an absurd size gives `None`, so the button draws its own glyph.
-#[test]
-fn theme_icons_are_cached_and_fall_back() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    let calls = std::sync::Arc::new(AtomicUsize::new(0));
-    let counter = std::sync::Arc::clone(&calls);
-    let render = move |icon: CaptionIcon, px: u32| {
-        counter.fetch_add(1, Ordering::Relaxed);
-        match icon {
-            CaptionIcon::Close => Some(vec![255; (px * px) as usize]),
-            CaptionIcon::Minimize => Some(vec![255; 3]),
-            _ => None,
-        }
-    };
-    let icons = CaptionIcons { theme: "Test".into(), render: std::sync::Arc::new(render) };
-    let ctx = egui::Context::default();
-    let mut out = ctx.run_ui(RawInput::default(), |ui| {
-        let tex = theme_icon(ui.ctx(), &icons, CaptionIcon::Close, 16).expect("rendered");
-        assert_eq!(tex.size(), [16, 16]);
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Close, 16).is_some());
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Restore, 16).is_none());
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Restore, 16).is_none());
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Minimize, 16).is_none(), "a mask of the wrong size");
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Close, 0).is_none());
-        assert!(theme_icon(ui.ctx(), &icons, CaptionIcon::Close, 100_000).is_none());
-    });
-    out.textures_delta.clear();
-    assert_eq!(calls.load(Ordering::Relaxed), 3, "each icon and size rendered once; absurd sizes never");
 }

@@ -4,6 +4,8 @@
 
 use super::*;
 use crate::theme::ThemeKind;
+use craft_ui::title_bar::{CaptionFamily, CaptionIcon, CaptionIcons};
+use egui::vec2;
 use egui_kittest::kittest::Queryable;
 use egui_kittest::{Harness, SnapshotOptions};
 use photocraft_engine::Session;

@@ -46,6 +46,11 @@ mod portal {
         pub(crate) fn wait_first(&self, remaining: std::time::Duration) {
             self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).wait_first(remaining);
         }
+
+        /// GNOME's `button-layout` as the watcher last heard it, for the caption buttons.
+        pub(crate) fn button_layout(&self) -> Option<String> {
+            self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).button_layout()
+        }
     }
 
     impl eframe::ViewportHooks for PortalTheme {
