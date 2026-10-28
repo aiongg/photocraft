@@ -5,7 +5,7 @@ use super::*;
 /// The app's top bar: brand mark, menus, the document title and the workspace controls. With
 /// [`PhotocraftApp::custom_titlebar`] (Windows and Linux) it is also the window's title bar, as in
 /// Photoshop on Windows: the caption buttons take its ends (`titlebar`). With the system
-/// title bar (Windows and Linux, `system_title_bar`) the OS draws its own icon and title, so the
+/// title bar (`system_title_bar`) the OS draws its own icon and title, so the
 /// in-app bar shows menus and workspace controls only: no brand mark, no centred title.
 pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
@@ -25,19 +25,15 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // buttons centre on the whole bar.
         let height = if custom && family == craft_ui::title_bar::CaptionFamily::Windows { panel.height() } else { bar_height };
         let bar = craft_ui::title_bar::TitleBar::new(&frame, height, colors).labels(&labels).icons(style.icons.as_ref());
-        // The bar's resize zones run along the whole window and inherit this clip rect; the
-        // bar's own contents keep the panel's.
-        let panel_clip = ui.clip_rect();
-        ui.set_clip_rect(ui.ctx().content_rect());
         let response = bar.show(ui, |ui, slots| {
-            // The caption buttons' room at each end, from the window's edge, or the traffic
-            // lights' at the leading one; a side with buttons has no margin.
-            let window = ui.ctx().content_rect();
+            // The caption buttons' room at each end, or the traffic lights' at the left; a side
+            // with buttons has no margin. The slots follow the UI direction, the layout below is
+            // physical.
             let inset = matches!(frame, craft_ui::title_bar::Frame::Inset(_));
-            let lead = slots.content.left() - panel.left();
-            let caption = |room: bool, width: f32| if room && !inset { width } else { 0.0 };
-            let caption_left = caption(lead > 0.0, slots.content.left() - window.left());
-            let caption_right = caption(slots.content.right() < panel.right(), window.right() - slots.content.right());
+            let (reserved_left, reserved_right) =
+                if crate::direction::is_rtl() { (slots.trailing_caption, slots.leading_caption) } else { (slots.leading_caption, slots.trailing_caption) };
+            let (caption_left, caption_right) = if inset { (0.0, 0.0) } else { (reserved_left, reserved_right) };
+            let lead = reserved_left;
             let left = if inset {
                 lead
             } else if caption_left > 0.0 {
@@ -51,7 +47,6 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let half = panel.height() / 2.0;
             let full = egui::Rect::from_x_y_ranges(panel.left() + left..=panel.right() - right, centre - half..=centre + half);
             let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(full).layout(egui::Layout::top_down(egui::Align::Min)));
-            ui.set_clip_rect(panel_clip);
             bar_contents(app, ui, full, system, (caption_left, caption_right));
         });
         close = response.close_requested;
@@ -186,13 +181,11 @@ fn bar_contents(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: egui::Rect, sy
     }
 }
 
-/// Whether the window shows the system's title bar instead of the app drawing its own: Windows
-/// and Linux with Preferences › Interface › System Title Bar. macOS always has system decorations,
-/// but keeps the in-app brand mark and centred title, so it never counts as system mode here; nor
-/// does the web build (the browser tab has no document title), nor an embedder or the snapshot
-/// example that never turned the preference on.
+/// Whether the OS draws the window's title bar and title, so the app draws neither: the shell
+/// decided on the native frame ([`PhotocraftApp::native_frame`]). Never on the web build, whose
+/// browser tab has no document title.
 pub fn system_title_bar(app: &PhotocraftApp) -> bool {
-    !app.custom_titlebar && app.session.prefs().interface.system_title_bar && !cfg!(any(target_os = "macos", target_arch = "wasm32"))
+    app.native_frame && !cfg!(target_arch = "wasm32")
 }
 
 /// The OS window title: the active document's name suffixed with the app name (a `*` prefix
