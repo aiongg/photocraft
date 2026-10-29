@@ -81,6 +81,7 @@ PATTERNS = [
     ("token", "`t.<field>` token reads"),
     ("tokens_get", "`Tokens::get(ctx)`"),
     ("add_space", "`add_space(n)`"),
+    ("item_spacing", "`item_spacing.x/y = n`"),
     ("stroke", "`Stroke::new(<width>, ..)`"),
     ("radius", "`rect_filled/rect_stroke` radius argument"),
     ("corner_radius", "`CornerRadius::same(n)` / `.corner_radius(n)` literals"),
@@ -219,6 +220,7 @@ class Scan:
         self.theme_found = defaultdict(int)  # pattern -> sites inside theme.rs / theme/
         self.done = defaultdict(int)  # pattern -> already converted (not in found)
         self.rewritten = defaultdict(int)
+        self.role = defaultdict(int)  # pattern -> rewrites that emit a gap role token (subset of rewritten)
         self.rounded = defaultdict(int)  # pattern -> rewrites that apply a decided rounding (subset of rewritten)
         self.rewritten_detail = defaultdict(lambda: defaultdict(int))  # pattern -> label -> n
         self.left = defaultdict(lambda: defaultdict(list))  # pattern -> reason -> [(file, line)]
@@ -239,6 +241,10 @@ def receiver_evidence(m: str):
 
 
 ROUND = True
+# a gap next to one of these separates sections or groups
+SECTION_HINT = re.compile(r"\.separator\(\)|Separator|\bheading\(|\.collapsing\(|CollapsingHeader|[Ss]ection|[Hh]eader|[Dd]ivider|group_title|\.strong\(\)|hairline\(|\bgroup\(ui|group_title")
+# the next statement starts a row, so the gap sits between two sibling rows
+ROW_START = re.compile(r"^(?:ui\.(?:horizontal|horizontal_wrapped|add|label|columns)\b|widgets::\w+\(|\w+::\w+\(ui\b)")
 
 
 def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
@@ -280,6 +286,47 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             return "painter.ctx()"
         return None
 
+    code_lines = m_code.split("\n")
+    line_starts = [0]
+    for ln in code_lines:
+        line_starts.append(line_starts[-1] + len(ln) + 1)
+
+    def neighbours(i):
+        """Previous and next non-blank code lines around offset i (comments are masked)."""
+        k = bisect.bisect_right(line_starts, i) - 1
+        prev = next_ = ""
+        for q in range(k - 1, max(k - 4, -1), -1):
+            if code_lines[q].strip():
+                prev = code_lines[q].strip()
+                break
+        for q in range(k + 1, min(k + 4, len(code_lines))):
+            if code_lines[q].strip():
+                next_ = code_lines[q].strip()
+                break
+        return prev, next_
+
+    def tokens_var(i):
+        """The name bound to a Tokens value in the enclosing fn before offset i, else None."""
+        k = bisect.bisect_right(fn_starts, i) - 1
+        if k < 0:
+            return None
+        params, body = fns[k][1], m_code[fn_starts[k]:i]
+        for r in ("t", "tokens"):
+            if re.search(rf"\b{r}\s*:\s*&?\s*(?:mut\s+)?(?:[\w]+::)*(?:Ui)?Tokens\b", params) or re.search(
+                rf"\blet\s+(?:mut\s+)?{r}\b[^;=]*=\s*&?\s*(?:[\w]+::)*(?:Tokens::(?:get|for_kind|of)|current)\b", body
+            ):
+                return r
+        return None
+
+    def gap_role(v, i):
+        """'section' or 'stack' when the neighbouring statements show the role of an add_space(v), else None."""
+        prev, nxt = neighbours(i)
+        if 8.0 <= v <= 24.0 and (SECTION_HINT.search(prev) or SECTION_HINT.search(nxt)):
+            return "section"
+        if v in (4.0, 6.0, 8.0) and prev.endswith(("});", "}", ");")) and "add_space" not in prev and ROW_START.match(nxt) and not nxt.startswith("//"):
+            return "stack"
+        return None
+
     def record_found(pat):
         (scan.theme_found if theme else scan.found)[pat] += 1
 
@@ -287,13 +334,15 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if not theme:
             scan.left[pat][reason].append((str(rel), line(i)))
 
-    def rewrite(pat, a, b, new, label, rounded=False):
+    def rewrite(pat, a, b, new, label, rounded=False, role=False):
         if theme:
             return
         edits.append((a, b, new))
         scan.rewritten[pat] += 1
         if rounded:
             scan.rounded[pat] += 1
+        if role:
+            scan.role[pat] += 1
         scan.rewritten_detail[pat][label] += 1
 
     # ---- 1. token reads
@@ -364,7 +413,7 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             continue
         a, b = spans[0]
         arg = m_code[a:b].strip()
-        if f"{scale}::Space::" in arg:
+        if f"{scale}::Space::" in arg or ".space.gap." in arg:
             if not theme:
                 scan.done["add_space"] += 1
             continue
@@ -374,13 +423,34 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if v is None:
             neg = re.fullmatch(r"-\s*(\d+(?:\.\d*)?)(?:_?f32)?", arg)
             leave("add_space", "negative literal" if neg else "not a literal (expression or variable)", mm.start())
-        elif v in SPACE:
-            rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{SPACE[v]}.px()", f"{fmt(v)} -> Space::{SPACE[v]}")
-        elif v in SPACE_ROUND and ROUND:
-            st = SPACE_ROUND[v]
-            rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{st}.px()", f"{fmt(v)} -> Space::{st} (rounded, DS-43 B8)", rounded=True)
+        elif v in SPACE or (v in SPACE_ROUND and ROUND):
+            rounded = v not in SPACE
+            role = gap_role(v, mm.start())
+            tv = tokens_var(mm.start()) if role else None
+            if role and tv:
+                rewrite("add_space", ws_a, ws_a + len(arg), f"{tv}.space.gap.{role}", f"{fmt(v)} -> gap.{role} (role)" + (" (rounded)" if rounded else ""), rounded=rounded, role=True)
+            else:
+                st = SPACE_ROUND[v] if rounded else SPACE[v]
+                rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{st}.px()", f"{fmt(v)} -> Space::{st}" + (" (rounded, DS-43 B8)" if rounded else ""), rounded=rounded)
         else:
             leave("add_space", f"off-scale {fmt(v)}: " + nearest(v, SPACE, ""), mm.start())
+
+    # ---- 3b. item_spacing.x / .y = <literal>: the axis names the role (x inline, y stack)
+    for mm in re.finditer(r"\.item_spacing\.([xy])\s*=(?!=)\s*([\d.]+(?:_?f32)?)\s*;", m_code):
+        record_found("item_spacing")
+        axis, lit = mm.group(1), literal(mm.group(2))
+        tv = tokens_var(mm.start())
+        role = "inline" if axis == "x" else "stack"
+        if f".space.gap." in m_code[mm.start():mm.end()]:
+            continue
+        if lit not in ((4.0, 6.0) if axis == "x" else (4.0, 6.0, 8.0)):
+            leave("item_spacing", f"{axis} = {fmt(lit)} is a local reset or tweak, not a gap role", mm.start())
+        elif not tv:
+            leave("item_spacing", "no Tokens binding in the enclosing fn", mm.start())
+        else:
+            rewrite("item_spacing", mm.start(2), mm.end(2), f"{tv}.space.gap.{role}", f"{axis} = {fmt(lit)} -> gap.{role} (role)", role=True)
+    if not theme:
+        scan.done["item_spacing"] += len(re.findall(r"\.item_spacing\.[xy]\s*=\s*\w+\.space\.gap\.", m_code))
 
     # ---- 4. Stroke::new
     for mm in re.finditer(r"(?<![\w])((?:\w+::)*)Stroke::new\s*\(", m_code):
@@ -489,12 +559,12 @@ def md_report(scan: Scan, commit: str, args) -> str:
         "",
         "## Totals",
         "",
-        "| Pattern | Sites found | Rewritten | of which rounded (DS-43 B8/B9) | Left for hand work | Already converted | In theme.rs (not rewritten) |",
-        "|---|---|---|---|---|---|---|",
+        "| Pattern | Sites found | Rewritten | of which role token | of which rounded (DS-43 B8/B9) | Left for hand work | Already converted | In theme.rs (not rewritten) |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for key, label in PATTERNS:
         left = sum(len(v) for v in scan.left[key].values())
-        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {scan.rounded[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
+        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {scan.role[key]} | {scan.rounded[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
     out.append("")
     for key, label in PATTERNS:
         out += [f"## {label}", ""]
@@ -541,7 +611,8 @@ Checked against `design-system` @ `01e20c71`. The scale re-export (`craft_ui::th
 - `chrome` and `card` both map to `surface.panel`; they differ in the Studio family (themes.md Table 0). Pin the difference in the theme files.
 - `icon` maps to `text.normal` and `radius_sm/radius/radius_lg` to `t.shape.radius.control/popup/window` (f32), as DS-43 B2 and B7 decide. A rewritten `t.radius_sm - 1.0` keeps its f32 type.
 - Radius literals map to the scale step with the same value (`Radius::R4.px()`), not to the roles of codemods.md Table 4: a role changes the value per theme.
-- Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. Where a site separates rows or groups, `gap.stack`/`gap.section` is the better target; that is a hand pass.
+- Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. A rounded value that also gets a role token is counted in both columns.
+- Role tokens (`t.space.gap.section`, `.stack`, `.inline`; Compact 12/6/4, Comfortable 16/8/6) replace the S-step when the neighbouring statements show the role: `add_space` of 8 to 24 next to a separator, heading, hairline, group or header line is `section`; `add_space` of 4, 6 or 8 between two sibling rows is `stack`; `item_spacing.x = 4|6` is `inline` and `item_spacing.y = 4|6|8` is `stack`. A role is emitted only when a `Tokens` value (`t`) is bound earlier in the same fn; otherwise the S-step is emitted. Other `item_spacing` assignments (0, 1, 2, 3, 10, constants) are local resets, left.
 - `Stroke::new(<w>, <colour>)` becomes `scale::Stroke::W1.egui(<ctx>, <colour>)`; `<ctx>` is `ui.ctx()`, `ctx`/`&ctx` or `painter.ctx()`, taken from the enclosing fn's parameters.
 - `Tokens::get(<ui>.ctx())` becomes `Tokens::of(<ui>)`; any other Context becomes `craft_ui::theme::current(<ctx>)`. After a rewrite `t` is a `UiTokens`, so every read in the file must be rewritten too; a file with a left read will not compile until it is done by hand.
 - Receiver check is per file: `t`, `tokens`, `theme`, `tk` is rewritten only when the file binds that name to a `Tokens`. A second, unrelated `t` in the same file would be rewritten too; review the diff.
