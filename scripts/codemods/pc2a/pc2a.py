@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PC-2a codemod: PhotoCraft app wrapper calls -> craft_ui components.
 
-Usage: python3 -I pc2a.py [--root DIR] [--apply] [--lossy] [--diff FILE] [--report FILE]
+Usage: python3 -I pc2a.py [--root DIR] [--apply] [--diff FILE] [--report FILE]
 See README.md. Matches on syntax (comments and strings are masked), never on line numbers,
 and a rewritten call no longer matches, so re-runs are idempotent.
 """
@@ -108,15 +108,34 @@ def is_test_file(rel):
 
 # ---------------------------------------------------------------- icons manifest
 
+# PhotoCraft icon file name -> manifest name (DS-43 "Icon manifest additions"). A name is used
+# only when the manifest on origin/design-system lists it; the others are reported as missing.
+ALIASES = {
+    "x": "close", "undo-2": "undo", "ellipsis": "more", "pipette": "eyedropper", "file-plus": "new_file",
+    "link-2": "link", "message-square": "note", "square-plus": "new_layer", "folder-plus": "new_folder",
+    "arrow-left-right": "swap_horizontal", "circle-dot": "target", "sliders-horizontal": "adjustments",
+    "grid-3x3": "grid", "grid-2x2": "grid_small", "square-dashed": "marquee_rect",
+    "circle-dashed": "marquee_ellipse", "house": "home", "rectangle-vertical": "orientation_portrait",
+    "rectangle-horizontal": "orientation_landscape", "layer-mask": "layer_mask", "font-variable": "font_variable",
+    "font-similar": "font_similar", "painting-symmetry": "symmetry", "text-warp": "text_warp",
+}
+
 
 def load_icons(craft_libs):
+    """manifest names -> Icon variant, or None when the manifest cannot be read."""
     try:
         t = subprocess.run(["git", "-C", craft_libs, "show", "origin/design-system:crates/ui/icons/icons.toml"],
                            capture_output=True, text=True, check=True).stdout
     except Exception:
         return None
     names = re.findall(r'^name\s*=\s*"([^"]+)"', t, re.M)
-    return {n.replace("-", "_"): "".join(w[:1].upper() + w[1:] for w in re.split(r"[_-]", n)) for n in names}
+    return {n: "".join(w[:1].upper() + w[1:] for w in n.split("_")) for n in names}
+
+
+def icon_variant(file_name, icons):
+    """(variant, None) or (None, manifest name wanted)."""
+    want = ALIASES.get(file_name, file_name.replace("-", "_"))
+    return (icons[want], None) if want in icons else (None, want)
 
 
 # ---------------------------------------------------------------- rewrite rules
@@ -162,10 +181,10 @@ COUNT_ONLY = collections.OrderedDict([
 ])
 
 HAND_REASON = {
-    "value_field": "NumberField takes `f64` by value plus `LocaleNumbers` and reports through an EditResponse event; the app passes `&mut f32` with a unit suffix string and pixel width. Needs an adapter, not a rename",
-    "slider": "Slider takes the value by value and returns an event; the app passes `&mut f32` with gradient and suffix. Needs an adapter, not a rename",
-    "pill_tab": "one tab per call; Segmented takes the whole group (value + items)",
-    "text_field": "TextField takes `&str` and reports the new String through an event; IME, hint, char limit and width stay with the caller",
+    "value_field": "needs the app-side adapter `widgets/bound.rs` (DS-43: host, doc and `apply` for the undo step); `value_field` also has no label argument for the accessible name. craft-ui now takes f32 values, so this is app code, not a rename",
+    "slider": "needs the app-side adapter `widgets/bound.rs` (DS-43: host, doc and `apply` for the undo step); gradient/suffix arguments map to `track_colors`/`Unit`",
+    "pill_tab": "one tab per call; DS-43 A12: each group becomes one `Segmented` (2-4 items) or a `TabStrip`, by hand",
+    "text_field": "no label argument for the accessible name, and the event's String must be written back; DS-43 A10: hint = `placeholder`, width = layout",
     "dialog_buttons": "DialogFooter (DS-33) is not built in craft-libs",
     "radio": "RadioGroup/RadioSet take the whole group; sites are single rows",
     "panel_menu": "PanelHeader menu (DS-31) is not built; per-panel bodies",
@@ -221,66 +240,73 @@ def build(label, name, args, opts, icons):
         v = "Primary" if label == "primary_button" else "Secondary"
         w = "" if is_zero(a[2]) else f".min_width({a[2]})"
         return f"{ui_expr(a[0])}.add({CU}Button::new({translated(a[1])}).variant({CU}ButtonVariant::{v}){w})", None
-    if label == "compact_button":
-        return None, "`height` argument: Button has only ControlSize Sm/Md, no pixel height"
     if label == "icons::button":
         if name == "rail_button":
-            return None, "rail look (quiet filled 'on' state, no accent): IconButton has no such state"
-        if name == "button_with_icon_size_tip":
-            return None, "`show_tip` flag: IconButton has no hidden-tooltip option"
-        want = 5 if name == "button" else 6
+            return None, "rail look (quiet filled 'on' state, no accent): belongs to DS-31 `Rail`"
+        want = {"button": 5, "button_with_icon_size": 6, "button_with_icon_size_tip": 7}[name]
         if n != want:
             return None, "unexpected argument count"
         nm = re.fullmatch(r'"([\w-]+)"', a[1])
         if not nm:
             return None, "icon name is not a string literal"
-        key = nm.group(1).replace("-", "_")
         if icons is None:
             return None, "icons manifest not readable"
-        if key not in icons:
-            return None, f"MISSING-ICON:{nm.group(1)}"
-        sel = a[3] if name == "button" else a[4]
-        if sel != "false":
-            return None, "`selected` is not literal false: IconButton::toggle takes `&mut bool`, there is no `selected(bool)`"
+        var, wanted = icon_variant(nm.group(1), icons)
+        if var is None:
+            return None, f"MISSING-ICON:{nm.group(1)}={wanted}"
         if not re.fullmatch(r"[\d.]+(_?f32)?", a[2]):
             return None, "box size is not a numeric literal"
-        if not opts.lossy:
-            return None, "LOSSY: box size in pixels has no equivalent (ControlSize Sm/Md only)"
-        sz = "Sm" if float(re.sub(r"[^\d.]", "", a[2])) <= 24 else "Md"
+        box = float(re.sub(r"[^\d.]", "", a[2]))
+        if box > 34 or box < 16:
+            return None, "box size outside 16 to 34 px (DS-43 A4 maps 16-22 to Sm, 24-34 to Md)"
+        sz = "Sm" if box <= 22 else "Md"
+        sel = a[3] if name == "button" else a[4]
         tip = a[4] if name == "button" else a[5]
         if tip in ('""', ""):
             return None, "empty tooltip: IconButton needs a label"
-        return (f"{ui_expr(a[0])}.add({CU}IconButton::new(craft_ui::icons::Icon::{icons[key]}, {tip})"
-                f".size({CU}ControlSize::{sz}))"), None
+        out = f"{ui_expr(a[0])}.add({CU}IconButton::new(craft_ui::icons::Icon::{var}, {tip}).size({CU}ControlSize::{sz})"
+        if sel != "false":
+            out += f".selected({sel})"
+        if name == "button_with_icon_size_tip" and a[6] != "true":
+            out += f".show_tooltip({a[6]})"
+        return out + ")", None
     if label == "dropdown":
-        if name not in ("dropdown", "dropdown_literal"):
-            return None, {"dropdown_hovered": "reports the hovered option (live preview): Select has no hover output",
-                          "dropdown_wheel_hovered": "wheel steps list plus hover output: Select::wheel_steps has no per-notch list",
-                          "dropdown_with_tooltips": "per-option tooltips: Select options have none"}[name]
+        if name == "dropdown_hovered":
+            return None, "returns (changed, hovered); write `.highlighted(&mut out)` by hand"
+        if name == "dropdown_wheel_hovered":
+            return None, "returns every option chosen per notch plus the hovered one; port uses `.wheel_steps(true)` and `.highlighted(..)` by hand (DS-43 A2)"
         if n != 6:
             return None, "unexpected argument count"
-        if not opts.lossy:
-            return None, "LOSSY: `width` argument has no equivalent (Select fills the row or uses its token width)"
-        tr = name == "dropdown"
+        tooltips = name == "dropdown_with_tooltips"
+        tr = name != "dropdown_literal"
         o = a[4]
         lit = re.fullmatch(r"&\[(.*)\]", o, re.S)
+        fit = ".fit(true)"
         if lit:
-            items = split_top(lit.group(1))
             chain = ""
-            for it in items:
+            for it in split_top(lit.group(1)):
                 m = re.fullmatch(r"\((.*)\)", it.strip(), re.S)
                 parts = split_top(m.group(1)) if m else []
-                if len(parts) != 2:
-                    return None, "option list literal has a non-pair element"
+                if len(parts) != (3 if tooltips else 2):
+                    return None, "option list literal has a non-tuple element"
                 t = parts[1].strip()
                 chain += f".option({parts[0].strip()}, {translated(t) if tr else t})"
-        elif plain_path(o):
+                if tooltips:
+                    chain += f".option_tooltip({translated(parts[2].strip())})"
+        elif plain_path(o) and not tooltips:
             ref = o.lstrip("&")
             txt = f"tl!({ref}[i].1)" if tr else f"{ref}[i].1"
             chain = f".rows({ref}.len(), |i| {ref}[i].0.clone(), |i| {txt})"
+            fit = ""  # fit is ignored with rows()
+        elif tooltips:
+            return None, "options is a path with per-option tooltips: `rows` has no tooltip; write the `.option(..).option_tooltip(..)` chain by hand"
         else:
             return None, "options is an expression, not a literal list or a plain path"
-        return f"{CU}Select::new({a[1]}, {a[2]}, {a[3]}){chain}.show({a[0]}).response.changed()", None
+        return f"{CU}Select::new({a[1]}, {a[2]}, {a[3]}){fit}{chain}.show({a[0]}).response.changed()", None
+    if label == "compact_button":
+        if n != 3:
+            return None, "unexpected argument count"
+        return f"{ui_expr(a[0])}.add({CU}Button::new({translated(a[1])}).size({CU}ControlSize::Sm))", None
     if label in HAND_REASON:
         return None, HAND_REASON[label]
     return None, "no rule"
@@ -366,8 +392,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", default=".", help="PhotoCraft checkout (default: cwd)")
     ap.add_argument("--apply", action="store_true", help="rewrite files in place (default: dry run)")
-    ap.add_argument("--lossy", action="store_true",
-                    help="also rewrite sites that drop a pixel width/size craft_ui cannot express (Select width, IconButton box size)")
     ap.add_argument("--craft-libs", default=os.environ.get("CRAFT_LIBS", "../craft-libs"),
                     help="craft-libs checkout with an origin/design-system ref (default: $CRAFT_LIBS or ../craft-libs)")
     ap.add_argument("--diff", help="write a unified diff of the rewrites to FILE")
@@ -421,7 +445,7 @@ def reasons(ss):
     c = collections.OrderedDict()
     for s in ss:
         if s.status == "left":
-            key = "icon not in craft-libs manifest" if s.reason.startswith("MISSING-ICON") else s.reason
+            key = "icon not in the craft-libs manifest yet" if s.reason.startswith("MISSING-ICON") else s.reason
             c.setdefault(key, []).append(s)
     return c
 
@@ -440,17 +464,16 @@ def report(sites, counts_only, nfiles, changed, opts, root):
     L.append("# PC-2a dry-run report: wrapper calls to craft-libs components\n")
     L.append(f"- Run date: {datetime.date.today().isoformat()}")
     L.append(f"- Source: PhotoCraft `{commit(root)}`, `{SRC_REL}` ({nfiles} non-test `.rs` files; test files and inline `#[cfg(test)] mod` blocks excluded)")
-    L.append(f"- Mode: dry run{' (--lossy)' if opts.lossy else ''}; script `scripts/codemods/pc2a/pc2a.py`")
+    L.append(f"- Mode: dry run{' '}; script `scripts/codemods/pc2a/pc2a.py`")
     L.append(f"- Files that would change: {changed}\n")
     L.append("## Totals\n")
-    L.append("| Pattern | Found | Rewritten | Also rewritten with `--lossy` | Left for hand work |")
-    L.append("|---|---|---|---|---|")
+    L.append("| Pattern | Found | Rewritten | Left for hand work |")
+    L.append("|---|---|---|---|")
     for rule_, ss in group(sites).items():
         w = sum(s.status == "rewritten" for s in ss)
-        lo = sum(s.reason.startswith("LOSSY") for s in ss)
-        L.append(f"| `{rule_}` | {len(ss)} | {w} | {lo} | {len(ss) - w - lo} |")
+        L.append(f"| `{rule_}` | {len(ss)} | {w} | {len(ss) - w} |")
     for rule_, ss in group(counts_only).items():
-        L.append(f"| `{rule_}` | {len(ss)} | 0 | 0 | {len(ss)} |")
+        L.append(f"| `{rule_}` | {len(ss)} | 0 | {len(ss)} |")
     L.append("")
     for rule_, ss in group(sites).items():
         L.append(f"## `{rule_}`\n")
@@ -464,7 +487,7 @@ def report(sites, counts_only, nfiles, changed, opts, root):
             L.append("|---|---|---|")
             for why, xs in sorted(rs.items(), key=lambda kv: -len(kv[1])):
                 ex = ", ".join(f"`{x.rel}:{x.line}`" for x in xs[:3])
-                L.append(f"| {why.replace('LOSSY: ', 'eligible with `--lossy`: ').replace('|', chr(92) + '|')} | {len(xs)} | {ex} |")
+                L.append(f"| {why.replace('|', chr(92) + '|')} | {len(xs)} | {ex} |")
             L.append("")
     L.append("## Menu and select sites (counted, not rewritten)\n")
     L.append("| Pattern | Sites | Examples |")
@@ -475,7 +498,8 @@ def report(sites, counts_only, nfiles, changed, opts, root):
     miss = collections.Counter(s.reason.split(":", 1)[1] for s in sites if s.reason.startswith("MISSING-ICON"))
     L.append("## Icon names not in the craft-libs manifest\n")
     if miss:
-        L.append(", ".join(f"`{k}` ({v})" for k, v in miss.most_common()) + "\n")
+        L.append("PhotoCraft name, manifest name it needs (count):\n")
+        L.append(", ".join(f"`{k.replace('=', '` -> `')}` ({v})" for k, v in miss.most_common()) + "\n")
     else:
         L.append("None.\n")
     open(opts.report, "w").write("\n".join(L) + "\n")

@@ -21,6 +21,8 @@ from pathlib import Path
 # PhotoCraft `Tokens` field -> craft-libs colour path (themes.md Table 0), read from
 # `craft_theme::Tokens` (`UiTokens` derefs to it).  Every entry is 1:1 by field.
 COLOR_FIELDS = {
+    # DS-43 B2: the port normalises glyph colour to `text.normal`
+    "icon": "color.text.normal",
     "chrome": "color.surface.panel",
     "card": "color.surface.panel",
     "dock": "color.surface.background",
@@ -51,11 +53,10 @@ COLOR_FIELDS = {
 }
 # Fields with no single token (themes.md Table 0/2): left, with the reason.
 AMBIGUOUS_FIELDS = {
-    "icon": "no token: `text.normal` or an icon component",
-    "accent_border": "no token: component or `line.focus`",
-    "canvas_dot": "no token: needs `surface.canvas_pattern` or an app pin",
-    "shadow": "elevation colour, not a colour token",
-    "histogram_level": "u8 intensity, not a colour",
+    "accent_border": "DS-43 B3: per use (selected look, `ToggleButton`/`Segmented`, or `accent.solid` stroke)",
+    "canvas_dot": "DS-43 B4: app-side (canvas colour moved 0.06 in OKLCH lightness)",
+    "shadow": "DS-43 B5: two uses (floating-panel shadow -> `shadow.popup/dialog`; cursor halo -> `overlay.halo`)",
+    "histogram_level": "DS-43 B6: dropped; `histogram_color`/`scope_hue` move to `data.*`",
 }
 RADIUS_FIELDS = {"radius_sm": "control", "radius": "popup", "radius_lg": "window"}
 RECEIVERS = ("t", "tokens", "theme", "tk")
@@ -64,6 +65,17 @@ ALL_FIELDS = sorted(set(COLOR_FIELDS) | set(AMBIGUOUS_FIELDS) | set(RADIUS_FIELD
 SPACE = {0.0: "S0", 2.0: "S2", 4.0: "S4", 6.0: "S6", 8.0: "S8", 12.0: "S12", 16.0: "S16", 20.0: "S20", 24.0: "S24", 32.0: "S32"}
 RADIUS = {0.0: "R0", 2.0: "R2", 3.0: "R3", 4.0: "R4", 6.0: "R6", 8.0: "R8", 12.0: "R12"}
 STROKE = {1.0: "W1", 1.5: "W1_5", 2.0: "W2"}
+# DS-43 B8/B9: decided roundings (no new steps). Counted apart from exact rewrites; --exact-only turns them off.
+SPACE_ROUND = {3.0: "S4", 5.0: "S4", 7.0: "S8", 9.0: "S8", 10.0: "S12", 14.0: "S12", 18.0: "S16", 22.0: "S24", 26.0: "S24", 46.0: "S32"}
+RADIUS_ROUND = {1.0: "R2"}
+# DS-43 B10: where each off-scale stroke width goes (a hint for the hand pass, never rewritten)
+STROKE_HINT = {
+    1.15: "glyph or box outline: Icon/Disclosure or W1", 1.2: "glyph or box outline: Icon/Disclosure or W1", 1.25: "glyph or box outline: Icon/Disclosure or W1",
+    1.3: "glyph or box outline: Icon/Disclosure or W1", 0.75: "brush ring: app canvas ink", 0.7: "scope line: histogram.line or app canvas ink",
+    0.6: "scope line: histogram.line or app canvas ink", 0.5: "app canvas ink", 0.3: "app canvas ink",
+    2.5: "halo: component token or app canvas ink", 3.0: "halo: component token or app canvas ink", 3.5: "halo: component token or app canvas ink",
+    4.5: "halo: component token or app canvas ink", 5.0: "tool-button arc: DS-35 Toolbar",
+}
 
 PATTERNS = [
     ("token", "`t.<field>` token reads"),
@@ -207,6 +219,7 @@ class Scan:
         self.theme_found = defaultdict(int)  # pattern -> sites inside theme.rs / theme/
         self.done = defaultdict(int)  # pattern -> already converted (not in found)
         self.rewritten = defaultdict(int)
+        self.rounded = defaultdict(int)  # pattern -> rewrites that apply a decided rounding (subset of rewritten)
         self.rewritten_detail = defaultdict(lambda: defaultdict(int))  # pattern -> label -> n
         self.left = defaultdict(lambda: defaultdict(list))  # pattern -> reason -> [(file, line)]
         self.edits = {}  # file -> [(start, end, text)]
@@ -225,6 +238,9 @@ def receiver_evidence(m: str):
     return names
 
 
+ROUND = True
+
+
 def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
     text = path.read_text()
     m = mask(text)
@@ -240,6 +256,30 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
     def line(i):
         return bisect.bisect_left(nl, i) + 1
 
+    fns = []
+    for fm in re.finditer(r"\bfn\s+\w+\s*(?:<[^>{}]*>)?\s*\(", m_code):
+        spans, close = parse_args(m_code, fm.end() - 1)
+        if spans is not None:
+            fns.append((fm.start(), m_code[fm.end() - 1:close + 1]))
+    fn_starts = [f[0] for f in fns]
+
+    def ctx_expr(i):
+        """An expression for the egui Context at offset i, from the enclosing fn's parameters and closures; None if unknown."""
+        k = bisect.bisect_right(fn_starts, i) - 1
+        if k < 0:
+            return None
+        params = fns[k][1]
+        body = m_code[fn_starts[k]:i]
+        if re.search(r"\bui\s*:", params) or re.search(r"\|\s*(?:mut\s+)?ui\s*[,|:]", body):
+            return "ui.ctx()"
+        if re.search(r"\bctx\s*:\s*&", params):
+            return "ctx"
+        if re.search(r"\bctx\s*:", params) or re.search(r"\blet\s+ctx\b", body):
+            return "&ctx"
+        if re.search(r"\bpainter\s*:", params) or re.search(r"\blet\s+(?:mut\s+)?painter\b", body):
+            return "painter.ctx()"
+        return None
+
     def record_found(pat):
         (scan.theme_found if theme else scan.found)[pat] += 1
 
@@ -247,11 +287,13 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if not theme:
             scan.left[pat][reason].append((str(rel), line(i)))
 
-    def rewrite(pat, a, b, new, label):
+    def rewrite(pat, a, b, new, label, rounded=False):
         if theme:
             return
         edits.append((a, b, new))
         scan.rewritten[pat] += 1
+        if rounded:
+            scan.rounded[pat] += 1
         scan.rewritten_detail[pat][label] += 1
 
     # ---- 1. token reads
@@ -282,13 +324,9 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             leave("token", f"receiver `{recv}` not bound to `Tokens` in this file", a)
             continue
         if field in RADIUS_FIELDS:
-            # f32 -> CornerRadius changes the type, so only plain call arguments are exact
-            before = m_code[:a].rstrip()[-1:]
-            after = m_code[b:].lstrip()[:1]
-            if before in "(," and after in "),":
-                rewrite("token", a, b, f"{recv}.radius.{RADIUS_FIELDS[field]}", f"{field} -> radius.{RADIUS_FIELDS[field]}")
-            else:
-                leave("token", f"`{field}` used as f32 (arithmetic, cast or method), not a plain argument", a)
+            # DS-43 B7: the f32 value lives on the `Tokens` deref path; `t.radius.*` stays `CornerRadius`
+            role = RADIUS_FIELDS[field]
+            rewrite("token", a, b, f"{recv}.shape.radius.{role}", f"{field} -> shape.radius.{role}")
             continue
         tok = COLOR_FIELDS[field]
         rewrite("token", a, b, f"{recv}.{tok}.to_egui()", f"{field} -> {tok}")
@@ -304,8 +342,20 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         am = re.fullmatch(r"&?\s*(\w+)\.ctx\(\)", arg)
         if am and re.fullmatch(r"(?:\w*_)?ui(?:_\w+)?|ui\d*", am.group(1)):
             rewrite("tokens_get", mm.start(), close + 1, f"{mm.group(1)}Tokens::of({am.group(1)})", "Tokens::get(ui.ctx()) -> Tokens::of(ui)")
+            continue
+        # DS-43 B11: any other Context goes through `craft_ui::theme::current(&Context)`
+        if re.fullmatch(r"&?\s*(?:self\.)?\w+\.ctx\(\)", arg):
+            ctx = arg.lstrip("& ")
+        elif re.fullmatch(r"&\s*[\w.]+", arg):
+            ctx = arg
+        elif re.fullmatch(r"\w+", arg):
+            k = bisect.bisect_right(fn_starts, mm.start()) - 1
+            is_ref = k >= 0 and re.search(rf"\b{arg}\s*:\s*&", fns[k][1])
+            ctx = arg if is_ref else "&" + arg
         else:
-            leave("tokens_get", f"argument `{arg[:30]}` is not `<ui>.ctx()`", mm.start())
+            leave("tokens_get", f"argument `{arg[:30]}` is not a Context expression", mm.start())
+            continue
+        rewrite("tokens_get", mm.start(), close + 1, f"craft_ui::theme::current({ctx})", "Tokens::get(<ctx>) -> craft_ui::theme::current(<ctx>)")
 
     # ---- 3. add_space
     for mm in re.finditer(r"\badd_space\s*\(", m_code):
@@ -320,12 +370,15 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             continue
         record_found("add_space")
         v = literal(arg)
+        ws_a = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
         if v is None:
             neg = re.fullmatch(r"-\s*(\d+(?:\.\d*)?)(?:_?f32)?", arg)
             leave("add_space", "negative literal" if neg else "not a literal (expression or variable)", mm.start())
         elif v in SPACE:
-            ws_a = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
             rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{SPACE[v]}.px()", f"{fmt(v)} -> Space::{SPACE[v]}")
+        elif v in SPACE_ROUND and ROUND:
+            st = SPACE_ROUND[v]
+            rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{st}.px()", f"{fmt(v)} -> Space::{st} (rounded, DS-43 B8)", rounded=True)
         else:
             leave("add_space", f"off-scale {fmt(v)}: " + nearest(v, SPACE, ""), mm.start())
 
@@ -336,21 +389,28 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             continue
         a, b = spans[0]
         arg = m_code[a:b].strip()
-        if f"{scale}::Stroke::" in arg:
-            if not theme:
-                scan.done["stroke"] += 1
-            continue
         record_found("stroke")
         v = literal(arg)
         if v is None:
             leave("stroke", "width not a literal", mm.start())
         elif v in STROKE:
-            ws_a = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
-            rewrite("stroke", ws_a, ws_a + len(arg), f"{scale}::Stroke::{STROKE[v]}.width(1.0)", f"{fmt(v)} -> Stroke::{STROKE[v]}")
+            if len(spans) != 2:
+                leave("stroke", "colour argument not parsed", mm.start())
+                continue
+            ctx = ctx_expr(mm.start())
+            if ctx is None:
+                leave("stroke", "no `ui`, `ctx` or `painter` in the enclosing fn to take pixels_per_point from", mm.start())
+                continue
+            # replace `Stroke::new(<width>` only; `, <colour>)` stays so edits inside the colour expression still apply
+            wa = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
+            rewrite("stroke", mm.start(), wa + len(arg), f"{scale}::Stroke::{STROKE[v]}.egui({ctx}", f"{fmt(v)} -> Stroke::{STROKE[v]}.egui(ctx, colour)")
         elif v == 0.0:
             leave("stroke", "zero width (no step; `Stroke::NONE`)", mm.start())
         else:
-            leave("stroke", f"off-scale {fmt(v)}: " + nearest(v, {1.0: "W1", 1.5: "W1_5", 2.0: "W2"}, "") + "; Hairline is 1/ppp", mm.start())
+            hint = STROKE_HINT.get(v, "no B10 row")
+            leave("stroke", f"off-scale {fmt(v)} ({hint}): " + nearest(v, STROKE, ""), mm.start())
+    if not theme:
+        scan.done["stroke"] += len(re.findall(re.escape(scale) + r"::Stroke::\w+\.egui\(", m_code))
 
     # ---- 5. rect_filled / rect_stroke radius
     for mm in re.finditer(r"\.(rect_filled|rect_stroke)\s*\(", m_code):
@@ -365,12 +425,15 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             continue
         record_found("radius")
         v = literal(arg)
+        ws_a = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
         if v is None:
-            kind = "token read, see the token rows" if re.match(r"(?:" + "|".join(RECEIVERS) + r")\.radius", arg) else "variable or expression"
+            kind = "token read, see the token rows" if re.match(r"(?:" + "|".join(RECEIVERS) + r")\.(?:shape\.)?radius", arg) else "variable or expression"
             leave("radius", f"not a literal ({kind})", mm.start())
         elif v in RADIUS:
-            ws_a = a + (len(m_code[a:b]) - len(m_code[a:b].lstrip()))
             rewrite("radius", ws_a, ws_a + len(arg), f"{scale}::Radius::{RADIUS[v]}.px()", f"{fmt(v)} -> Radius::{RADIUS[v]}")
+        elif v in RADIUS_ROUND and ROUND:
+            st = RADIUS_ROUND[v]
+            rewrite("radius", ws_a, ws_a + len(arg), f"{scale}::Radius::{st}.px()", f"{fmt(v)} -> Radius::{st} (rounded, DS-43 B9)", rounded=True)
         else:
             leave("radius", f"off-scale {fmt(v)}: " + nearest(v, RADIUS, ""), mm.start())
 
@@ -422,16 +485,16 @@ def md_report(scan: Scan, commit: str, args) -> str:
         f"- Run date: {today}",
         f"- Source: PhotoCraft `{commit}`, `{args.src}` (script `scripts/codemods/pc2b/pc2b.py`, mode `{'apply' if args.apply else 'dry-run'}`)",
         f"- Scope: {scan.files} non-test `.rs` files, {scan.lines:,} lines (test files, `#[cfg(test)]`-gated modules and inline test blocks cut). `theme.rs` is scanned but never rewritten; its hits are in the last column.",
-        f"- Target: craft-libs `design-system` @ `e13f09f2`. Scale paths are written as `{args.scale}::Space::S4.px()` etc.",
+        f"- Target: craft-libs `design-system` @ `01e20c71` (API as built in DS-43). Scale paths are written as `{args.scale}::Space::S4.px()` etc.",
         "",
         "## Totals",
         "",
-        "| Pattern | Sites found | Rewritten | Left for hand work | Already converted | In theme.rs (not rewritten) |",
-        "|---|---|---|---|---|---|",
+        "| Pattern | Sites found | Rewritten | of which rounded (DS-43 B8/B9) | Left for hand work | Already converted | In theme.rs (not rewritten) |",
+        "|---|---|---|---|---|---|---|",
     ]
     for key, label in PATTERNS:
         left = sum(len(v) for v in scan.left[key].values())
-        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
+        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {scan.rounded[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
     out.append("")
     for key, label in PATTERNS:
         out += [f"## {label}", ""]
@@ -453,7 +516,7 @@ def md_report(scan: Scan, commit: str, args) -> str:
             mo = re.match(r"off-scale ([\d.]+)", reason)
             if mo:
                 counts[mo.group(1)] += len(sites)
-        top = ", ".join(f"{v}: {n}" for v, n in sorted(counts.items(), key=lambda kv: -kv[1]))
+        top = ", ".join(f"{v}: {n}" for v, n in sorted(counts.items(), key=lambda kv: -kv[1])) or "none"
         out.append(f"| {dict(PATTERNS)[key]} | {top} |")
     out += ["", MISSING, ""]
     return "\n".join(out)
@@ -461,28 +524,27 @@ def md_report(scan: Scan, commit: str, args) -> str:
 
 MISSING = """## Missing in craft-libs
 
-Checked against `design-system` @ `e13f09f2` (`crates/theme/src/{scale,tokens}.rs`, `crates/ui/src/theme`).
+Checked against `design-system` @ `01e20c71`. The scale re-export (`craft_ui::theme::scale`), `StrokeExt::egui`, `craft_ui::theme::current(&Context)`, `ToEgui` and the f32 radii (`t.shape.radius.*` through the `UiTokens` deref) all exist, and every token path the script emits was found in `crates/theme/src/tokens.rs` and `components/`. The removed tokens `menu.tint_alpha` and `histogram.fill_alpha` are not emitted. Nothing in craft-libs blocks a rewrite. What is left is decided in DS-43 as port or app work, so it is not a craft-libs gap:
 
-| Needed | Why | Sites |
+| Left | Decision (DS-43) | Where |
 |---|---|---|
-| `Space`, `Radius`, `Stroke` re-exported from `craft_ui` (or a `craft-theme` dependency in `photocraft-ui-egui`) | PhotoCraft depends on `craft-ui` only; the emitted `craft_theme::Space::S4.px()` does not resolve today. `--scale craft_ui::theme` switches the prefix once the re-export exists. | every scale rewrite |
-| A token for `icon` (glyph colour that is not `text.normal`) | `t.icon` has no one-to-one role | see token table |
-| A token for `accent_border` (or an agreed use of `line.focus`) | no role | see token table |
-| `surface.canvas_pattern` (or an app pin) for `canvas_dot` | no role | see token table |
-| A colour token or component for `shadow` | `Tokens.shadow` is a colour; the DS has elevation geometry only (`Shadows`) | see token table |
-| `histogram_level` (u8 intensity) | derivable, no token | see token table |
-| `f32` radius accessor on `UiTokens` | `UiTokens.radius.*` is `CornerRadius` (u8); `tokens.shape.radius.*` is f32 and needs the deref path. Sites that do arithmetic on `t.radius*` are left. | see token table |
-| `Space` steps 3, 10, 14, 22 (or an agreed rounding) | frequent off-scale literals, see the off-scale table | see off-scale table |
-| `Radius` step 1 | `1.0` radius is common, nearest steps are R0/R2 | see off-scale table |
-| `Stroke` steps for 0.75, 1.25, 3.0, or agreed rounding | the scale has only Hairline/W1/W1_5/W2 | see off-scale table |
-| `Tokens::of` taking a `Context` | sites with only a `ctx` (or `painter.ctx()`) are left; `craft_ui::theme::current(ctx)` exists and returns the same value | `Tokens::get` table |
+| `shadow` reads | B5: floating-panel shadow becomes `UiTokens.shadow.popup/dialog` by size, a cursor halo becomes `overlay.halo`; chosen per use | token table |
+| `accent_border` reads | B3: per use (selected look, `ToggleButton`/`Segmented`, or an `accent.solid` stroke) | token table |
+| `canvas_dot` reads | B4: app-side, derived from the canvas colour in use | token table |
+| `histogram_level` | B6: dropped with `histogram_color`/`scope_hue` moving to `data.*` | token table |
+| Off-scale `Stroke` widths | B10: no new steps; glyphs become `Icon`/`Disclosure`, halos component tokens (`handle.halo`, `gradient_line.halo`, `marquee.drawing_halo`) or app canvas ink | stroke table, hints in the reasons |
+| Space/Radius values not listed in B8/B9 (e.g. Space 46, Radius 0.5, 1.5, 8.5) | no decision | off-scale table |
+| `Stroke::new` in a fn with no `ui`, `ctx` or `painter` | the codemod cannot name a `Context`; thread one through by hand | stroke table |
 
 ## Notes
 
 - `chrome` and `card` both map to `surface.panel`; they differ in the Studio family (themes.md Table 0). Pin the difference in the theme files.
-- Radius literals map to the scale step with the same value (`Radius::R4.px()`), not to the roles `radius.control/popup/window` that codemods.md Table 4 suggests: a role changes the value per theme, so it is not an exact mapping.
-- A file that rewrites `Tokens::get` but keeps a ctx-only call, or rewrites reads on one binding but not another, will not compile until the leftovers are done by hand: after a rewrite `t` is a `UiTokens`, and `t.color...` exists only on it.
-- Receiver check is per file: `t`, `tokens`, `theme`, `tk` is rewritten only when the file binds that name to a `Tokens` (`let t = ..Tokens::get(..)`, `t: &Tokens`). A second, unrelated `t` in the same file would be rewritten too; review the diff.
+- `icon` maps to `text.normal` and `radius_sm/radius/radius_lg` to `t.shape.radius.control/popup/window` (f32), as DS-43 B2 and B7 decide. A rewritten `t.radius_sm - 1.0` keeps its f32 type.
+- Radius literals map to the scale step with the same value (`Radius::R4.px()`), not to the roles of codemods.md Table 4: a role changes the value per theme.
+- Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. Where a site separates rows or groups, `gap.stack`/`gap.section` is the better target; that is a hand pass.
+- `Stroke::new(<w>, <colour>)` becomes `scale::Stroke::W1.egui(<ctx>, <colour>)`; `<ctx>` is `ui.ctx()`, `ctx`/`&ctx` or `painter.ctx()`, taken from the enclosing fn's parameters.
+- `Tokens::get(<ui>.ctx())` becomes `Tokens::of(<ui>)`; any other Context becomes `craft_ui::theme::current(<ctx>)`. After a rewrite `t` is a `UiTokens`, so every read in the file must be rewritten too; a file with a left read will not compile until it is done by hand.
+- Receiver check is per file: `t`, `tokens`, `theme`, `tk` is rewritten only when the file binds that name to a `Tokens`. A second, unrelated `t` in the same file would be rewritten too; review the diff.
 - Rewritten colour reads add `use craft_ui::theme::ToEgui;` after the file's first `use` statement.
 """
 
@@ -494,17 +556,22 @@ def main():
     g.add_argument("--apply", action="store_true", help="rewrite exact matches in place")
     ap.add_argument("--root", default=None, help="PhotoCraft checkout (default: the checkout containing this script)")
     ap.add_argument("--src", default="crates/ui-egui/src")
-    ap.add_argument("--scale", default="craft_theme", help="module path of Space/Radius/Stroke in emitted code")
+    ap.add_argument("--scale", default="craft_ui::theme::scale", help="module path of Space/Radius/Stroke in emitted code")
+    ap.add_argument("--exact-only", action="store_true", help="skip the DS-43 B8/B9 roundings (Space 3, 10, 14, ..; Radius 1)")
     ap.add_argument("--report", help="write the markdown report here")
+    ap.add_argument("--source-commit", help="commit named in the report (default: HEAD of the checkout)")
     ap.add_argument("--json", help="write raw counts here")
     ap.add_argument("--dump-left", help="write every left site (pattern, reason, file:line) to this file")
     args = ap.parse_args()
 
+    global ROUND
+    ROUND = not args.exact_only
     root = Path(args.root) if args.root else Path(__file__).resolve().parents[3]
     src = root / args.src
     if not src.is_dir():
         sys.exit(f"no such directory: {src}")
     commit = subprocess.run(["git", "-C", str(root), "rev-parse", "--short=10", "HEAD"], capture_output=True, text=True).stdout.strip()
+    commit = args.source_commit or commit
 
     scan = Scan()
     texts = {}
