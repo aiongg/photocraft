@@ -29,3 +29,5 @@ python3 -I scripts/codemods/pc2b/pc2b.py --apply              # rewrite exact ma
 Options: `--root DIR` (checkout, default: the one holding the script), `--src` (default `crates/ui-egui/src`), `--scale PATH` (module path of `Space`/`Radius`/`Stroke` in emitted code, default `craft_ui::theme::scale`), `--json FILE`, `--exact-only` (skip the B8/B9 roundings), `--source-commit SHA` (commit named in the report).
 
 After `--apply`, the file gets `use craft_ui::theme::ToEgui;` where it needed it. The tree compiles only after the left sites and the `craft-theme`/re-export question are settled; see "Missing in craft-libs" and "Notes" in the report (`.thoughts/theming/design-system/pc0/codemod-reports/pc2b.md`).
+
+Role tokens: `add_space(n)` and `item_spacing.x/y = n` get `t.space.gap.section|stack|inline` instead of an S-step when the neighbouring statements show the role (separator or heading beside it, a gap between two rows, the axis of `item_spacing`) and a `Tokens` value is bound in the same fn. Literals that differ from the token in Compact or Comfortable are listed as "shifted" in the report.

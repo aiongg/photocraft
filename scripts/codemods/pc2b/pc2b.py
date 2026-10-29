@@ -220,6 +220,8 @@ class Scan:
         self.theme_found = defaultdict(int)  # pattern -> sites inside theme.rs / theme/
         self.done = defaultdict(int)  # pattern -> already converted (not in found)
         self.rewritten = defaultdict(int)
+        self.shifted = defaultdict(int)  # pattern -> role rewrites whose token differs from the literal in some density
+        self.shifted_sites = []  # (pattern, file, line, literal, compact, comfortable, role)
         self.role = defaultdict(int)  # pattern -> rewrites that emit a gap role token (subset of rewritten)
         self.rounded = defaultdict(int)  # pattern -> rewrites that apply a decided rounding (subset of rewritten)
         self.rewritten_detail = defaultdict(lambda: defaultdict(int))  # pattern -> label -> n
@@ -241,6 +243,8 @@ def receiver_evidence(m: str):
 
 
 ROUND = True
+# gap role values (Compact, Comfortable), crates/theme/src/values.rs at 01e20c71
+GAP_VALUES = {"inline": (4.0, 6.0), "stack": (6.0, 8.0), "section": (12.0, 16.0)}
 # a gap next to one of these separates sections or groups
 SECTION_HINT = re.compile(r"\.separator\(\)|Separator|\bheading\(|\.collapsing\(|CollapsingHeader|[Ss]ection|[Hh]eader|[Dd]ivider|group_title|\.strong\(\)|hairline\(|\bgroup\(ui|group_title")
 # the next statement starts a row, so the gap sits between two sibling rows
@@ -326,6 +330,12 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if v in (4.0, 6.0, 8.0) and prev.endswith(("});", "}", ");")) and "add_space" not in prev and ROW_START.match(nxt) and not nxt.startswith("//"):
             return "stack"
         return None
+
+    def note_shift(pat, v, role, i):
+        c, k = GAP_VALUES[role]
+        if not theme and (v != c or v != k):
+            scan.shifted[pat] += 1
+            scan.shifted_sites.append((pat, str(rel), line(i), v, c, k, role))
 
     def record_found(pat):
         (scan.theme_found if theme else scan.found)[pat] += 1
@@ -428,7 +438,8 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             role = gap_role(v, mm.start())
             tv = tokens_var(mm.start()) if role else None
             if role and tv:
-                rewrite("add_space", ws_a, ws_a + len(arg), f"{tv}.space.gap.{role}", f"{fmt(v)} -> gap.{role} (role)" + (" (rounded)" if rounded else ""), rounded=rounded, role=True)
+                rewrite("add_space", ws_a, ws_a + len(arg), f"{tv}.space.gap.{role}", f"{fmt(v)} -> gap.{role} (role)", role=True)
+                note_shift("add_space", v, role, mm.start())
             else:
                 st = SPACE_ROUND[v] if rounded else SPACE[v]
                 rewrite("add_space", ws_a, ws_a + len(arg), f"{scale}::Space::{st}.px()", f"{fmt(v)} -> Space::{st}" + (" (rounded, DS-43 B8)" if rounded else ""), rounded=rounded)
@@ -449,6 +460,7 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             leave("item_spacing", "no Tokens binding in the enclosing fn", mm.start())
         else:
             rewrite("item_spacing", mm.start(2), mm.end(2), f"{tv}.space.gap.{role}", f"{axis} = {fmt(lit)} -> gap.{role} (role)", role=True)
+            note_shift("item_spacing", lit, role, mm.start())
     if not theme:
         scan.done["item_spacing"] += len(re.findall(r"\.item_spacing\.[xy]\s*=\s*\w+\.space\.gap\.", m_code))
 
@@ -559,12 +571,12 @@ def md_report(scan: Scan, commit: str, args) -> str:
         "",
         "## Totals",
         "",
-        "| Pattern | Sites found | Rewritten | of which role token | of which rounded (DS-43 B8/B9) | Left for hand work | Already converted | In theme.rs (not rewritten) |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Pattern | Sites found | Rewritten | of which role token | of which shifted (role) | of which rounded (DS-43 B8/B9) | Left for hand work | Already converted | In theme.rs (not rewritten) |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for key, label in PATTERNS:
         left = sum(len(v) for v in scan.left[key].values())
-        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {scan.role[key]} | {scan.rounded[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
+        out.append(f"| {label} | {scan.found[key]} | {scan.rewritten[key]} | {scan.role[key]} | {scan.shifted[key]} | {scan.rounded[key]} | {left} | {scan.done[key]} | {scan.theme_found[key]} |")
     out.append("")
     for key, label in PATTERNS:
         out += [f"## {label}", ""]
@@ -588,6 +600,11 @@ def md_report(scan: Scan, commit: str, args) -> str:
                 counts[mo.group(1)] += len(sites)
         top = ", ".join(f"{v}: {n}" for v, n in sorted(counts.items(), key=lambda kv: -kv[1])) or "none"
         out.append(f"| {dict(PATTERNS)[key]} | {top} |")
+    out += ["", f"## Shifted role sites ({len(scan.shifted_sites)})", "",
+            "A role token replaces a literal that differs from the token in Compact, Comfortable or both, so the site changes size in at least one density. Compact and Comfortable are the token values.", "",
+            "| Site | Role | Literal | Compact | Comfortable |", "|---|---|---|---|---|"]
+    for pat, f, ln, v, c, k, role in sorted(scan.shifted_sites, key=lambda x: (x[1], x[2])):
+        out.append(f"| `{f}:{ln}` | {pat.replace('item_spacing', 'item_spacing')} gap.{role} | {fmt(v)} | {fmt(c)} | {fmt(k)} |")
     out += ["", MISSING, ""]
     return "\n".join(out)
 
@@ -611,7 +628,7 @@ Checked against `design-system` @ `01e20c71`. The scale re-export (`craft_ui::th
 - `chrome` and `card` both map to `surface.panel`; they differ in the Studio family (themes.md Table 0). Pin the difference in the theme files.
 - `icon` maps to `text.normal` and `radius_sm/radius/radius_lg` to `t.shape.radius.control/popup/window` (f32), as DS-43 B2 and B7 decide. A rewritten `t.radius_sm - 1.0` keeps its f32 type.
 - Radius literals map to the scale step with the same value (`Radius::R4.px()`), not to the roles of codemods.md Table 4: a role changes the value per theme.
-- Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. A rounded value that also gets a role token is counted in both columns.
+- Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. A rounded value that gets a role token is counted as role and shifted only, not as rounded.
 - Role tokens (`t.space.gap.section`, `.stack`, `.inline`; Compact 12/6/4, Comfortable 16/8/6) replace the S-step when the neighbouring statements show the role: `add_space` of 8 to 24 next to a separator, heading, hairline, group or header line is `section`; `add_space` of 4, 6 or 8 between two sibling rows is `stack`; `item_spacing.x = 4|6` is `inline` and `item_spacing.y = 4|6|8` is `stack`. A role is emitted only when a `Tokens` value (`t`) is bound earlier in the same fn; otherwise the S-step is emitted. Other `item_spacing` assignments (0, 1, 2, 3, 10, constants) are local resets, left.
 - `Stroke::new(<w>, <colour>)` becomes `scale::Stroke::W1.egui(<ctx>, <colour>)`; `<ctx>` is `ui.ctx()`, `ctx`/`&ctx` or `painter.ctx()`, taken from the enclosing fn's parameters.
 - `Tokens::get(<ui>.ctx())` becomes `Tokens::of(<ui>)`; any other Context becomes `craft_ui::theme::current(<ctx>)`. After a rewrite `t` is a `UiTokens`, so every read in the file must be rewritten too; a file with a left read will not compile until it is done by hand.
