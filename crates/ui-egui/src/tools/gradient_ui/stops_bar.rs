@@ -14,7 +14,7 @@ use photocraft_doc::Fill;
 use serde_json::{Value, json};
 
 /// What the bar asks the caller to do this frame.
-pub(super) enum BarAction {
+pub(crate) enum BarAction {
     /// A gesture's value, previewed through the canvas path until it commits.
     Preview(Value),
     /// A finished edit: one command, one history step.
@@ -27,7 +27,7 @@ pub(super) enum BarAction {
 
 /// The bar's value for `fill`: sorted stops tagged `index + 1`, the opacity row always explicit
 /// (the engine's empty list is two 100 % stops).
-pub(super) fn stops_of(fill: &Fill) -> GradientStops {
+pub(crate) fn stops_of(fill: &Fill) -> GradientStops {
     let Fill::Gradient { stops, opacity_stops, midpoints, .. } = fill else { return GradientStops::default() };
     let mut sorted: Vec<(usize, &(f32, photocraft_color::Color))> = stops.iter().enumerate().collect();
     sorted.sort_by(|a, b| a.1.0.total_cmp(&b.1.0));
@@ -51,7 +51,7 @@ pub(super) fn stops_of(fill: &Fill) -> GradientStops {
 
 /// The engine edit that turns `old` (from [`stops_of`]) into `new`, or `None` when they agree or
 /// the change is one the engine has no edit for (an opacity midpoint).
-pub(super) fn command(old: &GradientStops, new: &GradientStops) -> Option<Value> {
+pub(crate) fn command(old: &GradientStops, new: &GradientStops) -> Option<Value> {
     row_command(old, new, StopRow::Color).or_else(|| row_command(old, new, StopRow::Opacity))
 }
 
@@ -128,37 +128,90 @@ struct Draft {
     value: GradientStops,
 }
 
-/// Shows the bar and fields for `fill` under `key`. `midpoints` shows the colour midpoint
-/// diamonds (a layer's; presets keep theirs centred).
-pub(super) fn show(ui: &mut Ui, key: egui::Id, fill: &Fill, midpoints: bool) -> Option<BarAction> {
+/// How [`edit_stops`] runs the library editor.
+#[derive(Clone, Copy)]
+pub(crate) struct BarOptions {
+    pub rows: StopRows,
+    /// The colour midpoint diamonds (a layer's; presets keep theirs centred).
+    pub midpoints: bool,
+    /// The fewest and most stops a row keeps.
+    pub stops: (usize, usize),
+    /// The library edits a stop's colour in its own popover; else a request goes to the caller.
+    pub color_popover: bool,
+    /// The caller applies each preview as it arrives, so its stops change under the gesture: the
+    /// draft then outlives that, and events carry the stops the gesture started from.
+    pub live: bool,
+}
+
+impl BarOptions {
+    pub(crate) fn new(rows: StopRows, midpoints: bool) -> Self {
+        Self { rows, midpoints, stops: (2, 1024), color_popover: false, live: false }
+    }
+}
+
+/// What the library editor reported, with the stops the gesture started from.
+pub(crate) enum StopsEvent {
+    Preview { base: GradientStops, value: GradientStops },
+    Commit { base: GradientStops, value: GradientStops, changed: bool },
+    Set { base: GradientStops, value: GradientStops },
+    Cancel { base: GradientStops },
+    Color(usize),
+}
+
+/// Drops the gesture draft of the bar `key` (the caller replaced the stops under it).
+pub(crate) fn clear_draft(ui: &Ui, key: egui::Id) {
+    ui.data_mut(|d| d.remove::<Draft>(key.with("draft")));
+}
+
+/// Shows the bar and fields for `base` under `key`.
+pub(crate) fn edit_stops(ui: &mut Ui, key: egui::Id, base: &GradientStops, options: BarOptions) -> Option<StopsEvent> {
     let numbers = LocaleNumbers::of(ui);
-    let base = stops_of(fill);
     let draft_key = key.with("draft");
     // A draft made against other stops (an undo, or another edit) is stale.
-    let draft = ui.data(|d| d.get_temp::<Draft>(draft_key)).filter(|d| d.base == base);
-    let shown = draft.as_ref().map_or(&base, |d| &d.value);
-    let response = GradientEditor::new(key, tl!("Gradient stops"), shown, &numbers).rows(StopRows::Split).midpoints(midpoints).labels(labels()).show(ui);
-    let action = match response.edit.event {
+    let draft = ui.data(|d| d.get_temp::<Draft>(draft_key)).filter(|d| options.live || d.base == *base);
+    let (from, shown) = draft.as_ref().map_or((base, base), |d| (&d.base, &d.value));
+    let from = from.clone();
+    let response = GradientEditor::new(key, tl!("Gradient stops"), shown, &numbers)
+        .rows(options.rows)
+        .midpoints(options.midpoints)
+        .stops(options.stops.0, options.stops.1)
+        .color_popover(options.color_popover)
+        .labels(labels())
+        .show(ui);
+    let event = match response.edit.event {
         Some(EditEvent::Update { value, .. }) => {
-            let preview = command(&base, &value);
-            ui.data_mut(|d| d.insert_temp(draft_key, Draft { base: base.clone(), value }));
-            preview.map(BarAction::Preview)
+            ui.data_mut(|d| d.insert_temp(draft_key, Draft { base: from.clone(), value: value.clone() }));
+            Some(StopsEvent::Preview { base: from, value })
         }
         Some(EditEvent::Commit { value, changed, .. }) => {
             ui.data_mut(|d| d.remove::<Draft>(draft_key));
-            Some(command(&base, &value).filter(|_| changed).map_or(BarAction::Clear, BarAction::Commit))
+            Some(StopsEvent::Commit { base: from, value, changed })
         }
         Some(EditEvent::Set { value, .. }) => {
             ui.data_mut(|d| d.remove::<Draft>(draft_key));
-            command(&base, &value).map(BarAction::Commit)
+            Some(StopsEvent::Set { base: from, value })
         }
         Some(EditEvent::Cancel { .. }) => {
             ui.data_mut(|d| d.remove::<Draft>(draft_key));
-            Some(BarAction::Clear)
+            Some(StopsEvent::Cancel { base: from })
         }
         _ => None,
     };
-    action.or(response.color_requested.map(BarAction::Color))
+    event.or(response.color_requested.map(StopsEvent::Color))
+}
+
+/// Shows the bar and fields for `fill` under `key` and reads the edit as an engine command.
+/// `midpoints` shows the colour midpoint diamonds (a layer's; presets keep theirs centred).
+/// `live` is [`BarOptions::live`]; the commands then address the gradient the gesture started from.
+pub(crate) fn show(ui: &mut Ui, key: egui::Id, fill: &Fill, midpoints: bool, live: bool) -> Option<BarAction> {
+    let options = BarOptions { live, ..BarOptions::new(StopRows::Split, midpoints) };
+    Some(match edit_stops(ui, key, &stops_of(fill), options)? {
+        StopsEvent::Preview { base, value } => BarAction::Preview(command(&base, &value)?),
+        StopsEvent::Commit { base, value, changed } => command(&base, &value).filter(|_| changed).map_or(BarAction::Clear, BarAction::Commit),
+        StopsEvent::Set { base, value } => BarAction::Commit(command(&base, &value)?),
+        StopsEvent::Cancel { .. } => BarAction::Clear,
+        StopsEvent::Color(i) => BarAction::Color(i),
+    })
 }
 
 #[cfg(test)]

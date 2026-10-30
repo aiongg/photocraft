@@ -1,9 +1,11 @@
-use super::hue_saturation::spectrum_bar;
-use super::{
-    Color32, Edit, EditorCx, GradientPreset, Group, PhotocraftApp, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, Value, adjust_params, color_button,
-    color32, flag, json, label, pos2, rgb_of, round, vec2, widgets,
-};
-use craft_ui::theme::StrokeExt;
+use super::{Edit, EditorCx, GradientPreset, Group, PhotocraftApp, Value, adjust_params, flag, json, label, rgb_of, round, vec2};
+use crate::gradient_ui::stops_bar::{self, BarOptions, StopsEvent};
+use craft_theme::Srgba;
+use craft_ui::composites::gradient::{ColorStop, GradientRamp, GradientStops, StopRows};
+use craft_ui::controls::Select;
+use craft_ui::edit::EditEvent;
+use craft_ui::menu::{MenuEntry, MenuItem};
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 
 // ---------------------------------------------------------------------------------------------
 // Gradient Map
@@ -53,198 +55,101 @@ fn sample_stops(s: &[Stop], t: f32) -> [f32; 3] {
     sorted.last().map_or([t; 3], |l| l.1)
 }
 
-#[derive(Clone, Copy)]
-struct MapStopDrag {
-    index: usize,
-    offset: f32,
-    changed: bool,
+/// The bar's value for `stops`: colour stops only, tagged by their sorted place.
+fn bar_stops(stops: &[Stop]) -> GradientStops {
+    let mut sorted = stops.to_vec();
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+    GradientStops::new(
+        sorted
+            .iter()
+            .enumerate()
+            .map(|(i, (at, c))| ColorStop { location: *at, color: Srgba::new(c[0], c[1], c[2], 1.0), midpoint: 0.5, tag: i as u64 + 1 })
+            .collect(),
+    )
 }
 
-/// Keep selection on the same stop when it crosses another stop (including coincident stops).
-fn move_map_stop(stops: &mut [Stop], index: usize, location: f32) -> Option<usize> {
-    let stop = stops.get_mut(index)?;
-    stop.0 = round(location.clamp(0.0, 1.0), 0.001);
-    let location = stop.0;
-    let rank = stops.iter().enumerate().filter(|(i, s)| *i != index && (s.0 < location || (s.0 == location && *i < index))).count();
-    stops.sort_by(|a, b| a.0.total_cmp(&b.0));
-    Some(rank)
+fn stops_of_bar(bar: &GradientStops) -> Vec<Stop> {
+    bar.color.iter().map(|s| (s.location, [s.color.r, s.color.g, s.color.b])).collect()
 }
 
-fn gradient_map_strip(ui: &mut egui::Ui, stops: &mut Vec<Stop>, cx: &EditorCx, selected: &mut usize) -> Edit {
-    let t = Tokens::get(ui.ctx());
-    let key = cx.mem.with("gm-stop-drag");
-    let mut edit = Edit::default();
-    let w = ui.available_width().min(300.0);
-    let (outer, resp) = ui.allocate_exact_size(vec2(w, 44.0), Sense::click_and_drag());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Gradient stops")));
-    let bar = Rect::from_min_max(outer.min + vec2(8.0, 2.0), pos2(outer.right() - 8.0, outer.top() + 26.0));
-    let x_of = |loc: f32| bar.left() + loc * bar.width();
-    let loc_of = |x: f32| ((x - bar.left()) / bar.width().max(1.0)).clamp(0.0, 1.0);
-    let hit =
-        |pos: Pos2, stops: &[Stop]| stops.iter().enumerate().rev().find(|(_, s)| pos.y >= bar.bottom() && (x_of(s.0) - pos.x).abs() <= 6.0).map(|(i, _)| i);
-    if resp.drag_started()
-        && let Some(pos) = ui.input(|i| i.pointer.press_origin())
-        && let Some(index) = hit(pos, stops)
-    {
-        *selected = index;
-        let offset = stops.get(index).map_or(0.0, |s| pos.x - x_of(s.0));
-        ui.data_mut(|d| d.insert_temp(key, MapStopDrag { index, offset, changed: false }));
-    }
-    if let Some(mut drag) = ui.data(|d| d.get_temp::<MapStopDrag>(key)) {
-        if (resp.dragged() || resp.drag_stopped())
-            && let Some(pos) = resp.interact_pointer_pos()
-        {
-            let location = round(loc_of(pos.x - drag.offset), 0.001);
-            let changed = stops.get(drag.index).is_some_and(|s| s.0 != location);
-            if let Some(index) = move_map_stop(stops, drag.index, location) {
-                drag.index = index;
-                drag.changed |= changed;
-                *selected = index;
-                edit.changed |= changed;
-            }
-        }
-        if resp.drag_stopped() {
-            edit.commit = drag.changed;
-            ui.data_mut(|d| d.remove::<MapStopDrag>(key));
-        } else if ui.input(|i| i.pointer.primary_down()) {
-            ui.data_mut(|d| d.insert_temp(key, drag));
-        } else {
-            ui.data_mut(|d| d.remove::<MapStopDrag>(key));
-        }
-    }
-    if resp.clicked()
-        && let Some(pos) = resp.interact_pointer_pos()
-    {
-        resp.request_focus();
-        if let Some(index) = hit(pos, stops) {
-            *selected = index;
-        } else if stops.len() < 64 {
-            let at = round(loc_of(pos.x), 0.001);
-            let color = sample_stops(stops, at);
-            stops.push((at, color));
-            let index = stops.len() - 1;
-            *selected = move_map_stop(stops, index, at).unwrap_or(0);
-            edit.add(Edit::discrete(true));
-        }
-    }
-    if resp.hovered() && ui.input(|i| i.pointer.hover_pos()).is_some_and(|pos| hit(pos, stops).is_some()) || resp.dragged() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-    }
-    // Markers address un-reversed locations, as in the Gradient Tool; Reverse changes the image.
-    let cols: Vec<Color32> = (0..=48).map(|i| color32(sample_stops(stops, i as f32 / 48.0))).collect();
-    spectrum_bar(ui.painter(), bar, &cols);
-    ui.painter().rect_stroke(
-        bar,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-        StrokeKind::Outside,
-    );
-    for (i, (at, color)) in stops.iter().enumerate() {
-        let x = x_of(*at);
-        let border = if i == *selected { t.accent } else { t.text_dim };
-        let body = Rect::from_center_size(pos2(x, bar.bottom() + 10.0), vec2(10.0, 10.0));
-        ui.painter().add(egui::Shape::convex_polygon(
-            vec![pos2(x, bar.bottom() + 1.0), pos2(x + 5.0, body.top()), pos2(x - 5.0, body.top())],
-            border,
-            Stroke::NONE,
-        ));
-        ui.painter().rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color32(*color));
-        ui.painter().rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
-    }
-    edit
+/// The stops of a preset with the tool colours resolved; a map has no transparency, so they show opaque.
+fn preset_colors(p: &GradientPreset, fg: [f32; 4], bg: [f32; 4]) -> Vec<(f32, [f32; 4])> {
+    p.resolve(fg, bg).into_iter().map(|(at, c)| (at, [c[0], c[1], c[2], 1.0])).collect()
 }
 
 pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
-    let t = Tokens::get(ui.ctx());
     let mut e = Edit::default();
     let mut stops = read_stops(v);
-    let selection = cx.mem.with("gm-stop-selection");
-    let mut selected = ui.data(|d| d.get_temp::<usize>(selection)).unwrap_or(0).min(stops.len().saturating_sub(1));
     // Photoshop's gradient picker: the same library as the Gradient tool and Gradients panel
     // (built-in groups and the user's own), Foreground/Background resolved to the current colours.
     let [fg, bg] = cx.swatches.map(|c| [c[0], c[1], c[2], 1.0]);
+    let bar_key = cx.mem.with("gm-bar");
     ui.horizontal(|ui| {
         label(ui, tl!("Preset:"));
-        let mut picked = None;
-        let (press, close) = crate::press_menu::PressCombo::before(ui, cx.mem.with("gm-preset"));
-        let combo = craft_ui::ComboBox::from_id_salt(cx.mem.with("gm-preset"))
-            .selected_text(tl!("Custom"))
-            .width(ui.available_width().min(190.0))
-            .height(420.0)
-            .icon(widgets::chevron_icon)
-            .close_behavior(close)
-            .show_ui(ui, |ui| {
-                let gear = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Settings, tl!("Gradient Preset Options")).size(craft_ui::controls::ControlSize::Md));
-                egui::containers::menu::SubMenu::new().show(ui, &gear, |ui| {
-                    if ui.button(tl!("Import .GRD")).clicked() {
-                        e.import_gradients = true;
-                        ui.close();
-                    }
-                });
-                ui.separator();
-                for g in &cx.gradients {
-                    ui.label(RichText::new(&g.name).color(t.text_faint));
-                    for p in &g.items {
-                        ui.horizontal(|ui| {
-                            // A map has no transparency: colour stops only, shown opaque.
-                            let rgba: Vec<(f32, [f32; 4])> = p.resolve(fg, bg).into_iter().map(|(at, c)| (at, [c[0], c[1], c[2], 1.0])).collect();
-                            let (r, swatch) = ui.allocate_exact_size(vec2(48.0, 16.0), Sense::click());
-                            crate::preset_panels::paint_gradient(ui, r, &rgba);
-                            // Both, not short-circuited: the name is drawn either way.
-                            let name = ui.selectable_label(false, &p.name);
-                            if press.chosen(ui, &swatch) | press.chosen(ui, &name) {
-                                picked = Some(rgba.iter().map(|(at, c)| (*at, [c[0], c[1], c[2]])).collect::<Vec<Stop>>());
-                            }
-                        });
-                    }
-                }
-            });
-        press.after(&combo.response);
-        let _ = combo.response.accessible_name(tl!("Preset:"));
-        if let Some(p) = picked {
-            stops = p;
-            selected = 0;
-            ui.data_mut(|d| d.remove::<MapStopDrag>(cx.mem.with("gm-stop-drag")));
+        let tokens = LibTokens::of(ui);
+        let mut current = (usize::MAX, 0usize);
+        let mut select = Select::new(cx.mem.with("gm-preset"), tl!("Preset:"), &mut current).placeholder(tl!("Custom")).row_content(
+            vec2(48.0, 16.0),
+            |painter, rect, &(g, i)| {
+                let Some(p) = cx.gradients.get(g).and_then(|group| group.items.get(i)) else { return };
+                let colors: Vec<(f32, Srgba)> = preset_colors(p, fg, bg).into_iter().map(|(at, c)| (at, Srgba::new(c[0], c[1], c[2], c[3]))).collect();
+                GradientRamp::paint_colors(painter, rect, &colors, &tokens);
+            },
+        );
+        for (g, group) in cx.gradients.iter().enumerate() {
+            select = select.group(group.name.clone());
+            for (i, p) in group.items.iter().enumerate() {
+                select = select.option((g, i), p.name.clone());
+            }
+        }
+        let entries: Vec<MenuEntry<usize>> = vec![MenuItem::new(tl!("Import .GRD"), 0).into()];
+        let mut menu_pick = None;
+        let width = ui.available_width().min(190.0);
+        let response = ui.allocate_ui_with_layout(vec2(width, 0.0), egui::Layout::top_down_justified(egui::Align::Min), |ui| {
+            select.header_menu(tl!("Gradient Preset Options"), &entries, &mut menu_pick).show(ui)
+        });
+        if menu_pick.is_some() {
+            e.import_gradients = true;
+        }
+        let picked = match response.inner.event {
+            Some(EditEvent::Commit { value, changed: true, .. } | EditEvent::Set { value, .. }) => Some(value),
+            _ => None,
+        };
+        if let Some((g, i)) = picked
+            && let Some(p) = cx.gradients.get(g).and_then(|group| group.items.get(i))
+        {
+            stops = preset_colors(p, fg, bg).into_iter().map(|(at, c)| (at, [c[0], c[1], c[2]])).collect();
+            stops_bar::clear_draft(ui, bar_key);
             write_stops(v, &stops);
             e.add(Edit::discrete(true));
         }
     });
-    let strip = gradient_map_strip(ui, &mut stops, cx, &mut selected);
-    let mut changed = strip.changed;
-    e.add(strip);
-    // The selected stop's colour and location, like the Gradient Tool's compact stop editor.
-    let mut location = None;
-    let mut remove = false;
-    let can_remove = stops.len() > 2;
-    if let Some(s) = stops.get_mut(selected) {
-        ui.horizontal(|ui| {
-            label(ui, tl!("Color:"));
-            let r = color_button(ui, &mut s.1);
-            changed |= r.changed;
-            e.add(r);
-            ui.add_enabled_ui(can_remove, |ui| {
-                remove = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Close, tl!("Remove stop")).size(craft_ui::controls::ControlSize::Sm)).clicked();
-            });
-        });
-        ui.horizontal(|ui| {
-            label(ui, tl!("Location:"));
-            let mut loc = s.0 * 100.0;
-            let rl = widgets::value_field(ui, &mut loc, 0.0..=100.0, "%", 70.0).accessible_name(tl!("Location:"));
-            if rl.changed() {
-                location = Some(loc / 100.0);
-                changed = true;
-            }
-            e.add(Edit::of(&rl));
-        });
-    }
-    if let Some(loc) = location {
-        selected = move_map_stop(&mut stops, selected, loc).unwrap_or(0);
-    }
-    if remove && can_remove {
-        stops.remove(selected);
-        selected = selected.min(stops.len() - 1);
-        changed = true;
-        e.add(Edit::discrete(true));
+    // The library bar: click adds, drag moves, a tear-off deletes; its fields row sets the
+    // selected stop's colour (in its popover) and location, and deletes it.
+    let mut changed = false;
+    let options = BarOptions { stops: (2, 64), color_popover: true, live: true, ..BarOptions::new(StopRows::ColorOnly, false) };
+    match stops_bar::edit_stops(ui, bar_key, &bar_stops(&stops), options) {
+        Some(StopsEvent::Preview { value, .. }) => {
+            stops = stops_of_bar(&value);
+            changed = true;
+            e.changed = true;
+        }
+        Some(StopsEvent::Commit { value, changed: true, .. }) => {
+            stops = stops_of_bar(&value);
+            changed = true;
+            e.add(Edit::discrete(true));
+        }
+        Some(StopsEvent::Set { value, .. }) => {
+            stops = stops_of_bar(&value);
+            changed = true;
+            e.add(Edit::discrete(true));
+        }
+        Some(StopsEvent::Cancel { base }) => {
+            stops = stops_of_bar(&base);
+            changed = true;
+            e.changed = true;
+        }
+        _ => {}
     }
     if stops.len() < 64 && ui.add(craft_ui::controls::Button::new(tl!("Add Stop")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
         // Halfway along the widest gap, in the gradient's colour there.
@@ -252,8 +157,6 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
         let at = sorted.windows(2).max_by(|a, b| (a[1].0 - a[0].0).total_cmp(&(b[1].0 - b[0].0))).map_or(0.5, |w| (w[0].0 + w[1].0) / 2.0);
         stops.push((at, sample_stops(&stops, at)));
-        let index = stops.len() - 1;
-        selected = move_map_stop(&mut stops, index, at).unwrap_or(0);
         changed = true;
         e.add(Edit::discrete(true));
     }
@@ -261,11 +164,10 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         write_stops(v, &stops);
         e.changed = true;
     }
-    ui.data_mut(|d| d.insert_temp(selection, selected));
     ui.horizontal(|ui| {
         for (key, text) in [("reverse", tl!("Reverse")), ("dither", tl!("Dither"))] {
             let mut b = flag(v, key, false);
-            if craft_ui::controls::Checkbox::bool(tl!(text), &mut b).show(ui).response.changed() {
+            if craft_ui::controls::Checkbox::bool(text, &mut b).show(ui).response.changed() {
                 v[key] = json!(b);
                 e.add(Edit::discrete(true));
             }

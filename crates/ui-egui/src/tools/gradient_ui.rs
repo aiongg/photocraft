@@ -34,7 +34,7 @@ use crate::widgets;
 #[cfg(test)]
 mod editor_tests;
 mod properties_panel;
-mod stops_bar;
+pub(crate) mod stops_bar;
 
 use stops_bar::BarAction;
 
@@ -459,7 +459,7 @@ fn line(painter: &egui::Painter, a: Pos2, b: Pos2) {
     painter.line_segment([a, b], craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE));
 }
 
-pub(crate) fn diamond(painter: &egui::Painter, c: Pos2, r: f32, fill: Color32, outline: Color32) {
+fn diamond(painter: &egui::Painter, c: Pos2, r: f32, fill: Color32, outline: Color32) {
     let pts = vec![pos2(c.x, c.y - r), pos2(c.x + r, c.y), pos2(c.x, c.y + r), pos2(c.x - r, c.y)];
     painter.add(egui::Shape::convex_polygon(pts, fill, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), outline)));
 }
@@ -519,31 +519,6 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 }
 
 // ---------------------------------------------------------------- options bar
-
-/// A ramp of RGBA stops over a checkerboard in `r`.
-pub(crate) fn paint_ramp(p: &egui::Painter, r: Rect, sample: impl Fn(f32) -> [f32; 4]) {
-    // The tessellator snaps the checker's rects to pixels but not the mesh: snap both alike, or a
-    // half-pixel offset leaves a row of checker showing under the ramp (#4577).
-    let r = r.round_to_pixels(p.pixels_per_point());
-    widgets::checker(p, r, 5.0);
-    let n = 64;
-    let mut mesh = egui::Mesh::default();
-    for k in 0..=n {
-        let u = k as f32 / n as f32;
-        let c = sample(u);
-        let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-        let col = Color32::from_rgba_unmultiplied(q(c[0]), q(c[1]), q(c[2]), q(c[3]));
-        let x = r.left() + u * r.width();
-        mesh.colored_vertex(pos2(x, r.top()), col);
-        mesh.colored_vertex(pos2(x, r.bottom()), col);
-        if k > 0 {
-            let i = (2 * k) as u32;
-            mesh.add_triangle(i - 2, i - 1, i);
-            mesh.add_triangle(i - 1, i + 1, i);
-        }
-    }
-    p.add(mesh);
-}
 
 /// Side, in pixels, of a gradient fill layer's thumbnail texture.
 const THUMB_PX: u32 = 64;
@@ -812,7 +787,7 @@ fn preset_stop_color(app: &mut PhotocraftApp, i: usize) {
 
 fn stops_editor_for(app: &mut PhotocraftApp, ui: &mut egui::Ui, sink: Sink, f: Fill) {
     let key = strip_key(app, sink);
-    match stops_bar::show(ui, key, &f, sink.midpoints()) {
+    match stops_bar::show(ui, key, &f, sink.midpoints(), false) {
         Some(BarAction::Preview(p)) => match sink {
             Sink::Layer(id) => app.gradient.panel = Some((id, cmds::STOP, sink.params(p))),
             Sink::Preset => app.gradient.preset_stop = Some(p),
