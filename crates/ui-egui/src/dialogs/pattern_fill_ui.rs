@@ -5,7 +5,9 @@
 //! one), so it is one History step; Cancel changes nothing. The fields are the command's params,
 //! so `ui.dialog.set` / `ui.dialog.confirm` drive it like any dialog.
 
-use craft_ui::theme::ToEgui;
+use craft_ui::composites::{FormGrid, LabelAlign};
+use craft_ui::controls::{AngleDial, Button, ButtonVariant, Checkbox};
+use craft_ui::localized::LocaleNumbers;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -14,7 +16,6 @@ use photocraft_engine::pattern_fill_cmds as cmds;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 const MARK: &str = "__patternFill";
 /// The fields that are command params (besides the target in `__params`).
@@ -162,32 +163,43 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     ui.horizontal(|ui| {
         let pat = f.get("pattern").and_then(Value::as_str).unwrap_or_default().to_string();
         if app.session.patterns.items.is_empty() {
-            ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
+            ui.label(tl!("No patterns"));
         } else if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
             f.insert("pattern".into(), json!(id));
         }
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
         // Photoshop: Snap to Origin puts the pattern's origin back at the layer's (or canvas's).
-        if ui.add(craft_ui::controls::Button::new(tl!("Snap to Origin")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked() {
+        if ui.add(Button::new(tl!("Snap to Origin")).variant(ButtonVariant::Secondary)).clicked() {
             f.insert("phase".into(), json!([0.0, 0.0]));
         }
     });
-    let mut angle = num(f, "angle", 0.0);
-    if crate::widgets::angle_dial_row(ui, tl!("Angle:"), &mut angle, -180.0..=180.0).changed() {
-        f.insert("angle".into(), json!(angle.clamp(-180.0, 180.0)));
-    }
     let (min, max) = cmds::SCALE_RANGE;
-    let mut scale = num(f, "scale", 100.0);
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Scale:")).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
-        if crate::widgets::value_field(ui, &mut scale, min as f32..=max as f32, "%", 70.0).accessible_name(tl!("Scale:")).changed() {
-            f.insert("scale".into(), json!(scale.clamp(min as f32, max as f32)));
-        }
+    FormGrid::new("pattern-fill").label_align(LabelAlign::Start).show(ui, |form| {
+        form.row(tl!("Angle:"), |ui, _| {
+            let numbers = LocaleNumbers::of(ui);
+            let edit = AngleDial::new("pattern-fill-angle", tl!("Angle:"), f64::from(num(f, "angle", 0.0)), &numbers).range(-180.0..=180.0).show(ui);
+            if let Some(angle) = edit.event.as_ref().and_then(|e| e.value()).copied() {
+                f.insert("angle".into(), json!(angle.clamp(-180.0, 180.0)));
+            }
+            edit
+        });
+        form.row(tl!("Scale:"), |ui, _| {
+            let mut scale = num(f, "scale", 100.0);
+            let edit = crate::widgets::dialog_number_field(ui, "pattern-fill-scale", tl!("Scale:"), &mut scale, min as f32..=max as f32, "{n}%", 0);
+            if edit.changed {
+                f.insert("scale".into(), json!(scale.clamp(min as f32, max as f32)));
+            }
+            edit.response
+        });
+        form.unlabelled(|ui| {
+            let mut link = f.get("link").and_then(Value::as_bool).unwrap_or(true);
+            let edit = Checkbox::bool(tl!("Link with Layer"), &mut link).show(ui);
+            if edit.response.changed() {
+                f.insert("link".into(), json!(link));
+            }
+            edit
+        });
     });
-    let mut link = f.get("link").and_then(Value::as_bool).unwrap_or(true);
-    if craft_ui::controls::Checkbox::bool(tl!("Link with Layer"), &mut link).show(ui).response.changed() {
-        f.insert("link".into(), json!(link));
-    }
 }
 
 #[cfg(test)]

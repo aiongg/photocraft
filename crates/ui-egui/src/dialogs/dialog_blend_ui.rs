@@ -3,11 +3,10 @@
 //! Both commands support the same layer blend modes, opacity and transparency lock.
 //! Keeping one widget and validation implementation prevents their options diverging.
 
-use craft_ui::theme::ToEgui;
-use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::composites::{FormGrid, SectionLabel};
+use craft_ui::controls::{Checkbox, Select};
+use craft_ui::primitives::Divider;
 use serde_json::{Map, Value, json};
-
-use crate::theme::Tokens;
 
 /// Validate a persisted blending choice before restoring it from Preferences.
 pub fn valid(key: &str, v: &Value) -> bool {
@@ -19,40 +18,43 @@ pub fn valid(key: &str, v: &Value) -> bool {
     }
 }
 
-/// UI for the identical Blending section of Fill and Stroke.
+/// The Blending section of Fill and Stroke: Mode, Opacity and Preserve Transparency.
 pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    craft_ui::composites::SectionLabel::new(tl!("Blending")).show(ui);
-    crate::widgets::hairline(ui);
-    ui.horizontal(|ui| {
-        label(ui, tl!("Mode:"));
-        let mut mode = fields.get("mode").and_then(Value::as_str).unwrap_or("normal").to_string();
-        let opts: Vec<(String, &str)> = photocraft_color::BlendMode::LAYER_MODES.iter().map(|m| (mode_key(*m), m.label())).collect();
-        if craft_ui::controls::Select::new(&format!("{prefix}-mode"), tl!("Blend Mode"), &mut mode).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
-            fields.insert("mode".into(), json!(mode));
-        }
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("Opacity:"));
-        let mut opacity = fields.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
-        if crate::widgets::value_field(ui, &mut opacity, 0.0..=100.0, "%", 70.0).accessible_name(tl!("Opacity:")).changed() {
-            fields.insert("opacity".into(), json!(opacity.round()));
-        }
-    });
-    ui.horizontal(|ui| {
-        label(ui, "");
-        let mut preserve = fields.get("preserveTransparency").and_then(Value::as_bool).unwrap_or(false);
-        if craft_ui::controls::Checkbox::bool(tl!("Preserve Transparency"), &mut preserve).show(ui).response.changed() {
-            fields.insert("preserveTransparency".into(), json!(preserve));
-        }
+    SectionLabel::new(tl!("Blending")).show(ui);
+    Divider::horizontal().show(ui);
+    FormGrid::new(format!("{prefix}-blending")).min_label_width(LABEL_WIDTH).show(ui, |form| {
+        form.row(tl!("Mode:"), |ui, _| {
+            let mut mode = fields.get("mode").and_then(Value::as_str).unwrap_or("normal").to_string();
+            let opts: Vec<(String, &str)> = photocraft_color::BlendMode::LAYER_MODES.iter().map(|m| (mode_key(*m), m.label())).collect();
+            let edit = Select::new(format!("{prefix}-mode"), tl!("Blend Mode"), &mut mode).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
+            if edit.response.changed() {
+                fields.insert("mode".into(), json!(mode));
+            }
+            edit
+        });
+        form.row(tl!("Opacity:"), |ui, _| {
+            let mut opacity = fields.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
+            let edit = crate::widgets::dialog_number_field(ui, format!("{prefix}-opacity"), tl!("Opacity:"), &mut opacity, 0.0..=100.0, "{n}%", 0);
+            if edit.changed {
+                fields.insert("opacity".into(), json!(opacity.round()));
+            }
+            edit.response
+        });
+        form.unlabelled(|ui| {
+            let mut preserve = fields.get("preserveTransparency").and_then(Value::as_bool).unwrap_or(false);
+            let edit = Checkbox::bool(tl!("Preserve Transparency"), &mut preserve).show(ui);
+            if edit.response.changed() {
+                fields.insert("preserveTransparency".into(), json!(preserve));
+            }
+            edit
+        });
     });
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(112.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
-}
+/// The label column of Fill, Stroke and their Blending section: all grids share it so their
+/// controls line up.
+pub(crate) const LABEL_WIDTH: f32 = 112.0;
 
 /// The `mode` param naming a blend mode ("normal", "colorBurn"…), parsed by the engine.
 pub(crate) fn mode_key(m: photocraft_color::BlendMode) -> String {
