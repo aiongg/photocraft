@@ -195,8 +195,8 @@ fn layer_rename_layer_from_the_menu_commits_an_open_rename() {
     let ctx = h.ctx.clone();
     crate::menus::invoke(h.state_mut(), &ctx, "layer.renameLayer", json!({"layer": b})).unwrap();
     h.run_steps(3);
-    // The library keeps the typed text until the field ends, so a rename started by command
-    // does not commit the open one; only the new rename is open.
+    // #314: the text typed into the open rename is committed; only the new rename is open.
+    assert_eq!(name(&h, a), "Kept");
     assert_eq!(renaming(&h.ctx), Some(b));
     assert!(field_shown(&h, b) && !field_shown(&h, a));
     type_text(&mut h, "From menu");

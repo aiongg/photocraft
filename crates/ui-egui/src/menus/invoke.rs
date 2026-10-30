@@ -193,7 +193,7 @@ fn invoke_file_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, 
             let id = params.get("layer").and_then(Value::as_u64).or(st.active_layer.map(|l| l.0)).ok_or("no active layer")?;
             let name = st.doc.layer(photocraft_doc::LayerId(id)).map(|l| l.name.clone()).ok_or("no such layer")?;
             // Another rename in progress is committed first (#314).
-            if let Some((cmd, p)) = crate::layer_row_ui::start_rename(ctx, id, &name) {
+            if let Some((cmd, p)) = crate::layer_row_ui::start_rename_from_menu(ctx, id, &name) {
                 app.run(&cmd, p)?;
             }
             Ok(Value::Null)

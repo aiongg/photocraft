@@ -279,6 +279,19 @@ pub fn start_rename_in(ui: &egui::Ui, layer: u64, name: &str) -> Option<(String,
     start_rename(ui.ctx(), layer, name)
 }
 
+/// [`start_rename`] from a command that has the context only (a menu item): the text typed into
+/// the rename it replaces is taken from the library's open rename and committed with it (#314).
+pub fn start_rename_from_menu(ctx: &egui::Context, layer: u64, name: &str) -> Option<(String, Value)> {
+    if rename(ctx).is_some_and(|r| r.layer != layer)
+        && let Some((key, text)) = ListRow::<u64>::take_open_rename_draft(ctx)
+        && let Some(mut previous) = rename(ctx).filter(|r| r.layer == key)
+    {
+        previous.text = text;
+        store(ctx, Some(previous));
+    }
+    start_rename(ctx, layer, name)
+}
+
 /// End the rename in progress: commit it (its command is returned) or cancel it.
 pub fn end_rename(ctx: &egui::Context, commit: bool) -> Option<(String, Value)> {
     let r = rename(ctx)?;
