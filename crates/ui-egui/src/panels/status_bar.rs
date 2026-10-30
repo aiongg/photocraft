@@ -57,7 +57,7 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.with_layout(crate::direction::trailing(), |ui| {
                     if app.session.active().is_some()
                         && !t.pro
-                        && widgets::compact_button(ui, tl!("Fit"), control_h).clicked()
+                        && ui.add(craft_ui::controls::Button::new(tl!("Fit")).size(craft_ui::controls::ControlSize::Sm)).clicked()
                         && let Some(i) = app.session.active_index()
                     {
                         app.ui.views[i].fit_pending = true;
