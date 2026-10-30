@@ -1,5 +1,5 @@
-use super::{Align2, BlendMode, Color32, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, c32, icons, json, pos2, vec2};
 use super::options_bar::select_cell;
+use super::{Align2, BlendMode, Color32, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, c32, icons, json, pos2, vec2};
 use craft_ui::controls::{Checkbox, ControlSize, IconButton};
 use craft_ui::icons::Icon;
 use craft_ui::theme::StrokeExt;

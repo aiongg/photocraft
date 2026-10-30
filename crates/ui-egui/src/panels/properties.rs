@@ -243,4 +243,3 @@ pub(super) fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.ui.dock_tabs.properties = 0;
     }
 }
-

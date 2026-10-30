@@ -189,7 +189,14 @@ pub fn open_settings(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// (Photoshop's "Toggle the Brush Settings panel"). It runs Window › Brush Settings (F5).
 pub fn settings_toggle(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let on = app.ui.panels.brush_settings;
-    if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Adjustments, tl!("Toggle the Brush Settings panel")).size(craft_ui::controls::ControlSize::Md).shortcut("F5").selected(on)).clicked()
+    if ui
+        .add(
+            craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Adjustments, tl!("Toggle the Brush Settings panel"))
+                .size(craft_ui::controls::ControlSize::Md)
+                .shortcut("F5")
+                .selected(on),
+        )
+        .clicked()
         && let Err(e) = crate::menus::invoke(app, ui.ctx(), "window.panel.brushSettings", json!({}))
     {
         app.ui.status = e;

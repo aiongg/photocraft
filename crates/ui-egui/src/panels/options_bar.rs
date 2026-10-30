@@ -56,15 +56,23 @@ pub(crate) struct Field<'a> {
     pub width: CellWidth,
     pub decimals: RangeInclusive<usize>,
     pub tooltip: Option<&'a str>,
+    /// How many field units one stored unit is: 100 for a fraction shown as a percentage.
+    pub scale: f64,
 }
 
 impl<'a> Field<'a> {
     pub(crate) fn new(label: &'a str, range: RangeInclusive<f32>, suffix: &'a str, width: CellWidth) -> Self {
-        Self { label, range: f64::from(*range.start())..=f64::from(*range.end()), suffix, width, decimals: 0..=1, tooltip: None }
+        Self { label, range: f64::from(*range.start())..=f64::from(*range.end()), suffix, width, decimals: 0..=1, tooltip: None, scale: 1.0 }
     }
 
     pub(crate) fn decimals(mut self, decimals: RangeInclusive<usize>) -> Self {
         self.decimals = decimals;
+        self
+    }
+
+    /// The stored value is a fraction shown as a percentage.
+    pub(crate) fn percent(mut self) -> Self {
+        self.scale = 100.0;
         self
     }
 
@@ -107,8 +115,14 @@ fn reader(suffix: &str, units: Option<widgets::FieldUnits>) -> impl Fn(&str) -> 
     }
 }
 
+/// The host's value as the field is given it. The field compares it with what it sent, so a stored
+/// f32 that left the field as 53 must come back as 53, not 53.000004.
+fn shown(value: f32, scale: f64) -> f64 {
+    (f64::from(value) * scale * 1e4).round() / 1e4
+}
+
 /// Applies a field's edit to `value`. A cancelled gesture puts back the value it began with.
-fn apply(ui: &egui::Ui, id: egui::Id, event: Option<&EditEvent<f64>>, value: &mut f32) -> (bool, Option<u64>) {
+fn apply(ui: &egui::Ui, id: egui::Id, scale: f64, event: Option<&EditEvent<f64>>, value: &mut f32) -> (bool, Option<u64>) {
     let start = id.with("gesture-start");
     let gesture = event.and_then(EditEvent::id).map(|g| {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -121,12 +135,12 @@ fn apply(ui: &egui::Ui, id: egui::Id, event: Option<&EditEvent<f64>>, value: &mu
             false
         }
         Some(EditEvent::Update { value: v, .. } | EditEvent::Set { value: v, .. }) => {
-            *value = *v as f32;
+            *value = (*v / scale) as f32;
             true
         }
         Some(EditEvent::Commit { value: v, changed, .. }) => {
             if *changed {
-                *value = *v as f32;
+                *value = (*v / scale) as f32;
             }
             *changed
         }
@@ -160,7 +174,7 @@ fn number_cell_with(
     let name = tl!(field.label);
     let mut out = None;
     OptionsBar::cell(ui, &caption(field.label), field.width, |ui, caption| {
-        let mut number = NumberField::new(salt.as_str(), name, f64::from(*value), &numbers)
+        let mut number = NumberField::new(salt.as_str(), name, shown(*value, field.scale), &numbers)
             .range(field.range.clone())
             .decimals(field.decimals.clone())
             .or_parse(reader(field.suffix, units))
@@ -173,7 +187,7 @@ fn number_cell_with(
             number = number.unit_menu(entries, picked);
         }
         let edit = number.show(ui);
-        let (changed, gesture) = apply(ui, edit.response.id, edit.event.as_ref(), value);
+        let (changed, gesture) = apply(ui, edit.response.id, field.scale, edit.event.as_ref(), value);
         if let Some(tip) = field.tooltip {
             edit.response.on_hover_text(tip);
         }
@@ -184,12 +198,7 @@ fn number_cell_with(
 
 /// A percent cell for a stored fraction (0..=1) shown as a percentage.
 fn percent_cell(ui: &mut egui::Ui, label: &str, fraction: &mut f32, range: RangeInclusive<f32>) -> CellEdit {
-    let mut percent = *fraction * 100.0;
-    let edit = number_cell(ui, &Field::new(label, range, "%", CellWidth::Md), &mut percent);
-    if edit.changed {
-        *fraction = percent / 100.0;
-    }
-    edit
+    number_cell(ui, &Field::new(label, range, "%", CellWidth::Md).percent(), fraction)
 }
 
 /// The Smoothing percentage of a brush (the live stroke and the commit use it).
@@ -397,9 +406,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut Br
             ui.add(IconButton::new(Icon::Brush, tl!("Load the brush after each stroke")).size(ControlSize::Md).toggle(&mut m.load_after_stroke));
             ui.add(IconButton::new(Icon::BrushCleaning, tl!("Clean the brush after each stroke")).size(ControlSize::Md).toggle(&mut m.clean_after_stroke));
             OptionsBar::divider(ui);
-            for (label, value) in
-                [("Wet", &mut b.mixer.wet), ("Load", &mut b.mixer.load), ("Mix", &mut b.mixer.mix), ("Flow", &mut b.mixer.flow)]
-            {
+            for (label, value) in [("Wet", &mut b.mixer.wet), ("Load", &mut b.mixer.load), ("Mix", &mut b.mixer.mix), ("Flow", &mut b.mixer.flow)] {
                 percent_cell(ui, label, value, 0.0..=100.0);
             }
             OptionsBar::divider(ui);
@@ -503,7 +510,10 @@ fn lasso_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     select_and_mask_button(app, ui);
     if crate::lasso_ui::active(app) || (app.ui.tool == Tool::PolygonLasso && !app.ui.polygon.is_empty()) {
-        OptionsBar::hint(ui, &crate::i18n::fmt(tl!("Click the first point or press {key} to close · Esc cancels"), &[("key", &crate::shortcuts::pretty("Enter"))]));
+        OptionsBar::hint(
+            ui,
+            &crate::i18n::fmt(tl!("Click the first point or press {key} to close · Esc cancels"), &[("key", &crate::shortcuts::pretty("Enter"))]),
+        );
     } else if app.ui.tool == Tool::Lasso {
         OptionsBar::hint(ui, tl!("Hold Alt while drawing for straight segments"));
     }
@@ -621,7 +631,12 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 let (mut rw, mut rh) = crate::crop_size::custom_ratio_fields(o, doc_size);
                 let decimals = crate::crop_size::RATIO_DECIMALS;
                 let fw = widgets::value_field_prec(ui, &mut rw, 0.0..=99_999.0, "", 54.0, decimals);
-                let swap = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width")).size(craft_ui::controls::ControlSize::Sm)).clicked();
+                let swap = ui
+                    .add(
+                        craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width"))
+                            .size(craft_ui::controls::ControlSize::Sm),
+                    )
+                    .clicked();
                 let fh = widgets::value_field_prec(ui, &mut rh, 0.0..=99_999.0, "", 54.0, decimals);
                 let (cw, ch) = (fw.changed(), fh.changed());
                 if swap {
@@ -653,7 +668,13 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
             // Fill: what a turned or extending crop puts where the image doesn't reach
             // (#3823). Generative Expand is not offered.
             ui.label(tl!("Fill:"));
-            craft_ui::controls::Select::new("crop-fill", tl!("Fill:"), &mut o.crop_content_aware).fit(true).option(false, tl!("Background (Default)")).option(true, tl!("Content-Aware Fill")).show(ui).response.changed();
+            craft_ui::controls::Select::new("crop-fill", tl!("Fill:"), &mut o.crop_content_aware)
+                .fit(true)
+                .option(false, tl!("Background (Default)"))
+                .option(true, tl!("Content-Aware Fill"))
+                .show(ui)
+                .response
+                .changed();
             if crate::crop_ui::preset_ratio(app) != before_ratio {
                 match ratio_base {
                     Some(base) => crate::crop_ui::apply_ratio_from(app, base),

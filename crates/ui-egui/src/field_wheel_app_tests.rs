@@ -4,7 +4,7 @@
 use egui::accesskit::Role;
 use egui::vec2;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -23,8 +23,12 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 }
 
 /// The value field showing `value`: the options bar's Smoothing is the brush's only one at 10.
-fn field<'a>(h: &'a Harness<'_, PhotocraftApp>, value: &str) -> egui_kittest::Node<'a> {
-    h.query_all_by_role(Role::SpinButton).find(|n| n.value().as_deref() == Some(value)).unwrap()
+fn field<'a>(h: &'a Harness<'_, PhotocraftApp>, value: f64) -> egui_kittest::Node<'a> {
+    h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(value)).unwrap()
+}
+
+fn has_value(h: &Harness<'_, PhotocraftApp>, value: f64) -> bool {
+    h.query_all_by_role(Role::SpinButton).any(|n| n.accesskit_node().numeric_value() == Some(value))
 }
 
 fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2, lines: f32, modifiers: egui::Modifiers) {
@@ -54,27 +58,27 @@ fn a_focused_field_takes_the_wheel_over_the_canvas() {
     wheel(&mut h, canvas, -1.0, egui::Modifiers::NONE);
     assert_ne!(view(&h), before, "without a focused field the wheel pans the canvas");
     let before = view(&h);
-    field(&h, "10").click();
+    field(&h, 10.0).click();
     h.run();
     wheel(&mut h, canvas, -2.0, egui::Modifiers::NONE);
     assert_eq!(view(&h), before, "the canvas neither pans nor zooms");
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("8")), "Smoothing stepped from 10 to 8");
+    assert!(has_value(&h, 8.0), "Smoothing stepped from 10 to 8");
     // ⌥/Alt + wheel is still the view's zoom.
     wheel(&mut h, canvas, 1.0, egui::Modifiers::ALT);
     assert_ne!(view(&h).0, before.0, "Alt + wheel zooms");
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("8")));
+    assert!(has_value(&h, 8.0));
 }
 
 #[test]
 fn the_wheel_over_a_field_steps_it_without_a_click() {
     let mut h = harness();
     let before = view(&h);
-    let at = field(&h, "10").rect().center();
+    let at = field(&h, 10.0).rect().center();
     wheel(&mut h, at, 1.0, egui::Modifiers::NONE);
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("11")), "Smoothing stepped from 10 to 11");
+    assert!(has_value(&h, 11.0), "Smoothing stepped from 10 to 11");
     wheel(&mut h, at, 1.0, egui::Modifiers::SHIFT);
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("21")), "Shift: ten a notch");
-    assert!(!field(&h, "21").is_focused(), "hovering doesn't put the cursor in the field");
+    assert!(has_value(&h, 21.0), "Shift: ten a notch");
+    assert!(!field(&h, 21.0).is_focused(), "hovering doesn't put the cursor in the field");
     assert_eq!(view(&h), before, "the canvas didn't move");
 }
 
@@ -83,7 +87,7 @@ fn the_wheel_over_a_field_steps_it_without_a_click() {
 fn canvas_pan(focus: bool, delta: egui::Vec2, modifiers: egui::Modifiers) -> (f32, [f32; 2]) {
     let mut h = harness();
     if focus {
-        field(&h, "10").click();
+        field(&h, 10.0).click();
         h.run();
     }
     let canvas = egui::pos2(640.0, 500.0);
@@ -98,7 +102,7 @@ fn canvas_pan(focus: bool, delta: egui::Vec2, modifiers: egui::Modifiers) -> (f3
         modifiers,
     });
     h.run_steps(40);
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("10")), "focus {focus}: the field wasn't stepped");
+    assert!(has_value(&h, 10.0), "focus {focus}: the field wasn't stepped");
     let after = view(&h);
     (after.0 / before.0, [after.1[0] - before.1[0], after.1[1] - before.1[1]])
 }

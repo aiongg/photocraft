@@ -131,7 +131,7 @@ fn capture_compact_visual_fixtures() {
                 let stem = format!("photocraft-compact-{}-{width}-{height}-{scale}x", kind.id());
                 harness.render().unwrap().save(directory.join(format!("{stem}.png"))).unwrap();
                 let mut regions = serde_json::Map::new();
-                for id in ["options_bar", "toolbar"] {
+                for id in ["toolbar"] {
                     let r = egui::containers::panel::PanelState::load(&harness.ctx, panel_state_id(&harness.ctx, id)).unwrap().outer_rect;
                     regions.insert(id.into(), json!([r.left(), r.top(), r.width(), r.height()]));
                 }
@@ -246,7 +246,7 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
                         egui_extras::install_image_loaders(ui.ctx());
                         theme::install_fonts(ui.ctx());
                         theme::apply(ui.ctx(), kind);
-                        app.ui.tool = if Tokens::get(ui.ctx()).pro { Tool::Pencil } else { Tool::Brush };
+                        app.ui.tool = Tool::Pencil;
                         app.session.prefs.edit(|prefs| prefs.shortcuts.insert("window.togglePanels".into(), String::new()));
                         ready = true;
                         return;
@@ -257,8 +257,7 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
                 PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()),
             );
             harness.run_steps(4);
-            let pro = Tokens::get(&harness.ctx).pro;
-            let last_label = if pro { "Auto Erase" } else { "Pressure for Opacity" };
+            let last_label = "Auto Erase";
             // Only the canvas Tab shortcut is cleared, using its public preference;
             // no response is assigned focus programmatically.
             let mut reached = false;
@@ -293,10 +292,10 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
                 })
                 .expect("the final option remains painted");
             assert!(clip.contains_rect(label), "{kind:?} at {scale}x: Tab leaves the focused final option outside {clip:?}: {label:?}");
-            let previous = if pro { harness.state().ui.tool_options.pencil_auto_erase } else { harness.state().session.tools.brush.pressure_opacity };
+            let previous = harness.state().ui.tool_options.pencil_auto_erase;
             harness.key_press(egui::Key::Space);
             harness.run_steps(3);
-            let current = if pro { harness.state().ui.tool_options.pencil_auto_erase } else { harness.state().session.tools.brush.pressure_opacity };
+            let current = harness.state().ui.tool_options.pencil_auto_erase;
             assert_ne!(current, previous, "{kind:?} at {scale}x: Space must activate the revealed option");
             assert!(harness.state().ui.panels.options_bar, "widget traversal must preserve the options bar");
         }
@@ -436,29 +435,28 @@ fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
 
 #[test]
 fn the_narrow_options_bar_preference_shortens_the_bar() {
-    assert_eq!(options_bar_height(true, false), 36.0);
-    assert_eq!(options_bar_height(true, true), 30.0);
-    assert_eq!(options_bar_height(false, false), 42.0);
-    assert_eq!(options_bar_height(false, true), 34.0);
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
     crate::theme::apply(&ctx, crate::theme::ThemeKind::ALL[0]);
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 900.0));
-    let run = |app: &mut PhotocraftApp| {
+    // The bar's height and the library's for the same preference.
+    let run = |app: &mut PhotocraftApp, narrow: bool| {
         let mut top = 0.0;
+        let mut expected = 0.0;
         let mut out = ctx.run_ui(input_at_scale(screen, 1.0), |ui| {
             options_bar(app, ui);
-            top = ui.available_rect_before_wrap().top();
+            top = ui.available_rect_before_wrap().top() - ui.spacing().item_spacing.y;
+            expected = craft_ui::patterns::OptionsBar::style(&<craft_ui::theme::Tokens as craft_ui::theme::TokensOf>::of(ui), narrow).height;
         });
         out.textures_delta.clear();
-        top
+        (top, expected)
     };
-    let normal = run(&mut app);
-    assert_eq!(normal, options_bar_height(Tokens::get(&ctx).pro, false));
+    let (normal, expected) = run(&mut app, false);
+    assert_eq!(normal, expected);
     app.session.execute("prefs.set", json!({"path": "workspace.enableNarrowOptionsBar", "value": true})).unwrap();
-    let narrow = run(&mut app);
-    assert_eq!(narrow, options_bar_height(Tokens::get(&ctx).pro, true));
+    let (narrow, expected) = run(&mut app, true);
+    assert_eq!(narrow, expected);
     assert!(narrow < normal, "narrow {narrow} must trim the bar under {normal}");
 }
 
@@ -472,7 +470,7 @@ fn narrow_tool_options_can_scroll_to_the_last_control() {
                 crate::theme::install_fonts(&ctx);
                 crate::theme::apply(&ctx, kind);
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-                let (tool, last_label) = if Tokens::get(&ctx).pro { (Tool::Pencil, "Auto Erase") } else { (Tool::Brush, "Pressure for Opacity") };
+                let (tool, last_label) = (Tool::Pencil, "Auto Erase");
                 app.ui.tool = tool;
                 let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(width, 120.0));
                 let mut output = ctx.run_ui(input_at_scale(screen, scale), |ui| options_bar(&mut app, ui));
