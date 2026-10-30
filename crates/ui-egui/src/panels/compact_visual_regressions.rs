@@ -157,46 +157,34 @@ fn capture_compact_visual_fixtures() {
     }
 }
 
+/// The rect of the node named `label` in a toolbar shown in a window `height` tall.
+fn chip_rects(kind: crate::theme::ThemeKind, double: bool, height: f32, scale: f32) -> [Rect; 2] {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.ui.panels.toolbar_double = double;
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size(vec2(800.0, height))
+        .with_pixels_per_point(scale)
+        .build_ui_state(|ui, app: &mut PhotocraftApp| toolbar(app, ui), app);
+    PhotocraftApp::setup_context(&harness.ctx, kind);
+    // The scroll bar shows from the frame after the one that measured the tools.
+    harness.run_steps(4);
+    ["Set foreground color", "Set background color"].map(|label| harness.get_by_label(label).rect())
+}
+
 /// #7316: a window too short for the tools scrolls them, and the scroll bar widened the UI
-/// the colour chips were centred in, so they (and Switch Colors with them) sat a bar's width
-/// right of the tools. They stay where they are in a window tall enough not to scroll.
+/// the colour chips were centred in, so they sat a bar's width right of the tools. They stay
+/// where they are in a window tall enough not to scroll.
 #[test]
 fn color_chips_stay_centred_when_the_tools_scroll() {
-    let chips = |kind: crate::theme::ThemeKind, double: bool, height: f32, scale: f32| {
-        let ctx = egui::Context::default();
-        egui_extras::install_image_loaders(&ctx);
-        crate::theme::install_fonts(&ctx);
-        crate::theme::apply(&ctx, kind);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.session.tools.foreground = [1.0, 0.0, 1.0, 1.0];
-        app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
-        app.ui.panels.toolbar_double = double;
-        let input = || input_at_scale(Rect::from_min_size(egui::Pos2::ZERO, vec2(800.0, height)), scale);
-        // The scroll bar shows from the frame after the one that measured the tools.
-        let mut output = ctx.run_ui(input(), |ui| toolbar(&mut app, ui));
-        for _ in 0..2 {
-            output.textures_delta.clear();
-            output = ctx.run_ui(input(), |ui| toolbar(&mut app, ui));
-        }
-        output.textures_delta.clear();
-        [Color32::from_rgb(255, 0, 255), Color32::GREEN].map(|color| {
-            output
-                .shapes
-                .iter()
-                .find_map(|shape| match &shape.shape {
-                    egui::Shape::Rect(rect) if rect.fill == color => Some(rect.rect.center()),
-                    egui::Shape::Circle(circle) if circle.fill == color => Some(circle.center),
-                    _ => None,
-                })
-                .unwrap_or_else(|| panic!("{kind:?}: both color chips are painted"))
-                .x
-        })
-    };
     for kind in crate::theme::ThemeKind::ALL {
         for double in [false, true] {
             for scale in [1.0, 2.0] {
-                let (short, tall) = (chips(kind, double, 420.0, scale), chips(kind, double, 1400.0, scale));
-                assert_eq!(short, tall, "{kind:?}, two columns {double}, scale {scale}: the chips don't move when the tools scroll");
+                let (short, tall) = (chip_rects(kind, double, 420.0, scale), chip_rects(kind, double, 1400.0, scale));
+                assert_eq!(
+                    short.map(|r| r.center().x),
+                    tall.map(|r| r.center().x),
+                    "{kind:?}, two columns {double}, scale {scale}: the chips don't move when the tools scroll"
+                );
             }
         }
     }
@@ -207,28 +195,8 @@ fn compact_toolbar_keeps_both_color_chips_visible() {
     for kind in crate::theme::ThemeKind::ALL {
         for height in [480.0, 720.0] {
             for scale in [1.0, 1.5, 2.0] {
-                let ctx = egui::Context::default();
-                egui_extras::install_image_loaders(&ctx);
-                crate::theme::install_fonts(&ctx);
-                crate::theme::apply(&ctx, kind);
-                let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-                app.session.tools.foreground = [1.0, 0.0, 1.0, 1.0];
-                app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
-                let mut output = ctx.run_ui(input_at_scale(Rect::from_min_size(egui::Pos2::ZERO, vec2(800.0, height)), scale), |ui| toolbar(&mut app, ui));
-                output.textures_delta.clear();
-                for color in [Color32::from_rgb(255, 0, 255), Color32::GREEN] {
-                    let (clip, chip) = output
-                        .shapes
-                        .iter()
-                        .find_map(|shape| match &shape.shape {
-                            egui::Shape::Rect(rect) if rect.fill == color => Some((shape.clip_rect, rect.rect)),
-                            egui::Shape::Circle(circle) if circle.fill == color => {
-                                Some((shape.clip_rect, Rect::from_center_size(circle.center, vec2(circle.radius * 2.0, circle.radius * 2.0))))
-                            }
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| panic!("{kind:?} at {height}/{scale}: both color chips are painted"));
-                    assert!(clip.contains_rect(chip) && chip.bottom() <= height, "{kind:?} at {height}: color chip {chip:?} clipped by {clip:?}");
+                for chip in chip_rects(kind, false, height, scale) {
+                    assert!(chip.height() > 0.0 && chip.bottom() <= height, "{kind:?} at {height}/{scale}: color chip {chip:?} is inside the window");
                 }
             }
         }

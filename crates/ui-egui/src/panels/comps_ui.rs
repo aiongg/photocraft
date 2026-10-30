@@ -7,18 +7,17 @@
 
 use std::cell::RefCell;
 
-use craft_ui::composites::PanelFooter;
+use craft_ui::composites::{PanelFooter, Tone};
 use craft_ui::controls::{ControlSize, IconButton};
 use craft_ui::edit::EditEvent;
 use craft_ui::icons::Icon;
 use craft_ui::list::{ListRow, RowEvent, ToggleColumn};
 use craft_ui::menu::{ContextMenu, MenuItem};
 use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
-use egui::{Rect, Sense, pos2, vec2};
+use egui::{Rect, pos2, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 /// The comp footer and row actions act on: the panel selection if still valid, else the last
 /// applied comp.
@@ -97,16 +96,13 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if missing > 0 {
                 row = row.trailing_item(18.0, |ui| {
                     let r = Rect::from_center_size(ui.max_rect().center(), vec2(14.0, 14.0));
-                    let hit = ui.interact(r, ui.scope_id().with("comp-warning"), Sense::click());
-                    crate::icons::paint(ui, r, "triangle-alert", 12.0, Tokens::get(ui.ctx()).warning);
                     let tip = crate::i18n::trn(
                         crate::i18n::current(),
                         missing as u64,
                         "{n} layer recorded by this comp was deleted. Update the comp, or clear the warning.",
                         "{n} layers recorded by this comp were deleted. Update the comp, or clear the warning.",
                     );
-                    hit.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &tip));
-                    if hit.on_hover_text(&tip).clicked() {
+                    if IconButton::new(Icon::Warning, &tip).tone(Tone::Warn).show_at(ui, r).clicked() {
                         *row_hits.borrow_mut() = Some(clear_warning_action(c.id));
                     }
                 });

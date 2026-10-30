@@ -106,7 +106,7 @@ pub use status_bar::status_bar;
 pub use title_bar::{sync_window_title, system_title_bar, title_bar, window_title};
 pub use toolbar::toolbar;
 #[cfg(test)]
-use toolbar::{TOOL_SECTIONS, chips_height, color_chips};
+use toolbar::{TOOL_SECTIONS, color_pair};
 
 fn c32(c: [f32; 4]) -> Color32 {
     Color32::from_rgba_unmultiplied((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8, (c[3] * 255.0) as u8)

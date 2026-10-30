@@ -87,3 +87,35 @@ fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     h.run_steps(2);
     assert!(h.state().ui.tool != Tool::Move, "M picks a marquee tool once the list is closed");
 }
+
+/// The same letter again picks the next mode starting with it.
+#[test]
+fn a_repeated_letter_cycles_the_blend_modes_starting_with_it() {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.ui.tool = Tool::Move;
+        app
+    });
+    h.run_steps(6);
+    let blend = |h: &Harness<'_, PhotocraftApp>| {
+        let st = h.state().session.active().unwrap();
+        st.doc.layer(st.active_layer.unwrap()).unwrap().blend
+    };
+    let named = |n: &egui_kittest::Node<'_>| {
+        let a = n.accesskit_node();
+        a.value().as_deref() == Some("Normal") || a.label().as_deref() == Some("Normal")
+    };
+    h.query_all_by_role(Role::ComboBox).find(|n| named(n)).expect("the Layers panel's Blend Mode dropdown").click();
+    h.run_steps(2);
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        h.key_press(egui::Key::D);
+        h.event(egui::Event::Text("d".into()));
+        h.run_steps(2);
+        seen.push(blend(&h));
+    }
+    assert_eq!(seen, [BlendMode::Dissolve, BlendMode::Darken, BlendMode::DarkerColor], "D, D, D cycles the D modes");
+}
