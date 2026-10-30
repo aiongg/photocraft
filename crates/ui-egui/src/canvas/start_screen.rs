@@ -51,13 +51,13 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.horizontal(|ui| {
                     ui.add_space(((card.width() - 2.0 * button_width - HOME_BUTTON_GAP) / 2.0).max(0.0));
                     ui.spacing_mut().item_spacing.x = HOME_BUTTON_GAP;
-                    new_clicked = crate::widgets::primary_button(ui, &new_label, button_width).clicked();
-                    open_clicked = crate::widgets::secondary_button(ui, &open_label, button_width).clicked();
+                    new_clicked = ui.add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width)).clicked();
+                    open_clicked = ui.add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked();
                 });
             } else {
-                new_clicked = crate::widgets::primary_button(ui, &new_label, button_width).clicked();
+                new_clicked = ui.add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width)).clicked();
                 ui.add_space(HOME_BUTTON_GAP);
-                open_clicked = crate::widgets::secondary_button(ui, &open_label, button_width).clicked();
+                open_clicked = ui.add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked();
             }
             if new_clicked {
                 let fields = app.new_document_fields();
