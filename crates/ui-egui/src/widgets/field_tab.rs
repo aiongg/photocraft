@@ -148,17 +148,7 @@ mod tests {
         let mut h = harness(PhotocraftApp::new(s, crate::Services::default()));
         crate::adjust_dialog::open(h.state_mut(), "image.adjustments.hueSaturation").unwrap();
         h.run_steps(3);
-        assert_eq!(h.ctx.memory(|m| m.focused()), None, "nothing is focused to begin with");
-        // The library walks the title bar's close button, then the fields, then the footer buttons.
-        let mut reached = false;
-        for _ in 0..2 {
-            tab(&mut h);
-            reached = h.query_all_by_role(Role::SpinButton).next().is_some_and(|n| n.is_focused());
-            if reached {
-                break;
-            }
-        }
-        assert!(reached, "Tab reaches Hue's field");
+        assert!(h.query_all_by_role(Role::SpinButton).next().is_some_and(|n| n.is_focused()), "the dialog opens on Hue");
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::NONE);
         assert_eq!(num(&h, "hue"), 1.0);
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::SHIFT);
@@ -174,7 +164,7 @@ mod tests {
         tab(&mut h);
         arrow(&mut h, egui::Key::ArrowDown, egui::Modifiers::SHIFT);
         assert_eq!(num(&h, "lightness"), -10.0, "the third is Lightness");
-        // Past Lightness: OK, Cancel, then the wrap to Hue (the close button is not in the cycle).
+        // Past Lightness: OK, Cancel, then the wrap to Hue (the close box is not in the cycle).
         for _ in 0..3 {
             tab(&mut h);
         }
