@@ -279,7 +279,11 @@ impl<'a> Row<'a> {
     pub(crate) fn show(self, ui: &mut egui::Ui, x: &mut f32) -> Edit {
         let numbers = LocaleNumbers::of(ui);
         let before = ui.make_persistent_id((self.label, "before"));
-        let mut row = SliderRow::new(self.label, self.label, f64::from(*x), f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
+        // The host stores f32, the row reports f64 on its step: show the reported value while the
+        // stored one is its f32 rounding, so the gesture sees the value it reported.
+        let exact = before.with("exact");
+        let shown = ui.data(|d| d.get_temp::<f64>(exact)).filter(|v| *v as f32 == *x).unwrap_or(f64::from(*x));
+        let mut row = SliderRow::new(self.label, self.label, shown, f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
             .unit(Unit::new(&format!("{{n}}{}", self.unit)));
         // Every value the row reports is on the step, so the host stores it as reported.
         let range = f64::from(*self.range.end() - *self.range.start());
@@ -303,6 +307,9 @@ impl<'a> Row<'a> {
         }
         let mut e = Edit::default();
         for event in row.show(ui).edits() {
+            if let EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. } = &event {
+                ui.data_mut(|d| d.insert_temp(exact, *value));
+            }
             e.add(apply_event(ui, before, Some(event), x, |v| *v as f32));
         }
         e
