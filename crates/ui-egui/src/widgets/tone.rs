@@ -6,7 +6,6 @@
 
 use std::sync::Arc;
 
-use egui::{Color32, Rect};
 use photocraft_doc::adjust::ToneSpace;
 use photocraft_doc::{Document, Layer, LayerId};
 
@@ -363,38 +362,6 @@ pub fn keep_after_commit(app: &mut PhotocraftApp, layer: LayerId, before: Option
     }
 }
 
-/// Display scale for a 256-bin histogram: bar heights are `v / top` clamped to 1, linear
-/// to the tallest bin like Photoshop. A percentile of the sorted bins degenerates on
-/// sparse histograms (few occupied levels sort 0 into every low index), drawing tiny
-/// counts as tall as the real peaks (#6574).
-/// Extracted from [`draw_histogram`] so the scaling is unit-testable.
-pub fn histogram_scale_top(h: &[u32; 256]) -> f32 {
-    h.iter().copied().max().unwrap_or(1).max(1) as f32 * 1.1
-}
-
-pub fn draw_histogram(p: &egui::Painter, r: Rect, h: &[u32; 256], color: Color32) {
-    let top = histogram_scale_top(h);
-    let mut pts = vec![egui::pos2(r.left(), r.bottom())];
-    for (i, v) in h.iter().enumerate() {
-        let x = r.left() + (i as f32 + 0.5) / 256.0 * r.width();
-        let y = r.bottom() - (*v as f32 / top).min(1.0) * r.height();
-        pts.push(egui::pos2(x, y));
-    }
-    pts.push(egui::pos2(r.right(), r.bottom()));
-    // One mesh of vertical strips: no anti-aliasing feather, so no seams between bins.
-    let mut mesh = egui::Mesh::default();
-    for w in pts.windows(2).skip(1).take(256) {
-        let (a, b) = (w[0], w[1]);
-        let i = mesh.vertices.len() as u32;
-        for q in [egui::pos2(a.x, r.bottom()), a, b, egui::pos2(b.x, r.bottom())] {
-            mesh.colored_vertex(q, color);
-        }
-        mesh.add_triangle(i, i + 1, i + 2);
-        mesh.add_triangle(i, i + 2, i + 3);
-    }
-    p.add(mesh);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,34 +441,6 @@ mod tests {
                 assert_ne!(tag(*a, ToneSpace::Rgb), tag(*b, ToneSpace::Rgb), "{a:?} and {b:?}");
             }
         }
-    }
-
-    /// #6574: bar heights scale linearly to the tallest bin. A 90/10 black/white
-    /// histogram draws the small bar at a ninth of the big one, not full height.
-    #[test]
-    fn histogram_scale_is_proportional_for_two_level_images() {
-        let mut h = [0u32; 256];
-        h[0] = 100_000;
-        h[255] = 900_000;
-        let top = histogram_scale_top(&h);
-        let small = (h[0] as f32 / top).min(1.0);
-        let big = (h[255] as f32 / top).min(1.0);
-        assert!((small / big - 1.0 / 9.0).abs() < 0.02, "small/big = {}, top = {top}", small / big);
-    }
-
-    /// #6574: a sparse histogram (few occupied levels) must not scale to a bin
-    /// index that is 0: the old `sorted.get(250)` degenerated to `top = 1.1`,
-    /// drawing a few hundred samples as tall as hundreds of thousands.
-    #[test]
-    fn histogram_scale_does_not_degenerate_on_sparse_histograms() {
-        let mut h = [0u32; 256];
-        h[0] = 500_000;
-        h[128] = 300;
-        h[255] = 500_000;
-        let top = histogram_scale_top(&h);
-        assert!(top > h[128] as f32, "scale {top} must exceed the tiny middle bin");
-        let tiny = (h[128] as f32 / top).min(1.0);
-        assert!(tiny < 0.05, "tiny bin draws near-flat, got {tiny}");
     }
 
     /// A white document with black filled over columns `0..split` (a layer above the background).
