@@ -2,118 +2,22 @@
 //! Photoshop, instead of reaching the document's History beneath it (which the dialog previews
 //! and is about to change), or doing nothing.
 //!
-//! A dialog keeps an [`EditHistory`] of its settings and calls [`EditHistory::settle`] every frame
-//! and after a control-channel edit. A change becomes one step once no edit is in progress, so a
-//! slider drag is one step rather than one per frame. Liquify, Puppet Warp and Camera Raw keep
+//! A parameter dialog keeps its history in `craft_ui::dialog::Dialog` (`history`); this module
+//! is the history of the workspaces without a dialog host. Liquify, Puppet Warp and Camera Raw keep
 //! their own histories.
 
-use std::collections::HashMap;
-
-use serde_json::{Map, Value};
-
 use crate::PhotocraftApp;
-use crate::state::DialogKind;
 
-/// Most steps a dialog keeps.
-const LIMIT: usize = 100;
+pub use craft_ui::dialog::{LocalHistory as EditHistory, Step, take_step};
 
-pub struct EditHistory<T> {
-    undo: Vec<T>,
-    redo: Vec<T>,
-    /// The settings as of the latest step.
-    settled: T,
-}
-
-impl<T: Clone + PartialEq> EditHistory<T> {
-    pub fn new(now: &T) -> Self {
-        Self { undo: Vec::new(), redo: Vec::new(), settled: now.clone() }
-    }
-
-    /// Records a change since the latest step as a new step, unless `busy` (a drag in progress).
-    pub fn settle(&mut self, now: &T, busy: bool) {
-        if busy || *now == self.settled {
-            return;
-        }
-        if self.undo.len() >= LIMIT {
-            self.undo.remove(0);
-        }
-        self.undo.push(std::mem::replace(&mut self.settled, now.clone()));
-        self.redo.clear();
-    }
-
-    /// Steps `now` back (`Undo`) or forward (`Redo`); an unfinished edit is the latest step.
-    /// False when there is nowhere to go.
-    pub fn step(&mut self, now: &mut T, step: Step) -> bool {
-        self.settle(now, false);
-        let (from, to) = match step {
-            Step::Undo => (&mut self.undo, &mut self.redo),
-            Step::Redo => (&mut self.redo, &mut self.undo),
-        };
-        let Some(next) = from.pop() else { return false };
-        to.push(std::mem::replace(now, next.clone()));
-        self.settled = next;
-        true
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Step {
-    Undo,
-    Redo,
-}
-
-/// ⌘Z or ⇧⌘Z pressed this frame, consumed.
-fn take_step(ctx: &egui::Context) -> Option<Step> {
-    let cmd_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
-    if ctx.input_mut(|i| i.consume_key(cmd_shift, egui::Key::Z)) {
-        Some(Step::Redo)
-    } else if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z)) {
-        Some(Step::Undo)
-    } else {
-        None
-    }
-}
-
-/// A parameter dialog's settings: its fields without the private `__` keys (preview toggle,
-/// command, label…).
-fn settings(fields: &Map<String, Value>) -> Map<String, Value> {
-    fields.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect()
-}
-
-/// The parameter dialogs' histories, by dialog id.
-pub type DialogEdits = HashMap<u64, EditHistory<Map<String, Value>>>;
-
-/// Once a frame: records each open parameter dialog's settings and forgets closed dialogs.
-pub fn track_dialogs(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let busy = ctx.input(|i| i.pointer.any_down());
-    let dialogs = &app.ui.dialogs;
-    app.dialog_edits.retain(|id, _| dialogs.iter().any(|d| d.id == *id));
-    for d in dialogs.iter().filter(|d| d.kind == DialogKind::Command) {
-        let now = settings(&d.fields);
-        app.dialog_edits.entry(d.id).or_insert_with(|| EditHistory::new(&now)).settle(&now, busy);
-    }
-}
-
-/// ⌘Z / ⇧⌘Z while a dialog with its own history is in front: steps that dialog, and the keys
-/// never reach the document's History beneath it. A focused text field keeps them for its typing.
+/// ⌘Z / ⇧⌘Z while a workspace without a dialog host is in front (Filter Gallery, Adaptive Wide
+/// Angle, Vanishing Point): steps its own history, and the keys never reach the document's
+/// History beneath it. The parameter dialogs step theirs inside `craft_ui::dialog::Dialog`.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if ctx.text_edit_focused() {
+    if ctx.text_edit_focused() || !app.ui.dialogs.is_empty() {
         return;
     }
-    if let Some(top) = app.ui.dialogs.last() {
-        if top.kind != DialogKind::Command {
-            return;
-        }
-        let id = top.id;
-        let mut now = settings(&top.fields);
-        if let Some(step) = take_step(ctx)
-            && app.dialog_edits.entry(id).or_insert_with(|| EditHistory::new(&now)).step(&mut now, step)
-            && let Some(d) = app.ui.dialog_mut(id)
-        {
-            d.fields.retain(|k, _| k.starts_with("__"));
-            d.fields.extend(now);
-        }
-    } else if let Some(d) = app.distort.gallery.as_mut() {
+    if let Some(d) = app.distort.gallery.as_mut() {
         if let Some(step) = take_step(ctx) {
             d.step(step);
         }

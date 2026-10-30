@@ -1415,6 +1415,7 @@ source = "git+https://github.com/aiongg/craft-libs?rev=74aaf68a554c35f1aef2fc33a
 dependencies = [
  "craft-keymap",
  "craft-quit",
+ "craft-theme",
  "craft-ui",
  "egui",
  "muda",

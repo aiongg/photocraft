@@ -570,8 +570,8 @@ pub struct PhotocraftApp {
     pub(crate) raw_redevelop: Vec<camera_raw_ui::Redevelop>,
     /// Filter › Adaptive Wide Angle dialog (wide_angle_ui).
     pub(crate) wide_angle: Option<wide_angle_ui::WideAngleDialog>,
-    /// ⌘Z history of each open parameter dialog (edit_history).
-    pub(crate) dialog_edits: edit_history::DialogEdits,
+    /// The chrome state (outer gesture, ⌘Z history, focus) of each open dialog, by dialog id.
+    pub(crate) dialog_chrome: std::collections::HashMap<u64, craft_ui::dialog::DialogState<dialogs::Settings>>,
     /// The filter a "Rasterize?" prompt answered for, run after the dialog closes, where the
     /// egui context is available again (rasterize_prompt).
     pub(crate) pending_after_prompt: Option<(String, serde_json::Value)>,
