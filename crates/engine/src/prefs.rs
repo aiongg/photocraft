@@ -57,6 +57,10 @@ choice!(PointSize { PostScript = "postScript", Traditional = "traditional" } def
 choice!(Interpolation { BicubicAutomatic = "bicubicAutomatic", Nearest = "nearestNeighbor", Bilinear = "bilinear", Bicubic = "bicubic", BicubicSmoother = "bicubicSmoother", BicubicSharper = "bicubicSharper", PreserveDetails = "preserveDetails" } default BicubicAutomatic);
 choice!(ColorPicker { Adobe = "adobe", System = "system" } default Adobe);
 choice!(Theme { Pro = "pro", ProMedium = "proMedium", ProLightGray = "proLightGray", ProLight = "proLight", Studio = "studio", StudioLight = "studioLight", Classic = "classic", SolarizedDark = "solarizedDark", Adwaita = "adwaita", AdwaitaDark = "adwaitaDark", BreezeLight = "breezeLight", BreezeDark = "breezeDark", SoftDark = "softDark", SoftLight = "softLight" } default ProMedium);
+choice!(
+    /// The app's Size override: `suite` follows the Craft suite's Size.
+    AppSize { Suite = "suite", Compact = "compact", Comfortable = "comfortable" } default Suite
+);
 choice!(AppearanceMode { Auto = "auto", Dark = "dark", Light = "light" } default Dark);
 choice!(DarkTheme { Pro = "pro", ProMedium = "proMedium", Studio = "studio", SolarizedDark = "solarizedDark", AdwaitaDark = "adwaitaDark", BreezeDark = "breezeDark", SoftDark = "softDark" } default ProMedium);
 choice!(LightTheme { ProLight = "proLight", ProLightGray = "proLightGray", StudioLight = "studioLight", Classic = "classic", Adwaita = "adwaita", BreezeLight = "breezeLight", SoftLight = "softLight" } default ProLight);
@@ -261,7 +265,19 @@ pub struct Interface {
     pub dark_theme: DarkTheme,
     pub light_theme: LightTheme,
     /// Theme shortcuts shown in the appearance button's context menu.
-    pub favorite_themes: Vec<Theme>,
+    pub favorite_themes: Vec<String>,
+    /// This app's own light and dark theme (library ids such as `craft.studio`); empty follows the
+    /// suite. The legacy `theme`, `darkTheme` and `lightTheme` ids stay valid aliases that write
+    /// these (and `size`) through.
+    pub theme_light: String,
+    pub theme_dark: String,
+    /// This app's Size; `suite` follows the suite's.
+    pub size: AppSize,
+    /// The legacy appearance keys have been imported into the override (see `appearance::migrate`).
+    pub appearance_imported: bool,
+    /// The suite selection last accepted, kept so the web build (no files) and a missing
+    /// selection file show the same look (`craft_theme_store::Accepted`, opaque here).
+    pub last_suite: Value,
     /// Pasteboard colour in standard screen mode (`canvasCustomColor` when "custom").
     pub canvas_color: CanvasColor,
     pub canvas_custom_color: String,
@@ -316,6 +332,11 @@ impl Default for Interface {
             dark_theme: DarkTheme::ProMedium,
             light_theme: LightTheme::ProLight,
             favorite_themes: Vec::new(),
+            theme_light: String::new(),
+            theme_dark: String::new(),
+            size: AppSize::Suite,
+            appearance_imported: true,
+            last_suite: Value::Null,
             canvas_color: CanvasColor::Default,
             canvas_custom_color: "#282828".into(),
             show_canvas_dots: true,
@@ -435,6 +456,7 @@ impl Default for Tools {
 pub use photocraft_paint::ResponseCurve as PressureCurve;
 
 mod cmds;
+pub mod appearance;
 mod customize;
 mod files;
 mod shortcuts;
@@ -1390,10 +1412,14 @@ impl Session {
             // A partially migrated file may already contain a newer theme selection (#5139).
             interface.entry(slot).or_insert_with(|| json!(theme.name()));
         }
+        if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut) {
+            appearance::migrate(interface);
+        }
         let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
         let presets = v.as_object_mut().and_then(|m| m.remove("presets"));
         let mut invalid = Vec::new();
-        let prefs: Preferences = read_lenient(v, &[], &mut invalid);
+        let mut prefs: Preferences = read_lenient(v, &[], &mut invalid);
+        prefs.interface.normalize_favorites();
         if let Some(c) = color {
             self.color.settings = read_lenient(c, &["colorSettings"], &mut invalid);
             photocraft_compose::psblend::set_text_gamma(self.color.settings.blend_text_gamma);
@@ -1466,68 +1492,10 @@ impl Session {
         } else {
             next.set(path, value)?;
         }
-        // Old `prefs.set interface.theme` clients (by path or inside a section object) still
-        // select a visible theme.
-        if path == "interface.theme" || next.interface.theme != self.prefs().interface.theme {
-            match next.interface.theme {
-                Theme::Pro => {
-                    next.interface.dark_theme = DarkTheme::Pro;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::ProMedium => {
-                    next.interface.dark_theme = DarkTheme::ProMedium;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::Studio => {
-                    next.interface.dark_theme = DarkTheme::Studio;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::StudioLight => {
-                    next.interface.light_theme = LightTheme::StudioLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::ProLightGray => {
-                    next.interface.light_theme = LightTheme::ProLightGray;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::ProLight => {
-                    next.interface.light_theme = LightTheme::ProLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::Classic => {
-                    next.interface.light_theme = LightTheme::Classic;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::Adwaita => {
-                    next.interface.light_theme = LightTheme::Adwaita;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::SolarizedDark => {
-                    next.interface.dark_theme = DarkTheme::SolarizedDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::AdwaitaDark => {
-                    next.interface.dark_theme = DarkTheme::AdwaitaDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::BreezeDark => {
-                    next.interface.dark_theme = DarkTheme::BreezeDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::BreezeLight => {
-                    next.interface.light_theme = LightTheme::BreezeLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::SoftDark => {
-                    next.interface.dark_theme = DarkTheme::SoftDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::SoftLight => {
-                    next.interface.light_theme = LightTheme::SoftLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-            }
-        }
+        // The legacy theme ids stay aliases of the override (`interface.theme` always applies, by
+        // path or inside a section object); the legacy slots follow the library ids.
+        let prev = self.prefs().interface.clone();
+        next.interface.reconcile(&prev, path == "interface.theme");
         self.prefs.edit(|p| *p = next);
         Ok(color_changed)
     }

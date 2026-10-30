@@ -149,15 +149,51 @@ fn favorite_themes_persist_and_reject_invalid_lists() {
     let mut s = Session::new();
     assert!(s.prefs().interface.favorite_themes.is_empty());
     s.execute("prefs.set", json!({"path": "interface.favoriteThemes", "value": ["classic", "studio"]})).unwrap();
-    assert_eq!(s.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
+    assert_eq!(s.prefs().interface.favorite_themes, vec!["craft.classic".to_string(), "craft.studio".to_string()]);
     s.execute("prefs.set", json!({"path": "interface.theme", "value": "pro"})).unwrap();
     let mut restored = Session::new();
     restored.load_prefs_json(&s.prefs_to_json()).unwrap();
-    assert_eq!(restored.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
-    for invalid in [json!("classic"), json!(["unknown"]), json!(["classic", "classic"]), json!([23])] {
+    assert_eq!(restored.prefs().interface.favorite_themes, vec!["craft.classic".to_string(), "craft.studio".to_string()]);
+    for invalid in [json!("classic"), json!(["Not A Theme!"]), json!([23])] {
         assert!(s.execute("prefs.set", json!({"path": "interface.favoriteThemes", "value": invalid})).is_err());
-        assert_eq!(s.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
+        assert_eq!(s.prefs().interface.favorite_themes, vec!["craft.classic".to_string(), "craft.studio".to_string()]);
     }
+}
+
+#[test]
+fn legacy_appearance_keys_import_once_into_the_override() {
+    let load = |interface: serde_json::Value| {
+        let mut s = Session::new();
+        s.load_prefs_json(&json!({"interface": interface}).to_string()).unwrap();
+        s.prefs().interface.clone()
+    };
+    // Studio (dark) and Pro Light Gray: Comfortable beside the dark slot, the mode stays the app's.
+    let i = load(json!({"darkTheme": "studio", "lightTheme": "proLightGray", "appearanceMode": "auto", "favoriteThemes": ["proLight", "pro", "studio"]}));
+    assert_eq!((i.theme_dark.as_str(), i.theme_light.as_str(), i.size), ("craft.studio", "craft.pro-light-gray", AppSize::Comfortable));
+    assert_eq!(i.appearance_mode, AppearanceMode::Auto);
+    assert_eq!(i.favorite_themes, vec!["craft.pro", "craft.studio"]);
+    // The light mode takes the light slot's Size; the default pair is ArtCraft in both slots.
+    let i = load(json!({"darkTheme": "proMedium", "lightTheme": "classic", "appearanceMode": "light"}));
+    assert_eq!((i.theme_light.as_str(), i.size, i.appearance_mode), ("craft.classic", AppSize::Comfortable, AppearanceMode::Light));
+    let i = load(json!({"darkTheme": "proMedium", "lightTheme": "proLight"}));
+    assert_eq!((i.theme_dark.as_str(), i.theme_light.as_str(), i.size), ("craft.artcraft", "craft.artcraft", AppSize::Compact));
+    // A lone legacy theme keeps its look through the older migration.
+    let i = load(json!({"theme": "breezeLight"}));
+    assert_eq!((i.theme_light.as_str(), i.appearance_mode), ("craft.breeze", AppearanceMode::Light));
+    // A file without appearance keys follows the suite; an imported file is not imported again.
+    let i = load(json!({"showTooltips": true}));
+    assert_eq!((i.theme_light.as_str(), i.theme_dark.as_str(), i.size), ("", "", AppSize::Suite));
+    let i = load(json!({"appearanceImported": true, "darkTheme": "studio", "themeDark": ""}));
+    assert_eq!(i.theme_dark, "");
+    // Old ids still set the theme and its Size through `prefs.set`.
+    let mut s = Session::new();
+    s.execute("prefs.set", json!({"path": "interface.theme", "value": "solarizedDark"})).unwrap();
+    let i = &s.prefs().interface;
+    assert_eq!((i.theme_dark.as_str(), i.size, i.appearance_mode), ("craft.solarized-dark", AppSize::Comfortable, AppearanceMode::Dark));
+    s.execute("prefs.set", json!({"path": "interface.lightTheme", "value": "proLightGray"})).unwrap();
+    assert_eq!((s.prefs().interface.theme_light.as_str(), s.prefs().interface.size), ("craft.pro-light-gray", AppSize::Compact));
+    s.execute("prefs.set", json!({"path": "interface.themeDark", "value": "craft.soft"})).unwrap();
+    assert_eq!(s.prefs().interface.dark_theme, DarkTheme::SoftDark);
 }
 
 #[test]

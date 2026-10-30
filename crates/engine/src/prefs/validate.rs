@@ -1,6 +1,7 @@
 use super::shortcuts::normalize_shortcut;
+use super::appearance;
 use super::{
-    AppearanceMode, Ask, CanvasBorder, CanvasColor, CheckerColors, CheckerSize, ColorPicker, DarkTheme, ExportLocation, ExportMetadata, FontPreview,
+    AppSize, AppearanceMode, Ask, CanvasBorder, CanvasColor, CheckerColors, CheckerSize, ColorPicker, DarkTheme, ExportLocation, ExportMetadata, FontPreview,
     GpuBackend, Interpolation, LightTheme, LineStyle, LinuxDisplayServer, LogDestination, LogDetail, OtherCursor, PaintingCursor, PointSize, PressureCurve,
     QuickExportFormat, RawColorSpace, RawDemosaic, RawDepth, RawSharpen, RenderingMode, RightClickPaint, TextEngine, Theme, TypeUnit, UiFontSize, UiScale,
     Unit, Value,
@@ -74,6 +75,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
         "general.imageInterpolation" => Interpolation::NAMES,
         "interface.theme" => Theme::NAMES,
         "interface.appearanceMode" => AppearanceMode::NAMES,
+        "interface.size" => AppSize::NAMES,
         "interface.darkTheme" => DarkTheme::NAMES,
         "interface.lightTheme" => LightTheme::NAMES,
         "interface.canvasColor" => CanvasColor::NAMES,
@@ -219,16 +221,20 @@ pub(super) fn set_path(root: &mut Value, path: &str, value: Value) -> std::resul
 pub(super) fn check_value(path: &str, v: &Value) -> std::result::Result<(), String> {
     if path == "interface.favoriteThemes" {
         let items = v.as_array().ok_or("`interface.favoriteThemes` must be a list of theme ids")?;
-        if items.len() > Theme::NAMES.len() {
+        if items.len() > 64 {
             return Err("`interface.favoriteThemes` contains too many themes".into());
         }
-        let mut seen = Vec::with_capacity(items.len());
         for item in items {
-            let theme = item.as_str().and_then(Theme::parse).ok_or_else(|| format!("unknown favorite theme `{item}`"))?;
-            if seen.contains(&theme) {
-                return Err(format!("duplicate favorite theme `{}`", theme.name()));
+            let ok = item.as_str().is_some_and(|s| Theme::parse(s).is_some() || appearance::is_theme_id(s));
+            if !ok {
+                return Err(format!("unknown favorite theme `{item}`"));
             }
-            seen.push(theme);
+        }
+    }
+    if matches!(path, "interface.themeLight" | "interface.themeDark") {
+        let ok = v.as_str().is_some_and(|s| s.is_empty() || appearance::is_theme_id(s));
+        if !ok {
+            return Err(format!("`{path}` must be a theme id such as `craft.studio`, or empty to follow the suite"));
         }
     }
     if path == "performance.renderingMode" && v.is_null() {
