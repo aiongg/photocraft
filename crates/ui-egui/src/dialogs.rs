@@ -369,6 +369,9 @@ fn library_fields(fields: &Fields) -> bool {
         || crate::channel_options_ui::owns_new_spot(fields)
         || crate::duplicate_layer_ui::owns(fields)
         || crate::new_guide_ui::owns(fields)
+        || crate::fill_ui::owns(fields)
+        || crate::pattern_fill_ui::owns(fields)
+        || crate::stroke_ui::owns(fields)
 }
 
 /// Whether the dialog opens with its first field focused and selected, so typing replaces it

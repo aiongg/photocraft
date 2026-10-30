@@ -6,12 +6,12 @@
 //! drive it like any dialog. OK remembers the choices in the preferences (`dialogs["edit.fill"]`),
 //! which are saved to disk, so the dialog opens with them again after a restart.
 
-use craft_ui::theme::ToEgui;
-use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::composites::FormGrid;
+use craft_ui::controls::{Checkbox, Select};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
+use crate::dialog_blend_ui::LABEL_WIDTH;
 
 pub const COMMAND: &str = "edit.fill";
 const MARK: &str = "__fill";
@@ -134,12 +134,6 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     app.run(COMMAND, params(f))
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(112.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
-}
-
 fn get_str(f: &Map<String, Value>, k: &str, d: &str) -> String {
     f.get(k).and_then(Value::as_str).unwrap_or(d).to_string()
 }
@@ -153,55 +147,63 @@ fn parse_hex(h: &str) -> [u8; 3] {
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.spacing_mut().item_spacing.y = 6.0;
     let mut contents = get_str(f, "contents", "foreground");
-    ui.horizontal(|ui| {
-        label(ui, tl!("Contents:"));
-        let opts: Vec<(String, &str)> = CONTENTS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-        if crate::widgets::dropdown(ui, "fill-contents", tl!("Contents:"), &mut contents, &opts, 170.0) {
-            f.insert("contents".into(), json!(contents));
-            // Choosing Color… opens the Color Picker, as in Photoshop.
-            if contents == "color" {
-                crate::color_picker_ui::request(f, tl!("Color Picker (Fill Color)"));
-            }
-        }
-    });
-    match contents.as_str() {
-        "color" => {
-            ui.horizontal(|ui| {
-                label(ui, tl!("Color:"));
-                // Photoshop shows no swatch; this one reopens the Color Picker on the colour.
-                let rgb = parse_hex(&get_str(f, "color", "#000000"));
-                if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Fill color")).clicked() {
+    FormGrid::new("fill-contents-grid").min_label_width(LABEL_WIDTH).show(ui, |form| {
+        form.row(tl!("Contents:"), |ui, _| {
+            let edit = Select::new("fill-contents", tl!("Contents:"), &mut contents)
+                .rows(CONTENTS.len(), |i| CONTENTS[i].0.to_string(), |i| tl!(CONTENTS[i].1))
+                .show(ui);
+            if edit.response.changed() {
+                f.insert("contents".into(), json!(contents));
+                // Choosing Color… opens the Color Picker, as in Photoshop.
+                if contents == "color" {
                     crate::color_picker_ui::request(f, tl!("Color Picker (Fill Color)"));
                 }
-            });
-        }
-        "pattern" => {
-            ui.horizontal(|ui| {
-                label(ui, tl!("Custom Pattern:"));
-                let pat = get_str(f, "pattern", "");
-                if app.session.patterns.items.is_empty() {
-                    ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
-                } else {
-                    // Photoshop shows the pattern itself and opens a grid of swatches.
-                    if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
-                        f.insert("pattern".into(), json!(id));
+            }
+            edit
+        });
+        match contents.as_str() {
+            "color" => {
+                form.row(tl!("Color:"), |ui, _| {
+                    // Photoshop shows no swatch; this one reopens the Color Picker on the colour.
+                    let rgb = parse_hex(&get_str(f, "color", "#000000"));
+                    let swatch = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Fill color"));
+                    if swatch.clicked() {
+                        crate::color_picker_ui::request(f, tl!("Color Picker (Fill Color)"));
                     }
-                    let name = app.session.patterns.items.iter().find(|p| p.id == get_str(f, "pattern", "")).map(|p| p.display_name().to_string());
-                    ui.label(egui::RichText::new(name.unwrap_or_default()).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
-                }
-            });
+                    crate::widgets::keep_own_name(ui, &swatch)
+                });
+            }
+            "pattern" => {
+                form.row(tl!("Custom Pattern:"), |ui, _| {
+                    ui.horizontal(|ui| {
+                        let pat = get_str(f, "pattern", "");
+                        if app.session.patterns.items.is_empty() {
+                            ui.label(tl!("No patterns"));
+                        } else {
+                            // Photoshop shows the pattern itself and opens a grid of swatches.
+                            if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
+                                f.insert("pattern".into(), json!(id));
+                            }
+                            let name = app.session.patterns.items.iter().find(|p| p.id == get_str(f, "pattern", "")).map(|p| p.display_name().to_string());
+                            ui.label(name.unwrap_or_default());
+                        }
+                    })
+                    .response
+                });
+            }
+            "contentAware" => {
+                form.unlabelled(|ui| {
+                    let mut on = f.get("colorAdaptation").and_then(Value::as_bool).unwrap_or(true);
+                    let edit = Checkbox::bool(tl!("Color Adaptation"), &mut on).show(ui);
+                    if edit.response.changed() {
+                        f.insert("colorAdaptation".into(), json!(on));
+                    }
+                    edit
+                });
+            }
+            _ => {}
         }
-        "contentAware" => {
-            ui.horizontal(|ui| {
-                label(ui, "");
-                let mut on = f.get("colorAdaptation").and_then(Value::as_bool).unwrap_or(true);
-                if crate::widgets::checkbox(ui, &mut on, "Color Adaptation").changed() {
-                    f.insert("colorAdaptation".into(), json!(on));
-                }
-            });
-        }
-        _ => {}
-    }
+    });
     crate::dialog_blend_ui::body(ui, f, "fill");
 }
 

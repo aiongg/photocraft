@@ -1,12 +1,13 @@
 //! Edit › Stroke…: a Photoshop-style options dialog for the existing `edit.stroke` command.
 //! The engine remains directly callable with parameters by CLI, MCP and Actions.
 
-use craft_ui::theme::ToEgui;
-use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::composites::{FormGrid, SectionLabel};
+use craft_ui::controls::Select;
+use craft_ui::primitives::Divider;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
+use crate::dialog_blend_ui::LABEL_WIDTH;
 
 pub const COMMAND: &str = "edit.stroke";
 const MARK: &str = "__stroke";
@@ -72,43 +73,44 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     result
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(112.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
-}
-
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.spacing_mut().item_spacing.y = 6.0;
-    crate::widgets::section_label(ui, tl!("Stroke"));
-    crate::widgets::hairline(ui);
-    ui.horizontal(|ui| {
-        label(ui, tl!("Width:"));
-        let mut width = f.get("width").and_then(Value::as_f64).unwrap_or(1.0) as f32;
-        if crate::widgets::value_field(ui, &mut width, 1.0..=250.0, "px", 84.0).accessible_name(tl!("Width:")).changed() {
-            f.insert("width".into(), json!(width.round()));
-        }
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("Color:"));
-        let current = f.get("color").and_then(Value::as_str).unwrap_or("#000000");
-        let rgb = [1usize, 3, 5].map(|i| current.get(i..i + 2).and_then(|b| u8::from_str_radix(b, 16).ok()).unwrap_or(0));
-        // As in Photoshop, the swatch opens the Color Picker on the stroke colour.
-        if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Stroke color")).clicked() {
-            crate::color_picker_ui::request(f, tl!("Color Picker (Stroke Color)"));
-        }
+    SectionLabel::new(tl!("Stroke")).show(ui);
+    Divider::horizontal().show(ui);
+    FormGrid::new("stroke-options").min_label_width(LABEL_WIDTH).show(ui, |form| {
+        form.row(tl!("Width:"), |ui, _| {
+            let mut width = f.get("width").and_then(Value::as_f64).unwrap_or(1.0) as f32;
+            let edit = crate::widgets::dialog_number_field(ui, "stroke-width", tl!("Width:"), &mut width, 1.0..=250.0, "px", 0);
+            if edit.changed {
+                f.insert("width".into(), json!(width.round()));
+            }
+            edit.response
+        });
+        form.row(tl!("Color:"), |ui, _| {
+            let current = f.get("color").and_then(Value::as_str).unwrap_or("#000000");
+            let rgb = [1usize, 3, 5].map(|i| current.get(i..i + 2).and_then(|b| u8::from_str_radix(b, 16).ok()).unwrap_or(0));
+            // As in Photoshop, the swatch opens the Color Picker on the stroke colour.
+            let swatch = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Stroke color"));
+            if swatch.clicked() {
+                crate::color_picker_ui::request(f, tl!("Color Picker (Stroke Color)"));
+            }
+            crate::widgets::keep_own_name(ui, &swatch)
+        });
     });
 
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    crate::widgets::section_label(ui, tl!("Location"));
-    crate::widgets::hairline(ui);
-    ui.horizontal(|ui| {
-        label(ui, tl!("Location:"));
-        let mut location = f.get("location").and_then(Value::as_str).unwrap_or("center").to_string();
-        let opts: Vec<(String, &str)> = LOCATIONS.iter().map(|(key, label)| (key.to_string(), tl!(label))).collect();
-        if crate::widgets::dropdown(ui, "stroke-location", tl!("Location"), &mut location, &opts, 170.0) {
-            f.insert("location".into(), json!(location));
-        }
+    SectionLabel::new(tl!("Location")).show(ui);
+    Divider::horizontal().show(ui);
+    FormGrid::new("stroke-location-grid").min_label_width(LABEL_WIDTH).show(ui, |form| {
+        form.row(tl!("Location:"), |ui, _| {
+            let mut location = f.get("location").and_then(Value::as_str).unwrap_or("center").to_string();
+            let opts: Vec<(String, &str)> = LOCATIONS.iter().map(|(key, label)| (key.to_string(), tl!(label))).collect();
+            let edit = Select::new("stroke-location", tl!("Location"), &mut location).rows(opts.len(), |i| opts[i].0.clone(), |i| opts[i].1).show(ui);
+            if edit.response.changed() {
+                f.insert("location".into(), json!(location));
+            }
+            edit
+        });
     });
     crate::dialog_blend_ui::body(ui, f, "stroke");
 }
