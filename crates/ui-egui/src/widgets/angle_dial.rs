@@ -17,7 +17,11 @@ pub fn angle_dial_row(ui: &mut Ui, label: &str, angle: &mut f32, range: std::ops
     let (lo, hi) = (f64::from(*range.start()).min(f64::from(*range.end())), f64::from(*range.start()).max(f64::from(*range.end())));
     ui.horizontal(|ui| {
         ui.add(Text::new(tl!(label)).content(Content::Muted));
-        let edit = AngleDial::new(("angle-dial", label), tl!(label), f64::from(*angle), &numbers).range(lo..=hi).show(ui);
+        let edit = AngleDial::new(("angle-dial", label), tl!(label), f64::from(*angle), &numbers)
+            .range(lo..=hi)
+            // A range under one turn (a line's -90..=90) wraps; a full turn wraps by default, and a wider range stops at its ends.
+            .wrap(hi - lo < 360.0 - 1e-9)
+            .show(ui);
         let mut response = edit.response.clone();
         if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. }) = edit.event {
             *angle = value as f32;
