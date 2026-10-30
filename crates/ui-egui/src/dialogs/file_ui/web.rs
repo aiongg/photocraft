@@ -1,7 +1,8 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Value, WebSettings, b, check_row, json, n, number_row, params, s, select_row, web_cmds, web_preview};
 use craft_theme::TypeRole;
 use craft_ui::composites::{Form, FormGrid, SectionLabel};
-use craft_ui::controls::{Checkbox, Segmented, Select};
+use craft_ui::controls::{Checkbox, IconButton, Segmented, Select};
+use craft_ui::icons::Icon;
 use craft_ui::primitives::{Content, Text};
 
 /// Width of the settings column beside the previews.
@@ -235,7 +236,7 @@ fn web_playback(ui: &mut egui::Ui, f: &mut Map<String, Value>, doc: &photocraft_
         (frame, last) = advance_preview(frame, timeline.duration, timeline.fps, last, now);
     }
     ui.horizontal(|ui| {
-        if crate::icons::button(ui, if playing { "pause" } else { "play" }, 22.0, playing, if playing { tl!("Pause") } else { tl!("Play") }).clicked() {
+        if ui.add(IconButton::new(if playing { Icon::Pause } else { Icon::Play }, if playing { tl!("Pause") } else { tl!("Play") }).selected(playing)).clicked() {
             playing = !playing;
             last = now;
         }
