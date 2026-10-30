@@ -9,30 +9,20 @@ mod bar;
 pub mod enable_rules;
 mod invoke;
 mod items;
-pub mod menu_keys;
-pub mod menu_nav;
+mod model;
 pub mod native_menu;
 pub mod parity;
 pub mod plugin_ui;
-mod render;
-mod search;
 mod state;
 pub mod view_cmds;
 pub mod workspace_ui;
 
-pub use bar::menu_bar;
-#[cfg(test)]
-use bar::pointer_reaches_title;
+pub use bar::{alt_click, menu_bar};
 pub use invoke::{apply_workspace, invoke};
 pub(crate) use invoke::{invoke_unguarded, panel_alias};
 pub(crate) use items::ItemCache;
 pub use items::{MenuItem, is_live, menu_items};
-pub use render::alt_click;
-#[cfg(test)]
-use render::submenu_enabled;
-#[cfg(test)]
-use search::HELP_SEARCH_MAX;
-pub use search::{search_items, search_rank};
+pub use model::{Model, menu_model};
 pub use state::is_enabled;
 pub(crate) use state::reveal_label;
 #[cfg(test)]

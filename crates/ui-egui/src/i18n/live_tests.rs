@@ -7,8 +7,8 @@ use serde_json::json;
 /// The File menu's title as the menu bar draws it in `lang`: the translation, plus the English
 /// access key where it has no Latin letter of its own ("文件(F)", #5863).
 fn file_title(lang: Lang) -> String {
-    let (shown, _) = crate::menu_keys::localized(&[tr(lang, "File").to_string()], &["File"], &[Some('F')]);
-    shown.into_iter().next().unwrap_or_default()
+    let shown = tr(lang, "File").to_string();
+    if shown.chars().any(|c| c.is_ascii_alphanumeric()) { shown } else { format!("{shown}(F)") }
 }
 
 fn lang(code: &str) -> Lang {

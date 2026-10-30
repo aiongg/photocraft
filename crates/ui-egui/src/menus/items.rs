@@ -258,18 +258,11 @@ pub(super) fn menu_tint(name: &str) -> Option<egui::Color32> {
     })
 }
 
-/// The open menus' items, kept between frames: building them asks every command whether it can
-/// run, which on a document with thousands of layers costs far more than a frame.
+/// The menus' rows for the library bar, kept between frames.
 pub(crate) struct ItemCache {
-    /// [`crate::native_menu::state_hash`] of the state the items were built from.
+    /// [`crate::native_menu::state_hash`] of the state the rows were built from.
     pub(super) state: u64,
-    pub(super) items: Vec<MenuItem>,
-}
-
-impl ItemCache {
-    /// The items, while they still describe `state`. A frame with a click or key press rebuilds
-    /// them, which covers state the hash doesn't list.
-    pub(super) fn reuse(self, state: u64, input: bool) -> Option<Vec<MenuItem>> {
-        (!input && self.state == state).then_some(self.items)
-    }
+    /// The UI language the rows are written in.
+    pub(super) language: String,
+    pub(super) menus: super::model::UiMenus,
 }

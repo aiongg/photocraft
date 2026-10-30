@@ -138,7 +138,7 @@ pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     // A popup owns Enter/Escape; dismissing it must not commit or cancel the transform.
-    if crate::menu_nav::is_open(ctx) || egui::Popup::is_any_open(ctx) {
+    if craft_ui::menu::any_open(ctx) || egui::Popup::is_any_open(ctx) {
         return;
     }
     if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape)) {

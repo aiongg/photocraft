@@ -1,4 +1,5 @@
 use super::invoke::{panel_alias, proof_preset, workspace_name};
+#[cfg(test)]
 use super::items::MenuItem;
 use super::{DOCUMENT_ITEM, PhotocraftApp, Value};
 
@@ -216,15 +217,21 @@ pub(crate) fn reveal_label() -> &'static str {
 
 /// Translate the fixed command label and substitute the currently configured export format.
 /// Reuse the existing translated PNG sentence, so dynamic formats work in every UI language.
+#[cfg(test)]
 pub(super) fn translated_menu_label(lang: crate::i18n::Lang, item: &MenuItem) -> String {
     // A document's name is shown as it is.
     if item.id.starts_with(DOCUMENT_ITEM) {
         return item.label.clone();
     }
-    if item.id == "file.export.quickExportAsPng"
-        && let Some(fmt) = item.label.strip_prefix("Quick Export as ")
+    translated_label(lang, &item.id, &item.label)
+}
+
+/// [`translated_menu_label`] for a command `id` and its English `label`.
+pub(super) fn translated_label(lang: crate::i18n::Lang, id: &str, label: &str) -> String {
+    if id == "file.export.quickExportAsPng"
+        && let Some(fmt) = label.strip_prefix("Quick Export as ")
     {
-        return crate::i18n::tr_id(lang, &item.id, "Quick Export as PNG").replace("PNG", fmt);
+        return crate::i18n::tr_id(lang, id, "Quick Export as PNG").replace("PNG", fmt);
     }
-    crate::i18n::tr_id(lang, &item.id, &item.label).to_string()
+    crate::i18n::tr_id(lang, id, label).to_string()
 }

@@ -44,6 +44,7 @@ photocraft-ipp = { path = "crates/ipp" }
 craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }
 craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }
 craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }
+craft-menu = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }
 craft-keymap = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }
 craft-platform = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa", features = ["appearance", "egui"] }
 craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "b24f90bfc0098efb19fe97380fc398d8dd0ad2fa" }

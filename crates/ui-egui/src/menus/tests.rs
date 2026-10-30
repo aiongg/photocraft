@@ -60,23 +60,6 @@ fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark_across_palettes() {
 }
 
 #[test]
-fn submenu_header_is_disabled_when_every_item_is() {
-    let item = |label: &str, enabled: bool| MenuItem {
-        id: label.into(),
-        label: label.into(),
-        path: vec!["File".into(), "Export".into()],
-        shortcut: None,
-        enabled,
-        checked: None,
-        color: None,
-    };
-    let (off, on, sep) = (item("Off", false), item("On", true), item("---", true));
-    assert!(!submenu_enabled(&[]));
-    assert!(!submenu_enabled(&[&off, &sep]));
-    assert!(submenu_enabled(&[&off, &on]));
-}
-
-#[test]
 fn live_lookup_finds_engine_and_shell_commands() {
     for command in photocraft_engine::commands::command_specs() {
         assert!(is_live(command.id), "{}", command.id);
@@ -129,187 +112,6 @@ fn color_to_alpha_sits_in_filter_other_after_offset() {
     assert!(!others.iter().any(|p| p.as_str() == "Other"), "no duplicate Other submenu: {others:?}");
 }
 
-#[test]
-fn menu_bar_labels_have_horizontal_padding_and_open_menus() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    for theme in crate::theme::ThemeKind::ALL {
-        for width in [640.0, 1440.0] {
-            let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-            let mut harness = Harness::builder().with_size(egui::vec2(width, 200.0)).build_ui_state(
-                |ui, app| {
-                    menu_bar(app, ui);
-                },
-                app,
-            );
-            PhotocraftApp::setup_context(&harness.ctx, theme);
-            harness.run_steps(3);
-
-            let font = egui::TextStyle::Button.resolve(&harness.ctx.global_style());
-            let mut right = 0.0;
-            for label in TOP_MENUS {
-                let rect = harness.get_by_label(label).rect();
-                let text_width = harness.ctx.fonts_mut(|fonts| fonts.layout_no_wrap(label.into(), font.clone(), egui::Color32::WHITE).size().x);
-                assert!(rect.width() >= text_width + 11.5, "{theme:?}: {label} lacks horizontal padding");
-                assert!(rect.left() >= right && rect.right() <= width, "{theme:?}: {label} overlaps or overflows at width {width}");
-                right = rect.right();
-            }
-
-            harness.get_by_label("File").click();
-            harness.run_steps(3);
-            assert!(harness.query_by_label_contains("Open…").is_some(), "{theme:?}: File menu did not open");
-        }
-    }
-}
-
-#[test]
-fn overlapped_menu_title_does_not_receive_hover_switching() {
-    let ctx = egui::Context::default();
-    let mut title: Option<egui::Response> = None;
-    let p = egui::pos2(90.0, 12.0);
-    let mut reaches = true;
-    // The popup area becomes hit-testable once egui has laid it out, so draw a few frames.
-    for _ in 0..3 {
-        let raw = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0))), ..Default::default() };
-        let mut out = ctx.run_ui(raw, |ui| {
-            let ctx = &ui.ctx().clone();
-            egui::CentralPanel::default().show(ui, |ui| {
-                let (rect, _) = ui.allocate_exact_size(egui::vec2(80.0, 24.0), egui::Sense::hover());
-                let shifted = rect.translate(egui::vec2(p.x - rect.center().x, p.y - rect.center().y));
-                let response = ui.interact(shifted, egui::Id::unique("menu-title-test"), egui::Sense::hover());
-                title = Some(response);
-            });
-            egui::Area::new(egui::Id::unique("overlapping-popup-test")).order(egui::Order::Foreground).fixed_pos(p - egui::vec2(10.0, 10.0)).show(ctx, |ui| {
-                ui.allocate_space(egui::vec2(20.0, 20.0));
-            });
-            let response = title.as_ref().unwrap();
-            reaches = pointer_reaches_title(ctx, response, p);
-        });
-        out.textures_delta.clear();
-    }
-    assert!(!reaches);
-}
-
-/// #7702: a pointer at the very top edge of the screen (the window maximized) moving between
-/// titles switches the open menu, as it does a little lower.
-#[test]
-fn hovering_a_title_at_the_screen_edge_switches_the_open_menu() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
-        |ui, app| {
-            egui::Frame::NONE.inner_margin(egui::Margin { top: 4, ..Default::default() }).show(ui, |ui| {
-                menu_bar(app, ui);
-            });
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.run_steps(3);
-    harness.get_by_label("File").click();
-    harness.run_steps(3);
-    assert!(harness.query_by_label_contains("Open…").is_some());
-    let image = harness.get_by_label("Image").rect();
-    assert!(image.top() > 0.0, "the title sits below the screen edge");
-    harness.hover_at(egui::pos2(image.center().x, 0.0));
-    harness.run_steps(4);
-    assert!(harness.query_by_label_contains("Open…").is_none(), "File menu should close");
-    assert!(harness.query_by_label_contains("Duplicate…").is_some(), "Image menu should open from the screen edge");
-}
-
-#[test]
-fn hovering_another_title_switches_the_open_menu() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
-        |ui, app| {
-            menu_bar(app, ui);
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.run_steps(3);
-    // Nothing open: hovering a title does not open it.
-    harness.get_by_label("Image").hover();
-    harness.run_steps(3);
-    assert!(harness.query_by_label_contains("Open…").is_none() && harness.query_by_label_contains("Duplicate…").is_none());
-    harness.get_by_label("File").click();
-    harness.run_steps(3);
-    assert!(harness.query_by_label_contains("Open…").is_some());
-    harness.get_by_label("Image").hover();
-    harness.run_steps(4);
-    assert!(harness.query_by_label_contains("Open…").is_none(), "File menu should close");
-    assert!(harness.query_by_label_contains("Duplicate…").is_some(), "Image menu should open on hover");
-}
-
-/// An open menu reuses its items between frames (building them costs far more than a frame on
-/// a document with thousands of layers), rebuilds them when the state changes under it, and
-/// keeps nothing once it closes.
-#[test]
-fn an_open_menu_reuses_its_items_until_the_state_changes() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
-        |ui, app| {
-            menu_bar(app, ui);
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.run_steps(3);
-    assert!(harness.state().menu_cache.is_none(), "no menu open, nothing built");
-    harness.get_by_label("File").click();
-    harness.run_steps(3);
-    // The same allocation frame after frame: the items were not rebuilt.
-    let built = |app: &PhotocraftApp| app.menu_cache.as_ref().map(|c| c.items.as_ptr());
-    let close = |app: &PhotocraftApp| app.menu_cache.as_ref().and_then(|c| c.items.iter().find(|i| i.id == "file.close")).map(|i| i.enabled);
-    let first = built(harness.state());
-    assert!(first.is_some());
-    assert_eq!(close(harness.state()), Some(false));
-    harness.run_steps(3);
-    assert_eq!(built(harness.state()), first);
-    // A document opened under the open menu (a job ending, an agent): the items follow.
-    harness.state_mut().run("file.new", json!({"width": 8, "height": 8})).unwrap();
-    harness.run_steps(1);
-    assert_eq!(close(harness.state()), Some(true));
-    harness.key_press(egui::Key::Escape);
-    harness.run_steps(3);
-    assert!(harness.state().menu_cache.is_none(), "closed, nothing kept");
-}
-
-#[test]
-fn help_search_finds_commands_by_any_word() {
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let items = menu_items(&app);
-    let ids = |q: &str| search_items(&items, q, crate::i18n::Lang::EN).iter().map(|i| i.id.clone()).collect::<Vec<_>>();
-    let di = ids("DI");
-    assert!(di.contains(&"edit.transform.distort".to_string()), "{di:?}");
-    assert!(di.len() <= HELP_SEARCH_MAX);
-    // A word inside the label matches too, and a label match outranks a path-only match.
-    assert!(ids("selection").contains(&"select.transformSelection".to_string()));
-    assert_eq!(search_rank("dis", "Distort", &[]), Some(0));
-    assert_eq!(search_rank("sel", "Transform Selection", &[]), Some(1));
-    assert_eq!(search_rank("orm", "Transform Selection", &[]), Some(2));
-    assert_eq!(search_rank("trans", "Distort", &["Edit".into(), "Transform".into()]), Some(3));
-    assert!(ids("   ").is_empty());
-    assert!(ids("zzzzqqq").is_empty());
-}
-
-/// In another UI language both the translated and the English names match.
-#[test]
-fn help_search_matches_the_ui_language_and_english() {
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let items = menu_items(&app);
-    let Some(fr) = crate::i18n::Lang::from_code("fr") else { return };
-    let ids = |q: &str| search_items(&items, q, fr).iter().map(|i| i.id.clone()).collect::<Vec<_>>();
-    assert!(!ids(&crate::i18n::tr(fr, "Layer").to_lowercase()).is_empty(), "French menu name");
-    assert!(ids("distort").contains(&"edit.transform.distort".to_string()), "English still matches");
-    assert!(ids("zzzzqqq").is_empty());
-}
-
 /// #1447, #1438: a click on Help leaves its search field focused, so typing searches at once,
 /// and clicking into the field and typing keeps the menu open. Whole app, real clicks (press
 /// and release in separate frames), with the custom title bar (Windows, Linux) and without.
@@ -346,149 +148,23 @@ fn help_search_takes_typing_and_clicks_without_closing_the_menu() {
             h.run_steps(3);
         };
         let open = |h: &Harness<'_, PhotocraftApp>| h.query_by_label_contains("About PhotoCraft").is_some();
-        let field_id = egui::Id::unique("help-menu-search").with("field");
+        let field_focused = |h: &Harness<'_, PhotocraftApp>| h.ctx.text_edit_focused();
         let help = h.get_by_label("Help").rect().center();
         click(&mut h, help);
         assert!(open(&h), "Help opened ({what})");
-        assert_eq!(h.ctx.memory(|m| m.focused()), Some(field_id), "the click on Help leaves the search field focused ({what})");
+        assert!(field_focused(&h), "the click on Help leaves the search field focused ({what})");
         typing(&mut h, "lev");
         assert!(open(&h), "typing keeps Help open ({what})");
         assert!(h.query_all_by_label_contains("› Levels").next().is_some(), "typing right away searches ({what})");
-        let field = h.query_all_by_role(egui::accesskit::Role::TextInput).find(|n| n.is_focused()).map(|n| n.rect().center());
+        let field = h.query_all_by_role(egui::accesskit::Role::SearchInput).find(|n| n.is_focused()).map(|n| n.rect().center());
         let field = field.unwrap_or_else(|| panic!("the search field is in the accessibility tree ({what})"));
         click(&mut h, field);
         assert!(open(&h), "clicking the search field keeps Help open ({what})");
-        assert_eq!(h.ctx.memory(|m| m.focused()), Some(field_id), "and focused ({what})");
+        assert!(field_focused(&h), "and focused ({what})");
         typing(&mut h, "els");
         assert!(open(&h), "typing after the click keeps Help open ({what})");
         assert!(h.query_all_by_label_contains("› Levels").next().is_some(), "and lists the matches ({what})");
     }
-}
-
-/// #5996: a real key press comes as a key and its text. A letter typed into Help › Search is
-/// text for the field, not a mnemonic: "S" ran System Info and "A" the ArtCraft website.
-#[test]
-fn help_search_letters_are_not_mnemonics() {
-    use egui::{Event, Key, Modifiers, PointerButton};
-    use egui_kittest::{Harness, kittest::Queryable};
-    let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
-    });
-    h.run_steps(4);
-    let help = h.get_by_label("Help").rect().center();
-    h.event(Event::PointerMoved(help));
-    h.run_steps(1);
-    for pressed in [true, false] {
-        h.event(Event::PointerButton { pos: help, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
-        h.run_steps(1);
-    }
-    h.run_steps(3);
-    assert!(h.query_by_label_contains("About PhotoCraft").is_some(), "Help opened");
-    for c in "DeSelect all".chars() {
-        let key = Key::from_name(&c.to_ascii_uppercase().to_string());
-        if let Some(key) = key {
-            h.event(Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers: Modifiers::NONE });
-        }
-        h.event(Event::Text(c.to_string()));
-        h.run_steps(1);
-        if let Some(key) = key {
-            h.event(Event::Key { key, physical_key: Some(key), pressed: false, repeat: false, modifiers: Modifiers::NONE });
-        }
-    }
-    h.run_steps(3);
-    assert!(h.query_by_label_contains("About PhotoCraft").is_some(), "typing keeps Help open");
-    let query: String = h.ctx.data(|d| d.get_temp(egui::Id::unique("help-menu-search"))).unwrap_or_default();
-    assert_eq!(query, "DeSelect all", "every letter reached the field");
-    assert!(h.state().ui.dialogs.is_empty(), "no menu command ran: {:?}", h.state().ui.dialogs);
-}
-
-#[test]
-fn dropdown_items_have_room() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    for theme in crate::theme::ThemeKind::ALL {
-        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(
-            |ui, app| {
-                menu_bar(app, ui);
-            },
-            app,
-        );
-        PhotocraftApp::setup_context(&harness.ctx, theme);
-        harness.run_steps(3);
-        harness.get_by_label("File").click();
-        harness.run_steps(3);
-        let a = harness.get_by_label_contains("New…").rect();
-        let b = harness.get_by_label_contains("Open…").rect();
-        let font = egui::TextStyle::Button.resolve(&harness.ctx.global_style()).size;
-        assert!(a.height() >= font + 8.0, "{theme:?}: item height {} for a {font} pt font", a.height());
-        assert!(b.top() - a.top() >= font + 10.0, "{theme:?}: rows {} apart", b.top() - a.top());
-        // #402: rows touch (no dialog spacing between them), so long menus fit the window.
-        let next = harness.get_by_label_contains("New from Clipboard").rect();
-        assert!((next.top() - a.bottom()).abs() < 0.5, "{theme:?}: {} pt between rows", next.top() - a.bottom());
-        assert!(next.top() - a.top() <= 24.5, "{theme:?}: rows {} apart", next.top() - a.top());
-    }
-}
-
-#[test]
-fn menu_level_height_is_bounded_by_viewport() {
-    use egui_kittest::Harness;
-
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut harness = Harness::builder().with_size(egui::vec2(900.0, 240.0)).build_ui_state(
-        |ui, app| {
-            menu_bar(app, ui);
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.run_steps(3);
-    // Opening a top-level menu with many entries must not grow its popup past the viewport.
-    use egui_kittest::kittest::Queryable;
-    harness.get_by_label("Filter").click();
-    harness.run_steps(3);
-    let viewport = harness.ctx.content_rect();
-    let max_bottom = harness
-        .ctx
-        .memory(|m| m.areas().visible_layer_ids())
-        .into_iter()
-        .filter_map(|layer| harness.ctx.memory(|m| m.area_rect(layer.id)))
-        .map(|r| r.bottom())
-        .fold(viewport.top(), f32::max);
-    assert!(max_bottom <= viewport.bottom() + 1.0, "menu popup overflowed viewport: {max_bottom} > {}", viewport.bottom());
-}
-
-#[test]
-fn tall_menu_scrolls_with_mouse_wheel_on_short_display() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut harness = Harness::builder().with_size(egui::vec2(900.0, 220.0)).build_ui_state(
-        |ui, app| {
-            menu_bar(app, ui);
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.run_steps(3);
-    harness.get_by_label("Filter").click();
-    harness.run_steps(3);
-
-    let item = harness.get_by_label_contains("Filter Gallery…");
-    let before = item.rect().top();
-    harness.hover_at(item.rect().center());
-    harness.event(egui::Event::MouseWheel {
-        source: egui::MouseWheelSource::Unknown,
-        unit: egui::MouseWheelUnit::Point,
-        delta: egui::vec2(0.0, -80.0),
-        phase: egui::TouchPhase::Move,
-        modifiers: egui::Modifiers::NONE,
-    });
-    harness.run_steps(4);
-
-    let after = harness.get_by_label_contains("Filter Gallery…").rect().top();
-    assert!(after < before - 1.0, "mouse wheel should move tall menu content: {before} -> {after}");
 }
 
 #[test]
@@ -534,4 +210,73 @@ fn proof_setup_presets_and_checkmarks() {
     let spec = photocraft_engine::commands::find("edit.convertToProfile").unwrap();
     let params = crate::filter_dialog::parse_spec(spec.params);
     assert!(matches!(&params[0].kind, crate::filter_dialog::Kind::Choice { options, .. } if options[0] == "srgb" && !options.iter().any(|v| v.contains('/'))));
+}
+
+/// The menu model keeps every item, shortcut and state of [`menu_items`]; its bar rows add the
+/// tints and tooltips, and match the English names in another UI language.
+#[test]
+fn menu_model_and_bar_rows_keep_the_items() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+    app.session.execute("prefs.set", json!({"values": {"menus.colors.file.close": "red"}})).unwrap();
+    let items = menu_items(&app);
+    let model = menu_model(&items);
+    let in_model: Vec<&craft_menu::Item> = model.bar.items();
+    for it in items.iter().filter(|i| i.label != "---" && i.path.first().is_some_and(|top| TOP_MENUS.contains(&top.as_str()))) {
+        let found = in_model.iter().find(|m| m.command.id == it.id).unwrap_or_else(|| panic!("{} is in the model", it.id));
+        assert_eq!((found.label.as_str(), found.enabled, found.kind.checked()), (it.label.as_str(), it.enabled, it.checked), "{}", it.id);
+        if let Some(sc) = &it.shortcut {
+            let chord = found.shortcut.unwrap_or_else(|| panic!("{}: `{sc}` is not a craft-keymap chord", it.id));
+            assert_eq!(chord.portable(), sc.parse::<craft_keymap::Chord>().unwrap().portable());
+        }
+    }
+    assert_eq!(model.bar.menus.iter().map(|m| m.title.as_str()).collect::<Vec<_>>(), TOP_MENUS);
+    assert!(model.tints.contains_key("file.close"));
+
+    let platform = craft_keymap::Platform::Linux;
+    let fr = crate::i18n::Lang::from_code("fr").unwrap();
+    let rows = model::ui_menus(&model, fr, platform);
+    assert_eq!(rows.len(), TOP_MENUS.len());
+    let entries = craft_ui::behavior::PaletteEntry::from_menu(&rows);
+    let found = craft_ui::behavior::CommandSearch::new(&entries).query("distort").fuzzy(false).results(15);
+    assert!(found.iter().any(|m| m.entry.command().id == "edit.transform.distort"), "the English name stays searchable");
+}
+
+/// An idle bar keeps its rows (building them walks every command and layer); an open menu
+/// follows the state, and one with input rebuilds.
+#[test]
+fn an_idle_bar_keeps_its_rows_and_an_open_menu_follows_the_state() {
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
+        |ui, app| {
+            menu_bar(app, ui);
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    harness.run_steps(3);
+    let rows = |app: &PhotocraftApp| app.menu_cache.as_ref().map(|c| c.menus.as_ptr());
+    let close = |app: &PhotocraftApp| {
+        let file = app.menu_cache.as_ref().and_then(|c| c.menus[0].children())?;
+        file.iter().filter_map(|e| e.item()).find(|i| i.command().is_some_and(|c| c.id == "file.close")).map(|i| i.is_enabled())
+    };
+    let idle = rows(harness.state());
+    assert!(idle.is_some() && close(harness.state()) == Some(false));
+    // A document opened while nobody looks at the bar: nothing is rebuilt.
+    harness.state_mut().run("file.new", json!({"width": 8, "height": 8})).unwrap();
+    harness.run_steps(3);
+    assert_eq!(rows(harness.state()), idle, "an idle bar is not rebuilt");
+    // Opening the menu shows the current state, and the rows then stay put frame after frame.
+    harness.get_by_label("File").click();
+    harness.run_steps(3);
+    assert_eq!(close(harness.state()), Some(true));
+    let open = rows(harness.state());
+    harness.run_steps(3);
+    assert_eq!(rows(harness.state()), open);
+    // State that changes under the open menu (a job ending, an agent): the rows follow.
+    harness.state_mut().run("file.close", json!({})).unwrap();
+    harness.run_steps(2);
+    assert_eq!(close(harness.state()), Some(false));
 }

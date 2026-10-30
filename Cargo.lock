@@ -1397,6 +1397,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-keymap"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=b24f90bfc0098efb19fe97380fc398d8dd0ad2fa#b24f90bfc0098efb19fe97380fc398d8dd0ad2fa"
+dependencies = [
+ "craft-i18n",
+ "craft-ui",
+ "egui",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "craft-menu"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=b24f90bfc0098efb19fe97380fc398d8dd0ad2fa#b24f90bfc0098efb19fe97380fc398d8dd0ad2fa"
+dependencies = [
+ "craft-keymap",
+ "craft-quit",
+ "craft-ui",
+ "egui",
+ "muda",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+]
+
+[[package]]
 name = "craft-platform"
 version = "0.1.0"
 source = "git+https://github.com/aiongg/craft-libs?rev=b24f90bfc0098efb19fe97380fc398d8dd0ad2fa#b24f90bfc0098efb19fe97380fc398d8dd0ad2fa"
@@ -1422,6 +1448,17 @@ dependencies = [
  "tempfile",
  "winprint",
  "winsafe",
+]
+
+[[package]]
+name = "craft-quit"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=b24f90bfc0098efb19fe97380fc398d8dd0ad2fa#b24f90bfc0098efb19fe97380fc398d8dd0ad2fa"
+dependencies = [
+ "dispatch2",
+ "egui",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
 ]
 
 [[package]]
@@ -5515,6 +5552,8 @@ name = "photocraft-ui-egui"
 version = "0.17.0"
 dependencies = [
  "base64 0.23.1",
+ "craft-keymap",
+ "craft-menu",
  "craft-print",
  "craft-theme",
  "craft-theme-store",

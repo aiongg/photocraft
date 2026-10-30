@@ -211,7 +211,7 @@ impl Focus {
 /// dialog, the unsaved-changes prompt, a warp or the Filter Gallery, inline type.
 fn key_owner(app: &PhotocraftApp, ctx: &egui::Context) -> (bool, usize, bool, bool, bool) {
     let distort = app.distort.active() || app.distort.gallery.is_some();
-    (crate::menu_nav::is_open(ctx), app.ui.dialogs.len(), app.discard.is_some(), distort, app.ui.text_edit.is_some())
+    (craft_ui::menu::any_open(ctx), app.ui.dialogs.len(), app.discard.is_some(), distort, app.ui.text_edit.is_some())
 }
 
 /// Keys whose shortcuts follow the key's position, as in Photoshop: ⇧⌘. is ⇧⌘> on a US layout,
