@@ -124,7 +124,10 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, previous: Option<
         })
         .collect();
     strip_tabs.extend(opening.iter().map(|(job, name, frac)| {
-        Tab::new(DocTab::Opening(*job), format!("{name} ({} {:.0}%)", tl!("Opening…"), frac * 100.0)).closable(true).progress(Some(*frac))
+        Tab::new(DocTab::Opening(*job), format!("{name} ({} {:.0}%)", tl!("Opening…"), frac * 100.0))
+            .closable(true)
+            .close_label(tl!("Cancel opening"))
+            .progress(Some(*frac))
     }));
     let selected = match app.jobs.focus.filter(|job| opening.iter().any(|(open, _, _)| open == job)) {
         Some(job) => Some(DocTab::Opening(job)),
