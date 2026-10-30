@@ -137,14 +137,14 @@ mod title_tests {
     fn app(custom_titlebar: bool) -> crate::PhotocraftApp {
         let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.custom_titlebar = custom_titlebar;
-        // The preference that makes the shell launch without its own title bar.
-        app.session.edit_prefs(|p| p.interface.system_title_bar = !custom_titlebar);
+        // The shell decided on the system's frame whenever it drew no title bar of its own.
+        app.native_frame = !custom_titlebar;
         app
     }
 
     #[test]
     fn without_the_preference_the_mark_stays() {
-        // The default (e.g. the web build or the snapshot example): no custom bar, no preference.
+        // The default (e.g. the web build or the snapshot example): no system frame decided.
         let app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         assert!(!system_title_bar(&app));
     }
@@ -200,7 +200,8 @@ mod title_tests {
             }
             texts
         };
-        assert!(texts(&mut app).iter().any(|t| t.contains("foo.psd")), "shown by default");
+        let t0 = texts(&mut app);
+        assert!(t0.iter().any(|t| t.contains("foo.psd")), "shown by default");
         app.session.prefs.edit(|p| p.interface.show_file_name_in_title = false);
         let hidden = texts(&mut app);
         assert!(!hidden.iter().any(|t| t.contains("foo.psd")), "file name hidden: {hidden:?}");
@@ -222,7 +223,7 @@ mod title_tests {
                 collect_text(&shape.shape, &mut texts);
             }
             let system = system_title_bar(&app);
-            assert_eq!(system, !custom && !cfg!(target_os = "macos"));
+            assert_eq!(system, !custom);
             assert_eq!(crate::brand::mark_rect(&ctx).is_some(), !system, "mark in system mode (custom={custom})");
             assert_eq!(texts.iter().any(|t| t.contains("foo.psd")), !system, "centred title in system mode (custom={custom}): {texts:?}");
         }

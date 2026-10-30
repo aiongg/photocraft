@@ -52,11 +52,6 @@ fn rects(ctx: &egui::Context) -> Vec<egui::Rect> {
     ctx.data(|m| m.get_temp(egui::Id::unique(RECTS))).unwrap_or_default()
 }
 
-/// The window drag target must not cover a dialog which has been moved into the title bar.
-pub(crate) fn titlebar_drag_area_is_clear(ctx: &egui::Context, area: egui::Rect) -> bool {
-    rects(ctx).iter().all(|dialog| !dialog.intersects(area))
-}
-
 /// Whether the press that is being held began on a dialog (#6810). The dialog follows the pointer
 /// while its title is dragged, so the press origin ends up outside the (moved) dialog and a canvas
 /// check against the dialog rects alone would take the drag for a canvas drag. Remembered from the
@@ -736,6 +731,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 }
             }
         }
+    }
+    for rect in &shown {
+        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), *rect);
     }
     ctx.data_mut(|m| m.insert_temp(egui::Id::unique(RECTS), shown));
 }
