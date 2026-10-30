@@ -250,7 +250,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 }
                 if search.trim().is_empty()
                     && has_visible_fields(&values, &section)
-                    && crate::widgets::secondary_button(ui, tl!("Reset Section"), 110.0).clicked()
+                    && ui.add(craft_ui::controls::Button::new(tl!("Reset Section")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked()
                     && let Some(mut def) = prefs::Preferences::default().get(&section)
                 {
                     // The favourite fonts are the user's library, not a Type setting: kept, as
@@ -418,11 +418,11 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let mut b = *b;
                 if read_at_launch(&path) {
                     ui.vertical(|ui| {
-                        crate::widgets::checkbox(ui, &mut b, &label);
+                        craft_ui::controls::Checkbox::bool(tl!(&label), &mut b).show(ui).response;
                         ui.label(RichText::new(tl!("Applies at next launch.")).color(t.text_dim));
                     });
                 } else {
-                    crate::widgets::checkbox(ui, &mut b, &label);
+                    craft_ui::controls::Checkbox::bool(tl!(&label), &mut b).show(ui).response;
                 }
                 obj.insert(k, json!(b));
             }
@@ -431,7 +431,7 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let mut pairs: Vec<(String, &str)> = vec![("auto".into(), tl!("Auto"))];
                 pairs.extend(crate::i18n::Lang::for_picker().into_iter().map(|l| (l.code().to_string(), l.name())));
                 let mut cur = s.clone();
-                crate::widgets::dropdown(ui, &format!("pref-{path}"), tl!(&label), &mut cur, &pairs, 220.0);
+                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
                 obj.insert(k, json!(cur));
             }
             Value::String(s) if prefs::choices(&path).is_some() => {
@@ -440,7 +440,7 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let labels: Vec<String> = opts.iter().map(|o| choice_label(o)).collect();
                 let pairs: Vec<(String, &str)> = opts.iter().map(|o| o.to_string()).zip(labels.iter().map(String::as_str)).collect();
                 let mut cur = s.clone();
-                crate::widgets::dropdown(ui, &format!("pref-{path}"), tl!(&label), &mut cur, &pairs, 220.0);
+                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
                 obj.insert(k, json!(cur));
             }
             Value::String(s) if prefs::is_color(&path) => {
@@ -497,7 +497,7 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                         ui.horizontal(|ui| {
                             let mut on = d.get("enabled").and_then(Value::as_bool).unwrap_or(false);
                             let mut path = d.get("path").and_then(Value::as_str).unwrap_or("").to_string();
-                            crate::widgets::checkbox(ui, &mut on, tl!("Enabled"));
+                            craft_ui::controls::Checkbox::bool(tl!("Enabled"), &mut on).show(ui).response;
                             ui.add(egui::TextEdit::singleline(&mut path).desired_width(240.0)).accessible_name(tl!("Path"));
                             *d = json!({"enabled": on, "path": path});
                         });

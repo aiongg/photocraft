@@ -41,7 +41,7 @@ pub(super) fn gpu_status_rows(ui: &mut egui::Ui, info: Option<&Value>, adapters:
             let options = prefs::choices("performance.gpuBackend").unwrap_or(&[]);
             let labels: Vec<String> = options.iter().map(|o| choice_label(o)).collect();
             let pairs: Vec<(String, &str)> = options.iter().map(|o| o.to_string()).zip(labels.iter().map(String::as_str)).collect();
-            crate::widgets::dropdown(ui, "graphics-backend", tl!("GPU Backend"), &mut current, &pairs, 220.0);
+            craft_ui::controls::Select::new("graphics-backend", tl!("GPU Backend"), &mut current).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
             obj.insert("gpuBackend".into(), json!(current));
         });
         if !prefs::is_hidden("performance.gpuAdapter") {
@@ -69,7 +69,7 @@ fn graphics_adapter_row(ui: &mut egui::Ui, adapters: Option<&Value>, obj: &mut M
     pairs.extend(names.iter().cloned().zip(labels.iter().map(String::as_str)));
     ui.horizontal(|ui| {
         ui.label(tl!("GPU adapter"));
-        crate::widgets::dropdown_literal(ui, "graphics-adapter", tl!("GPU adapter"), &mut current, &pairs, 320.0);
+        craft_ui::controls::Select::new("graphics-adapter", tl!("GPU adapter"), &mut current).rows(pairs.len(), |i| pairs[i].0.clone(), |i| pairs[i].1).show(ui).response.changed();
     });
     ui.label(RichText::new(tl!("Applies at next launch.")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
     obj.insert("gpuAdapter".into(), json!(current));
@@ -83,7 +83,7 @@ pub(super) fn rendering_mode_row(ui: &mut egui::Ui, obj: &mut Map<String, Value>
         let pairs =
             vec![("auto".to_string(), tl!("Automatic (recommended)")), ("gpu".to_string(), tl!("GPU")), ("cpu".to_string(), tl!("CPU / Compatibility"))];
         let previous = current.clone();
-        crate::widgets::dropdown(ui, "rendering-mode", tl!("Rendering Mode"), &mut current, &pairs, 240.0);
+        craft_ui::controls::Select::new("rendering-mode", tl!("Rendering Mode"), &mut current).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
         if current != previous {
             obj.insert("renderingMode".into(), json!(current));
             obj.insert("useGpu".into(), json!(current != "cpu"));
