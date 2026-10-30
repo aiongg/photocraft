@@ -51,7 +51,7 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
             );
             ui.spacing_mut().item_spacing.x = 3.0;
             for (value, name) in STYLES {
-                if ui.add(IconButton::new(style_icon(value), tl!(name)).size(ControlSize::Md).selected(value == style)).clicked() {
+                if ui.add(IconButton::new(style_icon(value), tl!(name)).size(ControlSize::Sm).selected(value == style)).clicked() {
                     let _ = app.run(cmds::SET, json!({"layer": layer.id.0, "style": cmds::style_name(value)}));
                 }
             }
