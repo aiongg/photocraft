@@ -457,7 +457,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
                         // Touch-tolerant double-tap (finger jitter > egui's 6 px); see `widgets::second_click`.
                         create |= widgets::second_click(ui, &response);
                     }
-                    if widgets::secondary_button(ui, tl!("Delete"), 76.0).clicked() {
+                    if ui.add(craft_ui::controls::Button::new(tl!("Delete")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(76.0)).clicked() {
                         match app.run("document.presets.delete", json!({"name":preset.name})) {
                             Ok(_) => {
                                 f.remove("__presetError");
@@ -483,7 +483,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
 fn save_preset(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.add_space(craft_ui::theme::scale::Space::S12.px());
     if f.get("__savingPreset").and_then(Value::as_bool) != Some(true) {
-        if widgets::secondary_button(ui, tl!("Save Preset…"), 240.0).clicked() {
+        if ui.add(craft_ui::controls::Button::new(tl!("Save Preset…")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(240.0)).clicked() {
             f.insert("__savingPreset".into(), json!(true));
             f.remove("__presetError");
         }
@@ -495,7 +495,7 @@ fn save_preset(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<St
         ui.add(egui::TextEdit::singleline(&mut name).id_salt("document-preset-name").desired_width(240.0).char_limit(255)).labelled_by(label.id);
         f.insert("__presetName".into(), json!(name));
         ui.horizontal(|ui| {
-            if widgets::secondary_button(ui, tl!("Save"), 110.0).clicked() || enter {
+            if ui.add(craft_ui::controls::Button::new(tl!("Save")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked() || enter {
                 match app.run("document.presets.save", json!({"name":name,"settings":document_settings(f)})) {
                     Ok(_) => {
                         if let Some(preset) = app.session.presets.documents.last() {
@@ -512,7 +512,7 @@ fn save_preset(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<St
                     }
                 }
             }
-            if widgets::secondary_button(ui, tl!("Cancel"), 110.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked() {
                 f.remove("__savingPreset");
                 f.remove("__presetError");
             }
@@ -678,7 +678,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     set_size(f, "width", w, &unit, ppi);
                 }
                 let opts: Vec<(String, &str)> = UNITS.iter().map(|u| (u.0.to_string(), u.1)).collect();
-                if widgets::dropdown(ui, "nd-unit", tl!("Units"), &mut unit, &opts, 120.0) {
+                if craft_ui::controls::Select::new("nd-unit", tl!("Units"), &mut unit).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                     f.insert("__unit".into(), json!(unit));
                     f.remove("__savedPreset");
                 }
@@ -707,7 +707,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             });
             // Under Orientation, as in Photoshop: the document starts as one artboard (#9086).
             let mut artboard = f.get("artboard").and_then(Value::as_bool).unwrap_or(false);
-            if widgets::checkbox(ui, &mut artboard, tl!("Artboards")).changed() {
+            if craft_ui::controls::Checkbox::bool(tl!("Artboards"), &mut artboard).show(ui).response.changed() {
                 f.insert("artboard".into(), json!(artboard));
             }
             ui.add_space(craft_ui::theme::scale::Space::S4.px());
@@ -719,14 +719,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     set_resolution(f, if per_cm { r * 2.54 } else { r });
                 }
                 let mut ru = get_s(f, "__resUnit", "in");
-                if widgets::dropdown(
-                    ui,
-                    "nd-resunit",
-                    tl!("Resolution"),
-                    &mut ru,
-                    &[("in".to_string(), tl!("Pixels/Inch")), ("cm".to_string(), tl!("Pixels/Centimeter"))],
-                    120.0,
-                ) {
+                if craft_ui::controls::Select::new("nd-resunit", tl!("Resolution"), &mut ru).fit(true).option("in".to_string(), tl!("Pixels/Inch")).option("cm".to_string(), tl!("Pixels/Centimeter")).show(ui).response.changed() {
                     f.insert("__resUnit".into(), json!(ru));
                     f.remove("__savedPreset");
                 }
@@ -735,19 +728,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             small_label(ui, tl!("Color Mode"));
             ui.horizontal(|ui| {
                 let mut mode = get_s(f, "mode", "rgb");
-                if widgets::dropdown(
-                    ui,
-                    "nd-mode",
-                    tl!("Color Mode"),
-                    &mut mode,
-                    &[
-                        ("gray".to_string(), tl!("Grayscale")),
-                        ("rgb".to_string(), tl!("RGB Color")),
-                        ("cmyk".to_string(), tl!("CMYK Color")),
-                        ("lab".to_string(), tl!("Lab Color")),
-                    ],
-                    110.0,
-                ) {
+                if craft_ui::controls::Select::new("nd-mode", tl!("Color Mode"), &mut mode).fit(true).option("gray".to_string(), tl!("Grayscale")).option("rgb".to_string(), tl!("RGB Color")).option("cmyk".to_string(), tl!("CMYK Color")).option("lab".to_string(), tl!("Lab Color")).show(ui).response.changed() {
                     f.insert("mode".into(), json!(mode));
                     // A profile of the old mode's colour space doesn't suit the new one.
                     f.remove("profile");
@@ -777,7 +758,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     f.remove("profile");
                 }
                 let shown: Vec<(String, &str)> = opts.iter().map(|(v, l)| (v.clone(), l.as_str())).collect();
-                if widgets::dropdown(ui, "nd-profile", tl!("Color Profile"), &mut profile, &shown, 240.0) {
+                if craft_ui::controls::Select::new("nd-profile", tl!("Color Profile"), &mut profile).rows(shown.len(), |i| shown[i].0.clone(), |i| tl!(shown[i].1)).show(ui).response.changed() {
                     if profile == "working" {
                         f.remove("profile");
                     } else {
@@ -801,7 +782,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             let shown = background_rgb(app, f);
             let mut pick = false;
             ui.horizontal(|ui| {
-                if widgets::dropdown(ui, "nd-bg", tl!("Background"), &mut bg, &opts, 240.0 - SWATCH - 6.0) {
+                if craft_ui::controls::Select::new("nd-bg", tl!("Background"), &mut bg).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                     if bg == CUSTOM {
                         // Custom… opens the Color Picker on the colour shown so far.
                         pick = true;

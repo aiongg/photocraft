@@ -205,7 +205,7 @@ fn dim_field(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, orig_key:
 fn unit_dropdown(ui: &mut egui::Ui, f: &mut Map<String, Value>, id: &str) {
     let mut unit = f.get("__unit").and_then(Value::as_str).unwrap_or("px").to_string();
     let opts: Vec<(String, &str)> = UNITS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-    if crate::widgets::dropdown(ui, id, tl!("Units"), &mut unit, &opts, 110.0) {
+    if craft_ui::controls::Select::new(id, tl!("Units"), &mut unit).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
         f.insert("__unit".into(), json!(unit));
     }
 }
@@ -318,7 +318,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.horizontal(|ui| {
         label(ui, "", 90.0);
         let mut on = resampling;
-        if crate::widgets::checkbox(ui, &mut on, tl!("Resample")).changed() {
+        if craft_ui::controls::Checkbox::bool(tl!("Resample"), &mut on).show(ui).response.changed() {
             // Back on, it takes the method it had when the dialog opened.
             let method = f.get("__resample").cloned().unwrap_or_else(|| json!("bicubic"));
             f.insert("resample".into(), if on { method } else { json!("none") });
@@ -344,7 +344,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             // which the command doesn't use and a save quantises away (#6019).
             let indexed = f.get("__indexed").and_then(Value::as_bool) == Some(true);
             let opts: Vec<_> = opts.into_iter().filter(|(k, _)| !indexed || k == "automatic" || k == "nearest").collect();
-            if crate::widgets::dropdown(ui, "is-resample", tl!("Resample"), &mut cur, &opts, 200.0) {
+            if craft_ui::controls::Select::new("is-resample", tl!("Resample"), &mut cur).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                 f.insert("resample".into(), json!(cur));
             }
         }
@@ -381,7 +381,7 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.horizontal(|ui| {
         label(ui, "", 90.0);
         let mut rel = relative;
-        if crate::widgets::checkbox(ui, &mut rel, tl!("Relative")).changed() {
+        if craft_ui::controls::Checkbox::bool(tl!("Relative"), &mut rel).show(ui).response.changed() {
             // Convert between absolute and delta so the resulting canvas is unchanged.
             let (w, h) = (num(f, "width"), num(f, "height"));
             let (w, h) = if rel { (w - ow, h - oh) } else { (w + ow, h + oh) };
@@ -408,7 +408,7 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             ("black".to_string(), tl!("Black")),
             ("transparent".to_string(), tl!("Transparent")),
         ];
-        if crate::widgets::dropdown(ui, "cs-ext", tl!("Canvas extension color:"), &mut cur, &opts, 140.0) {
+        if craft_ui::controls::Select::new("cs-ext", tl!("Canvas extension color:"), &mut cur).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             f.insert("extensionColor".into(), json!(cur));
         }
     });
