@@ -74,6 +74,12 @@ fn bodies_id() -> egui::Id {
     area_id().with("bodies")
 }
 
+/// The Layers panel's least width as of the last frame (points).
+#[cfg(test)]
+pub(crate) fn last_layers_min(ctx: &egui::Context) -> f32 {
+    ctx.data(|data| data.get_temp::<f32>(bodies_id().with("layers-min"))).unwrap_or_default()
+}
+
 /// The body of each panel drawn last frame, the canvas included (screen points).
 #[cfg(test)]
 pub(crate) fn last_bodies(ctx: &egui::Context) -> Vec<(String, egui::Rect)> {
@@ -568,9 +574,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if let Some(width) = ui.ctx().data_mut(|data| data.remove_temp::<f32>(crate::panels::dock_width_id())) {
         let range = crate::panels::dock_width_range(ui.ctx().content_rect().width());
-        set_dock_width(app, width.clamp(*range.start(), *range.end()));
+        set_dock_width(app, ui, width.clamp(*range.start(), *range.end()));
     }
-    native_dock_width(app, ui.ctx());
+    native_dock_width(app, ui);
     let layout = match &app.ui.docking {
         Some(workspace) => workspace.layout.clone(),
         None => legacy(app),
@@ -611,6 +617,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     let strip = style.tab_height;
     let layers_min = crate::panels::layer_row::min_panel_width(ui, app.ui.layers_panel_options.thumbnail_size);
+    #[cfg(test)]
+    ui.ctx().data_mut(|data| data.insert_temp(bodies_id().with("layers-min"), layers_min.max(220.0)));
     let card: std::collections::HashSet<String> =
         layout.floating.iter().filter(|window| window.id == PROPERTIES_WINDOW).flat_map(|window| window.panels().cloned()).collect();
     #[cfg(test)]
@@ -631,8 +639,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             } else {
                 // The native group's smallest height, tab strip included.
                 let height = PANELS.iter().find(|p| p.0 == id).map_or(80.0, |p| p.2.min_height() - strip);
-                let width = if id == "layers" { layers_min.max(220.0) } else { 220.0 };
-                craft_ui::docking::PanelLimits { min: egui::vec2(width, height), ..Default::default() }
+                craft_ui::docking::PanelLimits { min: egui::vec2(panel_min_width(id, layers_min), height), ..Default::default() }
             }
         },
         &mut PanelContent { app, collapsed: &collapsed, fillers: &fillers, card: &card, strip },
@@ -761,8 +768,15 @@ fn pin_group_heights(ctx: &egui::Context, layout: &Layout<String>, actions: &mut
     actions.splice(0..0, pins);
 }
 
-/// `ui.set {dockWidth}`: the width of the end dock's outer column.
-fn set_dock_width(app: &mut PhotocraftApp, width: f32) {
+/// The narrowest width panel `id` allows its column (points); the Layers panel's depends on the
+/// theme's row.
+fn panel_min_width(id: &str, layers_min: f32) -> f32 {
+    if id == "layers" { layers_min.max(220.0) } else { 220.0 }
+}
+
+/// `ui.set {dockWidth}`: the width of the end dock's outer column, at least what its panels'
+/// limits allow.
+fn set_dock_width(app: &mut PhotocraftApp, ui: &egui::Ui, width: f32) {
     let Ok(mut workspace) = workspace_of(app) else { return };
     let outer = match workspace.layout.root.as_ref() {
         Some(Node::Split { second, .. }) => match second.as_ref() {
@@ -772,6 +786,9 @@ fn set_dock_width(app: &mut PhotocraftApp, width: f32) {
         _ => None,
     };
     let Some((current, Some(panel))) = outer else { return };
+    let layers_min = crate::panels::layer_row::min_panel_width(ui, app.ui.layers_panel_options.thumbnail_size);
+    let least = outer_column_panels(&workspace).iter().map(|id| panel_min_width(id, layers_min)).fold(0.0, f32::max);
+    let width = width.max(least);
     if current == width {
         return;
     }
@@ -786,7 +803,8 @@ fn set_dock_width(app: &mut PhotocraftApp, width: f32) {
 /// A dock width saved by earlier versions is in egui's remembered memory under the `dock` side
 /// panel's id. The default layout's column takes it once, after the canvas has been laid out so
 /// the Studio Properties card keeps its place.
-fn native_dock_width(app: &mut PhotocraftApp, ctx: &egui::Context) {
+fn native_dock_width(app: &mut PhotocraftApp, ui: &egui::Ui) {
+    let ctx = ui.ctx();
     let id = crate::panels::panel_state_id(ctx, "dock");
     let Some(state) = ctx.data_mut(|data| data.get_persisted::<egui::PanelState>(id)) else { return };
     if app.ui.docking.is_none() && !app.last_canvas_rect.is_positive() {
@@ -797,7 +815,18 @@ fn native_dock_width(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let range = crate::panels::dock_width_range(ctx.content_rect().width());
     let width = state.size().x;
     if app.ui.docking.is_none() && width.is_finite() && (width - default_width(pro)).abs() >= 1.0 {
-        set_dock_width(app, width.clamp(*range.start(), *range.end()));
+        set_dock_width(app, ui, width.clamp(*range.start(), *range.end()));
+    }
+}
+
+/// Every panel of the end dock's outer column.
+fn outer_column_panels(workspace: &Workspace) -> Vec<String> {
+    match workspace.layout.root.as_ref() {
+        Some(Node::Split { second, .. }) => match second.as_ref() {
+            Node::Dock { columns, .. } => columns.first().into_iter().flat_map(|c| c.groups.iter().flat_map(|g| g.panels.iter().cloned())).collect(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
     }
 }
 
