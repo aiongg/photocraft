@@ -1,4 +1,4 @@
-use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Stroke, Tokens, empty, icons, json, pos2, theme, vec2, widgets};
+use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Tokens, empty, icons, json, pos2, theme, vec2, widgets};
 use craft_ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- properties
@@ -244,31 +244,3 @@ pub(super) fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The options bar's Select and Mask… button: greyed out, as the menu item is, until there is a
-/// selection (or a layer mask) to refine (#7520).
-pub(super) fn select_and_mask_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let enabled = crate::menus::is_enabled(app, "select.selectAndMask");
-    let clicked = ui.add_enabled_ui(enabled, |ui| widgets::secondary_button(ui, tl!("Select and Mask…"), 0.0).clicked()).inner;
-    if clicked {
-        let _ = crate::menus::invoke(app, ui.ctx(), "select.selectAndMask", json!({}));
-    }
-}
-
-/// New / add / subtract / intersect selection buttons (shared by selection tools).
-pub(super) fn selection_mode_buttons(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    ui.spacing_mut().item_spacing.x = 2.0;
-    for (i, (icon, tip)) in [
-        ("square", tl!("New selection").to_string()),
-        ("plus", crate::i18n::fmt(tl!("Add to selection  ({key})"), &[("key", &crate::shortcuts::pretty("Shift"))])),
-        ("minus", crate::i18n::fmt(tl!("Subtract from selection  ({key})"), &[("key", &crate::shortcuts::pretty("Alt"))])),
-        ("squares-subtract", crate::i18n::fmt(tl!("Intersect with selection  ({key})"), &[("key", &crate::shortcuts::pretty("Shift+Alt"))])),
-    ]
-    .iter()
-    .enumerate()
-    {
-        if icons::button(ui, icon, 24.0, app.ui.selection_mode == i as u8, tip).clicked() {
-            app.ui.selection_mode = i as u8;
-        }
-    }
-    ui.spacing_mut().item_spacing.x = 8.0;
-}

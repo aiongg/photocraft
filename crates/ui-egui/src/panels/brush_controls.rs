@@ -1,4 +1,7 @@
-use super::{Align2, BlendMode, Color32, PhotocraftApp, Rect, Sense, Stroke, StrokeKind, Tokens, c32, icons, json, pos2, vec2, widgets};
+use super::{Align2, BlendMode, Color32, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, c32, icons, json, pos2, vec2};
+use super::options_bar::select_cell;
+use craft_ui::controls::{Checkbox, ControlSize, IconButton};
+use craft_ui::icons::Icon;
 use craft_ui::theme::StrokeExt;
 
 /// A painting tool's Mode dropdown over `modes` (`None` is Clear); the wheel over it steps the
@@ -6,8 +9,7 @@ use craft_ui::theme::StrokeExt;
 pub(super) fn tool_mode_dropdown(ui: &mut egui::Ui, id: &str, modes: &[Option<BlendMode>], current: Option<BlendMode>) -> Option<Option<BlendMode>> {
     let opts: Vec<(Option<BlendMode>, &str)> = modes.iter().map(|m| (*m, m.map_or("Clear", BlendMode::label))).collect();
     let mut mode = current;
-    let chosen = widgets::dropdown_wheel_hovered(ui, id, tl!("Mode"), &mut mode, &opts, 96.0).0;
-    chosen.last().copied()
+    select_cell(ui, Some("Mode"), id, "Mode", &mut mode, &opts, true).then_some(mode)
 }
 
 /// The Brush's or Pencil's Mode dropdown: the blend modes, with Photoshop's painting-only Clear
@@ -18,7 +20,7 @@ pub(super) fn paint_mode_dropdown(ui: &mut egui::Ui, id: &str, b: &mut photocraf
     let at = opts.iter().position(|o| o.0 == Some(BlendMode::Dissolve)).map_or(opts.len(), |i| i + 1);
     opts.insert(at, (None, "Clear"));
     let mut mode = if *clear || held { None } else { Some(b.mode) };
-    if !widgets::dropdown_wheel_hovered(ui, id, tl!("Mode"), &mut mode, &opts, 96.0).0.is_empty() {
+    if select_cell(ui, Some("Mode"), id, "Mode", &mut mode, &opts, true) {
         *clear = mode.is_none();
         if let Some(m) = mode {
             b.mode = m;
@@ -26,26 +28,16 @@ pub(super) fn paint_mode_dropdown(ui: &mut egui::Ui, id: &str, b: &mut photocraf
     }
 }
 
-/// Options-bar Smoothing % (the brush's stroke smoothing; the live stroke and the commit use it).
-pub(super) fn smoothing_field(ui: &mut egui::Ui, b: &mut photocraft_engine::BrushSettings, width: f32) {
-    let mut sm = (b.smoothing.amount * 100.0).round();
-    if widgets::value_field_named(ui, tl!("Smoothing"), &mut sm, 0.0..=100.0, "%", width).changed() {
-        b.smoothing.enabled = true;
-        b.smoothing.amount = (sm / 100.0).clamp(0.0, 1.0);
-    }
-}
-
 /// Options-bar gear beside Smoothing: Photoshop's smoothing options popup, edited on the brush
 /// like the Smoothing % (so they stay per tool and reach the live stroke and the commit).
 pub(super) fn smoothing_options(ui: &mut egui::Ui, b: &mut photocraft_engine::BrushSettings) {
-    let resp = icons::button(ui, "settings", 24.0, false, tl!("Set additional smoothing options"));
-    let resp = crate::brush_picker::named(resp, "Set additional smoothing options");
+    let resp = ui.add(IconButton::new(Icon::Settings, tl!("Set additional smoothing options")).size(ControlSize::Md));
     egui::Popup::from_toggle_button_response(&resp).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
         let s = &mut b.smoothing;
-        widgets::checkbox(ui, &mut s.pulled_string, tl!("Pulled String Mode"));
-        widgets::checkbox(ui, &mut s.catch_up, tl!("Stroke Catch-up"));
-        widgets::checkbox(ui, &mut s.catch_up_on_end, tl!("Catch-up on Stroke End"));
-        widgets::checkbox(ui, &mut s.adjust_for_zoom, tl!("Adjust for Zoom"));
+        Checkbox::bool(tl!("Pulled String Mode"), &mut s.pulled_string).show(ui).response;
+        Checkbox::bool(tl!("Stroke Catch-up"), &mut s.catch_up).show(ui).response;
+        Checkbox::bool(tl!("Catch-up on Stroke End"), &mut s.catch_up_on_end).show(ui).response;
+        Checkbox::bool(tl!("Adjust for Zoom"), &mut s.adjust_for_zoom).show(ui).response;
     });
 }
 
