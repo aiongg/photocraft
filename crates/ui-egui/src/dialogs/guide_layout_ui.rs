@@ -238,17 +238,13 @@ fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
         ("__columnsEnabled", "columns", "width", "gutter", tl!("Columns"), tl!("Width"))
     };
     let mut enabled = on(f, toggle, positive(f, count));
-    GroupBox::new(title)
-        .checkbox(&mut enabled)
-        .fill(false)
-        .id_salt(count)
-        .show(ui, |ui| {
-            FormGrid::new(count).label_align(LabelAlign::Start).show(ui, |form| {
-                form.row(tl!("Number"), |ui, _| number(ui, f, count, "Number", true));
-                form.row(size_label, |ui, _| optional(ui, f, size, size_label));
-                form.row(tl!("Spacing"), |ui, _| number(ui, f, gap, "Spacing", false));
-            });
+    GroupBox::new(title).checkbox(&mut enabled).fill(false).id_salt(count).show(ui, |ui| {
+        FormGrid::new(count).label_align(LabelAlign::Start).show(ui, |form| {
+            form.row(tl!("Number"), |ui, _| number(ui, f, count, "Number", true));
+            form.row(size_label, |ui, _| optional(ui, f, size, size_label));
+            form.row(tl!("Spacing"), |ui, _| number(ui, f, gap, "Spacing", false));
         });
+    });
     if enabled != on(f, toggle, positive(f, count)) {
         f.insert(toggle.into(), json!(enabled));
     }

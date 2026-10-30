@@ -101,20 +101,18 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         });
         let mut m = mode(f);
         form.row(tl!("Mode:"), |ui, _| {
-            {
-                let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
-                let edit = Select::new("new-layer-mode", tl!("Mode"), &mut m).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
-                if edit.response.changed() {
-                    f.insert("mode".into(), json!(m.label()));
-                }
-                ui.label(tl!("Opacity:"));
-                let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
-                let field = crate::widgets::dialog_number_field(ui, "new-layer-opacity", tl!("Opacity:"), &mut o, 0.0..=100.0, "{n}%", 0);
-                if field.changed {
-                    f.insert("opacity".into(), json!(o.clamp(0.0, 100.0)));
-                }
-                (edit, field.response)
+            let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
+            let edit = Select::new("new-layer-mode", tl!("Mode"), &mut m).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
+            if edit.response.changed() {
+                f.insert("mode".into(), json!(m.label()));
             }
+            ui.label(tl!("Opacity:"));
+            let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
+            let field = crate::widgets::dialog_number_field(ui, "new-layer-opacity", tl!("Opacity:"), &mut o, 0.0..=100.0, "{n}%", 0);
+            if field.changed {
+                f.insert("opacity".into(), json!(o.clamp(0.0, 100.0)));
+            }
+            (edit, field.response)
         });
         form.unlabelled(|ui| {
             let available = neutral_color(m).is_some();

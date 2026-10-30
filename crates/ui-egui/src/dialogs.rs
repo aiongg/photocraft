@@ -344,8 +344,9 @@ fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, 
             crate::filter_dialog::body(ui, fields);
         }
     };
-    // Select and Mask leaves the keyboard to its view keys (F, X, O, V…).
-    if crate::select_mask_view::owns(fields) {
+    // Select and Mask leaves the keyboard to its view keys (F, X, O, V…); a dialog that opens on
+    // an angle dial gets its focus from the host.
+    if crate::select_mask_view::owns(fields) || crate::filter_dialog::opens_on_angle_dial(fields) {
         body(ui, fields);
     } else {
         first_field_focused(ui, id, |ui| body(ui, fields));
@@ -418,7 +419,12 @@ fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool)
 /// dialog has them. `None` for the dialogs that draw their own buttons (Guide Layout, Brush Preset
 /// and the Color Picker: a column at the body's side that validates Enter itself). OK and Apply
 /// are enabled as `(ok, apply)` says once the body has run.
-fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>, table: &'a Cell<Option<crate::color_table_ui::Action>>, preview: &'a Cell<Option<bool>>) -> Footer<'a> {
+fn footer_for<'a>(
+    d: &Dialog,
+    enabled: &'a Cell<(bool, bool)>,
+    table: &'a Cell<Option<crate::color_table_ui::Action>>,
+    preview: &'a Cell<Option<bool>>,
+) -> Footer<'a> {
     let fields = &d.fields;
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
@@ -527,7 +533,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(if opens_on_first_field(&fields) { InitialFocus::FirstField } else { InitialFocus::None });
+            .initial_focus(if opens_on_first_field(&fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
+                InitialFocus::FirstField
+            } else {
+                InitialFocus::None
+            });
         if let Some(offset) = crate::blur_pins::first_place(&d.fields, ctx) {
             dialog = dialog.first_place(move |_| Some(offset));
         }
