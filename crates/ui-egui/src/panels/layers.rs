@@ -532,7 +532,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         }
         actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
-        let adj_open = ui.id().with("adjustment_menu_open");
+        let adj_open = ui.scope_id().with("adjustment_menu_open");
         let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"), was_open(ui, adj_open));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).
         crate::press_menu::show(&adj, |ui, menu| {
@@ -572,7 +572,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
-        let fx_open = ui.id().with("style_menu_open");
+        let fx_open = ui.scope_id().with("style_menu_open");
         let fx = PanelFooter::menu_button(ui, Icon::Fx, tl!("Add a layer style"), was_open(ui, fx_open));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);
