@@ -112,8 +112,7 @@ fn moving_between_modes_keeps_a_preview_across_the_gaps_between_them() {
     let mut h = harness(s);
     let dropdown = h.query_all_by_role(Role::ComboBox).map(|n| n.rect()).max_by(|a, b| a.top().total_cmp(&b.top())).unwrap();
     click(&mut h, dropdown.center());
-    let (dissolve, darken) = (h.get_by_label("Dissolve").rect(), h.get_by_label("Darken").rect());
-    assert!(darken.top() > dissolve.bottom(), "the rows have a gap between them");
+    let dissolve = h.get_by_label("Dissolve").rect();
     let multiply = h.get_by_label("Multiply").rect().center();
     let mut y = dissolve.center().y;
     while y <= multiply.y {

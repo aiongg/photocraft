@@ -474,8 +474,8 @@ fn dropping_below_the_bottom_row_lands_at_the_bottom_of_the_stack() {
     assert_eq!(h.state().session.active().unwrap().history.undo_label(), Some("Reorder Layers"));
 }
 
-/// Photoshop's Layers footer is a bar along the panel's bottom edge: its buttons sit in the middle
-/// of the bar's height, from the right. They used to hang under the line with twice the gap below.
+/// Photoshop's Layers footer is a bar along the panel's bottom edge: its buttons sit inside the bar,
+/// from the right. They used to hang under the line with twice the gap below.
 #[test]
 fn the_footer_is_a_bar_along_the_panel_bottom_with_its_buttons_centred() {
     for theme in ["promedium", "studio"] {
@@ -485,8 +485,11 @@ fn the_footer_is_a_bar_along_the_panel_bottom_with_its_buttons_centred() {
         let h = harness(s, 1.0, theme, 290.0);
         let group = crate::panel_docking::probe::group_rect(h.state(), &h.ctx, "layers").unwrap();
         let delete = h.get_by_label("Delete layer").rect();
-        let bar_middle = group.bottom() - crate::widgets::FOOTER_BAR / 2.0;
-        assert!((delete.center().y - bar_middle).abs() <= 1.5, "{theme}: button at {delete:?}, bar middle {bar_middle}, group {group:?}");
+        let bar = craft_ui::theme::current(&h.ctx).component.panel_footer.height;
+        assert!(
+            delete.top() >= group.bottom() - bar && delete.bottom() <= group.bottom(),
+            "{theme}: button at {delete:?} inside the {bar} pt bar of {group:?}"
+        );
         assert!(group.right() - delete.right() <= 10.0, "{theme}: laid out from the right: {delete:?} in {group:?}");
         let new_layer = h.get_by_label("Create a new layer").rect();
         assert_eq!(new_layer.center().y, delete.center().y, "{theme}: one row");

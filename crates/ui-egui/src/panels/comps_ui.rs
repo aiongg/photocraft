@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn dragging_a_comp_row_reorders_without_applying_it() {
-        use egui_kittest::{Harness, kittest::Queryable};
+        use egui_kittest::Harness;
         let mut app = PhotocraftApp::new(Session::new(), crate::Services::default());
         app.run("file.new", json!({"width":16,"height":16})).unwrap();
         for name in ["First", "Second", "Third"] {
