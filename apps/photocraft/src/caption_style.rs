@@ -2,8 +2,8 @@
 //! reads the button layout at startup (GNOME's `button-layout`, KWin's order, GTK's
 //! `gtk-decoration-layout`); [`LayoutWatch`] follows it while the app runs: GNOME's through the
 //! appearance watcher on the settings portal, the others' files again when the window regains
-//! focus. The round buttons' glyphs come from the desktop's icon theme, which GNOME's portal
-//! reports and announces as it changes.
+//! focus. The round buttons' glyphs come from the desktop's icon theme, which the same watcher
+//! reports as it changes.
 //!
 //! `PHOTOCRAFT_CAPTION_STYLE` (`windows`, `adwaita`, `breeze`, `generic`),
 //! `PHOTOCRAFT_CAPTION_LAYOUT` (a GTK layout such as `close,minimize:`) and
@@ -14,11 +14,9 @@
 use craft_window::Layout;
 #[cfg(target_os = "linux")]
 use craft_window::policy::{CaptionFamily, DesktopKind, Frame, LayoutWatch};
+use craft_platform::appearance::EguiService;
 #[cfg(target_os = "linux")]
 use photocraft_ui_egui::{CaptionIcon, CaptionIcons, CaptionStyle, Captions};
-
-/// GNOME's `button-layout` as the appearance watcher last heard it (`None` until it answers).
-pub type GnomeLayoutFn = Box<dyn Fn() -> Option<String> + Send + Sync>;
 
 /// The family and, when the layout is overridden, the fixed layout.
 #[cfg(target_os = "linux")]
@@ -81,96 +79,38 @@ impl IconCache {
     }
 }
 
-#[cfg(target_os = "linux")]
-const INTERFACE_NAMESPACE: &str = "org.gnome.desktop.interface";
-#[cfg(target_os = "linux")]
-const ICONS_KEY: &str = "icon-theme";
-
-/// A string setting from the portal, unwrapping the variants some portals nest it in.
-#[cfg(target_os = "linux")]
-fn portal_string(value: zbus::zvariant::OwnedValue) -> Option<String> {
-    let mut value: zbus::zvariant::Value<'_> = value.into();
-    for _ in 0..4 {
-        match value {
-            zbus::zvariant::Value::Value(inner) => value = *inner,
-            zbus::zvariant::Value::Str(s) => return Some(s.to_string()),
-            _ => return None,
-        }
-    }
-    None
-}
-
-/// The caption style of `decision`'s app-drawn frame, following the layout as it changes and
-/// bringing the icon theme's glyphs. A worker reads the glyphs (and on GNOME follows the icon
-/// theme) and wakes the UI when they change; the first answer usually lands before the first
-/// frame. `None` for any other frame, and off Linux.
-pub fn service(decision: &craft_window::policy::Decision, gnome_layout: GnomeLayoutFn) -> Option<photocraft_ui_egui::CaptionStyleFn> {
+/// The caption style of `decision`'s app-drawn frame, following the layout and the icon theme as
+/// the desktop watcher (`appearance`) hears them; it wakes the UI when they change. `None` for any
+/// other frame, and off Linux.
+pub fn service(decision: &craft_window::policy::Decision, appearance: Option<EguiService>) -> Option<photocraft_ui_egui::CaptionStyleFn> {
     #[cfg(target_os = "linux")]
     {
-        use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+        use std::sync::{Mutex, PoisonError};
         let Frame::Integrated(captions) = &decision.frame else { return None };
         let var = |k: &str| std::env::var(k).ok();
         let (family, fixed) = overrides(captions.family, &var);
         let gnome = decision.desktop.kind == DesktopKind::Gnome;
         let desktop_icons = decision.desktop.icon_theme.clone();
-        let icons: Arc<Mutex<Option<CaptionIcons>>> = Arc::new(Mutex::new(None));
-        let wake: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
-        let (shared, waker) = (Arc::clone(&icons), Arc::clone(&wake));
         let cache = IconCache::default();
-        let publish = move |portal: Option<&str>| {
-            let next = icon_theme_name(portal, desktop_icons.as_deref(), &|k: &str| std::env::var(k).ok()).and_then(|t| cache.get(&t));
-            let mut cur = shared.lock().unwrap_or_else(PoisonError::into_inner);
-            if *cur != next {
-                *cur = next;
-                if let Some(ctx) = waker.get() {
-                    ctx.request_repaint();
-                }
-            }
-        };
-        let (ready, wait) = std::sync::mpsc::channel();
-        let spawned = std::thread::Builder::new().name("caption-icons".into()).spawn(move || {
-            let proxy = if gnome { crate::appearance::portal_proxy() } else { None };
-            let Some(proxy) = proxy else {
-                publish(None);
-                let _ = ready.send(());
-                return;
-            };
-            // Subscribe before the first read, so a change during start-up isn't lost.
-            let signals = proxy.receive_signal("SettingChanged").ok();
-            let value: Option<zbus::zvariant::OwnedValue> = proxy.call("Read", &(INTERFACE_NAMESPACE, ICONS_KEY)).ok();
-            let mut theme = value.and_then(portal_string);
-            publish(theme.as_deref());
-            let _ = ready.send(());
-            for message in signals.into_iter().flatten() {
-                let Ok((namespace, key, value)) = message.body().deserialize::<(String, String, zbus::zvariant::OwnedValue)>() else { continue };
-                if (namespace.as_str(), key.as_str()) == (INTERFACE_NAMESPACE, ICONS_KEY) {
-                    theme = portal_string(value);
-                    publish(theme.as_deref());
-                }
-            }
-        });
-        // A fast desktop answers before the first frame; a slow one updates the bar later.
-        if spawned.is_ok() {
-            let _ = wait.recv_timeout(std::time::Duration::from_millis(150));
-        }
         let layouts = Mutex::new((LayoutWatch::new(decision), None::<bool>));
         Some(Box::new(move |ctx| {
-            let _ = wake.set(ctx.clone());
             let mut guard = layouts.lock().unwrap_or_else(PoisonError::into_inner);
             let (watch, was_focused) = &mut *guard;
-            watch.set_gnome(gnome_layout().as_deref());
+            watch.set_gnome(appearance.as_ref().and_then(EguiService::button_layout).as_deref());
             let focused = ctx.input(|i| i.viewport().focused);
             if focused == Some(true) && *was_focused != Some(true) {
                 watch.on_focus();
             }
             *was_focused = focused;
             let layout = fixed.clone().unwrap_or_else(|| watch.layout().clone());
-            CaptionStyle { captions: Captions { family, layout }, icons: icons.lock().unwrap_or_else(PoisonError::into_inner).clone() }
+            let portal = appearance.as_ref().filter(|_| gnome).and_then(EguiService::icon_theme);
+            let icons = icon_theme_name(portal.as_deref(), desktop_icons.as_deref(), &|k: &str| std::env::var(k).ok()).and_then(|t| cache.get(&t));
+            CaptionStyle { captions: Captions { family, layout }, icons }
         }))
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (decision, gnome_layout);
+        let _ = (decision, appearance);
         None
     }
 }
@@ -203,13 +143,5 @@ mod tests {
         assert_eq!(layout, Some(Layout { left: vec![Minimize, Close], right: vec![Maximize] }));
         // An unknown name keeps the family the policy found.
         assert_eq!(overrides(CaptionFamily::Breeze, &env(&[("PHOTOCRAFT_CAPTION_STYLE", "aqua")])).0, CaptionFamily::Breeze);
-    }
-
-    #[test]
-    fn portal_strings_unwrap_nested_variants() {
-        use zbus::zvariant::{OwnedValue, Value};
-        let nested = Value::Value(Box::new(Value::Value(Box::new(Value::from("Papirus")))));
-        assert_eq!(portal_string(OwnedValue::try_from(nested).unwrap()).as_deref(), Some("Papirus"));
-        assert_eq!(portal_string(OwnedValue::try_from(Value::U32(7)).unwrap()), None);
     }
 }

@@ -105,8 +105,6 @@ pub use properties::properties_window;
 #[cfg(test)]
 use properties::{adjustments_grid, properties_body};
 pub use status_bar::{status_bar, status_bar_heights};
-#[cfg(test)]
-use title_bar::title_x;
 pub use title_bar::{sync_window_title, system_title_bar, title_bar, window_title};
 #[cfg(test)]
 use toolbar::{STUDIO_CHIP, TOOL_SECTIONS, chips_height, color_chips, tool_flyout_drag_open, tool_flyout_release, toolbar_icon_size, visible_sections};
@@ -118,21 +116,7 @@ fn c32(c: [f32; 4]) -> Color32 {
 
 #[cfg(test)]
 mod title_tests {
-    use super::{system_title_bar, title_x, window_title};
-
-    #[test]
-    fn title_never_overlaps_menus_or_controls() {
-        // Wide window: centred.
-        assert_eq!(title_x(800.0, 420.0, 1300.0, 60.0), Some(770.0));
-        // Centre would hit the menus: slid right into the gap.
-        assert_eq!(title_x(400.0, 420.0, 1300.0, 60.0), Some(436.0));
-        // Centre would hit the controls: slid left.
-        assert_eq!(title_x(1280.0, 420.0, 1300.0, 60.0), Some(1224.0));
-        // No room for the whole title: the caller elides or drops it.
-        assert_eq!(title_x(400.0, 420.0, 480.0, 60.0), None);
-        assert_eq!(title_x(f32::NAN, 420.0, 1300.0, 60.0), Some(436.0));
-        assert_eq!(title_x(400.0, f32::INFINITY, 1300.0, 60.0), None);
-    }
+    use super::{system_title_bar, window_title};
 
     fn app(custom_titlebar: bool) -> crate::PhotocraftApp {
         let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

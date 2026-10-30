@@ -332,14 +332,10 @@ impl PhotocraftApp {
         // transparent strip is no title bar, and AppKit would still drag the window from it.
         #[cfg(target_os = "macos")]
         if self.integrated_titlebar {
-            if self.ui.panels.menu_bar {
-                craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
-            } else if let Some(set_movable) = self.services.set_movable.as_ref()
-                && self.titlebar_movable != Some(false)
-            {
-                set_movable(false);
-                self.titlebar_movable = Some(false);
+            if !self.ui.panels.menu_bar {
+                craft_window::title_bar::set_window_movable(&ctx, false);
             }
+            craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
         }
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);

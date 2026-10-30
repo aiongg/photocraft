@@ -1,4 +1,4 @@
-use super::{PhotocraftApp, Sense, Tokens, icons, theme, vec2, widgets};
+use super::{PhotocraftApp, Sense, Tokens, icons, vec2, widgets};
 
 // ----------------------------------------------------------------------------- title bar
 
@@ -22,12 +22,10 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let active = app.session.active();
     let name = active.filter(|_| show_name).map_or_else(|| "PhotoCraft".to_owned(), |d| d.doc.name.clone());
     let dirty = active.is_some_and(|d| d.is_dirty());
-    // Under the native frame the library draws no title: the OS does. The web build and
-    // embedders have none, so the bar draws it there itself (`paint_title`).
-    let own_title = !system && matches!(frame, craft_ui::title_bar::Frame::Native);
     let mut bar = craft_ui::title_bar::TitleBar::new(&frame).labels(&labels).icons(style.icons.as_ref()).separator(true);
     if !system {
-        bar = bar.title(craft_ui::title_bar::Title::new(name.clone()).unsaved(dirty).unsaved_label(tl!("Unsaved changes")));
+        // Under the native frame the library draws the title itself, as it does in the other frames.
+        bar = bar.title_when_native(true).title(craft_ui::title_bar::Title::new(name.clone()).unsaved(dirty).unsaved_label(tl!("Unsaved changes")));
     }
     let mut response = None;
     // The leading and trailing groups run one after the other, each needing the app.
@@ -54,9 +52,6 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let app = &mut **shared.borrow_mut();
                     end = if app.services.native_menu.is_some() { craft_ui::title_bar::LeadingEnd::from_ui(ui) } else { crate::menus::menu_bar(app, ui) };
                 });
-                if own_title {
-                    paint_title(ui, &slots, &name, dirty, end);
-                }
                 end
             },
             |ui, slots| {
@@ -138,36 +133,6 @@ fn bar_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The centred title where nothing else draws one (the web build, embedders): in the free gap
-/// the library measured between the menus (ending at `menus_end`) and the controls.
-fn paint_title(ui: &egui::Ui, slots: &craft_ui::title_bar::BarSlots, name: &str, dirty: bool, menus_end: f32) {
-    let t = Tokens::get(ui.ctx());
-    let title = format!("{name}{}", if dirty { "  \u{2022}" } else { "" });
-    let rtl = crate::direction::is_rtl();
-    let gap = slots.gap;
-    let (free_l, free_r) = if gap.is_positive() {
-        (gap.left(), gap.right())
-    } else if rtl {
-        (slots.content.left(), menus_end)
-    } else {
-        (menus_end, slots.content.right())
-    };
-    let font = theme::medium(13.0);
-    let galley = ui.painter().layout_job(title_job(&title, font.clone(), t.text_dim));
-    let centre_y = slots.centre_line;
-    if let Some(x) = title_x(slots.content.center().x, free_l, free_r, galley.size().x) {
-        ui.painter().galley(egui::pos2(x, centre_y - galley.size().y / 2.0), galley, t.text_dim);
-    } else if free_r - free_l > 80.0 {
-        // Too narrow for the whole name: the start of it, elided, in the free gap next to the menus.
-        let avail = free_r - free_l - 2.0 * TITLE_GAP;
-        let mut job = title_job(&title, font, t.text_dim);
-        job.wrap = egui::text::TextWrapping::truncate_at_width(avail);
-        let g = ui.painter().layout_job(job);
-        let x = if rtl { free_r - TITLE_GAP - g.size().x } else { free_l + TITLE_GAP };
-        ui.painter().galley(egui::pos2(x, centre_y - g.size().y / 2.0), g, t.text_dim);
-    }
-}
-
 /// Whether the OS draws the window's title bar and title, so the app draws neither: the shell
 /// decided on the native frame ([`PhotocraftApp::native_frame`]). Never on the web build, whose
 /// browser tab has no document title.
@@ -196,35 +161,10 @@ pub fn sync_window_title(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// The in-app title line. It reads left to right as a whole, so a right-to-left document name keeps
-/// "— PhotoCraft" after it, at the right; egui orders the name's own words.
-pub(crate) fn title_job(title: &str, font: egui::FontId, color: egui::Color32) -> egui::text::LayoutJob {
-    let mut job = egui::text::LayoutJob::simple_singleline(title.to_owned(), font, color);
-    job.direction = egui::epaint::text::TextDirection::LeftToRight;
-    job
-}
-
 /// Room kept between the caption buttons and the bar's contents.
 const CAPTION_CLEARANCE: f32 = 4.0;
-
-/// Minimum space kept between the window title and the menus or controls beside it.
-const TITLE_GAP: f32 = 16.0;
 
 /// The workspace switcher's narrowest width, and one 28 pt title-bar icon with its spacing.
 const WORKSPACE_MIN: f32 = 90.0;
 
 const ICON_SLOT: f32 = 34.0;
-
-/// Left edge for a title `width` wide: centred on `center` when it fits in the free gap from
-/// `left` to `right` (the menus' and the controls' facing edges, whichever side each is on),
-/// else slid into that gap; None when the gap is too small for the whole title.
-pub(super) fn title_x(center: f32, left: f32, right: f32, width: f32) -> Option<f32> {
-    let (lo, hi) = (left + TITLE_GAP, right - TITLE_GAP - width);
-    if !(lo.is_finite() && hi.is_finite() && width.is_finite()) || hi < lo {
-        return None;
-    }
-    if !center.is_finite() {
-        return Some(lo);
-    }
-    Some((center - width / 2.0).clamp(lo, hi))
-}

@@ -31,7 +31,6 @@
 
 mod app_dirs;
 mod app_icon;
-mod appearance;
 #[cfg(target_os = "macos")]
 mod apple_events;
 mod caps_lock;
@@ -41,6 +40,7 @@ mod crash_guard;
 mod cursor;
 mod file_dialog_probe;
 mod gpu_startup;
+#[cfg(target_os = "linux")]
 #[cfg(target_os = "linux")]
 mod icon_theme;
 mod launch_args;
@@ -507,8 +507,8 @@ fn main() -> eframe::Result {
             app.integrated_titlebar = matches!(decision.frame, craft_window::policy::Frame::Inset(_));
             app.custom_titlebar = custom_titlebar;
             app.native_frame = matches!(decision.frame, craft_window::policy::Frame::Native);
-            let appearance = appearance::Appearance::start();
-            app.services.system_theme = appearance.as_ref().map(appearance::Appearance::theme_service);
+            let appearance = craft_platform::appearance::egui_system_service();
+            app.services.system_theme = appearance.clone().map(craft_platform::appearance::EguiService::into_theme_fn);
             // Long commands and file opens run as background jobs with progress and Cancel (#210).
             app.background_jobs = std::env::var_os("PHOTOCRAFT_INLINE_JOBS").is_none();
             // Displays and their profiles (#569): wait briefly so the first frames already use
@@ -605,7 +605,6 @@ fn main() -> eframe::Result {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
                 // Quit through AppKit, not by closing the window (Touch Bar Macs, #1575, #1458).
                 app.services.quit = Some(Box::new(mac_window::terminate_later));
-                app.services.set_movable = Some(Box::new(mac_window::set_movable));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
                     app.services.native_menu = mac_menu::install(&cc.egui_ctx, &app);
@@ -628,11 +627,7 @@ fn main() -> eframe::Result {
             app.services.window_frame = window_frame::service(cc, custom_titlebar);
             // Linux: the desktop's caption buttons (GNOME's, KDE's) on the sides its layout puts them.
             if custom_titlebar {
-                let gnome_layout: caption_style::GnomeLayoutFn = {
-                    let appearance = appearance.clone();
-                    Box::new(move || appearance.as_ref().and_then(appearance::Appearance::button_layout))
-                };
-                app.services.caption_style = caption_style::service(&decision, gnome_layout);
+                app.services.caption_style = caption_style::service(&decision, appearance.clone());
             }
             // Caps Lock state (X11/Windows/macOS; `None` on native Wayland): the canvas shows the
             // precise crosshair for painting tools while it is toggled on (#1758).
