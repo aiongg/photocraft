@@ -197,7 +197,11 @@ pub(crate) fn edit_stops(ui: &mut Ui, key: egui::Id, base: &GradientStops, optio
         }
         _ => None,
     };
-    event.or(response.color_requested.map(StopsEvent::Color))
+    // A double-click selects (an unchanged commit) and asks for the colour in one frame.
+    match (event, response.color_requested) {
+        (None | Some(StopsEvent::Commit { changed: false, .. } | StopsEvent::Cancel { .. }), Some(i)) => Some(StopsEvent::Color(i)),
+        (event, _) => event,
+    }
 }
 
 /// Shows the bar and fields for `fill` under `key` and reads the edit as an engine command.

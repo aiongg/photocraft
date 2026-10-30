@@ -3,7 +3,10 @@ use super::*;
 use crate::shape_options::set_tool_paint;
 use crate::shape_paint_ui::color_of;
 use egui::{Event, Key, Modifiers, PointerButton};
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::{
+    Harness,
+    kittest::{NodeT, Queryable},
+};
 use photocraft_doc::ShapeLayer;
 
 fn app(mode: &str, depth: u32) -> PhotocraftApp {
@@ -632,6 +635,17 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, pos: Pos2) {
     h.run_steps(2);
 }
 
+/// The fields row's Color well.
+fn color_well(h: &Harness<'_, PhotocraftApp>) -> Rect {
+    h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Color well").rect()
+}
+
+/// A point of the open inline picker's saturation / brightness field, off its centre.
+fn picker_field(h: &Harness<'_, PhotocraftApp>) -> Pos2 {
+    let field = h.get_by_label("Saturation and brightness").rect();
+    field.left_top() + vec2(12.0, 12.0)
+}
+
 /// The Gradient tab's strip edits the stops as Photoshop's popover does: a click below the ramp
 /// adds a colour stop, above it an opacity stop; Delete removes the selected one; dragging a stop
 /// moves it; the selected colour stop's swatch opens an inline picker that recolours only it.
@@ -674,12 +688,11 @@ fn gradient_tab_strip_adds_moves_recolours_and_deletes_stops() {
     assert!((locations[0] - 0.3).abs() < 0.03 && locations[1] == 1.0, "{locations:?}");
     // The selected stop's colour: its swatch opens the picker; a drag in it recolours that stop.
     let before = gradient_stops(&tool_stroke_gradient(&h)).0;
-    let swatch = h.get(egui_kittest::kittest::by().label("Color").role(egui::accesskit::Role::ColorWell)).rect();
+    let swatch = color_well(&h);
     click(&mut h, swatch.center());
     h.run_steps(2);
-    // The inline picker opens under the stop's rows (readouts, preview, then the saturation /
-    // value field); a click in that field.
-    let field = pos2(swatch.left() + 30.0, h.get_by_label("Location").rect().bottom() + 120.0);
+    // The inline picker opens under the stop's rows; a click in its saturation / value field.
+    let field = picker_field(&h);
     click(&mut h, field);
     let after = gradient_stops(&tool_stroke_gradient(&h)).0;
     assert_eq!(after.len(), before.len());
@@ -735,8 +748,7 @@ fn gradient_tab_keeps_the_stop_colour_after_a_preset_with_fewer_stops() {
     h.run_steps(3);
     assert_eq!(gradient_stops(&tool_stroke_gradient(&h)).0.len(), 2);
     assert!(h.query_by_label("Location").is_some(), "the selected stop's rows stay after a preset with fewer stops");
-    let color_well = egui_kittest::kittest::by().label("Color").role(egui::accesskit::Role::ColorWell);
-    assert!(h.query(color_well).is_some());
+    assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::Button), "the Color well stays");
     // Double-click the right colour stop: its picker opens, and a click in it recolours only that stop.
     let stop = pos2(x_at(1.0), bar_bottom + 10.0);
     h.hover_at(stop);
@@ -748,8 +760,7 @@ fn gradient_tab_keeps_the_stop_colour_after_a_preset_with_fewer_stops() {
     }
     h.run_steps(2);
     let before = gradient_stops(&tool_stroke_gradient(&h)).0;
-    let swatch = h.get(egui_kittest::kittest::by().label("Color").role(egui::accesskit::Role::ColorWell)).rect();
-    let field = pos2(swatch.left() + 30.0, h.get_by_label("Location").rect().bottom() + 120.0);
+    let field = picker_field(&h);
     click(&mut h, field);
     let after = gradient_stops(&tool_stroke_gradient(&h)).0;
     assert_eq!(after[0], before[0], "the left stop keeps its colour");
