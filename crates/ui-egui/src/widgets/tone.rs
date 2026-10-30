@@ -11,7 +11,6 @@ use photocraft_doc::adjust::ToneSpace;
 use photocraft_doc::{Document, Layer, LayerId};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 static EMPTY: [u32; 256] = [0; 256];
 
@@ -394,21 +393,6 @@ pub fn draw_histogram(p: &egui::Painter, r: Rect, h: &[u32; 256], color: Color32
         mesh.add_triangle(i, i + 2, i + 3);
     }
     p.add(mesh);
-}
-
-/// Display colour of channel `name` (curve, histogram and gradient bars).
-pub fn channel_color(name: &str, t: &Tokens) -> Color32 {
-    match name {
-        "red" => Color32::from_rgb(235, 80, 80),
-        "green" => Color32::from_rgb(80, 205, 95),
-        "blue" => Color32::from_rgb(90, 140, 255),
-        "cyan" => Color32::from_rgb(40, 200, 230),
-        "magenta" => Color32::from_rgb(225, 70, 200),
-        "yellow" => Color32::from_rgb(235, 210, 40),
-        "a" => Color32::from_rgb(220, 90, 140),
-        "b" => Color32::from_rgb(200, 180, 60),
-        _ => t.text,
-    }
 }
 
 #[cfg(test)]

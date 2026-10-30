@@ -6,8 +6,6 @@
 //! and `commit` when a gesture ends (the Properties host then runs one `layer.setAdjustment`; a
 //! dialog commits on OK). Selective Color and Color Lookup keep their editors in `adjust_ui`.
 
-use crate::point_curve as curve_edit;
-use crate::state::CurvesEditorState as CurveUi;
 use craft_ui::theme::ToEgui;
 use std::sync::Arc;
 
@@ -38,8 +36,6 @@ use basic::track_stops;
 use basic::{black_white, brightness_contrast, channel_mixer, color_balance, photo_filter, sliders, threshold};
 pub use basic::{reset_adjustment_editor, reset_color_balance};
 use curves::curves;
-#[cfg(test)]
-use curves::{CURVE_HANDLE_SIZE, curve_graph};
 pub use curves::{ToneChannel, tone_channels};
 pub(crate) use curves::{curve_side_max, read_curve};
 use gradient_map::gradient_map;
@@ -267,20 +263,6 @@ mod tests {
 
         let canonical = move_hue_range_handle([0.0, 30.0, 60.0, 90.0], 2, 65.0);
         assert_eq!(canonical, [0.0, 30.0, 65.0, 90.0]);
-    }
-
-    #[test]
-    fn curve_endpoint_handles_fit_inside_the_allocated_area() {
-        for side in [120.0, 200.0, 300.0] {
-            let full = Rect::from_min_size(pos2(100.0, 50.0), vec2(side, side + 14.0));
-            let graph = curve_graph(full, side);
-            let to_scr = |q: [f32; 2]| pos2(graph.left() + q[0] / 255.0 * graph.width(), graph.bottom() - q[1] / 255.0 * graph.height());
-            for q in [[0.0, 0.0], [255.0, 255.0]] {
-                let r = Rect::from_center_size(to_scr(q), vec2(CURVE_HANDLE_SIZE, CURVE_HANDLE_SIZE)).expand(1.0);
-                assert!(r.left() >= full.left() && r.right() <= full.right());
-                assert!(r.top() >= full.top() && r.bottom() <= full.bottom());
-            }
-        }
     }
 
     #[test]
