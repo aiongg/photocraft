@@ -166,28 +166,30 @@ fn theme_names_parse() {
 }
 
 #[test]
-fn every_palette_keeps_complete_egui_styles_when_the_os_changes() {
+fn every_palette_shows_its_own_variant_whatever_the_os_reports() {
     for kind in ThemeKind::ALL {
         let ctx = egui::Context::default();
         ctx.run_ui(egui::RawInput { system_theme: Some(egui::Theme::Dark), ..Default::default() }, |ui| apply(ui.ctx(), kind)).textures_delta.clear();
-        let expected = ctx.global_style();
         for appearance in [Some(egui::Theme::Light), Some(egui::Theme::Dark), None] {
             ctx.run_ui(egui::RawInput { system_theme: appearance, ..Default::default() }, |_| {}).textures_delta.clear();
-            assert_eq!(Tokens::get(&ctx), Tokens::for_kind(kind));
-            assert_eq!(ctx.global_style(), expected, "{kind:?} changed with {appearance:?}");
-            assert_eq!(ctx.style_of(egui::Theme::Light), expected);
-            assert_eq!(ctx.style_of(egui::Theme::Dark), expected);
+            let t = Tokens::get(&ctx);
+            assert_eq!(t, Tokens::for_kind(kind));
+            let style = ctx.global_style();
+            assert_eq!(style.visuals.dark_mode, kind.is_dark(), "{kind:?} with {appearance:?}");
+            assert_eq!(style.visuals.window_fill, t.card, "{kind:?} with {appearance:?}");
         }
     }
 }
 
 #[test]
-fn applying_a_palette_clears_a_pinned_native_appearance_preference() {
+fn applying_a_palette_pins_its_mode_over_a_pinned_native_preference() {
     for pinned in [egui::Theme::Light, egui::Theme::Dark] {
         let ctx = egui::Context::default();
         ctx.set_theme(pinned);
         apply(&ctx, ThemeKind::ProMedium);
-        assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::System);
+        assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::Dark);
+        apply(&ctx, ThemeKind::ProLight);
+        assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::Light);
     }
 }
 

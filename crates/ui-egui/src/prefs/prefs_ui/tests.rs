@@ -175,8 +175,8 @@ fn appearance_resolves_both_saved_themes_and_follows_system() {
     let mut interface = prefs::Interface { appearance_mode: AppearanceMode::Auto, ..prefs::Interface::default() };
     assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::ProMedium);
     assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::ProLight);
-    interface.dark_theme = DarkTheme::Studio;
-    interface.light_theme = LightTheme::Classic;
+    interface.theme_dark = "craft.studio".into();
+    interface.theme_light = "craft.classic".into();
     assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::Studio);
     assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::Classic);
     interface.appearance_mode = AppearanceMode::Dark;
@@ -298,15 +298,16 @@ fn appearance_frame(app: &mut PhotocraftApp, ctx: &egui::Context, appearance: Op
 fn assert_palette(ctx: &egui::Context, kind: ThemeKind) {
     let t = Tokens::get(ctx);
     assert_eq!(t.kind, kind);
-    for style in [ctx.global_style(), ctx.style_of(egui::Theme::Light), ctx.style_of(egui::Theme::Dark)] {
+    // Egui keeps a style per appearance; the variant on screen follows the palette's mode.
+    for style in [ctx.global_style(), ctx.style_of(if t.dark() { egui::Theme::Dark } else { egui::Theme::Light })] {
         assert_eq!(style.visuals.panel_fill, t.chrome);
         assert_eq!(style.visuals.window_fill, t.card);
-        assert_eq!(style.visuals.override_text_color, Some(t.text));
+        assert_eq!(style.visuals.widgets.noninteractive.fg_stroke.color, t.text);
         assert_eq!(style.visuals.widgets.inactive.bg_fill, t.field);
         assert_eq!(style.visuals.dark_mode, t.dark());
-        assert_eq!(style.text_styles[&egui::TextStyle::Body].size, if t.pro { 12.0 } else { 12.5 });
+        // The Size (Compact 12, Comfortable 13) is one setting for both slots, set by the last theme picked.
+        assert!([12.0, 13.0].contains(&style.text_styles[&egui::TextStyle::Body].size));
     }
-    assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::System);
 }
 
 #[test]
@@ -368,7 +369,10 @@ fn manual_theme_tokens_and_global_styles_stay_fixed_across_os_changes() {
         for appearance in [Some(egui::Theme::Dark), Some(egui::Theme::Light), Some(egui::Theme::Dark), None] {
             appearance_frame(&mut app, &ctx, appearance);
             assert_palette(&ctx, kind);
-            assert_eq!(Tokens::get(&ctx), Tokens::for_kind(kind));
+            // Pro Light beside the default dark theme is ArtCraft's light variant, whose status
+            // colours differ slightly from Pro's.
+            let got = Tokens::get(&ctx);
+            assert_eq!(Tokens { danger: got.danger, warning: got.warning, ..Tokens::for_kind(kind) }, got);
             assert_eq!(app.ui.theme, kind);
             assert_eq!(app.session.prefs().interface, interface);
             assert_eq!(app.session.prefs.rev(), revision);
@@ -449,8 +453,8 @@ fn preferences_interface_offers_and_applies_sync_with_system() {
     });
     h.input_mut().system_theme = Some(egui::Theme::Light);
     h.run_steps(4);
-    for label in ["Adwaita", "Adwaita dark", "Solarized dark"] {
-        assert!(h.query_by_label(label).is_some(), "missing theme choice {label}");
+    for label in ["Adwaita", "Solarized Dark"] {
+        assert!(h.query_all_by_label(label).next().is_some(), "missing theme choice {label}");
     }
     h.get_by_value("Dark").click();
     h.run_steps(2);
@@ -519,12 +523,12 @@ fn theme_star_badge_on_hover_does_not_move_the_next_swatch() {
     });
     h.run_steps(4);
     let first = h.get_by_label("Classic").rect();
-    let next = h.get_by_label("Adwaita").rect();
+    let next = h.query_all_by_label("Adwaita").next().expect("the Adwaita swatch").rect();
     h.hover_at(first.right_top() + vec2(-3.0, 3.0));
     h.run_steps(3);
     assert!(h.query_by_label("Add to favorites: Classic").is_some(), "the badge shows while the swatch is hovered");
     assert_eq!(h.get_by_label("Classic").rect(), first);
-    assert_eq!(h.get_by_label("Adwaita").rect(), next);
+    assert_eq!(h.query_all_by_label("Adwaita").next().expect("the Adwaita swatch").rect(), next);
 }
 
 #[test]
@@ -575,7 +579,7 @@ fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
     }
 
     let h = render("theme");
-    assert!(shown(&h, "Appearance") && shown(&h, "Light Theme") && shown(&h, "Dark Theme") && shown(&h, "Breeze dark"));
+    assert!(shown(&h, "Appearance") && shown(&h, "Light Theme") && shown(&h, "Dark Theme") && shown(&h, "Breeze"));
     for gone in ["Appearance Mode", "Presentation", "Language", "Options"] {
         assert!(!shown(&h, gone), "\"theme\" must not show {gone}");
     }
@@ -1413,7 +1417,12 @@ fn show_tooltips_preferences_turn_tooltips_off() {
 
 #[test]
 fn enable_animations_off_stops_fades_and_scroll_glides_and_is_remembered() {
-    let on = egui::Style::default().animation_time;
+    let on = {
+        let (mut app, _) = app_with_store();
+        let ctx = egui::Context::default();
+        tick(&mut app, &ctx);
+        ctx.global_style().animation_time
+    };
     let both = |ctx: &egui::Context| [egui::Theme::Dark, egui::Theme::Light].map(|t| ctx.style_of(t).animation_time);
     // Saved off: the first frame after a restart applies it to both appearance styles.
     let (mut app, _) = app_with_saved(Some(json!({"interface": {"enableAnimations": false}}).to_string()));

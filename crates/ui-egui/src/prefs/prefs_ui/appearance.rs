@@ -262,16 +262,22 @@ pub(super) fn sync_tooltips(app: &PhotocraftApp, ctx: &egui::Context) {
 }
 
 /// Interface › Enable Animations: off, egui's fades and slides take no time and scroll areas jump
-/// straight to their target (#3273). Re-checked every frame because a theme change rebuilds the
-/// style; both the dark and light styles are set, so a system appearance switch keeps it.
+/// straight to their target (#3273). The selection already asks for reduced motion; this
+/// re-checks every frame because a theme change rebuilds the style, and covers the scroll glide,
+/// which the library's reduced-motion style leaves on. On, the library's motion stands. Both the
+/// dark and light styles are set, so a system appearance switch keeps it.
 pub(super) fn sync_animations(app: &PhotocraftApp, ctx: &egui::Context) {
-    let on = app.session.prefs().interface.enable_animations;
-    let time = if on { egui::Style::default().animation_time } else { 0.0 };
-    if ctx.global_style().animation_time != time {
-        let scroll = if on { egui::style::ScrollAnimation::default() } else { egui::style::ScrollAnimation::none() };
+    if app.session.prefs().interface.enable_animations {
+        return;
+    }
+    let none = egui::style::ScrollAnimation::none();
+    if [egui::Theme::Dark, egui::Theme::Light].iter().any(|t| {
+        let s = ctx.style_of(*t);
+        s.animation_time != 0.0 || s.scroll_animation != none
+    }) {
         ctx.all_styles_mut(|s| {
-            s.animation_time = time;
-            s.scroll_animation = scroll;
+            s.animation_time = 0.0;
+            s.scroll_animation = egui::style::ScrollAnimation::none();
         });
     }
 }
@@ -300,6 +306,11 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     persist_suite(app);
     let key = (sel.clone(), system, generation);
     let rt = &mut app.prefs_rt.suite;
+    // A restored or embedding-supplied pin must not suppress native appearance events while the
+    // mode follows the system.
+    if sel.mode == ModeChoice::System && ctx.options(|o| o.theme_preference) != egui::ThemePreference::System && ctx.system_theme().is_some() {
+        ctx.set_theme(egui::ThemePreference::System);
+    }
     // A kind set from outside (tests, `ui.set`) is put back to what the selection resolves to.
     if rt.resolved.as_ref() == Some(&key) && rt.shown.as_ref().is_some_and(|(kind, _)| *kind == app.ui.theme) {
         return;
