@@ -9,9 +9,7 @@
 //! groups and where a floated panel docks back.
 
 use crate::dock::Group;
-use craft_ui::docking::{
-    Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side, Target, Zone,
-};
+use craft_ui::docking::{Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side};
 use craft_ui::layout::{SplitAxis, SplitSize};
 use craft_ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
@@ -55,6 +53,11 @@ const DOCK_LABELS: &[(&str, &str)] = &[
     ("dock.resizeWindow", "Resize panel window"),
     ("dock.closeGroup", "Close Tab Group"),
     ("dock.floatGroup", "Float Tab Group"),
+    ("dock.minimize", "Collapse Panel Group"),
+    ("dock.expand", "Expand Panel Group"),
+    ("dock.moveGroupUp", "Move Group Up"),
+    ("dock.moveGroupDown", "Move Group Down"),
+    ("dock.panelMenu", "Panel menu"),
 ];
 
 /// Where a panel floats when a command gives no rect: craft-ui places it 24 points inside this
@@ -158,6 +161,34 @@ pub(crate) fn newer(saved: &Value) -> bool {
     saved.get("docking").and_then(|docking| docking.get("version")).and_then(Value::as_u64).is_some_and(|version| version > u64::from(Workspace::VERSION))
 }
 
+/// A saved workspace keeps its collapsed groups in the layout. Older saves listed the collapsed
+/// panels as `dockingCollapsed` and left the native dock's collapse flags on an intact native
+/// group; both minimize the group once here, and the flags are cleared.
+pub(crate) fn migrate_collapsed(app: &mut PhotocraftApp, saved: &Value) {
+    let Some(mut workspace) = app.ui.docking.take() else { return };
+    let mut collapsed: std::collections::HashSet<String> =
+        saved.get("dockingCollapsed").and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok()).unwrap_or_default().into_iter().collect();
+    let pro = app.ui.theme.is_pro();
+    for panels in root_groups(&workspace.layout) {
+        let group = panels.first().and_then(|id| PANELS.iter().find(|p| p.0 == id)).map(|p| p.2);
+        if let Some(group) = group.filter(|group| app.ui.dock.is_collapsed(*group)) {
+            let native: Vec<_> = app.ui.dock.visible_tabs(group, pro).iter().filter_map(|(_, name)| normalize(name)).collect();
+            if panels.len() == native.len() && panels.iter().all(|panel| native.contains(&panel.as_str())) {
+                collapsed.extend(panels.iter().cloned());
+            }
+        }
+    }
+    for panels in root_groups(&workspace.layout) {
+        if let Some(first) = panels.first().filter(|_| panels.iter().all(|id| collapsed.contains(id))) {
+            let _ = workspace.apply(Action::SetMinimized { panel: first.clone(), minimized: true }, permissions);
+        }
+    }
+    app.ui.docking = Some(workspace);
+    for group in Group::ALL {
+        app.ui.dock.set_collapsed(group, false);
+    }
+}
+
 fn legacy(app: &PhotocraftApp) -> Layout<String> {
     legacy_layout(app, false)
 }
@@ -184,7 +215,7 @@ fn legacy_layout(app: &PhotocraftApp, all: bool) -> Layout<String> {
             continue;
         }
         let height = app.ui.dock.heights.contains_key(&group).then(|| app.ui.dock.height(group));
-        groups.push(craft_ui::docking::Group { height, ..craft_ui::docking::Group::new(panels, active) });
+        groups.push(craft_ui::docking::Group { height, minimized: app.ui.dock.is_collapsed(group), ..craft_ui::docking::Group::new(panels, active) });
     }
     let (columns, width) = if groups.is_empty() { (Vec::new(), 0.0) } else { (vec![Column::new(groups, default_width(pro))], default_width(pro)) };
     Layout { root: Some(with_canvas(Node::Dock { side: Side::End, columns }, width)), floating }
@@ -224,6 +255,10 @@ fn commit(app: &mut PhotocraftApp, workspace: Workspace, mut returns: Returns) {
     returns.retain(|panel, _| floats(&workspace.layout, panel));
     app.ui.docking = Some(workspace);
     app.ui.docking_returns = returns;
+    // A group the native dock had collapsed is minimized in the layout from here on.
+    for group in Group::ALL {
+        app.ui.dock.set_collapsed(group, false);
+    }
     app.ui.panels.dock = true;
     sync_visibility(app);
 }
@@ -232,24 +267,16 @@ fn floats(layout: &Layout<String>, panel: &str) -> bool {
     layout.floating.iter().any(|window| window.contains(&panel.to_owned()))
 }
 
-// Native collapse flags remain app-owned. An intact native tab group keeps its collapsed
-// presentation when the workspace first becomes customizable; mixed custom groups are expanded.
-fn collapsed_members(app: &PhotocraftApp, layout: &Layout<String>) -> std::collections::HashSet<String> {
-    let mut collapsed: std::collections::HashSet<String> = app.ui.docking_collapsed.iter().cloned().collect();
-    for group in layout.root.iter().flat_map(tree_groups).filter(|group| group.minimized) {
-        collapsed.extend(group.panels);
-    }
-    for panels in root_groups(layout) {
-        let group = panels.first().and_then(|id| PANELS.iter().find(|p| p.0 == id)).map(|p| p.2);
-        if let Some(group) = group.filter(|group| app.ui.dock.is_collapsed(*group)) {
-            let pro = app.ui.theme.is_pro();
-            let native: Vec<_> = app.ui.dock.visible_tabs(group, pro).iter().filter_map(|(_, name)| normalize(name)).collect();
-            if panels.len() == native.len() && panels.iter().all(|panel| native.contains(&panel.as_str())) {
-                collapsed.extend(panels.iter().cloned());
-            }
-        }
-    }
-    collapsed
+/// The panels of the dock groups that are minimized (PhotoCraft's collapsed groups).
+fn collapsed_members(layout: &Layout<String>) -> std::collections::HashSet<String> {
+    layout.root.iter().flat_map(tree_groups).filter(|group| group.minimized).flat_map(|group| group.panels).collect()
+}
+
+/// The panels of the minimized groups, sorted: `inspect`'s `dockingCollapsed`.
+pub(crate) fn collapsed_panels(app: &PhotocraftApp) -> Vec<String> {
+    let mut panels: Vec<String> = app.ui.docking.iter().flat_map(|workspace| collapsed_members(&workspace.layout)).collect();
+    panels.sort();
+    panels
 }
 
 fn first_root(layout: &Layout<String>, except: &str) -> Option<String> {
@@ -360,7 +387,7 @@ pub(crate) fn command(app: &mut PhotocraftApp, id: &str, params: &Value) -> Opti
         let layout = app.ui.docking.as_ref().map(|workspace| &workspace.layout);
         let showing = layout.is_some_and(|layout| layout.contains(&panel.to_string()));
         let show = match params.get("show").or_else(|| params.get("on")) {
-            None => !showing || layout.is_some_and(|layout| !panel_active(layout, panel) || collapsed_members(app, layout).contains(panel)),
+            None => !showing || layout.is_some_and(|layout| !panel_active(layout, panel) || collapsed_members(layout).contains(panel)),
             Some(value) => match value.as_bool() {
                 Some(show) => show,
                 None => return Some(Err("show must be a boolean".into())),
@@ -481,11 +508,7 @@ fn run(app: &mut PhotocraftApp, command: DockCommand<String>) -> Result<Value, S
     }
     commit(app, workspace, returns);
     if let Some(panel) = &reveal {
-        if let Some((_, _, group)) = PANELS.iter().find(|p| p.0 == panel) {
-            app.ui.dock.set_collapsed(*group, false);
-        }
         app.ui.docking_reveal = Some(panel.clone());
-        reveal_group(app, panel);
     }
     let layout = app.ui.docking.as_ref().map(|workspace| &workspace.layout);
     Ok(json!({"panel": command_panel(&command), "layout": layout, "closed": closed}))
@@ -552,8 +575,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         Some(workspace) => workspace.layout.clone(),
         None => legacy(app),
     };
-    let collapsed = collapsed_members(app, &layout);
-    let layout = presented(layout, &collapsed);
+    let collapsed = collapsed_members(&layout);
     let fillers = fillers(&layout);
     let reveal = app.ui.docking_reveal.take();
     let t = crate::theme::Tokens::get(ui.ctx());
@@ -572,6 +594,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     style.accent = t.accent;
     style.right_to_left = crate::direction::is_rtl();
     style.new_dock_zones = true;
+    // The panel menu button ends every tab strip; its menu has the panel's items, then the group's
+    // (collapse, float, move up and down, close).
+    style.panel_menu_button = true;
     let style = style.localized(|key| DOCK_LABELS.iter().find(|(k, _)| *k == key).map(|(_, english)| tl!(english).to_string()));
     let mut dock = craft_ui::docking::DockArea::new(area)
         .locked(locked)
@@ -584,7 +609,6 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     {
         dock = dock.native_input_hook(native_input_hook(ui.ctx()));
     }
-    let mut commands = Vec::new();
     let strip = style.tab_height;
     let card: std::collections::HashSet<String> =
         layout.floating.iter().filter(|window| window.id == PROPERTIES_WINDOW).flat_map(|window| window.panels().cloned()).collect();
@@ -609,7 +633,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 craft_ui::docking::PanelLimits { min: egui::vec2(220.0, height), ..Default::default() }
             }
         },
-        &mut PanelContent { app, collapsed: &collapsed, fillers: &fillers, card: &card, strip, commands: &mut commands },
+        &mut PanelContent { app, collapsed: &collapsed, fillers: &fillers, card: &card, strip },
     );
     if let Some(error) = output.error.take() {
         app.ui.status = error.to_string();
@@ -622,20 +646,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut actions = output.actions;
     pin_group_heights(ui.ctx(), &layout, &mut actions);
     for action in actions {
-        let result = match action {
-            // A dock group minimizes as PhotoCraft's collapsed group, which the native dock's
-            // collapse also sets.
-            Action::SetMinimized { panel, minimized } if in_dock_column(&layout, &panel) => {
-                group_command(app, &json!({"panel": panel, "operation": if minimized {"collapse"} else {"expand"}}))
-            }
-            action => app.run("window.panel.layout", json!({"action": action})),
-        };
-        if let Err(error) = result {
-            app.ui.status = error;
-        }
-    }
-    for (id, params) in commands {
-        if let Err(error) = app.run(id, params) {
+        if let Err(error) = app.run("window.panel.layout", json!({"action": action})) {
             app.ui.status = error;
         }
     }
@@ -789,23 +800,6 @@ fn native_dock_width(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// `layout` as drawn: a dock group whose panels are all collapsed shows only its tab strip.
-fn presented(mut layout: Layout<String>, collapsed: &std::collections::HashSet<String>) -> Layout<String> {
-    let mut pending: Vec<&mut Node<String>> = layout.root.iter_mut().collect();
-    while let Some(node) = pending.pop() {
-        match node {
-            Node::Split { first, second, .. } => pending.extend([first.as_mut(), second.as_mut()]),
-            Node::Dock { columns, .. } => {
-                for group in columns.iter_mut().flat_map(|c| c.groups.iter_mut()) {
-                    group.minimized |= group.panels.iter().all(|id| collapsed.contains(id));
-                }
-            }
-            _ => {}
-        }
-    }
-    layout
-}
-
 /// The panels of each dock column's last open group, which fills the column.
 fn fillers(layout: &Layout<String>) -> std::collections::HashSet<String> {
     let mut out = std::collections::HashSet::new();
@@ -956,22 +950,10 @@ fn group_members(layout: &Layout<String>, panel: &str) -> Vec<String> {
     layout.root.iter().chain(layout.floating.iter().map(|window| &window.root)).find_map(|root| tree_group(root, panel)).unwrap_or_default()
 }
 
-fn reveal_group(app: &mut PhotocraftApp, panel: &str) {
-    if let Some(workspace) = &app.ui.docking {
-        let members = group_members(&workspace.layout, panel);
-        app.ui.docking_collapsed.retain(|id| !members.contains(id));
-        for id in members {
-            if let Some((_, _, group)) = PANELS.iter().find(|p| p.0 == id) {
-                app.ui.dock.set_collapsed(*group, false);
-            }
-        }
-    }
-}
-
 pub(crate) fn rail_on(app: &PhotocraftApp, group: Group) -> bool {
     app.ui.docking.as_ref().is_some_and(|workspace| {
         let layout = &workspace.layout;
-        let collapsed = collapsed_members(app, layout);
+        let collapsed = collapsed_members(layout);
         PANELS.iter().filter(|p| p.2 == group).any(|p| layout.contains(&p.0.to_owned()) && !collapsed.contains(p.0))
     })
 }
@@ -1003,7 +985,8 @@ fn root_groups(layout: &Layout<String>) -> Vec<Vec<String>> {
     layout.root.iter().flat_map(tree_groups).map(|group| group.panels).filter(|panels| !panels.iter().any(|id| id == CANVAS)).collect()
 }
 
-/// `window.panel.group {panel, operation}`: PhotoCraft's commands for a panel's whole group.
+/// `window.panel.group {panel, operation}`: automation's commands for a panel's whole group.
+/// Collapse and expand are `window.panel.minimize`, up and down `window.panel.stepGroup`.
 fn group_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, String> {
     let panel = params.get("panel").and_then(Value::as_str).and_then(normalize).ok_or("panel must name a registered panel")?;
     let operation = params.get("operation").and_then(Value::as_str).ok_or("operation is required")?;
@@ -1011,19 +994,18 @@ fn group_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Strin
         return Err("workspace is locked".into());
     }
     let mut workspace = workspace_of(app)?;
-    let members = group_members(&workspace.layout, panel);
-    if members.is_empty() {
+    if group_members(&workspace.layout, panel).is_empty() {
         return Err("panel is hidden".into());
     }
-    let mut collapsed = collapsed_members(app, &workspace.layout);
+    let panel = panel.to_owned();
     match operation {
-        "close" => {
-            workspace.apply(Action::CloseGroup { panel: panel.to_owned() }, permissions).map_err(|e| e.to_string())?;
-            collapsed.retain(|id| !members.contains(id));
+        "close" => drop(workspace.apply(Action::CloseGroup { panel }, permissions).map_err(|e| e.to_string())?),
+        "collapse" | "expand" => {
+            drop(workspace.apply(Action::SetMinimized { panel, minimized: operation == "collapse" }, permissions).map_err(|e| e.to_string())?)
         }
-        "collapse" => collapsed.extend(members.iter().cloned()),
-        "expand" => collapsed.retain(|id| !members.contains(id)),
+        "up" | "down" => drop(workspace.apply(Action::StepGroup { panel, up: operation == "up" }, permissions).map_err(|e| e.to_string())?),
         "move" => {
+            let members = group_members(&workspace.layout, &panel);
             if params.get("anchor").and_then(Value::as_str).and_then(normalize).is_some_and(|anchor| members.iter().any(|id| id == anchor)) {
                 return Err("group cannot be moved into itself".into());
             }
@@ -1035,44 +1017,21 @@ fn group_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Strin
             let before = (app.ui.docking.clone(), app.ui.docking_returns.clone());
             dock_command(app, "window.panel.move", &params)?;
             workspace = workspace_of(app)?;
-            if let Err(error) = workspace.apply(Action::Activate { panel: panel.to_owned() }, permissions) {
+            if let Err(error) = workspace.apply(Action::Activate { panel }, permissions) {
                 (app.ui.docking, app.ui.docking_returns) = before;
                 sync_visibility(app);
                 return Err(error.to_string());
             }
         }
-        "up" | "down" => {
-            let groups = root_groups(&workspace.layout);
-            let index = groups.iter().position(|g| g.contains(&panel.to_owned())).ok_or("floating groups cannot move within the dock")?;
-            let neighbor = if operation == "up" { index.checked_sub(1) } else { index.checked_add(1).filter(|i| *i < groups.len()) };
-            let anchor = neighbor.and_then(|i| groups.get(i)).and_then(|g| g.first()).ok_or("group is already at the edge")?;
-            let zone = if operation == "up" { Zone::Top } else { Zone::Bottom };
-            let placement = Placement::for_zone(&workspace.layout, anchor, zone, crate::direction::is_rtl()).map_err(|e| e.to_string())?;
-            workspace
-                .apply_all(
-                    [
-                        Action::MoveGroup { panel: panel.to_owned(), to: Target::At { anchor: anchor.clone(), placement } },
-                        Action::Activate { panel: panel.to_owned() },
-                    ],
-                    permissions,
-                )
-                .map_err(|e| e.to_string())?;
-        }
         _ => return Err("operation must be close, collapse, expand, move, up or down".into()),
     }
     let returns = app.ui.docking_returns.clone();
     commit(app, workspace, returns);
-    app.ui.docking_collapsed = collapsed.into_iter().collect();
-    // Native collapse flags must not re-collapse a custom group after explicit expansion.
-    if operation == "expand" || operation == "move" {
-        reveal_group(app, panel);
-    }
     Ok(json!({"layout": app.ui.docking.as_ref().map(|workspace| &workspace.layout)}))
 }
 
 pub(crate) struct LegacyUpdate {
     workspace: Workspace,
-    clear_collapse: Vec<Group>,
 }
 
 /// Validate and stage the legacy controls before ui.set commits any fields.
@@ -1101,9 +1060,10 @@ pub(crate) fn prepare_legacy_update(
     if app.session.prefs().workspace_locked {
         return Err("workspace is locked".into());
     }
-    let clear_collapse: Vec<_> =
-        dock.map(|d| Group::ALL.into_iter().filter(|g| d.is_collapsed(*g) != app.ui.dock.is_collapsed(*g)).collect()).unwrap_or_default();
-    if !clear_collapse.is_empty()
+    let collapse_changes: Vec<_> = dock
+        .map(|d| Group::ALL.into_iter().filter(|g| d.is_collapsed(*g) != app.ui.dock.is_collapsed(*g)).map(|g| (g, d.is_collapsed(g))).collect())
+        .unwrap_or_default();
+    if !collapse_changes.is_empty()
         && root_groups(&current.layout).iter().any(|ids| {
             let groups: std::collections::HashSet<_> = ids.iter().filter_map(|id| PANELS.iter().find(|p| p.0 == id).map(|p| p.2)).collect();
             groups.len() > 1
@@ -1145,22 +1105,34 @@ pub(crate) fn prepare_legacy_update(
             workspace.apply(Action::Activate { panel: id.to_owned() }, permissions).map_err(|e| e.to_string())?;
         }
     }
-    Ok(Some(LegacyUpdate { workspace, clear_collapse }))
+    // A group the request collapses or expands, by its first panel in the layout; showing a group
+    // or selecting its tab expands it.
+    for group in Group::ALL {
+        let expands = request.get("dockTabs").and_then(|p| p.get(group.key())).is_some()
+            || request.get("panels").and_then(|p| p.get(group.key())).and_then(Value::as_bool) == Some(true);
+        let minimized = if expands {
+            false
+        } else if let Some((_, on)) = collapse_changes.iter().find(|(g, _)| *g == group) {
+            *on
+        } else {
+            continue;
+        };
+        if let Some(panel) = PANELS.iter().find(|p| p.2 == group && workspace.layout.contains(&p.0.to_owned())).map(|p| p.0)
+            && collapsed_members(&workspace.layout).contains(panel) != minimized
+        {
+            workspace.apply(Action::SetMinimized { panel: panel.to_owned(), minimized }, permissions).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(Some(LegacyUpdate { workspace }))
 }
 
 pub(crate) fn commit_legacy_update(app: &mut PhotocraftApp, update: LegacyUpdate, request: &Value) {
-    for group in update.clear_collapse {
-        let ids: Vec<_> = PANELS.iter().filter(|p| p.2 == group).map(|p| p.0).collect();
-        app.ui.docking_collapsed.retain(|id| !ids.contains(&id.as_str()));
-    }
     let returns = app.ui.docking_returns.clone();
     commit(app, update.workspace, returns);
     for group in Group::ALL {
         if request.get("dockTabs").and_then(|p| p.get(group.key())).is_some()
             || request.get("panels").and_then(|p| p.get(group.key())).and_then(Value::as_bool) == Some(true)
         {
-            let ids: Vec<_> = PANELS.iter().filter(|p| p.2 == group).map(|p| p.0).collect();
-            app.ui.docking_collapsed.retain(|id| !ids.contains(&id.as_str()));
             app.ui.dock.set_collapsed(group, false);
         }
     }
@@ -1174,7 +1146,6 @@ struct PanelContent<'a> {
     card: &'a std::collections::HashSet<String>,
     /// The tab strip's height, which the native groups' heights include.
     strip: f32,
-    commands: &'a mut Vec<(&'static str, Value)>,
 }
 
 fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: &str) {
@@ -1242,43 +1213,6 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
     }
     fn allow_native(&self, id: &String) -> bool {
         !self.card.contains(id)
-    }
-    fn group_header_width(&self, _panels: &[String], _active: &String, _floating: bool, _strip_width: f32) -> f32 {
-        28.0
-    }
-    fn group_header(&mut self, ui: &mut egui::Ui, panels: &[String], active: &String, floating: bool) {
-        let collapsed = panels.iter().all(|id| self.collapsed.contains(id));
-        let locked = self.app.session.prefs().workspace_locked;
-        let resp = crate::icons::button(ui, "ellipsis", ui.available_height().min(28.0), false, tl!("Panel menu"));
-        egui::Popup::menu(&resp).show(|ui| {
-            ui.set_min_width(180.0);
-            panel_menu(self.app, ui, active);
-            if ui.add_enabled(!locked, egui::Button::new(if collapsed { tl!("Expand Panel Group") } else { tl!("Collapse Panel Group") })).clicked() {
-                self.commands.push(("window.panel.group", json!({"panel":active,"operation":if collapsed {"expand"} else {"collapse"}})));
-                ui.close();
-            }
-            if ui.add_enabled(!locked, egui::Button::new(if floating { tl!("Dock Panel") } else { tl!("Float Panel") })).clicked() {
-                self.commands.push((if floating { "window.panel.dock" } else { "window.panel.float" }, json!({"panel":active})));
-                ui.close();
-            }
-            if !floating {
-                let groups = self.app.ui.docking.as_ref().map(|workspace| root_groups(&workspace.layout)).unwrap_or_default();
-                let index = groups.iter().position(|g| g.contains(active));
-                for (operation, label, enabled) in
-                    [("up", tl!("Move Group Up"), index.is_some_and(|i| i > 0)), ("down", tl!("Move Group Down"), index.is_some_and(|i| i + 1 < groups.len()))]
-                {
-                    if ui.add_enabled(!locked && enabled, egui::Button::new(label)).clicked() {
-                        self.commands.push(("window.panel.group", json!({"panel":active,"operation":operation})));
-                        ui.close();
-                    }
-                }
-            }
-            ui.separator();
-            if ui.add_enabled(!locked, egui::Button::new(tl!("Close Tab Group"))).clicked() {
-                self.commands.push(("window.panel.group", json!({"panel":active,"operation":"close"})));
-                ui.close();
-            }
-        });
     }
 }
 

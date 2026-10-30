@@ -399,9 +399,6 @@ pub struct UiState {
     /// version, which shows the default layout: saved again unchanged until the layout changes.
     #[serde(skip)]
     pub docking_kept: Option<serde_json::Map<String, serde_json::Value>>,
-    /// Panels belonging to explicitly collapsed custom tab groups.
-    #[serde(default)]
-    pub docking_collapsed: Vec<String>,
     /// One-frame focus/raise request from an explicit panel reveal.
     #[serde(skip)]
     pub docking_reveal: Option<String>,
@@ -560,7 +557,6 @@ impl Default for UiState {
             docking_returns: Default::default(),
             docking_kept: None,
             docking_generation: 0,
-            docking_collapsed: Vec::new(),
             docking_reveal: None,
             color_panel: Default::default(),
             brush_section: 0,

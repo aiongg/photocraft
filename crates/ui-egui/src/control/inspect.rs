@@ -72,7 +72,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "dock": app.ui.dock,
         "docking": app.ui.docking,
         "dockingReturns": app.ui.docking_returns,
-        "dockingCollapsed": app.ui.docking_collapsed,
+        "dockingCollapsed": crate::panel_docking::collapsed_panels(app),
         "view": app.ui.view,
         "views": app.ui.views,
         "dialogs": dialogs,

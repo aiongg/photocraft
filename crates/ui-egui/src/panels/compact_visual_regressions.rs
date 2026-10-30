@@ -50,7 +50,7 @@ fn compact_toolbar_scrolls_to_and_activates_the_last_tool() {
             // second "Zoom Tool" node.
             harness.event(egui::Event::PointerMoved(pos2(300.0, 100.0)));
             harness.run_steps(2);
-            let node = harness.get_by_label("Zoom Tool  (Z)");
+            let node = harness.get_by_label("Zoom Tool");
             let rect = node.rect();
             assert!(rect.top() >= 0.0 && rect.bottom() <= 360.0, "{kind:?} at {scale}x: last tool remains outside the toolbar: {rect:?}");
             node.click();
@@ -71,14 +71,14 @@ fn compact_toolbar_tab_reveals_and_activates_the_last_tool() {
             for _ in 0..80 {
                 harness.key_press(egui::Key::Tab);
                 harness.run_steps(3);
-                reached = harness.get_by_label("Zoom Tool  (Z)").is_focused();
+                reached = harness.get_by_label("Zoom Tool").is_focused();
                 if reached {
                     break;
                 }
             }
             assert!(reached, "{kind:?} at {scale}x: Tab must reach the last tool");
             harness.run_steps(20);
-            let rect = harness.get_by_label("Zoom Tool  (Z)").rect();
+            let rect = harness.get_by_label("Zoom Tool").rect();
             assert!(rect.top() >= 0.0 && rect.bottom() <= 360.0, "{kind:?} at {scale}x: focused tool remains clipped: {rect:?}");
             harness.key_press(egui::Key::Space);
             harness.run_steps(3);

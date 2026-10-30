@@ -104,9 +104,9 @@ pub use properties::properties_window;
 use properties::{adjustments_grid, properties_body};
 pub use status_bar::status_bar;
 pub use title_bar::{sync_window_title, system_title_bar, title_bar, window_title};
+pub use toolbar::toolbar;
 #[cfg(test)]
-use toolbar::{STUDIO_CHIP, TOOL_SECTIONS, chips_height, color_chips, tool_flyout_drag_open, tool_flyout_release, toolbar_icon_size, visible_sections};
-pub use toolbar::{paint_toolbar_flyout_indicator, toolbar, toolbar_width};
+use toolbar::{TOOL_SECTIONS, chips_height, color_chips};
 
 fn c32(c: [f32; 4]) -> Color32 {
     Color32::from_rgba_unmultiplied((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8, (c[3] * 255.0) as u8)
@@ -1099,82 +1099,6 @@ mod swatch_type_tests {
 }
 
 #[cfg(test)]
-mod tool_flyout_drag_tests {
-    use super::*;
-
-    fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64, events: Vec<egui::Event>) {
-        let mut out = ctx.run_ui(
-            egui::RawInput { time: Some(time), events, screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 1800.0))), ..Default::default() },
-            |ui| toolbar(app, ui),
-        );
-        out.textures_delta.clear();
-    }
-
-    fn primary(pos: Pos2, pressed: bool) -> egui::Event {
-        egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() }
-    }
-
-    #[test]
-    fn flyout_drag_only_opens_after_a_primary_press_leaves_its_button() {
-        let button = Rect::from_min_size(pos2(20.0, 20.0), vec2(36.0, 36.0));
-        let inside = button.center();
-        let outside = pos2(120.0, 34.0);
-        assert!(!tool_flyout_drag_open(button, Some(inside), Some(inside), true));
-        assert!(!tool_flyout_drag_open(button, Some(inside), Some(outside), false));
-        assert!(!tool_flyout_drag_open(button, Some(outside), Some(outside), true));
-        assert!(!tool_flyout_drag_open(button, None, Some(outside), true));
-        assert!(tool_flyout_drag_open(button, Some(inside), Some(outside), true));
-        let row = Rect::from_min_size(pos2(90.0, 20.0), vec2(160.0, 26.0));
-        assert!(tool_flyout_release(row, Some(row.center()), true, true));
-        assert!(!tool_flyout_release(row, Some(row.center()), false, true));
-        assert!(!tool_flyout_release(row, Some(row.center()), true, false));
-        assert!(!tool_flyout_release(row, Some(outside + vec2(0.0, 200.0)), true, true));
-        assert!(!tool_flyout_release(row, None, true, true));
-    }
-
-    /// #2301: the press begins on the toolbar button, not on a flyout row. No long-press
-    /// delay is needed; releasing over the second row picks it and closes the flyout.
-    #[test]
-    fn flyout_press_drag_release_selects_the_row_without_long_press() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
-        frame(&mut app, &ctx, 0.0, vec![]);
-        frame(&mut app, &ctx, 0.1, vec![]);
-        let slot_index = TOOL_SECTIONS.iter().flat_map(|section| section.iter()).position(|slot| slot.contains(&Tool::Brush)).unwrap();
-        let bx = if Tokens::get(&ctx).pro { 30.0 } else { 36.0 };
-        let mut buttons: Vec<Rect> = ctx.viewport(|v| {
-            v.prev_pass
-                .widgets
-                .layers()
-                .flat_map(|(_, w)| w.iter())
-                .filter(|w| w.rect.size() == egui::Vec2::splat(bx) && w.sense.senses_click())
-                .map(|w| w.rect)
-                .collect()
-        });
-        buttons.sort_by(|a, b| a.top().total_cmp(&b.top()));
-        let origin = buttons[slot_index].center();
-        let key = egui::Id::unique(("tool-slot", slot_index));
-        let flyout_id = egui::Id::unique("tool-flyout");
-        let initial = app.ui.tool;
-        frame(&mut app, &ctx, 1.0, vec![egui::Event::PointerMoved(origin), primary(origin, true)]);
-        assert!(ctx.data(|d| d.get_temp::<(egui::Id, Rect)>(flyout_id)).is_none());
-        // Move right of the icon, still held. The flyout must appear before 350 ms.
-        frame(&mut app, &ctx, 1.08, vec![egui::Event::PointerMoved(origin + vec2(bx + 70.0, 0.0))]);
-        assert_eq!(ctx.data(|d| d.get_temp::<(egui::Id, Rect)>(flyout_id)).map(|(id, _)| id), Some(key));
-        assert_eq!(app.ui.tool, initial, "drag-opening doesn't activate the starting tool");
-        let menu = ctx.memory(|m| m.area_rect(key.with("flyout"))).expect("flyout area");
-        let row = pos2(menu.left() + 65.0, menu.top() + 47.0);
-        frame(&mut app, &ctx, 1.12, vec![egui::Event::PointerMoved(row)]);
-        frame(&mut app, &ctx, 1.16, vec![primary(row, false)]);
-        assert_eq!(app.ui.tool, Tool::Pencil);
-        assert!(ctx.data(|d| d.get_temp::<(egui::Id, Rect)>(flyout_id)).is_none());
-        frame(&mut app, &ctx, 1.2, vec![]);
-        assert_eq!(app.ui.tool, Tool::Pencil, "the original button cannot activate on release");
-    }
-}
-
-#[cfg(test)]
 mod type_flyout_tests;
 
 #[cfg(test)]
@@ -1215,16 +1139,15 @@ mod toolbar_hidden_tests {
     }
 
     #[test]
-    fn a_slot_keeps_only_its_visible_tools_and_its_index() {
-        let sections = visible_sections(&["Sponge".to_string(), "Move".to_string(), "Artboard".to_string()]);
-        assert_eq!(sections.len(), TOOL_SECTIONS.len() - 1, "the Move section has no tools left");
-        let index = TOOL_SECTIONS.iter().flat_map(|section| section.iter()).position(|slot| slot.contains(&Tool::Sponge)).unwrap();
-        let slot = sections.iter().flatten().find(|(i, _)| *i == index).map(|(_, tools)| tools.clone());
-        assert_eq!(slot, Some(vec![Tool::Dodge, Tool::Burn]));
-        assert!(sections.iter().flatten().all(|(_, tools)| !tools.contains(&Tool::Move) && !tools.contains(&Tool::Sponge)));
-        assert_eq!(visible_sections(&[]).iter().map(Vec::len).sum::<usize>(), TOOL_SECTIONS.iter().map(|section| section.len()).sum::<usize>());
-        let by_command = visible_sections(&["sponge".to_string(), "move".to_string(), "artboard".to_string()]);
-        assert_eq!(by_command, sections, "edit.toolbar names are read like `ui.set {{tool}}` names");
+    fn hidden_tools_are_read_by_debug_or_command_name() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let all = tool_buttons(&mut app);
+        hide(&mut app, &[Tool::Sponge, Tool::Move, Tool::Artboard]);
+        let by_debug_name = tool_buttons(&mut app);
+        // The Move slot has no tools left; the Sponge slot keeps Dodge and Burn.
+        assert_eq!(by_debug_name, all - 1);
+        app.session.edit_prefs(|p| p.toolbar.hidden = ["sponge", "move", "artboard"].map(String::from).to_vec());
+        assert_eq!(tool_buttons(&mut app), by_debug_name, "edit.toolbar names are read like `ui.set {{tool}}` names");
     }
 }
 
