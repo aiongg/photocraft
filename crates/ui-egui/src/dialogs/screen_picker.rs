@@ -125,6 +125,17 @@ pub fn take(ctx: &Context, id: Id) -> Option<[f32; 3]> {
     let mut s = lock(&r);
     if s.completed.as_ref().is_some_and(|(owner, _)| *owner == id) { s.completed.take().map(|(_, rgb)| rgb) } else { None }
 }
+/// Starts a pick for `id`; the result comes back through [`take`]. For hosts that draw their own
+/// button (the Color Picker dialog's, which is the library picker's).
+pub fn request(ctx: &Context, id: Id) {
+    let r = runtime(ctx);
+    lock(&r).request = Some(id);
+    ctx.request_repaint();
+}
+/// Whether the app can sample the screen at all.
+pub fn available(ctx: &Context) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(Id::unique("screen-color-picker-available"))).unwrap_or(false)
+}
 /// Same action for full dialogs and compact swatches. Cancellation returns no change.
 pub fn button(ui: &mut egui::Ui, id: Id) -> Option<[f32; 3]> {
     let r = runtime(ui.ctx());
