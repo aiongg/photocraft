@@ -2,6 +2,21 @@ use super::dropdown::swatch_popup;
 use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui, Vec2, pos2};
 use craft_ui::theme::StrokeExt;
 
+/// Camera Raw-style continuous RGB ribbons on craft-ui's [`Histogram`]. Raw bins remain exact;
+/// the library filters them for display.
+pub(crate) mod rgb_histogram {
+    use craft_ui::composites::{Histogram, HistogramScale};
+    use photocraft_algo::histogram::RgbHistogram;
+
+    /// `h` as RGB ribbons. `typical` scales by the typical columns as Camera Raw does, so a shadow or
+    /// highlight spike runs off the top; otherwise the tallest interior column fits.
+    pub(crate) fn histogram(id: &str, label: &str, h: &RgbHistogram, typical: bool) -> Histogram {
+        let [red, green, blue] = &h.channels;
+        let histogram = Histogram::new(id, label).rgb([&red[..], &green[..], &blue[..]]);
+        if typical { histogram.scale(HistogramScale::Typical) } else { histogram }
+    }
+}
+
 /// Cached RGB data; drawing work is bounded by the 256 display bins, never the image size.
 pub fn rgb_histogram(ui: &mut Ui, histogram: &photocraft_algo::histogram::RgbHistogram, height: f32) -> egui::Response {
     crate::rgb_histogram::histogram("rgb-histogram", tl!("Histogram"), histogram, false).height(height.max(1.0)).show(ui).response
