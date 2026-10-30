@@ -75,7 +75,7 @@ fn source_square(h: &Harness<'_, PhotocraftApp>, paint: LayerId) -> photocraft_g
 #[test]
 fn a_layers_panel_drag_onto_a_tab_drops_the_layer_where_it_is_released() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = h.get_by_role_and_label(Role::TreeItem, "paint").rect().center();
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[row, over_tab, drop], Modifiers::NONE);
@@ -90,7 +90,7 @@ fn a_layers_panel_drag_onto_a_tab_drops_the_layer_where_it_is_released() {
 #[test]
 fn shift_centres_the_copy_when_the_documents_differ_in_size() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = h.get_by_role_and_label(Role::TreeItem, "paint").rect().center();
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center() + vec2(80.0, 60.0);
     drag_along(&mut h, &[row, over_tab, drop], Modifiers::SHIFT);
@@ -122,7 +122,7 @@ fn a_move_tool_drag_onto_a_tab_copies_the_layer_under_the_pointer_and_leaves_the
 #[test]
 fn dropping_back_on_the_source_copies_nothing() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = h.get_by_role_and_label(Role::TreeItem, "paint").rect().center();
     let (dest_tab, source_tab) = (tab(&h, "dest-doc"), tab(&h, "source-doc"));
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[row, dest_tab, source_tab, drop], Modifiers::NONE);

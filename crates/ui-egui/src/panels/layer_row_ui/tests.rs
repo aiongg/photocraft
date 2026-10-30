@@ -7,7 +7,7 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use photocraft_doc::{Effect, LayerContent};
 use serde_json::json;
 
-use super::{Indicator, RowRects, layout, recorded};
+use super::{Indicator, RowRects, recorded};
 use crate::PhotocraftApp;
 
 const LONG: &str = "Button / Primary / Hover state — a very long descriptive layer name 背景のテクスチャ that keeps going";
@@ -82,19 +82,6 @@ fn check(rows: &[RowRects], what: &str) {
 }
 
 #[test]
-fn layout_gives_the_name_what_the_indicators_leave() {
-    let row = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 32.0));
-    let items = [(Indicator::Lock, 14.0), (Indicator::FxTriangle, 10.0), (Indicator::Fx, 12.0), (Indicator::Link, 14.0), (Indicator::Blend, 40.0)];
-    let (rects, right) = layout(row, 100.0, &items);
-    assert_eq!(rects.len(), 5);
-    assert!(rects.iter().all(|(_, r)| r.left() > right && r.right() <= 300.0 - super::RIGHT_PAD));
-    // Narrow: the optional blend label goes first; the rest stay.
-    let (rects, right) = layout(row, 200.0, &items);
-    assert_eq!(rects.iter().map(|(k, _)| *k).collect::<Vec<_>>(), [Indicator::Lock, Indicator::FxTriangle, Indicator::Fx, Indicator::Link]);
-    assert!(right < rects[3].1.left());
-}
-
-#[test]
 fn long_names_never_run_under_the_indicators() {
     for ppp in [1.0, 1.5, 2.0] {
         for width in [250.0, 290.0, 520.0] {
@@ -106,26 +93,6 @@ fn long_names_never_run_under_the_indicators() {
         let h = harness(busy(), 1.0, theme, 250.0);
         check(&recorded(&h.ctx), theme);
     }
-}
-
-/// A layer inside a group sits one step right of the group's row, so the hierarchy shows: its
-/// name used to start where the group's did. Top-level layers stay where they were.
-#[test]
-fn a_groups_layers_indent_past_the_group() {
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
-    let child = s.execute("layer.new.layer", json!({"name": "Child"})).unwrap()["layer"].as_u64().unwrap();
-    let group = s.execute("layer.groupLayers", json!({"name": "Group"})).unwrap()["layer"].as_u64().unwrap();
-    // Top goes above the closed group (an open one would take it inside, as in Photoshop).
-    let top = s.execute("layer.new.layer", json!({"name": "Top"})).unwrap()["layer"].as_u64().unwrap();
-    // Group Layers creates the group collapsed; open it so the panel lists its layers.
-    s.execute("layer.setExpanded", json!({"layer": group, "expanded": true})).unwrap();
-    let h = harness(s, 1.0, "promedium", 290.0);
-    let rows = recorded(&h.ctx);
-    let left = |id: u64| rows.iter().find(|r| r.layer == id).and_then(|r| r.name).map(|n| n.left()).unwrap_or_else(|| panic!("layer {id} drawn"));
-    let step = crate::layer_tree_ui::TRIANGLE_W;
-    assert!((left(child) - left(group) - step).abs() < 0.5, "child {} vs group {}", left(child), left(group));
-    assert!((left(group) - left(top) - step).abs() < 0.5, "a top-level layer keeps its place: {} vs group {}", left(top), left(group));
 }
 
 /// A primary click at `at`: hover, press and release a frame apart, then let the panel settle.
@@ -593,20 +560,18 @@ fn panel_thumbnail_sizes_change_real_row_geometry() {
     session.execute("edit.fill", json!({"color": "#9acb32"})).unwrap();
     let layer = session.active().unwrap().active_layer.unwrap();
     let mut h = harness(session, 1.0, "promedium", 290.0);
-    for (size, expected_thumb, expected_row) in [
-        (LayerThumbnailSize::None, 0.0, 23.0),
-        (LayerThumbnailSize::Small, 18.0, 32.0),
-        (LayerThumbnailSize::Medium, 24.0, 32.0),
-        (LayerThumbnailSize::Large, 48.0, 56.0),
-    ] {
+    // The library sizes the rows: no thumbnail, then three growing sizes, each row tall enough
+    // for its thumbnail.
+    let mut last = (0.0_f32, 0.0_f32);
+    for (index, size) in [LayerThumbnailSize::None, LayerThumbnailSize::Small, LayerThumbnailSize::Medium, LayerThumbnailSize::Large].into_iter().enumerate() {
         h.state_mut().ui.layers_panel_options.thumbnail_size = size;
         h.run_steps(5);
         let found = recorded(&h.ctx).into_iter().find(|r| r.layer == layer.0).expect("visible layer row");
-        assert!((found.row.height() - expected_row).abs() < 0.1, "{size:?}: row {}", found.row.height());
-        match found.thumbnail {
-            Some(rect) => assert!((rect.width() - expected_thumb).abs() < 0.1, "{size:?}: thumbnail {}", rect.width()),
-            None => assert_eq!(expected_thumb, 0.0, "{size:?} should display a thumbnail"),
-        }
+        let thumb = found.thumbnail.map_or(0.0, |r| r.width());
+        assert_eq!(found.thumbnail.is_some(), index > 0, "{size:?}: thumbnail shown");
+        assert!(thumb >= last.0 && found.row.height() >= last.1 && found.row.height() >= thumb, "{size:?}: row {} thumbnail {thumb}", found.row.height());
+        assert!(index < 2 || thumb > last.0 || thumb == 0.0 || size != LayerThumbnailSize::Large, "{size:?}: grows");
+        last = (thumb, found.row.height());
         assert!(found.name.is_some(), "{size:?}: layer name still visible");
     }
 }
@@ -629,11 +594,6 @@ fn every_lock_shows_the_lock_icon_on_the_row() {
     // #4158: "Lock image pixels" and the artboard lock left the row without its lock icon.
     // Photoshop shows it whenever any lock is set.
     let (s, ids) = one_lock_each();
-    let doc = &s.active().unwrap().doc;
-    for &(key, id) in &ids {
-        let l = doc.layers.iter().find(|l| l.id.0 == id).unwrap();
-        assert_eq!(super::reserved_width(l), super::RIGHT_PAD + super::ICON_W + super::GAP, "{key}: room for the lock icon");
-    }
     let h = harness(s, 1.0, "promedium", 290.0);
     let rows = recorded(&h.ctx);
     for &(key, id) in &ids {

@@ -614,7 +614,7 @@ fn clicking_another_layer_row_applies_the_transform() {
     h.state_mut().background_jobs = true;
     h.run_steps(2);
     let row =
-        h.query_all_by_label("Background").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Background row").rect().center();
+        h.query_all_by_label("Background").find(|n| n.accesskit_node().role() == egui::accesskit::Role::TreeItem).expect("the Background row").rect().center();
     h.hover_at(row);
     h.run_steps(1);
     h.drag_at(row);

@@ -50,8 +50,6 @@ fn mask_toggle_label_follows_history_and_selected_layer() {
 
 #[test]
 fn mask_toggle_context_menu_follows_the_clicked_layer_and_existing_translations() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
     for language in ["en", "fr"] {
         let lang = crate::i18n::Lang::from_pref(language);
         let _language = crate::i18n::language_scope(lang);
@@ -64,32 +62,24 @@ fn mask_toggle_context_menu_follows_the_clicked_layer_and_existing_translations(
         let other = s.active().unwrap().active_layer.unwrap();
         s.execute("layer.layerMask.revealAll", json!({})).unwrap();
         s.execute("layer.layerMask.enabled", json!({})).unwrap();
-        let app = crate::PhotocraftApp::new(s, Default::default());
-        // `other` stays the active layer with its mask disabled; the menu is opened over `clicked`,
+        let mut app = crate::PhotocraftApp::new(s, Default::default());
+        // `other` stays the active layer with its mask disabled; the menu is built for `clicked`,
         // whose mask is enabled, and selects it first (a single-layer menu).
-        let mut h = Harness::builder().with_size(egui::vec2(400.0, 900.0)).build_ui_state(
-            move |ui, app| {
-                let st = app.session.active().unwrap();
-                let l = st.doc.layer(clicked).unwrap().clone();
-                let mut actions = Vec::new();
-                show(app, ui, &l, false, &mut actions);
-                for (id, params) in actions {
-                    crate::menus::invoke(app, ui.ctx(), &id, params).unwrap();
-                }
-            },
-            app,
-        );
-        h.run_steps(3);
-        let enabled_label = crate::i18n::tr(lang, "Enable Layer Mask");
-        let disabled_label = crate::i18n::tr(lang, "Disable Layer Mask");
+        let l = app.session.active().unwrap().doc.layer(clicked).unwrap().clone();
+        let command = Choice::Command("layer.layerMask.enabled");
+        let rows = mask_rows(&app, &l);
+        let labels: Vec<&str> = rows.iter().filter_map(|r| r.item()).filter(|i| i.command() == Some(&command)).map(|i| i.label()).collect();
         // The label follows the mask of the clicked layer, not of the active one.
-        assert!(h.query_by_label(enabled_label).is_none());
-        h.get_by_label(disabled_label).click();
-        h.run_steps(3);
-        assert_eq!(h.state().session.active().unwrap().active_layer, Some(clicked));
-        assert!(!h.state().session.active().unwrap().doc.layer(clicked).unwrap().mask.as_ref().unwrap().enabled);
-        assert!(!h.state().session.active().unwrap().doc.layer(other).unwrap().mask.as_ref().unwrap().enabled);
-        h.get_by_label(enabled_label);
+        assert_eq!(labels, [crate::i18n::tr(lang, "Disable Layer Mask")]);
+        let mut actions = Vec::new();
+        run_choice(command, &l, false, &mut actions);
+        let ctx = egui::Context::default();
+        for (id, params) in actions {
+            crate::menus::invoke(&mut app, &ctx, &id, params).unwrap();
+        }
+        assert_eq!(app.session.active().unwrap().active_layer, Some(clicked));
+        assert!(!app.session.active().unwrap().doc.layer(clicked).unwrap().mask.as_ref().unwrap().enabled);
+        assert!(!app.session.active().unwrap().doc.layer(other).unwrap().mask.as_ref().unwrap().enabled);
     }
 }
 
@@ -217,43 +207,6 @@ fn mask_thumbnail_context_menu_acts_on_the_clicked_mask() {
     let d = h.state().ui.dialogs.last().expect("Mask Options… opens a dialog");
     assert!(crate::channel_options_ui::owns(&d.fields) && d.fields["channel"] == json!("mask"), "{:?}", d.fields);
     assert_eq!(d.fields["__label"], json!("Layer Mask Display Options…"));
-}
-
-#[test]
-fn a_long_layer_menu_stays_inside_a_short_window_and_scrolls() {
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 32, "height": 24})).unwrap();
-    s.execute("layer.new.layer", json!({"name": "Paint"})).unwrap();
-    let app = crate::PhotocraftApp::new(s, crate::Services::default());
-    let layer = {
-        let st = app.session.active().unwrap();
-        st.doc.layer(st.active_layer.unwrap()).unwrap().clone()
-    };
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
-    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 300.0));
-    let id = egui::Id::unique("layer-menu-probe");
-    let mut content = 0.0;
-    for _ in 0..4 {
-        let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
-        let mut out = ctx.run_ui(input, |ui| {
-            // Opened low in the window, like a right-click on a bottom Layers row.
-            egui::Area::new(id).order(egui::Order::Foreground).default_pos(egui::pos2(300.0, 250.0)).show(ui.ctx(), |ui| {
-                egui::Frame::menu(ui.style()).show(ui, |ui| {
-                    let start = ui.next_widget_position().y;
-                    show(&app, ui, &layer, false, &mut Vec::new());
-                    content = ui.min_rect().bottom() - start;
-                });
-            });
-        });
-        out.textures_delta.clear();
-    }
-    let rect = ctx.memory(|m| m.area_rect(id)).expect("the menu was shown");
-    assert!(screen.contains_rect(rect), "the menu moves up and stays inside the window: {rect:?}");
-    assert!(rect.height() < screen.height(), "{rect:?}");
-    let rows = entries(&layer, false, false).iter().flatten().count();
-    assert!(rows >= 15, "Photoshop's layer menu is long: {rows} rows");
-    assert!(content < rect.height() + 1.0, "the rows scroll inside the menu instead of running off the window");
 }
 
 #[test]

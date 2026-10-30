@@ -1780,7 +1780,7 @@ mod layer_click_type_commit_tests {
                 for thumbnail in [true, false] {
                     let (mut h, text, other) = harness(kind);
                     let label = if same { "Edited type" } else { "Other pixels" };
-                    let row = h.get_by_label(label).rect();
+                    let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, label).rect();
                     let at = pos2(row.left() + if thumbnail { 43.0 } else { 120.0 }, row.center().y);
                     click(&mut h, at, egui::Modifiers::NONE);
                     assert!(h.state().ui.text_edit.is_none(), "{kind:?}, same={same}, thumbnail={thumbnail}");
@@ -1795,7 +1795,7 @@ mod layer_click_type_commit_tests {
     fn layer_click_commits_without_breaking_modifier_selection_or_double_click_editing() {
         for kind in theme::ThemeKind::ALL {
             let (mut h, text, other) = harness(kind);
-            let row = h.get_by_label("Other pixels").rect();
+            let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Other pixels").rect();
             click(&mut h, pos2(row.left() + 120.0, row.center().y), egui::Modifiers { command: true, ..Default::default() });
             assert!(h.state().ui.text_edit.is_none());
             let selected = h.state().session.active().unwrap().selected_layers();
@@ -1826,7 +1826,7 @@ mod layer_click_type_commit_tests {
         h.run_steps(4);
         assert!(h.state().ui.text_edit.is_some());
         h.render().unwrap().save("5584-before.png").unwrap();
-        let row = h.get_by_label("Other pixels").rect();
+        let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Other pixels").rect();
         click(&mut h, pos2(row.left() + 120.0, row.center().y), egui::Modifiers::NONE);
         assert!(h.state().ui.text_edit.is_none());
         preserved(h.state(), text);

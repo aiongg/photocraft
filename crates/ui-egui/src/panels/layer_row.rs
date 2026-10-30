@@ -312,7 +312,7 @@ pub(super) fn layer_row(
         let layer = l.id.0;
         let name = link_name(kind, linked, &l.name);
         let cells = &cells;
-        lr = lr.trailing_item(side + CHAIN_SLOT, move |ui| {
+        lr = lr.optional_item(side + CHAIN_SLOT, move |ui| {
             let r = ui.max_rect();
             let chain = Rect::from_min_size(r.left_top(), vec2(CHAIN_SLOT, r.height()));
             let hit = ui.interact(chain, ui.scope_id().with(("mask-chain", layer, true)), Sense::click());
@@ -396,8 +396,9 @@ pub(super) fn layer_row(
     }
 
     // The label as the library laid it out: the name is only as wide as its text.
-    let name_w = super::options_bar::body_text_width(ui, &l.name).min(out.label.width());
-    let name_rect = (out.label.width() > 1.0).then(|| Rect::from_min_size(out.label.min, vec2(name_w, out.label.height())));
+    let galley = ui.painter().layout_no_wrap(l.name.clone(), egui::TextStyle::Body.resolve(ui.style()), Color32::WHITE);
+    let name_size = vec2(galley.size().x.min(out.label.width()), galley.size().y.min(out.label.height()));
+    let name_rect = (out.label.width() > 1.0).then(|| Rect::from_min_size(pos2(out.label.left(), out.label.center().y - name_size.y / 2.0), name_size));
     crate::layer_row_ui::record(
         ctx,
         crate::layer_row_ui::RowRects { layer: l.id.0, row: rect, thumbnail: (ts > 0.0).then_some(thumb), name: name_rect, indicators: cells.indicators.take() },

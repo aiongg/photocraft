@@ -47,7 +47,7 @@ fn filters(h: &egui_kittest::Harness<'static, PhotocraftApp>, id: u64) -> Vec<St
 /// The centre of the Layers panel row (or footer button) labelled `label`: rows are selectable
 /// labels, which AccessKit calls buttons, unlike the same name drawn elsewhere.
 fn at(h: &egui_kittest::Harness<'static, PhotocraftApp>, label: &str) -> Pos2 {
-    h.query_all_by_label(label).find(|n| n.accesskit_node().role() == Role::Button).unwrap_or_else(|| panic!("`{label}` drawn")).rect().center()
+    h.query_all_by_label(label).find(|n| matches!(n.accesskit_node().role(), Role::TreeItem | Role::Button)).unwrap_or_else(|| panic!("`{label}` drawn")).rect().center()
 }
 
 fn selected(h: &egui_kittest::Harness<'static, PhotocraftApp>, label: &str) -> bool {

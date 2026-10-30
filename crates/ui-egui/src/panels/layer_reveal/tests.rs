@@ -1,7 +1,7 @@
 //! #152: a new active layer opens its parent groups and is scrolled into view.
 
 use egui::{Rect, vec2};
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::{Harness, kittest::{NodeT, Queryable}};
 use photocraft_doc::LayerId;
 use serde_json::json;
 
@@ -52,7 +52,7 @@ fn layers_group(h: &Harness<'static, PhotocraftApp>) -> Option<Rect> {
 /// The Layers panel row of `name`, if drawn.
 fn row(h: &Harness<'static, PhotocraftApp>, name: &str) -> Option<Rect> {
     let layers = layers_group(h)?;
-    h.query_all_by_label(name).map(|n| n.rect()).find(|r| layers.contains(r.center()) || (r.left() >= layers.left() && r.right() <= layers.right()))
+    h.query_all_by_label(name).filter(|n| n.accesskit_node().role() == egui::accesskit::Role::TreeItem).map(|n| n.rect()).find(|r| layers.contains(r.center()) || (r.left() >= layers.left() && r.right() <= layers.right()))
 }
 
 /// Fully inside the rows viewport (below the strip and the blend/lock rows, above the footer).

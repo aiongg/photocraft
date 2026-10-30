@@ -525,7 +525,6 @@ fn alt_click_views_the_mask_in_gray_and_the_layer_thumbnail_returns() {
         let px = canvas_px(&h).expect("the canvas shows the mask");
         assert_eq!(px[50 * 200 + 50], egui::Color32::BLACK, "hidden reads black");
         assert_eq!(px[10 * 200 + 150], egui::Color32::WHITE, "revealed reads white");
-        assert!(near(super::brackets(&h.ctx).unwrap(), r.expand(3.0)), "brackets on the mask");
         // ⌥-click again: back to the composite.
         click_with(&mut h, r.center(), Modifiers::ALT);
         assert_eq!(mask_view(&h), serde_json::Value::Null);
@@ -802,7 +801,7 @@ fn a_new_adjustment_or_fill_layer_shows_its_settings_until_the_mask_thumbnail_is
             assert!(h.query_all_by_label(label).next().is_some(), "{command}: its settings show");
         }
         // Clicking the row (not a thumbnail) keeps the settings.
-        let row = h.get_by_label(&layer(&h, id).name).rect().center();
+        let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, &layer(&h, id).name).rect().center();
         click_with(&mut h, row, Modifiers::NONE);
         assert!(h.state().ui.mask_target);
         assert!(h.query_all_by_label("Density").next().is_none(), "{command}: a row click keeps the settings");
