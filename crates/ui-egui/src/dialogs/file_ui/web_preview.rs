@@ -1,5 +1,9 @@
 //! Save for Web navigation and indexed palette UI. Draft state is serialized in dialog fields.
-use super::{Arc, Map, Optimized, PhotocraftApp, Tokens, Value, WebSettings, json, n, params, s, web_cmds};
+use super::{Arc, Map, Optimized, PhotocraftApp, Value, WebSettings, json, n, params, s, web_cmds};
+use craft_theme::TypeRole;
+use craft_ui::composites::SectionLabel;
+use craft_ui::controls::{Button, ButtonVariant, ControlSize};
+use craft_ui::primitives::{Content, Text};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 
@@ -86,7 +90,7 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let Ok(settings) = WebSettings::from_params(&p, "preview") else { return };
     let Some(table) = settings.color_table else { return };
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    ui.label(egui::RichText::new(tl!("Color Table…").trim_end_matches('…')).font(crate::theme::semibold(12.0)));
+    SectionLabel::new(tl!("Color Table…").trim_end_matches('…')).show(ui);
     ui.scope(|ui| {
         ui.spacing_mut().interact_size = egui::vec2(14.0, 14.0);
         ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
@@ -125,8 +129,8 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         });
     });
     ui.horizontal(|ui| {
-        ui.weak(format!("{}: {}", tl!("Colors"), table.len()));
-        if ui.small_button(tl!("Reset")).clicked() {
+        ui.add(Text::new(format!("{}: {}", tl!("Colors"), table.len())).role(TypeRole::Caption).content(Content::Muted));
+        if ui.add(Button::new(tl!("Reset")).variant(ButtonVariant::Secondary).size(ControlSize::Sm)).clicked() {
             f.remove("colorTableEdits");
         }
     });
@@ -214,25 +218,26 @@ impl Navigation {
 pub fn controls(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut nav = Navigation::read(f);
     let effective = n(f, "__effectiveZoom", 1.0) as f32;
+    let small = |label: &str| Button::new(label).variant(ButtonVariant::Secondary).size(ControlSize::Sm);
     ui.horizontal(|ui| {
-        if ui.small_button(tl!("Fit")).clicked() {
+        if ui.add(small(tl!("Fit"))).clicked() {
             nav.zoom = None;
             nav.center = egui::vec2(0.5, 0.5);
         }
-        if ui.small_button("−").clicked() {
+        if ui.add(small("−")).clicked() {
             nav.zoom = Some((nav.zoom.unwrap_or(effective) / 1.25).max(0.0001));
         }
-        if ui.small_button("+").clicked() {
+        if ui.add(small("+")).clicked() {
             nav.zoom = Some((nav.zoom.unwrap_or(effective) * 1.25).min(32.0));
         }
         let mut percent = nav.zoom.unwrap_or(effective) * 100.0;
-        if ui.add(egui::DragValue::new(&mut percent).range(0.01..=3200.0).suffix("%").speed(10.0)).accessible_name(tl!("Zoom")).changed() {
+        if crate::widgets::dialog_number(ui, "web-zoom", tl!("Zoom"), &mut percent, 0.01..=3200.0, "%", 2) {
             nav.zoom = Some(percent / 100.0);
         }
-        if ui.small_button(tl!("100%")).clicked() {
+        if ui.add(small(tl!("100%"))).clicked() {
             nav.zoom = Some(1.0);
         }
-        ui.add(egui::Label::new(egui::RichText::new(tl!("Drag to pan · Scroll to zoom · Double-click to fit")).weak()).truncate());
+        ui.add(Text::new(tl!("Drag to pan · Scroll to zoom · Double-click to fit")).content(Content::Muted).truncate());
     });
     nav.write(f);
 }
