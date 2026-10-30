@@ -168,7 +168,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         }
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
         // Photoshop: Snap to Origin puts the pattern's origin back at the layer's (or canvas's).
-        if crate::widgets::secondary_button(ui, tl!("Snap to Origin"), 110.0).clicked() {
+        if ui.add(craft_ui::controls::Button::new(tl!("Snap to Origin")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked() {
             f.insert("phase".into(), json!([0.0, 0.0]));
         }
     });
@@ -185,7 +185,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         }
     });
     let mut link = f.get("link").and_then(Value::as_bool).unwrap_or(true);
-    if crate::widgets::checkbox(ui, &mut link, tl!("Link with Layer")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Link with Layer"), &mut link).show(ui).response.changed() {
         f.insert("link".into(), json!(link));
     }
 }

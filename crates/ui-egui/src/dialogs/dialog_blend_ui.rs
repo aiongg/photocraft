@@ -22,13 +22,13 @@ pub fn valid(key: &str, v: &Value) -> bool {
 /// UI for the identical Blending section of Fill and Stroke.
 pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    crate::widgets::section_label(ui, tl!("Blending"));
+    craft_ui::composites::SectionLabel::new(tl!("Blending")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Mode:"));
         let mut mode = fields.get("mode").and_then(Value::as_str).unwrap_or("normal").to_string();
         let opts: Vec<(String, &str)> = photocraft_color::BlendMode::LAYER_MODES.iter().map(|m| (mode_key(*m), m.label())).collect();
-        if crate::widgets::dropdown(ui, &format!("{prefix}-mode"), tl!("Blend Mode"), &mut mode, &opts, 170.0) {
+        if craft_ui::controls::Select::new(&format!("{prefix}-mode"), tl!("Blend Mode"), &mut mode).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             fields.insert("mode".into(), json!(mode));
         }
     });
@@ -42,7 +42,7 @@ pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
     ui.horizontal(|ui| {
         label(ui, "");
         let mut preserve = fields.get("preserveTransparency").and_then(Value::as_bool).unwrap_or(false);
-        if crate::widgets::checkbox(ui, &mut preserve, tl!("Preserve Transparency")).changed() {
+        if craft_ui::controls::Checkbox::bool(tl!("Preserve Transparency"), &mut preserve).show(ui).response.changed() {
             fields.insert("preserveTransparency".into(), json!(preserve));
         }
     });

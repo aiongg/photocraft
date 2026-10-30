@@ -80,7 +80,7 @@ fn label(ui: &mut egui::Ui, text: &str) {
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.spacing_mut().item_spacing.y = 6.0;
-    crate::widgets::section_label(ui, tl!("Stroke"));
+    craft_ui::composites::SectionLabel::new(tl!("Stroke")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Width:"));
@@ -100,13 +100,13 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     });
 
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    crate::widgets::section_label(ui, tl!("Location"));
+    craft_ui::composites::SectionLabel::new(tl!("Location")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Location:"));
         let mut location = f.get("location").and_then(Value::as_str).unwrap_or("center").to_string();
         let opts: Vec<(String, &str)> = LOCATIONS.iter().map(|(key, label)| (key.to_string(), tl!(label))).collect();
-        if crate::widgets::dropdown(ui, "stroke-location", tl!("Location"), &mut location, &opts, 170.0) {
+        if craft_ui::controls::Select::new("stroke-location", tl!("Location"), &mut location).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             f.insert("location".into(), json!(location));
         }
     });

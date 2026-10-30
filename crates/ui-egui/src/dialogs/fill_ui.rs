@@ -156,7 +156,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
     ui.horizontal(|ui| {
         label(ui, tl!("Contents:"));
         let opts: Vec<(String, &str)> = CONTENTS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-        if crate::widgets::dropdown(ui, "fill-contents", tl!("Contents:"), &mut contents, &opts, 170.0) {
+        if craft_ui::controls::Select::new("fill-contents", tl!("Contents:"), &mut contents).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             f.insert("contents".into(), json!(contents));
             // Choosing Color… opens the Color Picker, as in Photoshop.
             if contents == "color" {
@@ -195,7 +195,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
             ui.horizontal(|ui| {
                 label(ui, "");
                 let mut on = f.get("colorAdaptation").and_then(Value::as_bool).unwrap_or(true);
-                if crate::widgets::checkbox(ui, &mut on, "Color Adaptation").changed() {
+                if craft_ui::controls::Checkbox::bool(tl!("Color Adaptation"), &mut on).show(ui).response.changed() {
                     f.insert("colorAdaptation".into(), json!(on));
                 }
             });
