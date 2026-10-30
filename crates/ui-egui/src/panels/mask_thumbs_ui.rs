@@ -34,13 +34,13 @@ pub enum MaskKind {
 
 impl MaskKind {
     /// The engine command prefix for this mask.
-    fn command(self) -> &'static str {
+    pub(crate) fn command(self) -> &'static str {
         match self {
             MaskKind::Pixel => "layer.layerMask",
             MaskKind::Vector => "layer.vectorMask",
         }
     }
-    fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             MaskKind::Pixel => "layer mask",
             MaskKind::Vector => "vector mask",
@@ -173,6 +173,11 @@ type Rects = (Vec<(MaskKind, Rect)>, Vec<(MaskKind, Rect)>);
 /// Memory key of the per-layer record of where the mask thumbnails and chains were drawn.
 fn rects_id() -> egui::Id {
     egui::Id::unique("mask-thumb-rects")
+}
+
+/// Record where the row of layer `id` drew its mask thumbnails and chains.
+pub fn record(ctx: &egui::Context, id: u64, thumbs: Vec<(MaskKind, Rect)>, chains: Vec<(MaskKind, Rect)>) {
+    ctx.data_mut(|d| d.get_temp_mut_or_default::<std::collections::HashMap<u64, Rects>>(rects_id()).insert(id, (thumbs, chains)));
 }
 
 /// The mask thumbnails and chains last drawn for layer `id` (for tests and automation).

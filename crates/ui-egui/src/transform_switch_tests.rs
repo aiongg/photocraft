@@ -109,7 +109,7 @@ fn picking_another_layer_in_the_panel_applies_the_transform() {
         } else {
             transform_and_move(&mut h);
         }
-        h.get_by_label("Background").click();
+        h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Background").click();
         h.run_steps(4);
         assert!(h.state().ui.transform.is_none(), "placed {placed}");
         assert_eq!(h.state().session.active().unwrap().doc.layers.len(), 2, "placed {placed}");

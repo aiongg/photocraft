@@ -1,9 +1,17 @@
+use std::cell::{Cell, RefCell};
+
+use craft_ui::edit::{EditEvent, GestureId};
+use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
+use craft_ui::menu::{ContextMenu, OpenAt};
+use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
+
 use super::layer_drag::{MaskDrag, fx_drop, layer_drag_and_drop, mask_drag_key, start_fx_drag, starts_mask_drag};
+use super::layer_row_ui::{ICON_W, Indicator, TRIANGLE_W};
 use super::layers::simple_lock_toggle;
-use super::{
-    Color32, CornerRadius, Layer, LayerContent, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Value, icons, json, pos2, theme, vec2, widgets,
-};
-use craft_ui::theme::StrokeExt;
+use super::mask_thumbs_ui::MaskKind;
+use super::{Color32, Layer, LayerContent, PhotocraftApp, Pos2, Rect, Sense, Tokens, Value, icons, json, pos2, theme, vec2, widgets};
+use crate::state::LayerThumbnailSize;
+use photocraft_color::BlendMode;
 
 /// How a Layers panel row is selected: in the (multi-)selection, the primary/active layer, and
 /// whether several layers are selected.
@@ -42,75 +50,209 @@ fn select_mode(m: egui::Modifiers) -> &'static str {
     }
 }
 
-/// A drag down the Layers panel's eye column (Photoshop): the first eye toggles and every row
-/// swept over gets the same visibility, once per row, all in one history step.
-#[derive(Clone)]
-struct EyeSweep {
-    visible: bool,
-    /// The `coalesce` key shared by the drag's `layer.setProps` calls.
-    key: u64,
-    swept: Vec<u64>,
-}
-
-/// Starts an eye-column sweep from `eye`, or applies a running one to the row `row` of `l`.
-fn eye_sweep(ctx: &egui::Context, l: &Layer, row: Rect, eye: &egui::Response, actions: &mut Vec<(String, Value)>) {
-    let id = egui::Id::unique("layer-eye-sweep");
-    let set =
-        |visible: bool, key: u64| ("layer.setProps".to_string(), json!({"layer": l.id.0, "visible": visible, "coalesce": format!("layer-eye-sweep:{key}")}));
-    if eye.drag_started() {
-        start_eye_sweep(ctx, l, id, actions, &set);
-    } else {
-        continue_eye_sweep(ctx, l, row, id, actions, &set);
-    }
-}
-
-fn start_eye_sweep(ctx: &egui::Context, layer: &Layer, id: egui::Id, actions: &mut Vec<(String, Value)>, set: &impl Fn(bool, u64) -> (String, Value)) {
-    let sweep = EyeSweep { visible: !layer.visible, key: ctx.cumulative_pass_nr(), swept: vec![layer.id.0] };
-    actions.push(set(sweep.visible, sweep.key));
-    ctx.data_mut(|data| data.insert_temp(id, sweep));
-}
-
-fn continue_eye_sweep(
-    ctx: &egui::Context,
-    layer: &Layer,
-    row: Rect,
-    id: egui::Id,
-    actions: &mut Vec<(String, Value)>,
-    set: &impl Fn(bool, u64) -> (String, Value),
-) {
-    let Some(mut sweep) = ctx.data(|data| data.get_temp::<EyeSweep>(id)) else { return };
-    if !sweep_pointer_down(ctx) {
-        ctx.data_mut(|data| data.remove::<EyeSweep>(id));
-        return;
-    }
-    let Some((y0, y1)) = swept_pointer_range(ctx) else { return };
-    if y1 < row.top() || y0 >= row.bottom() || sweep.swept.contains(&layer.id.0) {
-        return;
-    }
-    if layer.visible != sweep.visible {
-        actions.push(set(sweep.visible, sweep.key));
-    }
-    sweep.swept.push(layer.id.0);
-    ctx.data_mut(|data| data.insert_temp(id, sweep));
-}
-
-fn sweep_pointer_down(ctx: &egui::Context) -> bool {
-    ctx.input(|input| input.pointer.primary_down())
-}
-
-/// The pointer segment between frames catches rows even when a fast drag skips them visually.
-fn swept_pointer_range(ctx: &egui::Context) -> Option<(f32, f32)> {
-    let (position, delta) = ctx.input(|input| (input.pointer.interact_pos(), input.pointer.delta()));
-    let p = position?;
-    Some(((p.y - delta.y).min(p.y), (p.y - delta.y).max(p.y)))
-}
-
 /// Marker in the clipped row's existing 12-point slot, beside its thumbnail.
 pub(super) fn paint_clipping_indicator(painter: &egui::Painter, at: Pos2, color: Color32) {
     let tip = at + vec2(5.0, 3.0);
     let stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
     painter.add(egui::Shape::line(vec![at + vec2(9.0, -4.0), at + vec2(5.0, -4.0), tip], stroke));
     painter.add(egui::Shape::line(vec![at + vec2(2.0, 0.0), tip, at + vec2(8.0, 0.0)], stroke));
+}
+
+/// Width of the clipping marker's slot beside the thumbnail.
+const CLIP_W: f32 = 12.0;
+/// Width of the link button before a mask thumbnail in the trailing slot.
+const CHAIN_SLOT: f32 = 18.0;
+
+/// What the row's closures hand back: where the library drew the parts the app paints into.
+#[derive(Default)]
+struct Cells {
+    first: Cell<Option<Rect>>,
+    second: Cell<Option<Rect>>,
+    extra: Cell<Option<Rect>>,
+    extra_chain: Cell<Option<Rect>>,
+    /// A trailing widget (effects triangle, lock, vector-mask chain) took a click this frame.
+    clicked: Cell<bool>,
+    indicators: RefCell<Vec<(Indicator, Rect)>>,
+    queued: RefCell<Vec<(String, Value)>>,
+}
+
+/// The words of a group's disclosure triangle.
+fn tree_text() -> TreeText {
+    let alt = crate::shortcuts::pretty("Alt");
+    let tip = |pattern: &str| crate::i18n::fmt(pattern, &[("key", &alt)]);
+    TreeText {
+        expand: tl!("Expand group {row}").to_owned(),
+        collapse: tl!("Collapse group {row}").to_owned(),
+        expand_tip: tip(tl!("Expand group  ({key}-click: all groups)")),
+        collapse_tip: tip(tl!("Collapse group  ({key}-click: all groups)")),
+    }
+}
+
+/// The thumbnail the row's editing is aimed at, and whether the library can bracket it.
+#[derive(Clone, Copy, PartialEq)]
+enum Target {
+    Library(ThumbTarget),
+    /// A vector mask in the trailing slot beside a layer mask: PhotoCraft brackets it.
+    Extra,
+}
+
+fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -> Option<Target> {
+    if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
+        // The Smart Filters row's filter mask thumbnail carries the brackets.
+        return None;
+    }
+    let slot = |kind: MaskKind| masks.iter().position(|m| m.0 == kind).map(|i| if i == 0 { Target::Library(ThumbTarget::Second) } else { Target::Extra });
+    if app.ui.vector_mask_target
+        && let Some(target) = slot(MaskKind::Vector)
+    {
+        return Some(target);
+    }
+    if app.ui.mask_target
+        && let Some(target) = slot(MaskKind::Pixel)
+    {
+        return Some(target);
+    }
+    Some(Target::Library(ThumbTarget::First))
+}
+
+/// The drag and drop hooks that act on the row's response (layer, mask and effect drags).
+fn drag_hooks(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect, resp: &egui::Response, actions: &mut Vec<(String, Value)>) {
+    // A drag from a mask's thumbnail drags that mask, not the layer (#3113, #3119).
+    let mask_drag = starts_mask_drag(ctx, l, resp);
+    if let Some(kind) = mask_drag {
+        ctx.data_mut(|d| d.insert_temp::<MaskDrag>(mask_drag_key(), (l.id.0, kind)));
+    }
+    layer_drag_and_drop(app, ctx, ui, l, rect, resp, actions);
+    fx_drop(ctx, ui, l, rect, actions);
+    crate::smart_ui::drop_on_row(ctx, ui, l, rect, actions);
+    if resp.drag_started() && mask_drag.is_none() {
+        crate::layer_transfer::begin_from_panel(app, ctx, l.id);
+    }
+}
+
+fn menu_open_key(layer: u64) -> egui::Id {
+    egui::Id::unique(("layer-row-menu-open", layer))
+}
+
+/// The accessible name of a mask's link button.
+fn link_name(kind: MaskKind, linked: bool, layer: &str) -> String {
+    let (verb, what) = (if linked { "Unlink" } else { "Link" }, kind.label());
+    let template = "{verb} {mask} {layer}";
+    crate::i18n::fmt(tl!(template), &[("verb", tl!(verb)), ("mask", tl!(what)), ("layer", layer)])
+}
+
+/// The Layers panel's thumbnail setting as the library's.
+fn thumb_size_of(size: LayerThumbnailSize) -> ThumbSize {
+    match size {
+        LayerThumbnailSize::None => ThumbSize::None,
+        LayerThumbnailSize::Small => ThumbSize::Small,
+        LayerThumbnailSize::Medium => ThumbSize::Medium,
+        LayerThumbnailSize::Large => ThumbSize::Large,
+    }
+}
+
+/// The trailing items of `l`'s row, outermost first: what is wrong, locks, effects and Smart
+/// Filters, the blend mode. Each records its rect in `cells` and queues its commands there.
+fn indicator_items<'a>(
+    ui: &egui::Ui,
+    ctx: &egui::Context,
+    l: &'a Layer,
+    doc: &'a photocraft_doc::Document,
+    fx_open: bool,
+    mut row: ListRow<'a, u64>,
+    cells: &'a Cells,
+) -> ListRow<'a, u64> {
+    let t = craft_ui::theme::current(ctx);
+    let (muted, faint, normal, warn) =
+        (t.color.text.muted.to_egui(), t.color.text.faint.to_egui(), t.color.text.normal.to_egui(), t.color.status.warn.fg.to_egui());
+    let has_fx = !l.effects.items.is_empty();
+    let has_smart = crate::smart_ui::has_filters(l);
+    let show_blend = l.blend != BlendMode::Normal && l.blend != BlendMode::PassThrough;
+    let fx_galley = has_fx.then(|| ui.painter().layout_no_wrap("fx".into(), theme::semibold(11.0), muted));
+    let blend_galley = show_blend.then(|| ui.painter().layout_no_wrap(tl!(l.blend.label()).into(), egui::FontId::proportional(10.5), faint));
+    let icon_rect = |r: Rect| Rect::from_center_size(r.center(), vec2(ICON_W, ICON_W));
+    let id = l.id.0;
+    if let Some(key) = crate::layer_row_ui::unsupported_key(l) {
+        row = row.trailing_item(ICON_W, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::Unsupported, r));
+            icons::paint(ui, icon_rect(r), "triangle-alert", 12.0, warn);
+            let tip = crate::i18n::fmt(tl!("Not rendered: this adjustment ({key}) is kept as imported."), &[("key", key)]);
+            ui.interact(r, ui.scope_id().with(("row-unsupported", id)), Sense::hover()).on_hover_text(tip);
+        });
+    }
+    if l.locks.any() {
+        row = row.trailing_item(ICON_W, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::Lock, r));
+            icons::paint(ui, icon_rect(r), "lock", 12.0, faint);
+            // Clicking the lock icon unlocks the layer, and makes the Background a normal one
+            // (Photoshop, #4723). It takes the click from the row, so the row isn't selected.
+            if ui.interact(r, ui.scope_id().with(("row-lock", id)), Sense::click()).clicked() {
+                cells.clicked.set(true);
+                cells.queued.borrow_mut().push(simple_lock_toggle(doc.is_background(l.id), l, &json!({"layer": id})));
+            }
+        });
+    }
+    if has_fx || has_smart {
+        row = row.trailing_item(TRIANGLE_W, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::FxTriangle, r));
+            let resp = ui.interact(r, ui.scope_id().with(("fx-disclosure", id)), Sense::click());
+            crate::layer_row_ui::paint_triangle(ui.painter(), r.center(), fx_open, normal);
+            if resp.clicked() {
+                cells.clicked.set(true);
+                let all = ui.input(|i| i.modifiers.alt);
+                cells.queued.borrow_mut().push(("layer.setEffectsExpanded".into(), json!({"layer": id, "expanded": !fx_open, "all": all})));
+            }
+            let (verb, name) = (if fx_open { tl!("Collapse") } else { tl!("Expand") }, l.name.clone());
+            let tip = match (has_smart, fx_open) {
+                (true, true) => tl!("Hide the layer's effects and Smart Filters  ({key}-click: all layers)"),
+                (true, false) => tl!("Show the layer's effects and Smart Filters  ({key}-click: all layers)"),
+                (false, true) => tl!("Hide the layer's effects  ({key}-click: all layers)"),
+                (false, false) => tl!("Show the layer's effects  ({key}-click: all layers)"),
+            };
+            let resp = resp.on_hover_text(crate::i18n::fmt(tip, &[("key", &crate::shortcuts::pretty("Alt"))]));
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{verb} effects {name}")));
+        });
+    }
+    if has_smart {
+        row = row.trailing_item(ICON_W, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::SmartFilters, r));
+            let enabled = matches!(&l.content, LayerContent::Smart(sm) if sm.filters_enabled);
+            crate::smart_ui::paint_badge(ui.painter(), r.center(), if enabled { normal } else { faint });
+            ui.interact(r, ui.scope_id().with(("smart-filters-badge", id)), Sense::hover()).on_hover_text(tl!("Smart Filters"));
+        });
+    }
+    if let Some(g) = fx_galley {
+        let ctx = ctx.clone();
+        row = row.trailing_item(g.size().x, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::Fx, r));
+            ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, muted);
+            // Dragging the fx badge drags all the layer's effects, not the layer (Photoshop). Like
+            // the eye, it takes the drag from the row; clicks still reach the row.
+            if ui.interact(r, ui.scope_id().with(("fx-badge", id)), Sense::drag()).drag_started() {
+                start_fx_drag(&ctx, l.id, None);
+            }
+        });
+    }
+    if l.link_group.is_some() {
+        row = row.trailing_item(ICON_W, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::Link, r));
+            icons::paint(ui, icon_rect(r), "link-2", 12.0, faint);
+        });
+    }
+    if let Some(g) = blend_galley {
+        row = row.optional_item(g.size().x, move |ui| {
+            let r = ui.max_rect();
+            cells.indicators.borrow_mut().push((Indicator::Blend, r));
+            ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, faint);
+        });
+    }
+    row
 }
 
 /// One row of the Layers panel for `l`, `depth` levels inside groups or artboards: it paints the
@@ -128,98 +270,168 @@ pub(super) fn layer_row(
 ) -> Rect {
     let selected = row.selected;
     let t = Tokens::get(ctx);
+    let tokens = LibTokens::of(ui);
+    let style = ListRow::<u64>::style(&tokens);
     // The Layers Panel Options thumbnail size controls rows and both layer/mask thumbnails.
-    let (base, row_h) = crate::layers_panel_ui::thumbnail_geometry(app.ui.layers_panel_options.thumbnail_size, t.pro);
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click_and_drag());
+    let thumb_size = thumb_size_of(app.ui.layers_panel_options.thumbnail_size);
+    let has_thumbs = thumb_size != ThumbSize::None;
+    let height = style.height(thumb_size, false);
+    let place = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), height));
     // With thumbnails off no mask thumbnail is drawn, so none may keep catching drags from older frames.
-    if base == 0.0 {
+    if !has_thumbs {
         crate::mask_thumbs_ui::forget(ctx, l.id.0);
     }
-    // A drag from a mask's thumbnail drags that mask, not the layer (#3113, #3119).
-    let mask_drag = starts_mask_drag(ctx, l, &resp);
-    if let Some(kind) = mask_drag {
-        ctx.data_mut(|d| d.insert_temp::<MaskDrag>(mask_drag_key(), (l.id.0, kind)));
-    }
-    let mask_drag = mask_drag.is_some();
-    layer_drag_and_drop(app, ctx, ui, l, rect, &resp, actions);
-    fx_drop(ctx, ui, l, rect, actions);
-    crate::smart_ui::drop_on_row(ctx, ui, l, rect, actions);
-    if resp.drag_started() && !mask_drag {
-        crate::layer_transfer::begin_from_panel(app, ctx, l.id);
-    }
-    // Rows are painted: name them for screen readers and UI tests.
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &l.name));
+    let renaming = crate::layer_row_ui::renaming(ctx) == Some(l.id.0);
     // A row scrolled out of view only keeps its place (#125): a layout's hundreds of rows would
     // otherwise lay out names, icons and thumbnails every frame. Group rows stay whole: their
     // disclosure triangle is a widget (accessibility, scroll-to).
-    if !ui.is_rect_visible(rect) && !l.is_group() && !resp.context_menu_opened() && crate::layer_row_ui::renaming(ctx) != Some(l.id.0) {
+    let menu_open = ctx.data(|d| d.get_temp::<bool>(menu_open_key(l.id.0))).unwrap_or(false);
+    if !ui.is_rect_visible(place) && !l.is_group() && !menu_open && !renaming {
+        let (rect, resp) = ui.allocate_exact_size(place.size(), Sense::click_and_drag());
+        drag_hooks(app, ctx, ui, l, rect, &resp, actions);
         return rect;
     }
-    let painter = ui.painter_at(rect.expand(1.0));
-    let is_hovered = resp.hovered() || app.canvas_hover_layer == Some(l.id);
+
+    let cells = Cells::default();
+    let masks = crate::mask_thumbs_ui::masks(l);
+    let expanded = matches!(&l.content, LayerContent::Group(g) if g.expanded);
+    let fx_open = app.session.active().is_none_or(|d| !d.fx_collapsed.contains(&l.id));
+    let target = target_of(app, l, &masks).filter(|_| row.primary && has_thumbs);
+    let mut lr = ListRow::new(l.id.0, l.name.as_str())
+        .toggle(ToggleColumn::eye(tl!("Visibility {row}"), l.visible))
+        .selected(selected)
+        .dimmed(!l.visible)
+        .highlight(app.canvas_hover_layer == Some(l.id))
+        .layer(true)
+        .renaming(renaming)
+        .indent(if l.clipped { CLIP_W } else { 0.0 });
+    if has_thumbs {
+        lr = lr.thumb(thumb_size, |_, r| cells.first.set(Some(r)));
+        if let Some(&(kind, _, linked)) = masks.first() {
+            lr = lr.second_thumb(|_, r| cells.second.set(Some(r))).thumb_link(linked, link_name(kind, linked, &l.name));
+        }
+        if let Some(Target::Library(which)) = target {
+            lr = lr.thumb_target(which);
+        }
+    }
+    lr = indicator_items(ui, ctx, l, doc, fx_open, lr, &cells);
+    if has_thumbs && let Some(&(kind, _, linked)) = masks.get(1) {
+        // A second mask (a vector mask beside a layer mask): the row has room for one mask
+        // thumbnail, so this one sits at the trailing end with its own link button.
+        let side = style.thumb_side(thumb_size);
+        let layer = l.id.0;
+        let name = link_name(kind, linked, &l.name);
+        let cells = &cells;
+        lr = lr.optional_item(side + CHAIN_SLOT, move |ui| {
+            let r = ui.max_rect();
+            let chain = Rect::from_min_size(r.left_top(), vec2(CHAIN_SLOT, r.height()));
+            let hit = ui.interact(chain, ui.scope_id().with(("mask-chain", layer, true)), Sense::click());
+            icons::paint(ui, chain, if linked { "link" } else { "unlink" }, 12.0, if hit.hovered() { t.text } else { t.icon });
+            hit.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
+            if hit.on_hover_text(&name).clicked() {
+                cells.clicked.set(true);
+                cells.queued.borrow_mut().push((format!("{}.linked", kind.command()), json!({"layer": layer, "linked": !linked})));
+            }
+            cells.extra_chain.set(Some(chain));
+            cells.extra.set(Some(Rect::from_center_size(pos2(chain.right() + side / 2.0, r.center().y), vec2(side, side))));
+        });
+    }
+    let out = TreeRow::new(lr, depth, matches!(&l.content, LayerContent::Group(_)), expanded).text(tree_text()).show(ui);
+    let (rect, resp) = (out.response.rect, out.response.clone());
+    drag_hooks(app, ctx, ui, l, rect, &resp, actions);
     if resp.hovered() {
         app.hover_layer = Some(l.id);
     }
-    paint_row_background(&painter, &t, l, rect, selected, is_hovered);
-    let mut x = rect.left() + 6.0;
-    let eye_resp = eye_column(app, ui, l, row, rect, actions);
-    // Everything but the thumbnails, the indentation and the name, so a narrow panel squeezes
-    // the indentation first, then the thumbnails (a layer with two masks has three).
-    let others = 6.0
-        + 28.0
-        + if l.is_group() { crate::layer_tree_ui::TRIANGLE_W } else { 0.0 }
-        + if l.clipped { 12.0 } else { 0.0 }
-        + crate::layer_row_ui::reserved_width(l);
-    let ts = if base == 0.0 { 0.0 } else { crate::mask_thumbs_ui::thumb_size(l, base, rect.width() - others) };
-    let fixed = others + if ts == 0.0 { 0.0 } else { ts + 6.0 + crate::mask_thumbs_ui::width(l, ts) };
-    // A layer inside a group (or an artboard) indents one step more than its depth, past the
-    // triangle's column, so it sits right of its parent: with only its depth its thumbnail lined
-    // up under the group's, hiding the hierarchy. Top-level rows don't move.
-    let steps = if !l.is_group() && depth > 0 { depth + 1 } else { depth };
-    x += 28.0 + crate::layer_row_ui::indent(steps, rect.width(), fixed);
-    let toggled = crate::layer_tree_ui::disclosure(ui, rect, &mut x, l, actions);
-    if l.clipped {
-        paint_clipping_indicator(&painter, pos2(x, rect.center().y), t.text_faint);
-        x += 12.0;
+    actions.append(&mut cells.queued.borrow_mut());
+
+    // Events of the row's own parts: the eye column, the disclosure triangle, the mask link and
+    // the rename field.
+    let mut toggled = cells.clicked.get();
+    let mut masks_clicked = false;
+    for event in &out.events {
+        match event {
+            RowEvent::Toggle(edit) => eye_event(ctx, l, edit, actions),
+            RowEvent::Open(OpenChange { open, all, .. }) => {
+                toggled = true;
+                actions.push(("layer.setExpanded".into(), json!({"layer": l.id.0, "expanded": open, "all": all})));
+            }
+            RowEvent::LinkToggled { linked, .. } => {
+                if let Some(&(kind, ..)) = masks.first() {
+                    masks_clicked = true;
+                    actions.push((format!("{}.linked", kind.command()), json!({"layer": l.id.0, "linked": linked})));
+                }
+            }
+            _ => {}
+        }
     }
-    let thumb = Rect::from_min_size(pos2(x, rect.center().y - ts / 2.0), vec2(ts, ts));
+    if let Some(done) = crate::layer_row_ui::apply_rename_events(ctx, l.id.0, &out.events) {
+        actions.push(done);
+    }
+
+    let thumb = cells.first.get().unwrap_or_else(|| Rect::from_center_size(rect.left_center(), vec2(0.0, 0.0)));
+    let ts = if has_thumbs { thumb.width() } else { 0.0 };
+    let mut mask_rects = crate::mask_thumbs_ui::MaskRects { clicked: cells.clicked.get() || masks_clicked, ..Default::default() };
+    for (index, &(kind, ..)) in masks.iter().enumerate() {
+        if let Some(r) = if index == 0 { cells.second.get() } else { cells.extra.get() } {
+            mask_rects.thumbs.push((kind, r));
+        }
+    }
+    if let (Some(a), Some(b), Some(&(kind, ..))) = (cells.first.get(), cells.second.get(), masks.first()) {
+        mask_rects.chains.push((kind, Rect::from_min_max(a.right_top(), b.left_bottom())));
+    }
+    if let (Some(chain), Some(&(kind, ..))) = (cells.extra_chain.get(), masks.get(1)) {
+        mask_rects.chains.push((kind, chain));
+    }
+    if has_thumbs {
+        crate::mask_thumbs_ui::record(ctx, l.id.0, mask_rects.thumbs.clone(), mask_rects.chains.clone());
+    }
+
+    // What the library does not draw: the colour label behind the eye, the thumbnails' content
+    // and the clipping marker.
+    let painter = ui.painter_at(rect.expand(1.0));
+    paint_label_color(ui, &t, l, eye_cell(rect, style.toggle_column, craft_ui::direction::is_rtl(ui)));
     if ts > 0.0 {
-        draw_layer_thumb(app, ctx, ui, doc, l, thumb, row.primary);
-        x += ts + 6.0;
+        draw_layer_thumb(app, ctx, ui, doc, l, thumb);
+        for (index, &(kind, enabled, _)) in masks.iter().enumerate() {
+            if let Some(r) = if index == 0 { cells.second.get() } else { cells.extra.get() } {
+                paint_mask_thumb(app, ctx, ui, doc, l, kind, enabled, r);
+            }
+        }
+        if target == Some(Target::Extra)
+            && let Some(r) = cells.extra.get()
+        {
+            crate::mask_thumbs_ui::paint_brackets(&painter, r, t.text);
+        }
     }
-    // With thumbnails disabled the labels and disclosure controls remain interactive.
-    let masks = if ts > 0.0 { crate::mask_thumbs_ui::paint(app, ctx, ui, &painter, doc, l, &mut x, rect.center().y, ts, actions) } else { Default::default() };
-    let rc = RowCtx { l, doc, row, rect, ts, thumb, resp: &resp, masks: &masks };
-    paint_target_brackets(app, &painter, &t, &rc);
-    // Right-hand indicators first; the name gets what is left and ends in "…" (#144).
-    let fx_open = app.session.active().is_none_or(|d| !d.fx_collapsed.contains(&l.id));
-    let (name_right, indicators, fx_toggled) = crate::layer_row_ui::indicators(ui, &painter, rect, x, l, fx_open, actions);
-    // Dragging the fx badge drags all the layer's effects, not the layer (Photoshop). Like the eye,
-    // it takes the drag from the row; clicks still reach the row.
-    if let Some(&(_, badge)) = indicators.iter().find(|(k, _)| *k == crate::layer_row_ui::Indicator::Fx)
-        && ui.interact(badge, ui.scope_id().with(("fx-badge", l.id.0)), Sense::drag()).drag_started()
-    {
-        start_fx_drag(ctx, l.id, None);
+    if l.clipped {
+        let group_column = if matches!(&l.content, LayerContent::Group(_)) { style.disclosure } else { 0.0 };
+        let right = if ts > 0.0 { thumb.left() } else { out.label.left() } - group_column;
+        paint_clipping_indicator(&painter, pos2(right - CLIP_W, rect.center().y), t.text_faint);
     }
-    // Clicking the lock icon unlocks the layer, and makes the Background a normal one (Photoshop,
-    // #4723). It takes the click from the row, so the row isn't selected.
-    if let Some(&(_, lock)) = indicators.iter().find(|(k, _)| *k == crate::layer_row_ui::Indicator::Lock)
-        && ui.interact(lock, ui.scope_id().with(("row-lock", l.id.0)), Sense::click()).clicked()
-    {
-        actions.push(simple_lock_toggle(doc.is_background(l.id), l, &json!({"layer": l.id.0})));
-    }
-    let name_rect = paint_row_name(&painter, &t, &rc, x, name_right);
+
+    // The label as the library laid it out: the name is only as wide as its text.
+    let galley = ui.painter().layout_no_wrap(l.name.clone(), egui::TextStyle::Body.resolve(ui.style()), Color32::WHITE);
+    let name_size = vec2(galley.size().x.min(out.label.width()), galley.size().y.min(out.label.height()));
+    let name_rect = (out.label.width() > 1.0).then(|| Rect::from_min_size(pos2(out.label.left(), out.label.center().y - name_size.y / 2.0), name_size));
     crate::layer_row_ui::record(
         ctx,
-        crate::layer_row_ui::RowRects { layer: l.id.0, row: rect, thumbnail: (ts > 0.0).then_some(thumb), name: name_rect, indicators },
+        crate::layer_row_ui::RowRects {
+            layer: l.id.0,
+            row: rect,
+            thumbnail: (ts > 0.0).then_some(thumb),
+            name: name_rect,
+            indicators: cells.indicators.take(),
+        },
     );
+    let rc = RowCtx { l, doc, row, rect, ts, thumb, resp: &resp, masks: &mask_rects };
+
     // ⌘-click a layer, mask or vector-mask thumbnail loads its transparency / mask / path as a
     // selection (⇧ add, ⌥ subtract, ⇧⌥ intersect) instead of changing the layer selection.
     let load_at = |m: egui::Modifiers, p: Pos2| {
         if !m.command {
             return None;
         }
-        if let Some(kind) = masks.hit(p) {
+        if let Some(kind) = mask_rects.hit(p) {
             return Some(crate::mask_thumbs_ui::load_params(l, kind, m));
         }
         // The Background has no transparency to load: Photoshop treats the click as a plain one.
@@ -236,14 +448,14 @@ pub(super) fn layer_row(
     }
     // ⇧-click a mask thumbnail: disable / enable that mask; ⌥-click a layer mask: view it.
     let mask_toggle = resp.clicked().then(|| (ui.input(|i| i.modifiers), resp.interact_pointer_pos())).and_then(|(m, pos)| {
-        let kind = masks.hit(pos?)?;
+        let kind = mask_rects.hit(pos?)?;
         crate::mask_thumbs_ui::click_command(l, kind, m)
     });
     if let Some(p) = thumb_load {
         actions.push(("select.loadSelection".into(), p));
     } else if let Some(cmd) = mask_toggle {
         actions.push(cmd);
-    } else if resp.clicked() && !eye_resp.clicked() && !toggled && !fx_toggled && !masks.clicked {
+    } else if resp.clicked() && !toggled && !mask_rects.clicked {
         select_row_on_click(app, ui, &rc, actions);
     }
     // Double-click: the name renames in place (over the row's full height, not just the glyphs:
@@ -253,11 +465,7 @@ pub(super) fn layer_row(
     // anywhere else on the row opens Layer Style (#350, #537).
     // The first click already made this the active layer.
     handle_row_double_click(app, ui.ctx(), &rc, name_rect, actions);
-    let edit_rect = Rect::from_min_max(pos2(x - 3.0, rect.center().y - 11.0), pos2(name_right.max(x + 40.0), rect.center().y + 11.0));
-    if let Some(done) = crate::layer_row_ui::rename_field(ui, l.id.0, edit_rect) {
-        actions.push(done);
-    }
-    row_context_menu(app, ui, &rc, &eye_resp, actions);
+    row_context_menu(app, ui, &rc, eye_cell(rect, style.toggle_column, craft_ui::direction::is_rtl(ui)), actions);
     rect
 }
 
@@ -273,117 +481,51 @@ struct RowCtx<'a> {
     masks: &'a crate::mask_thumbs_ui::MaskRects,
 }
 
-fn eye_cell(rect: Rect) -> Rect {
-    Rect::from_min_max(rect.left_top(), pos2((rect.left() + 30.0).min(rect.right()), rect.bottom()))
-}
-
-/// The row's fill (selection / hover), the label colour behind the eye column and the pro dividers.
-fn paint_row_background(painter: &egui::Painter, t: &Tokens, l: &Layer, rect: Rect, selected: bool, is_hovered: bool) {
-    if t.pro {
-        if selected {
-            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
-        } else if is_hovered {
-            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
-            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.accent.gamma_multiply(0.12));
-        }
-    } else if selected {
-        painter.rect_filled(rect, t.radius, t.hover);
-        painter.rect_stroke(rect, t.radius, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.field_border), StrokeKind::Inside);
-    } else if is_hovered {
-        painter.rect_filled(rect, t.radius, t.hover.gamma_multiply(0.5));
-        painter.rect_filled(rect, t.radius, t.accent.gamma_multiply(0.12));
-    }
-    let eye_cell = eye_cell(rect);
-    if let Some((_, background)) = t.layer_label_colors(l.label) {
-        painter.rect_filled(eye_cell, craft_ui::theme::scale::Radius::R0.px(), background);
-    }
-    if t.pro {
-        // Paint dividers over the label so the eye column stays distinct.
-        painter.line_segment(
-            [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator),
-        );
-        painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
+/// The eye column's cell at the row's reading start.
+fn eye_cell(rect: Rect, column: f32, rtl: bool) -> Rect {
+    let width = column.min(rect.width());
+    if rtl {
+        Rect::from_min_size(pos2(rect.right() - width, rect.top()), vec2(width, rect.height()))
+    } else {
+        Rect::from_min_size(rect.left_top(), vec2(width, rect.height()))
     }
 }
 
-/// The eye column: visibility toggle (⌥ shows only this layer), sweep-drag and its colour menu.
-fn eye_column(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer, row: RowSel, rect: Rect, actions: &mut Vec<(String, Value)>) -> egui::Response {
-    let ctx = &ui.ctx().clone();
-    let t = Tokens::get(ctx);
-    let selected = row.selected;
-    let eye_cell = eye_cell(rect);
-    // The whole eye column takes drags too (so a drag starting on it never reorders the row): dragging down
-    // the eyes gives every row swept over the visibility the first eye toggled to (#8467).
-    let eye_resp = ui.interact(eye_cell, ui.scope_id().with(("eye", l.id.0)), Sense::click_and_drag());
-    // A hidden layer's eye box is left empty (still clickable; the whole column takes the click, #8467).
+/// The layer's colour label fills the eye column behind its icon.
+fn paint_label_color(ui: &egui::Ui, t: &Tokens, l: &Layer, cell: Rect) {
+    let Some((_, background)) = t.layer_label_colors(l.label) else { return };
+    ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R0.px(), background);
+    // A hidden layer's eye box is left empty.
     if l.visible {
-        // Centre the drawing in the column while preserving the visibility hit area.
-        icons::paint(ui, eye_cell, "eye", 15.0, t.layer_label_icon(l.label));
+        icons::paint(ui, cell, "eye", 15.0, t.layer_label_icon(l.label));
     }
-    eye_sweep(ctx, l, rect, &eye_resp, actions);
-    if eye_resp.clicked() {
-        // ⌥-click shows only this layer; ⌥-click it again to restore the others.
-        if ui.input(|i| i.modifiers.alt) {
+}
+
+/// An edit of the eye column: a click, or a drag down the column (Photoshop), where the first eye
+/// toggles and every row swept over gets the same visibility, all in one history step. ⌥ shows
+/// only this layer (once per gesture).
+fn eye_event(ctx: &egui::Context, l: &Layer, edit: &EditEvent<ToggleEdit<u64>>, actions: &mut Vec<(String, Value)>) {
+    let alt_key = egui::Id::unique("layer-eye-alt");
+    let (gesture, value, modifiers) = match edit {
+        EditEvent::Update { id, value, modifiers, .. } => (Some(*id), value, *modifiers),
+        EditEvent::Set { value, modifiers, .. } => (None, value, *modifiers),
+        _ => return,
+    };
+    if modifiers.alt {
+        let seen = gesture.is_some_and(|g| ctx.data(|d| d.get_temp::<GestureId>(alt_key)) == Some(g));
+        if !seen {
+            if let Some(g) = gesture {
+                ctx.data_mut(|d| d.insert_temp(alt_key, g));
+            }
             actions.push(("layer.showOnly".into(), json!({"layer": l.id.0})));
-        } else {
-            actions.push(("layer.setProps".into(), json!({"layer": l.id.0, "visible": !l.visible})));
         }
+        return;
     }
-    eye_resp.context_menu(|ui| {
-        crate::widgets::style_spectrum_popup_menu(ui);
-        crate::layer_menu_ui::color_choices(app, ui, l, row.multi && selected, actions);
-    });
-    eye_resp
-}
-
-fn paint_target_brackets(app: &PhotocraftApp, painter: &egui::Painter, t: &Tokens, rc: &RowCtx<'_>) {
-    let (l, thumb) = (rc.l, rc.thumb);
-    let mask_rect = rc.masks.thumb(crate::mask_thumbs_ui::MaskKind::Pixel);
-    let vector_rect = rc.masks.thumb(crate::mask_thumbs_ui::MaskKind::Vector);
-    // Photoshop frames the targeted thumbnail (pixels, mask or vector mask) of the active layer
-    // with corner brackets.
-    if rc.row.primary && rc.ts > 0.0 {
-        let target = if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
-            // The Smart Filters row's filter mask thumbnail carries the brackets.
-            None
-        } else if app.ui.vector_mask_target && vector_rect.is_some() {
-            vector_rect
-        } else if app.ui.mask_target {
-            mask_rect.or(Some(thumb))
-        } else {
-            Some(thumb)
-        };
-        if let Some(r) = target {
-            crate::mask_thumbs_ui::paint_brackets(painter, r, t.text);
-        }
+    let mut params = json!({"layer": l.id.0, "visible": value.on});
+    if let Some(g) = gesture {
+        params["coalesce"] = json!(format!("layer-eye-sweep:{g}"));
     }
-}
-
-/// The layer name (and the kind sub-label of non-pixel rows); returns the name's rect.
-fn paint_row_name(painter: &egui::Painter, t: &Tokens, rc: &RowCtx<'_>, x: f32, name_right: f32) -> Option<Rect> {
-    let (l, doc, rect, ts, selected) = (rc.l, rc.doc, rc.rect, rc.ts, rc.row.selected);
-    let name_color = if l.visible { t.text } else { t.text_faint };
-    let font = if selected && !t.pro { theme::medium(13.0) } else { egui::FontId::proportional(if t.pro { 12.0 } else { 13.0 }) };
-    // Photoshop before 2026 set the Background layer's name in italics; 2026 sets it upright.
-    let italic = !t.pro && doc.is_background(l.id);
-    // Photoshop rows show only the name; the kind sub-label is a Studio-theme addition.
-    let is_pixel = t.pro || ts == 0.0 || matches!(l.content, LayerContent::Raster(_));
-    let name_rect = crate::layer_row_ui::truncated(painter, &l.name, font, name_color, italic, name_right - x).map(|galley| {
-        let text_pos = pos2(x, rect.center().y - galley.size().y / 2.0 - if is_pixel { 0.0 } else { 7.0 });
-        let r = Rect::from_min_size(text_pos, galley.size());
-        painter.galley(text_pos, galley, name_color);
-        r
-    });
-    if !is_pixel {
-        let sub = match &l.content {
-            LayerContent::Adjustment(a) => tl!(a.label()).to_string(),
-            LayerContent::Group(g) => crate::i18n::trn(crate::i18n::current(), g.children.len() as u64, "Group · {n} layer", "Group · {n} layers"),
-            other => tl!(other.kind_name()).to_string(),
-        };
-        crate::layer_row_ui::label(painter, x, rect.center().y + 8.0, name_right, &sub, egui::FontId::proportional(11.0), t.text_faint);
-    }
-    name_rect
+    actions.push(("layer.setProps".into(), params));
 }
 
 /// A plain click on the row: select the layer and retarget pixels / mask / vector mask.
@@ -470,32 +612,53 @@ fn handle_row_double_click(app: &mut PhotocraftApp, ctx: &egui::Context, rc: &Ro
     }
 }
 
-/// The visibility icon has its own color menu, and the layer-mask thumbnail its mask menu (#4575).
-fn row_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, rc: &RowCtx<'_>, eye_resp: &egui::Response, actions: &mut Vec<(String, Value)>) {
+/// Where a right-click landed, which picks the menu: the eye column has its colour menu, the
+/// layer-mask thumbnail its mask menu (#4575), the rest of the row the full layer menu.
+#[derive(Clone, Copy, PartialEq)]
+enum Zone {
+    Row,
+    Eye,
+    Mask,
+}
+
+fn row_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, rc: &RowCtx<'_>, eye: Rect, actions: &mut Vec<(String, Value)>) {
     let (l, resp, masks, row) = (rc.l, rc.resp, rc.masks, rc.row);
-    let (ctx, selected) = (&ui.ctx().clone(), row.selected);
-    // The visibility icon has its own color menu, and the layer-mask thumbnail its mask menu
-    // (#4575); elsewhere use the full layer menu.
-    let on_mask_id = ui.scope_id().with(("mask-menu", l.id.0));
-    if resp.secondary_clicked() {
-        let on_mask = resp.interact_pointer_pos().and_then(|p| masks.hit(p)) == Some(crate::mask_thumbs_ui::MaskKind::Pixel);
-        ctx.data_mut(|d| d.insert_temp(on_mask_id, on_mask));
+    let ctx = ui.ctx().clone();
+    let zone_id = ui.scope_id().with(("row-menu-zone", l.id.0));
+    let secondary = ui.input(|i| i.pointer.button_clicked(egui::PointerButton::Secondary));
+    let pos = ui.input(|i| i.pointer.interact_pos());
+    // The eye cell takes the pointer from the row, so its right-click is read from the pointer.
+    let on_eye = secondary && pos.is_some_and(|p| eye.contains(p)) && ui.rect_contains_pointer(rc.rect);
+    let open_at = if on_eye || resp.secondary_clicked() { pos } else { None };
+    if let Some(p) = open_at {
+        let zone = if on_eye {
+            Zone::Eye
+        } else if masks.hit(p) == Some(crate::mask_thumbs_ui::MaskKind::Pixel) {
+            Zone::Mask
+        } else {
+            Zone::Row
+        };
+        ctx.data_mut(|d| d.insert_temp(zone_id, zone));
     }
-    if !eye_resp.secondary_clicked() && !eye_resp.context_menu_opened() {
-        resp.context_menu(|ui| {
-            crate::widgets::style_spectrum_popup_menu(ui);
-            if ui.ctx().data(|d| d.get_temp::<bool>(on_mask_id)).unwrap_or(false) {
-                crate::layer_menu_ui::show_mask(app, ui, l, actions);
-                return;
-            }
-            // Right-clicking inside a multi-selection keeps it and acts on every selected layer.
-            let on_set = row.multi && selected;
-            if crate::layer_menu_ui::show(app, ui, l, on_set, actions)
-                && let Some(done) = crate::layer_row_ui::start_rename(ui.ctx(), l.id.0, &l.name)
-            {
-                actions.push(done);
-            }
-        });
+    let open = ContextMenu::<()>::is_open(&ctx, resp);
+    ctx.data_mut(|d| d.insert_temp(menu_open_key(l.id.0), open));
+    if open_at.is_none() && !open {
+        return;
+    }
+    // Right-clicking inside a multi-selection keeps it and acts on every selected layer.
+    let on_set = row.multi && row.selected;
+    let zone = ctx.data(|d| d.get_temp::<Zone>(zone_id)).unwrap_or(Zone::Row);
+    let rows = match zone {
+        Zone::Eye => crate::layer_menu_ui::color_rows(app, &ctx, l, on_set),
+        Zone::Mask => crate::layer_menu_ui::mask_rows(app, l),
+        Zone::Row => crate::layer_menu_ui::menu_rows(app, &ctx, l, on_set),
+    };
+    let menu = ContextMenu::new(&rows).own_gestures(false).open_at(open_at.map(OpenAt::Pointer)).show(ui, resp);
+    if let Some(choice) = menu.chosen
+        && crate::layer_menu_ui::run_choice(choice, l, on_set && zone != Zone::Mask, actions)
+        && let Some(done) = crate::layer_row_ui::start_rename(&ctx, l.id.0, &l.name)
+    {
+        actions.push(done);
     }
 }
 
@@ -505,7 +668,8 @@ pub(super) fn layer_thumb_fit(cell: Rect, w: u32, h: u32) -> (Rect, Rect) {
     crate::channels_panel::fit_thumb(cell, w, h)
 }
 
-fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui, doc: &photocraft_doc::Document, l: &Layer, rect: Rect, selected: bool) {
+/// The content of a layer's thumbnail; the library frames it.
+fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui, doc: &photocraft_doc::Document, l: &Layer, rect: Rect) {
     let t = Tokens::get(ctx);
     let p = ui.painter();
     match &l.content {
@@ -516,7 +680,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
         }
         LayerContent::Text(_) => {
             // Photoshop: type layers show a "T" tile rather than a pixel thumbnail.
-            p.rect_filled(rect, if t.pro { 0.0 } else { 6.0 }, Color32::from_gray(if t.pro { 222 } else { 236 }));
+            p.rect_filled(rect, 0.0, Color32::from_gray(222));
             icons::paint(ui, rect, "type", 20.0, Color32::from_gray(40));
         }
         // Gradient fills show the gradient itself (Photoshop); solid ones their colour.
@@ -525,8 +689,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
             crate::solid_fill_ui::paint_thumbnail(ui, crate::solid_fill_ui::thumbnail_color(app, doc.id, l.id, *color), rect);
         }
         LayerContent::Fill(_) => {
-            let c = [128, 128, 128, 255];
-            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3]));
+            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), Color32::from_rgba_unmultiplied(128, 128, 128, 255));
         }
         _ => {
             // Keep row layout and outside thumbnail decorations when the image is clipped.
@@ -540,13 +703,43 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
             }
         }
     }
-    let stroke = if t.pro {
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20))
-    } else if selected {
-        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)
-    } else {
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border)
-    };
-    p.rect_stroke(rect, CornerRadius::same(if t.pro { 0 } else { 5 }), stroke, StrokeKind::Outside);
     crate::smart_ui::thumb_badge(ui, l, rect);
+}
+
+/// The content of a mask's thumbnail: its image, Photoshop's red X when it is disabled and the
+/// kind badge; the library frames it.
+#[allow(clippy::too_many_arguments)]
+fn paint_mask_thumb(
+    app: &mut PhotocraftApp,
+    ctx: &egui::Context,
+    ui: &egui::Ui,
+    doc: &photocraft_doc::Document,
+    l: &Layer,
+    kind: MaskKind,
+    enabled: bool,
+    r: Rect,
+) {
+    let t = Tokens::get(ctx);
+    let painter = ui.painter();
+    if ui.is_rect_visible(r) {
+        let tex = match kind {
+            MaskKind::Pixel => l.mask.as_ref().map(|m| app.mask_thumb(ctx, doc, l.id, m)),
+            MaskKind::Vector => l.vector_mask.as_ref().map(|m| app.vector_mask_thumb(ctx, doc, l.id, m)),
+        };
+        if let Some(tex) = tex {
+            painter.image(tex, r, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
+        }
+        if !enabled {
+            let st = craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger);
+            let k = r.shrink(1.0);
+            painter.line_segment([k.left_top(), k.right_bottom()], st);
+            painter.line_segment([k.right_top(), k.left_bottom()], st);
+        }
+    }
+    if app.ui.layers_panel_options.show_layer_mask_badges {
+        // Distinguish pixel and vector masks without altering their thumbnails.
+        let badge = Rect::from_min_size(pos2(r.right() - 9.0, r.bottom() - 9.0), vec2(9.0, 9.0));
+        painter.rect_filled(badge, craft_ui::theme::scale::Radius::R2.px(), t.card);
+        icons::paint(ui, badge, if kind == MaskKind::Vector { "pen-tool" } else { "circle-dot" }, 8.0, t.text);
+    }
 }

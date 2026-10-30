@@ -8,7 +8,13 @@ use photocraft_doc::{Layer, LayerContent};
 use serde::{Deserialize, Serialize};
 
 use crate::state::UiState;
-use crate::{PhotocraftApp, icons, widgets};
+use craft_ui::controls::{ControlSize, IconButton, NumberField, SearchField, Select};
+use craft_ui::edit::EditEvent;
+use craft_ui::icons::Icon;
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use egui::{Align, Layout, vec2};
+
+use crate::PhotocraftApp;
 
 /// What the Layers panel filters by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,22 +126,33 @@ fn kind(l: &Layer) -> &'static str {
 
 /// Draw the filter row: the type dropdown, then that type's controls.
 pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    let tokens = LibTokens::of(ui);
+    let height = NumberField::style(&tokens, ControlSize::Sm).field.height;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        let by = [(FilterBy::Kind, tl!("Kind")), (FilterBy::Name, tl!("Name")), (FilterBy::Mode, tl!("Mode"))];
-        widgets::dropdown(ui, "layer-filter-by", tl!("Kind"), &mut app.ui.layer_filter_by, &by, 64.0);
+        let width = 64.0;
+        ui.allocate_ui_with_layout(vec2(width, height), Layout::left_to_right(Align::Center).with_main_justify(true), |ui| {
+            Select::new("layer-filter-by", tl!("Kind"), &mut app.ui.layer_filter_by)
+                .size(ControlSize::Sm)
+                .option(FilterBy::Kind, tl!("Kind"))
+                .option(FilterBy::Name, tl!("Name"))
+                .option(FilterBy::Mode, tl!("Mode"))
+                .show(ui)
+                .response
+                .changed();
+        });
         ui.add_space(craft_ui::theme::scale::Space::S4.px());
         match app.ui.layer_filter_by {
             FilterBy::Kind => {
                 for (kind, icon, tip) in [
-                    ("pixel", "image", tl!("Filter for pixel layers")),
-                    ("adjustment", "adjustment-layer", tl!("Filter for adjustment layers")),
-                    ("type", "type", tl!("Filter for type layers")),
-                    ("shape", "square", tl!("Filter for shape layers")),
-                    ("smart", "app-window", tl!("Filter for smart objects")),
+                    ("pixel", Icon::Image, tl!("Filter for pixel layers")),
+                    ("adjustment", Icon::AdjustmentLayer, tl!("Filter for adjustment layers")),
+                    ("type", Icon::Text, tl!("Filter for type layers")),
+                    ("shape", Icon::Square, tl!("Filter for shape layers")),
+                    ("smart", Icon::AppWindow, tl!("Filter for smart objects")),
                 ] {
                     let on = app.ui.layer_filter.iter().any(|k| k == kind);
-                    if icons::button(ui, icon, 22.0, on, tip).clicked() {
+                    if ui.add(IconButton::new(icon, tip).size(ControlSize::Sm).selected(on)).clicked() {
                         if on {
                             app.ui.layer_filter.retain(|k| k != kind);
                         } else {
@@ -146,12 +163,25 @@ pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
             FilterBy::Name => {
                 let width = ui.available_width().max(48.0);
-                widgets::text_field(ui, ui.scope_id().with("layer-filter-name"), &mut app.ui.layer_filter_name, tl!("Search"), width, false);
+                ui.allocate_ui_with_layout(vec2(width, height), Layout::left_to_right(Align::Center).with_main_justify(true), |ui| {
+                    let edit = SearchField::new("layer-filter-name", tl!("Search"), &app.ui.layer_filter_name, tl!("Clear"))
+                        .placeholder(tl!("Search"))
+                        .size(ControlSize::Sm)
+                        .show(ui);
+                    if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event {
+                        app.ui.layer_filter_name = value;
+                    }
+                });
             }
             FilterBy::Mode => {
-                let modes: Vec<(BlendMode, &str)> = std::iter::once(BlendMode::PassThrough).chain(BlendMode::LAYER_MODES).map(|m| (m, m.label())).collect();
                 let width = ui.available_width().max(96.0);
-                widgets::dropdown(ui, "layer-filter-mode", tl!("Mode"), &mut app.ui.layer_filter_mode, &modes, width);
+                ui.allocate_ui_with_layout(vec2(width, height), Layout::left_to_right(Align::Center).with_main_justify(true), |ui| {
+                    let mut select = Select::new("layer-filter-mode", tl!("Mode"), &mut app.ui.layer_filter_mode).size(ControlSize::Sm);
+                    for mode in std::iter::once(BlendMode::PassThrough).chain(BlendMode::LAYER_MODES) {
+                        select = select.option(mode, tl!(mode.label()));
+                    }
+                    select.show(ui).response.changed();
+                });
             }
         }
     });

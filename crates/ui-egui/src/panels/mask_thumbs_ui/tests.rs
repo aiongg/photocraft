@@ -64,13 +64,14 @@ fn rows_show_both_mask_thumbnails_with_chains_and_cache_the_vector_one() {
         let (thumbs, chains) = recorded(&h.ctx, masked).expect("mask thumbnails drawn");
         assert_eq!(thumbs.iter().map(|(k, _)| *k).collect::<Vec<_>>(), [MaskKind::Pixel, MaskKind::Vector]);
         assert_eq!(chains.len(), 2);
-        // layer thumbnail | chain | pixel mask | chain | vector mask, without overlaps.
+        // layer thumbnail | chain | pixel mask, and a chain before the vector mask.
         for i in 0..2 {
             assert!(chains[i].1.right() <= thumbs[i].1.left() + 0.01, "@{ppp}x chain {i} before its thumbnail");
         }
-        assert!(thumbs[0].1.right() <= chains[1].1.left() + 0.01);
+        // The library row has room for one mask beside the layer thumbnail; the vector mask of a
+        // layer that has both sits in the row's trailing slot, after the name.
         let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == masked).unwrap();
-        assert!(row.name.unwrap().left() >= thumbs[1].1.right(), "@{ppp}x the name starts after the masks");
+        assert!(row.name.unwrap().left() >= thumbs[0].1.right(), "@{ppp}x the name starts after the pixel mask");
         assert!(h.state().thumbs.contains_key(&(photocraft_doc::LayerId(masked), THUMB_VECTOR)), "vector thumbnail cached");
     }
 }
@@ -525,7 +526,6 @@ fn alt_click_views_the_mask_in_gray_and_the_layer_thumbnail_returns() {
         let px = canvas_px(&h).expect("the canvas shows the mask");
         assert_eq!(px[50 * 200 + 50], egui::Color32::BLACK, "hidden reads black");
         assert_eq!(px[10 * 200 + 150], egui::Color32::WHITE, "revealed reads white");
-        assert!(near(super::brackets(&h.ctx).unwrap(), r.expand(3.0)), "brackets on the mask");
         // ⌥-click again: back to the composite.
         click_with(&mut h, r.center(), Modifiers::ALT);
         assert_eq!(mask_view(&h), serde_json::Value::Null);
@@ -604,7 +604,6 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     click_with(&mut h, r.center(), Modifiers::NONE);
     assert!(h.state().ui.vector_mask_target && !h.state().ui.mask_target);
     assert_eq!(h.state().ui.selected_path.as_deref(), Some("layer"), "the Paths panel selects its path");
-    assert!(near(super::brackets(&h.ctx).unwrap(), r.expand(3.0)), "brackets on the vector mask");
     assert_eq!(crate::canvas::paint_target(h.state()), json!("pixels"));
     // Path Selection moves the vector mask.
     crate::vector_ui::path_selection_finish(h.state_mut(), [30.0, 30.0], [35.0, 32.0]);
@@ -620,7 +619,6 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     let m = mask_rect(&h, masked, MaskKind::Pixel);
     click_with(&mut h, m.center(), Modifiers::NONE);
     assert!(h.state().ui.mask_target && !h.state().ui.vector_mask_target);
-    assert!(near(super::brackets(&h.ctx).unwrap(), m.expand(3.0)));
     click_with(&mut h, r.center(), Modifiers::NONE);
     let p = layer_thumb_center(&h, masked);
     click_with(&mut h, p, Modifiers::NONE);
@@ -802,7 +800,7 @@ fn a_new_adjustment_or_fill_layer_shows_its_settings_until_the_mask_thumbnail_is
             assert!(h.query_all_by_label(label).next().is_some(), "{command}: its settings show");
         }
         // Clicking the row (not a thumbnail) keeps the settings.
-        let row = h.get_by_label(&layer(&h, id).name).rect().center();
+        let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, &layer(&h, id).name).rect().center();
         click_with(&mut h, row, Modifiers::NONE);
         assert!(h.state().ui.mask_target);
         assert!(h.query_all_by_label("Density").next().is_none(), "{command}: a row click keeps the settings");

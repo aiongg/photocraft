@@ -41,9 +41,9 @@ fn layer_color_context_menu_edits_the_clicked_layer_and_preserves_multi_selectio
         let (mut h, red, other) = harness(crate::theme::ThemeKind::Pro, ppp);
         let at = row(&h, red).center();
         click(&mut h, at, PointerButton::Secondary, Modifiers::NONE);
-        let at = h.query_all_by_role_and_label(egui::accesskit::Role::Button, "Color").last().expect("the Color submenu").rect().center();
+        let at = h.query_all_by_label("Color").last().expect("the Color submenu").rect().center();
         click(&mut h, at, PointerButton::Primary, Modifiers::NONE);
-        let at = h.get_by_role_and_label(egui::accesskit::Role::Button, "Seafoam").rect().center();
+        let at = h.get_by_label("Seafoam").rect().center();
         click(&mut h, at, PointerButton::Primary, Modifiers::NONE);
         let st = h.state().session.active().unwrap();
         assert_eq!(st.active_layer, Some(red));
@@ -55,9 +55,9 @@ fn layer_color_context_menu_edits_the_clicked_layer_and_preserves_multi_selectio
         assert_eq!(common_color(h.state(), clicked, true), None);
         let at = row(&h, red).center();
         click(&mut h, at, PointerButton::Secondary, Modifiers::NONE);
-        let at = h.query_all_by_role_and_label(egui::accesskit::Role::Button, "Color").last().expect("the Color submenu").rect().center();
+        let at = h.query_all_by_label("Color").last().expect("the Color submenu").rect().center();
         click(&mut h, at, PointerButton::Primary, Modifiers::NONE);
-        let at = h.get_by_role_and_label(egui::accesskit::Role::Button, "Indigo").rect().center();
+        let at = h.get_by_label("Indigo").rect().center();
         click(&mut h, at, PointerButton::Primary, Modifiers::NONE);
         let st = h.state().session.active().unwrap();
         assert_eq!(st.selected_layers().len(), 2);
@@ -119,7 +119,7 @@ fn right_clicking_eye_opens_color_choices_without_toggling_visibility() {
     let r = row(&h, red);
     let eye = pos2(r.left() + 17.0, r.center().y);
     click(&mut h, eye, PointerButton::Secondary, Modifiers::NONE);
-    let blue = h.get_by_role_and_label(egui::accesskit::Role::Button, "Blue").rect().center();
+    let blue = h.query_all_by_label("Blue").last().expect("the Blue choice").rect().center();
     click(&mut h, blue, PointerButton::Primary, Modifiers::NONE);
 
     let st = h.state().session.active().unwrap();
@@ -130,12 +130,14 @@ fn right_clicking_eye_opens_color_choices_without_toggling_visibility() {
 
 #[test]
 fn layer_color_menu_marks_only_the_common_color() {
-    let mut h = Harness::new_ui(|ui| {
-        for c in LabelColor::ALL {
-            color_button(ui, c, c == LabelColor::Blue);
-        }
-    });
-    h.run();
-    assert_eq!(h.get_by_role_and_label(egui::accesskit::Role::Button, "Blue").accesskit_node().toggled(), Some(egui::accesskit::Toggled::True));
-    assert_eq!(h.get_by_role_and_label(egui::accesskit::Role::Button, "Red").accesskit_node().toggled(), Some(egui::accesskit::Toggled::False));
+    let mut s = photocraft_engine::Session::new();
+    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
+    s.execute("layer.new.layer", json!({"name": "Blue layer"})).unwrap();
+    s.execute("layer.setLabelColor", json!({"color": "blue"})).unwrap();
+    let app = crate::PhotocraftApp::new(s, crate::Services::default());
+    let l = app.session.active().unwrap().doc.layer(app.session.active().unwrap().active_layer.unwrap()).unwrap().clone();
+    let rows = color_rows(&app, &egui::Context::default(), &l, false);
+    let checked = |name: &str| rows.iter().filter_map(|r| r.item()).find(|i| i.label() == name).and_then(|i| i.item_kind().checked());
+    assert_eq!(checked("Blue"), Some(true));
+    assert_eq!(checked("Red"), Some(false));
 }
