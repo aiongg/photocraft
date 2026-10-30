@@ -719,7 +719,8 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
             let (w, h) = (get_f(f, "width", 1920.0), get_f(f, "height", 1080.0));
             let mut buttons = Vec::new();
             for (icon, portrait) in [(Icon::OrientationPortrait, true), (Icon::OrientationLandscape, false)] {
-                let button = ui.add(IconButton::new(icon, if portrait { tl!("Portrait") } else { tl!("Landscape") }).size(ControlSize::Md).selected((h > w) == portrait));
+                let button = ui
+                    .add(IconButton::new(icon, if portrait { tl!("Portrait") } else { tl!("Landscape") }).size(ControlSize::Md).selected((h > w) == portrait));
                 if button.clicked() {
                     // The pick also turns the presets (`oriented`), even when the size already has it.
                     f.insert("__orientation".into(), json!(if portrait { "portrait" } else { "landscape" }));

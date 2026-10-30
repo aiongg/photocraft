@@ -44,8 +44,7 @@ pub use color::{
 #[cfg(test)]
 use color::{checker_tile_id, checker_uv};
 pub use dialog_fields::{
-    NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units,
-    text as dialog_text,
+    NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units, text as dialog_text,
 };
 pub use dropdown::{dropdown, dropdown_hovered, dropdown_literal, dropdown_wheel_hovered, dropdown_with_tooltips, menu_scroll, swatch_popup};
 pub(crate) use fields::compact_wrapping_value_field;

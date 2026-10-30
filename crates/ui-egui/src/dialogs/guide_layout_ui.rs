@@ -365,6 +365,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
 
 /// The dialog's fields and the live preview; OK and Cancel are the host's side column.
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
+    let before = (params(f), on(f, "__preview", true), f.get("color").cloned());
     main_fields(app, ui, f);
     match calculate(app, f) {
         Ok(guides) => {
@@ -375,6 +376,10 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
         Err(error) => {
             ui.colored_label(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui(), tl!("Invalid guide layout")).on_hover_text(error);
         }
+    }
+    // The canvas paints before the dialog. Schedule the frame that displays this draft edit.
+    if before != (params(f), on(f, "__preview", true), f.get("color").cloned()) {
+        ui.ctx().request_repaint();
     }
 }
 
