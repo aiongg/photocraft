@@ -7,6 +7,7 @@
 //! once answered. Cancel drops the save. Scripts skip the prompt by passing `ddsCompression` or
 //! `ddsMipmaps`.
 
+use craft_ui::dialog::Outcome;
 use photocraft_io::{DdsCompression, DdsOptions};
 
 use crate::{ExportSettings, PhotocraftApp};
@@ -67,30 +68,22 @@ fn label(c: DdsCompression) -> &'static str {
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.dds_options else { return };
-    let (mut ok, mut cancel) = (false, false);
     let mut options = p.options;
-    let modal = egui::Modal::new(egui::Id::unique("dds-options")).show(ctx, |ui| {
-        ui.set_max_width(340.0);
-        ui.label(egui::RichText::new(tl!("DDS Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    let answer = crate::dialogs::show_prompt(ctx, "dds-options", tl!("DDS Options"), craft_ui::dialog::Width::Compact, &mut options, |ui, options| {
         craft_ui::composites::SectionLabel::new(tl!("Compression")).show(ui);
-        for c in DdsCompression::ALL {
-            ui.radio_value(&mut options.compression, c, label(c));
-        }
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        craft_ui::controls::Checkbox::bool(tl!("Generate Mipmaps"), &mut options.mipmaps).show(ui).response;
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            ok = ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(84.0)).clicked();
-            cancel = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked();
+        ui.indent("dds-options-compression", |ui| {
+            let mut group = craft_ui::controls::RadioGroup::new("dds-options-compression", tl!("Compression"), &mut options.compression);
+            for c in DdsCompression::ALL {
+                group = group.item(c, label(c));
+            }
+            _ = group.show(ui);
         });
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        _ = craft_ui::controls::Checkbox::bool(tl!("Generate Mipmaps"), &mut options.mipmaps).show(ui);
     });
-    cancel |= modal.should_close();
     p.options = options;
-    // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.
+    let outcome = answer.outcome;
+    let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));
     if ok || (!cancel && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))) {
         let Some(p) = app.dds_options.take() else { return };
         let settings = ExportSettings { dds: p.options, ..app.save_settings() };

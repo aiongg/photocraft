@@ -480,6 +480,36 @@ fn dialog_labels() -> DialogLabels {
     labels
 }
 
+/// Shows an options prompt whose values live in the app, not in a dialog's JSON fields (the JPEG,
+/// TIFF, TGA and DDS options a save waits on). It is the host's frame with a standard OK / Cancel
+/// footer, so the buttons, Enter, Esc and the close box follow the platform like every dialog. The
+/// frame's chrome is kept in the context under `key` while the prompt is open.
+pub(crate) fn show_prompt<H: Clone + PartialEq + Send + Sync + 'static>(
+    ctx: &egui::Context,
+    key: &'static str,
+    title: &str,
+    width: craft_ui::dialog::Width,
+    fields: &mut H,
+    body: impl FnOnce(&mut egui::Ui, &mut H),
+) -> craft_ui::dialog::DialogResponse {
+    let slot = egui::Id::NULL.with(("save-options-prompt", key));
+    let mut state: craft_ui::dialog::DialogState<H> = ctx.data(|d| d.get_temp(slot)).unwrap_or_else(craft_ui::dialog::DialogState::new);
+    let response = HostDialog::new(key, title)
+        .width(width)
+        .place_key(PlaceKey(slot))
+        .footer(Footer::standard().labels(dialog_labels()).ok(tl!("OK")).cancel(tl!("Cancel")))
+        .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
+        .show(ctx, &mut state, fields, body);
+    ctx.data_mut(|d| {
+        if state.is_open() {
+            d.insert_temp(slot, state);
+        } else {
+            d.remove::<craft_ui::dialog::DialogState<H>>(slot);
+        }
+    });
+    response
+}
+
 /// What the answer to a prompt that offers a choice (`choice` field) is, for the role pressed.
 fn set_choice(fields: &mut Fields, outcome: Outcome) {
     let alternate = outcome == Outcome::Alternate;

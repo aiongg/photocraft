@@ -16,6 +16,10 @@
 //! without the path for a plain `file.save`, which writes whichever file an action is played on
 //! ([`plain_save_step`]).
 
+use craft_ui::composites::FormGrid;
+use craft_ui::controls::{RadioGroup, Select, Slider};
+use craft_ui::dialog::Outcome;
+use craft_ui::composites::FieldControl as _;
 use photocraft_codecs::JpegFormat;
 use serde_json::Value;
 
@@ -194,45 +198,50 @@ pub fn park_at(app: &mut PhotocraftApp, path: String, copy: bool, record: &'stat
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.jpeg_options else { return };
-    let (mut ok, mut cancel) = (false, false);
-    let (mut quality, mut format) = (p.quality, p.format);
-    let modal = egui::Modal::new(egui::Id::unique("jpeg-options")).show(ctx, |ui| {
-        ui.set_max_width(360.0);
-        ui.label(egui::RichText::new(tl!("JPEG Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    let mut values = (p.quality, p.format);
+    let answer = crate::dialogs::show_prompt(ctx, "jpeg-options", tl!("JPEG Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (quality, format)| {
         craft_ui::composites::SectionLabel::new(tl!("Image Options")).show(ui);
-        ui.horizontal(|ui| {
-            let quality_caption = ui.label(tl!("Quality"));
-            ui.add(egui::DragValue::new(&mut quality).range(0..=MAX_QUALITY).speed(0.1)).labelled_by(quality_caption.id);
-            // Photoshop's presets: picking one sets the quality it starts at.
-            let preset = craft_ui::ComboBox::from_id_salt("jpeg-quality-preset").selected_text(quality_label(quality)).show_ui(ui, |ui| {
-                for q in [3, 5, 8, 10] {
-                    if ui.selectable_label(quality_label(quality) == quality_label(q), quality_label(q)).clicked() {
-                        quality = q;
+        FormGrid::new("jpeg-options-quality").show(ui, |form| {
+            form.row(tl!("Quality"), |ui, _| {
+                let mut q = f32::from(*quality);
+                let number = crate::widgets::dialog_number_field(ui, "jpeg-quality", tl!("Quality"), &mut q, 0.0..=f32::from(MAX_QUALITY), "", 0);
+                if number.changed {
+                    *quality = (q.round() as u8).min(MAX_QUALITY);
+                }
+                // Photoshop's presets: picking one sets the quality it starts at.
+                let presets = [3u8, 5, 8, 10];
+                let mut current = quality_label(*quality).to_string();
+                let preset = Select::new("jpeg-quality-preset", tl!("Preset"), &mut current)
+                    .rows(presets.len(), |i| quality_label(presets[i]).to_string(), |i| quality_label(presets[i]))
+                    .show(ui);
+                if preset.response.changed() {
+                    if let Some(q) = presets.iter().find(|&&q| quality_label(q) == current.as_str()) {
+                        *quality = *q;
                     }
                 }
+                (number.response.own_name(), preset.response)
             });
-            let _ = preset.response.accessible_name(tl!("Preset"));
+            form.unlabelled(|ui| {
+                let edit = Slider::new("jpeg-quality-slider", tl!("Quality"), f64::from(*quality), 0.0..=f64::from(MAX_QUALITY)).step(1.0).show(ui);
+                if let Some(v) = edit.event.as_ref().and_then(|e| e.value()).copied() {
+                    *quality = (v.round() as u8).min(MAX_QUALITY);
+                }
+                edit
+            });
         });
-        ui.add(egui::Slider::new(&mut quality, 0..=MAX_QUALITY).show_value(false)).accessible_name(tl!("Quality"));
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
         craft_ui::composites::SectionLabel::new(tl!("Format Options")).show(ui);
-        ui.radio_value(&mut format, JpegFormat::Baseline, tl!("Baseline (\"Standard\")"));
-        ui.radio_value(&mut format, JpegFormat::Optimized, tl!("Baseline Optimized"));
-        ui.radio_value(&mut format, JpegFormat::Progressive, tl!("Progressive"));
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            ok = ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(84.0)).clicked();
-            cancel = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked();
+        ui.indent("jpeg-options-format", |ui| {
+            _ = RadioGroup::new("jpeg-options-format", tl!("Format Options"), format)
+                .item(JpegFormat::Baseline, tl!("Baseline (\"Standard\")"))
+                .item(JpegFormat::Optimized, tl!("Baseline Optimized"))
+                .item(JpegFormat::Progressive, tl!("Progressive"))
+                .show(ui);
         });
     });
-    cancel |= modal.should_close();
-    p.quality = quality.min(MAX_QUALITY);
-    p.format = format;
-    // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.
+    (p.quality, p.format) = (values.0.min(MAX_QUALITY), values.1);
+    let outcome = answer.outcome;
+    let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));
     if ok || (!cancel && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))) {
         confirm(app, ctx);
     } else if cancel {
