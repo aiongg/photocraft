@@ -6,7 +6,7 @@
 //! drive it like any dialog. OK remembers the choices in the preferences (`dialogs["edit.fill"]`),
 //! which are saved to disk, so the dialog opens with them again after a restart.
 
-use craft_ui::composites::FormGrid;
+use craft_ui::composites::{FieldControl, FormGrid};
 use craft_ui::controls::{Checkbox, Select};
 use serde_json::{Map, Value, json};
 
@@ -170,7 +170,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
                     if swatch.clicked() {
                         crate::color_picker_ui::request(f, tl!("Color Picker (Fill Color)"));
                     }
-                    crate::widgets::keep_own_name(ui, &swatch)
+                    swatch.own_name()
                 });
             }
             "pattern" => {

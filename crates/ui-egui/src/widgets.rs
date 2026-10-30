@@ -44,7 +44,7 @@ pub use color::{
 #[cfg(test)]
 use color::{checker_tile_id, checker_uv};
 pub use dialog_fields::{
-    NumberEdit, TextEdit, keep_own_name, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units,
+    NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units,
     text as dialog_text,
 };
 pub use dropdown::{dropdown, dropdown_hovered, dropdown_literal, dropdown_wheel_hovered, dropdown_with_tooltips, menu_scroll, swatch_popup};

@@ -1,7 +1,7 @@
 //! Edit › Stroke…: a Photoshop-style options dialog for the existing `edit.stroke` command.
 //! The engine remains directly callable with parameters by CLI, MCP and Actions.
 
-use craft_ui::composites::{FormGrid, SectionLabel};
+use craft_ui::composites::{FieldControl, FormGrid, SectionLabel};
 use craft_ui::controls::Select;
 use craft_ui::primitives::Divider;
 use serde_json::{Map, Value, json};
@@ -94,7 +94,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             if swatch.clicked() {
                 crate::color_picker_ui::request(f, tl!("Color Picker (Stroke Color)"));
             }
-            crate::widgets::keep_own_name(ui, &swatch)
+            swatch.own_name()
         });
     });
 
