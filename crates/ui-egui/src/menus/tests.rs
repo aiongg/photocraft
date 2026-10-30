@@ -221,7 +221,7 @@ fn menu_model_and_bar_rows_keep_the_items() {
     app.session.execute("prefs.set", json!({"values": {"menus.colors.file.close": "red"}})).unwrap();
     let items = menu_items(&app);
     let model = menu_model(&items);
-    let in_model: Vec<&craft_menu::Item> = model.bar.items();
+    let in_model: Vec<&craft_menu::Item> = model.items();
     for it in items.iter().filter(|i| i.label != "---" && i.path.first().is_some_and(|top| TOP_MENUS.contains(&top.as_str()))) {
         let found = in_model.iter().find(|m| m.command.id == it.id).unwrap_or_else(|| panic!("{} is in the model", it.id));
         assert_eq!((found.label.as_str(), found.enabled, found.kind.checked()), (it.label.as_str(), it.enabled, it.checked), "{}", it.id);
@@ -230,16 +230,16 @@ fn menu_model_and_bar_rows_keep_the_items() {
             assert_eq!(chord.portable(), sc.parse::<craft_keymap::Chord>().unwrap().portable());
         }
     }
-    assert_eq!(model.bar.menus.iter().map(|m| m.title.as_str()).collect::<Vec<_>>(), TOP_MENUS);
-    assert!(model.tints.contains_key("file.close"));
+    assert_eq!(model.menus.iter().map(|m| m.title.as_str()).collect::<Vec<_>>(), TOP_MENUS);
+    assert!(model.find(&"file.close".into()).is_some_and(|i| i.tint.is_some()), "Edit › Menus colour");
+    assert_eq!(model.find(&"image.mode.bits32".into()).and_then(|i| i.tooltip.as_deref()), Some("Floating point"));
 
-    let platform = craft_keymap::Platform::Linux;
     let fr = crate::i18n::Lang::from_code("fr").unwrap();
-    let rows = model::ui_menus(&model, fr, platform);
-    assert_eq!(rows.len(), TOP_MENUS.len());
-    let entries = craft_ui::behavior::PaletteEntry::from_menu(&rows);
-    let found = craft_ui::behavior::CommandSearch::new(&entries).query("distort").fuzzy(false).results(15);
-    assert!(found.iter().any(|m| m.entry.command().id == "edit.transform.distort"), "the English name stays searchable");
+    let (shown, english) = model::translated(&model, fr);
+    assert_eq!(shown.menus.len(), TOP_MENUS.len());
+    let distort = craft_keymap::CommandRef::new("edit.transform.distort");
+    assert_eq!(english.of(craft_menu::Labeled::Command(&distort)).as_deref(), Some("Distort"), "the English name stays known");
+    assert_eq!(shown.find(&"image.mode.bits32".into()).and_then(|i| i.tooltip.clone()), Some(crate::i18n::tr(fr, "Floating point").to_string()));
 }
 
 /// An idle bar keeps its rows (building them walks every command and layer); an open menu
@@ -257,11 +257,8 @@ fn an_idle_bar_keeps_its_rows_and_an_open_menu_follows_the_state() {
     );
     PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
     harness.run_steps(3);
-    let rows = |app: &PhotocraftApp| app.menu_cache.as_ref().map(|c| c.menus.as_ptr());
-    let close = |app: &PhotocraftApp| {
-        let file = app.menu_cache.as_ref().and_then(|c| c.menus[0].children())?;
-        file.iter().filter_map(|e| e.item()).find(|i| i.command().is_some_and(|c| c.id == "file.close")).map(|i| i.is_enabled())
-    };
+    let rows = |app: &PhotocraftApp| app.menu_cache.as_ref().map(|c| c.menus.menus.as_ptr());
+    let close = |app: &PhotocraftApp| app.menu_cache.as_ref()?.menus.find(&"file.close".into()).map(|i| i.enabled);
     let idle = rows(harness.state());
     assert!(idle.is_some() && close(harness.state()) == Some(false));
     // A document opened while nobody looks at the bar: nothing is rebuilt.

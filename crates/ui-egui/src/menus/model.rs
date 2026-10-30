@@ -1,30 +1,18 @@
-//! PhotoCraft's menus as a craft-menu model, and the rows the library's menu bar draws.
+//! PhotoCraft's menus as a craft-menu model.
 //!
 //! [`menu_model`] turns the flat rows of [`menu_items`](super::menu_items) into a
-//! [`craft_menu::MenuBar`] in English, with the roles the Mac layout needs. [`ui_menus`] converts
-//! that model into the library bar's [`craft_ui::menu::MenuItem`] rows in the UI language, adding
-//! what craft-menu's items do not carry: Edit › Menus tints and the row tooltips.
+//! [`craft_menu::MenuBar`] in English, with the roles the Mac layout needs, the Edit › Menus
+//! tints and the row tooltips. [`translated`] writes it in the UI language for the in-window bar.
 
 use std::collections::HashMap;
 
-use craft_keymap::{Chord, CommandRef, Platform};
-use craft_menu::{ItemRole, MenuRole, Node, Row};
-use craft_ui::menu::{MenuEntry, MenuItem as UiItem};
+use craft_keymap::{Chord, CommandRef};
+use craft_menu::{Item, ItemRole, MenuRole, Node, Row};
 
 use super::items::{MenuItem, menu_tint};
 use super::state::translated_label;
 use super::{DOCUMENT_ITEM, TOP_MENUS};
 use crate::i18n::{Lang, tr};
-
-/// Menu rows the library bar draws: one submenu row per top-level menu.
-pub(crate) type UiMenus = Vec<UiItem<CommandRef>>;
-
-/// The model of the menus, and the tints the model has no field for.
-pub struct Model {
-    pub bar: craft_menu::MenuBar,
-    /// Edit › Menus colour of a command, by command id.
-    pub tints: HashMap<String, egui::Color32>,
-}
 
 /// Photoshop's mnemonics for the top menus (Windows), used where the shown label has the letter.
 const TOP_PREFERRED: [(&str, char); 10] = [
@@ -40,27 +28,19 @@ const TOP_PREFERRED: [(&str, char); 10] = [
     ("Help", 'H'),
 ];
 
-/// Index of the Help menu in [`TOP_MENUS`]: the menu that holds the search field.
-pub(crate) const HELP: usize = 9;
-
 /// The menus as craft-menu's tree, in English. A shortcut that is not a craft-keymap chord is left
 /// off the row.
-pub fn menu_model(items: &[MenuItem]) -> Model {
-    let mut tints = HashMap::new();
+pub fn menu_model(items: &[MenuItem]) -> craft_menu::MenuBar {
+    let by_id: HashMap<&str, &MenuItem> = items.iter().map(|it| (it.id.as_str(), it)).collect();
     let rows: Vec<Row> = items
         .iter()
-        .map(|it| {
-            if let Some(color) = it.color.as_deref().and_then(menu_tint) {
-                tints.insert(it.id.clone(), color);
-            }
-            Row {
-                path: it.path.clone(),
-                command: CommandRef::new(it.id.as_str()),
-                label: it.label.clone(),
-                shortcut: it.shortcut.as_deref().and_then(|s| s.parse::<Chord>().ok()),
-                enabled: it.enabled,
-                kind: it.checked.map_or(craft_menu::ItemKind::Plain, craft_menu::ItemKind::Check),
-            }
+        .map(|it| Row {
+            path: it.path.clone(),
+            command: CommandRef::new(it.id.as_str()),
+            label: it.label.clone(),
+            shortcut: it.shortcut.as_deref().and_then(|s| s.parse::<Chord>().ok()),
+            enabled: it.enabled,
+            kind: it.checked.map_or(craft_menu::ItemKind::Plain, craft_menu::ItemKind::Check),
         })
         .collect();
     let mut bar = craft_menu::from_items(&TOP_MENUS, &rows);
@@ -73,91 +53,97 @@ pub fn menu_model(items: &[MenuItem]) -> Model {
     bar.tag_submenu(MenuRole::Edit, "Preferences", ItemRole::Settings);
     bar.tag_submenu(MenuRole::Window, "Theme", ItemRole::Appearance);
     bar.tag_item(&"window.theme.toggle".into(), ItemRole::Appearance);
-    Model { bar, tints }
-}
-
-/// The platform whose shortcut names the bar writes.
-pub(crate) fn platform(ctx: &egui::Context) -> Platform {
-    match ctx.os() {
-        egui::os::OperatingSystem::Mac | egui::os::OperatingSystem::IOS => Platform::Mac,
-        egui::os::OperatingSystem::Windows => Platform::Windows,
-        _ => Platform::Linux,
-    }
-}
-
-/// The model's menus as library bar rows, in `lang`. A label or title that differs from its English
-/// one carries the English as well, which the bar's search matches and its mnemonics use for a
-/// label with no Latin letter.
-pub(crate) fn ui_menus(model: &Model, lang: Lang, platform: Platform) -> UiMenus {
-    let cx = Cx { lang, platform, tints: &model.tints };
-    model
-        .bar
-        .menus
-        .iter()
-        .map(|menu| {
-            let mut entries = cx.entries(&menu.children);
-            if entries.is_empty() {
-                entries.push(UiItem::new(tr(lang, "(coming soon)").to_string(), CommandRef::new("menu.empty")).enabled(false).into());
+    fn decorate(nodes: &mut [Node], by_id: &HashMap<&str, &MenuItem>) {
+        for n in nodes {
+            match n {
+                Node::Item(item) => {
+                    if let Some(color) = by_id.get(item.command.id.as_str()).and_then(|it| it.color.as_deref()).and_then(menu_tint) {
+                        item.tint = Some(color.into());
+                    }
+                    item.tooltip = tooltip(&item.command.id).map(str::to_string);
+                }
+                Node::Submenu { children, .. } => decorate(children, by_id),
+                _ => {}
             }
-            let mut row = cx.submenu(&menu.title, entries);
-            if let Some((_, letter)) = TOP_PREFERRED.iter().find(|(t, _)| *t == menu.title) {
-                row = row.mnemonic(*letter);
+        }
+    }
+    for menu in &mut bar.menus {
+        decorate(&mut menu.children, &by_id);
+    }
+    bar
+}
+
+/// The English tooltip of a row (translated when the bar is written in the UI language).
+fn tooltip(id: &str) -> Option<&'static str> {
+    match id {
+        "image.mode.bits8" | "image.mode.bits16" => Some("Integer"),
+        "image.mode.bits32" => Some("Floating point"),
+        _ => None,
+    }
+}
+
+/// The English names behind a translated bar, for the bar's mnemonics and Help search.
+#[derive(Default)]
+pub(crate) struct English {
+    commands: HashMap<String, String>,
+    titles: HashMap<String, String>,
+}
+
+impl English {
+    pub(crate) fn of(&self, labeled: craft_menu::Labeled<'_>) -> Option<String> {
+        match labeled {
+            craft_menu::Labeled::Command(c) => self.commands.get(&c.id).cloned(),
+            craft_menu::Labeled::Title(t) => self.titles.get(t).cloned(),
+        }
+    }
+}
+
+/// The model written in `lang`, with the English names of what differs. A menu left with no rows
+/// shows a disabled "(coming soon)".
+pub(crate) fn translated(model: &craft_menu::MenuBar, lang: Lang) -> (craft_menu::MenuBar, English) {
+    let mut bar = model.clone();
+    let mut english = English::default();
+    fn walk(nodes: &mut [Node], lang: Lang, english: &mut English) {
+        for n in nodes {
+            match n {
+                Node::Item(it) => {
+                    // A document's name is shown as it is.
+                    if it.command.id.starts_with(DOCUMENT_ITEM) {
+                        continue;
+                    }
+                    let shown = translated_label(lang, &it.command.id, &it.label);
+                    if shown != it.label {
+                        english.commands.insert(it.command.id.clone(), std::mem::replace(&mut it.label, shown));
+                    }
+                    if let Some(tip) = it.tooltip.take() {
+                        it.tooltip = Some(tr(lang, &tip).to_string());
+                    }
+                }
+                Node::Submenu { label, children, .. } => {
+                    let shown = tr(lang, label).to_string();
+                    if shown != *label {
+                        english.titles.insert(shown.clone(), std::mem::replace(label, shown));
+                    }
+                    walk(children, lang, english);
+                }
+                _ => {}
             }
-            row
-        })
-        .collect()
+        }
+    }
+    for menu in &mut bar.menus {
+        let shown = tr(lang, &menu.title).to_string();
+        if shown != menu.title {
+            english.titles.insert(shown.clone(), std::mem::replace(&mut menu.title, shown));
+        }
+        if menu.children.is_empty() {
+            menu.children.push(Item::new("menu.empty", tr(lang, "(coming soon)")).enabled(false).into());
+        }
+        walk(&mut menu.children, lang, &mut english);
+    }
+    (bar, english)
 }
 
-struct Cx<'a> {
-    lang: Lang,
-    platform: Platform,
-    tints: &'a HashMap<String, egui::Color32>,
-}
-
-impl Cx<'_> {
-    fn submenu(&self, name: &str, entries: Vec<MenuEntry<CommandRef>>) -> UiItem<CommandRef> {
-        let shown = tr(self.lang, name).to_string();
-        let english = (shown != name).then(|| name.to_string());
-        let row = UiItem::submenu(shown, entries);
-        match english {
-            Some(english) => row.english(english),
-            None => row,
-        }
-    }
-
-    fn entries(&self, nodes: &[Node]) -> Vec<MenuEntry<CommandRef>> {
-        nodes
-            .iter()
-            .filter_map(|n| match n {
-                Node::Item(it) => Some(self.item(it).into()),
-                Node::Separator => Some(MenuEntry::Separator),
-                Node::Submenu { label, children, .. } => Some(self.submenu(label, self.entries(children)).into()),
-                Node::Standard { .. } => None,
-            })
-            .collect()
-    }
-
-    fn item(&self, it: &craft_menu::Item) -> UiItem<CommandRef> {
-        let id = it.command.id.as_str();
-        // A document's name is shown as it is.
-        let shown = if id.starts_with(DOCUMENT_ITEM) { it.label.clone() } else { translated_label(self.lang, id, &it.label) };
-        let mut row = UiItem::new(shown.clone(), it.command.clone()).enabled(it.enabled);
-        if let craft_menu::ItemKind::Check(on) | craft_menu::ItemKind::Radio(on) = it.kind {
-            row = row.check(on);
-        }
-        if let Some(chord) = &it.shortcut {
-            row = row.shortcut(craft_keymap::ui::kbd(chord, self.platform));
-        }
-        if shown != it.label && !id.starts_with(DOCUMENT_ITEM) {
-            row = row.english(it.label.clone());
-        }
-        if let Some(color) = self.tints.get(id) {
-            row = row.tint(*color);
-        }
-        match id {
-            "image.mode.bits8" | "image.mode.bits16" => row.tooltip(tr(self.lang, "Integer").to_string()),
-            "image.mode.bits32" => row.tooltip(tr(self.lang, "Floating point").to_string()),
-            _ => row,
-        }
-    }
+/// The preferred mnemonics of the top menus, by title as shown.
+pub(crate) fn top_mnemonics(lang: Lang) -> Vec<(String, char)> {
+    TOP_PREFERRED.iter().map(|(t, c)| (tr(lang, t).to_string(), *c)).collect()
 }

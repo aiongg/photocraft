@@ -37,7 +37,7 @@ pub const LANGUAGE_PREFIX: &str = "app.language.";
 /// PhotoCraft's menus as a Mac menu bar, in the UI language; `language` is the
 /// `interface.language` preference (`auto` or a code), checked in the app menu's Language.
 pub fn mac_layout(items: &[MenuItem], lang: Lang, language: &str) -> Layout {
-    let mut bar = menu_model(items).bar;
+    let mut bar = menu_model(items);
     translate(&mut bar, lang);
     list_documents(&mut bar);
     // The layout moves Language into the app menu, after Settings, wherever it is put.

@@ -153,7 +153,7 @@ fn menu_rows_show_the_shortcut_that_runs_them() {
     assert_eq!(shortcut(&l.bar, "layer.hideLayers"), Some(chord("Cmd+,")));
     let app = app(true);
     let bindings = crate::shortcut_dispatch::bindings(&app);
-    let model = menu_model(&crate::menus::menu_items(&app)).bar;
+    let model = menu_model(&crate::menus::menu_items(&app));
     for it in crate::menus::menu_items(&app).iter().filter(|it| it.enabled) {
         let Some(shown) = it.shortcut.as_deref().and_then(crate::shortcuts::parse) else { continue };
         let runs = bindings.iter().find(|(_, b)| *b == shown).map(|(id, _)| id.as_str());

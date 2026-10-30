@@ -22,7 +22,7 @@ pub use invoke::{apply_workspace, invoke};
 pub(crate) use invoke::{invoke_unguarded, panel_alias};
 pub(crate) use items::ItemCache;
 pub use items::{MenuItem, is_live, menu_items};
-pub use model::{Model, menu_model};
+pub use model::menu_model;
 pub use state::is_enabled;
 pub(crate) use state::reveal_label;
 #[cfg(test)]

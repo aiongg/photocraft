@@ -1,9 +1,9 @@
 use craft_keymap::CommandRef;
-use craft_ui::menu::{MenuBar, MenuBarLabels};
+use craft_menu::MenuBarUi;
 
 use super::invoke::invoke;
 use super::items::{ItemCache, menu_items};
-use super::model::{HELP, menu_model, platform, ui_menus};
+use super::model::{menu_model, top_mnemonics, translated};
 use super::{PhotocraftApp, Value, json};
 
 /// Draws the menu bar with the library's; returns the inner edge of the menu titles, facing the
@@ -13,28 +13,23 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
     let ctx = ui.ctx().clone();
     let lang = crate::i18n::current();
     let cache = fresh_cache(app, ui);
-    let labels = MenuBarLabels {
-        // Not "⋯" (U+22EF): the shell's fonts have no glyph for it.
-        more: "…".into(),
-        all: crate::i18n::tr(lang, "Menu").into(),
-        search: crate::i18n::tr(lang, "Search menus").into(),
-        clear: crate::i18n::tr(lang, "Clear").into(),
-        no_matches: crate::i18n::tr(lang, "No matching commands").into(),
-        scroll_up: crate::i18n::tr(lang, "Scroll menu up").into(),
-        scroll_down: crate::i18n::tr(lang, "Scroll menu down").into(),
-    };
-    // Option is a typing key on a Mac, so the bar has no mnemonics there.
-    craft_ui::menu::set_mnemonics(&ctx, Some(!platform(&ctx).is_mac()));
-    let shown = MenuBar::new(&cache.menus)
+    let label = |english: &'static str| crate::i18n::tr(lang, english).to_string();
+    let english = |labeled: craft_menu::Labeled<'_>| cache.english.of(labeled);
+    let preferred = top_mnemonics(lang);
+    let preferred: Vec<(&str, char)> = preferred.iter().map(|(t, c)| (t.as_str(), *c)).collect();
+    let shown = MenuBarUi::new(&cache.menus)
         .id(egui::Id::unique("photocraft-menu-bar"))
         .shrink_to_fit(f32::INFINITY)
-        .labels(&labels)
-        .help_search(HELP)
-        .text_editing(ctx.text_edit_focused())
+        .help_search(true)
+        .label(&label)
+        .english(&english)
+        .mnemonics(&preferred)
+        .gate(craft_menu::Gate { text_editing: ctx.text_edit_focused(), ..Default::default() })
         .show(ui);
     let titles = shown.titles;
+    let commands = shown.commands;
     app.menu_cache = Some(cache);
-    if let Some(command) = shown.chosen {
+    for command in commands {
         run(app, &ctx, command);
     }
     if crate::direction::is_rtl() { titles.left() } else { titles.right() }
@@ -59,8 +54,8 @@ fn fresh_cache(app: &mut PhotocraftApp, ui: &egui::Ui) -> ItemCache {
     match kept {
         Some(c) if c.language == language && !((open || hovered || keys) && (c.state != state || (open && input))) => c,
         _ => {
-            let model = menu_model(&menu_items(app));
-            ItemCache { state, language, menus: ui_menus(&model, lang, platform(ctx)) }
+            let (menus, english) = translated(&menu_model(&menu_items(app)), lang);
+            ItemCache { state, language, menus, english }
         }
     }
 }
