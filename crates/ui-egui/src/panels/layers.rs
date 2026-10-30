@@ -12,7 +12,7 @@ use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::hash::{Hash, Hasher};
 
 use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action};
-use super::{BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, icons, json, label, pos2, theme, vec2, widgets};
+use super::{BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, json, label, pos2, theme, vec2, widgets};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -532,7 +532,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         }
         actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
-        let adj = footer_menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"));
+        let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).
         crate::press_menu::show(&adj, |ui, menu| {
             ui.set_min_width(190.0);
@@ -570,7 +570,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
-        let fx = fx_button(ui, tl!("Add a layer style"));
+        let fx = PanelFooter::menu_button(ui, Icon::Fx, tl!("Add a layer style"));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);
             if menu.item(ui, tl!("Blending Options…")) {
@@ -643,36 +643,6 @@ pub(super) fn footer_label(command: &str) -> &'static str {
         "layer.duplicate" => tl!("Create a new layer"),
         _ => tl!("Create a new group"),
     }
-}
-
-/// The small down-arrow makes it clear that the footer icon expands into a menu.
-fn footer_menu_arrow(ui: &egui::Ui, rect: Rect) {
-    let t = Tokens::get(ui.ctx());
-    let arrow = Rect::from_min_size(rect.right_bottom() - vec2(11.0, 10.0), vec2(9.0, 9.0));
-    icons::paint(ui, arrow, "chevron-down", 8.0, t.text_dim);
-}
-
-fn footer_menu_button(ui: &mut egui::Ui, icon: Icon, tip: &str) -> egui::Response {
-    let response = PanelFooter::button(ui, icon, tip);
-    footer_menu_arrow(ui, response.rect);
-    response
-}
-
-/// Photoshop's italic "fx" footer button (the library has no such icon).
-fn fx_button(ui: &mut egui::Ui, tip: &str) -> egui::Response {
-    let t = Tokens::get(ui.ctx());
-    let side = LibTokens::of(ui).component.panel_footer.button;
-    let (r, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click());
-    if resp.hovered() {
-        ui.painter().rect_filled(r, t.radius_sm, t.hover);
-    }
-    let mut job = egui::text::LayoutJob::default();
-    job.append("fx", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(15.0), color: t.icon, italics: true, ..Default::default() });
-    let g = ui.painter().layout_job(job);
-    ui.painter().galley(r.center() - g.size() / 2.0, g, t.icon);
-    footer_menu_arrow(ui, r);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
-    resp.on_hover_text(tip)
 }
 
 pub(super) fn channels(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
