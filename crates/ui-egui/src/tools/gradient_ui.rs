@@ -645,13 +645,14 @@ pub fn editor_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 preset_stops_editor(app, ui);
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 ui.horizontal(|ui| {
-                    if widgets::secondary_button(ui, tl!("Save As Preset"), 0.0)
+                    if ui
+                        .add(craft_ui::controls::Button::new(tl!("Save As Preset")).variant(craft_ui::controls::ButtonVariant::Secondary))
                         .on_hover_text(tl!("Adds the current gradient to the Gradients panel"))
                         .clicked()
                     {
                         let _ = app.run("gradient.presets.new", json!({}));
                     }
-                    show_panel = widgets::secondary_button(ui, tl!("Gradients"), 0.0).clicked();
+                    show_panel = ui.add(craft_ui::controls::Button::new(tl!("Gradients")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked();
                 });
             }
         });
