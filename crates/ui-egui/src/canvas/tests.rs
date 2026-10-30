@@ -1410,11 +1410,16 @@ fn home_recent_list_hides_when_the_preference_is_off() {
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
     h.state_mut().1 = true;
     h.run_steps(3);
-    assert!(h.query_by_label("hidden.psd").is_some(), "listed by default");
+    assert!(h.query_by(|n| is_recent_row(n.label(), "hidden.psd")).is_some(), "listed by default");
     h.state_mut().0.run("prefs.set", serde_json::json!({"values": {"interface.showHomeRecentFiles": false}})).unwrap();
     h.run_steps(3);
-    assert!(h.query_by_label("hidden.psd").is_none(), "hidden when off");
+    assert!(h.query_by(|n| is_recent_row(n.label(), "hidden.psd")).is_none(), "hidden when off");
     assert_eq!(h.state().0.ui.recent_files.len(), 1, "the list itself is kept");
+}
+
+/// Whether an AccessKit name is a Home recent-file row: one node named by the file name and its folder ("name, folder").
+fn is_recent_row(label: Option<String>, name: &str) -> bool {
+    label.is_some_and(|l| l.strip_prefix(name).is_some_and(|rest| rest.starts_with(", ")))
 }
 
 /// The Home screen's × takes a file off Recent without opening it, and its right-click menu
@@ -1445,20 +1450,20 @@ fn home_recent_entries_can_be_removed() {
     assert_eq!(listed(&h), ["a.png", "b.psd", "c.tif"]);
     assert!(h.query_by_label("Remove b.psd from Recent").is_none(), "the × shows on the hovered row only");
 
-    h.get_by_label("b.psd").hover();
+    h.get_by(|n| is_recent_row(n.label(), "b.psd")).hover();
     h.run_steps(2);
     h.get_by_label("Remove b.psd from Recent").click();
     h.run_steps(2);
     assert_eq!(listed(&h), ["a.png", "c.tif"]);
     assert!(h.state().0.session.documents().is_empty(), "the file was not opened");
 
-    h.get_by_label("c.tif").click_secondary();
+    h.get_by(|n| is_recent_row(n.label(), "c.tif")).click_secondary();
     h.run_steps(2);
     h.get_by_label("Remove from Recent").click();
     h.run_steps(2);
     assert_eq!(listed(&h), ["a.png"]);
 
-    h.get_by_label("a.png").click_secondary();
+    h.get_by(|n| is_recent_row(n.label(), "a.png")).click_secondary();
     h.run_steps(2);
     h.get_by_label("Clear Recent Files").click();
     h.run_steps(2);
