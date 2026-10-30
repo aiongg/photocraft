@@ -338,16 +338,17 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
     if let Some(picked) = shown.edit.event.as_ref().and_then(|e| e.value()) {
         apply_picked(f, picked);
     }
-    actions(ui, f, shown.edit.response.rect)
+    actions(ui, f, shown.edit.response.rect.top())
 }
 
 /// OK, Cancel and Add to Swatches in a column at the picker's top-right corner, beside the
-/// compare swatch and above the channel fields, as Photoshop's are.
-fn actions(ui: &mut egui::Ui, f: &mut Map<String, Value>, picker: Rect) -> Option<bool> {
+/// compare swatch and above the channel fields, as Photoshop's are. `top` is the picker's top.
+fn actions(ui: &mut egui::Ui, f: &mut Map<String, Value>, top: f32) -> Option<bool> {
     let mut outcome = None;
     // As wide as the longest label, at the right edge like Photoshop's.
     let width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
-    let rect = Rect::from_min_max(pos2(picker.right() - width, picker.top()), picker.right_bottom());
+    let right = ui.max_rect().right();
+    let rect = Rect::from_min_max(pos2(right - width, top), pos2(right, top + 120.0));
     let mut column = ui.new_child(UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Max)));
     let ui = &mut column;
     if ui.add(Button::new(tl!("OK")).variant(ButtonVariant::Primary).min_width(width)).clicked() {

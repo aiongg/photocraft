@@ -1,5 +1,6 @@
 use super::dropdown::swatch_popup;
 use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui, Vec2, pos2};
+use craft_theme::Srgba;
 use craft_ui::theme::StrokeExt;
 
 /// Camera Raw-style continuous RGB ribbons on craft-ui's [`Histogram`]. Raw bins remain exact;
@@ -135,16 +136,40 @@ fn color_edit_button(ui: &mut Ui, color: &mut Color32, alpha: egui::color_picker
         *color = sampled_color(rgb, *color, alpha);
         response.mark_changed();
     }
+    let with_alpha = !matches!(alpha, egui::color_picker::Alpha::Opaque);
     swatch_popup(&response).show(|ui| {
-        if egui::color_picker::color_picker_color32(ui, color, alpha) {
-            response.mark_changed();
-        }
-        if let Some(rgb) = crate::screen_picker::button(ui, id) {
-            *color = sampled_color(rgb, *color, alpha);
+        let [r, g, b, a] = color.to_srgba_unmultiplied();
+        let current = Srgba::new(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0, if with_alpha { f32::from(a) / 255.0 } else { 1.0 });
+        if let Some(picked) = popup_picker(ui, id, current, with_alpha) {
+            let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+            *color = if with_alpha {
+                Color32::from_rgba_unmultiplied(byte(picked.r), byte(picked.g), byte(picked.b), byte(picked.a))
+            } else {
+                Color32::from_rgb(byte(picked.r), byte(picked.g), byte(picked.b))
+            };
             response.mark_changed();
         }
     });
     response
+}
+
+/// The library's Compact colour picker in a swatch popup. Returns the colour when it was edited.
+/// The eyedropper starts a screen pick for `screen_id`; the caller takes the result, also when
+/// the popup has closed meanwhile.
+fn popup_picker(ui: &mut Ui, screen_id: egui::Id, color: Srgba, alpha: bool) -> Option<Srgba> {
+    use craft_ui::composites::{ColorPicker, ColorPickerLayout};
+    let numbers = craft_ui::localized::LocaleNumbers::of(ui);
+    let shown = ColorPicker::new("popup-picker", tl!("Color"), color, &numbers)
+        .layout(ColorPickerLayout::Compact)
+        .alpha(alpha)
+        .eyedropper(tl!("Pick screen color"))
+        .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
+        .text(|key| tl!(key).to_string())
+        .show(ui);
+    if shown.eyedropper_requested {
+        crate::screen_picker::request(ui.ctx(), screen_id);
+    }
+    shown.edit.event.as_ref().and_then(|e| e.value()).map(|p| p.color)
 }
 
 fn sampled_color(rgb: [f32; 3], original: Color32, alpha: egui::color_picker::Alpha) -> Color32 {
@@ -174,30 +199,17 @@ pub fn color_edit_button_rgb(ui: &mut Ui, rgb: &mut [f32; 3]) -> Response {
     let mut response = color_swatch(ui, Color32::from(egui::Rgba::from_rgb(rgb[0], rgb[1], rgb[2])));
     let id = response.id.with("screen-color");
     let to_linear = |color: [f32; 3]| color.map(egui::ecolor::linear_from_gamma);
+    let to_encoded = |color: [f32; 3]| color.map(egui::ecolor::gamma_from_linear);
     if let Some(color) = crate::screen_picker::take(ui.ctx(), id) {
         *rgb = to_linear(color);
         response.mark_changed();
     }
-    let rgba = egui::Rgba::from_rgb(rgb[0], rgb[1], rgb[2]);
-    let cache = response.id.with("linear-hsva");
-    let mut hsva = ui
-        .ctx()
-        .data(|d| d.get_temp::<(egui::Rgba, egui::ecolor::Hsva)>(cache))
-        .filter(|(previous, _)| *previous == rgba)
-        .map(|(_, hsva)| hsva)
-        .unwrap_or_else(|| egui::ecolor::Hsva::from(rgba));
     swatch_popup(&response).show(|ui| {
-        if egui::color_picker::color_picker_hsva_2d(ui, &mut hsva, egui::color_picker::Alpha::Opaque) {
-            let color = egui::Rgba::from(hsva);
-            *rgb = [color.r(), color.g(), color.b()];
-            response.mark_changed();
-        }
-        if let Some(color) = crate::screen_picker::button(ui, id) {
-            *rgb = to_linear(color);
-            hsva = egui::ecolor::Hsva::from(egui::Rgba::from_rgb(rgb[0], rgb[1], rgb[2]));
+        let [r, g, b] = to_encoded(*rgb);
+        if let Some(picked) = popup_picker(ui, id, Srgba::rgb(r, g, b), false) {
+            *rgb = to_linear([picked.r, picked.g, picked.b]);
             response.mark_changed();
         }
     });
-    ui.ctx().data_mut(|d| d.insert_temp(cache, (egui::Rgba::from_rgb(rgb[0], rgb[1], rgb[2]), hsva)));
     response
 }

@@ -225,12 +225,12 @@ fn real_swatch_click_opens_shared_dialog_and_enter_escape_only_affect_the_child(
         let parent = h.state().ui.dialogs[0].id;
         let before = fields(h.state(), parent);
         h.get_by_role(egui::accesskit::Role::ColorWell).click();
-        h.run();
+        h.run_steps(8);
         assert_eq!(h.state().ui.dialogs.len(), 2);
         let picker = h.state().ui.dialogs[1].id;
         set_color(h.state_mut(), picker, "#00ff00");
         h.key_press(action);
-        h.run();
+        h.run_steps(8);
         assert_eq!(h.state().ui.dialogs.len(), 1);
         assert_eq!(h.state().ui.dialogs[0].id, parent);
         if action == Key::Escape {

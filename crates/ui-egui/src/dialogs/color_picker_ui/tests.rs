@@ -34,17 +34,6 @@ fn color(h: &Harness<'static, Map<String, Value>>) -> String {
     h.state().get("color").and_then(Value::as_str).unwrap().to_string()
 }
 
-/// Press at `at` and hold, with no release and no time passing, then run one frame.
-fn press<S>(h: &mut Harness<'static, S>, at: egui::Pos2) {
-    press_button(h, at, egui::PointerButton::Primary, true);
-}
-
-fn press_button<S>(h: &mut Harness<'static, S>, at: egui::Pos2, button: egui::PointerButton, pressed: bool) {
-    h.event(egui::Event::PointerMoved(at));
-    h.event(egui::Event::PointerButton { pos: at, button, pressed, modifiers: egui::Modifiers::NONE });
-    h.run_steps(1);
-}
-
 #[test]
 fn hex_field_shows_uppercase_without_rewriting_the_selected_color() {
     let h = picker("#12abef");
@@ -74,11 +63,14 @@ fn hex_field_takes_typed_digits() {
 fn hex_field_takes_every_paste_with_or_without_hash() {
     let mut h = picker("#336699");
     for (paste, want) in [("ff8800", "#ff8800"), ("#00ff00", "#00ff00"), (" 1234AB\n", "#1234ab")] {
+        // A paste goes in at the cursor like in any text field: select the old digits first.
+        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+        h.run_steps(1);
         h.event(egui::Event::Paste(paste.into()));
         h.run_steps(2);
         assert_eq!(color(&h), want, "paste {paste:?}");
         // The library's field shows what was pasted while it has the focus.
-        let shown = h.get_by_role(Role::TextInput).value().unwrap_or_default().to_ascii_lowercase();
+        let shown = h.get_by_role(Role::TextInput).value().unwrap_or_default().to_ascii_lowercase().trim_start_matches('#').to_string();
         assert_eq!(shown, want[1..], "paste {paste:?}");
     }
     h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
