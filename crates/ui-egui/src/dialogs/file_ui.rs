@@ -5,7 +5,8 @@
 //! Events Manager, Package and Paths to Illustrator. Every OK runs the engine command with the
 //! dialog's fields, so the control channel can drive them with `ui.dialog.set` / `confirm`.
 
-use craft_ui::theme::ToEgui;
+use craft_ui::composites::Form;
+use craft_ui::controls::{Checkbox, Select};
 use std::sync::Arc;
 
 use photocraft_engine::web_cmds::{self, Optimized, WebSettings};
@@ -214,28 +215,28 @@ fn b(f: &Map<String, Value>, k: &str, d: bool) -> bool {
 #[path = "file_ui/web_preview.rs"]
 mod web_preview;
 
-fn dropdown_str(ui: &mut egui::Ui, id: &str, name: &str, f: &mut Map<String, Value>, key: &str, opts: &[(&str, &str)], w: f32) {
+/// A labelled [`Select`](craft_ui::controls::Select) row over the string field `key`; the row's
+/// label names the control. `opts` are (value, label) pairs, the first the default.
+fn select_row(form: &mut Form<'_>, id: &str, label: &str, f: &mut Map<String, Value>, key: &str, opts: &[(&str, &str)]) {
     let mut v = s(f, key, opts.first().map_or("", |o| o.0));
-    let o: Vec<(String, &str)> = opts.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-    if craft_ui::controls::Select::new(id, name, &mut v).rows(o.len(), |i| o[i].0.clone(), |i| tl!(o[i].1)).show(ui).response.changed() {
+    let edit = form.row(label, |ui, _| Select::new(id, label, &mut v).rows(opts.len(), |i| opts[i].0.to_string(), |i| tl!(opts[i].1)).show(ui));
+    if edit.inner.response.changed() {
         f.insert(key.into(), json!(v));
     }
 }
 
-fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, d: bool) {
+/// An unlabelled checkbox row over the boolean field `key`.
+fn check_row(form: &mut Form<'_>, f: &mut Map<String, Value>, key: &str, label: &str, d: bool) {
     let mut v = b(f, key, d);
-    craft_ui::controls::Checkbox::bool(tl!(label), &mut v).show(ui).response;
+    form.unlabelled(|ui| Checkbox::bool(tl!(label), &mut v).show(ui));
     f.insert(key.into(), json!(v));
 }
 
-fn number(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, range: std::ops::RangeInclusive<f32>, unit: &str, d: f64) {
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()));
-        let mut v = n(f, key, d) as f32;
-        crate::widgets::value_field(ui, &mut v, range, unit, 64.0).accessible_name(tl!(&label));
-        f.insert(key.into(), json!(v.round()));
-    });
+/// A labelled whole-number row over the numeric field `key`.
+fn number_row(form: &mut Form<'_>, f: &mut Map<String, Value>, key: &str, label: &str, range: std::ops::RangeInclusive<f32>, unit: &str, d: f64) {
+    let mut v = n(f, key, d) as f32;
+    form.row(label, |ui, _| crate::widgets::dialog_number_field(ui, ("file-ui", key), label, &mut v, range, unit, 0).response);
+    f.insert(key.into(), json!(v.round()));
 }
 
 #[cfg(test)]
