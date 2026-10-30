@@ -5,6 +5,7 @@
 //! "started" hook once the first frames have rendered (the crash-safe startup marker), and
 //! provides the Help › System Info text (including the monitor profile in use).
 
+use craft_ui::theme::ToEgui;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -261,7 +262,7 @@ fn choose_recovery(app: &mut PhotocraftApp, retry: bool) -> Result<(), String> {
 pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(reason) = app.ui.gpu_fallback_notice.clone() else { return };
     let retry_now = can_retry_now(app);
-    let t = crate::theme::Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let mut choice = None;
     egui::Window::new(tl!("Switched to CPU rendering"))
         .id(egui::Id::unique("gpu-fallback-warning"))
@@ -270,7 +271,7 @@ pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .default_width(440.0)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
-            ui.label(egui::RichText::new(tl!("GPU acceleration could not continue. Your documents are unchanged.")).color(t.warning));
+            ui.label(egui::RichText::new(tl!("GPU acceleration could not continue. Your documents are unchanged.")).color(t.color.status.warn.fg.to_egui()));
             ui.label(tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter."));
             ui.collapsing(tl!("Details"), |ui| {
                 ui.label(&reason);

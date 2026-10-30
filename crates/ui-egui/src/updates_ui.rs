@@ -1,5 +1,6 @@
 //! One background check at startup and a non-modal window for release information.
 
+use craft_ui::theme::ToEgui;
 use photocraft_engine::updates_cmds::Status;
 use serde_json::Value;
 
@@ -118,7 +119,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .resizable(false)
         .default_width(380.0)
         .show(ctx, |ui| {
-            let t = crate::theme::Tokens::get(ctx);
+            let t = craft_ui::theme::current(ctx);
             ui.label(crate::i18n::fmt(crate::i18n::t("Installed version: {version}"), &[("version", photocraft_engine::build_info::VERSION)]));
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
             match &status {
@@ -148,7 +149,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     ui.label(tl!("PhotoCraft is up to date."));
                 }
                 Status::Failed { message } => {
-                    ui.colored_label(t.warning, tl!("Could not check for updates."));
+                    ui.colored_label(t.color.status.warn.fg.to_egui(), tl!("Could not check for updates."));
                     ui.label(message);
                 }
                 Status::Idle => {

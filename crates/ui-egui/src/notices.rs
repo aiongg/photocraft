@@ -4,6 +4,7 @@
 //! control channel can read them (`ui.inspect`) and clear them (`ui.set`).
 
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
@@ -219,7 +220,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         app.notices_hovered = false;
         return;
     }
-    let t = crate::theme::Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let mut dismiss_id = None;
     // Clear the status bar (~24 px) and leave the dock's edge some air.
     let area = egui::Area::new(egui::Id::unique("photocraft-notices"))
@@ -230,29 +231,40 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ui.set_max_width(360.0);
             for n in &app.ui.notices {
                 egui::Frame::NONE
-                    .fill(t.card)
-                    .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if n.error { t.warning } else { t.card_border }))
-                    .corner_radius(t.radius)
+                    .fill(t.color.surface.panel.to_egui())
+                    .stroke(
+                        craft_ui::theme::scale::Stroke::W1
+                            .egui(ui.ctx(), if n.error { t.color.status.warn.fg.to_egui() } else { t.color.line.border.to_egui() }),
+                    )
+                    .corner_radius(t.shape.radius.popup)
                     .inner_margin(egui::Margin::same(10))
-                    .shadow(egui::Shadow { offset: [0, 2], blur: 8, spread: 0, color: t.shadow })
+                    .shadow(egui::Shadow { offset: [0, 2], blur: 8, spread: 0, color: t.color.surface.shadow.to_egui() })
                     .show(ui, |ui| {
                         ui.set_width(340.0);
                         ui.horizontal(|ui| {
-                            let title = egui::RichText::new(n.text(&n.title)).strong().color(if n.error { t.warning } else { t.text });
+                            let title = egui::RichText::new(n.text(&n.title)).strong().color(if n.error {
+                                t.color.status.warn.fg.to_egui()
+                            } else {
+                                t.color.text.normal.to_egui()
+                            });
                             ui.add(egui::Label::new(title).wrap());
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                                if ui.add(egui::Button::new(egui::RichText::new("×").color(t.text_dim)).frame(false)).on_hover_text(tl!("Dismiss")).clicked() {
+                                if ui
+                                    .add(egui::Button::new(egui::RichText::new("×").color(t.color.text.muted.to_egui())).frame(false))
+                                    .on_hover_text(tl!("Dismiss"))
+                                    .clicked()
+                                {
                                     dismiss_id = Some(n.id);
                                 }
                             });
                         });
                         for line in n.lines.iter().take(MAX_LINES) {
                             let line = n.text(line);
-                            ui.add(egui::Label::new(egui::RichText::new(format!("• {line}")).color(t.text_dim)).wrap());
+                            ui.add(egui::Label::new(egui::RichText::new(format!("• {line}")).color(t.color.text.muted.to_egui())).wrap());
                         }
                         if n.lines.len() > MAX_LINES {
                             let text = crate::i18n::fmt(tl!("…and {n} more"), &[("n", &(n.lines.len() - MAX_LINES).to_string())]);
-                            ui.label(egui::RichText::new(text).color(t.text_faint));
+                            ui.label(egui::RichText::new(text).color(t.color.text.faint.to_egui()));
                         }
                     });
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());

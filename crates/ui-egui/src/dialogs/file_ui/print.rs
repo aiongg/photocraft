@@ -1,5 +1,6 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Tokens, Value, b, check, dropdown_str, json, n, number, params, s};
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 /// Print's Printer menu: the default printer (value ""), then every printer `file.printers`
 /// listed. A saved name the spooler no longer lists stays selectable rather than vanishing.
@@ -176,12 +177,12 @@ fn length_field_prec(ui: &mut egui::Ui, label: &str, pt: &mut f64, units: &str, 
 /// Edits a length stored in print points (72 per inch), returning true for a finite edit.
 /// `range` is in the displayed `units`; a signed range permits negative Top/Left offsets.
 fn length_field_range(ui: &mut egui::Ui, label: &str, pt: &mut f64, units: &str, decimals: u32, range: std::ops::RangeInclusive<f32>) -> bool {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let k = unit_pt(units);
     let mut v = (*pt / k) as f32;
     let mut changed = false;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(label).color(t.text_dim));
+        ui.label(egui::RichText::new(label).color(t.color.text.muted.to_egui()));
         let before = v;
         crate::widgets::value_field_prec(ui, &mut v, range, units, 70.0, decimals).accessible_name(tl!(&label));
         if (v - before).abs() > 1e-4 && v.is_finite() {
@@ -307,7 +308,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     // PDF exports and previews retain editable paper on Windows too. Only a real native
     // submission takes its media from the printer; entering that mode refreshes the driver
@@ -336,7 +337,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
         // Page preview.
         ui.vertical(|ui| {
             let (area, _) = ui.allocate_exact_size(egui::vec2(330.0, 400.0), egui::Sense::hover());
-            ui.painter().rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+            ui.painter().rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.canvas.to_egui());
             match photocraft_engine::print_cmds::layout(&doc, &p, "file.print") {
                 Ok(mut l) => {
                     let (pw, ph) = l.paper;
@@ -346,7 +347,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                     ui.painter().rect_stroke(
                         page,
                         craft_ui::theme::scale::Radius::R0.px(),
-                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
                         egui::StrokeKind::Outside,
                     );
                     let mut img = print_preview_image(l, page, k);
@@ -417,12 +418,18 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                     let note = if fits { String::new() } else { "  ·  larger than the paper".to_string() };
                     ui.label(
                         egui::RichText::new(format!("Scale {:.1}%  ·  {:.2} × {:.2} in{note}", l.scale * 100.0, w / 72.0, h / 72.0))
-                            .color(if fits { t.text_dim } else { t.warning })
+                            .color(if fits { t.color.text.muted.to_egui() } else { t.color.status.warn.fg.to_egui() })
                             .size(11.0),
                     );
                 }
                 Err(e) => {
-                    ui.painter().text(area.center(), egui::Align2::CENTER_CENTER, e.to_string(), egui::FontId::proportional(12.0), t.text_dim);
+                    ui.painter().text(
+                        area.center(),
+                        egui::Align2::CENTER_CENTER,
+                        e.to_string(),
+                        egui::FontId::proportional(12.0),
+                        t.color.text.muted.to_egui(),
+                    );
                 }
             }
         });
@@ -431,13 +438,13 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
             ui.set_width(340.0);
             let head = |ui: &mut egui::Ui, s: &str| {
                 ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                ui.label(egui::RichText::new(s).font(crate::theme::semibold(12.0)).color(t.text));
+                ui.label(egui::RichText::new(s).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
             };
             head(ui, tl!("Printer Setup"));
             if let Some(printers) = &printers {
                 // Windows: Photoshop's Printer menu and Print Settings… (the driver's own dialog).
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Printer")).color(t.text_dim));
+                    ui.label(egui::RichText::new(tl!("Printer")).color(t.color.text.muted.to_egui()));
                     let before = s(f, "printer", "");
                     let opts: Vec<(&str, &str)> = printers.iter().map(|n| (n.as_str(), n.as_str())).collect();
                     dropdown_str(ui, "print-printer", tl!("Printer"), f, "printer", &opts, 220.0);
@@ -469,7 +476,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 // Photoshop's Layout: Portrait / Landscape turn the driver settings, so the paper
                 // and the preview turn with them without opening Print Settings….
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Orientation")).color(t.text_dim));
+                    ui.label(egui::RichText::new(tl!("Orientation")).color(t.color.text.muted.to_egui()));
                     let wide = driver_paper_is_wide(f);
                     for (landscape, label) in [(false, "Portrait"), (true, "Landscape")] {
                         if crate::widgets::pill_tab(ui, label, wide == landscape).clicked() && wide != landscape {
@@ -482,13 +489,13 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                     Some((Some(w), Some(h))) => format!("{:.0} × {:.0} mm  ·  {}", w / 72.0 * 25.4, h / 72.0 * 25.4, tl!("set in Print Settings…")),
                     _ => String::new(),
                 };
-                ui.label(egui::RichText::new(text).color(t.text_dim).size(11.0));
+                ui.label(egui::RichText::new(text).color(t.color.text.muted.to_egui()).size(11.0));
                 if let Some(e) = f.get("__pageError").and_then(Value::as_str) {
-                    ui.label(egui::RichText::new(e).color(t.warning).size(11.0));
+                    ui.label(egui::RichText::new(e).color(t.color.status.warn.fg.to_egui()).size(11.0));
                 }
             } else {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Printer")).color(t.text_dim));
+                    ui.label(egui::RichText::new(tl!("Printer")).color(t.color.text.muted.to_egui()));
                     let mut pr = s(f, "printer", "");
                     let opts = printer_options(f.get("__systemPrinters"), &pr);
                     let o: Vec<(String, &str)> = opts.iter().map(|(k, l)| (k.clone(), l.as_str())).collect();
@@ -554,7 +561,9 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 });
                 if printers.is_some() {
                     ui.label(
-                        egui::RichText::new(tl!("Remember to turn off the printer's own colour management in Print Settings…")).color(t.warning).size(11.0),
+                        egui::RichText::new(tl!("Remember to turn off the printer's own colour management in Print Settings…"))
+                            .color(t.color.status.warn.fg.to_egui())
+                            .size(11.0),
                     );
                 }
             }
@@ -589,7 +598,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 if !fit {
                     // Two decimals: Height and Width set fractional scales.
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(tl!("Scale")).color(t.text_dim));
+                        ui.label(egui::RichText::new(tl!("Scale")).color(t.color.text.muted.to_egui()));
                         let mut v = n(f, "scale", 100.0) as f32;
                         crate::widgets::value_field(ui, &mut v, 1.0..=1000.0, "%", 64.0).accessible_name(tl!("Scale"));
                         f.insert("scale".into(), json!((f64::from(v) * 100.0).round() / 100.0));
@@ -612,7 +621,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 });
                 if w > 0.0 {
                     let ppi = f64::from(doc.size.width) / (w / 72.0);
-                    ui.label(egui::RichText::new(format!("{} {ppi:.0} PPI", tl!("Print Resolution:"))).color(t.text_dim).size(11.0));
+                    ui.label(egui::RichText::new(format!("{} {ppi:.0} PPI", tl!("Print Resolution:"))).color(t.color.text.muted.to_egui()).size(11.0));
                 }
             }
             head(ui, tl!("Printing Marks"));
@@ -628,7 +637,11 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
             head(ui, tl!("Functions"));
             check(ui, f, "emulsionDown", tl!("Emulsion Down"), false);
             if b(f, "emulsionDown", false) && printers.is_some() {
-                ui.label(egui::RichText::new(tl!("Don't also tick Mirror Image in Print Settings…: the two flips cancel out.")).color(t.text_dim).size(11.0));
+                ui.label(
+                    egui::RichText::new(tl!("Don't also tick Mirror Image in Print Settings…: the two flips cancel out."))
+                        .color(t.color.text.muted.to_egui())
+                        .size(11.0),
+                );
             }
             head(ui, tl!("Save as PDF"));
             ui.horizontal(|ui| {

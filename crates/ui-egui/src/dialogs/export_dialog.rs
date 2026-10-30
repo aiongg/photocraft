@@ -3,6 +3,7 @@
 //! pixel count, so the dialog stays instant on 36 MP documents.
 
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
@@ -674,12 +675,12 @@ fn write_size(f: &mut Map<String, Value>, size: ExportSize, sizing: &str) {
 /// the link is on, the other side. The widget is compared with the value it was given so a field
 /// that only clamps an out-of-range scale does not overwrite an exact pixel size.
 fn size_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h: f64) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let stored = n(f, "scale", 100.0);
     let passed = stored.clamp(1.0, 1000.0).round();
     let mut sc = passed as f32;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Scale")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Scale")).color(t.color.text.muted.to_egui()));
         crate::widgets::value_field(ui, &mut sc, 1.0..=1000.0, "%", 70.0).accessible_name(tl!("Scale"));
     });
     let sc_r = f64::from(sc).round().clamp(1.0, 1000.0);
@@ -692,7 +693,7 @@ fn size_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h:
     let stored_w = n(f, "width", src_w.max(1.0));
     let mut width = stored_w.clamp(1.0, MAX_PX) as f32;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Width")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Width")).color(t.color.text.muted.to_egui()));
         crate::widgets::value_field(ui, &mut width, 1.0..=MAX_PX as f32, "px", 70.0).accessible_name(tl!("Width"));
     });
     let width_r = f64::from(width).round();
@@ -704,7 +705,7 @@ fn size_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h:
     let stored_h = n(f, "height", src_h.max(1.0));
     let mut height = stored_h.clamp(1.0, MAX_PX) as f32;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Height")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Height")).color(t.color.text.muted.to_egui()));
         crate::widgets::value_field(ui, &mut height, 1.0..=MAX_PX as f32, "px", 70.0).accessible_name(tl!("Height"));
     });
     let height_r = f64::from(height).round();
@@ -725,9 +726,9 @@ fn size_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h:
 /// Export As › Image Size › Resample, with Photoshop's choices (only the exported copy is
 /// resampled; the document keeps its pixels).
 fn resample_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Resample")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Resample")).color(t.color.text.muted.to_egui()));
         let mut method = resample_method(f, None).unwrap_or(DEFAULT_RESAMPLE).to_string();
         let opts: Vec<(String, &str)> = RESAMPLE.iter().map(|(k, label)| ((*k).to_string(), resample_label(label))).collect();
         if crate::widgets::dropdown(ui, "export-resample", tl!("Resample"), &mut method, &opts, 130.0) {
@@ -797,12 +798,12 @@ fn preset_settings(f: &Map<String, Value>) -> Value {
 }
 
 fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h: f64) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let names: Vec<String> = app.session.presets.export_presets.iter().map(|p| p.name.clone()).collect();
     if !names.is_empty() {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(tl!("Preset")).color(t.text_dim));
+            ui.label(egui::RichText::new(tl!("Preset")).color(t.color.text.muted.to_egui()));
             let mut selected = s(f, "__preset");
             let mut opts = Vec::with_capacity(names.len() + 1);
             opts.push(("".to_string(), "—"));
@@ -868,15 +869,15 @@ fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String,
 }
 
 pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let Some(doc) = app.session.active().map(|s| s.doc.clone()) else { return };
     ui.horizontal_top(|ui| {
         // Left: settings.
         ui.vertical(|ui| {
             ui.set_width(248.0);
-            ui.label(egui::RichText::new(tl!("File Settings")).font(crate::theme::semibold(12.0)).color(t.text));
+            ui.label(egui::RichText::new(tl!("File Settings")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(tl!("Format")).color(t.text_dim));
+                ui.label(egui::RichText::new(tl!("Format")).color(t.color.text.muted.to_egui()));
                 let mut fmt = s_fmt(f);
                 let opts: Vec<(String, &str)> = FORMATS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
                 if crate::widgets::dropdown(ui, "export-format", tl!("Format"), &mut fmt, &opts, 130.0) {
@@ -896,7 +897,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
             if fmt == "tga" {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Resolution")).color(t.text_dim));
+                    ui.label(egui::RichText::new(tl!("Resolution")).color(t.color.text.muted.to_egui()));
                     let mut bits = s(f, "tgaBits");
                     let opts: Vec<(String, &str)> =
                         vec![("auto".into(), tl!("Auto")), ("24".into(), tl!("24 bits/pixel")), ("32".into(), tl!("32 bits/pixel"))];
@@ -911,7 +912,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 f.insert("transparency".into(), json!(tr));
             }
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(tl!("Metadata")).color(t.text_dim));
+                ui.label(egui::RichText::new(tl!("Metadata")).color(t.color.text.muted.to_egui()));
                 let mut m = s(f, "metadata");
                 let opts: Vec<(String, &str)> = vec![("none".into(), tl!("None")), ("exif".into(), tl!("EXIF")), ("all".into(), tl!("All"))];
                 if crate::widgets::dropdown(ui, "export-metadata", tl!("Metadata"), &mut m, &opts, 130.0) {
@@ -919,7 +920,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 }
             });
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(tl!("Color Profile")).color(t.text_dim));
+                ui.label(egui::RichText::new(tl!("Color Profile")).color(t.color.text.muted.to_egui()));
                 let mut profile = s(f, "profile");
                 if profile != "srgb" {
                     profile = "document".into();
@@ -933,14 +934,14 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             crate::widgets::checkbox(ui, &mut embed, tl!("Embed Color Profile"));
             f.insert("embedProfile".into(), json!(embed));
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.text));
+            ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
             let (bw, bh) = (n(f, "__w", f64::from(doc.size.width)), n(f, "__h", f64::from(doc.size.height)));
             size_fields(ui, f, bw, bh);
             resample_field(ui, f);
             let (w, h) = (n(f, "width", bw), n(f, "height", bh));
-            ui.label(egui::RichText::new(format!("{w} × {h} px")).color(t.text_dim).size(11.5));
+            ui.label(egui::RichText::new(format!("{w} × {h} px")).color(t.color.text.muted.to_egui()).size(11.5));
             if fmt == "ico" && (w > 256.0 || h > 256.0) {
-                ui.label(egui::RichText::new(tl!("ICO is limited to 256 × 256 pixels")).color(t.warning));
+                ui.label(egui::RichText::new(tl!("ICO is limited to 256 × 256 pixels")).color(t.color.status.warn.fg.to_egui()));
             }
             preset_fields(app, ui, f, bw, bh);
         });
@@ -996,12 +997,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             } else if preview.is_none() {
                 ui.put(egui::Rect::from_center_size(r.center(), egui::vec2(24.0, 24.0)), egui::Spinner::new());
             } else {
-                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, tl!("Preview"), egui::FontId::proportional(12.0), t.text_dim);
+                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, tl!("Preview"), egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
             }
             ui.painter().rect_stroke(
                 r,
                 craft_ui::theme::scale::Radius::R0.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
                 egui::StrokeKind::Outside,
             );
             #[cfg(not(target_arch = "wasm32"))]
@@ -1010,7 +1011,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let exact: Option<u64> = None;
             let est =
                 exact.or_else(|| preview.as_ref().and_then(|preview| preview.estimate)).map_or("—".to_string(), |b| crate::sizing::human_bytes(b as f64));
-            ui.label(egui::RichText::new(format!("{}  ≈ {est}", s_fmt(f).to_uppercase())).color(t.text_dim).size(11.5));
+            ui.label(egui::RichText::new(format!("{}  ≈ {est}", s_fmt(f).to_uppercase())).color(t.color.text.muted.to_egui()).size(11.5));
         });
     });
 }
