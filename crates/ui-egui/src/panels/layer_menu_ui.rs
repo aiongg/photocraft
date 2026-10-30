@@ -2,7 +2,7 @@
 //! unavailable ones are greyed using the same enablement as the main menus. Items marked as menu
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
-use craft_ui::theme::StrokeExt;
+use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
 use photocraft_doc::{LabelColor, Layer, LayerContent};
 use serde_json::{Value, json};
 
@@ -142,104 +142,134 @@ pub fn effects_entries() -> Vec<Entry> {
     ]
 }
 
-/// Render the menu. Pushes `(command, params)` actions; `Value::Null` params mean "invoke like the
-/// menu item" (opens the command's dialog when it has one).
-pub fn show(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) -> bool {
-    crate::widgets::menu_scroll(ui, |ui| {
-        ui.set_min_width(220.0);
-        let mut rename = false;
-        let has_selection = app.session.active().is_some_and(|s| s.doc.selection.is_some());
-        items(app, ui, l, on_set, entries(l, on_set, has_selection), actions);
-        ui.separator();
-        if ui.button(tl!("Rename Layer…")).clicked() {
-            rename = true;
-            ui.close();
-        }
-        color_menu(app, ui, l, on_set, actions);
-        rename
-    })
+/// What a row of a layer menu asks for.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Choice {
+    /// A command by id; `Value::Null` params, so the command's dialog opens like from the menu bar.
+    Command(&'static str),
+    /// Rename the layer in place.
+    Rename,
+    /// Set the layer (or the selection) label colour.
+    Color(LabelColor),
+    /// Load the layer mask as a selection with this operation.
+    LoadMask(&'static str),
+    /// Select and Mask… on the layer mask.
+    SelectAndMask,
+    /// Layer Mask Display Options.
+    MaskOptions,
 }
 
-/// The menu of `l`'s layer-mask thumbnail (#4575), in Photoshop's order. It acts on `l`, which it
-/// selects first like the row menu.
-pub fn show_mask(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, actions: &mut Vec<(String, Value)>) {
-    let Some(mask) = &l.mask else { return };
-    crate::widgets::menu_scroll(ui, |ui| {
-        ui.set_min_width(220.0);
-        let edits = vec![
-            Some((tl!(mask_toggle_label(mask.enabled)), "layer.layerMask.enabled")),
-            Some((tl!("Delete Layer Mask"), "layer.layerMask.delete")),
-            Some((tl!("Apply Layer Mask"), "layer.layerMask.apply")),
-        ];
-        items(app, ui, l, false, edits, actions);
-        ui.separator();
-        // ⌘⇧-, ⌘⌥- and ⌘⇧⌥-clicking the thumbnail, as menu items.
-        let loads =
-            [(tl!("Add Mask to Selection"), "add"), (tl!("Subtract Mask from Selection"), "subtract"), (tl!("Intersect Mask with Selection"), "intersect")];
-        for (label, operation) in loads {
-            if ui.button(label).clicked() {
-                actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-                actions.push(("select.loadSelection".into(), json!({"channel": "mask", "layer": l.id.0, "operation": operation})));
-                ui.close();
-            }
-        }
-        ui.separator();
-        if ui.add_enabled(crate::menus::is_enabled(app, "select.selectAndMask"), egui::Button::new(tl!("Select and Mask…"))).clicked() {
-            // Like double-clicking the thumbnail with that preference on: it refines the mask.
-            actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-            actions.push(("ui.maskTarget".into(), json!(true)));
-            actions.push(("select.selectAndMask".into(), Value::Null));
-            ui.close();
-        }
-        // Layer Mask Display Options: the rubylith's colour and opacity (`channel.options`).
-        if ui.button(tl!("Mask Options…")).clicked() {
-            actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-            actions.push(("ui.maskTarget".into(), json!(true)));
-            actions.push(("channel.options".into(), Value::Null));
-            ui.close();
-        }
-    });
-}
-
-/// Render the layer style menu of `l`'s effect rows ([`effects_entries`]); the actions select `l`
-/// first when it isn't the active layer.
-pub fn show_effects(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, actions: &mut Vec<(String, Value)>) {
-    crate::widgets::menu_scroll(ui, |ui| {
-        ui.set_min_width(200.0);
-        items(app, ui, l, false, effects_entries(), actions);
-    });
-}
-
-/// The command items of a layer menu, separators collapsed.
-fn items(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, entries: Vec<Entry>, actions: &mut Vec<(String, Value)>) {
-    let mut last_sep = true;
+/// The menu rows of `entries`: separators collapsed, commands this build lacks left out, and
+/// each command enabled the way the main menus enable it.
+fn command_rows(app: &crate::PhotocraftApp, l: &Layer, on_set: bool, entries: Vec<Entry>) -> Vec<MenuEntry<Choice>> {
+    let mut rows: Vec<MenuEntry<Choice>> = Vec::new();
     for e in entries {
         match e {
             None => {
-                if !last_sep {
-                    ui.separator();
+                if !matches!(rows.last(), None | Some(MenuEntry::Separator)) {
+                    rows.push(MenuEntry::Separator);
                 }
-                last_sep = true;
             }
             Some((label, id)) => {
                 // Skip commands this build doesn't have rather than showing dead items.
                 if photocraft_engine::commands::find(id).is_none() && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
                     continue;
                 }
-                last_sep = false;
                 // Enablement is exact for the active layer (or the selection); another row is
                 // selected first when clicked, so its items stay available.
                 let is_active = app.session.active().is_some_and(|s| s.active_layer == Some(l.id));
                 let enabled = !(on_set && single_layer_only(id)) && if on_set || is_active { crate::menus::is_enabled(app, id) } else { true };
-                if ui.add_enabled(enabled, egui::Button::new(tl!(&label))).clicked() {
-                    if !on_set {
-                        actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-                    }
-                    actions.push((id.into(), Value::Null));
-                    ui.close();
-                }
+                rows.push(MenuItem::new(tl!(&label), Choice::Command(id)).enabled(enabled).into());
             }
         }
+    }
+    if matches!(rows.last(), Some(MenuEntry::Separator)) {
+        rows.pop();
+    }
+    rows
+}
+
+/// The rows of the layer menu for `l`; `on_set` when it acts on the whole selection.
+pub fn menu_rows(app: &crate::PhotocraftApp, ctx: &egui::Context, l: &Layer, on_set: bool) -> Vec<MenuEntry<Choice>> {
+    let has_selection = app.session.active().is_some_and(|s| s.doc.selection.is_some());
+    let mut rows = command_rows(app, l, on_set, entries(l, on_set, has_selection));
+    rows.push(MenuEntry::Separator);
+    rows.push(MenuItem::new(tl!("Rename Layer…"), Choice::Rename).into());
+    rows.push(MenuItem::submenu(tl!("Color"), color_rows(app, ctx, l, on_set)).into());
+    rows
+}
+
+/// The rows of `l`'s layer-mask thumbnail menu (#4575), in Photoshop's order; empty without a mask.
+pub fn mask_rows(app: &crate::PhotocraftApp, l: &Layer) -> Vec<MenuEntry<Choice>> {
+    let Some(mask) = &l.mask else { return Vec::new() };
+    let edits = vec![
+        Some((tl!(mask_toggle_label(mask.enabled)), "layer.layerMask.enabled")),
+        Some((tl!("Delete Layer Mask"), "layer.layerMask.delete")),
+        Some((tl!("Apply Layer Mask"), "layer.layerMask.apply")),
+    ];
+    let mut rows = command_rows(app, l, false, edits);
+    rows.push(MenuEntry::Separator);
+    // ⌘⇧-, ⌘⌥- and ⌘⇧⌥-clicking the thumbnail, as menu items.
+    for (label, operation) in [(tl!("Add Mask to Selection"), "add"), (tl!("Subtract Mask from Selection"), "subtract"), (tl!("Intersect Mask with Selection"), "intersect")] {
+        rows.push(MenuItem::new(label, Choice::LoadMask(operation)).into());
+    }
+    rows.push(MenuEntry::Separator);
+    rows.push(MenuItem::new(tl!("Select and Mask…"), Choice::SelectAndMask).enabled(crate::menus::is_enabled(app, "select.selectAndMask")).into());
+    // Layer Mask Display Options: the rubylith's colour and opacity (`channel.options`).
+    rows.push(MenuItem::new(tl!("Mask Options…"), Choice::MaskOptions).into());
+    rows
+}
+
+/// The rows of `l`'s effect-row menu ([`effects_entries`]).
+pub fn effects_rows(app: &crate::PhotocraftApp, l: &Layer) -> Vec<MenuEntry<Choice>> {
+    command_rows(app, l, false, effects_entries())
+}
+
+/// The actions for a chosen row of `l`'s menu. Returns true when the row asks to rename `l`.
+pub fn run_choice(choice: Choice, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) -> bool {
+    let select = |actions: &mut Vec<(String, Value)>| actions.push(("layer.select".into(), json!({"layer": l.id.0})));
+    match choice {
+        Choice::Command(id) => {
+            if !on_set {
+                select(actions);
+            }
+            actions.push((id.into(), Value::Null));
+        }
+        Choice::Rename => return true,
+        Choice::Color(color) => {
+            let params = if on_set {
+                json!({"color": color.id()})
+            } else {
+                select(actions);
+                json!({"layer": l.id.0, "color": color.id()})
+            };
+            actions.push(("layer.setLabelColor".into(), params));
+        }
+        Choice::LoadMask(operation) => {
+            select(actions);
+            actions.push(("select.loadSelection".into(), json!({"channel": "mask", "layer": l.id.0, "operation": operation})));
+        }
+        Choice::SelectAndMask => {
+            // Like double-clicking the thumbnail with that preference on: it refines the mask.
+            select(actions);
+            actions.push(("ui.maskTarget".into(), json!(true)));
+            actions.push(("select.selectAndMask".into(), Value::Null));
+        }
+        Choice::MaskOptions => {
+            select(actions);
+            actions.push(("ui.maskTarget".into(), json!(true)));
+            actions.push(("channel.options".into(), Value::Null));
+        }
+    }
+    false
+}
+
+/// The layer style menu of `l`'s effect rows on `widget` (right-click); the actions select `l`
+/// first when it isn't the active layer.
+pub fn show_effects(app: &crate::PhotocraftApp, ui: &egui::Ui, widget: &egui::Response, l: &Layer, actions: &mut Vec<(String, Value)>) {
+    let rows = effects_rows(app, l);
+    if let Some(choice) = ContextMenu::new(&rows).show(ui, widget).chosen {
+        run_choice(choice, l, false, actions);
     }
 }
 
@@ -258,60 +288,22 @@ fn common_color(app: &crate::PhotocraftApp, l: &Layer, on_set: bool) -> Option<L
     labels.all(|c| c == first).then_some(first)
 }
 
-fn color_menu(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) {
-    ui.menu_button(tl!("Color"), |ui| {
-        color_choices(app, ui, l, on_set, actions);
-    });
-}
-
-/// The eye column opens the same color choices directly, without the row's full context menu.
-pub(crate) fn color_choices(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) {
+/// The label-colour rows: the current colour checked, each colour tinting its row.
+pub(crate) fn color_rows(app: &crate::PhotocraftApp, ctx: &egui::Context, l: &Layer, on_set: bool) -> Vec<MenuEntry<Choice>> {
     let current = common_color(app, l, on_set);
-    crate::widgets::menu_scroll(ui, |ui| {
-        ui.set_min_width(170.0);
-        for color in LabelColor::ALL {
-            if color == LabelColor::Red {
-                ui.separator();
-            }
-            if color_button(ui, color, current == Some(color)).clicked() {
-                let params = if on_set {
-                    json!({"color": color.id()})
-                } else {
-                    actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-                    json!({"layer": l.id.0, "color": color.id()})
-                };
-                actions.push(("layer.setLabelColor".into(), params));
-                ui.close();
-            }
+    let t = crate::theme::Tokens::get(ctx);
+    let mut rows = Vec::new();
+    for color in LabelColor::ALL {
+        if color == LabelColor::Red {
+            rows.push(MenuEntry::Separator);
         }
-    });
-}
-
-fn color_button(ui: &mut egui::Ui, color: LabelColor, checked: bool) -> egui::Response {
-    use egui::{Atom, Rect, Stroke, StrokeKind, vec2};
-    let t = crate::theme::Tokens::get(ui.ctx());
-    let check_id = egui::IdSalt::new(("label-check", color.id()));
-    let swatch_id = egui::IdSalt::new(("label-swatch", color.id()));
-    let name = color_name(color);
-    let button = egui::Button::new((Atom::custom(check_id, vec2(14.0, 16.0)), Atom::custom(swatch_id, vec2(16.0, 16.0)), name, Atom::grow())).atom_ui(ui);
-    if checked && let Some(rect) = button.rect(check_id) {
-        crate::icons::paint(ui, rect, "check", 14.0, t.icon);
-    }
-    if let Some(rect) = button.rect(swatch_id) {
-        let rect = Rect::from_center_size(rect.center(), vec2(16.0, 16.0));
-        let p = ui.painter();
+        let mut item = MenuItem::new(color_name(color), Choice::Color(color)).check(current == Some(color));
         if let Some((swatch, _)) = t.layer_label_colors(color) {
-            p.rect_filled(rect, t.radius_sm, swatch);
-        } else {
-            let stroke = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
-            p.rect_stroke(rect, t.radius_sm, stroke, StrokeKind::Inside);
-            let r = rect.shrink(4.0);
-            p.line_segment([r.left_top(), r.right_bottom()], stroke);
-            p.line_segment([r.right_top(), r.left_bottom()], stroke);
+            item = item.tint(swatch);
         }
+        rows.push(item.into());
     }
-    button.response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), checked, name));
-    button.response
+    rows
 }
 
 #[cfg(test)]

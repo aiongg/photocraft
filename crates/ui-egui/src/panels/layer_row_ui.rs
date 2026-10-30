@@ -1,31 +1,22 @@
-//! Layers panel row: the right-hand indicators and the name between them and the thumbnails
-//! (#144).
+//! Layers panel row support: the right-hand indicators' widths, the rects each row drew
+//! ([`recorded`], for tests and automation), the in-place rename state and the panel's flyout.
 //!
-//! The indicators (lock, fx badge with its effects triangle, link, the blend-mode label) are
-//! laid out first, from the row's right edge inward; the name gets the width that is left and
-//! is cut with an ellipsis, so a long name never runs under an indicator at any panel width or
-//! UI scale. The blend-mode label is optional: it is dropped before the name gets too narrow.
-//! The rects drawn each frame are recorded ([`recorded`]) for tests and automation.
+//! The row itself is a craft-ui `ListRow` ([`layer_row`](super::layer_row)); its trailing items
+//! drop out and its label is cut by the library.
 
-use craft_ui::theme::ToEgui;
-use egui::{Align2, FontId, Galley, Painter, Pos2, Rect, Sense, Shape, Stroke, pos2, vec2};
-use photocraft_color::BlendMode;
+use craft_ui::list::{RenameEnd, RowEvent};
+use egui::{Align2, FontId, Galley, Painter, Rect, pos2};
 use photocraft_doc::{Adjustment, Layer, LayerContent};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
-use crate::icons;
-use crate::theme::{self, Tokens};
-
 /// Space kept free at a row's right edge: the overlay scrollbar sits there.
 pub const RIGHT_PAD: f32 = 10.0;
-/// Gap between indicators, and between the name and the first indicator.
-const GAP: f32 = 4.0;
 /// Width of an icon indicator (lock, link).
-const ICON_W: f32 = 14.0;
+pub(super) const ICON_W: f32 = 14.0;
 /// Width of the effects triangle beside the fx badge.
-const TRIANGLE_W: f32 = 10.0;
-/// The blend-mode label is shown only while the name keeps at least this much room.
+pub(super) const TRIANGLE_W: f32 = 10.0;
+/// The name keeps at least this much room.
 pub const MIN_NAME_W: f32 = 64.0;
 
 /// A right-hand row indicator.
@@ -53,27 +44,6 @@ pub struct RowRects {
     pub indicators: Vec<(Indicator, Rect)>,
 }
 
-/// Lay out `items` (right to left, with their widths; `Blend` is optional) inside `row`,
-/// leaving the name the span from `name_left`. Returns the indicator rects and the name's
-/// right limit.
-pub fn layout(row: Rect, name_left: f32, items: &[(Indicator, f32)]) -> (Vec<(Indicator, Rect)>, f32) {
-    let mut right = row.right() - RIGHT_PAD;
-    let mut out = Vec::with_capacity(items.len());
-    for &(kind, w) in items {
-        let w = w.max(0.0);
-        // The fx badge hugs its triangle; everything else keeps a gap.
-        let gap = if kind == Indicator::Fx && out.last().is_some_and(|(k, _)| *k == Indicator::FxTriangle) { 1.0 } else { GAP };
-        let left = right - w;
-        if kind == Indicator::Blend && left - GAP - name_left < MIN_NAME_W {
-            continue;
-        }
-        out.push((kind, Rect::from_min_max(pos2(left, row.top()), pos2(right, row.bottom()))));
-        right = left - gap;
-    }
-    let name_right = out.last().map_or(right, |(_, r)| r.left() - GAP);
-    (out, name_right)
-}
-
 /// The PSD key of the adjustment `l` holds when PhotoCraft keeps it as imported but cannot
 /// render it.
 pub fn unsupported_key(l: &Layer) -> Option<&str> {
@@ -81,31 +51,6 @@ pub fn unsupported_key(l: &Layer) -> Option<&str> {
         LayerContent::Adjustment(Adjustment::Unsupported { psd_key, .. }) => Some(psd_key),
         _ => None,
     }
-}
-
-/// Width the always-shown indicators of `l` take at the row's right (blend label excluded).
-pub fn reserved_width(l: &Layer) -> f32 {
-    let mut w = RIGHT_PAD;
-    if unsupported_key(l).is_some() {
-        w += ICON_W + GAP;
-    }
-    if l.locks.any() {
-        w += ICON_W + GAP;
-    }
-    let smart = crate::smart_ui::has_filters(l);
-    if !l.effects.items.is_empty() || smart {
-        w += TRIANGLE_W + GAP;
-    }
-    if !l.effects.items.is_empty() {
-        w += 13.0 + GAP;
-    }
-    if smart {
-        w += ICON_W + GAP;
-    }
-    if l.link_group.is_some() {
-        w += ICON_W + GAP;
-    }
-    w
 }
 
 /// Group indentation for a row at `depth`: 14 pt a level, squeezed when the panel is so narrow
@@ -138,113 +83,15 @@ pub fn truncated(painter: &Painter, text: &str, font: FontId, color: egui::Color
     Some(layout(text, true))
 }
 
-/// Paint `l`'s right-hand indicators in `row` and handle the effects triangle. Returns the
-/// name's right limit, the indicator rects, and whether the triangle was clicked this frame (so
-/// the row doesn't also treat the click as a selection).
-pub fn indicators(
-    ui: &egui::Ui,
-    painter: &Painter,
-    row: Rect,
-    name_left: f32,
-    l: &Layer,
-    fx_open: bool,
-    actions: &mut Vec<(String, Value)>,
-) -> (f32, Vec<(Indicator, Rect)>, bool) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let locked = l.locks.any();
-    let fx_font = theme::semibold(11.0);
-    let blend_font = FontId::proportional(10.5);
-    let has_fx = !l.effects.items.is_empty();
-    let has_smart = crate::smart_ui::has_filters(l);
-    let show_blend = l.blend != BlendMode::Normal && l.blend != BlendMode::PassThrough;
-    let fx_galley = has_fx.then(|| painter.layout_no_wrap("fx".into(), fx_font, t.color.text.muted.to_egui()));
-    let blend_galley = show_blend.then(|| painter.layout_no_wrap(tl!(l.blend.label()).into(), blend_font, t.color.text.faint.to_egui()));
-    let mut items = Vec::new();
-    let unsupported = unsupported_key(l);
-    if unsupported.is_some() {
-        items.push((Indicator::Unsupported, ICON_W));
-    }
-    if locked {
-        items.push((Indicator::Lock, ICON_W));
-    }
-    if has_fx || has_smart {
-        items.push((Indicator::FxTriangle, TRIANGLE_W));
-    }
-    if has_smart {
-        items.push((Indicator::SmartFilters, ICON_W));
-    }
-    if let Some(g) = &fx_galley {
-        items.push((Indicator::Fx, g.size().x));
-    }
-    if l.link_group.is_some() {
-        items.push((Indicator::Link, ICON_W));
-    }
-    if let Some(g) = &blend_galley {
-        items.push((Indicator::Blend, g.size().x));
-    }
-    let (rects, name_right) = layout(row, name_left, &items);
-    let mut clicked = false;
-    let cy = row.center().y;
-    for &(kind, r) in &rects {
-        match kind {
-            Indicator::Unsupported => {
-                icons::paint(ui, Rect::from_center_size(r.center(), vec2(ICON_W, ICON_W)), "triangle-alert", 12.0, t.color.status.warn.fg.to_egui());
-                let key = unsupported.unwrap_or_default();
-                let tip = crate::i18n::fmt(tl!("Not rendered: this adjustment ({key}) is kept as imported."), &[("key", key)]);
-                ui.interact(r, ui.scope_id().with(("row-unsupported", l.id.0)), Sense::hover()).on_hover_text(tip);
-            }
-            Indicator::Lock => icons::paint(ui, Rect::from_center_size(r.center(), vec2(ICON_W, ICON_W)), "lock", 12.0, t.color.text.faint.to_egui()),
-            Indicator::Link => icons::paint(ui, Rect::from_center_size(r.center(), vec2(ICON_W, ICON_W)), "link-2", 12.0, t.color.text.faint.to_egui()),
-            Indicator::Fx => {
-                if let Some(g) = fx_galley.clone() {
-                    painter.galley(pos2(r.left(), cy - g.size().y / 2.0), g, t.color.text.muted.to_egui());
-                }
-            }
-            Indicator::Blend => {
-                if let Some(g) = blend_galley.clone() {
-                    painter.galley(pos2(r.left(), cy - g.size().y / 2.0), g, t.color.text.faint.to_egui());
-                }
-            }
-            Indicator::SmartFilters => {
-                let enabled = matches!(&l.content, photocraft_doc::LayerContent::Smart(sm) if sm.filters_enabled);
-                crate::smart_ui::paint_badge(painter, r.center(), if enabled { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui() });
-                ui.interact(r, ui.scope_id().with(("smart-filters-badge", l.id.0)), Sense::hover()).on_hover_text(tl!("Smart Filters"));
-            }
-            Indicator::FxTriangle => {
-                let resp = ui.interact(r, ui.scope_id().with(("fx-disclosure", l.id.0)), Sense::click());
-                paint_triangle(painter, r.center(), fx_open, if resp.hovered() { t.color.text.normal.to_egui() } else { t.color.text.normal.to_egui() });
-                if resp.clicked() {
-                    clicked = true;
-                    let all = ui.input(|i| i.modifiers.alt);
-                    actions.push(("layer.setEffectsExpanded".into(), json!({"layer": l.id.0, "expanded": !fx_open, "all": all})));
-                }
-                let (verb, name) = (if fx_open { tl!("Collapse") } else { tl!("Expand") }, l.name.clone());
-                let tip = if has_smart && fx_open {
-                    tl!("Hide the layer's effects and Smart Filters  ({key}-click: all layers)")
-                } else if has_smart {
-                    tl!("Show the layer's effects and Smart Filters  ({key}-click: all layers)")
-                } else if fx_open {
-                    tl!("Hide the layer's effects  ({key}-click: all layers)")
-                } else {
-                    tl!("Show the layer's effects  ({key}-click: all layers)")
-                };
-                let resp = resp.on_hover_text(crate::i18n::fmt(tip, &[("key", &crate::shortcuts::pretty("Alt"))]));
-                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{verb} effects {name}")));
-            }
-        }
-    }
-    (name_right, rects, clicked)
-}
-
 /// A small disclosure triangle: pointing down when open, right when closed.
-pub fn paint_triangle(painter: &Painter, c: Pos2, open: bool, color: egui::Color32) {
+pub(super) fn paint_triangle(painter: &Painter, c: egui::Pos2, open: bool, color: egui::Color32) {
     let s = 3.0;
     let pts = if open {
         vec![pos2(c.x - s, c.y - s * 0.6), pos2(c.x + s, c.y - s * 0.6), pos2(c.x, c.y + s * 0.6)]
     } else {
         vec![pos2(c.x - s * 0.6, c.y - s), pos2(c.x + s * 0.6, c.y), pos2(c.x - s * 0.6, c.y + s)]
     };
-    painter.add(Shape::convex_polygon(pts, color, Stroke::NONE));
+    painter.add(egui::Shape::convex_polygon(pts, color, egui::Stroke::NONE));
 }
 
 /// Paint `text` left-aligned at `x`, vertically centred on `cy`, cut to end before `right`.
@@ -438,42 +285,32 @@ pub fn take_next_rename(ctx: &egui::Context) -> Option<(u64, bool)> {
     ctx.data_mut(|d| d.remove_temp::<(u64, bool)>(next_rename_id()))
 }
 
-/// Draw the rename field of `layer` in `rect` when it is the one being renamed, and handle its
-/// keys and focus. Returns the rename command when it was committed this frame. Tab and ⇧Tab
-/// commit too and ask for the next rename ([`take_next_rename`]).
-pub fn rename_field(ui: &mut egui::Ui, layer: u64, rect: Rect) -> Option<(String, Value)> {
-    let ctx = ui.ctx().clone();
-    let mut r = rename(&ctx).filter(|r| r.layer == layer)?;
-    let id = egui::Id::unique(("layer-rename-field", layer));
-    let te = ui.put(rect, egui::TextEdit::singleline(&mut r.text).id(id).font(FontId::proportional(12.5))).accessible_name(tl!("Name"));
+/// Applies what a row's rename field reported this frame, for the row of `layer` that is being
+/// renamed: the text typed, and how the rename ended. Returns the rename command when it was
+/// committed. Tab and ⇧Tab commit too and ask for the next rename ([`take_next_rename`]).
+pub fn apply_rename_events(ctx: &egui::Context, layer: u64, events: &[RowEvent<u64>]) -> Option<(String, Value)> {
+    let mut r = rename(ctx).filter(|r| r.layer == layer)?;
     r.pass = ctx.cumulative_pass_nr();
-    if !r.focused {
-        te.request_focus();
-        // Photoshop selects the whole name, so typing replaces it.
-        if let Some(mut state) = egui::TextEdit::load_state(&ctx, id) {
-            let all = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(r.text.chars().count()));
-            state.cursor.set_char_range(Some(all));
-            state.store(&ctx, id);
+    r.focused = true;
+    for event in events {
+        match event {
+            RowEvent::Renamed { row, text } if *row == layer => r.text.clone_from(text),
+            RowEvent::RenameEnded { row, end } if *row == layer => {
+                store(ctx, None);
+                return match end {
+                    RenameEnd::Escape => None,
+                    RenameEnd::Tab | RenameEnd::ShiftTab => {
+                        ctx.data_mut(|d| d.insert_temp(next_rename_id(), (layer, *end == RenameEnd::ShiftTab)));
+                        r.commit_action()
+                    }
+                    _ => r.commit_action(),
+                };
+            }
+            _ => {}
         }
-        r.focused = true;
-        store(&ctx, Some(r));
-        return None;
     }
-    let (enter, tab, esc) = ctx.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab), i.key_pressed(egui::Key::Escape)));
-    if tab {
-        let up = ctx.input(|i| i.modifiers.shift);
-        ctx.data_mut(|d| d.insert_temp(next_rename_id(), (layer, up)));
-    }
-    if esc {
-        store(&ctx, None);
-        None
-    } else if enter || tab || te.lost_focus() || !te.has_focus() {
-        store(&ctx, None);
-        r.commit_action()
-    } else {
-        store(&ctx, Some(r));
-        None
-    }
+    store(ctx, Some(r));
+    None
 }
 
 #[cfg(test)]

@@ -1,21 +1,14 @@
 //! Layers panel tree: the rows in display order (top of the stack first, each group directly
-//! above its contents) and the groups' disclosure triangles (#126).
+//! above its contents) (#126).
 //!
-//! Clicking a triangle opens or closes the group; ⌥-click sets every group in the document to
-//! the new state (Photoshop). The state is the group's `expanded` flag, document data saved in
-//! `.pcraft` and as the PSD section divider's open/closed folder type, toggled through
-//! `layer.setExpanded` (a view change: no history step).
+//! A group's disclosure triangle is the library `TreeRow`'s: it opens or closes the group, and
+//! ⌥-click sets every group in the document to the new state (Photoshop). The state is the
+//! group's `expanded` flag, document data saved in `.pcraft` and as the PSD section divider's
+//! open/closed folder type, toggled through `layer.setExpanded` (a view change: no history step).
 
-use craft_ui::theme::ToEgui;
-use egui::{Rect, Sense, Shape, Stroke, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent};
-use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
-
-/// Width the disclosure triangle takes in a group row.
-pub const TRIANGLE_W: f32 = 14.0;
 
 /// Rows as the Layers panel lists them: topmost layer first, a group directly above its
 /// children, and the contents of closed groups left out (unless `show_all`, used while the
@@ -45,40 +38,6 @@ pub fn panel_rows<'a>(app: &PhotocraftApp, doc: &'a Document) -> Vec<(usize, &'a
         rows.retain(|(_, l)| l.id.0 != working);
     }
     rows
-}
-
-/// The hit area of a group row's triangle starting at `x`.
-pub fn triangle_rect(row: Rect, x: f32) -> Rect {
-    Rect::from_min_size(pos2(x - 2.0, row.top()), vec2(TRIANGLE_W + 2.0, row.height()))
-}
-
-/// Paint and handle a group row's disclosure triangle at `*x` (advancing it). Returns true when
-/// it was clicked this frame, so the row doesn't also treat the click as a selection.
-pub fn disclosure(ui: &mut egui::Ui, row: Rect, x: &mut f32, l: &Layer, actions: &mut Vec<(String, Value)>) -> bool {
-    let LayerContent::Group(g) = &l.content else { return false };
-    let hit = triangle_rect(row, *x);
-    let resp = ui.interact(hit, ui.scope_id().with(("disclosure", l.id.0)), Sense::click());
-    let t = craft_ui::theme::current(ui.ctx());
-    let c = pos2(*x + TRIANGLE_W / 2.0 - 1.0, row.center().y);
-    let s = 3.5;
-    let pts = if g.expanded {
-        vec![pos2(c.x - s, c.y - s * 0.6), pos2(c.x + s, c.y - s * 0.6), pos2(c.x, c.y + s * 0.6)]
-    } else {
-        vec![pos2(c.x - s * 0.6, c.y - s), pos2(c.x + s * 0.6, c.y), pos2(c.x - s * 0.6, c.y + s)]
-    };
-    let color = if resp.hovered() { t.color.text.normal.to_egui() } else { t.color.text.normal.to_egui() };
-    ui.painter().add(Shape::convex_polygon(pts, color, Stroke::NONE));
-    *x += TRIANGLE_W;
-    let clicked = resp.clicked();
-    if clicked {
-        let all = ui.input(|i| i.modifiers.alt);
-        actions.push(("layer.setExpanded".into(), json!({"layer": l.id.0, "expanded": !g.expanded, "all": all})));
-    }
-    let (verb, name) = (if g.expanded { tl!("Collapse") } else { tl!("Expand") }, l.name.clone());
-    let tip = if g.expanded { tl!("Collapse group  ({key}-click: all groups)") } else { tl!("Expand group  ({key}-click: all groups)") };
-    let resp = resp.on_hover_text(crate::i18n::fmt(tip, &[("key", &crate::shortcuts::pretty("Alt"))]));
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{verb} group {name}")));
-    clicked
 }
 
 #[cfg(test)]
