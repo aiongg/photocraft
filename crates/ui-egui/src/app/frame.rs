@@ -245,13 +245,13 @@ impl PhotocraftApp {
         // View › Screen Mode › Full Screen Mode: only the image, on black (F or Esc returns).
         screen_picker::show(&ctx);
         if screen_picker::busy(&ctx) && screen_picker::showing(&ctx) {
-            egui::Modal::new(egui::Id::unique("screen-color-wait")).show(&ctx, |ui| {
-                ui.spinner();
-                ui.label(tl!("Pick a screen pixel or press Esc to cancel"));
-                if ui.button(tl!("Cancel")).clicked() {
-                    screen_picker::cancel(&ctx);
-                }
-            });
+            let cancelled = craft_ui::dialog::BlockingOverlay::new("screen-color-wait")
+                .message(tl!("Pick a screen pixel or press Esc to cancel"))
+                .cancel(tl!("Cancel"))
+                .show(&ctx);
+            if cancelled {
+                screen_picker::cancel(&ctx);
+            }
             // This pass handled its input (the modal above ran): deliver the synthetic batch.
             self.finish_synthetic_pass();
             self.automation_input = false;
