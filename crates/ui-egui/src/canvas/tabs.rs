@@ -311,7 +311,7 @@ pub(crate) fn tab_title_at(app: &PhotocraftApp, i: usize, zoom: f32) -> String {
 }
 
 /// The strip's label: the title and a running save, without the modified mark the tab draws itself.
-fn tab_label(app: &PhotocraftApp, i: usize) -> String {
+pub(super) fn tab_label(app: &PhotocraftApp, i: usize) -> String {
     let (title, saving) = title_parts(app, i, app.ui.views.get(i).map_or(100.0, |v| v.zoom * 100.0));
     format!("{title}{saving}")
 }

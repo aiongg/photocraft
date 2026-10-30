@@ -4,13 +4,19 @@
 
 use egui::vec2;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT as _, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::theme::ThemeKind;
 
-use super::{TabStrip, pro_tab_title};
+use super::{TabStrip, pro_tab_title, tab_label};
+
+/// The name AccessKit gives document `i`'s tab: its label, with ", modified" while it has unsaved changes.
+fn tab_name(app: &PhotocraftApp, i: usize) -> String {
+    let label = tab_label(app, i);
+    if app.session.documents()[i].is_dirty() { format!("{label}, modified") } else { label }
+}
 
 /// A real app window with `docs` documents named "ch1-pNN.png".
 fn harness(docs: usize, theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
@@ -75,7 +81,7 @@ fn tabs_that_fit_keep_their_natural_widths_and_no_menu() {
 }
 
 #[test]
-fn studio_tabs_overflow_into_the_same_menu() {
+fn studio_tabs_overflow_into_the_same_menu_as_pro() {
     let h = harness(14, ThemeKind::Studio);
     let s = strip(&h);
     assert!(s.tabs.len() < 14, "{} shown", s.tabs.len());
@@ -84,7 +90,7 @@ fn studio_tabs_overflow_into_the_same_menu() {
     }
     assert!(has_menu(&h), "the Studio strip carries a » menu too");
     let active = h.state().session.active_index().unwrap();
-    let name = h.state().session.documents()[active].doc.name.clone();
+    let name = tab_name(h.state(), active);
     assert!(h.query_by_label(&name).is_some(), "the active tab is on the strip: {name}");
 }
 
@@ -96,9 +102,8 @@ fn saved_document_tabs_track_file_identity() {
         h.state_mut().services.write = Some(Box::new(|_, _| Ok(())));
         h.state_mut().save_as(Some("folder/My saved image.psd".into())).unwrap();
         h.run_steps(2);
-        let pro = crate::theme::Tokens::get(&h.ctx).pro;
         let app = h.state();
-        let label = if pro { pro_tab_title(app, 1) } else { "My saved image.psd".into() };
+        let label = tab_name(app, 1);
         assert!(h.query_by_label(&label).is_some(), "saved tab in {theme:?}: {label}");
         assert_eq!(app.session.active().unwrap().doc.name, "My saved image.psd");
         h.state_mut().session.set_active(0);
@@ -107,7 +112,7 @@ fn saved_document_tabs_track_file_identity() {
         h.state_mut().session.set_active(1);
         h.state_mut().run("layer.new.layer", json!({})).unwrap();
         h.run_steps(2);
-        let label = if pro { pro_tab_title(h.state(), 1) } else { "My saved image.psd".into() };
+        let label = tab_name(h.state(), 1);
         assert!(h.query_by_label(&label).is_some());
         assert_eq!(h.state().session.active().unwrap().doc.name, "My saved image.psd");
         assert!(h.state().session.active().unwrap().is_dirty());
@@ -206,21 +211,26 @@ fn crowded_tabs_keep_their_whole_names_and_the_menu_lists_every_document() {
         for active in [13, 5, 0] {
             h.state_mut().session.set_active(active);
             h.run_steps(2);
-            let pro = crate::theme::Tokens::get(&h.ctx).pro;
-            let labels: Vec<String> =
-                (0..14).map(|i| if pro { pro_tab_title(h.state(), i) } else { h.state().session.documents()[i].doc.name.clone() }).collect();
+            let labels: Vec<String> = (0..14).map(|i| tab_label(h.state(), i)).collect();
             h.get_by_label("More documents").click();
             h.run_steps(2);
             for (i, label) in labels.iter().enumerate() {
-                // The menu bar's padding: an unchecked row keeps the check mark's room, so names line up.
-                let (on, off) = (format!("✔ {label}"), format!("   {label}"));
-                let (want, other) = if i == active { (&on, &off) } else { (&off, &on) };
-                assert_eq!(h.query_all_by_label(want).count(), 1, "{theme:?}, active {active}: document {i} is in the menu as {want:?}");
-                assert_eq!(h.query_all_by_label(other).count(), 0, "{theme:?}, active {active}: document {i} is not {other:?}");
+                // A check row per document, checked on the active one.
+                let rows: Vec<_> =
+                    h.query_all_by_label(label.as_str()).filter(|n| n.accesskit_node().role() == egui::accesskit::Role::MenuItemCheckBox).collect();
+                assert_eq!(rows.len(), 1, "{theme:?}, active {active}: document {i} is in the menu once");
+                assert_eq!(
+                    rows[0].accesskit_node().toggled() == Some(egui::accesskit::Toggled::True),
+                    i == active,
+                    "{theme:?}, active {active}: document {i} is checked only when active"
+                );
             }
             h.key_press(egui::Key::Escape);
             h.run_steps(2);
-            assert!(h.query_by_label(&format!("✔ {}", labels[active])).is_none(), "{theme:?}: the menu closed");
+            assert!(
+                h.query_all_by_label(labels[active].as_str()).all(|n| n.accesskit_node().role() != egui::accesskit::Role::MenuItemCheckBox),
+                "{theme:?}: the menu closed"
+            );
         }
     }
 }

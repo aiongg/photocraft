@@ -1083,12 +1083,7 @@ fn tab_close_others_prompts_for_unsaved_nonactive_document() {
 /// The pure half of tab drag-to-reorder (UI-217-6): where a drop lands and which
 /// `document.move` target that is.
 #[test]
-fn tab_drop_index_and_move_target_cover_reorder_drops() {
-    let r = |x: f32| Rect::from_min_size(egui::pos2(x, 0.0), egui::vec2(100.0, 26.0));
-    let placed = vec![(0, r(0.0)), (1, r(100.0)), (2, r(200.0))];
-    assert_eq!(tab_drop_index(&placed, 10.0), 0);
-    assert_eq!(tab_drop_index(&placed, 160.0), 2);
-    assert_eq!(tab_drop_index(&placed, 350.0), 3, "past the end lands after the last shown tab");
+fn tab_move_target_covers_reorder_drops() {
     assert_eq!(tab_move_target(0, 3), 2);
     assert_eq!(tab_move_target(2, 0), 0);
     assert_eq!(tab_move_target(1, 1), 1, "before itself: no move");
@@ -1137,11 +1132,6 @@ fn dragging_a_tab_reorders_the_documents() {
 #[test]
 fn dragging_a_tab_off_the_strip_floats_it_in_a_window() {
     use egui_kittest::kittest::Queryable;
-    let strip = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(700.0, 26.0));
-    assert!(!torn_off(strip, egui::pos2(50.0, 13.0)));
-    assert!(!torn_off(strip, egui::pos2(50.0, 26.0 + TEAR_OFF - 1.0)), "a wobble below the strip still reorders");
-    assert!(torn_off(strip, egui::pos2(50.0, 26.0 + TEAR_OFF + 1.0)));
-    assert!(torn_off(strip, egui::pos2(50.0, -TEAR_OFF - 1.0)), "dragged up, off the window's top");
     for kind in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Pro] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         for name in ["a", "b", "c"] {

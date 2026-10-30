@@ -106,7 +106,7 @@ pub(crate) use tabs::tab_title_at;
 pub use tabs::{TabStrip, document_area, extra_windows};
 use tabs::{dots, paint_dots};
 #[cfg(test)]
-use tabs::{pro_tab_title, tab_context_items, tab_move_target, tabs};
+use tabs::{pro_tab_title, tab_context_items, tab_label, tab_move_target, tabs};
 #[cfg(test)]
 pub(crate) use textures::detail_plan;
 pub(crate) use textures::{DetailPlan, damage_since, effect_reach, ensure_texture_in_view, retain_gpu_documents, shown_as_document};
