@@ -45,12 +45,13 @@ pub fn park(app: &mut PhotocraftApp, path: String) -> Result<(), String> {
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.tiff_options else { return };
     let mut values = (p.discard_layers, p.dont_ask_again);
-    let answer = crate::dialogs::show_prompt(ctx, "tiff-options", tl!("TIFF Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (discard, dont_ask)| {
-        ui.label(tl!("Including layers will increase file size."));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        _ = craft_ui::controls::Checkbox::bool(tl!("Discard Layers and Save a Copy"), discard).show(ui);
-        _ = craft_ui::controls::Checkbox::bool(tl!("Don't show again"), dont_ask).show(ui);
-    });
+    let answer =
+        crate::dialogs::show_prompt(ctx, "tiff-options", tl!("TIFF Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (discard, dont_ask)| {
+            ui.label(tl!("Including layers will increase file size."));
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            _ = craft_ui::controls::Checkbox::bool(tl!("Discard Layers and Save a Copy"), discard).show(ui);
+            _ = craft_ui::controls::Checkbox::bool(tl!("Don't show again"), dont_ask).show(ui);
+        });
     (p.discard_layers, p.dont_ask_again) = values;
     let outcome = answer.outcome;
     let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));

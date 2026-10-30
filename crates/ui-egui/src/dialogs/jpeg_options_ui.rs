@@ -16,10 +16,10 @@
 //! without the path for a plain `file.save`, which writes whichever file an action is played on
 //! ([`plain_save_step`]).
 
+use craft_ui::composites::FieldControl as _;
 use craft_ui::composites::FormGrid;
 use craft_ui::controls::{RadioGroup, Select, Slider};
 use craft_ui::dialog::Outcome;
-use craft_ui::composites::FieldControl as _;
 use photocraft_codecs::JpegFormat;
 use serde_json::Value;
 
@@ -199,46 +199,47 @@ pub fn park_at(app: &mut PhotocraftApp, path: String, copy: bool, record: &'stat
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.jpeg_options else { return };
     let mut values = (p.quality, p.format);
-    let answer = crate::dialogs::show_prompt(ctx, "jpeg-options", tl!("JPEG Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (quality, format)| {
-        craft_ui::composites::SectionLabel::new(tl!("Image Options")).show(ui);
-        FormGrid::new("jpeg-options-quality").show(ui, |form| {
-            form.row(tl!("Quality"), |ui, _| {
-                let mut q = f32::from(*quality);
-                let number = crate::widgets::dialog_number_field(ui, "jpeg-quality", tl!("Quality"), &mut q, 0.0..=f32::from(MAX_QUALITY), "", 0);
-                if number.changed {
-                    *quality = (q.round() as u8).min(MAX_QUALITY);
-                }
-                // Photoshop's presets: picking one sets the quality it starts at.
-                let presets = [3u8, 5, 8, 10];
-                let mut current = quality_label(*quality).to_string();
-                let preset = Select::new("jpeg-quality-preset", tl!("Preset"), &mut current)
-                    .rows(presets.len(), |i| quality_label(presets[i]).to_string(), |i| quality_label(presets[i]))
-                    .show(ui);
-                if preset.response.changed() {
-                    if let Some(q) = presets.iter().find(|&&q| quality_label(q) == current.as_str()) {
-                        *quality = *q;
+    let answer =
+        crate::dialogs::show_prompt(ctx, "jpeg-options", tl!("JPEG Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (quality, format)| {
+            craft_ui::composites::SectionLabel::new(tl!("Image Options")).show(ui);
+            FormGrid::new("jpeg-options-quality").show(ui, |form| {
+                form.row(tl!("Quality"), |ui, _| {
+                    let mut q = f32::from(*quality);
+                    let number = crate::widgets::dialog_number_field(ui, "jpeg-quality", tl!("Quality"), &mut q, 0.0..=f32::from(MAX_QUALITY), "", 0);
+                    if number.changed {
+                        *quality = (q.round() as u8).min(MAX_QUALITY);
                     }
-                }
-                (number.response.own_name(), preset.response)
+                    // Photoshop's presets: picking one sets the quality it starts at.
+                    let presets = [3u8, 5, 8, 10];
+                    let mut current = quality_label(*quality).to_string();
+                    let preset = Select::new("jpeg-quality-preset", tl!("Preset"), &mut current)
+                        .rows(presets.len(), |i| quality_label(presets[i]).to_string(), |i| quality_label(presets[i]))
+                        .show(ui);
+                    if preset.response.changed() {
+                        if let Some(q) = presets.iter().find(|&&q| quality_label(q) == current.as_str()) {
+                            *quality = *q;
+                        }
+                    }
+                    (number.response.own_name(), preset.response)
+                });
+                form.unlabelled(|ui| {
+                    let edit = Slider::new("jpeg-quality-slider", tl!("Quality"), f64::from(*quality), 0.0..=f64::from(MAX_QUALITY)).step(1.0).show(ui);
+                    if let Some(v) = edit.event.as_ref().and_then(|e| e.value()).copied() {
+                        *quality = (v.round() as u8).min(MAX_QUALITY);
+                    }
+                    edit
+                });
             });
-            form.unlabelled(|ui| {
-                let edit = Slider::new("jpeg-quality-slider", tl!("Quality"), f64::from(*quality), 0.0..=f64::from(MAX_QUALITY)).step(1.0).show(ui);
-                if let Some(v) = edit.event.as_ref().and_then(|e| e.value()).copied() {
-                    *quality = (v.round() as u8).min(MAX_QUALITY);
-                }
-                edit
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            craft_ui::composites::SectionLabel::new(tl!("Format Options")).show(ui);
+            ui.indent("jpeg-options-format", |ui| {
+                _ = RadioGroup::new("jpeg-options-format", tl!("Format Options"), format)
+                    .item(JpegFormat::Baseline, tl!("Baseline (\"Standard\")"))
+                    .item(JpegFormat::Optimized, tl!("Baseline Optimized"))
+                    .item(JpegFormat::Progressive, tl!("Progressive"))
+                    .show(ui);
             });
         });
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        craft_ui::composites::SectionLabel::new(tl!("Format Options")).show(ui);
-        ui.indent("jpeg-options-format", |ui| {
-            _ = RadioGroup::new("jpeg-options-format", tl!("Format Options"), format)
-                .item(JpegFormat::Baseline, tl!("Baseline (\"Standard\")"))
-                .item(JpegFormat::Optimized, tl!("Baseline Optimized"))
-                .item(JpegFormat::Progressive, tl!("Progressive"))
-                .show(ui);
-        });
-    });
     (p.quality, p.format) = (values.0.min(MAX_QUALITY), values.1);
     let outcome = answer.outcome;
     let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));
