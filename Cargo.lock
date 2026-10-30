@@ -1350,17 +1350,17 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 
 [[package]]
 name = "craft-fonts-build"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 
 [[package]]
 name = "craft-i18n"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "fixed_decimal",
  "icu_decimal",
@@ -1383,7 +1383,7 @@ dependencies = [
 [[package]]
 name = "craft-jpeg"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "thiserror 2.0.21",
 ]
@@ -1391,7 +1391,7 @@ dependencies = [
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "craft-winprint-gdi",
  "log",
@@ -1405,7 +1405,7 @@ dependencies = [
 [[package]]
 name = "craft-theme"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "ecolor",
  "serde_json",
@@ -1414,7 +1414,7 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "craft-fonts-build",
  "craft-i18n",
@@ -1440,7 +1440,7 @@ dependencies = [
 [[package]]
 name = "craft-ui-macros"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1450,7 +1450,7 @@ dependencies = [
 [[package]]
 name = "craft-update"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=384f0dbd4a81f669f67e21a11a6e4dce83f50d4b#384f0dbd4a81f669f67e21a11a6e4dce83f50d4b"
+source = "git+https://github.com/aiongg/craft-libs?rev=c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc#c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc"
 dependencies = [
  "chrono",
  "dunce",
