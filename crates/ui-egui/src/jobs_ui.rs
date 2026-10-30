@@ -655,17 +655,17 @@ fn print_status_progress(app: &PhotocraftApp, ui: &mut egui::Ui, j: &JobInfo) {
     let t = Tokens::get(ui.ctx());
     let (bar_w, bar_h) = if t.pro { (120.0, 6.0) } else { (140.0, 6.0) };
     let more = app.session.jobs().len().saturating_sub(1);
+    let label = if more > 0 { format!("{} (+{more})", tl!(&j.label)) } else { tl!(&j.label).to_owned() };
+    ui.label(RichText::new(label).color(t.text_dim).size(12.0));
+    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
+    bar(ui, br, shown_fraction(j), &t);
+    ui.label(RichText::new(percent(j)).color(t.text_dim).size(11.5).monospace());
     let (xr, xresp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
     if xresp.hovered() {
         ui.painter().rect_filled(xr, t.radius_sm, t.hover);
     }
     crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_dim });
     xresp.on_hover_text(tl!("Manage submitted jobs in the system print queue"));
-    ui.label(RichText::new(percent(j)).color(t.text_dim).size(11.5).monospace());
-    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
-    bar(ui, br, shown_fraction(j), &t);
-    let label = if more > 0 { format!("{} (+{more})", tl!(&j.label)) } else { tl!(&j.label).to_owned() };
-    ui.label(RichText::new(label).color(t.text_dim).size(12.0));
 }
 
 /// Progress that has been reported, or `None` (indeterminate) while it's still 0.
@@ -707,24 +707,24 @@ pub fn status_progress(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         print_status_progress(app, ui, &j);
         return;
     }
-    // Right to left: ×, percentage, bar, label.
-    let (xr, xresp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
-    if xresp.hovered() {
-        ui.painter().rect_filled(xr, t.radius_sm, t.hover);
-    }
-    crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_dim });
-    let xresp = xresp.on_hover_text(tl!("Cancel (Esc)"));
-    if !saving {
-        ui.label(RichText::new(percent(&j)).color(t.text_dim).size(11.5).monospace());
-    }
-    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
-    bar(ui, br, shown_fraction(&j), &t);
+    // In reading order: label, bar, percentage, ×.
     let name = if saving { saving_percent(&j) } else { tl!(&j.label).to_owned() };
     let label = if more > 0 { format!("{name} (+{more})") } else { name };
     let resp = ui.label(RichText::new(label).color(t.text_dim).size(12.0));
     if saving {
         resp.on_hover_text(tl!(&j.label));
     }
+    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
+    bar(ui, br, shown_fraction(&j), &t);
+    if !saving {
+        ui.label(RichText::new(percent(&j)).color(t.text_dim).size(11.5).monospace());
+    }
+    let (xr, xresp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
+    if xresp.hovered() {
+        ui.painter().rect_filled(xr, t.radius_sm, t.hover);
+    }
+    crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_dim });
+    let xresp = xresp.on_hover_text(tl!("Cancel (Esc)"));
     if xresp.clicked() {
         cancel(app, j.id);
     }

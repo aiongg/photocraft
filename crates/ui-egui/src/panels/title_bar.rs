@@ -75,7 +75,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// the library's record of the direction is set here, not the style flag `apply` also sets.
 // TODO(library): `craft_ui::direction` needs a way to set the direction without the style flag
 // (or PhotoCraft adopts it), so this bridge can go.
-fn sync_library_direction(ctx: &egui::Context) {
+pub(super) fn sync_library_direction(ctx: &egui::Context) {
     use craft_ui::direction::{Direction, HasDirection as _};
     let want = if crate::direction::is_rtl() { Direction::Rtl } else { Direction::Ltr };
     if ctx.direction() != want {

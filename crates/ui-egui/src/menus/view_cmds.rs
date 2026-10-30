@@ -27,8 +27,6 @@ pub use dialogs::{form_body, form_keys, reset_form};
 #[cfg(test)]
 use dispatch::is_enabled_with_engine;
 pub use dispatch::{checked, handles, invoke, is_enabled};
-#[cfg(test)]
-use options::screen_mode_commands;
 pub use options::{persist, pixel_aspect_ratio, restore};
 
 /// View › Show flags (Photoshop defaults).

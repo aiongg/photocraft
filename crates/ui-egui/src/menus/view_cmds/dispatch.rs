@@ -1,6 +1,6 @@
 use super::arrange::{arrange, fit_layers};
 use super::dialogs::front;
-use super::options::{panel_state, panel_tab, pixel_aspect_ratio, screen_mode_commands, show_slot, snap_slot, was_maximized_id};
+use super::options::{panel_state, panel_tab, pixel_aspect_ratio, screen_mode, show_slot, snap_slot};
 use super::{FONT_PREVIEW, LANGUAGE, LAYOUTS, PIXEL_ASPECTS, PhotocraftApp, SCREEN_MODES, Show, SnapTo, Value, json};
 
 /// Ids handled here (live menu items).
@@ -325,14 +325,10 @@ fn run(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p: &Value) -> Res
             k
         };
         o.screen_mode = next.to_string();
-        // Tab's view of the chrome (#6760) lasts only while in Full Screen Mode.
-        app.ui.panels.full_screen_chrome = false;
-        // Both full-screen modes take the whole display; the menu bar stays in the first.
-        let (full_screen, maximized) = ctx.input(|i| (i.viewport().fullscreen.unwrap_or(false), i.viewport().maximized.unwrap_or(false)));
-        let was_maximized = ctx.data(|d| d.get_temp::<bool>(was_maximized_id())).unwrap_or(false);
-        let (commands, was_maximized) = screen_mode_commands(cfg!(target_os = "windows"), full_screen, maximized, was_maximized, next);
-        ctx.data_mut(|d| d.insert_temp(was_maximized_id(), was_maximized));
-        for command in commands {
+        // Both full-screen modes take the whole display; the menu bar stays in the first. The
+        // window commands also end the Tab reveal of Full Screen Mode (#6760).
+        let window = crate::PhotocraftApp::window_key();
+        for command in craft_ui::shell::full_screen_commands(ctx, &window, screen_mode(next), cfg!(target_os = "windows")) {
             ctx.send_viewport_cmd(command);
         }
         return Ok(json!({"screenMode": next}));

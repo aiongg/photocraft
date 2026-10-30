@@ -19,6 +19,7 @@ mod ime;
 mod input;
 mod prefs;
 mod screenshot;
+mod shell;
 mod targets;
 mod thumbs;
 mod view;
@@ -234,6 +235,11 @@ impl eframe::App for PhotocraftApp {
         // (maximize, restore, …): take it off again before the frame is laid out (#2246).
         if let Some(window_frame) = self.services.window_frame.as_mut() {
             window_frame();
+        }
+        // In Full Screen Mode Tab reveals or hides the chrome (#6760) when the key still runs
+        // Show/Hide All Panels and no control has the keyboard.
+        if self.ui.view.hides_chrome() && self.tab_runs_toggle_panels(raw_input) && craft_ui::shell::take_tab_toggle(ctx, raw_input) {
+            craft_ui::shell::AppShell::toggle_reveal(ctx, &Self::window_key());
         }
         // Native menu key equivalents become the key presses they were (see `native_menu`).
         if let Some(menu) = self.services.native_menu.as_mut() {

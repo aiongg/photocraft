@@ -81,13 +81,19 @@ pub(super) fn tool_flyout_release(row: Rect, pointer: Option<Pos2>, released: bo
     released && from_button && pointer.is_some_and(|p| row.contains(p))
 }
 
+/// The toolbar's width: one column, or two when the header chevron asks for them.
+pub fn toolbar_width(pro: bool, double: bool) -> f32 {
+    let (w1, bx) = if pro { (40.0, 30.0) } else { (50.0, 36.0) };
+    if double { w1 + bx + 2.0 } else { w1 }
+}
+
 pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
-    let (w1, bx, m) = if t.pro { (40.0, 30.0, 5i8) } else { (50.0, 36.0, 7i8) };
+    let (bx, m) = if t.pro { (30.0, 5i8) } else { (36.0, 7i8) };
     let sections = visible_sections(&app.session.prefs().toolbar.hidden);
     // Two columns when the header chevron asks for them; a column that doesn't fit scrolls.
     let double = app.ui.panels.toolbar_double;
-    let w = if double { w1 + bx + 2.0 } else { w1 };
+    let w = toolbar_width(t.pro, double);
     crate::direction::start_panel("toolbar")
         .resizable(false)
         .exact_size(w)

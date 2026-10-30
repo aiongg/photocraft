@@ -1,7 +1,7 @@
 //! Dock layout tests (#88): fixed group heights, splitters, collapse, reorder, persistence.
 
 use egui::{Modifiers, PointerButton, Pos2, Rect, vec2};
-use egui_kittest::Harness;
+use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::json;
 
 use super::*;
@@ -623,46 +623,61 @@ fn tab_in_full_screen_shows_and_hides_the_chrome_and_leaving_restores_the_panels
     // #6760: Full Screen Mode starts with the chrome hidden; Tab shows the menu bar and panels over
     // the canvas, Tab again hides them. Tab there never touches the panels' own state, so leaving
     // Full Screen brings them back exactly as they were, however many Tabs were pressed.
-    let (mut app, _, _) = app_with_layers();
-    let ctx = egui::Context::default();
-    let run = |app: &mut PhotocraftApp, id: &str| crate::menus::invoke(app, &ctx, id, json!({})).unwrap();
-    let state = |app: &PhotocraftApp| {
-        let p = &app.ui.panels;
+    let (app, _, _) = app_with_layers();
+    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                app.shell(ui);
+            }
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
+    h.run_steps(4);
+    let ctx = h.ctx.clone();
+    let window = PhotocraftApp::window_key();
+    let run = |h: &mut Harness<'static, PhotocraftApp>, id: &str| {
+        crate::menus::invoke(h.state_mut(), &ctx, id, json!({})).unwrap();
+        h.run_steps(3);
+    };
+    let state = |h: &Harness<'static, PhotocraftApp>| {
+        let p = &h.state().ui.panels;
         (p.toolbar, p.options_bar, p.dock, p.hidden_by_tab)
     };
+    let revealed = |h: &Harness<'static, PhotocraftApp>| craft_ui::shell::AppShell::reveal_active(&h.ctx, &window);
     // Before entering: the options bar hidden by hand, then everything hidden by Tab (outside Full Screen).
     for (hide_by_hand, tab_first) in [(false, false), (true, false), (false, true)] {
-        app.ui.panels = crate::state::Panels::default();
-        app.ui.panels.options_bar = !hide_by_hand;
+        h.state_mut().ui.panels = crate::state::Panels::default();
+        h.state_mut().ui.panels.options_bar = !hide_by_hand;
+        h.run_steps(2);
         if tab_first {
-            run(&mut app, "window.togglePanels");
+            run(&mut h, "window.togglePanels");
         }
-        let before = state(&app);
-        run(&mut app, "view.screenMode.fullScreen");
-        assert!(!app.ui.panels.full_screen_chrome, "hidden on entry");
-        run(&mut app, "window.togglePanels");
-        assert!(app.ui.panels.full_screen_chrome, "Tab shows the chrome");
-        assert_eq!(state(&app), before, "Tab in Full Screen leaves the panels alone");
-        run(&mut app, "view.screenMode.standard");
-        assert!(!app.ui.panels.full_screen_chrome);
-        assert_eq!(state(&app), before, "one Tab: restored as before entering");
-        run(&mut app, "view.screenMode.fullScreen");
-        run(&mut app, "window.togglePanels");
-        run(&mut app, "window.togglePanels");
-        assert!(!app.ui.panels.full_screen_chrome, "Tab twice hides the chrome again");
-        assert_eq!(state(&app), before);
-        run(&mut app, "view.screenMode.standard");
-        assert_eq!(state(&app), before, "two Tabs: restored as before entering");
+        let before = state(&h);
+        run(&mut h, "view.screenMode.fullScreen");
+        assert!(!revealed(&h), "hidden on entry");
+        assert_eq!(h.query_all_by_label("Toolbar").count(), 0, "no tool rail on entry");
+        run(&mut h, "window.togglePanels");
+        assert!(revealed(&h), "Tab shows the chrome");
+        assert!(h.query_all_by_label("Toolbar").count() > 0, "the tool rail shows");
+        assert_eq!(state(&h), before, "Tab in Full Screen leaves the panels alone");
+        run(&mut h, "view.screenMode.standard");
+        assert!(!revealed(&h));
+        assert_eq!(state(&h), before, "one Tab: restored as before entering");
+        run(&mut h, "view.screenMode.fullScreen");
+        run(&mut h, "window.togglePanels");
+        run(&mut h, "window.togglePanels");
+        assert!(!revealed(&h), "Tab twice hides the chrome again");
+        assert_eq!(state(&h), before);
+        run(&mut h, "view.screenMode.standard");
+        assert_eq!(state(&h), before, "two Tabs: restored as before entering");
     }
     // Entering again starts hidden, even when the last visit left the chrome shown.
-    run(&mut app, "view.screenMode.fullScreen");
-    run(&mut app, "window.togglePanels");
-    run(&mut app, "view.screenMode.standard");
-    run(&mut app, "view.screenMode.fullScreen");
-    assert!(!app.ui.panels.full_screen_chrome);
-    // The flag is not saved.
-    let v = serde_json::to_value(&app.ui.panels).unwrap();
-    assert!(v.get("full_screen_chrome").is_none());
+    run(&mut h, "view.screenMode.fullScreen");
+    run(&mut h, "window.togglePanels");
+    run(&mut h, "view.screenMode.standard");
+    run(&mut h, "view.screenMode.fullScreen");
+    assert!(!revealed(&h));
 }
 
 /// #2726: the Navigator sizes its own preview to the group (no outer scroll area, so no scroll

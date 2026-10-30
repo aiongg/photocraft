@@ -1,14 +1,11 @@
 //! Photoshop 2026 window chrome details: the status bar's info field and its "Show" menu, and the
 //! Home button at the start of the options bar.
 
-use craft_ui::theme::StrokeExt;
-use egui::{RichText, Sense, Stroke, vec2};
 use photocraft_doc::{Document, LayerContent};
 use serde::{Deserialize, Serialize};
 
 use crate::render_path::CpuReason;
-use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{PhotocraftApp, widgets};
 
 /// Shell-only chrome state (serialised with the UI state, so `ui.inspect` reports it).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -140,13 +137,42 @@ fn profile_name(doc: &Document) -> String {
     name.to_owned()
 }
 
-/// Status bar body (Pro): zoom %, the chosen info field and its ">" menu, then status messages.
+/// The zoom field of the status bar: a [`NumberField`] that scrubs past the screen edge in full
+/// screen, in the field cell of the bar.
+pub fn zoom_field(app: &mut PhotocraftApp, ui: &mut egui::Ui, i: usize) {
+    use craft_ui::controls::{ControlSize, NumberField};
+    use craft_ui::localized::{LocaleNumbers, Unit};
+    let numbers = LocaleNumbers::of(ui);
+    let range = crate::zoom_levels::percent_range(&app.ui.views[i]);
+    let pct = f64::from(app.ui.views[i].zoom * 100.0);
+    craft_ui::patterns::StatusBar::field(ui, |ui| {
+        let edit = NumberField::new("status-zoom", tl!("Zoom"), pct, &numbers)
+            .range(f64::from(*range.start())..=f64::from(*range.end()))
+            .decimals(0..=1)
+            .unit(Unit::new("{n}%"))
+            .scrub_wrap(true)
+            .size(ControlSize::Sm)
+            .show(ui);
+        if let Some(pct) = edit.event.as_ref().and_then(|e| e.value()).copied() {
+            let view = &mut app.ui.views[i];
+            view.zoom = crate::zoom_levels::clamp(pct as f32 / 100.0, view.doc_size);
+            view.zoom_animating = false;
+            view.zoom_anchor = None;
+            view.fit_pending = false;
+        }
+    });
+}
+
+/// Status bar leading group (Pro): zoom %, the chosen info field and its ">" menu, then status
+/// messages.
 pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
+    use craft_ui::controls::ControlSize;
+    use craft_ui::menu::{MenuEntry, MenuItem, PressMenu};
+    use craft_ui::patterns::StatusBar;
     let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) else {
-        ui.label(RichText::new(tl!("No document")).color(t.text_dim));
+        StatusBar::info(ui, tl!("No document"));
         // A command run with no document open still reports here (#1567: File › Automate › Batch).
-        status_message(app, ui, &t);
+        status_message(app, ui);
         return;
     };
     let text = status_info_text_with_units(
@@ -156,38 +182,15 @@ pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         &profile_name(&st.doc),
         &app.session.prefs().units_and_rulers,
     );
-    let mut pct = app.ui.views[i].zoom * 100.0;
-    let control_h = crate::panels::status_bar_heights(&t).1;
-    if widgets::compact_wrapping_value_field(ui, &mut pct, crate::zoom_levels::percent_range(&app.ui.views[i]), "%", vec2(64.0, control_h))
-        .accessible_name(tl!("Zoom"))
-        .changed()
-    {
-        app.ui.views[i].zoom = crate::zoom_levels::clamp(pct / 100.0, app.ui.views[i].doc_size);
-        app.ui.views[i].zoom_animating = false;
-        app.ui.views[i].zoom_anchor = None;
-        app.ui.views[i].fit_pending = false;
+    zoom_field(app, ui, i);
+    StatusBar::info(ui, tl!(&text));
+    let button = StatusBar::menu_button(ui, tl!("Show"));
+    let entries: Vec<MenuEntry<usize>> =
+        STATUS_INFO.iter().enumerate().map(|(n, (key, label))| MenuItem::new(*label, n).radio(app.ui.chrome.status_info == *key).into()).collect();
+    if let Some(n) = PressMenu::new(&entries).size(ControlSize::Sm).show(ui, &button).chosen {
+        app.ui.chrome.status_info = STATUS_INFO[n].0.to_string();
     }
-    ui.add_space(craft_ui::theme::scale::Space::S12.px());
-    ui.label(RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
-    let (r, resp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
-    if resp.hovered() {
-        ui.painter().rect_filled(r, t.radius_sm, t.hover);
-    }
-    // Points along the bar, away from the zoom field.
-    icons::paint(ui, r, if crate::direction::is_rtl() { "chevron-left" } else { "chevron-right" }, 11.0, t.text_dim);
-    let resp = resp.on_hover_text(tl!("Show"));
-    egui::Popup::menu(&resp).show(|ui| {
-        crate::widgets::style_spectrum_popup_menu(ui);
-        ui.set_min_width(200.0);
-        for (key, label) in STATUS_INFO {
-            let on = app.ui.chrome.status_info == *key;
-            if ui.add(egui::Button::selectable(on, *label)).clicked() {
-                app.ui.chrome.status_info = (*key).to_string();
-                ui.close();
-            }
-        }
-    });
-    status_message(app, ui, &t);
+    status_message(app, ui);
 }
 
 /// What the status bar says about the active document's render path: its label, tooltip and
@@ -224,22 +227,16 @@ pub(crate) fn render_path_label(app: &PhotocraftApp) -> Option<(&'static str, St
 /// "CPU Rendering", opens Help › System Info.
 pub fn render_path_status(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some((label, tip, command)) = render_path_label(app) else { return };
-    let t = Tokens::get(ui.ctx());
-    let resp = ui.add(egui::Label::new(RichText::new(label).color(t.warning).size(12.0)).sense(Sense::click())).on_hover_text(tip);
+    let resp = craft_ui::patterns::StatusBar::warning(ui, label).on_hover_text(tip);
     if resp.clicked() {
         crate::shortcut_dispatch::dispatch(app, ui.ctx(), command);
     }
 }
 
 /// The latest status message after a separator, in the warning colour when it is an error.
-fn status_message(app: &PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
-    if app.ui.status.is_empty() {
-        return;
-    }
-    let (r, _) = ui.allocate_exact_size(vec2(17.0, 16.0), Sense::hover());
-    ui.painter().line_segment([r.center_top(), r.center_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+pub(crate) fn status_message(app: &PhotocraftApp, ui: &mut egui::Ui) {
     let is_err = app.ui.status_error || app.ui.status.starts_with("Couldn");
-    ui.label(RichText::new(&app.ui.status).color(if is_err { t.warning } else { t.text_faint }));
+    craft_ui::patterns::StatusBar::message(ui, &app.ui.status, is_err);
 }
 
 /// Home button at the very start of Photoshop 2026's options bar: toggles the Home (start)
@@ -250,7 +247,11 @@ pub fn home_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let on = app.ui.chrome.shows_home(n, auto);
     // With no documents and auto-show on, Home can't be dismissed (there's nothing behind it).
     let can_toggle = n > 0 || !auto;
-    if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Home, tl!("Home")).size(craft_ui::controls::ControlSize::Md).selected(on && can_toggle)).clicked() && can_toggle {
+    if ui
+        .add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Home, tl!("Home")).size(craft_ui::controls::ControlSize::Md).selected(on && can_toggle))
+        .clicked()
+        && can_toggle
+    {
         app.ui.chrome.home = if on { None } else { Some(n) };
     }
 }
@@ -298,6 +299,7 @@ pub fn crop_ratio(key: &str, doc_w: f64, doc_h: f64) -> Option<(f64, f64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::vec2;
     use serde_json::json;
 
     fn doc() -> Document {

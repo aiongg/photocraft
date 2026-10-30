@@ -1,44 +1,13 @@
 use super::{Map, PhotocraftApp, Show, SnapTo, Value, ViewOptions};
 
-/// Whether the window was maximized when a screen mode took it full screen (egui temp data).
-pub(super) fn was_maximized_id() -> egui::Id {
-    egui::Id::unique("pc-full-screen-was-maximized")
-}
-
-/// The window commands for switching to screen mode `next`, and whether the window should be
-/// maximized again when it leaves full screen. With `keep_apart` (Windows), full screen and
-/// maximized never overlap: a maximized window is un-maximized before it goes full screen and
-/// maximized again after it leaves. Why: winit on Windows keeps the maximized style on a window
-/// that goes full screen from maximized, and the shell then draws the taskbar black instead of
-/// hiding it; on the way out the window stays maximized at the monitor's full size, over the
-/// taskbar (#3550, #4018, #4230). [OBSERVED 2026-10-12, Windows 11, eframe 0.36.2, winit 0.30.13,
-/// a minimal eframe window; un-maximizing first gave a clean full screen and a work-area maximize.]
-///
-/// WORKAROUND(winit#4756): remove `keep_apart` once the winit in Cargo.lock (0.30.13 today) has
-/// the fix; check first with https://gist.github.com/aweussom/3f80ffb82df7f0102341858afbbffd9b
-/// (`--max`, no `--fix`: full screen must have no WS_MAXIMIZE and hide the taskbar).
-pub(super) fn screen_mode_commands(
-    keep_apart: bool,
-    full_screen: bool,
-    maximized: bool,
-    was_maximized: bool,
-    next: &str,
-) -> (Vec<egui::ViewportCommand>, bool) {
-    let want = next != "standard";
-    let mut commands = Vec::new();
-    let mut remember = was_maximized;
-    if keep_apart && want && !full_screen && maximized {
-        commands.push(egui::ViewportCommand::Maximized(false));
-        remember = true;
+/// The shell's screen mode for a `view.screenMode.*` key.
+pub(super) fn screen_mode(key: &str) -> craft_ui::shell::ScreenMode {
+    use craft_ui::shell::ScreenMode;
+    match key {
+        "fullScreen" => ScreenMode::FullScreen,
+        "fullScreenWithMenuBar" => ScreenMode::FullScreenWithMenuBar,
+        _ => ScreenMode::Standard,
     }
-    commands.push(egui::ViewportCommand::Fullscreen(want));
-    if !want {
-        if keep_apart && full_screen && remember {
-            commands.push(egui::ViewportCommand::Maximized(true));
-        }
-        remember = false;
-    }
-    (commands, remember)
 }
 
 /// Pixel aspect ratio (width / height of a pixel) of a preset id.

@@ -690,7 +690,7 @@ fn invoke_window_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str)
                 Some(app.run("prefs.set", json!({"values": {"interface.language": code}})))
             }
         }
-        "window.togglePanels" => Some(toggle_panels(app)),
+        "window.togglePanels" => Some(toggle_panels(app, ctx)),
         "window.nextDocument" | "window.previousDocument" => Some((|| {
             let count = app.session.documents().len();
             let active = app.session.active_index().ok_or("no document open")?;
@@ -712,11 +712,11 @@ fn invoke_window_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str)
     }
 }
 
-fn toggle_panels(app: &mut PhotocraftApp) -> Result<Value, String> {
+fn toggle_panels(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<Value, String> {
     if app.ui.view.hides_chrome() {
-        // Full Screen Mode: Tab only shows or hides the chrome for now (#6760); the panels'
-        // own state, `hidden_by_tab` included, stays as it was before entering.
-        app.ui.panels.full_screen_chrome = !app.ui.panels.full_screen_chrome;
+        // Full Screen Mode: Tab only reveals or hides the chrome (#6760); the panels' own state,
+        // `hidden_by_tab` included, stays as it was before entering.
+        craft_ui::shell::AppShell::toggle_reveal(ctx, &PhotocraftApp::window_key());
         return Ok(Value::Null);
     }
     let panels = &mut app.ui.panels;

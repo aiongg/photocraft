@@ -1,74 +1,55 @@
-use super::{PhotocraftApp, RichText, Tokens, label, vec2, widgets};
+use super::PhotocraftApp;
+use craft_ui::patterns::StatusBar;
 
 // ----------------------------------------------------------------------------- status bar
 
-/// The status bar's height and the height of the controls in it (zoom field, Fit), which leaves
-/// them an even margin above and below inside the bar (#2823).
-pub fn status_bar_heights(t: &Tokens) -> (f32, f32) {
-    if t.pro { (24.0, 18.0) } else { (30.0, 22.0) }
-}
-
+/// The contents of the shell's status slot: a [`StatusBar`] with the zoom field, the document
+/// info and the message in its leading group, and the render path, background jobs and Fit in its
+/// trailing group.
 pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
-    egui::Panel::bottom("status_bar")
-        .exact_size(status_bar_heights(&t).0)
-        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(10, 0)))
-        .show(ui, |ui| {
-            let control_h = status_bar_heights(&t).1;
-            // Read from the right in a right-to-left UI, with the trailing group at the left.
-            crate::direction::horizontal_centered(ui, |ui| {
-                if t.pro {
-                    crate::chrome_ui::status_bar_pro(app, ui);
-                    // Background job progress with Cancel, at the far end (#210).
-                    ui.with_layout(crate::direction::trailing(), |ui| {
-                        crate::jobs_ui::status_progress(app, ui);
-                        crate::background_redraw::status(app, ui);
-                        crate::chrome_ui::render_path_status(app, ui);
-                    });
-                    return;
-                }
-                if let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) {
-                    let (w, h, mode, bits, layers) =
-                        (st.doc.size.width, st.doc.size.height, crate::canvas::mode_label(&st.doc), st.doc.depth.bits(), st.doc.layer_count());
-                    let mut pct = app.ui.views[i].zoom * 100.0;
-                    if widgets::compact_wrapping_value_field(ui, &mut pct, crate::zoom_levels::percent_range(&app.ui.views[i]), "%", vec2(78.0, control_h))
-                        .accessible_name(tl!("Zoom"))
-                        .changed()
-                    {
-                        app.ui.views[i].zoom = crate::zoom_levels::clamp(pct / 100.0, app.ui.views[i].doc_size);
-                        app.ui.views[i].zoom_animating = false;
-                        app.ui.views[i].zoom_anchor = None;
-                        app.ui.views[i].fit_pending = false;
-                    }
-                    widgets::vline(ui, 16.0);
-                    label(ui, &crate::i18n::fmt(tl!("{mode} Color · {bits} bit"), &[("mode", mode), ("bits", &bits.to_string())]));
-                    widgets::vline(ui, 16.0);
-                    label(ui, &format!("{w} × {h} px"));
-                    widgets::vline(ui, 16.0);
-                    label(ui, &crate::i18n::trn(crate::i18n::current(), layers as u64, "{n} layer", "{n} layers"));
-                } else {
-                    label(ui, tl!("No document"));
-                }
-                if !app.ui.status.is_empty() {
-                    widgets::vline(ui, 16.0);
-                    let is_err = app.ui.status_error || app.ui.status.starts_with("Couldn");
-                    ui.label(RichText::new(&app.ui.status).color(if is_err { t.warning } else { t.text_faint }));
-                }
-                ui.with_layout(crate::direction::trailing(), |ui| {
-                    if app.session.active().is_some()
-                        && !t.pro
-                        && ui.add(craft_ui::controls::Button::new(tl!("Fit")).size(craft_ui::controls::ControlSize::Sm)).clicked()
-                        && let Some(i) = app.session.active_index()
-                    {
-                        app.ui.views[i].fit_pending = true;
-                    }
-                    if app.session.has_jobs() {
-                        ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                        crate::jobs_ui::status_progress(app, ui);
-                    }
-                    crate::background_redraw::status(app, ui);
-                    crate::chrome_ui::render_path_status(app, ui);
-                });
-            });
+    let pro = crate::theme::Tokens::get(ui.ctx()).pro;
+    // The bar mirrors itself from the library's direction, which the title bar normally sets.
+    super::title_bar::sync_library_direction(ui.ctx());
+    let shared = std::cell::RefCell::new(&mut *app);
+    StatusBar::new("status_bar").label(tl!("Status bar")).show(ui, |bar| {
+        bar.leading(|ui| {
+            let app = &mut **shared.borrow_mut();
+            if pro {
+                crate::chrome_ui::status_bar_pro(app, ui);
+                return;
+            }
+            if let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) {
+                let (w, h, mode, bits, layers) =
+                    (st.doc.size.width, st.doc.size.height, crate::canvas::mode_label(&st.doc), st.doc.depth.bits(), st.doc.layer_count());
+                crate::chrome_ui::zoom_field(app, ui, i);
+                StatusBar::info(ui, &crate::i18n::fmt(tl!("{mode} Color · {bits} bit"), &[("mode", mode), ("bits", &bits.to_string())]));
+                StatusBar::separator(ui);
+                StatusBar::info(ui, &format!("{w} × {h} px"));
+                StatusBar::separator(ui);
+                StatusBar::info(ui, &crate::i18n::trn(crate::i18n::current(), layers as u64, "{n} layer", "{n} layers"));
+            } else {
+                StatusBar::info(ui, tl!("No document"));
+            }
+            crate::chrome_ui::status_message(app, ui);
         });
+        bar.trailing(|ui| {
+            let app = &mut **shared.borrow_mut();
+            crate::chrome_ui::render_path_status(app, ui);
+            crate::background_redraw::status(app, ui);
+            if pro {
+                // Background job progress with Cancel, at the far end (#210).
+                crate::jobs_ui::status_progress(app, ui);
+                return;
+            }
+            if app.session.has_jobs() {
+                crate::jobs_ui::status_progress(app, ui);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            }
+            if app.session.active().is_some() && ui.add(craft_ui::controls::Button::new(tl!("Fit")).size(craft_ui::controls::ControlSize::Sm)).clicked() {
+                if let Some(i) = app.session.active_index() {
+                    app.ui.views[i].fit_pending = true;
+                }
+            }
+        });
+    });
 }
