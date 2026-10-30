@@ -581,7 +581,7 @@ mod tests {
         let mut h = Harness::builder().with_size(vec2(900.0, 40.0)).build_ui_state(|ui, app| status_bar_pro(app, ui), app);
         h.run_steps(2);
         assert!(h.query_by_label("No document").is_some());
-        assert!(h.query_by_label(&e).is_some(), "status bar shows {e:?}");
+        assert!(h.query_all_by_label(&e).count() > 0, "status bar shows {e:?}");
     }
 
     #[test]

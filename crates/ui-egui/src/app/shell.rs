@@ -41,9 +41,7 @@ impl PhotocraftApp {
             .title(Slot::new("title").visible(panels_on.menu_bar).reveal_if(panels_on.menu_bar), |ui| panels::title_bar(&mut app.borrow_mut(), ui))
             .top(Slot::new("options").visible(panels_on.options_bar).reveal().height(options_height), |ui| panels::options_bar(&mut app.borrow_mut(), ui))
             .bottom(Slot::new("status").visible(panels_on.status_bar), |ui| panels::status_bar(&mut app.borrow_mut(), ui))
-            .start(Slot::new("tools").visible(panels_on.toolbar).reveal().width(tools_width).label(tl!("Toolbar")), |ui| {
-                panels::toolbar(&mut app.borrow_mut(), ui)
-            })
+            .start(Slot::new("tools").visible(panels_on.toolbar).reveal().width(tools_width), |ui| panels::toolbar(&mut app.borrow_mut(), ui))
             .body_mode(mode)
             .backdrop(Some(pasteboard))
             .show(ui, |ui, cx| {

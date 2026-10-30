@@ -1515,8 +1515,9 @@ mod embedding_tests {
         h
     }
 
-    fn drawn(h: &egui_kittest::Harness<'_, PhotocraftApp>, panel: &str) -> bool {
-        egui::containers::panel::PanelState::load(&h.ctx, panel_state_id(&h.ctx, panel)).is_some()
+    /// The title bar is drawn when its menus are.
+    fn title_bar_drawn(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> bool {
+        h.query_by_label("File").is_some()
     }
 
     /// The rail is drawn inside the canvas panel, so its panel state is keyed under that panel's
@@ -1532,12 +1533,12 @@ mod embedding_tests {
         assert!(panels.rail && panels.menu_bar);
 
         let h = whole_app(true, true);
-        assert!(rail_drawn(&h) && drawn(&h, "title_bar"));
+        assert!(rail_drawn(&h) && title_bar_drawn(&h));
         assert!(h.query_by_label("File").is_some());
 
         let h = whole_app(false, false);
         assert!(!rail_drawn(&h), "the icon rail is drawn");
-        assert!(!drawn(&h, "title_bar"), "the title bar is drawn");
+        assert!(!title_bar_drawn(&h), "the title bar is drawn");
         assert!(h.query_by_label("File").is_none(), "the menus are drawn");
         assert!(crate::panel_docking::last_bodies(&h.ctx).iter().any(|(id, _)| id == "layers"), "the dock itself stays");
     }

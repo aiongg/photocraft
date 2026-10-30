@@ -6,7 +6,7 @@
 
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT as _, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -36,7 +36,7 @@ fn app_harness() -> Harness<'static, PhotocraftApp> {
 
 /// The notice's message (the status bar shows it too, on one line: the notice wraps it).
 fn notice_text(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
-    let rects: Vec<egui::Rect> = h.get_all_by_label(MESSAGE).map(|n| n.rect()).collect();
+    let rects: Vec<egui::Rect> = h.get_all_by_label(MESSAGE).filter(|n| n.accesskit_node().bounding_box().is_some()).map(|n| n.rect()).collect();
     rects.into_iter().max_by(|a, b| a.height().total_cmp(&b.height())).unwrap()
 }
 

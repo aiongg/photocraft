@@ -656,7 +656,7 @@ fn tab_in_full_screen_shows_and_hides_the_chrome_and_leaving_restores_the_panels
         let before = state(&h);
         run(&mut h, "view.screenMode.fullScreen");
         assert!(!revealed(&h), "hidden on entry");
-        assert_eq!(h.query_all_by_label("Toolbar").count(), 0, "no tool rail on entry");
+        assert!(h.query_all_by_label("Toolbar").count() == 0, "no tool rail on entry");
         run(&mut h, "window.togglePanels");
         assert!(revealed(&h), "Tab shows the chrome");
         assert!(h.query_all_by_label("Toolbar").count() > 0, "the tool rail shows");
