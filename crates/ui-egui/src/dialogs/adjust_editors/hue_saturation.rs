@@ -74,7 +74,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
     }
     ui.horizontal(|ui| {
         let opts: Vec<(usize, &str)> = std::iter::once((0, tl!("Master"))).chain(RANGE_LABELS.iter().enumerate().map(|(i, l)| (i + 1, *l))).collect();
-        ui.add_enabled_ui(!colorize, |ui| widgets::dropdown(ui, &format!("{range_id:?}"), tl!("Range"), &mut range, &opts, 120.0));
+        ui.add_enabled_ui(!colorize, |ui| craft_ui::controls::Select::new(&format!("{range_id:?}"), tl!("Range"), &mut range).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed());
     });
     ui.data_mut(|d| d.insert_temp(range_id, range));
     let mut e = Edit::default();
@@ -127,7 +127,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         e.add(sub);
     }
     let mut c = colorize;
-    if widgets::checkbox(ui, &mut c, tl!("Colorize")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Colorize"), &mut c).show(ui).response.changed() {
         v["colorize"] = json!(c);
         let h = num(v, "hue", 0.0);
         v["hue"] = json!(if c {

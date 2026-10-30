@@ -41,7 +41,7 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!("Colors")).color(t.color.text.muted.to_egui()));
         let opts: Vec<(usize, &str)> = RANGE_LABELS.iter().copied().enumerate().collect();
-        if widgets::dropdown(ui, &format!("selc-colors-{}", id.0), tl!("Color"), &mut range, &opts, 150.0) {
+        if craft_ui::controls::Select::new(&format!("selc-colors-{}", id.0), tl!("Color"), &mut range).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             ui.data_mut(|d| d.insert_temp(key, range));
         }
     });
@@ -259,7 +259,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
         }
     });
     let mut d = *dither;
-    if widgets::toggle(ui, &mut d, tl!("Dither")).changed() {
+    if craft_ui::controls::Switch::new(tl!("Dither"), &mut d).show(ui).response.changed() {
         params = Some(json!({"dither": d}));
     }
     if let Some(mut p) = params {

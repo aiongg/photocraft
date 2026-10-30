@@ -55,7 +55,7 @@ pub(super) fn brightness_contrast(ui: &mut egui::Ui, v: &mut Value) -> Edit {
     let lo = if legacy { -100.0 } else { -50.0 };
     let mut e = sliders(ui, v, &[("brightness", tl!("Brightness"), -150.0, 150.0, 0.0, "", None), ("contrast", tl!("Contrast"), lo, 100.0, 0.0, "", None)]);
     let mut l = legacy;
-    if widgets::checkbox(ui, &mut l, tl!("Use Legacy")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Use Legacy"), &mut l).show(ui).response.changed() {
         v["legacy"] = json!(l);
         if !l {
             v["contrast"] = json!(num(v, "contrast", 0.0).max(-50.0));
@@ -141,7 +141,7 @@ pub(super) fn color_balance(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
         v[key] = json!(vals.map(f32::round));
     }
     let mut pl = flag(v, "preserveLuminosity", true);
-    if widgets::checkbox(ui, &mut pl, tl!("Preserve Luminosity")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
         v["preserveLuminosity"] = json!(pl);
         e.add(Edit::discrete(true));
     }
@@ -167,7 +167,7 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
     ui.add_space(craft_ui::theme::scale::Space::S2.px());
     ui.horizontal(|ui| {
         let mut on = flag(v, "tint", false);
-        if widgets::checkbox(ui, &mut on, tl!("Tint")).changed() {
+        if craft_ui::controls::Checkbox::bool(tl!("Tint"), &mut on).show(ui).response.changed() {
             v["tint"] = json!(on);
             e.add(Edit::discrete(true));
         }
@@ -177,7 +177,7 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
             v["tintColor"] = json!(adjust_params::hex(c));
         }
         e.add(r);
-        if widgets::secondary_button(ui, tl!("Default"), 0.0).clicked() {
+        if ui.add(craft_ui::controls::Button::new(tl!("Default")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
             for (i, key) in HUE_RANGES.iter().enumerate() {
                 v[*key] = json!(adjust_params::BW_DEFAULTS[i]);
             }
@@ -206,7 +206,7 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         if preset.is_none() {
             opts.insert(0, ("custom".into(), "Custom"));
         }
-        let changed = ui.add_enabled_ui(!use_color, |ui| widgets::dropdown(ui, &format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel, &opts, 170.0)).inner;
+        let changed = ui.add_enabled_ui(!use_color, |ui| craft_ui::controls::Select::new(&format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()).inner;
         if changed && let Some(f) = PHOTO_FILTERS.iter().find(|f| f.0 == sel) {
             c = f.2.map(|x| f32::from(x) / 255.0);
             v["color"] = json!(adjust_params::hex(c));
@@ -226,7 +226,7 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
     ui.data_mut(|d| d.insert_temp(mode_id, use_color));
     e.add(sliders(ui, v, &[("density", tl!("Density"), 0.0, 100.0, 25.0, "%", None)]));
     let mut pl = flag(v, "preserveLuminosity", true);
-    if widgets::checkbox(ui, &mut pl, tl!("Preserve Luminosity")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
         v["preserveLuminosity"] = json!(pl);
         e.add(Edit::discrete(true));
     }
@@ -247,7 +247,7 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
     }
     ui.horizontal(|ui| {
         label(ui, tl!("Output Channel:"));
-        widgets::dropdown(ui, &format!("{out_id:?}"), tl!("Output Channel:"), &mut out, outs, 110.0);
+        craft_ui::controls::Select::new(&format!("{out_id:?}"), tl!("Output Channel:"), &mut out).rows(outs.len(), |i| outs[i].0.clone(), |i| tl!(outs[i].1)).show(ui).response.changed();
     });
     ui.data_mut(|d| d.insert_temp(out_id, out));
     let key = if mono { "gray" } else { ["red", "green", "blue"][out] };
@@ -273,7 +273,7 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
         v[key] = json!(row.map(f32::round));
     }
     let mut m = mono;
-    if widgets::checkbox(ui, &mut m, tl!("Monochrome")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Monochrome"), &mut m).show(ui).response.changed() {
         v["monochrome"] = json!(m);
         if m {
             v["gray"] = json!([40.0, 40.0, 20.0, 0.0]);
