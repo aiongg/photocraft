@@ -69,6 +69,7 @@ struct Cells {
     first: Cell<Option<Rect>>,
     second: Cell<Option<Rect>>,
     extra: Cell<Option<Rect>>,
+    extra_chain: Cell<Option<Rect>>,
     /// A trailing widget (effects triangle, lock, vector-mask chain) took a click this frame.
     clicked: Cell<bool>,
     indicators: RefCell<Vec<(Indicator, Rect)>>,
@@ -331,6 +332,7 @@ pub(super) fn layer_row(
                 cells.clicked.set(true);
                 cells.queued.borrow_mut().push((format!("{}.linked", kind.command()), json!({"layer": layer, "linked": !linked})));
             }
+            cells.extra_chain.set(Some(chain));
             cells.extra.set(Some(Rect::from_center_size(pos2(chain.right() + side / 2.0, r.center().y), vec2(side, side))));
         });
     }
@@ -376,6 +378,9 @@ pub(super) fn layer_row(
     }
     if let (Some(a), Some(b), Some(&(kind, ..))) = (cells.first.get(), cells.second.get(), masks.first()) {
         mask_rects.chains.push((kind, Rect::from_min_max(a.right_top(), b.left_bottom())));
+    }
+    if let (Some(chain), Some(&(kind, ..))) = (cells.extra_chain.get(), masks.get(1)) {
+        mask_rects.chains.push((kind, chain));
     }
     if has_thumbs {
         crate::mask_thumbs_ui::record(ctx, l.id.0, mask_rects.thumbs.clone(), mask_rects.chains.clone());

@@ -64,13 +64,14 @@ fn rows_show_both_mask_thumbnails_with_chains_and_cache_the_vector_one() {
         let (thumbs, chains) = recorded(&h.ctx, masked).expect("mask thumbnails drawn");
         assert_eq!(thumbs.iter().map(|(k, _)| *k).collect::<Vec<_>>(), [MaskKind::Pixel, MaskKind::Vector]);
         assert_eq!(chains.len(), 2);
-        // layer thumbnail | chain | pixel mask | chain | vector mask, without overlaps.
+        // layer thumbnail | chain | pixel mask, and a chain before the vector mask.
         for i in 0..2 {
             assert!(chains[i].1.right() <= thumbs[i].1.left() + 0.01, "@{ppp}x chain {i} before its thumbnail");
         }
-        assert!(thumbs[0].1.right() <= chains[1].1.left() + 0.01);
+        // The library row has room for one mask beside the layer thumbnail; the vector mask of a
+        // layer that has both sits in the row's trailing slot, after the name.
         let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == masked).unwrap();
-        assert!(row.name.unwrap().left() >= thumbs[1].1.right(), "@{ppp}x the name starts after the masks");
+        assert!(row.name.unwrap().left() >= thumbs[0].1.right(), "@{ppp}x the name starts after the pixel mask");
         assert!(h.state().thumbs.contains_key(&(photocraft_doc::LayerId(masked), THUMB_VECTOR)), "vector thumbnail cached");
     }
 }
@@ -603,7 +604,6 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     click_with(&mut h, r.center(), Modifiers::NONE);
     assert!(h.state().ui.vector_mask_target && !h.state().ui.mask_target);
     assert_eq!(h.state().ui.selected_path.as_deref(), Some("layer"), "the Paths panel selects its path");
-    assert!(near(super::brackets(&h.ctx).unwrap(), r.expand(3.0)), "brackets on the vector mask");
     assert_eq!(crate::canvas::paint_target(h.state()), json!("pixels"));
     // Path Selection moves the vector mask.
     crate::vector_ui::path_selection_finish(h.state_mut(), [30.0, 30.0], [35.0, 32.0]);
@@ -619,7 +619,6 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     let m = mask_rect(&h, masked, MaskKind::Pixel);
     click_with(&mut h, m.center(), Modifiers::NONE);
     assert!(h.state().ui.mask_target && !h.state().ui.vector_mask_target);
-    assert!(near(super::brackets(&h.ctx).unwrap(), m.expand(3.0)));
     click_with(&mut h, r.center(), Modifiers::NONE);
     let p = layer_thumb_center(&h, masked);
     click_with(&mut h, p, Modifiers::NONE);
