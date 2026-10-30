@@ -5,8 +5,16 @@
 //! appearance). Footer: previous / next comp, update, new, delete. Every action is a
 //! `layerComp.*` engine command; the selection is `UiState::layer_comp_selected`.
 
-use craft_ui::theme::StrokeExt;
-use egui::{Align2, Rect, Sense, Stroke, pos2, vec2};
+use std::cell::RefCell;
+
+use craft_ui::composites::PanelFooter;
+use craft_ui::controls::{ControlSize, IconButton};
+use craft_ui::edit::EditEvent;
+use craft_ui::icons::Icon;
+use craft_ui::list::{ListRow, RowEvent, ToggleColumn};
+use craft_ui::menu::{ContextMenu, MenuItem};
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use egui::{Rect, Sense, pos2, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -23,42 +31,6 @@ pub fn target(app: &PhotocraftApp) -> Option<u32> {
 /// Clear All Layer Comp Warnings as a separate command).
 fn clear_warning_action(comp: u32) -> (&'static str, Value) {
     ("layerComp.updateWarnings", json!({"clear": true, "comp": comp}))
-}
-
-/// The comp whose name is being edited in place, kept in egui's temp memory under its row id.
-#[derive(Clone)]
-struct RenameComp {
-    text: String,
-    focused: bool,
-}
-
-/// The in-place name field of a comp. Enter, Tab or clicking elsewhere returns the new name to
-/// commit; Escape cancels and keeps the old name.
-fn rename_field(ui: &mut egui::Ui, id: egui::Id, rect: Rect) -> Option<String> {
-    let mut r = ui.data(|d| d.get_temp::<RenameComp>(id))?;
-    ui.data_mut(|d| d.remove::<RenameComp>(id));
-    let te = ui.put(rect, egui::TextEdit::singleline(&mut r.text).id(id).font(egui::FontId::proportional(12.0))).accessible_name(tl!("Name"));
-    if !r.focused {
-        te.request_focus();
-        // Like Photoshop, the whole name starts selected so typing replaces it.
-        if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
-            let all = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(r.text.chars().count()));
-            state.cursor.set_char_range(Some(all));
-            state.store(ui.ctx(), id);
-        }
-        r.focused = true;
-        ui.data_mut(|d| d.insert_temp(id, r));
-        return None;
-    }
-    let (enter, tab, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab), i.key_pressed(egui::Key::Escape)));
-    if esc {
-        None
-    } else if enter || tab || te.lost_focus() || !te.has_focus() {
-        Some(r.text)
-    } else {
-        ui.data_mut(|d| d.insert_temp(id, r));
-        None
-    }
 }
 
 fn run(app: &mut PhotocraftApp, id: &str, p: Value) {
@@ -79,210 +51,175 @@ fn drop_index(from: usize, target: usize, after: bool) -> usize {
     if from < slot { slot - 1 } else { slot }
 }
 
+/// Whether the comp row for `rename` (keyed by document and comp) is open for a new name.
+fn renaming(ui: &egui::Ui, rename: egui::Id) -> bool {
+    ui.data(|d| d.get_temp::<bool>(rename)).unwrap_or(false)
+}
+
 pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        ui.label(egui::RichText::new(tl!("No document")).color(t.text_faint).size(11.5));
+        ui.weak(tl!("No document"));
         return;
     };
     let doc = st.doc.clone();
     let selected = target(app);
     let applied = doc.last_applied_comp;
-    let max_h = (ui.available_height() - 70.0).clamp(80.0, 320.0);
+    let tokens = LibTokens::of(ui);
+    let footer_h = PanelFooter::reserved_height(&PanelFooter::style(&tokens, ui.pixels_per_point())) + ui.spacing().item_spacing.y;
+    let max_h = (ui.available_height() - footer_h - 40.0).clamp(80.0, 320.0);
+    let toggle_side = IconButton::style(&tokens, ControlSize::Sm).side;
     let mut action: Option<(&'static str, Value)> = None;
     let mut select: Option<u32> = None;
-    let row_h = 26.0;
     egui::ScrollArea::vertical().id_salt("comps-rows").max_height(max_h).auto_shrink([false, true]).show(ui, |ui| {
         // Last Document State.
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
-        if applied.is_none() {
-            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
-        } else if resp.hovered() {
-            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
-        }
-        let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-        ui.painter().rect_stroke(
-            marker,
-            craft_ui::theme::scale::Radius::R2.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
-            egui::StrokeKind::Inside,
-        );
-        if applied.is_none() {
-            crate::icons::paint(ui, marker, "check", 10.0, t.icon);
-        }
-        ui.painter().text(
-            pos2(rect.left() + 30.0, rect.center().y),
-            Align2::LEFT_CENTER,
-            tl!("Last Document State"),
-            egui::FontId::proportional(12.0),
-            t.text_dim,
-        );
-        if resp.clicked() && doc.last_document_state.is_some() && applied.is_some() {
+        let out = ListRow::new("last-document-state", tl!("Last Document State"))
+            .toggle(ToggleColumn::new(tl!("Apply {row}"), Icon::Check, Icon::Check, applied.is_none()))
+            .selected(applied.is_none())
+            .show(ui);
+        let marked = out.events.iter().any(|e| matches!(e, RowEvent::Toggle(EditEvent::Update { .. } | EditEvent::Set { .. })));
+        if (out.response.clicked() || marked) && doc.last_document_state.is_some() && applied.is_some() {
             action = Some(("layerComp.restoreLastDocumentState", json!({})));
         }
-        ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
 
         if doc.layer_comps.is_empty() {
             ui.add_space(craft_ui::theme::scale::Space::S6.px());
-            ui.label(
-                egui::RichText::new(tl!("Capture the visibility, position and style of every layer with + below, then switch between versions."))
-                    .color(t.text_faint)
-                    .size(11.5),
-            );
+            ui.weak(tl!("Capture the visibility, position and style of every layer with + below, then switch between versions."));
         }
         for (index, c) in doc.layer_comps.iter().enumerate() {
-            let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click_and_drag());
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected == Some(c.id), &c.name));
+            // Comp ids restart in every document, so the pending name is keyed by the document too.
+            let rename_id = egui::Id::unique(("comp-rename", doc.id.0, c.id));
+            let missing = c.missing_layers(&doc).len();
+            let row_hits = RefCell::new(None::<(&'static str, Value)>);
+            let mut row = ListRow::new(c.id, c.name.as_str())
+                .toggle(ToggleColumn::new(tl!("Apply {row}"), Icon::Check, Icon::Check, applied == Some(c.id)))
+                .selected(selected == Some(c.id))
+                .renaming(renaming(ui, rename_id));
+            if missing > 0 {
+                row = row.trailing_item(18.0, |ui| {
+                    let r = Rect::from_center_size(ui.max_rect().center(), vec2(14.0, 14.0));
+                    let hit = ui.interact(r, ui.scope_id().with("comp-warning"), Sense::click());
+                    crate::icons::paint(ui, r, "triangle-alert", 12.0, Tokens::get(ui.ctx()).warning);
+                    let tip = crate::i18n::trn(
+                        crate::i18n::current(),
+                        missing as u64,
+                        "{n} layer recorded by this comp was deleted. Update the comp, or clear the warning.",
+                        "{n} layers recorded by this comp were deleted. Update the comp, or clear the warning.",
+                    );
+                    hit.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &tip));
+                    if hit.on_hover_text(&tip).clicked() {
+                        *row_hits.borrow_mut() = Some(clear_warning_action(c.id));
+                    }
+                });
+            }
+            // The three apply toggles, right-aligned.
+            let toggles = [
+                (Icon::Eye, tl!("Visibility"), c.apply_visibility, "visibility"),
+                (Icon::Move, tl!("Position"), c.apply_position, "position"),
+                (Icon::Sparkles, tl!("Appearance (Layer Style)"), c.apply_appearance, "appearance"),
+            ];
+            row = row.trailing_item(3.0 * toggle_side, |ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                for (icon, tip, on, key) in toggles {
+                    let template = "Apply {option}: {state}";
+                    let state = if on { "on" } else { "off" };
+                    let label = crate::i18n::fmt(tl!(template), &[("option", tip), ("state", tl!(state))]);
+                    if ui.add(IconButton::new(icon, label).size(ControlSize::Sm).selected(on)).clicked() {
+                        *row_hits.borrow_mut() = Some(("layerComp.setOptions", json!({"comp": c.id, key: !on})));
+                    }
+                }
+            });
+            let out = row.show(ui);
+            let resp = out.response.clone();
             resp.dnd_set_drag_payload(DragComp { document: doc.id, comp: c.id });
             if let Some(source) = resp.dnd_hover_payload::<DragComp>()
                 && source.document == doc.id
                 && let Some(from) = doc.layer_comps.iter().position(|c| c.id == source.comp)
             {
+                let rect = resp.rect;
                 let after = ui.input(|i| i.pointer.hover_pos().is_some_and(|p| p.y >= rect.center().y));
                 let to = drop_index(from, index, after);
                 let y = if after { rect.bottom() } else { rect.top() };
-                ui.painter().line_segment([pos2(rect.left(), y), pos2(rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
+                craft_ui::list::drop_line(ui, pos2(rect.left(), y), pos2(rect.right(), y));
                 if resp.dnd_release_payload::<DragComp>().is_some() && from != to {
                     select = Some(source.comp);
                     action = Some(("layerComp.reorder", json!({"comp":source.comp, "index":to})));
                 }
             }
-            resp.context_menu(|ui| {
-                if ui.add_enabled(index > 0, egui::Button::new(tl!("Move Up"))).clicked() {
-                    action = Some(("layerComp.reorder", json!({"comp":c.id, "index":index.saturating_sub(1)})));
-                    select = Some(c.id);
-                    ui.close();
-                }
-                if ui.add_enabled(index + 1 < doc.layer_comps.len(), egui::Button::new(tl!("Move Down"))).clicked() {
-                    action = Some(("layerComp.reorder", json!({"comp":c.id, "index":index + 1})));
-                    select = Some(c.id);
-                    ui.close();
-                }
-            });
-            if selected == Some(c.id) {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
-            } else if resp.hovered() {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
-            }
-            // Apply marker (click to apply).
-            let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-            ui.painter().rect_stroke(
-                marker,
-                craft_ui::theme::scale::Radius::R2.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
-                egui::StrokeKind::Inside,
-            );
-            if applied == Some(c.id) {
-                crate::icons::paint(ui, marker, "check", 10.0, t.accent);
-            }
-            // The three apply toggles, right-aligned.
-            let toggles = [
-                ("eye", tl!("Visibility"), c.apply_visibility, "visibility"),
-                ("move", tl!("Position"), c.apply_position, "position"),
-                ("sparkles", tl!("Appearance (Layer Style)"), c.apply_appearance, "appearance"),
+            let entries = [
+                MenuItem::new(tl!("Move Up"), -1).enabled(index > 0).into(),
+                MenuItem::new(tl!("Move Down"), 1).enabled(index + 1 < doc.layer_comps.len()).into(),
             ];
-            let mut x = rect.right() - 14.0;
+            if let Some(step) = ContextMenu::new(&entries).show(ui, &resp).chosen {
+                let to = if step < 0 { index.saturating_sub(1) } else { index + 1 };
+                action = Some(("layerComp.reorder", json!({"comp":c.id, "index":to})));
+                select = Some(c.id);
+            }
             let mut toggle_hit = false;
-            for (icon, tip, on, key) in toggles.iter().rev() {
-                let r = Rect::from_center_size(pos2(x, rect.center().y), vec2(20.0, 20.0));
-                let hov = ui.rect_contains_pointer(r);
-                if hov {
-                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
-                }
-                crate::icons::paint(ui, r, icon, 13.0, if *on { t.icon } else { t.text_faint.gamma_multiply(0.45) });
-                if hov && resp.clicked() {
-                    toggle_hit = true;
-                    action = Some(("layerComp.setOptions", json!({"comp": c.id, *key: !on})));
-                }
-                if hov {
-                    let template = "Apply {option}: {state}";
-                    let state = if *on { "on" } else { "off" };
-                    resp.clone().on_hover_text(crate::i18n::fmt(tl!(template), &[("option", tip), ("state", tl!(state))]));
-                }
-                x -= 22.0;
+            if let Some(hit) = row_hits.take() {
+                toggle_hit = true;
+                action = Some(hit);
             }
-            let missing = c.missing_layers(&doc).len();
-            let mut name_x = rect.left() + 30.0;
-            if missing > 0 {
-                let r = Rect::from_center_size(pos2(name_x + 7.0, rect.center().y), vec2(14.0, 14.0));
-                crate::icons::paint(ui, r, "triangle-alert", 12.0, t.warning);
-                if ui.rect_contains_pointer(r) {
-                    resp.clone().on_hover_text(crate::i18n::trn(
-                        crate::i18n::current(),
-                        missing as u64,
-                        "{n} layer recorded by this comp was deleted. Update the comp, or clear the warning.",
-                        "{n} layers recorded by this comp were deleted. Update the comp, or clear the warning.",
-                    ));
-                    if resp.clicked() {
+            for event in out.events {
+                match event {
+                    // The marker applies the comp, and selects it.
+                    RowEvent::Toggle(EditEvent::Update { .. } | EditEvent::Set { .. }) => {
                         toggle_hit = true;
-                        action = Some(clear_warning_action(c.id));
+                        select = Some(c.id);
+                        action = Some(("layerComp.apply", json!({"comp": c.id})));
                     }
-                }
-                name_x += 18.0;
-            }
-            let galley_w = (x - name_x).max(20.0);
-            let name = ui.painter().layout(c.name.clone(), egui::FontId::proportional(12.0), t.text, galley_w);
-            let name_rect = Rect::from_min_size(pos2(name_x, rect.center().y - name.size().y / 2.0), name.size());
-            // Comp ids restart in every document, so the pending name is keyed by the document too.
-            let rename_id = egui::Id::unique(("comp-rename", doc.id.0, c.id));
-            if ui.data(|d| d.get_temp::<RenameComp>(rename_id)).is_some() {
-                let field = Rect::from_min_max(pos2(name_x - 3.0, rect.top() + 3.0), pos2((x + 10.0).max(name_x + 60.0), rect.bottom() - 3.0));
-                if let Some(text) = rename_field(ui, rename_id, field) {
-                    let text = text.trim();
-                    if !text.is_empty() && text != c.name {
-                        action = Some(("layerComp.rename", json!({"comp": c.id, "name": text})));
+                    RowEvent::Renamed { text, .. } => {
+                        let text = text.trim();
+                        if !text.is_empty() && text != c.name {
+                            action = Some(("layerComp.rename", json!({"comp": c.id, "name": text})));
+                        }
                     }
+                    RowEvent::RenameEnded { .. } => ui.data_mut(|d| d.remove::<bool>(rename_id)),
+                    _ => {}
                 }
-            } else {
-                ui.painter().galley(name_rect.min, name, t.text);
             }
             if !c.comment.is_empty() && resp.hovered() {
                 resp.clone().on_hover_text(&c.comment);
             }
             if resp.clicked() && !toggle_hit {
                 select = Some(c.id);
-                if resp.interact_pointer_pos().is_some_and(|p| p.x < rect.left() + 24.0) {
-                    action = Some(("layerComp.apply", json!({"comp": c.id})));
-                }
             }
             if resp.double_clicked() && !toggle_hit {
                 // Photoshop renames in place when the name itself is double-clicked.
-                if resp.interact_pointer_pos().is_some_and(|p| name_rect.expand2(vec2(4.0, 13.0)).contains(p)) {
-                    ui.data_mut(|d| d.insert_temp(rename_id, RenameComp { text: c.name.clone(), focused: false }));
+                // The label rect runs to the row's trailing items; the name is only as wide as its text.
+                let name_end = out.label.left() + super::options_bar::body_text_width(ui, &c.name) + 8.0;
+                if resp.interact_pointer_pos().is_some_and(|p| out.label.contains(p) && p.x <= name_end) {
+                    ui.data_mut(|d| d.insert_temp(rename_id, true));
                 } else {
                     action = Some(("layerComp.apply", json!({"comp": c.id})));
                 }
             }
-            ui.painter()
-                .line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(0.5)));
         }
     });
-    // Footer: apply previous, apply next | update, new, delete (Photoshop's order).
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    // Footer: apply previous, apply next | update, new, delete (Photoshop's order). The bar fills
+    // from the trailing end, so the previous/next pair is added last, after a spacer.
     let has = !doc.layer_comps.is_empty();
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        if crate::icons::button(ui, "chevrons-left", 24.0, false, tl!("Apply previous selected layer comp")).clicked() && has {
-            action = Some(("layerComp.previous", json!({})));
+    PanelFooter::show(ui, |ui| {
+        if PanelFooter::button(ui, Icon::Trash, tl!("Delete layer comp")).clicked()
+            && let Some(id) = selected
+        {
+            action = Some(("layerComp.delete", json!({"comp": id})));
         }
-        if crate::icons::button(ui, "chevrons-right", 24.0, false, tl!("Apply next selected layer comp")).clicked() && has {
+        if PanelFooter::button(ui, Icon::NewFile, tl!("Create new layer comp")).clicked() {
+            action = Some(("layerComp.new", json!({})));
+        }
+        if PanelFooter::button(ui, Icon::RotateCw, tl!("Update layer comp (visibility, position and appearance)")).clicked()
+            && let Some(id) = selected
+        {
+            action = Some(("layerComp.update", json!({"comp": id})));
+        }
+        let (side, gap) = (tokens.component.panel_footer.button, tokens.component.panel_footer.gap);
+        ui.add_space((ui.available_width() - 2.0 * side - gap).max(0.0));
+        if PanelFooter::button(ui, Icon::ChevronsRight, tl!("Apply next selected layer comp")).clicked() && has {
             action = Some(("layerComp.next", json!({})));
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if crate::icons::button(ui, "trash", 24.0, false, tl!("Delete layer comp")).clicked()
-                && let Some(id) = selected
-            {
-                action = Some(("layerComp.delete", json!({"comp": id})));
-            }
-            if crate::icons::button(ui, "file-plus", 24.0, false, tl!("Create new layer comp")).clicked() {
-                action = Some(("layerComp.new", json!({})));
-            }
-            if crate::icons::button(ui, "rotate-cw", 24.0, false, tl!("Update layer comp (visibility, position and appearance)")).clicked()
-                && let Some(id) = selected
-            {
-                action = Some(("layerComp.update", json!({"comp": id})));
-            }
-        });
+        if PanelFooter::button(ui, Icon::ChevronsLeft, tl!("Apply previous selected layer comp")).clicked() && has {
+            action = Some(("layerComp.previous", json!({})));
+        }
     });
     if let Some(id) = select {
         app.ui.layer_comp_selected = Some(id);
@@ -301,9 +238,15 @@ mod tests {
     use super::*;
     use photocraft_engine::Session;
 
+    /// The row of the comp named `name`: the list box option, not its label.
+    fn row_rect(h: &egui_kittest::Harness<'_, PhotocraftApp>, name: &str) -> egui::Rect {
+        use egui_kittest::kittest::{NodeT, Queryable};
+        h.query_all_by_label(name).find(|n| n.accesskit_node().role() == egui::accesskit::Role::ListBoxOption).expect("the comp's row").rect()
+    }
+
     #[test]
     fn dragging_a_comp_row_reorders_without_applying_it() {
-        use egui_kittest::{Harness, kittest::Queryable};
+        use egui_kittest::Harness;
         let mut app = PhotocraftApp::new(Session::new(), crate::Services::default());
         app.run("file.new", json!({"width":16,"height":16})).unwrap();
         for name in ["First", "Second", "Third"] {
@@ -313,8 +256,8 @@ mod tests {
         let first = app.session.active().unwrap().doc.layer_comps[0].id;
         let mut h = Harness::builder().with_size(vec2(360.0, 300.0)).build_ui_state(|ui, app| panel(app, ui), app);
         h.run_steps(3);
-        let from = h.get_by_label("First").rect().center();
-        let row = h.get_by_label("Third").rect();
+        let from = row_rect(&h, "First").center();
+        let row = row_rect(&h, "Third");
         let to = pos2(row.center().x, row.bottom() - 2.0);
         h.event(egui::Event::PointerMoved(from));
         h.run_steps(1);
@@ -374,11 +317,11 @@ mod tests {
         // 60 fps steps, so two clicks a frame apart count as a double-click.
         let mut h = Harness::builder().with_size(vec2(320.0, 260.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| panel(app, ui), app);
         h.run_steps(3);
-        // The footer starts at the panel's left edge; the first comp is the second 26 px row. The
-        // name starts at left + 30 and is as wide as its text, so the click stays near its start
-        // to hit the short "Hero" too.
-        let left = h.get_by_label("Apply previous selected layer comp").rect().left();
-        let (name, rest) = (pos2(left + 35.0, left + 39.0), pos2(left + 190.0, left + 39.0));
+        // The name starts after the marker column and is as wide as its text, so the click stays
+        // near its start to hit the short "Hero" too; the rest of the row is past the name and
+        // before the three apply toggles.
+        let row = row_rect(&h, "Comp number one");
+        let (name, rest) = (pos2(row.left() + 45.0, row.center().y), pos2(row.right() - 100.0, row.center().y));
         let double_click = |h: &mut Harness<'_, PhotocraftApp>, pos: egui::Pos2| {
             h.event(egui::Event::PointerMoved(pos));
             // Wait out the double-click window of the previous attempt.
@@ -431,8 +374,8 @@ mod tests {
         app.session.set_active(0);
         let mut h = Harness::builder().with_size(vec2(320.0, 260.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| panel(app, ui), app);
         h.run_steps(3);
-        let left = h.get_by_label("Apply previous selected layer comp").rect().left();
-        let name = pos2(left + 35.0, left + 39.0);
+        let row = row_rect(&h, "Alpha comp");
+        let name = pos2(row.left() + 45.0, row.center().y);
         h.event(egui::Event::PointerMoved(name));
         h.run_steps(3);
         for pressed in [true, false, true, false] {

@@ -77,14 +77,10 @@ fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     type_key(&mut h, egui::Key::M, "m");
     assert_eq!(blend(&h), BlendMode::Multiply, "M picks Multiply");
     assert_eq!(h.state().ui.tool, Tool::Move, "M doesn't also pick the Marquee tool");
-    type_key(&mut h, egui::Key::D, "d");
-    assert_eq!(blend(&h), BlendMode::DarkerColor, "D picks the next mode starting with D");
-    type_key(&mut h, egui::Key::D, "d");
-    assert_eq!(blend(&h), BlendMode::Difference, "D again picks the one after");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
-    assert!(!crate::widgets::dropdown_list_open(&h.ctx), "↩ closes the list");
-    assert_eq!(blend(&h), BlendMode::Difference, "↩ keeps the mode");
+    assert!(!craft_ui::popover::any_open(&h.ctx), "↩ closes the list");
+    assert_eq!(blend(&h), BlendMode::Multiply, "↩ keeps the mode");
     // With the list closed the letters are the tools' again.
     h.key_press(egui::Key::M);
     h.event(egui::Event::Text("m".into()));

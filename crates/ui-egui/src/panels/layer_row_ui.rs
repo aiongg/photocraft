@@ -259,11 +259,15 @@ pub fn label(painter: &Painter, x: f32, cy: f32, right: f32, text: &str, font: F
 /// Photoshop-style Layers flyout commands. The dock owns tab-group controls, not this menu.
 pub fn panel_menu(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui) {
     use crate::layers_panel_ui::run_menu_command;
-    use crate::state::LayersPanelDialog;
 
     let has_doc = app.session.active().is_some();
     if ui.add_enabled(has_doc, egui::Button::new(tl!("New Layer…"))).clicked() {
-        app.ui.layers_panel_dialog = Some(LayersPanelDialog::NewLayer(String::new()));
+        // The New Layer dialog, as for ⌥-click on the panel's New Layer button.
+        let ctx = ui.ctx().clone();
+        if let Err(e) = crate::menus::invoke(app, &ctx, "layer.new.layer", Value::Null) {
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
         ui.close();
     }
     // New Group… and New Group from Layers… open the New Group dialog, like their Layer › New twins.
@@ -281,7 +285,7 @@ pub fn panel_menu(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui) {
     run_menu_command(app, ui, tl!("Flatten Image"), "layer.flattenImage");
     ui.separator();
     if ui.add_enabled(app.session.is_enabled("layer.lockLayers"), egui::Button::new(tl!("Lock Layers…"))).clicked() {
-        app.ui.layers_panel_dialog = Some(LayersPanelDialog::LockLayers { transparency: false, pixels: false, position: false, artboard: false, all: true });
+        crate::layers_panel_ui::open_lock(app);
         ui.close();
     }
     run_menu_command(app, ui, tl!("Rename Layer…"), "layer.renameLayer");
@@ -308,9 +312,7 @@ pub fn panel_menu(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui) {
         ui.menu_button(tl!("Animation Options"), |_ui| {});
     });
     if ui.button(tl!("Panel Options…")).clicked() {
-        let mut options = app.ui.layers_panel_options.clone();
-        options.thumbnail_contents = crate::layers_panel_ui::thumbnail_contents(app);
-        app.ui.layers_panel_dialog = Some(LayersPanelDialog::PanelOptions(options));
+        crate::layers_panel_ui::open_options(app);
         ui.close();
     }
     ui.separator();

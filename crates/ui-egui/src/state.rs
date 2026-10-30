@@ -11,8 +11,8 @@ mod transform;
 
 pub use color_panel::{ColorPanelMode, ColorPanelState, ColorRamp, DockTabs};
 pub use panel_state::{
-    CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelDialog, LayersPanelOptions,
-    PointCurveDrag, PointCurveState,
+    CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions, PointCurveDrag,
+    PointCurveState,
 };
 pub use tool::Tool;
 pub use tool_options::{SampleAllLayers, ToolOptions};
@@ -325,9 +325,6 @@ pub struct UiState {
     /// Thumbnail dimensions, content cropping and filter-strip visibility.
     #[serde(default)]
     pub layers_panel_options: LayersPanelOptions,
-    /// Transient dialog; never restored with a workspace.
-    #[serde(skip)]
-    pub layers_panel_dialog: Option<LayersPanelDialog>,
     /// Layers panel filter type (#5048): kind (above), name or blend mode.
     #[serde(default)]
     pub layer_filter_by: crate::layer_filter_ui::FilterBy,
@@ -533,7 +530,6 @@ impl Default for UiState {
             layers_panel_options: LayersPanelOptions::default(),
             histogram_panel: Default::default(),
             histogram_range: None,
-            layers_panel_dialog: None,
             layer_filter_by: Default::default(),
             layer_filter_name: String::new(),
             layer_filter_mode: default_layer_filter_mode(),

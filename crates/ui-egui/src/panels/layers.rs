@@ -3,7 +3,15 @@ use super::layer_drag::{
     mask_drag_key,
 };
 use super::layer_row::{RowSel, layer_row};
-use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action, scrub_pct_label};
+use craft_ui::composites::PanelFooter;
+use craft_ui::controls::{ControlSize, IconButton, NumberField, Select};
+use craft_ui::edit::EditEvent;
+use craft_ui::icons::Icon;
+use craft_ui::localized::{LocaleNumbers, Unit};
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use std::hash::{Hash, Hasher};
+
+use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action};
 use super::{BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, icons, json, label, pos2, theme, vec2, widgets};
 
 // ----------------------------------------------------------------------------- layers
@@ -45,58 +53,195 @@ pub(super) fn opacity_row_layout(available: f32, label_width: f32, gap: f32) -> 
     ((available - reserved).max(40.0), show_label)
 }
 
+/// A percentage field's edit this frame: the new percentage and, inside a gesture, a number that
+/// is the same for every frame of it (the history coalesces on it).
+type PctEdit = Option<(f32, Option<u64>)>;
+
+/// The gesture number of an edit event, for coalescing its frames into one history step.
+fn gesture_of<T>(event: &EditEvent<T>) -> Option<u64> {
+    event.id().map(|g| {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        g.hash(&mut hasher);
+        hasher.finish()
+    })
+}
+
+/// Turns a field's or select's `event` into the value to apply: updates and one-shot sets apply, a
+/// commit applies when it changed something, and a cancel puts back the value the gesture began
+/// with (kept in `start`).
+fn edit_value<T: Clone + Send + Sync + 'static>(ui: &egui::Ui, start: egui::Id, event: Option<&EditEvent<T>>, current: &T) -> Option<(T, Option<u64>)> {
+    match event? {
+        EditEvent::Begin { .. } => {
+            ui.data_mut(|d| d.insert_temp(start, current.clone()));
+            None
+        }
+        e @ (EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some((value.clone(), gesture_of(e))),
+        e @ EditEvent::Commit { value, changed: true, .. } => Some((value.clone(), gesture_of(e))),
+        e @ EditEvent::Cancel { .. } => ui.data(|d| d.get_temp::<T>(start)).map(|before| (before, gesture_of(e))),
+        _ => None,
+    }
+}
+
+/// An Opacity or Fill field: the scrubby `label` (when `show_label`), then the number with its
+/// pop-up slider, [`LAYER_PCT_W`] wide, right-aligned in the row.
+fn pct_field(ui: &mut egui::Ui, salt: &str, label: &str, show_label: bool, pct: f32) -> PctEdit {
+    let numbers = LocaleNumbers::of(ui);
+    let name = label.trim_end_matches([':', '：']);
+    let height = NumberField::style(&LibTokens::of(ui), ControlSize::Sm).field.height;
+    let gap = ui.spacing().item_spacing.x;
+    let label_w = if show_label { body_text_width(ui, label).min((ui.available_width() - LAYER_PCT_W - gap).max(0.0)) } else { 0.0 };
+    let total = LAYER_PCT_W + if show_label { label_w + gap } else { 0.0 };
+    let mut out = None;
+    ui.allocate_ui_with_layout(vec2(total, height), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        // Elided to the room left in the row (full text on hover): a longer translation shrinks
+        // instead of running over the fixed controls beside it (#3580).
+        let scrub = show_label.then(|| widgets::elided_label_sensed(ui, label, label_w, Sense::hover()));
+        ui.allocate_ui_with_layout(vec2(LAYER_PCT_W, height), egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+            // The field is given the value as stored, rounded so that 53 does not come back as 53.000004.
+            let shown = (f64::from(pct) * 1e4).round() / 1e4;
+            let mut field = NumberField::new(salt, name, shown, &numbers)
+                .range(0.0..=100.0)
+                .decimals(0..=0)
+                .unit(Unit::new("{n}%"))
+                .or_parse(super::options_bar::reader("%", None))
+                .popup_slider(name)
+                .size(ControlSize::Sm);
+            if let Some(scrub) = &scrub {
+                field = field.scrub_by(scrub);
+            }
+            let edit = field.show(ui);
+            out = edit_value(ui, edit.response.id.with("gesture-start"), edit.event.as_ref(), &f64::from(pct)).map(|(v, g)| (v as f32, g));
+        });
+    });
+    out
+}
+
+/// What the blend-mode select did this frame.
+#[derive(Default)]
+struct BlendEdit {
+    /// The mode chosen (a click, an arrow key or a wheel notch), with its gesture number.
+    chosen: Option<(BlendMode, Option<u64>)>,
+    /// The mode under the pointer in the open list.
+    hovered: Option<BlendMode>,
+}
+
+/// The blend-mode select, `width` wide. Hovering a mode in the open list previews it on the
+/// canvas (#970); a wheel notch over the closed box steps the mode (#1747).
+fn blend_select(ui: &mut egui::Ui, current: BlendMode, options: &[(BlendMode, &str)], width: f32) -> BlendEdit {
+    let height = NumberField::style(&LibTokens::of(ui), ControlSize::Sm).field.height;
+    let mut out = BlendEdit::default();
+    ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+        let (mut value, mut hovered) = (current, None);
+        let mut select = Select::new("blend", tl!("Blend Mode"), &mut value).size(ControlSize::Sm).wheel_steps(true).highlighted(&mut hovered);
+        for (mode, label) in options {
+            select = select.option(*mode, tl!(label));
+        }
+        let edit = select.show(ui);
+        out.chosen = edit_value(ui, edit.response.id.with("gesture-start"), edit.event.as_ref(), &current);
+        out.hovered = hovered;
+    });
+    out
+}
+
+/// What the Opacity row did this frame.
+#[derive(Default)]
+struct OpacityEdit {
+    blend: BlendEdit,
+    opacity: PctEdit,
+}
+
+/// Blend mode and Opacity. Greyed when the ui is disabled.
+fn opacity_row(ui: &mut egui::Ui, pro: bool, blend: BlendMode, groups: bool, opacity: f32) -> OpacityEdit {
+    let mut out = OpacityEdit::default();
+    ui.horizontal(|ui| {
+        // Reserve space for the numeric field first. On a narrow dock, hide the redundant visible
+        // Opacity label rather than force the dropdown beyond the panel's right edge (#2309). The
+        // numeric field keeps its name.
+        let label = if pro { tl!("Opacity:") } else { tl!("Opacity") };
+        let (blend_width, show_label) = opacity_row_layout(ui.available_width(), body_text_width(ui, label), ui.spacing().item_spacing.x);
+        out.blend = blend_select(ui, blend, &blend_options(groups, blend), blend_width);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            out.opacity = pct_field(ui, "layer-opacity", label, show_label, opacity);
+        });
+    });
+    out
+}
+
+/// What the Lock and Fill row did this frame.
+#[derive(Default)]
+struct LockEdit {
+    /// The lock toggled (`transparency`, `pixels`, `position`, `artboard`, `all`) and its new state.
+    lock: Option<(&'static str, bool)>,
+    /// The simple themes' single lock button was clicked.
+    simple: bool,
+    fill: PctEdit,
+}
+
+/// The Lock row: the locks, in the order of `locks` (transparency, pixels, position, artboard,
+/// all), and Fill. `any` is whether any lock is set. Greyed when the ui is disabled; `fill_enabled`
+/// greys Fill alone.
+fn lock_row(ui: &mut egui::Ui, pro: bool, locks: [bool; 5], any: bool, fill: f32, fill_enabled: bool) -> LockEdit {
+    let mut out = LockEdit::default();
+    ui.horizontal(|ui| {
+        let lock_label = if pro { tl!("Lock:") } else { tl!("Lock") };
+        // Layer fill opacity (≠ Edit › Fill / path fill → Tô).
+        let lang = crate::i18n::current();
+        let fill_label = if pro { crate::i18n::tr_ctx(lang, "layers", "Fill:") } else { crate::i18n::tr_ctx(lang, "layers", "Fill") };
+        // In a narrow panel with long translated labels, drop the "Lock:" text (the icons keep
+        // their tooltips) rather than let the Fill label run over the lock icons.
+        let gap = ui.spacing().item_spacing.x;
+        let lock_button = craft_ui::controls::IconButton::style(&LibTokens::of(ui), ControlSize::Sm).side;
+        let icons_w = if pro { 5.0 * lock_button + gap } else { lock_button + gap };
+        let fits = body_text_width(ui, lock_label) + icons_w + body_text_width(ui, fill_label) + LAYER_PCT_W + 2.0 * gap <= ui.available_width();
+        if fits {
+            label(ui, lock_label);
+        }
+        if pro {
+            // The lock icons touch, but only they: the Fill label keeps the same gap before its
+            // field as Opacity's, so both stack in one right-aligned column (#2085).
+            ui.scope(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                for (n, (key, icon, tip)) in [
+                    ("transparency", Icon::Grid, tl!("Lock transparent pixels")),
+                    ("pixels", Icon::Brush, tl!("Lock image pixels")),
+                    ("position", Icon::Move, tl!("Lock position")),
+                    ("artboard", Icon::Scan, tl!("Prevent auto-nesting in and out of Artboards and Frames")),
+                    ("all", Icon::Lock, tl!("Lock all")),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let on = locks[n];
+                    // Lock Image Pixels includes Lock Transparent Pixels, which waits for it (#4892).
+                    let enabled = key != "transparency" || !locks[1];
+                    let button = IconButton::new(icon, tip).size(ControlSize::Sm).selected(on);
+                    if ui.add_enabled_ui(enabled, |ui| ui.add(button)).inner.clicked() {
+                        out.lock = Some((key, !on));
+                    }
+                }
+            });
+        } else {
+            let icon = if any { Icon::Lock } else { Icon::LockOpen };
+            out.simple = ui.add(IconButton::new(icon, tl!("Lock layer")).size(ControlSize::Sm).selected(any)).clicked();
+        }
+        ui.add_enabled_ui(fill_enabled, |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                out.fill = pct_field(ui, "layer-fill", fill_label, true, fill);
+            })
+        });
+    });
+    out
+}
+
 /// Blend mode, Opacity, the locks and Fill with no layer selected: Photoshop keeps them in place,
 /// greyed out at Normal, 100% and unlocked, instead of removing them (#8880). Same layout as the
 /// active layer's rows in `layers`.
 fn inactive_blend_rows(ui: &mut egui::Ui, pro: bool) {
     ui.add_enabled_ui(false, |ui| {
-        ui.horizontal(|ui| {
-            let opacity_label = if pro { tl!("Opacity:") } else { tl!("Opacity") };
-            let (blend_width, show_opacity_label) = opacity_row_layout(ui.available_width(), body_text_width(ui, opacity_label), ui.spacing().item_spacing.x);
-            let mut m = BlendMode::Normal;
-            let options = blend_options(false, m);
-            widgets::dropdown_wheel_hovered(ui, "blend", tl!("Blend Mode"), &mut m, &options, blend_width);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let mut o = 100.0;
-                widgets::popup_value_field(ui, opacity_label, &mut o, 0.0..=100.0, "%", LAYER_PCT_W);
-                if show_opacity_label {
-                    scrub_pct_label(ui, opacity_label, &mut o, ui.available_width());
-                }
-            });
-        });
+        opacity_row(ui, pro, BlendMode::Normal, false, 100.0);
+        // Docks zero the item spacing: keep the Opacity and Fill fields apart (#155).
         ui.add_space((theme::ROW_GAP - ui.spacing().item_spacing.y).max(0.0));
-        ui.horizontal(|ui| {
-            let lock_label = if pro { tl!("Lock:") } else { tl!("Lock") };
-            let lang = crate::i18n::current();
-            let fill_label = if pro { crate::i18n::tr_ctx(lang, "layers", "Fill:") } else { crate::i18n::tr_ctx(lang, "layers", "Fill") };
-            let gap = ui.spacing().item_spacing.x;
-            let icons_w = if pro { 5.0 * 20.0 + gap } else { 22.0 + gap };
-            let fits = body_text_width(ui, lock_label) + icons_w + body_text_width(ui, fill_label) + LAYER_PCT_W + 2.0 * gap <= ui.available_width();
-            if fits {
-                label(ui, lock_label);
-            }
-            if pro {
-                ui.scope(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    for (icon, tip) in [
-                        ("grid-3x3", tl!("Lock transparent pixels")),
-                        ("brush", tl!("Lock image pixels")),
-                        ("move", tl!("Lock position")),
-                        ("scan", tl!("Prevent auto-nesting in and out of Artboards and Frames")),
-                        ("lock", tl!("Lock all")),
-                    ] {
-                        icons::button(ui, icon, 20.0, false, tip);
-                    }
-                });
-            } else {
-                icons::button(ui, "lock-open", 22.0, false, tl!("Lock layer"));
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let mut f = 100.0;
-                widgets::popup_value_field(ui, fill_label, &mut f, 0.0..=100.0, "%", LAYER_PCT_W);
-                scrub_pct_label(ui, fill_label, &mut f, ui.available_width());
-            });
-        });
+        lock_row(ui, pro, [false; 5], false, 100.0, true);
         ui.add_space(craft_ui::theme::scale::Space::S2.px());
     });
 }
@@ -140,95 +285,38 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let bg = crate::doc_props_ui::is_background(&doc, l);
         // Pass Through is a group's mode: offered only when every target is a group.
         let all_groups = ids.iter().all(|id| doc.layer(*id).is_some_and(|x| x.is_group()));
-        ui.horizontal(|ui| {
-            ui.add_enabled_ui(!bg, |ui| {
-                let mut m = l.blend;
-                // Reserve space for the numeric field first. On a narrow dock, hide the
-                // redundant visible Opacity label rather than force the dropdown beyond
-                // the panel's right edge (#2309). The numeric field keeps its name.
-                let opacity_label = if t.pro { tl!("Opacity:") } else { tl!("Opacity") };
-                let (blend_width, show_opacity_label) =
-                    opacity_row_layout(ui.available_width(), body_text_width(ui, opacity_label), ui.spacing().item_spacing.x);
-                let (chosen, hovered) =
-                    widgets::dropdown_wheel_hovered(ui, "blend", tl!("Blend Mode"), &mut m, &blend_options(all_groups, l.blend), blend_width);
-                // One step per choice: a click, an arrow key or each wheel notch (#1747).
-                for m in &chosen {
-                    let mut p = targets.clone();
-                    p["blend"] = json!(m.label());
-                    actions.push(("layer.setProps".into(), p));
+        let edit = ui.add_enabled_ui(!bg, |ui| opacity_row(ui, t.pro, l.blend, all_groups, l.opacity * 100.0)).inner;
+        if !bg {
+            // One step per choice: a click, an arrow key or each wheel notch (#1747).
+            if let Some((mode, gesture)) = edit.blend.chosen.filter(|(mode, _)| *mode != l.blend) {
+                let mut p = targets.clone();
+                p["blend"] = json!(mode.label());
+                if let Some(n) = gesture {
+                    p["coalesce"] = json!(format!("layer-blend-select:{n}"));
                 }
-                // Hovering a mode previews it on the canvas (#970).
-                crate::blend_preview::hover(app, &ids, hovered.filter(|_| chosen.is_empty()));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut o = l.opacity * 100.0;
-                    let field = widgets::popup_value_field(ui, opacity_label, &mut o, 0.0..=100.0, "%", LAYER_PCT_W);
-                    // On a narrow dock the (scrubby) label yields its room to the controls (#2309).
-                    let scrub = if show_opacity_label {
-                        scrub_pct_label(ui, opacity_label, &mut o, ui.available_width())
-                    } else {
-                        widgets::PopupFieldResponse::default()
-                    };
-                    if field.changed || scrub.changed {
-                        actions.push(pct_action(&targets, "opacity", o, scrub.drag.or(field.drag)));
-                    }
-                });
-            });
-        });
+                actions.push(("layer.setProps".into(), p));
+            }
+            // Hovering a mode previews it on the canvas (#970).
+            crate::blend_preview::hover(app, &ids, edit.blend.hovered.filter(|_| edit.blend.chosen.is_none()));
+        }
+        if let Some((pct, gesture)) = edit.opacity {
+            actions.push(pct_action(&targets, "opacity", pct, gesture));
+        }
         // Docks zero the item spacing: keep the Opacity and Fill fields apart (#155).
         ui.add_space((theme::ROW_GAP - ui.spacing().item_spacing.y).max(0.0));
-        ui.horizontal(|ui| {
-            let lock_label = if t.pro { tl!("Lock:") } else { tl!("Lock") };
-            // Layer fill opacity (≠ Edit › Fill / path fill → Tô).
-            let lang = crate::i18n::current();
-            let fill_label = if t.pro { crate::i18n::tr_ctx(lang, "layers", "Fill:") } else { crate::i18n::tr_ctx(lang, "layers", "Fill") };
-            // In a narrow panel with long translated labels, drop the "Lock:" text (the icons keep
-            // their tooltips) rather than let the Fill label run over the lock icons.
-            let gap = ui.spacing().item_spacing.x;
-            let icons_w = if t.pro { 5.0 * 20.0 + gap } else { 22.0 + gap };
-            let fits = body_text_width(ui, lock_label) + icons_w + body_text_width(ui, fill_label) + LAYER_PCT_W + 2.0 * gap <= ui.available_width();
-            if fits {
-                label(ui, lock_label);
-            }
-            if t.pro {
-                // The lock icons touch, but only they: the Fill label keeps the same gap before its
-                // field as Opacity's, so both stack in one right-aligned column (#2085).
-                ui.scope(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    let lk = l.locks;
-                    for (key, icon, tip, on) in [
-                        ("transparency", "grid-3x3", tl!("Lock transparent pixels"), lk.transparency),
-                        ("pixels", "brush", tl!("Lock image pixels"), lk.pixels),
-                        ("position", "move", tl!("Lock position"), lk.position),
-                        ("artboard", "scan", tl!("Prevent auto-nesting in and out of Artboards and Frames"), lk.artboard),
-                        ("all", "lock", tl!("Lock all"), lk.all),
-                    ] {
-                        // Lock Image Pixels includes Lock Transparent Pixels, which waits for it (#4892).
-                        let enabled = key != "transparency" || !lk.pixels;
-                        if ui.add_enabled_ui(enabled, |ui| icons::button(ui, icon, 20.0, on, tip)).inner.clicked() {
-                            let mut p = targets.clone();
-                            p["locks"] = json!({ key: !on });
-                            actions.push(("layer.setProps".into(), p));
-                        }
-                    }
-                });
-            }
-            if !t.pro {
-                let locked = l.locks.any();
-                if icons::button(ui, if locked { "lock" } else { "lock-open" }, 22.0, locked, tl!("Lock layer")).clicked() {
-                    actions.push(simple_lock_toggle(crate::doc_props_ui::is_background(&doc, l), l, &targets));
-                }
-            }
-            ui.add_enabled_ui(!bg, |ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut f = l.fill_opacity * 100.0;
-                    let field = widgets::popup_value_field(ui, fill_label, &mut f, 0.0..=100.0, "%", LAYER_PCT_W);
-                    let scrub = scrub_pct_label(ui, fill_label, &mut f, ui.available_width());
-                    if field.changed || scrub.changed {
-                        actions.push(pct_action(&targets, "fill", f, scrub.drag.or(field.drag)));
-                    }
-                })
-            });
-        });
+        let lk = l.locks;
+        let row = lock_row(ui, t.pro, [lk.transparency, lk.pixels, lk.position, lk.artboard, lk.all], lk.any(), l.fill_opacity * 100.0, !bg);
+        if let Some((key, on)) = row.lock {
+            let mut p = targets.clone();
+            p["locks"] = json!({ key: on });
+            actions.push(("layer.setProps".into(), p));
+        }
+        if row.simple {
+            actions.push(simple_lock_toggle(crate::doc_props_ui::is_background(&doc, l), l, &targets));
+        }
+        if let Some((pct, gesture)) = row.fill {
+            actions.push(pct_action(&targets, "fill", pct, gesture));
+        }
         ui.add_space(craft_ui::theme::scale::Space::S2.px());
     } else {
         inactive_blend_rows(ui, t.pro);
@@ -237,7 +325,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
     let rows = crate::layer_tree_ui::panel_rows(app, &doc);
     let ctx = ui.ctx().clone();
-    let footer = widgets::footer_height(ui) + ui.spacing().item_spacing.y;
+    let footer = PanelFooter::reserved_height(&PanelFooter::style(&LibTokens::of(ui), ui.pixels_per_point())) + ui.spacing().item_spacing.y;
     let fill = ui.available_height() > footer + 60.0;
     let rows_h = if fill { ui.available_height() - footer } else { f32::INFINITY };
     egui::ScrollArea::vertical()
@@ -368,7 +456,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
         ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
     }
-    widgets::panel_footer(ui, |ui| {
+    PanelFooter::show(ui, |ui| {
         let active_layer = active.and_then(|id| doc.layer(id));
         let (delete, label) = if app.ui.vector_mask_target && active_layer.is_some_and(|l| l.vector_mask.is_some()) {
             ("layer.vectorMask.delete", "Delete Vector Mask")
@@ -377,7 +465,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         } else {
             ("layer.delete", "Delete layer")
         };
-        let trash = icons::button(ui, "trash", 26.0, false, tl!(label));
+        let trash = PanelFooter::button(ui, Icon::Trash, tl!(label));
         // A selected smart filter row is what Delete removes, as in Photoshop (#4751).
         let picked_filter = crate::smart_ui::selected(&ctx, &doc, active);
         if trash.clicked()
@@ -408,7 +496,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // A click follows the selected thumbnail; name that action for screen readers even
         // though dropping a whole layer row onto the same button always deletes the layer.
         trash.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
-        let new_layer = icons::button(ui, "square-plus", 26.0, false, &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"));
+        let new_layer = PanelFooter::button(ui, Icon::NewLayer, &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"));
         if new_layer.clicked() {
             // A click makes the layer above the selection; ⌥-click asks first (the New Layer
             // dialog) and ⌘/Ctrl-click adds it below, as in Photoshop.
@@ -423,7 +511,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             actions.push(("layer.new.layer".into(), params));
         }
         actions.extend(footer_drop(ui, &new_layer, footer_drag, "layer.duplicate"));
-        let group = icons::button(ui, "folder", 26.0, false, tl!("Create a new group"));
+        let group = PanelFooter::button(ui, Icon::Folder, tl!("Create a new group"));
         if group.clicked() {
             // Like Photoshop CC 2014 and later, a click with two or more layers selected puts them
             // in the new group (Layer › Group Layers); with one layer or none it adds an empty
@@ -444,7 +532,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         }
         actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
-        let adj = footer_menu_button(ui, "adjustment-layer", 26.0, tl!("Create new fill or adjustment layer"));
+        let adj = footer_menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).
         crate::press_menu::show(&adj, |ui, menu| {
             ui.set_min_width(190.0);
@@ -470,7 +558,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         } else {
             crate::i18n::fmt(tl!("Add a mask  (from the selection; {key} inverts)"), &[("key", &crate::shortcuts::pretty("Alt"))])
         };
-        let mask_btn = ui.add_enabled_ui(mask_cmd.is_some(), |ui| icons::button(ui, "layer-mask", 26.0, false, &mask_tip)).inner;
+        let mask_btn = ui.add_enabled_ui(mask_cmd.is_some(), |ui| PanelFooter::button(ui, Icon::LayerMask, &mask_tip)).inner;
         mask_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &mask_tip));
         if mask_btn.clicked()
             && let Some(cmd) = mask_cmd
@@ -482,7 +570,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
-        let fx = fx_button(ui, 26.0, tl!("Add a layer style"));
+        let fx = fx_button(ui, tl!("Add a layer style"));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);
             if menu.item(ui, tl!("Blending Options…")) {
@@ -497,7 +585,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
         // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
         let can_link = app.session.is_enabled("layer.linkLayers");
-        if ui.add_enabled_ui(can_link, |ui| icons::button(ui, "link-2", 26.0, false, tl!("Link layers"))).inner.clicked() {
+        if ui.add_enabled_ui(can_link, |ui| PanelFooter::button(ui, Icon::Link, tl!("Link layers"))).inner.clicked() {
             actions.push(("layer.linkLayers".into(), json!({})));
         }
     });
@@ -564,18 +652,17 @@ fn footer_menu_arrow(ui: &egui::Ui, rect: Rect) {
     icons::paint(ui, arrow, "chevron-down", 8.0, t.text_dim);
 }
 
-fn footer_menu_button(ui: &mut egui::Ui, icon: &str, size: f32, tip: &str) -> egui::Response {
-    let response = icons::button(ui, icon, size, false, tip);
-    // Named for screen readers (and tests) after its tooltip.
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
+fn footer_menu_button(ui: &mut egui::Ui, icon: Icon, tip: &str) -> egui::Response {
+    let response = PanelFooter::button(ui, icon, tip);
     footer_menu_arrow(ui, response.rect);
     response
 }
 
-/// Photoshop's italic "fx" footer button (no icon-font equivalent).
-fn fx_button(ui: &mut egui::Ui, size: f32, tip: &str) -> egui::Response {
+/// Photoshop's italic "fx" footer button (the library has no such icon).
+fn fx_button(ui: &mut egui::Ui, tip: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
+    let side = LibTokens::of(ui).component.panel_footer.button;
+    let (r, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click());
     if resp.hovered() {
         ui.painter().rect_filled(r, t.radius_sm, t.hover);
     }

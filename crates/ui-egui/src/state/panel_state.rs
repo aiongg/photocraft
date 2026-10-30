@@ -59,15 +59,6 @@ impl Default for LayersPanelOptions {
     }
 }
 
-/// Pending dialog data is transient: Cancel never changes persisted options.
-#[derive(Clone, Debug, PartialEq)]
-pub enum LayersPanelDialog {
-    PanelOptions(LayersPanelOptions),
-    NewLayer(String),
-    NewGroup(String),
-    LockLayers { transparency: bool, pixels: bool, position: bool, artboard: bool, all: bool },
-}
-
 /// Shared selection and capture for a point curve; document parameters remain with the host.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]

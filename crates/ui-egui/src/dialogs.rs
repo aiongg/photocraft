@@ -177,7 +177,9 @@ fn width_of(d: &Dialog) -> craft_ui::dialog::Width {
     let f = &d.fields;
     // The About window: room for the contributor table, the same width on every tab.
     let about_tabs = d.kind == DialogKind::About && f.get("systemInfo").and_then(Value::as_bool) != Some(true);
-    if crate::duplicate_layer_ui::owns(f) {
+    if crate::layers_panel_ui::owns(f) {
+        crate::layers_panel_ui::width(f)
+    } else if crate::duplicate_layer_ui::owns(f) {
         // A fixed small grid (labels + 260 pt fields ≈ 352 pt).
         Width::Fixed(360.0)
     } else if let Some(w) = crate::file_ui::dialog_width(f) {
@@ -218,6 +220,7 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
         _ if crate::pattern_fill_ui::owns(fields) => crate::pattern_fill_ui::body(app, ui, fields),
         _ if crate::stroke_ui::owns(fields) => crate::stroke_ui::body(ui, fields),
         _ if crate::new_group_ui::owns(fields) => crate::new_group_ui::body(ui, fields),
+        _ if crate::layers_panel_ui::owns(fields) => crate::layers_panel_ui::body(ui, fields),
         _ if crate::snapshot_dialog::owns(fields) => crate::snapshot_dialog::body(ui, fields),
         _ if crate::channel_options_ui::owns(fields) => crate::channel_options_ui::body(ui, fields),
         _ if crate::channel_options_ui::owns_new_spot(fields) => crate::channel_options_ui::new_spot_body(ui, fields),
@@ -687,6 +690,7 @@ const ROUTES: &[fn(&Fields) -> bool] = &[
     crate::actions::owns_insert_stop,
     crate::new_layer_ui::owns,
     crate::new_group_ui::owns,
+    crate::layers_panel_ui::owns,
     crate::mask_trash_prompt::owns,
     crate::rasterize_prompt::owns,
     crate::duplicate_layer_ui::owns,
@@ -833,6 +837,7 @@ fn confirm_command(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> 
         _ if crate::pattern_fill_ui::owns(&d.fields) => crate::pattern_fill_ui::confirm(app, &d.fields),
         _ if crate::stroke_ui::owns(&d.fields) => crate::stroke_ui::confirm(app, &d.fields),
         _ if crate::new_group_ui::owns(&d.fields) => crate::new_group_ui::confirm(app, &d.fields),
+        _ if crate::layers_panel_ui::owns(&d.fields) => crate::layers_panel_ui::confirm(app, &d.fields),
         _ if crate::snapshot_dialog::owns(&d.fields) => crate::snapshot_dialog::confirm(app, &d.fields),
         _ if crate::channel_options_ui::owns(&d.fields) => crate::channel_options_ui::confirm(app, &d.fields),
         _ if crate::channel_options_ui::owns_new_spot(&d.fields) => crate::channel_options_ui::confirm_new_spot(app, &d.fields),

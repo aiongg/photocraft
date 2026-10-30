@@ -99,7 +99,7 @@ fn unit_of(suffix: &str) -> Option<Unit> {
 
 /// Reads typed arithmetic (`1920/2`) and, in a length or percentage field, a number with a unit
 /// (`1in`), as PhotoCraft's fields do.
-fn reader(suffix: &str, units: Option<widgets::FieldUnits>) -> impl Fn(&str) -> Option<f64> + 'static {
+pub(super) fn reader(suffix: &str, units: Option<widgets::FieldUnits>) -> impl Fn(&str) -> Option<f64> + 'static {
     let unit = units.map(|u| u.unit).or(match suffix {
         "%" => Some(photocraft_engine::prefs::Unit::Percent),
         "px" => Some(photocraft_engine::prefs::Unit::Pixels),
