@@ -7,6 +7,8 @@ use photocraft_doc::{BlendMode, LabelColor};
 use photocraft_engine::new_layer::neutral_color;
 use serde_json::{Map, Value, json};
 
+use craft_ui::composites::FormGrid;
+
 use crate::PhotocraftApp;
 use crate::state::DialogKind;
 
@@ -70,61 +72,60 @@ pub fn neutral_label(mode: BlendMode) -> String {
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let label_width = 64.0;
-    let row_label = |ui: &mut egui::Ui, text: &str| {
-        ui.allocate_ui_with_layout(egui::vec2(label_width, 22.0), egui::Layout::right_to_left(egui::Align::Center), |ui| ui.label(text)).inner
-    };
-    ui.horizontal(|ui| {
-        let name_label = row_label(ui, tl!("Name:"));
-        let mut name = f.get("name").and_then(Value::as_str).unwrap_or("").to_string();
-        let field = ui.add(egui::TextEdit::singleline(&mut name).desired_width(260.0)).labelled_by(name_label.id);
-        if field.changed() {
-            f.insert("name".into(), json!(name));
-        }
-        // Photoshop opens on the name, selected, so typing replaces it.
-        if !ui.is_sizing_pass() && !flag(f, "__nameFocused") {
-            field.request_focus();
-            crate::field_tab::select_all(ui.ctx(), field.id, &name);
-            f.insert("__nameFocused".into(), json!(true));
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.add_space(label_width + ui.spacing().item_spacing.x);
-        let mut clip = flag(f, "clipToPrevious");
-        if crate::widgets::checkbox(ui, &mut clip, tl!("Use Previous Layer to Create Clipping Mask")).changed() {
-            f.insert("clipToPrevious".into(), json!(clip));
-        }
-    });
-    ui.horizontal(|ui| {
-        row_label(ui, tl!("Color:"));
-        let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or_default();
-        let options: Vec<(LabelColor, &str)> = LabelColor::ALL.into_iter().map(|c| (c, crate::layer_menu_ui::color_name(c))).collect();
-        if crate::widgets::dropdown(ui, "new-layer-color", tl!("Color"), &mut color, &options, 140.0) {
-            f.insert("color".into(), json!(color.id()));
-        }
-    });
-    let mut m = mode(f);
-    ui.horizontal(|ui| {
-        row_label(ui, tl!("Mode:"));
-        let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
-        if crate::widgets::dropdown(ui, "new-layer-mode", tl!("Mode"), &mut m, &options, 140.0) {
-            f.insert("mode".into(), json!(m.label()));
-        }
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        ui.label(tl!("Opacity:"));
-        let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
-        if crate::widgets::value_field(ui, &mut o, 0.0..=100.0, "%", 64.0).accessible_name(tl!("Opacity:")).changed() {
-            f.insert("opacity".into(), json!(o.clamp(0.0, 100.0)));
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.add_space(label_width + ui.spacing().item_spacing.x);
-        let available = neutral_color(m).is_some();
-        let mut fill = available && flag(f, "fillNeutral");
-        let changed = ui.add_enabled_ui(available, |ui| crate::widgets::checkbox(ui, &mut fill, &neutral_label(m)).changed()).inner;
-        if changed {
-            f.insert("fillNeutral".into(), json!(fill));
-        }
+    use craft_ui::controls::{Checkbox, Select};
+    FormGrid::new("new-layer").show(ui, |form| {
+        form.row(tl!("Name:"), |ui, _| {
+            let mut name = f.get("name").and_then(Value::as_str).unwrap_or("").to_string();
+            let edit = crate::widgets::dialog_text_opening(ui, "new-layer-name", tl!("Name:"), &mut name, f);
+            if edit.changed {
+                f.insert("name".into(), json!(name));
+            }
+            edit.response
+        });
+        form.unlabelled(|ui| {
+            let mut clip = flag(f, "clipToPrevious");
+            let edit = Checkbox::bool(tl!("Use Previous Layer to Create Clipping Mask"), &mut clip).show(ui);
+            if edit.response.changed() {
+                f.insert("clipToPrevious".into(), json!(clip));
+            }
+            edit
+        });
+        form.row(tl!("Color:"), |ui, _| {
+            let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or_default();
+            let options: Vec<(LabelColor, &str)> = LabelColor::ALL.into_iter().map(|c| (c, crate::layer_menu_ui::color_name(c))).collect();
+            let edit = Select::new("new-layer-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
+            if edit.response.changed() {
+                f.insert("color".into(), json!(color.id()));
+            }
+            edit
+        });
+        let mut m = mode(f);
+        form.row(tl!("Mode:"), |ui, _| {
+            ui.horizontal(|ui| {
+                let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
+                let edit = Select::new("new-layer-mode", tl!("Mode"), &mut m).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
+                if edit.response.changed() {
+                    f.insert("mode".into(), json!(m.label()));
+                }
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                ui.label(tl!("Opacity:"));
+                let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
+                if crate::widgets::dialog_number(ui, "new-layer-opacity", tl!("Opacity:"), &mut o, 0.0..=100.0, "{n}%", 0) {
+                    f.insert("opacity".into(), json!(o.clamp(0.0, 100.0)));
+                }
+                edit
+            })
+            .inner
+        });
+        form.unlabelled(|ui| {
+            let available = neutral_color(m).is_some();
+            let mut fill = available && flag(f, "fillNeutral");
+            let edit = Checkbox::bool(neutral_label(m), &mut fill).id_salt("new-layer-neutral").enabled(available).show(ui);
+            if edit.response.changed() {
+                f.insert("fillNeutral".into(), json!(fill));
+            }
+            edit
+        });
     });
 }
 

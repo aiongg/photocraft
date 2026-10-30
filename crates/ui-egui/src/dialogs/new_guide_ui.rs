@@ -19,6 +19,8 @@
 //! sending the colour only when it was changed, so a guide that uses the preference colour keeps
 //! doing so.
 
+use craft_ui::composites::{FormGrid, LabelAlign, Notice, Tone};
+use craft_ui::controls::{RadioGroup, Select};
 use photocraft_engine::edit_cmds::GUIDE_COLORS;
 use photocraft_engine::prefs::Unit;
 use serde_json::{Map, Value, json};
@@ -153,36 +155,37 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut position = f.get("position").and_then(Value::as_str).unwrap_or_default().to_string();
     let mut color = f.get("color").and_then(Value::as_str).filter(|c| is_color_name(c)).unwrap_or(DEFAULT_COLOR).to_string();
     if let Some(error) = f.get("__error").and_then(Value::as_str) {
-        ui.colored_label(ui.visuals().error_fg_color, error);
+        Notice::new(error).tone(Tone::Bad).show(ui);
         ui.add_space(craft_ui::theme::scale::Space::S4.px());
     }
-    egui::Grid::new("new-guide-dialog").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
-        ui.label(tl!("Orientation"));
-        ui.horizontal(|ui| {
-            ui.radio_value(&mut orientation, "horizontal".to_string(), tl!("Horizontal"));
-            ui.radio_value(&mut orientation, "vertical".to_string(), tl!("Vertical"));
+    FormGrid::new("new-guide-dialog").label_align(LabelAlign::Start).show(ui, |form| {
+        form.row(tl!("Orientation"), |ui, _| {
+            RadioGroup::new("new-guide-orientation", tl!("Orientation"), &mut orientation)
+                .item("horizontal".to_string(), tl!("Horizontal"))
+                .item("vertical".to_string(), tl!("Vertical"))
+                .show(ui)
         });
-        ui.end_row();
-        let position_label = ui.label(tl!("Position"));
-        ui.add(egui::TextEdit::singleline(&mut position).desired_width(120.0)).labelled_by(position_label.id);
-        ui.end_row();
-        ui.label(tl!("Color"));
-        ui.horizontal(|ui| {
-            // Custom… first, then Photoshop's colours.
-            let options: Vec<(String, &str)> =
-                std::iter::once(CUSTOM).chain(GUIDE_COLORS.iter().map(|(n, ..)| *n)).map(|n| (n.to_string(), color_label(n))).collect();
-            crate::widgets::dropdown(ui, "new-guide-color", tl!("Color"), &mut color, &options, 140.0);
-            if color == CUSTOM {
-                let hex = custom_color(f);
-                let rgb = photocraft_engine::prefs::parse_hex(&hex).unwrap_or([0x4a, 0xff, 0xff]);
-                if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Custom…")).clicked() {
-                    f.insert("customColor".into(), json!(hex));
-                    crate::color_picker_ui::request_field(f, "customColor", &crate::color_picker_ui::title_for(tl!("Guides")));
+        form.row(tl!("Position"), |ui, _| crate::widgets::dialog_text(ui, "new-guide-position", tl!("Position"), &mut position).response);
+        form.row(tl!("Color"), |ui, _| {
+            ui.horizontal(|ui| {
+                // Custom… first, then Photoshop's colours.
+                let options: Vec<(String, &str)> =
+                    std::iter::once(CUSTOM).chain(GUIDE_COLORS.iter().map(|(n, ..)| *n)).map(|n| (n.to_string(), color_label(n))).collect();
+                let edit =
+                    Select::new("new-guide-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui);
+                if color == CUSTOM {
+                    let hex = custom_color(f);
+                    let rgb = photocraft_engine::prefs::parse_hex(&hex).unwrap_or([0x4a, 0xff, 0xff]);
+                    if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]), tl!("Custom…")).clicked() {
+                        f.insert("customColor".into(), json!(hex));
+                        crate::color_picker_ui::request_field(f, "customColor", &crate::color_picker_ui::title_for(tl!("Guides")));
+                    }
+                    ui.label(egui::RichText::new(hex).monospace());
                 }
-                ui.label(egui::RichText::new(hex).monospace());
-            }
+                edit
+            })
+            .inner
         });
-        ui.end_row();
     });
     f.insert("orientation".into(), json!(orientation));
     f.insert("position".into(), json!(position));

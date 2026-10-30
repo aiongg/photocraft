@@ -768,6 +768,7 @@ pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 });
             });
         });
+    crate::dialogs::push_modal_rect(ctx, "job-progress");
     if shown.outcome.is_some_and(|o| o.closes()) {
         cancel(app, j.id);
     }

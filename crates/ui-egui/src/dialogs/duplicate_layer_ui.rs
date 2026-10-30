@@ -1,6 +1,9 @@
 //! Layer › Duplicate Layer… dialog (#3348): the copy's name and its destination document, as in
 //! Photoshop. Only the menu, palette and Layers panel menu open it; ⌘J, Alt-drag and dragging onto
 //! the New Layer button still duplicate at once.
+use craft_ui::composites::{FormGrid, SectionLabel};
+use craft_ui::controls::Select;
+
 use crate::{PhotocraftApp, state::DialogKind};
 use serde_json::{Map, Value, json};
 const MARK: &str = "__duplicateLayer";
@@ -45,26 +48,33 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String, Val
         Some(Value::Number(n)) => n.to_string(),
         _ => String::new(),
     };
-    egui::Grid::new("duplicate-layer").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+    FormGrid::new("duplicate-layer").show(ui, |form| {
         if let Some(name) = fields.get("name").and_then(Value::as_str) {
             let mut name = name.to_string();
-            let name_label = ui.label(tl!("Name:"));
-            ui.add(egui::TextEdit::singleline(&mut name).desired_width(260.0)).labelled_by(name_label.id);
-            fields.insert("name".into(), json!(name));
-            ui.end_row();
+            form.row(tl!("Name:"), |ui, _| {
+                let edit = crate::widgets::dialog_text(ui, "duplicate-layer-name", tl!("Name:"), &mut name);
+                if edit.changed {
+                    fields.insert("name".into(), json!(name));
+                }
+                edit.response
+            });
         }
-        ui.label(egui::RichText::new(tl!("Destination")).font(crate::theme::semibold(13.0)));
-        ui.end_row();
-        ui.label(tl!("Document"));
-        crate::widgets::dropdown(ui, "duplicate-layer-document", tl!("Document"), &mut destination, &options, 260.0);
-        ui.end_row();
+        form.unlabelled(|ui| SectionLabel::new(tl!("Destination")).show(ui));
+        form.row(tl!("Document"), |ui, _| {
+            // Document names are the user's own, so only "New" is translated.
+            let edit = Select::new("duplicate-layer-document", tl!("Document"), &mut destination)
+                .rows(options.len(), |i| options[i].0.clone(), |i| if options[i].0 == "new" { tl!(options[i].1).to_string() } else { options[i].1.to_string() })
+                .show(ui);
+            edit.response.clone()
+        });
         // Photoshop's document-`Name` is only there when the destination is a new document.
         if destination == "new" {
             let mut doc_name = fields.get("documentName").and_then(Value::as_str).unwrap_or("").to_string();
-            let name_label = ui.label(tl!("Name:"));
-            ui.add(egui::TextEdit::singleline(&mut doc_name).desired_width(260.0)).labelled_by(name_label.id);
+            form.row(tl!("Name:"), |ui, _| {
+                let edit = crate::widgets::dialog_text(ui, "duplicate-layer-document-name", tl!("Name:"), &mut doc_name);
+                edit.response
+            });
             fields.insert("documentName".into(), json!(doc_name));
-            ui.end_row();
         }
     });
     if destination == "new" {

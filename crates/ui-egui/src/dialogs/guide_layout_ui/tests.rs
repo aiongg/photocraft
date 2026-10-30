@@ -51,8 +51,11 @@ fn cancelling_invalid_and_empty_layouts_keep_guides_hidden() {
     }
 }
 
+/// Tab walks the library's fields in reading order, optional sizes included, and a field reached
+/// by Tab has its text selected (so typing replaces it).
 #[test]
 fn tab_includes_optional_sizes_and_shift_tab_selects_their_text() {
+    use egui_kittest::kittest::Queryable;
     let mut app = app();
     let id = open(&mut app);
     let f = &mut app.ui.dialog_mut(id).unwrap().fields;
@@ -63,45 +66,52 @@ fn tab_includes_optional_sizes_and_shift_tab_selects_their_text() {
     let mut h = harness(app);
     h.run_steps(3);
     let original = h.state().session.active().unwrap().doc.guides.clone();
-    for text in ["4", "120", "12", "2", "90"] {
+    h.get_all_by_label("Number").next().unwrap().focus();
+    h.run_steps(2);
+    for text in ["120", "12"] {
         h.key_press(egui::Key::Tab);
         h.run_steps(2);
         h.event(egui::Event::Text(text.into()));
         h.run_steps(2);
     }
     let f = &h.state().ui.dialogs.first().unwrap().fields;
-    assert_eq!((f["columns"].as_u64(), f["rows"].as_u64()), (Some(4), Some(2)));
-    assert_eq!(params(f)["width"], 120.0);
-    assert_eq!(params(f)["height"], 90.0);
-    assert_eq!(f["gutter"], 12.0);
+    assert_eq!(params(f)["width"], 120.0, "Tab from the column count reaches its width");
+    assert_eq!(f["gutter"], 12.0, "then its spacing");
+    assert_eq!(f["columns"], 5);
     h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
     h.run_steps(2);
-    h.event(egui::Event::Text("3".into()));
+    h.event(egui::Event::Text("90".into()));
     h.run_steps(2);
-    assert_eq!(h.state().ui.dialogs.first().unwrap().fields["rows"], 3);
+    assert_eq!(params(&h.state().ui.dialogs.first().unwrap().fields)["width"], 90.0, "Shift+Tab selects the text it returns to");
     assert_eq!(h.state().session.active().unwrap().doc.guides, original);
 }
 
+/// The fields of a disabled row or margin are no Tab stops.
 #[test]
 fn tab_skips_disabled_rows_and_margins() {
+    use egui_kittest::kittest::Queryable;
     let mut app = app();
     let id = open(&mut app);
     let f = &mut app.ui.dialog_mut(id).unwrap().fields;
     f.insert("columns".into(), json!(2));
+    f.insert("rows".into(), json!(0));
     f.insert("__rowsEnabled".into(), json!(false));
     f.insert("__marginEnabled".into(), json!(false));
+    let before = f.clone();
     let mut h = harness(app);
     h.run_steps(3);
-    for text in ["5", "100", "4", "6"] {
+    h.get_all_by_label("Spacing").next().unwrap().focus();
+    h.run_steps(2);
+    for _ in 0..6 {
         h.key_press(egui::Key::Tab);
         h.run_steps(2);
-        h.event(egui::Event::Text(text.into()));
+        h.event(egui::Event::Text("7".into()));
         h.run_steps(2);
     }
     let f = &h.state().ui.dialogs.first().unwrap().fields;
-    assert_eq!(f["columns"], 6, "Tab wraps after column spacing, skipping disabled row and margin fields");
-    assert_eq!(params(f)["width"], 100.0);
-    assert_eq!(f["gutter"], 4.0);
+    for key in ["rows", "rowGutter", "height", "margin"] {
+        assert_eq!(f[key], before[key], "{key} is disabled");
+    }
 }
 
 /// The disabled Number field must not clamp a zero count to 1 and so switch its axis on (#5625).
@@ -183,7 +193,7 @@ fn draw(app: &mut PhotocraftApp, id: u64) {
     let ctx = egui::Context::default();
     PhotocraftApp::setup_context(&ctx, Default::default());
     ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0))), ..Default::default() }, |ui| {
-        body(app, ui, &mut f, false);
+        body(app, ui, &mut f);
     })
     .textures_delta
     .clear();
