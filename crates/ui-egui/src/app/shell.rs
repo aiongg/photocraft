@@ -29,8 +29,7 @@ impl PhotocraftApp {
         let panels_on = self.ui.panels.clone();
         let mode = if self.ui.view.hides_chrome() { BodyMode::Only } else { BodyMode::Normal };
         let narrow = self.session.prefs().workspace.narrow_options_bar();
-        let options_height = panels::options_bar_height(t.pro, narrow);
-        let tools_width = panels::toolbar_width(t.pro, panels_on.toolbar_double);
+        let columns = if panels_on.toolbar_double { 2 } else { 1 };
         let pasteboard = prefs_ui::pasteboard_color(self).unwrap_or(t.canvas);
         if self.custom_titlebar && !panels_on.menu_bar {
             // The undecorated window keeps its edge resizing without the bar.
@@ -39,9 +38,9 @@ impl PhotocraftApp {
         let app = RefCell::new(&mut *self);
         AppShell::new(Self::window_key())
             .title(Slot::new("title").visible(panels_on.menu_bar).reveal_if(panels_on.menu_bar), |ui| panels::title_bar(&mut app.borrow_mut(), ui))
-            .top(Slot::new("options").visible(panels_on.options_bar).reveal().height(options_height), |ui| panels::options_bar(&mut app.borrow_mut(), ui))
+            .top(Slot::new("options").visible(panels_on.options_bar).reveal().narrow(narrow), |ui| panels::options_bar(&mut app.borrow_mut(), ui))
             .bottom(Slot::new("status").visible(panels_on.status_bar), |ui| panels::status_bar(&mut app.borrow_mut(), ui))
-            .start(Slot::new("tools").visible(panels_on.toolbar).reveal().width(tools_width), |ui| panels::toolbar(&mut app.borrow_mut(), ui))
+            .start(Slot::new("tools").visible(panels_on.toolbar).reveal().columns(columns), |ui| panels::toolbar(&mut app.borrow_mut(), ui))
             .body_mode(mode)
             .backdrop(Some(pasteboard))
             .show(ui, |ui, cx| {
