@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 
+use craft_theme::LabelColor;
 use craft_ui::edit::{EditEvent, GestureId};
 use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
 use craft_ui::menu::{ContextMenu, OpenAt};
@@ -50,27 +51,11 @@ fn select_mode(m: egui::Modifiers) -> &'static str {
     }
 }
 
-/// Marker in the clipped row's existing 12-point slot, beside its thumbnail.
-pub(super) fn paint_clipping_indicator(painter: &egui::Painter, at: Pos2, color: Color32) {
-    let tip = at + vec2(5.0, 3.0);
-    let stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
-    painter.add(egui::Shape::line(vec![at + vec2(9.0, -4.0), at + vec2(5.0, -4.0), tip], stroke));
-    painter.add(egui::Shape::line(vec![at + vec2(2.0, 0.0), tip, at + vec2(8.0, 0.0)], stroke));
-}
-
-/// Width of the clipping marker's slot beside the thumbnail.
-const CLIP_W: f32 = 12.0;
-/// Width of the link button before a mask thumbnail in the trailing slot.
-const CHAIN_SLOT: f32 = 18.0;
-
 /// What the row's closures hand back: where the library drew the parts the app paints into.
 #[derive(Default)]
 struct Cells {
     first: Cell<Option<Rect>>,
-    second: Cell<Option<Rect>>,
-    extra: Cell<Option<Rect>>,
-    extra_chain: Cell<Option<Rect>>,
-    /// A trailing widget (effects triangle, lock, vector-mask chain) took a click this frame.
+    /// A trailing widget (effects triangle, lock) took a click this frame.
     clicked: Cell<bool>,
     indicators: RefCell<Vec<(Indicator, Rect)>>,
     queued: RefCell<Vec<(String, Value)>>,
@@ -88,20 +73,13 @@ fn tree_text() -> TreeText {
     }
 }
 
-/// The thumbnail the row's editing is aimed at, and whether the library can bracket it.
-#[derive(Clone, Copy, PartialEq)]
-enum Target {
-    Library(ThumbTarget),
-    /// A vector mask in the trailing slot beside a layer mask: PhotoCraft brackets it.
-    Extra,
-}
-
-fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -> Option<Target> {
+/// The thumbnail the row's editing is aimed at, if the row shows the brackets.
+fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -> Option<ThumbTarget> {
     if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
         // The Smart Filters row's filter mask thumbnail carries the brackets.
         return None;
     }
-    let slot = |kind: MaskKind| masks.iter().position(|m| m.0 == kind).map(|i| if i == 0 { Target::Library(ThumbTarget::Extra(0)) } else { Target::Extra });
+    let slot = |kind: MaskKind| masks.iter().position(|m| m.0 == kind).map(ThumbTarget::Extra);
     if app.ui.vector_mask_target
         && let Some(target) = slot(MaskKind::Vector)
     {
@@ -112,7 +90,7 @@ fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -
     {
         return Some(target);
     }
-    Some(Target::Library(ThumbTarget::First))
+    Some(ThumbTarget::First)
 }
 
 /// The drag and drop hooks that act on the row's response (layer, mask and effect drags).
@@ -269,7 +247,6 @@ pub(super) fn layer_row(
     actions: &mut Vec<(String, Value)>,
 ) -> Rect {
     let selected = row.selected;
-    let t = Tokens::get(ctx);
     let tokens = LibTokens::of(ui);
     let style = ListRow::<u64>::style(&tokens);
     // The Layers Panel Options thumbnail size controls rows and both layer/mask thumbnails.
@@ -297,45 +274,30 @@ pub(super) fn layer_row(
     let expanded = matches!(&l.content, LayerContent::Group(g) if g.expanded);
     let fx_open = app.session.active().is_none_or(|d| !d.fx_collapsed.contains(&l.id));
     let target = target_of(app, l, &masks).filter(|_| row.primary && has_thumbs);
+    let extras: Vec<Cell<Option<Rect>>> = masks.iter().map(|_| Cell::new(None)).collect();
+    let mut eye = ToggleColumn::eye(tl!("Visibility {row}"), l.visible);
+    if let Some(color) = label_of(l.label) {
+        eye = eye.label(color);
+    }
     let mut lr = ListRow::new(l.id.0, l.name.as_str())
-        .toggle(ToggleColumn::eye(tl!("Visibility {row}"), l.visible))
+        .toggle(eye)
         .selected(selected)
         .dimmed(!l.visible)
         .highlight(app.canvas_hover_layer == Some(l.id))
         .layer(true)
         .renaming(renaming)
-        .indent(if l.clipped { CLIP_W } else { 0.0 });
+        .clipped(l.clipped)
+        .italic(crate::doc_props_ui::is_background(doc, l));
     if has_thumbs {
         lr = lr.thumb(thumb_size, |_, r| cells.first.set(Some(r)));
-        if let Some(&(kind, _, linked)) = masks.first() {
-            lr = lr.extra_thumb(|_, r| cells.second.set(Some(r))).thumb_link(linked, link_name(kind, linked, &l.name));
+        for (cell, &(kind, _, linked)) in extras.iter().zip(&masks) {
+            lr = lr.extra_thumb(|_, r| cell.set(Some(r))).thumb_link(linked, link_name(kind, linked, &l.name));
         }
-        if let Some(Target::Library(which)) = target {
+        if let Some(which) = target {
             lr = lr.thumb_target(which);
         }
     }
     lr = indicator_items(ui, ctx, l, doc, fx_open, lr, &cells);
-    if has_thumbs && let Some(&(kind, _, linked)) = masks.get(1) {
-        // A second mask (a vector mask beside a layer mask): the row has room for one mask
-        // thumbnail, so this one sits at the trailing end with its own link button.
-        let side = style.thumb_side(thumb_size);
-        let layer = l.id.0;
-        let name = link_name(kind, linked, &l.name);
-        let cells = &cells;
-        lr = lr.optional_item(side + CHAIN_SLOT, move |ui| {
-            let r = ui.max_rect();
-            let chain = Rect::from_min_size(r.left_top(), vec2(CHAIN_SLOT, r.height()));
-            let hit = ui.interact(chain, ui.scope_id().with(("mask-chain", layer, true)), Sense::click());
-            icons::paint(ui, chain, if linked { "link" } else { "unlink" }, 12.0, if hit.hovered() { t.text } else { t.icon });
-            hit.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
-            if hit.on_hover_text(&name).clicked() {
-                cells.clicked.set(true);
-                cells.queued.borrow_mut().push((format!("{}.linked", kind.command()), json!({"layer": layer, "linked": !linked})));
-            }
-            cells.extra_chain.set(Some(chain));
-            cells.extra.set(Some(Rect::from_center_size(pos2(chain.right() + side / 2.0, r.center().y), vec2(side, side))));
-        });
-    }
     let out = TreeRow::new(lr, depth, matches!(&l.content, LayerContent::Group(_)), expanded).text(tree_text()).show(ui);
     let (rect, resp) = (out.response.rect, out.response.clone());
     drag_hooks(app, ctx, ui, l, rect, &resp, actions);
@@ -355,8 +317,8 @@ pub(super) fn layer_row(
                 toggled = true;
                 actions.push(("layer.setExpanded".into(), json!({"layer": l.id.0, "expanded": open, "all": all})));
             }
-            RowEvent::LinkToggled { linked, .. } => {
-                if let Some(&(kind, ..)) = masks.first() {
+            RowEvent::LinkToggled { thumb, linked, .. } => {
+                if let Some(&(kind, ..)) = masks.get(*thumb) {
                     masks_clicked = true;
                     actions.push((format!("{}.linked", kind.command()), json!({"layer": l.id.0, "linked": linked})));
                 }
@@ -372,41 +334,26 @@ pub(super) fn layer_row(
     let ts = if has_thumbs { thumb.width() } else { 0.0 };
     let mut mask_rects = crate::mask_thumbs_ui::MaskRects { clicked: cells.clicked.get() || masks_clicked, ..Default::default() };
     for (index, &(kind, ..)) in masks.iter().enumerate() {
-        if let Some(r) = if index == 0 { cells.second.get() } else { cells.extra.get() } {
-            mask_rects.thumbs.push((kind, r));
+        let Some(r) = extras[index].get() else { continue };
+        mask_rects.thumbs.push((kind, r));
+        // The link glyph sits between the previous thumbnail and this one.
+        let before = if index == 0 { cells.first.get() } else { extras[index - 1].get() };
+        if let Some(a) = before {
+            mask_rects.chains.push((kind, Rect::from_min_max(a.right_top(), r.left_bottom())));
         }
-    }
-    if let (Some(a), Some(b), Some(&(kind, ..))) = (cells.first.get(), cells.second.get(), masks.first()) {
-        mask_rects.chains.push((kind, Rect::from_min_max(a.right_top(), b.left_bottom())));
-    }
-    if let (Some(chain), Some(&(kind, ..))) = (cells.extra_chain.get(), masks.get(1)) {
-        mask_rects.chains.push((kind, chain));
     }
     if has_thumbs {
         crate::mask_thumbs_ui::record(ctx, l.id.0, mask_rects.thumbs.clone(), mask_rects.chains.clone());
     }
 
-    // What the library does not draw: the colour label behind the eye, the thumbnails' content
-    // and the clipping marker.
-    let painter = ui.painter_at(rect.expand(1.0));
-    paint_label_color(ui, &t, l, eye_cell(rect, style.toggle_column, craft_ui::direction::is_rtl(ui)));
+    // What the library does not draw: the thumbnails' content.
     if ts > 0.0 {
         draw_layer_thumb(app, ctx, ui, doc, l, thumb);
         for (index, &(kind, enabled, _)) in masks.iter().enumerate() {
-            if let Some(r) = if index == 0 { cells.second.get() } else { cells.extra.get() } {
+            if let Some(r) = extras[index].get() {
                 paint_mask_thumb(app, ctx, ui, doc, l, kind, enabled, r);
             }
         }
-        if target == Some(Target::Extra)
-            && let Some(r) = cells.extra.get()
-        {
-            crate::mask_thumbs_ui::paint_brackets(&painter, r, t.text);
-        }
-    }
-    if l.clipped {
-        let group_column = if matches!(&l.content, LayerContent::Group(_)) { style.disclosure } else { 0.0 };
-        let right = if ts > 0.0 { thumb.left() } else { out.label.left() } - group_column;
-        paint_clipping_indicator(&painter, pos2(right - CLIP_W, rect.center().y), t.text_faint);
     }
 
     // The label as the library laid it out: the name is only as wide as its text.
@@ -464,8 +411,9 @@ pub(super) fn layer_row(
     // #2812) and a Smart Object thumbnail its contents, and a type thumbnail edits its text;
     // anywhere else on the row opens Layer Style (#350, #537).
     // The first click already made this the active layer.
-    handle_row_double_click(app, ui.ctx(), &rc, name_rect, actions);
-    row_context_menu(app, ui, &rc, eye_cell(rect, style.toggle_column, craft_ui::direction::is_rtl(ui)), actions);
+    handle_row_double_click(app, ui, &rc, name_rect, actions);
+    let eye_secondary = out.toggles.first().is_some_and(|r| r.secondary_clicked());
+    row_context_menu(app, ui, &rc, eye_secondary, actions);
     rect
 }
 
@@ -481,24 +429,23 @@ struct RowCtx<'a> {
     masks: &'a crate::mask_thumbs_ui::MaskRects,
 }
 
-/// The eye column's cell at the row's reading start.
-fn eye_cell(rect: Rect, column: f32, rtl: bool) -> Rect {
-    let width = column.min(rect.width());
-    if rtl {
-        Rect::from_min_size(pos2(rect.right() - width, rect.top()), vec2(width, rect.height()))
-    } else {
-        Rect::from_min_size(rect.left_top(), vec2(width, rect.height()))
-    }
-}
-
-/// The layer's colour label fills the eye column behind its icon.
-fn paint_label_color(ui: &egui::Ui, t: &Tokens, l: &Layer, cell: Rect) {
-    let Some((_, background)) = t.layer_label_colors(l.label) else { return };
-    ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R0.px(), background);
-    // A hidden layer's eye box is left empty.
-    if l.visible {
-        icons::paint(ui, cell, "eye", 15.0, t.layer_label_icon(l.label));
-    }
+/// The doc label colour as the library's; `None` leaves the row's own surface.
+pub(super) fn label_of(label: photocraft_doc::LabelColor) -> Option<LabelColor> {
+    use photocraft_doc::LabelColor as D;
+    Some(match label {
+        D::None => return None,
+        D::Red => LabelColor::Red,
+        D::Orange => LabelColor::Orange,
+        D::Yellow => LabelColor::Yellow,
+        D::Green => LabelColor::Green,
+        D::Seafoam => LabelColor::Seafoam,
+        D::Blue => LabelColor::Blue,
+        D::Indigo => LabelColor::Indigo,
+        D::Magenta => LabelColor::Magenta,
+        D::Fuchsia => LabelColor::Fuchsia,
+        D::Violet => LabelColor::Violet,
+        D::Gray => LabelColor::Gray,
+    })
 }
 
 /// An edit of the eye column: a click, or a drag down the column (Photoshop), where the first eye
@@ -573,7 +520,7 @@ fn select_row_on_click(app: &mut PhotocraftApp, ui: &egui::Ui, rc: &RowCtx<'_>, 
 }
 
 /// Double-click: rename, un-background, open the thumbnail's settings or the row's Layer Style.
-fn handle_row_double_click(app: &mut PhotocraftApp, ctx: &egui::Context, rc: &RowCtx<'_>, name_rect: Option<Rect>, actions: &mut Vec<(String, Value)>) {
+fn handle_row_double_click(app: &mut PhotocraftApp, ui: &egui::Ui, rc: &RowCtx<'_>, name_rect: Option<Rect>, actions: &mut Vec<(String, Value)>) {
     let (l, doc, resp, masks, ts, thumb, rect) = (rc.l, rc.doc, rc.resp, rc.masks, rc.ts, rc.thumb, rc.rect);
     if resp.double_clicked() {
         let pos = resp.interact_pointer_pos();
@@ -581,7 +528,7 @@ fn handle_row_double_click(app: &mut PhotocraftApp, ctx: &egui::Context, rc: &Ro
         if crate::doc_props_ui::is_background(doc, l) {
             actions.push(("layer.new.layerFromBackground".into(), json!({})));
         } else if name_rect.is_some_and(|n| on(Rect::from_x_y_ranges(n.x_range(), rect.y_range()))) {
-            if let Some(done) = crate::layer_row_ui::start_rename(ctx, l.id.0, &l.name) {
+            if let Some(done) = crate::layer_row_ui::start_rename_in(ui, l.id.0, &l.name) {
                 // One rename at a time: starting this one commits any other (#314).
                 actions.push(done);
             }
@@ -621,14 +568,11 @@ enum Zone {
     Mask,
 }
 
-fn row_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, rc: &RowCtx<'_>, eye: Rect, actions: &mut Vec<(String, Value)>) {
+fn row_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, rc: &RowCtx<'_>, on_eye: bool, actions: &mut Vec<(String, Value)>) {
     let (l, resp, masks, row) = (rc.l, rc.resp, rc.masks, rc.row);
     let ctx = ui.ctx().clone();
     let zone_id = ui.scope_id().with(("row-menu-zone", l.id.0));
-    let secondary = ui.input(|i| i.pointer.button_clicked(egui::PointerButton::Secondary));
     let pos = ui.input(|i| i.pointer.interact_pos());
-    // The eye cell takes the pointer from the row, so its right-click is read from the pointer.
-    let on_eye = secondary && pos.is_some_and(|p| eye.contains(p)) && ui.rect_contains_pointer(rc.rect);
     let open_at = if on_eye || resp.secondary_clicked() { pos } else { None };
     if let Some(p) = open_at {
         let zone = if on_eye {
@@ -656,7 +600,7 @@ fn row_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, rc: &RowCtx<'_>,
     let menu = ContextMenu::new(&rows).own_gestures(false).open_at(open_at.map(OpenAt::Pointer)).show(ui, resp);
     if let Some(choice) = menu.chosen
         && crate::layer_menu_ui::run_choice(choice, l, on_set && zone != Zone::Mask, actions)
-        && let Some(done) = crate::layer_row_ui::start_rename(&ctx, l.id.0, &l.name)
+        && let Some(done) = crate::layer_row_ui::start_rename_in(ui, l.id.0, &l.name)
     {
         actions.push(done);
     }

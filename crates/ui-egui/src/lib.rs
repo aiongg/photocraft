@@ -309,7 +309,6 @@ use widgets::numeric_expression;
 pub use widgets::point_curve;
 pub use widgets::press_menu;
 use widgets::rgb_histogram;
-pub use widgets::swap_arrow;
 use widgets::tab_strip;
 pub use widgets::text_field_menu;
 pub use widgets::tone;

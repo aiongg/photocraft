@@ -408,7 +408,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 && let Some(at) = drawn.iter().position(|(id, _)| id.0 == from)
                 && let Some(&(next, _)) = if up { at.checked_sub(1).and_then(|i| drawn.get(i)) } else { drawn.get(at + 1) }
                 && let Some(l) = doc.layer(next).filter(|l| !crate::doc_props_ui::is_background(&doc, l))
-                && let Some(done) = crate::layer_row_ui::start_rename(ui.ctx(), next.0, &l.name)
+                && let Some(done) = crate::layer_row_ui::start_rename_in(ui, next.0, &l.name)
             {
                 actions.push(done);
             }
