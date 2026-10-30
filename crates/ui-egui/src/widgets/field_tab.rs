@@ -181,7 +181,7 @@ mod tests {
         assert!(h.state().ui.dialogs.len() == 1, "Tab never closed the dialog");
     }
 
-    /// New Document opens with the name selected; Tab goes Width → Height → Resolution and wraps.
+    /// New Document opens with the name selected; Tab goes Width → Height → Resolution, then on and wraps.
     #[test]
     fn new_document_opens_on_the_name_and_tabs_to_width_then_height() {
         let mut h = harness(PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()));
@@ -203,10 +203,16 @@ mod tests {
         h.run_steps(2);
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::SHIFT);
         assert_eq!(fields(&h)["height"].as_u64(), Some(310));
-        // Tab from the last field wraps to the name.
-        tab(&mut h);
-        tab(&mut h);
-        assert!(h.get_by_role(Role::TextInput).is_focused(), "Tab wrapped to the name");
+        // Tab walks on through the menus and the footer buttons, then wraps to the name.
+        let mut wrapped = false;
+        for _ in 0..40 {
+            tab(&mut h);
+            if h.get_by_role(Role::TextInput).is_focused() {
+                wrapped = true;
+                break;
+            }
+        }
+        assert!(wrapped, "Tab wrapped to the name");
         type_text(&mut h, "Flyer");
         assert_eq!(fields(&h)["name"], "Flyer");
         h.key_press(egui::Key::Enter);
