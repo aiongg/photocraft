@@ -177,7 +177,7 @@ fn swap_and_default_colors_recolour_selected_type() {
         });
         let mut h = egui_kittest::Harness::builder()
             .with_size(vec2(80.0, 120.0))
-            .build_ui_state(|ui, app: &mut PhotocraftApp| color_chips(app, ui, egui::Color32::BLACK, 30.0), app);
+            .build_ui_state(|ui, app: &mut PhotocraftApp| color_chips(app, ui, egui::Color32::BLACK), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(2);
         h.get_by_label("Swap colours (X)").click();

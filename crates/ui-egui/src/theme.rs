@@ -195,8 +195,6 @@ pub struct Tokens {
     pub bevel: bool,
     /// Pro (Photoshop-grammar) layout: tab strips, flat panels, checkboxes, pill buttons.
     pub pro: bool,
-    /// Toolbar colour chips are large and round, stacked, with the colour buttons below (Studio).
-    pub round_chips: bool,
     /// Panel tab-strip background (Pro).
     pub tab_strip: Color32,
     /// Selected list row (layers, history).
