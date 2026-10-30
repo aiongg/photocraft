@@ -293,7 +293,19 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         .pencil(pencil)
         .overlays(&overlays)
         .hint(hint)
-        .labels(craft_ui::composites::CurveLabels { input: tl!("Input:").into(), output: tl!("Output:").into(), ..Default::default() });
+        .labels(craft_ui::composites::CurveLabels {
+            input: tl!("Input:").into(),
+            output: tl!("Output:").into(),
+            point: tl!("Point {i} of {n}").into(),
+            point_value: tl!("Input {x}, Output {y}").into(),
+            corner: tl!("Corner").into(),
+            corner_value: tl!("Input {x}, Output {y}, corner").into(),
+            graph_value: tl!("{channel}, {n} points").into(),
+            graph_points: tl!("{n} points").into(),
+            graph_drawn: tl!("{channel}, drawn").into(),
+            drawn: tl!("Drawn").into(),
+            percent: tl!("{n}%").into(),
+        });
     if let Some(h) = &histogram {
         editor = editor.histogram(h);
     }

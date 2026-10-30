@@ -852,3 +852,18 @@ fn curves_on_a_targeted_filter_mask_is_a_gray_plane() {
     assert!(h.ch[0][0] > 0 && h.ch[0][255] > 0, "black and white levels");
     assert_eq!(curve_mode(&app, "curves"), photocraft_doc::ColorMode::Grayscale);
 }
+
+/// The Levels editor in its dialog stays within the library's `levels.max_width` cap at each
+/// size: 300 at Compact (Pro) and 375 at Comfortable (Studio).
+#[test]
+fn levels_editor_width_stays_within_the_library_cap() {
+    for (kind, cap) in [(crate::theme::ThemeKind::Pro, 300.0), (crate::theme::ThemeKind::Studio, 375.0)] {
+        let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
+        PhotocraftApp::setup_context(&h.ctx, kind);
+        open(h.state_mut(), "image.adjustments.levels").unwrap();
+        h.run_steps(3);
+        let editor = h.query_all_by_role_and_label(egui::accesskit::Role::Group, "Levels").next().expect("Levels editor node");
+        let width = editor.rect().width();
+        assert!(width <= cap + 0.5, "{kind:?}: Levels editor is {width} wide, cap {cap}");
+    }
+}

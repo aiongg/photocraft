@@ -565,6 +565,7 @@ fn graph(app: &mut PhotocraftApp, ui: &mut egui::Ui, s: &Shown, channel: HistCha
         .height(height)
         .selection(app.ui.histogram_range.map(|[a, b]| f32::from(a.min(b))..=f32::from(a.max(b))))
         .markers(&marks)
+        .selection_labels(tl!("Selection start"), tl!("Selection end"))
         .stale(s.stale || s.hist.level > 1)
         .on_stale_click(tl!("Click to refresh histogram with uncached data"));
     // The original histogram outlined over the adjusted one while an adjustment previews.
