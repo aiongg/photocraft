@@ -298,7 +298,7 @@ fn the_picker_window_is_no_bigger_than_photoshops() {
     h.run_steps(4);
     let id = open(h.state_mut(), "foreground");
     h.run_steps(6);
-    let rect = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).expect("the picker window");
+    let rect = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).expect("the picker window");
     assert!(rect.width() <= 534.0 && rect.height() <= 376.0, "Color Picker window {} x {} points, Photoshop's 534 x 376", rect.width(), rect.height());
     // Everything still shows: the three actions and all 13 component fields.
     for label in ["OK", "Cancel", "Add to Swatches", "Only Web Colors"] {

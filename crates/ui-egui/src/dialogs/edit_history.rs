@@ -60,53 +60,57 @@ pub(crate) mod tests {
         app.session.active().unwrap().history.past_len()
     }
 
-    #[test]
-    fn a_drag_is_one_step_and_a_new_edit_drops_redo() {
-        let mut h = EditHistory::new(&0);
-        for v in 1..=5 {
-            h.settle(&v, true);
-        }
-        h.settle(&5, false);
-        h.settle(&7, false);
-        let mut now = 7;
-        assert!(h.step(&mut now, Step::Undo));
-        assert_eq!(now, 5);
-        assert!(h.step(&mut now, Step::Undo));
-        assert_eq!(now, 0, "the whole drag was one step");
-        assert!(!h.step(&mut now, Step::Undo));
-        assert!(h.step(&mut now, Step::Redo));
-        assert_eq!(now, 5);
-        now = 9;
-        assert!(!h.step(&mut now, Step::Redo), "a new edit drops what was undone");
-        assert!(h.step(&mut now, Step::Undo));
-        assert_eq!(now, 5, "an unsettled edit is undone first");
+    /// One frame of the shell: the key handling, then the dialogs.
+    fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, events: Vec<egui::Event>) {
+        let raw = egui::RawInput { events, ..Default::default() };
+        let mut out = ctx.run_ui(raw, |ui| {
+            crate::shortcuts::handle(app, ui.ctx());
+            crate::dialogs::show(app, ui.ctx());
+        });
+        out.textures_delta.clear();
+    }
+
+    fn key_z(modifiers: egui::Modifiers) -> Vec<egui::Event> {
+        vec![egui::Event::Key { key: egui::Key::Z, physical_key: None, pressed: true, repeat: false, modifiers }]
     }
 
     #[test]
     fn command_z_steps_a_parameter_dialog_and_leaves_its_private_keys() {
         let ctx = egui::Context::default();
+        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
         let mut app = app();
+        for _ in 0..2 {
+            frame(&mut app, &ctx, vec![]);
+        }
         let steps = past(&app);
         let id = crate::dialogs::open_command_dialog(&mut app, "filter.lensCorrection", "Lens Correction");
-        track_dialogs(&mut app, &ctx);
+        for _ in 0..3 {
+            frame(&mut app, &ctx, vec![]);
+        }
         let field = |app: &PhotocraftApp, k: &str| app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.get(k).cloned();
         let vertical = field(&app, "vertical");
         let private: Vec<String> = app.ui.dialog_mut(id).unwrap().fields.keys().filter(|k| k.starts_with("__")).cloned().collect();
         assert!(!private.is_empty());
         app.ui.dialog_mut(id).unwrap().fields.insert("vertical".into(), json!(-50.0));
-        track_dialogs(&mut app, &ctx);
+        frame(&mut app, &ctx, vec![]);
         app.ui.dialog_mut(id).unwrap().fields.insert("horizontal".into(), json!(30.0));
-        track_dialogs(&mut app, &ctx);
-        press_z(&mut app, &ctx, egui::Modifiers::COMMAND);
+        frame(&mut app, &ctx, vec![]);
+        // The filter dialog opens with its first number field focused, which keeps ⌘Z for typing.
+        ctx.memory_mut(|m| {
+            if let Some(focused) = m.focused() {
+                m.surrender_focus(focused);
+            }
+        });
+        frame(&mut app, &ctx, key_z(egui::Modifiers::COMMAND));
         assert_ne!(field(&app, "horizontal"), Some(json!(30.0)));
         assert_eq!(field(&app, "vertical"), Some(json!(-50.0)), "one step at a time");
-        press_z(&mut app, &ctx, egui::Modifiers::COMMAND);
+        frame(&mut app, &ctx, key_z(egui::Modifiers::COMMAND));
         assert_eq!(field(&app, "vertical"), vertical);
         assert_eq!(past(&app), steps, "the document beneath is untouched");
         for k in &private {
             assert!(field(&app, k).is_some(), "{k} survives");
         }
-        press_z(&mut app, &ctx, egui::Modifiers::COMMAND | egui::Modifiers::SHIFT);
+        frame(&mut app, &ctx, key_z(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT));
         assert_eq!(field(&app, "vertical"), Some(json!(-50.0)));
     }
 

@@ -1,5 +1,14 @@
 //! Dialogs rendered from `UiState::dialogs`. Field values live in the dialog data, so automation can
 //! set them (`ui.dialog.set`) and confirm (`ui.dialog.confirm`) exactly like a user.
+//!
+//! The frame, footer buttons, placement, stacking, Alt-reset, local undo and pass-through are
+//! `craft_ui::dialog::Dialog`; [`show`] feeds it the dialog's JSON fields (as [`Settings`]).
+//! A dialog body plugs in with four pieces:
+//! - a marker key in its fields and an `owns(fields)` test, routed in `command_body` (body),
+//!   `confirm_command` and [`ROUTES`] (confirm);
+//! - `body(ui, fields)`, which draws the controls only: no title, rule or buttons;
+//! - the footer in `footer_for` (labels, roles, enabled state), chosen from the same markers;
+//! - its width class in `width_of`, or its sizes in `resize_of`.
 
 use serde_json::{Value, json};
 
@@ -60,6 +69,12 @@ pub fn free_buttons(ctx: &egui::Context, canvas: egui::Rect) -> crate::paint_mou
 #[cfg(test)]
 pub(crate) fn area_id(id: u64) -> egui::Id {
     craft_ui::dialog::dialog_id(id)
+}
+
+/// Where the open dialogs are on screen.
+#[cfg(test)]
+pub(crate) fn rects(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Vec<egui::Rect> {
+    h.state().ui.dialogs.iter().filter_map(|d| h.ctx.memory(|m| m.area_rect(area_id(d.id)))).collect()
 }
 
 /// Height of a dialog's title, rule, button row and frame margins (points), around a filter body
@@ -917,15 +932,17 @@ mod preference_resize_tests {
 
     #[test]
     fn preferences_can_resize_while_standard_native_dialogs_keep_their_layout() {
+        let ctx = egui::Context::default();
         let prefs = json!({"__prefsui": "prefs"});
         let shortcuts = json!({"__prefsui": "shortcuts"});
         let ordinary = json!({});
         let web = json!({"__web": true});
+        let size = |fields: &serde_json::Value| resize_of(&ctx, fields.as_object().unwrap()).map(|(resize, _)| resize.default);
 
-        assert_eq!(resizable_dialog(prefs.as_object().unwrap()), Some(crate::prefs_ui::PREFERENCES_SIZE));
-        assert_eq!(resizable_dialog(shortcuts.as_object().unwrap()), None);
-        assert_eq!(resizable_dialog(ordinary.as_object().unwrap()), None);
-        assert_eq!(resizable_dialog(web.as_object().unwrap()), Some(egui::vec2(960.0, 900.0)));
+        assert_eq!(size(&prefs), Some(crate::prefs_ui::PREFERENCES_SIZE));
+        assert_eq!(size(&shortcuts), None);
+        assert_eq!(size(&ordinary), None);
+        assert_eq!(size(&web), Some(egui::vec2(960.0, 900.0)));
     }
 
     /// Drags the dialog's resize grip (its frame's bottom-right corner) by `by`.
@@ -942,8 +959,7 @@ mod preference_resize_tests {
     }
 
     fn frame(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> egui::Rect {
-        let rects: Vec<egui::Rect> = h.ctx.data(|m| m.get_temp(egui::Id::unique(RECTS))).unwrap();
-        rects[0]
+        rects(h)[0]
     }
 
     /// The button row sits in the frame's bottom-right corner (its order follows the platform):
@@ -1028,4 +1044,3 @@ mod preference_resize_tests {
         assert!(hugging.is_empty(), "an outline within 4 points of the title at {title:?}: {hugging:?}");
     }
 }
-

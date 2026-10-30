@@ -54,7 +54,6 @@ pub fn compact_button(ui: &mut Ui, label: &str, height: f32) -> Response {
     button_impl_h(ui, label, 0.0, Some(height), t.field, t.text, false)
 }
 
-
 /// What a dialog button does, which decides where the platform's button order puts it: the
 /// library's role and order rule.
 pub use craft_ui::dialog::ButtonRole;

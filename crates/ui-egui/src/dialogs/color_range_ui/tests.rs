@@ -209,7 +209,7 @@ fn dialog_shrinks_back_when_a_mode_needs_fewer_controls() {
     let mut h = harness(app_with_doc());
     open(h.state_mut());
     h.run_steps(4);
-    let area = egui::Id::unique(("dialog", dialog_id(h.state())));
+    let area = crate::dialogs::area_id(dialog_id(h.state()));
     let rect = |h: &Harness<'static, PhotocraftApp>| h.ctx.memory(|m| m.area_rect(area)).unwrap_or(egui::Rect::NOTHING);
     set(&mut h, "select", json!("outOfGamut"));
     let short = rect(&h);
@@ -526,7 +526,7 @@ fn opens_and_previews_in_the_full_app_without_a_gpu() {
     h.get_by_label("Color Range…").click();
     h.run_steps(6);
     let id = dialog_id(h.state());
-    let area = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).expect("the dialog is drawn");
+    let area = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).expect("the dialog is drawn");
     assert!(h.ctx.content_rect().contains_rect(area), "the dialog is on screen: {area:?}");
     assert!(h.query_by_label("Color Range preview").is_some());
     let p = h.state().color_range.as_ref().expect("the preview is cached");

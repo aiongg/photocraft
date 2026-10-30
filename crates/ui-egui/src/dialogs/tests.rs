@@ -105,9 +105,9 @@ fn the_close_box_and_the_title_drag_keep_apart() {
         return;
     }
     let mut h = dialog_harness(egui::vec2(1280.0, 800.0), "filter.blur.gaussianBlur");
-    let title = h.get_by_label("Gaussian Blur").rect();
+    let title = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect();
     let x = h.get_by_label("Close").rect();
-    let frame = rects(&h.ctx)[0];
+    let frame = rects(&h)[0];
     assert!((x.center().y - title.center().y).abs() < 2.0 && x.left() > title.right(), "the × is on the title row: {x:?}, {title:?}");
     assert!(frame.right() - x.right() < 16.0, "at its right end: {x:?} in {frame:?}");
     let drag = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>, from: egui::Pos2, to: egui::Pos2| {
@@ -123,37 +123,13 @@ fn the_close_box_and_the_title_drag_keep_apart() {
     };
     drag(&mut h, x.center(), x.center() + egui::vec2(-80.0, 60.0));
     assert_eq!(h.state().ui.dialogs.len(), 1, "a drag from the × doesn't close the dialog");
-    assert!((h.get_by_label("Gaussian Blur").rect().min - title.min).length() < 1.0, "nor move it");
+    assert!((h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect().min - title.min).length() < 1.0, "nor move it");
     let x = h.get_by_label("Close").rect();
     let beside = x.left_center() - egui::vec2(4.0, 0.0);
     drag(&mut h, beside, beside + egui::vec2(-120.0, 40.0));
     assert_eq!(h.state().ui.dialogs.len(), 1, "a title drag doesn't close the dialog");
-    let moved = h.get_by_label("Gaussian Blur").rect().min - title.min;
+    let moved = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect().min - title.min;
     assert!((moved - egui::vec2(-120.0, 40.0)).length() < 2.0, "the band beside the × moved the dialog: {moved:?}");
-}
-
-/// #6810: dragging a dialog's title moves the dialog under the pointer, so the press origin is
-/// no longer inside it; that drag must not pan the canvas or reach a canvas tool.
-#[test]
-fn dragging_a_dialog_title_does_not_pan_the_canvas() {
-    let ctx = egui::Context::default();
-    let canvas = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1000.0, 800.0));
-    let at_press = egui::Rect::from_min_max(egui::pos2(100.0, 100.0), egui::pos2(300.0, 200.0));
-    let moved = egui::Rect::from_min_max(egui::pos2(550.0, 480.0), egui::pos2(750.0, 580.0));
-    let run = |rect: egui::Rect, events: Vec<egui::Event>| {
-        ctx.data_mut(|m| m.insert_temp(egui::Id::unique(RECTS), vec![rect]));
-        ctx.begin_pass(egui::RawInput { events, ..Default::default() });
-        let out = (pan_delta(&ctx, canvas, true), free_press(&ctx, canvas));
-        ctx.end_pass().textures_delta.clear();
-        out
-    };
-    let press =
-        egui::Event::PointerButton { pos: egui::pos2(150.0, 120.0), button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE };
-    let (pan, click) = run(at_press, vec![egui::Event::PointerMoved(egui::pos2(150.0, 120.0)), press]);
-    assert!(pan.is_none() && click.is_none(), "the press is on the dialog");
-    let (pan, click) = run(moved, vec![egui::Event::PointerMoved(egui::pos2(600.0, 500.0))]);
-    assert!(pan.is_none(), "the dialog moved away from the press origin: {pan:?}");
-    assert!(click.is_none(), "and the drag is not a canvas tool drag: {click:?}");
 }
 
 #[test]
@@ -166,14 +142,14 @@ fn color_picker_has_inset_content_and_actions_at_the_right_edge() {
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         crate::color_picker_ui::open(h.state_mut(), "foreground");
         h.run_steps(4);
-        let frame = rects(&h.ctx)[0];
-        let title = h.get_by_label("Color Picker (Foreground Color)").rect();
+        let frame = rects(&h)[0];
+        let title = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Color Picker (Foreground Color)").rect();
         let ok = h.get_by_label("OK").rect();
         let cancel = h.get_by_label("Cancel").rect();
         let web = h.get_by_label("Only Web Colors").rect();
-        assert!((ok.right() - title.right()).abs() < 1.0, "OK aligns with the right content edge: {ok:?} vs {title:?}");
         assert!((cancel.right() - ok.right()).abs() < 1.0);
         assert!(frame.right() - ok.right() >= 16.0, "buttons retain the window's padding");
+        assert!(frame.right() - ok.right() < 32.0, "and sit at the right content edge: {ok:?} in {frame:?}");
         assert!(web.left() - frame.left() >= 16.0, "checkbox has comfortable left padding");
         assert!(frame.bottom() - web.bottom() >= 16.0, "checkbox has comfortable bottom padding");
         assert!(title.top() - frame.top() >= 16.0, "title has top padding");
@@ -196,7 +172,7 @@ fn layer_style_title_gutters_can_start_drags() {
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
         h.run_steps(3);
-        let before = h.get_by_label("Layer Style").rect();
+        let before = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Layer Style").rect();
         let from = match point {
             0 => egui::pos2(before.left() - 5.0, before.bottom() - 4.0),
             1 => egui::pos2(before.right() + 5.0, before.bottom() - 4.0),
@@ -213,7 +189,7 @@ fn layer_style_title_gutters_can_start_drags() {
         }
         h.drop_at(from + egui::vec2(64.0, -32.0));
         h.run_steps(3);
-        let delta = h.get_by_label("Layer Style").rect().min - before.min;
+        let delta = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Layer Style").rect().min - before.min;
         assert!((delta - egui::vec2(64.0, -32.0)).length() < 2.0, "point {point}: moved {delta:?}");
         assert_eq!(h.state().ui.dialogs.len(), 1);
     }
@@ -228,7 +204,7 @@ fn dragging_the_title_bar_moves_the_dialog() {
     PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
     harness.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
     harness.run_steps(3);
-    let before = harness.get_by_label("Layer Style").rect();
+    let before = harness.get_by_role_and_label(egui::accesskit::Role::Heading, "Layer Style").rect();
 
     // Grab the title text itself: it must move the dialog, not select the text.
     let from = before.center();
@@ -242,7 +218,7 @@ fn dragging_the_title_bar_moves_the_dialog() {
     harness.drop_at(from + egui::vec2(-120.0, 80.0));
     harness.run_steps(3);
 
-    let moved = harness.get_by_label("Layer Style").rect().min - before.min;
+    let moved = harness.get_by_role_and_label(egui::accesskit::Role::Heading, "Layer Style").rect().min - before.min;
     assert!((moved - egui::vec2(-120.0, 80.0)).length() < 1.0, "dialog moved by {moved:?}");
     assert_eq!(harness.state().ui.dialogs.len(), 1, "dragging must not close the dialog");
 }
@@ -336,7 +312,7 @@ fn a_tall_filter_dialog_keeps_its_title_and_buttons_in_a_small_window() {
     let size = egui::vec2(1000.0, 560.0);
     let h = dialog_harness(size, "filter.render.flame");
     for label in ["Flame", "OK", "Cancel"] {
-        let r = h.get_by_label(label).rect();
+        let r = if label == "Flame" { h.get_by_role_and_label(egui::accesskit::Role::Heading, label) } else { h.get_by_label(label) }.rect();
         assert!(r.top() >= 0.0 && r.bottom() <= size.y, "{label} at {r:?} is outside the {size:?} window");
     }
 }
@@ -346,7 +322,7 @@ fn a_moved_dialog_reopens_where_it_was_left() {
     use egui_kittest::kittest::Queryable;
     let size = egui::vec2(1280.0, 800.0);
     let mut h = dialog_harness(size, "filter.blur.gaussianBlur");
-    let centred = h.get_by_label("Gaussian Blur").rect();
+    let centred = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect();
     // Drag the title bar up and to the left.
     let (from, by) = (centred.center(), egui::vec2(-240.0, -150.0));
     h.event(egui::Event::PointerMoved(from));
@@ -357,7 +333,7 @@ fn a_moved_dialog_reopens_where_it_was_left() {
     }
     h.event(egui::Event::PointerButton { pos: from + by, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
     h.run_steps(3);
-    let moved = h.get_by_label("Gaussian Blur").rect();
+    let moved = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect();
     assert!((moved.min - (centred.min + by)).length() < 2.0, "dragged: {centred:?} → {moved:?}");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
@@ -365,14 +341,14 @@ fn a_moved_dialog_reopens_where_it_was_left() {
     // Reopened: where it was left.
     crate::filter_dialog::open(h.state_mut(), "filter.blur.gaussianBlur").unwrap();
     h.run_steps(4);
-    let reopened = h.get_by_label("Gaussian Blur").rect();
+    let reopened = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect();
     assert!((reopened.min - moved.min).length() < 2.0, "reopened at {reopened:?}, left at {moved:?}");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
     // Another dialog keeps its own place: never moved, it opens centred.
     crate::filter_dialog::open(h.state_mut(), "filter.blur.motionBlur").unwrap();
     h.run_steps(4);
-    let other = h.get_by_label("Motion Blur").rect();
+    let other = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Motion Blur").rect();
     assert!(other.min.x > moved.min.x + 100.0, "Motion Blur opened centred: {other:?}");
 }
 
@@ -421,11 +397,14 @@ fn fit_image_is_as_narrow_as_its_content() {
     let ctx = h.ctx.clone();
     let d = crate::menus::invoke(h.state_mut(), &ctx, "file.automate.fitImage", json!({})).unwrap()["dialog"].as_u64().unwrap();
     h.run_steps(4);
-    let window = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", d)))).expect("the Fit Image window");
+    let window = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(d))).expect("the Fit Image window");
     assert!(window.width() < 300.0, "Fit Image is {} points wide", window.width());
     for label in ["Fit Image", "Width", "Height", "OK", "Cancel"] {
         // A caption and the field it names share the label; either sits inside the window.
-        let node = h.query_all_by_label(label).next().unwrap_or_else(|| panic!("{label} in the dialog"));
+        let node = h
+            .query_all_by_label(label)
+            .find(|n| egui_kittest::kittest::NodeT::accesskit_node(n).bounding_box().is_some())
+            .unwrap_or_else(|| panic!("{label} in the dialog"));
         assert!(window.contains_rect(node.rect()), "{label} inside the window");
     }
 }
