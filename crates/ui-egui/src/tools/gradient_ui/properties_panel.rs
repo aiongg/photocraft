@@ -1,10 +1,12 @@
 //! Compact live-gradient Properties controls, sharing the editor's stop interaction.
 
-use super::{
-    Color32, Fill, GradientStyle, Layer, LayerId, Marker, PhotocraftApp, Rect, Sense, Sink, Stroke, StrokeKind, Tokens, c32, cmds, edit_stop_color, fill_of,
-    json, preset_stop_color, selection_after_edit, stops_editor_for, strip_key, vec2, widgets,
-};
-use crate::{icons, props_layout, theme};
+use super::{Color32, Fill, GradientStyle, Layer, LayerId, PhotocraftApp, Rect, Sense, Sink, StrokeKind, cmds, fill_of, json, stops_editor_for, vec2};
+use crate::{icons, props_layout};
+use craft_ui::composites::PropertyRow;
+use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, NumberField};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::{LocaleNumbers, Unit};
+use craft_ui::primitives::{Content, Text};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 
@@ -43,7 +45,8 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     let Some(Fill::Gradient { angle, scale, style, reverse, dither, align, .. }) = fill_of(layer).cloned() else { return };
     if props_layout::section(ui, "gradient-fill-options", "Gradient Options") {
         ui.horizontal(|ui| {
-            row_label(ui, "Style");
+            let theme = craft_ui::theme::current(ui.ctx());
+            ui.add_sized(vec2(theme.component.property.word_width, theme.component.field.height.get(ControlSize::Md)), Text::new(tl!("Style")).content(Content::Muted));
             ui.spacing_mut().item_spacing.x = 3.0;
             for (value, name) in STYLES {
                 if style_button(ui, value, value == style, name).clicked() {
@@ -60,20 +63,20 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
         }
         ui.horizontal_wrapped(|ui| {
             let mut value = reverse;
-            if craft_ui::controls::Checkbox::bool(tl!("Reverse"), &mut value).show(ui).response.changed() {
+            if Checkbox::bool(tl!("Reverse"), &mut value).show(ui).response.changed() {
                 let _ = app.run(cmds::SET, json!({"layer": layer.id.0, "reverse": value}));
             }
             let mut value = dither;
-            if craft_ui::controls::Checkbox::bool(tl!("Dither"), &mut value).show(ui).response.changed() {
+            if Checkbox::bool(tl!("Dither"), &mut value).show(ui).response.changed() {
                 let _ = app.run(cmds::SET, json!({"layer": layer.id.0, "dither": value}));
             }
         });
         let mut value = align;
-        if craft_ui::controls::Checkbox::bool(tl!("Align with layer"), &mut value).show(ui).response.changed() {
+        if Checkbox::bool(tl!("Align with layer"), &mut value).show(ui).response.changed() {
             let _ = app.run(cmds::SET, json!({"layer": layer.id.0, "align": value}));
         }
         if ui
-            .add(craft_ui::controls::Button::new(tl!("Reset Alignment")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(ui.available_width()))
+            .add(Button::new(tl!("Reset Alignment")).variant(ButtonVariant::Secondary).min_width(ui.available_width()))
             .on_hover_text(tl!("Centre the gradient (offset 0, 0)"))
             .clicked()
         {
@@ -86,27 +89,34 @@ fn current_fill(app: &PhotocraftApp, id: LayerId) -> Option<Fill> {
     fill_of(app.session.active()?.doc.layer(id)?).cloned()
 }
 
-fn row_label(ui: &mut egui::Ui, name: &str) -> egui::Response {
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.add_sized(vec2(72.0, 24.0), egui::Label::new(egui::RichText::new(tl!(name)).color(t.color.text.muted.to_egui())).halign(egui::Align::Min))
-}
-
-/// Scrubbing/typing commits once, as the existing Properties fields do.
+/// A word-labelled number field. Scrubbing and typing commit once, as the existing Properties
+/// fields do: the gesture's value is shown until it ends, and the edit is returned then.
 fn numeric_row(ui: &mut egui::Ui, id: &str, name: &str, current: f32, range: std::ops::RangeInclusive<f32>, suffix: &str) -> Option<f32> {
+    let numbers = LocaleNumbers::of(ui);
+    let unit = Unit::new(&format!("{{n}}{suffix}"));
     ui.push_id(id, |ui| {
-        ui.horizontal(|ui| {
-            let label = row_label(ui, name);
-            let key = ui.scope_id().with("draft");
-            let mut value = ui.data(|d| d.get_temp::<f32>(key)).unwrap_or(current);
-            let response = widgets::value_field(ui, &mut value, range, suffix, ui.available_width().min(88.0)).labelled_by(label.id);
-            if response.dragged() || response.has_focus() {
-                ui.data_mut(|d| d.insert_temp(key, value));
-                return None;
+        let draft = ui.scope_id().with("draft");
+        let shown = ui.data(|d| d.get_temp::<f32>(draft)).unwrap_or(current);
+        let edit = PropertyRow::word(tl!(name))
+            .show(ui, |ui, _| NumberField::new("value", tl!(name), shown, &numbers).range(range).decimals(0..=2).unit(unit).size(ControlSize::Md).show(ui))
+            .inner;
+        match edit.event {
+            Some(EditEvent::Update { value, .. }) => {
+                ui.data_mut(|d| d.insert_temp(draft, value as f32));
+                None
             }
-            ui.data_mut(|d| d.remove::<f32>(key));
-            (response.drag_stopped() || response.lost_focus() || response.changed()).then_some(value).filter(|v| (*v - current).abs() > 1e-3)
-        })
-        .inner
+            Some(EditEvent::Commit { value, changed, .. }) => {
+                ui.data_mut(|d| d.remove::<f32>(draft));
+                Some(value as f32).filter(|_| changed)
+            }
+            Some(EditEvent::Set { value, .. }) => Some(value as f32),
+            Some(EditEvent::Cancel { .. }) => {
+                ui.data_mut(|d| d.remove::<f32>(draft));
+                None
+            }
+            _ => None,
+        }
+        .filter(|v| (*v - current).abs() > 1e-3)
     })
     .inner
 }
@@ -150,89 +160,6 @@ fn style_button(ui: &mut egui::Ui, style: GradientStyle, selected: bool, name: &
     );
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), selected, tl!(name)));
     response.on_hover_text(tl!(name))
-}
-
-pub(super) fn stop_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, sink: Sink) {
-    let Some(Fill::Gradient { mut stops, mut opacity_stops, midpoints, .. }) = sink.fill(app) else { return };
-    stops.sort_by(|a, b| a.0.total_cmp(&b.0));
-    if opacity_stops.is_empty() {
-        opacity_stops = vec![(0.0, 1.0), (1.0, 1.0)];
-    }
-    opacity_stops.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let key = strip_key(app, sink).with("selection");
-    let selected = ui.data(|d| d.get_temp::<Marker>(key)).unwrap_or(Marker::Color(0));
-    let (index, location, count) = match selected {
-        Marker::Color(i) => {
-            let Some((location, color)) = stops.get(i) else {
-                ui.data_mut(|d| d.remove::<Marker>(key));
-                return;
-            };
-            ui.horizontal(|ui| {
-                row_label(ui, "Color");
-                let (rect, response) = ui.allocate_exact_size(vec2(88.0, 24.0), Sense::click());
-                let rgb = color.to_rgb();
-                ui.painter().rect_filled(rect.shrink(2.0), craft_ui::theme::current(ui.ctx()).shape.radius.control, c32([rgb[0], rgb[1], rgb[2], 1.0]));
-                ui.painter().rect_stroke(
-                    rect,
-                    craft_ui::theme::current(ui.ctx()).shape.radius.control,
-                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()),
-                    StrokeKind::Inside,
-                );
-                response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Color")));
-                if response.on_hover_text(tl!("Color")).clicked() {
-                    match sink {
-                        Sink::Layer(id) => edit_stop_color(app, id, i),
-                        Sink::Preset => preset_stop_color(app, i),
-                    }
-                }
-            });
-            (i, *location, stops.len())
-        }
-        Marker::Opacity(i) => {
-            let Some((location, opacity)) = opacity_stops.get(i) else {
-                ui.data_mut(|d| d.remove::<Marker>(key));
-                return;
-            };
-            if let Some(value) = numeric_row(ui, &format!("opacity-{i}"), "Opacity", *opacity * 100.0, 0.0..=100.0, "%") {
-                let _ = app.run(sink.cmd(), sink.params(json!({"action": "opacity", "kind": "opacity", "index": i, "opacity": value})));
-            }
-            (i, *location, opacity_stops.len())
-        }
-        Marker::Mid(i) => {
-            if stops.get(i).is_none() || stops.get(i.saturating_add(1)).is_none() {
-                ui.data_mut(|d| d.remove::<Marker>(key));
-                return;
-            }
-            if let Some(value) = numeric_row(ui, &format!("midpoint-{i}"), "Midpoint", midpoints.get(i).copied().unwrap_or(0.5) * 100.0, 5.0..=95.0, "%") {
-                let _ = app.run(sink.cmd(), sink.params(json!({"action": "midpoint", "index": i, "location": value / 100.0})));
-            }
-            return;
-        }
-    };
-    let kind = if matches!(selected, Marker::Opacity(_)) { "opacity" } else { "color" };
-    if let Some(value) = numeric_row(ui, &format!("{kind}-location-{index}"), "Location", location * 100.0, 0.0..=100.0, "%") {
-        let p = sink.params(json!({"action": "move", "kind": kind, "index": index, "location": value / 100.0}));
-        let selection = sink.fill(app).and_then(|f| selection_after_edit(&f, &p, Some(selected)));
-        if app.run(sink.cmd(), p).is_ok() {
-            if let Some(marker) = selection {
-                ui.data_mut(|d| d.insert_temp(key, marker));
-            }
-            // Index belongs to the old ordering; render the remaining controls next frame.
-            return;
-        }
-    }
-    ui.horizontal(|ui| {
-        ui.add_space(72.0 + ui.spacing().item_spacing.x);
-        ui.add_enabled_ui(count > 2, |ui| {
-            let response = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Trash, "Delete").size(craft_ui::controls::ControlSize::Md));
-            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Delete")));
-            if response.clicked() {
-                let _ = app.run(sink.cmd(), sink.params(json!({"action": "delete", "kind": kind, "index": index})));
-                ui.data_mut(|d| d.remove::<Marker>(key));
-            }
-        });
-    });
-    ui.add_space(theme::ROW_GAP);
 }
 
 #[cfg(test)]
