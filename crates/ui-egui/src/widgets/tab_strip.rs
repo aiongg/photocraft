@@ -90,11 +90,9 @@ fn tabs_in(
         // The padding gives way (down to a third) before the label is cut.
         let galley = elided(ui, name, font.clone(), t.text, (w - pad / 3.0).max(1.0));
         let cut = galley.size().x + pad + 0.5 < natural.get(i).copied().unwrap_or(0.0) && galley.size().x + pad / 3.0 >= w - 0.5;
-        let resp = craft_ui::tabs::Tab::new(id.with(("tab", i)), name, i == *selected).sense(Sense::click()).focus_stroke(Stroke::new(1.0, t.accent)).show_at(
-            ui,
-            r,
-            |ui, resp| paint_tab(ui, r, i, panel_id, galley, resp, active(i)),
-        );
+        let resp = ui.interact(r, id.with(("tab", i)), Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, i == *selected, name));
+        paint_tab(ui, r, i, panel_id, galley, &resp, active(i));
         let resp = if cut { resp.on_hover_text(*name) } else { resp };
         if resp.clicked() {
             *selected = i;
