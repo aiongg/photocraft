@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 
 [workspace.dependencies]
-craft-ui = { git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc", features = ["serde"] }
+craft-ui = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45", features = ["serde"] }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
@@ -39,13 +39,13 @@ photocraft-tablet = { path = "crates/tablet" }
 photocraft-ipp = { path = "crates/ipp" }
 
 # external
-craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc" }
-craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc" }
-craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc" }
-craft-keymap = { git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc" }
-craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc" }
+craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45" }
+craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45" }
+craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45" }
+craft-keymap = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45" }
+craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45" }
 # craft-update: app-specific pretend versions apply to startup and manual checks.
-craft-update = { git = "https://github.com/aiongg/craft-libs", version = "=0.1.0", rev = "c8fadab6ca62aed0d17d73e38bd4ea7d838ae4dc", features = ["egui"] }
+craft-update = { git = "https://github.com/aiongg/craft-libs", version = "=0.1.0", rev = "13796bddecc339dc11927c913837f4ad56c04c45", features = ["egui"] }
 thiserror = "2"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
