@@ -4,8 +4,8 @@
 //! values). Selective Color previews live while a slider drags, via `app.live_adjust` carrying
 //! the full parameter set; Color Lookup commits on every change (its table isn't in the params).
 
-use std::sync::{Arc, Mutex, PoisonError};
 use craft_ui::theme::ToEgui;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use photocraft_doc::{Adjustment, LayerId};
 use photocraft_engine::adjust_cmds::RANGES;

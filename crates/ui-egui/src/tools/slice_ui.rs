@@ -4,8 +4,8 @@
 //! (`slice.new`, `slice.set`, `slice.promote`, `slice.divide`, `slice.delete`); this module only
 //! turns pointer gestures into them.
 
-use egui::{Color32, Rect, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Rect, Stroke, vec2};
 use photocraft_doc::slices::{self, ResolvedSlice};
 use photocraft_doc::{Document, SliceOrigin};
 use serde::{Deserialize, Serialize};
@@ -264,10 +264,20 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
                 let pts = [sr.left_top(), sr.right_top(), sr.right_bottom(), sr.left_bottom(), sr.left_top()];
                 painter.add(egui::Shape::dashed_line(&pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color.gamma_multiply(0.7)), 3.0, 3.0));
             } else {
-                painter.rect_stroke(sr, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color), egui::StrokeKind::Inside);
+                painter.rect_stroke(
+                    sr,
+                    craft_ui::theme::scale::Radius::R0.px(),
+                    craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color),
+                    egui::StrokeKind::Inside,
+                );
             }
             if selected && tool_on {
-                painter.rect_stroke(sr, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color), egui::StrokeKind::Inside);
+                painter.rect_stroke(
+                    sr,
+                    craft_ui::theme::scale::Radius::R0.px(),
+                    craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color),
+                    egui::StrokeKind::Inside,
+                );
                 if r.origin == SliceOrigin::User {
                     for c in [
                         sr.left_top(),
@@ -306,17 +316,32 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     match &app.ui.slices.drag {
         Some(SliceDrag::New { start, cur }) => {
             let sr = to_screen(new_rect(app, *start, *cur));
-            painter.rect_stroke(sr, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE), egui::StrokeKind::Middle);
+            painter.rect_stroke(
+                sr,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE),
+                egui::StrokeKind::Middle,
+            );
             let pts = [sr.left_top(), sr.right_top(), sr.right_bottom(), sr.left_bottom(), sr.left_top()];
             painter.add(egui::Shape::dashed_line(&pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color), 4.0, 4.0));
         }
         Some(SliceDrag::Move { start, cur, rect, .. }) => {
             let r = rect.translate((cur[0] - start[0]).round() as i32, (cur[1] - start[1]).round() as i32);
-            painter.rect_stroke(to_screen(r), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color), egui::StrokeKind::Inside);
+            painter.rect_stroke(
+                to_screen(r),
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color),
+                egui::StrokeKind::Inside,
+            );
         }
         Some(SliceDrag::Resize { handle, start, cur, rect, .. }) => {
             let r = resized(*rect, *handle, (cur[0] - start[0]).round() as i32, (cur[1] - start[1]).round() as i32);
-            painter.rect_stroke(to_screen(r), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color), egui::StrokeKind::Inside);
+            painter.rect_stroke(
+                to_screen(r),
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), selected_color),
+                egui::StrokeKind::Inside,
+            );
         }
         None => {}
     }

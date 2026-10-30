@@ -1,6 +1,6 @@
 use super::shortcuts::shortcut_items;
-use craft_ui::theme::ToEgui;
 use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Tokens, Value, json, prefs};
+use craft_ui::theme::ToEgui;
 
 // ------------------------------------------------------------------ menu routing
 

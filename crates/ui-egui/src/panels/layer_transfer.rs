@@ -12,8 +12,8 @@
 //! A Move-tool drag starting inside a selection or moving a floating piece stays a move: Photoshop
 //! would copy just the selected pixels, which is not supported yet.
 
-use photocraft_doc::{DocId, LayerId};
 use craft_ui::theme::StrokeExt;
+use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
 
 use crate::PhotocraftApp;

@@ -9,8 +9,8 @@
 //! initialization, reusing the cached solver factorization. Warm-starting from earlier drag
 //! previews made the result depend on pointer history and snap to a different shape on release.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::{Color32, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::puppet::{ITERATIONS, PuppetDensity, PuppetMesh, PuppetMode, PuppetPin, PuppetSolver, PuppetWarp, build_mesh};

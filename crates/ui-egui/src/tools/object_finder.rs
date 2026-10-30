@@ -11,8 +11,8 @@
 //! Sample All Layers, and clears when the pointer leaves the canvas, the tool changes, a button
 //! goes down or the option is off. Quality of the object found is out of scope here (#2788).
 
-use std::sync::Arc;
 use craft_ui::theme::ToEgui;
+use std::sync::Arc;
 
 use egui::{Color32, TextureOptions, pos2};
 use photocraft_algo::selection::Region;

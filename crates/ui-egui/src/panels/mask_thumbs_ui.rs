@@ -9,8 +9,8 @@
 //! #196: ⌥-click a layer-mask thumbnail to view the mask (⇧⌥: as an overlay), ⌘-click either
 //! mask to load it as a selection, and click the vector mask to target it (brackets).
 
-use egui::{Color32, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerId, VectorMask};
 use serde_json::{Value, json};
 

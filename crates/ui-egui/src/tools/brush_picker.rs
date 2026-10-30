@@ -19,9 +19,9 @@
 //! `tools.setBrush` ([`crate::brush_panel::commit_gesture`]) and applies the returned [`Pick`]s
 //! with [`apply`], so every change is a journaled command (Rule 1).
 
-use egui::{CursorIcon, RichText, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{CursorIcon, RichText, Stroke, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE, TipShape};
 use serde_json::{Value, json};
@@ -337,7 +337,8 @@ pub fn resize_grip(ui: &mut egui::Ui, frame: egui::Rect, content: egui::Vec2) ->
     let corner = grip.right_bottom() - vec2(3.0, 3.0);
     for i in 0..3 {
         let o = i as f32 * 4.0;
-        ui.painter().line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui()));
+        ui.painter()
+            .line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui()));
     }
     if resp.hovered() || resp.dragged() {
         ui.ctx().set_cursor_icon(CursorIcon::ResizeNwSe);

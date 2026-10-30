@@ -1,6 +1,6 @@
 use super::defaults::apply;
-use craft_ui::theme::ToEgui;
 use super::{Arc, HashMap, PhotocraftApp, PoisonError, json};
+use craft_ui::theme::ToEgui;
 
 /// Font families: bundled, system, and those the host serves (`photocraft_text::served`, fetched
 /// when picked). Cached until the shared engine registers fonts or the served catalog changes.
@@ -702,7 +702,13 @@ pub(crate) fn family_picker_in(
                         if let Some(format) = format {
                             let center = egui::pos2(response.rect.right() - 8.0 - slot - FONT_BADGE_WIDTH / 2.0, response.rect.center().y);
                             let t = craft_ui::theme::current(ui.ctx());
-                            ui.painter().text(center, egui::Align2::CENTER_CENTER, format.badge(), egui::FontId::proportional(10.0), t.color.text.muted.to_egui());
+                            ui.painter().text(
+                                center,
+                                egui::Align2::CENTER_CENTER,
+                                format.badge(),
+                                egui::FontId::proportional(10.0),
+                                t.color.text.muted.to_egui(),
+                            );
                             let tip = egui::Rect::from_center_size(center, egui::vec2(FONT_BADGE_WIDTH, 14.0));
                             ui.interact(tip, ui.scope_id().with(("font-format", f, recent_row)), egui::Sense::hover())
                                 .on_hover_text(crate::font_filters::format_tip(format));

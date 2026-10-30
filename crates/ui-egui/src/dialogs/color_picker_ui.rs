@@ -5,8 +5,8 @@
 //! While it is the top dialog the image is its eyedropper, as in Photoshop: the pointer over the
 //! canvas is a pipette, and a click or drag there samples into the new colour ([`sample_at`]).
 
-use egui::{Color32, Mesh, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Mesh, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
@@ -486,9 +486,18 @@ fn color_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if web_only { flat_grid_mesh(rect, WEB_CELLS, |x, y| web_safe(color(x, y))) } else { grid_mesh(rect, 32, color) }
     };
     ui.painter().add(mesh(field, &|x, y| field_color(&mode, fz, x, y)));
-    ui.painter().rect_stroke(field, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        field,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        StrokeKind::Outside,
+    );
     let marker = pos2(field.left() + fx * field.width(), field.top() + fy * field.height());
-    ui.painter().circle_stroke(marker, 5.0, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if hsv[2] > 0.6 && hsv[1] < 0.4 { Color32::BLACK } else { Color32::WHITE }));
+    ui.painter().circle_stroke(
+        marker,
+        5.0,
+        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if hsv[2] > 0.6 && hsv[1] < 0.4 { Color32::BLACK } else { Color32::WHITE }),
+    );
     // Photoshop updates the colour on the press itself, not only when the button is released
     // (#6937): `is_pointer_button_down_on` is true from the press frame onwards (it covers
     // dragging too), while `clicked` fires on release and `dragged` only after a move.

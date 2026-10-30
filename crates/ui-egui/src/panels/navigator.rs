@@ -104,7 +104,12 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let vh = canvas.height() / point_zoom * s;
     let c = pos2(rect.min.x + center[0] * s, rect.min.y + center[1] * s);
     let vr = Rect::from_center_size(c, vec2(vw, vh)).intersect(frame.shrink(1.0));
-    ui.painter().rect_stroke(vr, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::from_rgb(255, 84, 84)), StrokeKind::Middle);
+    ui.painter().rect_stroke(
+        vr,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::from_rgb(255, 84, 84)),
+        StrokeKind::Middle,
+    );
     // Photoshop's one row under the preview (#4840): the zoom, typed in percent, then Zoom Out,
     // the slider and Zoom In.
     let controls = ui.vertical(|ui| {

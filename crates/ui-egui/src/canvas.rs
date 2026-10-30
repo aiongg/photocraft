@@ -4,8 +4,8 @@
 //! update only their damage rectangle (`set_partial`). The wgpu compositor (M5) will replace this
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
-use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Rect as DRect;
 use serde_json::json;
@@ -1293,7 +1293,12 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview),
     // nor while the Crop tool hides everything outside its box (Show Cropped Area off).
     if border == photocraft_engine::prefs::CanvasBorder::Line && !beyond && !crate::crop_shield::hides_outside(app) {
-        painter.rect_stroke(edge_rect, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20)), egui::StrokeKind::Outside);
+        painter.rect_stroke(
+            edge_rect,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20)),
+            egui::StrokeKind::Outside,
+        );
     }
     crate::type_tool::draw_overlay(app, painter, xf);
     crate::transform_tool::draw_overlay(app, painter, xf);
@@ -1630,7 +1635,10 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
     let camera = input.camera;
     app.tool_override = None;
     if let Some(b) = layer_edges_rect(app, idx) {
-        painter.set(layer_edges, egui::Shape::rect_stroke(xf.doc_rect(b), 0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), LAYER_EDGES), egui::StrokeKind::Outside));
+        painter.set(
+            layer_edges,
+            egui::Shape::rect_stroke(xf.doc_rect(b), 0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), LAYER_EDGES), egui::StrokeKind::Outside),
+        );
     }
     // A tool drag held past the canvas edge scrolls the view toward the pointer (#4183); the
     // drag's next move then extends into what scrolled in.

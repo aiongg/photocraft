@@ -6,8 +6,8 @@
 //! On the layer mask (double-click its Channels row, or Mask Options… on its Layers thumbnail)
 //! it is Photoshop's Layer Mask Display Options: just the rubylith's colour and opacity.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use photocraft_doc::ColorIndicates;
 use serde_json::{Map, Value, json};
 

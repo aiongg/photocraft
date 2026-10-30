@@ -5,8 +5,8 @@
 //! Rows can be dragged onto the footer's buttons, as in Photoshop (#4689): New duplicates the
 //! channel, Delete deletes it, and Load Channel as Selection loads it.
 
-use egui::{Align2, Color32, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::ColorIndicates;
 use photocraft_engine::channel_cmds::{self, ChannelTarget};
 use serde_json::{Value, json};
@@ -235,7 +235,10 @@ fn paint_row_background(painter: &egui::Painter, t: &Tokens, rect: Rect, selecte
         painter.rect_filled(rect, radius, t.hover.gamma_multiply(0.5));
     }
     if t.pro {
-        painter.line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
+        painter.line_segment(
+            [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator),
+        );
         painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
     }
 }
@@ -244,7 +247,11 @@ fn paint_row_background(painter: &egui::Painter, t: &Tokens, rect: Rect, selecte
 fn paint_spot_swatch(painter: &egui::Painter, thumb: Rect, spot: Option<(photocraft_doc::Color, f32)>) {
     let Some((ink, _)) = spot else { return };
     let c = ink.to_rgb().map(|v| (v.clamp(0.0, 1.0) * 255.0) as u8);
-    painter.rect_filled(Rect::from_min_size(thumb.right_bottom() - vec2(9.0, 9.0), vec2(9.0, 9.0)), craft_ui::theme::scale::Radius::R0.px(), Color32::from_rgb(c[0], c[1], c[2]));
+    painter.rect_filled(
+        Rect::from_min_size(thumb.right_bottom() - vec2(9.0, 9.0), vec2(9.0, 9.0)),
+        craft_ui::theme::scale::Radius::R0.px(),
+        Color32::from_rgb(c[0], c[1], c[2]),
+    );
 }
 
 fn row_presentation(row: Row, context: &RowPresentationContext<'_>, mask_visible: bool) -> RowPresentation {
@@ -388,7 +395,12 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if let Row::Alpha(i) = row {
                 paint_spot_swatch(&painter, thumb, doc.channels[i].spot);
             }
-            painter.rect_stroke(thumb, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if t.pro { Color32::from_gray(20) } else { t.field_border }), StrokeKind::Outside);
+            painter.rect_stroke(
+                thumb,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if t.pro { Color32::from_gray(20) } else { t.field_border }),
+                StrokeKind::Outside,
+            );
             let italic = matches!(row, Row::QuickMask | Row::LayerMask) || matches!(row, Row::Alpha(i) if doc.channels[i].spot.is_some());
             let mut job = egui::text::LayoutJob::default();
             let font = if selected && !t.pro { theme::medium(12.5) } else { egui::FontId::proportional(12.0) };

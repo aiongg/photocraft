@@ -2,8 +2,8 @@
 //! name and what the preset captures in the middle, OK and Cancel on the right. Every way of making
 //! a preset opens it: the picker's [+] and its gear menu, the Brush Settings [+] and the Brushes
 //! tab's [+]. Nothing is saved until OK.
-use egui::{Color32, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Color32, pos2, vec2};
 use photocraft_paint::{BrushPreset, BrushSettings};
 use serde_json::{Map, Value, json};
 
@@ -81,7 +81,14 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
         // The tip as the preset cards draw it, and the size under it.
         let (r, _) = ui.allocate_exact_size(vec2(PREVIEW, PREVIEW), egui::Sense::hover());
         ui.painter().rect_filled(r, t.shape.radius.control, t.color.surface.sunken.to_egui());
-        let tip = crate::brush_preview::tip_texture(ui.ctx(), "new-preset-tip", &brush.tip, (brush.hardness, brush.angle, brush.roundness), 64, t.color.text.normal.to_egui());
+        let tip = crate::brush_preview::tip_texture(
+            ui.ctx(),
+            "new-preset-tip",
+            &brush.tip,
+            (brush.hardness, brush.angle, brush.roundness),
+            64,
+            t.color.text.normal.to_egui(),
+        );
         let side = (PREVIEW - 30.0) * crate::brush_sections::thumb_scale(brush.size);
         let tr = egui::Rect::from_center_size(pos2(r.center().x, r.top() + 8.0 + (PREVIEW - 30.0) / 2.0), vec2(side, side));
         ui.painter().image(tip.id(), tr, egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);

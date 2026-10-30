@@ -1,9 +1,9 @@
 use super::layer_drag::{MaskDrag, fx_drop, layer_drag_and_drop, mask_drag_key, start_fx_drag, starts_mask_drag};
-use craft_ui::theme::StrokeExt;
 use super::layers::simple_lock_toggle;
 use super::{
     Color32, CornerRadius, Layer, LayerContent, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Value, icons, json, pos2, theme, vec2, widgets,
 };
+use craft_ui::theme::StrokeExt;
 
 /// How a Layers panel row is selected: in the (multi-)selection, the primary/active layer, and
 /// whether several layers are selected.
@@ -299,7 +299,10 @@ fn paint_row_background(painter: &egui::Painter, t: &Tokens, l: &Layer, rect: Re
     }
     if t.pro {
         // Paint dividers over the label so the eye column stays distinct.
-        painter.line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
+        painter.line_segment(
+            [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator),
+        );
         painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
     }
 }

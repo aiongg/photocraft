@@ -1,11 +1,11 @@
 use super::controls::{pointer, tool_icon, tool_tip};
-use craft_ui::theme::StrokeExt;
 use super::lifecycle::{apply, bounds, cancel, commit, fill_edit, report, reset, set_sampling};
 use super::preview::{drive_preview, rebase, refresh};
 use super::{
     Align2, BAR_H, CafTool, CafWorkspace, Color32, ERect, FontId, LEFT_W, PANEL_W, PREVIEW_W, PhotocraftApp, Pos2, Rect, Sense, Stroke, Tokens, ToolEvent,
     Value, json, pos2, vec2, widgets,
 };
+use craft_ui::theme::StrokeExt;
 
 /// A view: screen px per document px and the document point at the centre of `area`.
 #[derive(Clone, Copy)]
@@ -393,7 +393,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
             None => {
                 let b = v.rect(bounds(&w.base));
-                clip.rect_stroke(b, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::WHITE), egui::StrokeKind::Outside);
+                clip.rect_stroke(
+                    b,
+                    craft_ui::theme::scale::Radius::R0.px(),
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
             }
         }
         ctx.request_repaint_after(std::time::Duration::from_millis(120));
@@ -411,7 +416,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
             w.hover = Some(v.to_doc(hp));
         }
-        clip.rect_stroke(img, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
+        clip.rect_stroke(
+            img,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            egui::StrokeKind::Outside,
+        );
         // Mouse → tools (Space, the middle button or the Hand pan).
         let pan = ui.input(|i| i.key_down(egui::Key::Space) || i.pointer.middle_down()) || w.tool == CafTool::Hand;
         if pan && resp.dragged() {

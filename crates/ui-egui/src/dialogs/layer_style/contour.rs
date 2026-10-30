@@ -7,8 +7,8 @@
 //! - `contourEditor`: `{effect, key, original}` while the Contour Editor is open; `original` is
 //!   the param Cancel restores.
 
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::Contour;
 use photocraft_doc::adjust::CurvePoint;
 use photocraft_engine::layer_style::{CONTOURS, contour_from_param, contour_param, contour_to_shc, contours_from_shc};
@@ -112,7 +112,12 @@ pub(super) fn row(
         let (r, thumb) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::click());
         draw(ui.painter(), r, &c, t.text, &t);
         if thumb.hovered() {
-            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), StrokeKind::Outside);
+            ui.painter().rect_stroke(
+                r,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+                StrokeKind::Outside,
+            );
         }
         if thumb.on_hover_text(tl!("Contour Editor")).clicked() {
             open_editor(f, effect, key);
@@ -143,7 +148,12 @@ pub(super) fn row(
                     let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
                     draw(ui.painter(), r, &preset, t.text, &t);
                     if preset == c || resp.hovered() {
-                        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), StrokeKind::Outside);
+                        ui.painter().rect_stroke(
+                            r,
+                            craft_ui::theme::scale::Radius::R0.px(),
+                            craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent),
+                            StrokeKind::Outside,
+                        );
                     }
                     if resp.on_hover_text(tl!(name)).clicked() {
                         chosen = Some(name);
@@ -161,7 +171,12 @@ pub(super) fn row(
                         let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
                         draw(ui.painter(), r, u, t.text, &t);
                         if *u == c || resp.hovered() {
-                            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), StrokeKind::Outside);
+                            ui.painter().rect_stroke(
+                                r,
+                                craft_ui::theme::scale::Radius::R0.px(),
+                                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent),
+                                StrokeKind::Outside,
+                            );
                         }
                         let name = name_of(u).to_string();
                         let resp = resp.on_hover_text(name.as_str());

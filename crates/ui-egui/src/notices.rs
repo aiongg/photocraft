@@ -3,8 +3,8 @@
 //! flattened", files that couldn't be opened). Notices live in [`UiState`](crate::UiState) so the
 //! control channel can read them (`ui.inspect`) and clear them (`ui.set`).
 
-use serde::{Deserialize, Serialize};
 use craft_ui::theme::StrokeExt;
+use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
 

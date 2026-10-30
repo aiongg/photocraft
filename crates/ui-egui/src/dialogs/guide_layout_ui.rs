@@ -1,8 +1,8 @@
 //! Photoshop-style guide layout dialog. Its preview is a pure guide overlay, never an edit.
 
-use egui::{Color32, Stroke};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Color32, Stroke};
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 
@@ -213,7 +213,13 @@ fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: egu
     };
     let t = craft_ui::theme::current(ui.ctx());
     let response = ui
-        .add(egui::TextEdit::singleline(&mut value).id_salt(key).desired_width(60.0).font(crate::theme::mono(12.0)).background_color(t.color.surface.sunken.to_egui()))
+        .add(
+            egui::TextEdit::singleline(&mut value)
+                .id_salt(key)
+                .desired_width(60.0)
+                .font(crate::theme::mono(12.0))
+                .background_color(t.color.surface.sunken.to_egui()),
+        )
         .labelled_by(label);
     if ui.is_enabled() {
         crate::field_tab::register(ui.ctx(), response.id);
@@ -229,7 +235,11 @@ fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: egu
 
 fn group<R>(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let t = craft_ui::theme::current(ui.ctx());
-    egui::Frame::new().stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui())).inner_margin(8).show(ui, |ui| ui.vertical(content).inner).inner
+    egui::Frame::new()
+        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
+        .inner_margin(8)
+        .show(ui, |ui| ui.vertical(content).inner)
+        .inner
 }
 
 fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {

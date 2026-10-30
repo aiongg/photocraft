@@ -1,7 +1,7 @@
 use super::path_ops::active_path_name;
-use craft_ui::theme::ToEgui;
 use super::shapes::is_shape_tool;
 use super::{GradientChoices, LayerContent, PaintChange, PhotocraftApp, Tokens, Tool, Value, json, paint_param, swatch};
+use craft_ui::theme::ToEgui;
 
 // ---------------------------------------------------------------------------------------------
 // Options bars

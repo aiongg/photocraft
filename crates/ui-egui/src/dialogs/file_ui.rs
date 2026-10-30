@@ -5,8 +5,8 @@
 //! Events Manager, Package and Paths to Illustrator. Every OK runs the engine command with the
 //! dialog's fields, so the control channel can drive them with `ui.dialog.set` / `confirm`.
 
-use std::sync::Arc;
 use craft_ui::theme::ToEgui;
+use std::sync::Arc;
 
 use photocraft_engine::web_cmds::{self, Optimized, WebSettings};
 use serde_json::{Map, Value, json};

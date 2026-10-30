@@ -5,8 +5,8 @@
 //! one), so it is one History step; Cancel changes nothing. The fields are the command's params,
 //! so `ui.dialog.set` / `ui.dialog.confirm` drive it like any dialog.
 
-use std::hash::{Hash, Hasher};
 use craft_ui::theme::ToEgui;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use photocraft_doc::{DocId, Document, Fill, LayerContent};

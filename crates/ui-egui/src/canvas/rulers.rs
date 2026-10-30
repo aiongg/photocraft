@@ -2,9 +2,9 @@
 //! moved with the Move tool (drag one off the canvas or onto a ruler to delete it), all through
 //! undoable engine commands (`view.newGuide` / `view.moveGuide` / `view.deleteGuide`).
 
-use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::Document;
 use photocraft_engine::prefs::{GuidesGridAndSlices, Unit};
 use serde_json::json;

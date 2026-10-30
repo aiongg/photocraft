@@ -1,5 +1,4 @@
 use super::display::{canvas_display, checker, display_doc, display_image};
-use craft_ui::theme::StrokeExt;
 use super::drag::{
     angle_readout, draw_marquee_readout, draw_value_readout, marquee_ants, marquee_drag_ants, marquee_preview_px, single_line_drag_px, size_readout,
 };
@@ -8,6 +7,7 @@ use super::strokes::{EngineStroke, SPOT_HEALING_TRAIL, draw_smoothing_string, st
 use super::textures::texture_side;
 use super::view_xform::ViewXform;
 use super::{Color32, DRect, Document, Mesh, PhotocraftApp, Pos2, Rect, Stroke, TextureOptions, Tool, json, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 /// A texture mapped over the `size` document area starting at `origin` (follows a rotated view).
 pub(super) fn paint_mapped_image_at(painter: &egui::Painter, xf: &ViewXform, tex: egui::TextureId, uv: Rect, origin: [f32; 2], size: [f32; 2], tint: Color32) {
@@ -193,7 +193,12 @@ fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guide
             painter.rect_filled(band, craft_ui::theme::scale::Radius::R0.px(), dim);
         }
     }
-    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE), egui::StrokeKind::Middle);
+    painter.rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE),
+        egui::StrokeKind::Middle,
+    );
     draw_crop_guides(painter, guides, |a, b| r.min + r.size() * vec2(a, b));
     let h = Stroke::new(3.0, Color32::WHITE);
     let l = 14.0f32.min(r.width() / 3.0).min(r.height() / 3.0);

@@ -3,9 +3,9 @@
 //! Field values are stored in pixels (plus a display unit), so automation can set `width`/`height`
 //! directly and the dialog maps them to `image.imageSize` / `image.canvasSize` unchanged.
 
-use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -438,9 +438,18 @@ fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> Option<&'s
                 t.color.surface.sunken.to_egui()
             },
         );
-        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()), StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R2.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+            StrokeKind::Inside,
+        );
         if selected {
-            ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(8.0, 8.0)), craft_ui::theme::scale::Radius::R2.px(), t.color.text.normal.to_egui());
+            ui.painter().rect_filled(
+                Rect::from_center_size(r.center(), vec2(8.0, 8.0)),
+                craft_ui::theme::scale::Radius::R2.px(),
+                t.color.text.normal.to_egui(),
+            );
         } else {
             let (dx, dy) = (x - ax, y - ay);
             // Only neighbouring cells show arrows (Photoshop behaviour); direction flips when shrinking.

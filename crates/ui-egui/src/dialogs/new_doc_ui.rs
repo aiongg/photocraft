@@ -3,8 +3,8 @@
 //! `resolution` in ppi, `mode`, `depth`, `background`, `name`), so `ui.dialog.set` drives it and
 //! Create runs `file.new` with them.
 
-use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use photocraft_engine::prefs::UnitsAndRulers;
@@ -543,7 +543,10 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                 .add(egui::Label::new(RichText::new(label).size(13.0).color(if on { t.text } else { t.text_dim })).selectable(false).sense(Sense::click()))
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             if on {
-                ui.painter().line_segment([r.rect.left_bottom() + vec2(0.0, 3.0), r.rect.right_bottom() + vec2(0.0, 3.0)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.text));
+                ui.painter().line_segment(
+                    [r.rect.left_bottom() + vec2(0.0, 3.0), r.rect.right_bottom() + vec2(0.0, 3.0)],
+                    craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.text),
+                );
             }
             if r.clicked() {
                 f.insert("__category".into(), json!(name));
@@ -823,7 +826,12 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     }
                     None => widgets::checker(ui.painter(), r, 4.0),
                 }
-                ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).field_border), StrokeKind::Inside);
+                ui.painter().rect_stroke(
+                    r,
+                    craft_ui::theme::scale::Radius::R2.px(),
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).field_border),
+                    StrokeKind::Inside,
+                );
                 let resp = resp.on_hover_text(tl!("Custom background color")).on_hover_cursor(egui::CursorIcon::PointingHand);
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Custom background color")));
                 if resp.clicked() {

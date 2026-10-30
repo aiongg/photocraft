@@ -1,7 +1,7 @@
 use super::curvature::curvature_refresh;
-use craft_ui::theme::StrokeExt;
 use super::path_ops::{active_type_path, targeted_vector_mask, work_path_shown_in};
 use super::pen::{closing, over_first_anchor, shift_45};
+use craft_ui::theme::StrokeExt;
 use egui::{Color32, Pos2, Rect, Stroke, pos2, vec2};
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};

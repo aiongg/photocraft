@@ -14,8 +14,8 @@
 //! The lock beside a section name keeps that section's settings when another preset is picked
 //! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
 
-use egui::{Color32, CornerRadius, Sense, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, CornerRadius, Sense, Stroke, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
 use serde::{Deserialize, Serialize};

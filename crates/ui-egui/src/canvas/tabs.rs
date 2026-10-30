@@ -1,7 +1,7 @@
 use super::start_screen::start_screen;
-use craft_ui::theme::StrokeExt;
 use super::textures::retain_gpu_documents;
 use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, TextureOptions, canvas_view, fmt_zoom, json, mode_label, pos2};
+use craft_ui::theme::StrokeExt;
 
 /// Tabs + canvas for the active document, or the start screen; then drops layers dragged onto
 /// another document (`layer_transfer`).
@@ -82,7 +82,11 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     app.session.set_active(d);
                 }
             }
-            let stroke = if d == idx { craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent) } else { craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160)) };
+            let stroke = if d == idx {
+                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent)
+            } else {
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160))
+            };
             ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Inside);
         }
         return;
@@ -521,7 +525,12 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
         }
         if dragging.is_some_and(|p| r.contains(p)) {
             drag_over = Some(i);
-            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                r,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent),
+                egui::StrokeKind::Inside,
+            );
         }
         ui.painter().line_segment([r.right_top(), r.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let (xr, at) = pro_tab_layout(r, g.size().y, mac);

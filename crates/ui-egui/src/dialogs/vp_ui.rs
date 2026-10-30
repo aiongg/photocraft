@@ -14,8 +14,8 @@
 //! `filter.vanishingPoint` with the planes, the paste and the strokes, so the whole session is
 //! one history step and an action or agent can replay it exactly.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::{Color32, Pos2, Stroke, TextureHandle, pos2};
 use photocraft_algo::transform::Homography;

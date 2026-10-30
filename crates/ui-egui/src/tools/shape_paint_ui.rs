@@ -1,7 +1,7 @@
 //! Shape fill and stroke swatches shared by the options bar and the Properties panel.
 
-use egui::{Color32, Sense, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Sense, Stroke, vec2};
 
 use serde_json::{Value, json};
 

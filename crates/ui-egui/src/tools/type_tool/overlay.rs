@@ -1,8 +1,8 @@
 use super::editing::edit_home;
-use craft_ui::theme::StrokeExt;
 use super::ime_edit::{ime_offsets, ime_preedit_is_current};
 use super::layout::layout;
 use super::{Color32, LayerId, PhotocraftApp, Point, Pos2, Stroke, ViewXform, byte_of, text_layer};
+use craft_ui::theme::StrokeExt;
 
 /// Selection highlight, caret and text frame over the canvas.
 pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
@@ -80,7 +80,10 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
             for ln in &l.lines {
                 // Horizontal: just under the baseline; vertical: the column's centre line.
                 let y = if l.vertical { ln.baseline } else { ln.baseline + ln.descent * 0.25 };
-                painter.add(egui::Shape::line(run(ln.x0.min(0.0), ln.x1.max(ln.x0 + 1.0), y), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent.gamma_multiply(0.8))));
+                painter.add(egui::Shape::line(
+                    run(ln.x0.min(0.0), ln.x1.max(ln.x0 + 1.0), y),
+                    craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent.gamma_multiply(0.8)),
+                ));
             }
         }
     }

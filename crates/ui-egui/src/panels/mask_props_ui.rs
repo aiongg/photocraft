@@ -1,7 +1,7 @@
 //! Non-destructive layer-mask controls (pixel and vector), shared by docked and floating Properties.
 
-use photocraft_doc::{Layer, LayerContent};
 use craft_ui::theme::ToEgui;
+use photocraft_doc::{Layer, LayerContent};
 use serde_json::json;
 
 use crate::props_layout::COL_GAP;

@@ -5,9 +5,9 @@
 //! the Gradient Editor's grammar ([`apply_stop`]); the tab returns the edited gradient and the
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
-use egui::{Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_compose::gradient_fill as gf;
 use photocraft_doc::{Fill, GradientStyle};
 use photocraft_engine::gradient_fill_cmds::apply_stop;
@@ -112,7 +112,12 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
                     let (r, resp) = ui.allocate_exact_size(vec2(32.0, 18.0), Sense::click());
                     crate::preset_panels::paint_gradient(ui, r, &preset.resolve(choices.fg, choices.bg));
                     let border = if resp.hovered() { t.color.text.muted.to_egui() } else { t.color.line.control_edge.to_egui() };
-                    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
+                    ui.painter().rect_stroke(
+                        r,
+                        craft_ui::theme::scale::Radius::R0.px(),
+                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border),
+                        StrokeKind::Outside,
+                    );
                     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &preset.name));
                     if resp.on_hover_text(&preset.name).clicked() {
                         take_preset(edited(&mut out, fill), preset, choices.fg, choices.bg);
@@ -283,7 +288,12 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
     if let Some(ramp) = gf::Ramp::new(&unreversed(fill)) {
         crate::gradient_ui::paint_ramp(ui.painter(), bar, |u| ramp.sample(u));
     }
-    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        bar,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        StrokeKind::Outside,
+    );
     let (cs, os, mids) = sorted_stops(fill);
     let (drag_key, selection_key) = (id.with("stops-drag"), selection_key(id));
     let drag: Option<Drag> = ui.data(|d| d.get_temp(drag_key));
@@ -306,7 +316,13 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
     for i in 0..cs.len().saturating_sub(1) {
         if let Some(x) = mid_x(i) {
             let sel = selected == Some(Marker::Mid(i));
-            crate::gradient_ui::diamond(p, pos2(x, bar.bottom() + 6.0), 3.0, if sel { t.color.accent.solid.to_egui() } else { t.color.text.faint.to_egui() }, t.color.text.faint.to_egui());
+            crate::gradient_ui::diamond(
+                p,
+                pos2(x, bar.bottom() + 6.0),
+                3.0,
+                if sel { t.color.accent.solid.to_egui() } else { t.color.text.faint.to_egui() },
+                t.color.text.faint.to_egui(),
+            );
         }
     }
     for (i, (loc, a)) in os.iter().enumerate() {
@@ -446,7 +462,13 @@ fn stop_fields(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
             let (r, resp) = ui.allocate_exact_size(vec2(40.0, 20.0), Sense::click());
             let [cr, cg, cb, _] = rgba_of(c);
             ui.painter().rect_filled(r.shrink(1.0), t.shape.radius.control, rgba32([cr, cg, cb, 1.0]));
-            ui.painter().rect_stroke(r, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if picker_open { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }), StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                r,
+                t.shape.radius.control,
+                craft_ui::theme::scale::Stroke::W1
+                    .egui(ui.ctx(), if picker_open { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }),
+                StrokeKind::Inside,
+            );
             resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, true, tl!("Color")));
             if resp.on_hover_text(tl!("Color")).clicked() {
                 picker_open = !picker_open;

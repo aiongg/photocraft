@@ -73,7 +73,8 @@ pub fn panel_footer<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
     let m = body_margin(t.pro);
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), footer_height(ui)), Sense::hover());
     let y = r.top() + 0.5;
-    ui.painter().line_segment([pos2(r.left() - m.left as f32, y), pos2(r.right() + m.right as f32, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+    ui.painter()
+        .line_segment([pos2(r.left() - m.left as f32, y), pos2(r.right() + m.right as f32, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     let bar = Rect::from_min_size(pos2(r.left(), r.top() + 1.0), vec2(r.width(), FOOTER_BAR));
     let mut bar_ui = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::right_to_left(egui::Align::Center)));
     // The bar runs on over the body's bottom margin, past where the body's own clip ends: without
@@ -92,7 +93,8 @@ pub fn panel_menu_button(ui: &mut Ui) -> Response {
     if t.pro {
         for k in 0..3 {
             let y = rect.center().y - 3.5 + k as f32 * 3.5;
-            ui.painter().line_segment([pos2(rect.center().x - 5.0, y), pos2(rect.center().x + 5.0, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tint));
+            ui.painter()
+                .line_segment([pos2(rect.center().x - 5.0, y), pos2(rect.center().x + 5.0, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tint));
         }
     } else {
         crate::icons::paint(ui, rect, "ellipsis", 14.0, tint);

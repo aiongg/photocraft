@@ -8,9 +8,9 @@
 //! through the filter-preview machinery (`__filter` + `__preview`). OK runs the command once (one
 //! history step) and Cancel drops the preview, leaving the document untouched.
 
-use serde_json::{Map, Value, json};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::adjust_editors::{self, EditorCx};
@@ -180,7 +180,11 @@ pub(crate) fn picker_button(ui: &mut egui::Ui, selected: bool, enabled: bool, to
     let response = ui.add_enabled_ui(enabled, |ui| crate::icons::button(ui, "pipette", 28.0, selected, tooltip)).inner;
     let tokens = craft_ui::theme::current(ui.ctx());
     ui.painter().circle_filled(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, color);
-    ui.painter().circle_stroke(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tokens.color.line.control_edge.to_egui()));
+    ui.painter().circle_stroke(
+        response.rect.right_bottom() - egui::vec2(5.5, 5.5),
+        3.5,
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tokens.color.line.control_edge.to_egui()),
+    );
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, enabled, selected, tooltip));
     response
 }

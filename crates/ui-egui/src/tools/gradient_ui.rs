@@ -11,8 +11,8 @@
 //! on release: one history step. The Properties panel's stops editor ([`properties`]) previews
 //! through the same path.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::emath::GuiRounding;
 use egui::{Color32, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -596,7 +596,12 @@ pub fn preset_swatch(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
     let stops = app.session.presets.gradient.resolve(app.session.tools.foreground, app.session.tools.background);
     let (r, resp) = ui.allocate_exact_size(vec2(96.0, 20.0), Sense::click());
     paint_ramp(ui.painter(), r, |u| photocraft_algo::paint::sample_stops(&stops, u));
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        StrokeKind::Outside,
+    );
     // Name the control for accessibility (and so tests and agents can find it).
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Gradient picker")));
     resp.on_hover_text(tl!("Click to edit the gradient")).clicked()
@@ -905,7 +910,12 @@ fn stop_strip(ui: &mut egui::Ui, key: egui::Id, f: &Fill, midpoints: bool, pendi
     if let Some(ramp) = gf::Ramp::new(&track_fill) {
         paint_ramp(ui.painter(), bar, |u| ramp.sample(u));
     }
-    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        bar,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        StrokeKind::Outside,
+    );
     let (ss, os, mids) = match &shown {
         Fill::Gradient { stops, opacity_stops, midpoints, .. } => (stops.clone(), opacity_stops.clone(), midpoints.clone()),
         _ => (Vec::new(), Vec::new(), Vec::new()),
@@ -932,7 +942,12 @@ fn stop_strip(ui: &mut egui::Ui, key: egui::Id, f: &Fill, midpoints: bool, pendi
             Stroke::NONE,
         ));
         p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color);
-        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }), StrokeKind::Outside);
+        p.rect_stroke(
+            body,
+            craft_ui::theme::scale::Radius::R2.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }),
+            StrokeKind::Outside,
+        );
     }
     if midpoints {
         for i in 0..sorted.len().saturating_sub(1) {
@@ -956,7 +971,12 @@ fn stop_strip(ui: &mut egui::Ui, key: egui::Id, f: &Fill, midpoints: bool, pendi
             Stroke::NONE,
         ));
         p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color);
-        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }), StrokeKind::Outside);
+        p.rect_stroke(
+            body,
+            craft_ui::theme::scale::Radius::R2.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }),
+            StrokeKind::Outside,
+        );
     }
     // Interaction.
     let hit = |pos: Pos2| -> Option<Marker> {

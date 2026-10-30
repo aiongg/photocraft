@@ -1,9 +1,9 @@
 //! Radial Blur's Zoom centre: a schematic of the streaks beside the two coordinate sliders.
 //! The diagram and sliders edit the same dialog fields used by preview, OK and automation.
 
-use egui::{Rect, Response, Sense, Stroke, Ui, Vec2, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Rect, Response, Sense, Stroke, Ui, Vec2, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::theme::Tokens;
@@ -92,12 +92,26 @@ fn paint(ui: &Ui, rect: Rect, plot: Rect, center: Vec2, amount: f32, focused: bo
             for step in 0..4 {
                 let from = point.lerp(end, step as f32 / 4.0);
                 let to = point.lerp(end, (step + 1) as f32 / 4.0);
-                painter.line_segment([from, to], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui().gamma_multiply(1.0 - step as f32 / 5.0)));
+                painter.line_segment(
+                    [from, to],
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui().gamma_multiply(1.0 - step as f32 / 5.0)),
+                );
             }
         }
     }
-    painter.line_segment([pos2(plot.left(), origin.y), pos2(plot.right(), origin.y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
-    painter.line_segment([pos2(origin.x, plot.top()), pos2(origin.x, plot.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
+    painter.line_segment(
+        [pos2(plot.left(), origin.y), pos2(plot.right(), origin.y)],
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+    );
+    painter.line_segment(
+        [pos2(origin.x, plot.top()), pos2(origin.x, plot.bottom())],
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+    );
     painter.circle(origin, 3.0, t.color.surface.sunken.to_egui(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
-    ui.painter().rect_stroke(rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if focused { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        rect,
+        t.shape.radius.control,
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if focused { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }),
+        egui::StrokeKind::Inside,
+    );
 }

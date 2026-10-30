@@ -14,8 +14,8 @@
 //! The state is view state in egui memory, like [`crate::menu_nav::Nav`]. On macOS the native
 //! menu bar replaces the in-window one and this never runs.
 
-use egui::{Color32, Event, Id, Key, Modifiers, Stroke, Ui};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Event, Id, Key, Modifiers, Stroke, Ui};
 
 use crate::menu_nav::Nav;
 
@@ -233,8 +233,11 @@ pub fn menu_row_text(ui: &Ui, checked: bool, label: &str, mnemonic: Option<char>
     };
     for (k, part) in parts.into_iter().enumerate() {
         let Some(part) = part.filter(|p| !p.is_empty()) else { continue };
-        let format =
-            if k == 1 && at.is_some() { egui::TextFormat { underline: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::PLACEHOLDER), ..plain.clone() } } else { plain.clone() };
+        let format = if k == 1 && at.is_some() {
+            egui::TextFormat { underline: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::PLACEHOLDER), ..plain.clone() }
+        } else {
+            plain.clone()
+        };
         job.append(part, lead, format);
         lead = 0.0;
     }

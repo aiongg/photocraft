@@ -8,8 +8,8 @@
 //! recorded exactly as the engine replays them (`stroke_begin` + `stroke_segment` per point), so
 //! OK runs `filter.liquify` with the same strokes and gets the same field.
 
-use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::liquify::{LiquifyField, LiquifyStroke, LiquifyTool, ProxyImage, auto_cell};
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_geom::Rect;
@@ -1159,7 +1159,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
             d.hover = Some(to_doc(d, area, hp));
         }
-        clip.rect_stroke(img, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
+        clip.rect_stroke(
+            img,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            egui::StrokeKind::Outside,
+        );
         // Mouse → strokes (Space or middle button pans). Alt+right-drag resizes the brush (#4702).
         let (pan, secondary, mods_now) =
             ui.input(|i| (i.key_down(egui::Key::Space) || i.pointer.middle_down(), i.pointer.button_down(egui::PointerButton::Secondary), i.modifiers));

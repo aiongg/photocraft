@@ -100,7 +100,12 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 }
                 if f.get("__selectedColor").and_then(Value::as_u64) == Some(i as u64) {
                     let t = craft_ui::theme::current(ui.ctx());
-                    ui.painter().rect_stroke(response.rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(
+                        response.rect,
+                        t.shape.radius.control,
+                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
+                        egui::StrokeKind::Inside,
+                    );
                 }
                 if response.changed() {
                     let edits = f.entry("colorTableEdits").or_insert_with(|| json!({}));

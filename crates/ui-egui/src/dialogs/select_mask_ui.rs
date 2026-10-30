@@ -23,8 +23,8 @@
 //! Not here yet: Refine Hair (#2671) and Object Aware (a learned model, #2788) are shown but greyed
 //! out, and Photoshop's Presets.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_doc::{DocId, Document, LayerId};
@@ -1712,7 +1712,12 @@ fn paint_canvas(ui: &mut egui::Ui, ctx: &egui::Context, w: &mut SelectMaskWorksp
             }
             SmTool::Object => {
                 if let (Some(a), Some(b)) = (line.first(), line.last()) {
-                    clip.rect_stroke(ERect::from_two_pos(*a, *b), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Middle);
+                    clip.rect_stroke(
+                        ERect::from_two_pos(*a, *b),
+                        craft_ui::theme::scale::Radius::R0.px(),
+                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+                        egui::StrokeKind::Middle,
+                    );
                 }
             }
             _ => {}
@@ -1885,7 +1890,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
         // Reset at the left, OK and Cancel against the right edge.
         let foot = ERect::from_min_size(pos2(right.left() + 10.0, right.bottom() - 46.0), vec2(PANEL_W - 20.0, 32.0));
-        painter.line_segment([pos2(right.left(), foot.top() - 6.0), pos2(right.right(), foot.top() - 6.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.line_segment(
+            [pos2(right.left(), foot.top() - 6.0), pos2(right.right(), foot.top() - 6.0)],
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+        );
         let mut fb = ui.new_child(egui::UiBuilder::new().max_rect(foot).layout(egui::Layout::right_to_left(egui::Align::Center)));
         if widgets::secondary_button(&mut fb, tl!("Cancel"), 70.0).clicked() {
             action = Some("cancel");

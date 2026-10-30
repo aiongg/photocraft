@@ -1,7 +1,7 @@
 //! Shape toolbar edits share the engine commands used by the Properties panel.
 
-use photocraft_doc::LayerContent;
 use craft_ui::theme::ToEgui;
+use photocraft_doc::LayerContent;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

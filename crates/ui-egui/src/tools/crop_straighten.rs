@@ -14,8 +14,8 @@
 //! ↵ commits it and Esc cancels it as any crop. A line shorter than [`MIN_LINE_PX`] screen points
 //! does nothing.
 
-use egui::{Modifiers, Pos2};
 use craft_ui::theme::StrokeExt;
+use egui::{Modifiers, Pos2};
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;

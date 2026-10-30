@@ -7,8 +7,8 @@
 //! runs `edit.perspectiveWarp` with the planes. The preview is the layer texture on a 40×40 mesh
 //! pushed through the same piecewise-homography map the engine uses.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::{Color32, Pos2, Stroke, TextureHandle, pos2};
 use photocraft_algo::perspective::{PerspectiveMap, Plane, Straighten, linked_corners, plane_point, straighten};
@@ -304,7 +304,12 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
     }
     if let Some(Drag::NewPlane { start, cur }) = &s.drag {
         let r = egui::Rect::from_two_pos(scr(*start), scr(*cur));
-        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
+            egui::StrokeKind::Inside,
+        );
     }
 }
 

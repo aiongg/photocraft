@@ -161,7 +161,12 @@ fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<
         }
         crate::widgets::checker(ui.painter(), r, 8.0);
         web_preview::paint(ui, r, &response, &tex, source_size, f);
-        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+            egui::StrokeKind::Inside,
+        );
         let (l1, l2) = match (p, info) {
             (None, _) => ("Original".to_string(), format!("{}  ·  {} × {} px", doc.name, doc.size.width, doc.size.height)),
             (Some(_), Some((bytes, colors, ext))) => {
@@ -413,7 +418,10 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 let nslices = photocraft_doc::slices::resolve(&doc).len();
                 if !doc.slices.is_empty() {
                     ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                    ui.label(egui::RichText::new(crate::i18n::trn(crate::i18n::current(), nslices as u64, "{n} slice", "{n} slices")).color(t.color.text.muted.to_egui()));
+                    ui.label(
+                        egui::RichText::new(crate::i18n::trn(crate::i18n::current(), nslices as u64, "{n} slice", "{n} slices"))
+                            .color(t.color.text.muted.to_egui()),
+                    );
                     check(ui, f, "html", tl!("Save HTML and Images"), true);
                     dropdown_str(ui, "web-slices", tl!("Slices"), f, "slices", &[("all", tl!("All Slices")), ("user", tl!("All User Slices"))], 150.0);
                 }

@@ -1,8 +1,8 @@
 //! UI for the Eraser group's colour-aware tools: Magic Eraser (click → `paint.magicEraser`) and
 //! Background Eraser (stroke → `paint.backgroundEraser`), with their options bars.
 
-use serde_json::{Value, json};
 use craft_ui::theme::ToEgui;
+use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;

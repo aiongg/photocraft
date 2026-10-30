@@ -30,7 +30,12 @@ pub fn angle_dial_row(ui: &mut Ui, label: &str, angle: &mut f32, range: std::ops
         }
         let painter = ui.painter();
         let radius = rect.width() / 2.0 - 2.0;
-        painter.circle(rect.center(), radius, t.color.surface.sunken.to_egui(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
+        painter.circle(
+            rect.center(),
+            radius,
+            t.color.surface.sunken.to_egui(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        );
         let radians = angle.to_radians();
         let tip = rect.center() + vec2(radians.cos(), -radians.sin()) * (radius - 4.0);
         painter.line_segment([rect.center(), tip], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.color.accent.solid.to_egui()));

@@ -1,7 +1,7 @@
 use super::overlay::path_lines;
-use craft_ui::theme::StrokeExt;
 use super::shapes::hex;
 use super::{Color32, Document, LayerContent, Path, PhotocraftApp, Rect, Sense, Stroke, Tokens, Value, json, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 // ---------------------------------------------------------------------------------------------
 // Paths panel

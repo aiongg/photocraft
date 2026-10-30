@@ -5,9 +5,9 @@
 //! is picked there (#2591). The answer is cached per document revision and pointer pixel: a
 //! pointer resting on the canvas costs nothing per frame.
 
-use egui::{Pos2, Stroke};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Pos2, Stroke};
 use photocraft_doc::{DocId, Document, Layer, LayerContent, LayerId};
 use photocraft_geom::Rect;
 
@@ -129,7 +129,12 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
     }
     let Some(b) = outline_rect else { return };
     let accent = craft_ui::theme::current(painter.ctx()).color.accent.solid.to_egui();
-    painter.rect_stroke(xf.doc_rect(b), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent), egui::StrokeKind::Outside);
+    painter.rect_stroke(
+        xf.doc_rect(b),
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent),
+        egui::StrokeKind::Outside,
+    );
 }
 
 #[cfg(test)]

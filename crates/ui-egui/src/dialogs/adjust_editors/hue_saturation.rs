@@ -1,12 +1,12 @@
 use super::basic::{sliders, track_stops};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 use super::curves::gradient_bar;
 use super::levels::nearest;
 use super::{
     Color32, Edit, EditorCx, HUE_RANGES, HueRange, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, Value, color32, flag, hue_color, json, num, nums, pos2,
     vec2, widgets,
 };
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 // ---------------------------------------------------------------------------------------------
 // Hue/Saturation
@@ -177,7 +177,12 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
             let x = xof(*d);
             let fill = if k == 1 || k == 2 { t.color.text.normal.to_egui() } else { t.color.surface.sunken.to_egui() };
             p.rect_filled(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), craft_ui::theme::scale::Radius::R2.px(), fill);
-            p.rect_stroke(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()), StrokeKind::Inside);
+            p.rect_stroke(
+                Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)),
+                craft_ui::theme::scale::Radius::R2.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()),
+                StrokeKind::Inside,
+            );
         }
         let drag_id = cx.mem.with("hs-range-drag");
         let mut which: Option<u8> = ui.data(|d| d.get_temp(drag_id)).flatten();

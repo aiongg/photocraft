@@ -3,8 +3,8 @@
 //! Both commands support the same layer blend modes, opacity and transparency lock.
 //! Keeping one widget and validation implementation prevents their options diverging.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::theme::Tokens;

@@ -1,9 +1,9 @@
 use super::display::{canvas_display, display_image};
-use craft_ui::theme::StrokeExt;
 use super::drag::Drag;
 use super::textures::{canvas_texture_options, shown_as_document};
 use super::view_xform::ViewXform;
 use super::{Color32, DRect, PhotocraftApp, Pos2, Stroke, Tool, json, pos2};
+use craft_ui::theme::StrokeExt;
 
 pub(crate) struct ClonePreviewCache {
     pub(super) key: String,

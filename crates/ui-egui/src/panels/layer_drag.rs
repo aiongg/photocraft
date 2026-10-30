@@ -1,6 +1,6 @@
 use super::layers::footer_label;
-use craft_ui::theme::StrokeExt;
 use super::{Layer, LayerId, MaskKind, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Value, icons, json, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 /// Scroll the Layers panel while holding a layer drag over its top/bottom edge or past them.
 ///
@@ -324,7 +324,10 @@ pub(super) fn effect_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer,
             ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
         if t.pro {
-            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+            ui.painter().line_segment(
+                [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            );
         }
         // Nested under the layer's eye column so an effect does not read as its own layer (#4572).
         let eye = Rect::from_min_size(pos2(rect.left() + 36.0, rect.center().y - 9.0), vec2(18.0, 18.0));

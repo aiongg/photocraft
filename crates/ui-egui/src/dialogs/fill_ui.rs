@@ -6,8 +6,8 @@
 //! drive it like any dialog. OK remembers the choices in the preferences (`dialogs["edit.fill"]`),
 //! which are saved to disk, so the dialog opens with them again after a restart.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;

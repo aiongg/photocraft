@@ -1,8 +1,8 @@
 //! Per-filter blending and shared target validation for Smart Filter editors.
 //! Preview and commit dispatch the existing engine commands against the captured filter.
 
-use std::sync::{Arc, Weak};
 use craft_ui::theme::StrokeExt;
+use std::sync::{Arc, Weak};
 
 use photocraft_color::BlendMode;
 use photocraft_doc::{Document, LayerContent, LayerId};
@@ -225,12 +225,15 @@ fn viewport(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String,
         .and_then(Value::as_array)
         .and_then(|a| Some(egui::vec2(a.first()?.as_u64()? as f32, a.get(1)?.as_u64()? as f32)))
         .unwrap_or(image.texture.size_vec2());
-    egui::Frame::new().fill(Tokens::get(ui.ctx()).canvas).stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).field_border)).show(ui, |ui| {
-        ui.set_width(360.0);
-        egui::ScrollArea::both().id_salt("smart-filter-image").auto_shrink([false, false]).min_scrolled_height(220.0).max_height(220.0).show(ui, |ui| {
-            ui.add(egui::Image::new(&image.texture).fit_to_exact_size(size * zoom / 100.0));
-        });
-    });
+    egui::Frame::new().fill(Tokens::get(ui.ctx()).canvas).stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).field_border)).show(
+        ui,
+        |ui| {
+            ui.set_width(360.0);
+            egui::ScrollArea::both().id_salt("smart-filter-image").auto_shrink([false, false]).min_scrolled_height(220.0).max_height(220.0).show(ui, |ui| {
+                ui.add(egui::Image::new(&image.texture).fit_to_exact_size(size * zoom / 100.0));
+            });
+        },
+    );
     ui.horizontal(|ui| {
         if widgets::secondary_button(ui, "−", 32.0).clicked() {
             fields.insert("__zoom".into(), json!((zoom / 2.0).max(0.1)));

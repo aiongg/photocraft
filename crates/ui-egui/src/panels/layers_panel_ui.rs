@@ -1,7 +1,7 @@
 //! Layers panel flyout and display preferences, observed from Photoshop's panel menu.
 //! UI options do not edit document pixels or add history steps.
-use egui::{self, Context, Ui};
 use craft_ui::theme::StrokeExt;
+use egui::{self, Context, Ui};
 use photocraft_doc::Document;
 use serde_json::json;
 
@@ -122,7 +122,11 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
         let y0 = n as f32 / 22.0;
         let y1 = (n + 1) as f32 / 22.0;
         let f = n as f32 / 22.0;
-        painter.rect_filled(UiRect::from_min_max(point(0.0, y0), point(1.0, y1)), craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray((119.0 + f * 30.0) as u8));
+        painter.rect_filled(
+            UiRect::from_min_max(point(0.0, y0), point(1.0, y1)),
+            craft_ui::theme::scale::Radius::R0.px(),
+            Color32::from_gray((119.0 + f * 30.0) as u8),
+        );
     }
     painter.add(Shape::convex_polygon(
         vec![point(0.0, 0.60), point(0.22, 0.36), point(0.46, 0.56), point(0.72, 0.33), point(1.0, 0.62)],
@@ -171,7 +175,12 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
         let r = unit * if n % 2 == 0 { 0.16 } else { 0.21 };
         painter.circle_filled(center + vec2(theta.cos(), theta.sin()) * r, (side * 0.008).max(0.3), Color32::from_gray(119));
     }
-    painter.rect_stroke(rect, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(92)), egui::StrokeKind::Inside);
+    painter.rect_stroke(
+        rect,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(92)),
+        egui::StrokeKind::Inside,
+    );
 }
 
 /// Returns both the actual thumbnail width and the height allocated by the Layers

@@ -11,8 +11,8 @@
 //! Everything is drivable over the control channel with `filter.filterGallery {"ui": {...}}`
 //! while the dialog is open.
 
-use std::hash::{Hash, Hasher};
 use craft_ui::theme::StrokeExt;
+use std::hash::{Hash, Hasher};
 
 use egui::{Align2, Color32, FontId, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::{FilterParams, GALLERY_CATEGORIES, GalleryFilter};
@@ -664,7 +664,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         if let (Some(tex), Some(r)) = (&d.tex, shown) {
             widgets::checker(&clip, r.intersect(area), 8.0);
             clip.image(tex.id(), r, ERect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-            clip.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
+            clip.rect_stroke(
+                r,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                egui::StrokeKind::Outside,
+            );
         }
         let resp = ui.interact(area, egui::Id::unique("gallery-preview"), Sense::drag());
         if resp.dragged() && d.zoom > 0.0 {
@@ -734,7 +739,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                     ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R2.px(), t.field);
                                 }
                             }
-                            let stroke = if selected { craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent) } else { craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator) };
+                            let stroke = if selected {
+                                craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
+                            } else {
+                                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator)
+                            };
                             ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Outside);
                             ui.add_sized(
                                 [THUMB[0] as f32, 14.0],

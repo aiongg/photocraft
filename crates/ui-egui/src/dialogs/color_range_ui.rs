@@ -10,8 +10,8 @@
 //! full resolution (one history step). Reduced previews approximate fine detail and effects.
 //! Cancel never touches the document, so the previous selection stays as it was.
 
-use std::hash::{Hash, Hasher};
 use craft_ui::theme::StrokeExt;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -508,7 +508,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let g = ui.painter().layout(msg, egui::FontId::proportional(11.0), t.text_faint, frame.width() - 16.0);
             ui.painter().galley(frame.center() - g.size() / 2.0, g, t.text_faint);
         }
-        ui.painter().rect_stroke(frame, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+        ui.painter().rect_stroke(
+            frame,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+            StrokeKind::Outside,
+        );
         let label = match app.color_range.as_ref().and_then(|p| p.error.as_deref()) {
             Some(e) => format!("Color Range preview unavailable: {e}"),
             None => tl!("Color Range preview").to_string(),

@@ -2,8 +2,8 @@
 //! with a preview and an estimated file size. The estimate encodes a small proxy and scales by
 //! pixel count, so the dialog stays instant on 36 MP documents.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
 
@@ -998,7 +998,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             } else {
                 ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, tl!("Preview"), egui::FontId::proportional(12.0), t.text_dim);
             }
-            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
+            ui.painter().rect_stroke(
+                r,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                egui::StrokeKind::Outside,
+            );
             #[cfg(not(target_arch = "wasm32"))]
             let exact = poll_or_start_exact_estimate(ui, key, &sig, doc.clone(), f).flatten();
             #[cfg(target_arch = "wasm32")]

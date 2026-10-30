@@ -15,8 +15,8 @@
 //!   with the Crop tool, [`keys`]) fills them with the active document's size in px and its
 //!   resolution; Clear empties them; ⇄ and X swap W and H.
 
-use egui::{Modifiers, Stroke, StrokeKind, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Modifiers, Stroke, StrokeKind, vec2};
 use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};
 

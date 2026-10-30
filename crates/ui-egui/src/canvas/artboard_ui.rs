@@ -2,9 +2,9 @@
 //! View › Fit Artboard on Screen, and the Properties panel section (X/Y/W/H, preset,
 //! background). Everything that changes the document is `layer.artboard.set` and friends.
 
-use egui::{Align2, Color32, Pos2, Stroke};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Color32, Pos2, Stroke};
 use photocraft_doc::{ArtboardBackground, Document, Layer};
 use serde_json::{Value, json};
 
@@ -98,9 +98,20 @@ pub fn draw_frames(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform)
     for (id, name, a) in st.doc.artboards() {
         let r = xf.doc_rect(a.rect);
         let on = active == Some(id);
-        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), if on { t.color.accent.solid.to_egui() } else { Color32::from_black_alpha(90) }), egui::StrokeKind::Outside);
+        painter.rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), if on { t.color.accent.solid.to_egui() } else { Color32::from_black_alpha(90) }),
+            egui::StrokeKind::Outside,
+        );
         let pos = Pos2::new(r.left(), r.top() - 4.0);
-        painter.text(pos, Align2::LEFT_BOTTOM, name, egui::FontId::proportional(11.0), if on { t.color.text.normal.to_egui() } else { t.color.text.muted.to_egui() });
+        painter.text(
+            pos,
+            Align2::LEFT_BOTTOM,
+            name,
+            egui::FontId::proportional(11.0),
+            if on { t.color.text.normal.to_egui() } else { t.color.text.muted.to_egui() },
+        );
     }
 }
 

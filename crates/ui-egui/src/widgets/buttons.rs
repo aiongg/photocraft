@@ -1,6 +1,6 @@
 use super::panel::surface;
-use craft_ui::theme::StrokeExt;
 use super::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2, theme, vec2};
+use craft_ui::theme::StrokeExt;
 
 /// iOS-style toggle switch.
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
@@ -192,7 +192,12 @@ fn button_impl_h(ui: &mut Ui, label: &str, min_width: f32, height: Option<f32>, 
             if resp.hovered() || down {
                 ui.painter().rect_filled(rect, r, t.hover);
             }
-            ui.painter().rect_stroke(rect, r, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if resp.hovered() { t.text } else { t.text_dim }), StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                r,
+                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if resp.hovered() { t.text } else { t.text_dim }),
+                StrokeKind::Inside,
+            );
         }
         ui.painter().galley(rect.center() - galley.size() / 2.0, galley, fg);
         return resp;
@@ -263,6 +268,11 @@ pub fn check_box(p: &egui::Painter, rect: Rect, on: bool, hovered: bool, pressed
         p.line_segment([a, b], tick);
         p.line_segment([b, c], tick);
     } else {
-        p.rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), Stroke::new(1.5, if hovered || pressed { t.text_dim } else { t.text_faint }), StrokeKind::Inside);
+        p.rect_stroke(
+            rect,
+            craft_ui::theme::scale::Radius::R2.px(),
+            Stroke::new(1.5, if hovered || pressed { t.text_dim } else { t.text_faint }),
+            StrokeKind::Inside,
+        );
     }
 }

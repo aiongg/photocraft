@@ -3,8 +3,8 @@
 //! selection tools (Quick Selection, Object Selection): gesture → engine command, options bars,
 //! and the clone-source marker.
 
-use egui::{Color32, Stroke, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Color32, Stroke, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

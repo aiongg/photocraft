@@ -1,8 +1,8 @@
 //! Photoshop 2026 window chrome details: the status bar's info field and its "Show" menu, and the
 //! Home button at the start of the options bar.
 
-use egui::{RichText, Sense, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{RichText, Sense, Stroke, vec2};
 use photocraft_doc::{Document, LayerContent};
 use serde::{Deserialize, Serialize};
 

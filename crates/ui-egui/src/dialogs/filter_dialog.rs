@@ -4,8 +4,8 @@
 //! The preview runs the *same engine command* on the downsampled proxy document (pixel-sized
 //! parameters scaled by the proxy factor), so what you preview is what you get.
 
-use std::sync::Arc;
 use craft_ui::theme::ToEgui;
+use std::sync::Arc;
 
 use photocraft_doc::Document;
 use photocraft_engine::color_cmds::ColorSettings;

@@ -1,9 +1,9 @@
 use super::defaults::{apply, formatting_params, open_color_picker, shown_scale, target, target_doc, type_unit};
-use craft_ui::theme::StrokeExt;
 use super::editing::{cancel, commit_with};
 use super::fonts::{font_picker, fonts_ready, selected_style, style_label, styles};
 use super::keys::is_vertical;
 use super::{Color32, LayerId, PhotocraftApp, Stroke, byte_of, insertion_style, json, selected_styles, text_layer};
+use craft_ui::theme::StrokeExt;
 
 /// Photoshop's Type options bar.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
@@ -128,7 +128,12 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 18.0), egui::Sense::click());
     let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
     ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
-    ui.painter().rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        rect,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        egui::StrokeKind::Outside,
+    );
     let resp = resp.on_hover_text(tl!("Set the text color"));
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Set the text color")));
     if resp.clicked() {

@@ -1,6 +1,6 @@
 use super::fields::choice_label;
-use craft_ui::theme::ToEgui;
 use super::{Map, PhotocraftApp, RichText, Tokens, Value, json, prefs};
+use craft_ui::theme::ToEgui;
 
 /// Performance › Graphics: the compositor's GPU memory budget and whether the active document's
 /// layers fit it (the GPU Memory preference sets it).

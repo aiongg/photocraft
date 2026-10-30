@@ -343,7 +343,12 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                     let k = ((area.width() - 20.0) / pw as f32).min((area.height() - 20.0) / ph as f32);
                     let page = egui::Rect::from_center_size(area.center(), egui::vec2(pw as f32 * k, ph as f32 * k));
                     ui.painter().rect_filled(page, craft_ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
-                    ui.painter().rect_stroke(page, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
+                    ui.painter().rect_stroke(
+                        page,
+                        craft_ui::theme::scale::Radius::R0.px(),
+                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                        egui::StrokeKind::Outside,
+                    );
                     let mut img = print_preview_image(l, page, k);
                     let drag_id = ui.scope_id().with(("print-position", id));
                     let visible = img.intersect(page).intersect(ui.clip_rect());

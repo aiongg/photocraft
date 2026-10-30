@@ -5,8 +5,8 @@
 //! The Smart Filters row carries the filter mask thumbnail: click it to paint the filter mask,
 //! ⌥-click to view it, ⇧-click to disable it (FILE-215-3).
 
-use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
@@ -47,14 +47,24 @@ pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
     let t = Tokens::get(ui.ctx());
     let r = thumb_badge_rect(thumb);
     ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R2.px(), t.field);
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        egui::StrokeKind::Inside,
+    );
     match kind {
         ThumbBadge::Smart => icons::paint(ui, r, "app-window", 9.0, t.icon),
         // Photoshop's shape mark: a path with an anchor point on each corner. Painted rather
         // than an icon, so the anchors stay solid squares at this size.
         ThumbBadge::Shape => {
             let path = r.shrink(SHAPE_PATH_INSET);
-            ui.painter().rect_stroke(path, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.icon), egui::StrokeKind::Middle);
+            ui.painter().rect_stroke(
+                path,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.icon),
+                egui::StrokeKind::Middle,
+            );
             for anchor in [path.left_top(), path.right_top(), path.right_bottom(), path.left_bottom()] {
                 ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), craft_ui::theme::scale::Radius::R0.px(), t.icon);
             }
@@ -129,7 +139,10 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
         if t.pro {
-            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+            ui.painter().line_segment(
+                [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            );
         }
         let (name, on, shown) = filter_row_label(sm, index);
         let eye = Rect::from_center_size(pos2(rect.left() + indent + if index.is_none() { 9.0 } else { 41.0 }, rect.center().y), vec2(18.0, 18.0));
@@ -160,7 +173,12 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             } else {
                 ui.painter().rect_filled(sw, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
-            ui.painter().rect_stroke(sw, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                sw,
+                craft_ui::theme::scale::Radius::R2.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+                egui::StrokeKind::Inside,
+            );
             if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
                 crate::mask_thumbs_ui::paint_brackets(ui.painter(), sw, t.text);
             }

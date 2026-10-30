@@ -6,9 +6,9 @@
 //! eyedropper, the dialog eyedroppers and the Info panel, as in Photoshop.
 
 use crate::PhotocraftApp;
-use craft_ui::theme::ToEgui;
 use crate::theme::Tokens;
 use crate::widgets;
+use craft_ui::theme::ToEgui;
 
 /// The Sample Size menu: each size with its label, in Photoshop's order.
 pub fn size_options() -> [(u32, &'static str); 7] {

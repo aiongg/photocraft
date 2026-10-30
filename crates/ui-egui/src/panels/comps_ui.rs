@@ -5,8 +5,8 @@
 //! appearance). Footer: previous / next comp, update, new, delete. Every action is a
 //! `layerComp.*` engine command; the selection is `UiState::layer_comp_selected`.
 
-use egui::{Align2, Rect, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Rect, Sense, Stroke, pos2, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -101,7 +101,12 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
         }
         let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-        ui.painter().rect_stroke(marker, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            marker,
+            craft_ui::theme::scale::Radius::R2.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
+            egui::StrokeKind::Inside,
+        );
         if applied.is_none() {
             crate::icons::paint(ui, marker, "check", 10.0, t.icon);
         }
@@ -161,7 +166,12 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
             // Apply marker (click to apply).
             let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-            ui.painter().rect_stroke(marker, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                marker,
+                craft_ui::theme::scale::Radius::R2.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
+                egui::StrokeKind::Inside,
+            );
             if applied == Some(c.id) {
                 crate::icons::paint(ui, marker, "check", 10.0, t.accent);
             }
@@ -243,7 +253,8 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     action = Some(("layerComp.apply", json!({"comp": c.id})));
                 }
             }
-            ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(0.5)));
+            ui.painter()
+                .line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(0.5)));
         }
     });
     // Footer: apply previous, apply next | update, new, delete (Photoshop's order).

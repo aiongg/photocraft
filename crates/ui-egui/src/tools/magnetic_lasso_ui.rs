@@ -12,8 +12,8 @@
 //! The border closes through `select.magneticLasso` with `"trace": false`: the selection is exactly
 //! the outline drawn, in one history step, and an action replays that outline.
 
-use egui::{Color32, Key, Modifiers, Pos2, Rect, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Key, Modifiers, Pos2, Rect, Stroke, vec2};
 use photocraft_algo::magnetic::{self, Settings};
 use photocraft_engine::magnetic_cmds::EdgeSource;
 use serde::{Deserialize, Serialize};
@@ -426,7 +426,12 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, hover:
     for p in m.anchors.iter().filter_map(|&i| m.path.get(i)).map(screen) {
         let r = Rect::from_center_size(p, vec2(5.0, 5.0));
         painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::BLACK), egui::StrokeKind::Outside);
+        painter.rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::BLACK),
+            egui::StrokeKind::Outside,
+        );
     }
     if let Some(h) = hover
         && near_start(app, xf.to_doc(h))

@@ -13,8 +13,8 @@
 //!   opacity, fill opacity, channels, knockout, the Advanced Blending switches, Blend If) plus
 //!   the page-only `blendIfChannel`; `channelNames`: the document's colour channels.
 
-use egui::{Color32, RichText, Sense, Stroke, StrokeKind, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, RichText, Sense, Stroke, StrokeKind, vec2};
 use photocraft_doc::effects::{FxPaint, GlowSource, GlowTechnique, StrokePosition};
 use photocraft_doc::{Effect, Layer};
 use serde_json::{Map, Value, json};
@@ -1381,7 +1381,12 @@ fn blend_if_bar(ui: &mut egui::Ui, id: egui::Id, q: &mut [u8; 4]) -> bool {
         let g = (255.0 * (s as f32 + 0.5) / strips as f32) as u8;
         ui.painter().rect_filled(egui::Rect::from_x_y_ranges(x0..=x1, ramp.y_range()), craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(g));
     }
-    ui.painter().rect_stroke(ramp, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        ramp,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        StrokeKind::Outside,
+    );
     // Handles: triangles under the ramp; a split handle shows two half triangles.
     let mut changed = false;
     let drag_key = id.with("handle");

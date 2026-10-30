@@ -1,6 +1,6 @@
 use super::options_bar::reveal_focused_control;
-use craft_ui::theme::StrokeExt;
 use super::{Align2, Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, c32, icons, json, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- toolbar
 
@@ -149,7 +149,10 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         if si > 0 && !t.pro {
                             ui.add_space(craft_ui::theme::scale::Space::S4.px());
                             let (r, _) = ui.allocate_exact_size(vec2(if double { bx * 2.0 + 2.0 } else { bx }, 1.0), Sense::hover());
-                            ui.painter().line_segment([r.left_center() + vec2(8.0, 0.0), r.right_center() - vec2(8.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+                            ui.painter().line_segment(
+                                [r.left_center() + vec2(8.0, 0.0), r.right_center() - vec2(8.0, 0.0)],
+                                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                            );
                             ui.add_space(craft_ui::theme::scale::Space::S4.px());
                         }
                         let rows: Vec<&[(usize, Vec<Tool>)]> = if double { section.chunks(2).collect() } else { section.chunks(1).collect() };

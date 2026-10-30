@@ -2,8 +2,8 @@
 //! unavailable ones are greyed using the same enablement as the main menus. Items marked as menu
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
-use photocraft_doc::{LabelColor, Layer, LayerContent};
 use craft_ui::theme::StrokeExt;
+use photocraft_doc::{LabelColor, Layer, LayerContent};
 use serde_json::{Value, json};
 
 /// One entry: label, command id. `None` = separator.

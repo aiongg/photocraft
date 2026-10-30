@@ -7,9 +7,9 @@
 //! engine command (`layer.new.artboard`, `layer.artboard.set`, `layer.artboard.addBeside`), so each
 //! gesture is one undo step; this module only turns pointer gestures into them.
 
-use egui::{CursorIcon, Pos2, Rect, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{CursorIcon, Pos2, Rect, Stroke, vec2};
 use photocraft_doc::{Document, Layer, LayerId};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -286,7 +286,12 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     for (x, y) in [(r[0], r[1]), (mx, r[1]), (r[2], r[1]), (r[2], my), (r[2], r[3]), (mx, r[3]), (r[0], r[3]), (r[0], my)] {
         let h = Rect::from_center_size(pt(x, y), vec2(7.0, 7.0));
         painter.rect_filled(h, craft_ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
-        painter.rect_stroke(h, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            h,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()),
+            egui::StrokeKind::Inside,
+        );
     }
 }
 

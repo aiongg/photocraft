@@ -14,8 +14,8 @@
 //! tile nothing else shares is written in place. Each allocation is hashed once, and tiles are
 //! grouped by that 64-bit hash of their bytes.
 
-use std::collections::HashMap;
 use craft_ui::theme::StrokeExt;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 

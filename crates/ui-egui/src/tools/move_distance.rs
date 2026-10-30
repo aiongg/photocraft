@@ -10,8 +10,8 @@
 //! (`pick_cmds::auto_select_target`), cached per document revision, selection and pointer pixel,
 //! so a pointer resting on the canvas costs nothing per frame.
 
-use egui::{Color32, Pos2, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Pos2, Stroke, pos2, vec2};
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_engine::snap::{layer_rect, union};
 

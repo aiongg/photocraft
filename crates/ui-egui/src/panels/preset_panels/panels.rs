@@ -13,7 +13,12 @@ pub fn gradients_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let cur = app.session.presets.gradient.clone();
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 18.0), Sense::hover());
     paint_gradient(ui, r, &cur.resolve(fg, bg));
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).card_border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).card_border),
+        egui::StrokeKind::Inside,
+    );
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let groups: Vec<GroupView> = groups_src
         .iter()
@@ -340,7 +345,12 @@ pub fn shape_picker(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     let (r, resp) = ui.allocate_exact_size(vec2(36.0, 22.0), Sense::click());
     ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.field);
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R3.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        egui::StrokeKind::Inside,
+    );
     if let Some(sh) = groups.iter().flat_map(|g| g.items.iter()).find(|s| s.name == cur) {
         let tex = shape_texture(&ctx, sh);
         ui.painter().image(

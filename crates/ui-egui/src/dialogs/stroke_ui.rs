@@ -1,8 +1,8 @@
 //! Edit › Stroke…: a Photoshop-style options dialog for the existing `edit.stroke` command.
 //! The engine remains directly callable with parameters by CLI, MCP and Actions.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;

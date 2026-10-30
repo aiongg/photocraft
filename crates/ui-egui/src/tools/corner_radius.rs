@@ -8,8 +8,8 @@
 //! rectangle, `cornerRadius` for a polygon), as one history step; a click without movement
 //! changes nothing.
 
-use egui::{Color32, Modifiers, Pos2, Stroke};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Modifiers, Pos2, Stroke};
 use photocraft_doc::LayerContent;
 use photocraft_doc::vector::LiveShape;
 use photocraft_vector::shapes;

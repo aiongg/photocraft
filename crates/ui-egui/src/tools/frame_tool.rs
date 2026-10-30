@@ -4,9 +4,9 @@
 //! empty placeholder. Each frame is one engine command (`layer.new.frame`), so one undo step; this
 //! module only turns the drag into it.
 
-use egui::{Pos2, Stroke};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Pos2, Stroke};
 use photocraft_doc::LayerContent;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

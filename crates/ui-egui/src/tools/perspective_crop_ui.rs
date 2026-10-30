@@ -13,8 +13,8 @@
 //!
 //! A pending quad belongs to the document it was drawn on, like the Crop tool's frame.
 
-use egui::{Color32, Pos2, Stroke};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Pos2, Stroke};
 use photocraft_algo::transform::{Homography, convex_quad};
 use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};

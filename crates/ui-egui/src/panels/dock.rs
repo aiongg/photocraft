@@ -1,10 +1,10 @@
 use super::history::history;
-use craft_ui::theme::StrokeExt;
 use super::info::info_panel;
 use super::layers::{channels, layers};
 use super::navigator::navigator;
 use super::properties::{adjustments_grid, properties_body};
 use super::{PhotocraftApp, Stroke, Tokens, icons, pos2};
+use craft_ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- dock
 

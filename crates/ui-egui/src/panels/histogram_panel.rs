@@ -7,8 +7,8 @@
 //! revision, source and preview they describe, and kept until one of those changes; the panel
 //! shows the last one with the cached-data warning until the new one lands.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 
 use egui::{Color32, Rect, Sense, pos2, vec2};
 use photocraft_color::ColorMode;

@@ -29,8 +29,8 @@
 //! shows the layers' pixels past its edges (kept by a crop with Delete Cropped Pixels off, or moved
 //! out), with transparency out to the frame, under the shield ([`shows_beyond_canvas`]).
 
-use egui::{CursorIcon, Modifiers};
 use craft_ui::theme::StrokeExt;
+use egui::{CursorIcon, Modifiers};
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;

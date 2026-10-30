@@ -1,8 +1,8 @@
 use super::fields::{FieldOpts, value_field_in};
-use craft_ui::theme::StrokeExt;
 use super::panel::surface;
 use super::scrub::scrub_label_within;
 use super::{Color32, Pos2, Rect, Response, Sense, Stroke, Tokens, Ui, Vec2, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 /// Thin-track slider with a round knob. `gradient` paints the track (e.g. hue spectrum).
 pub fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {

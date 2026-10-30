@@ -2,8 +2,8 @@
 //! The existing Free Transform geometry is reused with Type's modifier rules (Ctrl exposes the
 //! frame; it must never distort a corner). Only release dispatches `type.edit`.
 
-use std::collections::VecDeque;
 use craft_ui::theme::StrokeExt;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use egui::{CursorIcon, Modifiers, Pos2, Stroke, vec2};
@@ -413,7 +413,12 @@ pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSes
     for p in pts.iter().chain(mids.iter()) {
         let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
         painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), tokens.accent_text);
-        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent),
+            egui::StrokeKind::Inside,
+        );
     }
     let c = xf.to_screen(t.pivot[0] as f32, t.pivot[1] as f32);
     painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), tokens.shadow));
@@ -472,7 +477,11 @@ pub(crate) fn cursor(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXfor
             // Original arrowhead indicator, above the canvas, without a proprietary cursor asset.
             let tokens = crate::theme::Tokens::get(ctx);
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-skew-cursor")));
-            painter.add(egui::Shape::convex_polygon(vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)], tokens.accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
+            painter.add(egui::Shape::convex_polygon(
+                vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)],
+                tokens.accent_text,
+                craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
+            ));
             CursorIcon::None
         }
         Some(Hit::Outside) => {

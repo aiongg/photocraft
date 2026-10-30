@@ -5,8 +5,8 @@
 //! `ui.dialog.set`) and shown in the ruler unit, or each in one picked from its right-click menu
 //! (`widthUnit`, `heightUnit`; not remembered, as in Photoshop).
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use photocraft_engine::prefs::Unit;

@@ -1,8 +1,8 @@
 use super::selection::floating_outline;
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 use super::view_xform::ViewXform;
 use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Stroke, Tool, Vec2, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 /// View › Show › Layer Edges: the colour of the active layer's outline.
 pub(crate) const LAYER_EDGES: Color32 = Color32::from_rgb(0x2d, 0x8c, 0xeb);
@@ -137,6 +137,11 @@ pub(super) fn draw_transform_controls(app: &mut PhotocraftApp, painter: &egui::P
     for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
         let h = Rect::from_center_size(p, vec2(7.0, 7.0));
         painter.rect_filled(h, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-        painter.rect_stroke(h, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            h,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
+            egui::StrokeKind::Inside,
+        );
     }
 }

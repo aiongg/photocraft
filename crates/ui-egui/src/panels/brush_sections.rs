@@ -3,9 +3,9 @@
 //! Dynamics, Transfer, Brush Pose, Build-up and Smoothing. Each edits a working copy of the brush;
 //! the panel turns the difference into one `tools.setBrush` call.
 
-use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{self, BrushPreset, Control, Dynamic, MAX_BRUSH_SIZE, MaskMode, Pattern, PatternStyle, TipShape};
 
@@ -233,7 +233,11 @@ fn ellipse_widget(ui: &mut egui::Ui, angle: &mut f32, roundness: &mut f32) -> bo
             c + major * a.cos() * ELLIPSE_R + minor * a.sin() * ELLIPSE_R * rr
         })
         .collect();
-    p.add(egui::Shape::convex_polygon(pts, t.color.text.normal.to_egui().gamma_multiply(0.18), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui())));
+    p.add(egui::Shape::convex_polygon(
+        pts,
+        t.color.text.normal.to_egui().gamma_multiply(0.18),
+        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui()),
+    ));
     // Arrow along the major axis.
     let tip = c + major * (ELLIPSE_R + 5.0);
     p.line_segment([c, tip], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
@@ -263,7 +267,11 @@ pub fn thumb_scale(size: f32) -> f32 {
 fn tip_grid(ui: &mut egui::Ui, id: &str, presets: &[BrushPreset], highlight: Option<usize>) -> Option<usize> {
     let t = craft_ui::theme::current(ui.ctx());
     let mut clicked = None;
-    let frame = egui::Frame::NONE.fill(t.color.surface.sunken.to_egui()).stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui())).corner_radius(t.shape.radius.control as u8).inner_margin(egui::Margin::same(3));
+    let frame = egui::Frame::NONE
+        .fill(t.color.surface.sunken.to_egui())
+        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
+        .corner_radius(t.shape.radius.control as u8)
+        .inner_margin(egui::Margin::same(3));
     frame.show(ui, |ui| {
         egui::ScrollArea::vertical().id_salt(id).max_height(104.0).auto_shrink([false, true]).show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -275,7 +283,12 @@ fn tip_grid(ui: &mut egui::Ui, id: &str, presets: &[BrushPreset], highlight: Opt
                     }
                     if highlight == Some(i) {
                         ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R3.px(), t.color.accent.soft.to_egui());
-                        ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
+                        ui.painter().rect_stroke(
+                            cell,
+                            craft_ui::theme::scale::Radius::R3.px(),
+                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
+                            egui::StrokeKind::Inside,
+                        );
                     } else if resp.hovered() {
                         ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R3.px(), t.color.state.hover.to_egui());
                     }
@@ -439,7 +452,12 @@ fn pattern_swatch(ui: &mut egui::Ui, tx: &paint::Texture) {
         })
     });
     ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-    ui.painter().rect_stroke(rect, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        rect,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        egui::StrokeKind::Inside,
+    );
 }
 
 fn texture(ui: &mut egui::Ui, b: &mut BrushSettings) {

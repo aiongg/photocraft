@@ -12,8 +12,8 @@
 //!
 //! Everything here is a few rectangles per frame: no allocation and no per-pixel work.
 
-use egui::{Color32, CornerRadius, Id, Pos2, Rect, Sense, Ui, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, CornerRadius, Id, Pos2, Rect, Sense, Ui, pos2, vec2};
 
 use crate::state::View;
 

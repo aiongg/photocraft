@@ -12,9 +12,9 @@
 //! from that proxy (veil fill layers, a layer mask, the refined selection for the ants) and the
 //! normal filter-preview path composites it.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use std::sync::Arc;
 
 use photocraft_color::{Color, PixelFormat};
 use photocraft_doc::{Document, Fill, Layer, LayerContent, LayerId, LayerMask};
@@ -307,11 +307,16 @@ pub fn canvas_brush(app: &mut PhotocraftApp, painter: &egui::Painter, over: egui
     // Alt paints in the other mode, as in Photoshop.
     let subtract = brush_subtract(&d.fields) != alt;
     let r = (brush_size(&d.fields) / 2.0 * zoom).max(1.5);
-    let (dark, light) = (craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220)));
+    let (dark, light) = (
+        craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_black_alpha(140)),
+        craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220)),
+    );
     painter.circle_stroke(over, r + 0.5, dark);
     painter.circle_stroke(over, r, light);
     let arm = 3.0;
-    for stroke in [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220))] {
+    for stroke in
+        [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220))]
+    {
         painter.line_segment([over - egui::vec2(arm, 0.0), over + egui::vec2(arm, 0.0)], stroke);
         if !subtract {
             painter.line_segment([over - egui::vec2(0.0, arm), over + egui::vec2(0.0, arm)], stroke);

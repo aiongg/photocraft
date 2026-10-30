@@ -6,9 +6,9 @@
 //! recorded. Trackpad rotate is gated by Preferences › Enhanced Controls › Rotate View with
 //! Trackpad; a two-finger twist on a touch screen also needs Enable Gestures (#204).
 
-use egui::{Align2, Pos2, Rect, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Pos2, Rect, Stroke, pos2, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

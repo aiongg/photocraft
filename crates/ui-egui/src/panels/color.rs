@@ -16,7 +16,12 @@ pub(crate) fn field_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, chips: Rec
         p.rect_stroke(bgr.expand(2.0), craft_ui::theme::scale::Radius::R2.px(), frame, StrokeKind::Outside);
     }
     p.rect_filled(fgr, craft_ui::theme::scale::Radius::R2.px(), c32(app.session.tools.foreground));
-    p.rect_stroke(fgr, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(210)), StrokeKind::Outside);
+    p.rect_stroke(
+        fgr,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(210)),
+        StrokeKind::Outside,
+    );
     if !bg_active {
         p.rect_stroke(fgr.expand(2.0), craft_ui::theme::scale::Radius::R2.px(), frame, StrokeKind::Outside);
     }
@@ -107,7 +112,12 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if brightness { egui::ecolor::Hsva::new(x.min(0.9999), 1.0 - y, hsva.v, 1.0) } else { egui::ecolor::Hsva::new(hsva.h, x, 1.0 - y, 1.0) }
         };
         ui.painter().add(color_grid(field, 16, |x, y| hsva_color32(at(x, y))));
-        ui.painter().rect_stroke(field, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), StrokeKind::Outside);
+        ui.painter().rect_stroke(
+            field,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            StrokeKind::Outside,
+        );
         let field_pick = widgets::pick_pos(&fresp);
         if let Some(p) = field_pick {
             let x = ((p.x - field.left()) / field.width()).clamp(0.0, 1.0);

@@ -10,8 +10,8 @@
 //! `ui.dialog.set` and `ui.dialog.confirm` work as for every schema dialog. The units are view
 //! state (`__resUnit`, `__freqUnit`).
 
-use serde_json::{Map, Value, json};
 use craft_ui::theme::ToEgui;
+use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::theme::Tokens;

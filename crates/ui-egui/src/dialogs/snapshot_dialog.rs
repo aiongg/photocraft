@@ -3,8 +3,8 @@
 //! document, its layers merged, or only the current layer). The command stays directly callable
 //! with the same params by agents and Actions.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Sense, pos2, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;

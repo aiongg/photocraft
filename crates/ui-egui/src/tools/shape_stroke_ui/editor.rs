@@ -1,6 +1,6 @@
 //! A live, locally owned popup: egui's memory popup slot belongs to its child ComboBoxes.
-use egui::{Rect, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{LineCap, LineJoin, StrokeAlign};
 use serde::{Deserialize, Serialize};
 
@@ -59,7 +59,12 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
         t.field
     };
     ui.painter().rect_filled(rect, t.radius_sm, fill);
-    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if active { t.accent_border } else { t.field_border }), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        rect,
+        t.radius_sm,
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if active { t.accent_border } else { t.field_border }),
+        egui::StrokeKind::Inside,
+    );
     ui.painter().galley(pos2(rect.left() + 8.0, rect.center().y - galley.size().y / 2.0), galley.clone(), color);
     let sample = Rect::from_min_max(
         pos2(rect.left() + galley.size().x + 18.0, rect.top() + 3.0),
@@ -69,7 +74,10 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
         paint_sample(ui, sample, response.id.with("sample"), options, false, color);
     } else {
         ui.painter().line_segment([sample.left_center(), sample.right_center()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
-        ui.painter().line_segment([sample.center() + vec2(-4.0, 6.0), sample.center() + vec2(4.0, -6.0)], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger));
+        ui.painter().line_segment(
+            [sample.center() + vec2(-4.0, 6.0), sample.center() + vec2(4.0, -6.0)],
+            craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger),
+        );
     }
     if opener {
         crate::icons::paint(ui, Rect::from_center_size(rect.right_center() - vec2(10.0, 0.0), vec2(12.0, 12.0)), "chevron-down", 12.0, t.text_dim);

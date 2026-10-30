@@ -2,9 +2,9 @@
 //! selected. Canvas size and orientation, resolution, colour mode and bit depth, and the
 //! Rulers & Grids toggles. Every edit dispatches an engine or view command, so the panel stays thin.
 
-use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::{ColorMode, Document, Layer, LayerId, SampleType};
 use serde_json::{Value, json};
 
@@ -120,7 +120,12 @@ fn committed_field(ui: &mut egui::Ui, id: &str, name: &str, current: f32, u: cra
 fn dim_field(ui: &mut egui::Ui, text: &str) {
     let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(74.0, 24.0), Sense::hover());
-    ui.painter().rect_stroke(r, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui().gamma_multiply(0.6)), StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        r,
+        t.shape.radius.control,
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui().gamma_multiply(0.6)),
+        StrokeKind::Inside,
+    );
     ui.painter().text(r.left_center() + vec2(6.0, 0.0), Align2::LEFT_CENTER, text, crate::theme::mono(12.0), t.color.text.faint.to_egui());
 }
 
@@ -133,7 +138,12 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut run: Vec<(String, Value)> = Vec::new();
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::hover());
-        ui.painter().rect_stroke(r, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            r,
+            t.shape.radius.control,
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+            StrokeKind::Inside,
+        );
         icons::paint(ui, r, "file", 15.0, t.color.text.normal.to_egui());
         ui.label(RichText::new(tl!("Document")).color(t.color.text.normal.to_egui()));
     });
@@ -185,7 +195,10 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.add_space(craft_ui::theme::scale::Space::S2.px());
         ui.horizontal(|ui| {
             ui.add_space(label_w + 6.0);
-            ui.label(RichText::new(crate::i18n::fmt(tl!("Resolution: {dpi} pixels/inch"), &[("dpi", &widgets::fmt_num(dpi as f64))])).color(t.color.text.normal.to_egui()));
+            ui.label(
+                RichText::new(crate::i18n::fmt(tl!("Resolution: {dpi} pixels/inch"), &[("dpi", &widgets::fmt_num(dpi as f64))]))
+                    .color(t.color.text.normal.to_egui()),
+            );
         });
         ui.add_space(craft_ui::theme::scale::Space::S2.px());
         ui.horizontal(|ui| {
@@ -212,7 +225,12 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             field_label(ui, tl!("Fill"), label_w);
             let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                r,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+                StrokeKind::Inside,
+            );
             // The canvas fill is only editable for documents without a Background layer.
             ui.add_enabled_ui(!has_bg, |ui| {
                 let mut f = 0u8;

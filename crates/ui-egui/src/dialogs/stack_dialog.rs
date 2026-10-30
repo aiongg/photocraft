@@ -3,9 +3,9 @@
 //! Sort By Name, then Attempt to Automatically Align Source Images and Create Smart Object after
 //! Loading Layers. Statistics adds Stack Mode and always creates a smart object. OK runs the
 //! corresponding engine command with the list or the folder.
-use egui::{RichText, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{RichText, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
@@ -148,23 +148,28 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             files(f)
         };
         let sel = selected(f);
-        egui::Frame::NONE.fill(t.color.surface.sunken.to_egui()).stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui())).corner_radius(t.shape.radius.control).inner_margin(4.0).show(ui, |ui| {
-            ui.set_min_size(vec2(300.0, 160.0));
-            ui.set_max_width(300.0);
-            egui::ScrollArea::vertical().id_salt("load-stack-files").max_height(160.0).auto_shrink([false, false]).show(ui, |ui| {
-                ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                    if folder_mode && !folder(f).is_empty() {
-                        ui.label(RichText::new(folder(f)).color(t.color.text.muted.to_egui()));
-                    }
-                    for (i, p) in shown.iter().enumerate() {
-                        let row = ui.add(egui::Button::selectable(!folder_mode && sel == Some(i), file_name(p))).on_hover_text(p.as_str());
-                        if row.clicked() && !folder_mode {
-                            f.insert("selected".into(), json!(i));
+        egui::Frame::NONE
+            .fill(t.color.surface.sunken.to_egui())
+            .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
+            .corner_radius(t.shape.radius.control)
+            .inner_margin(4.0)
+            .show(ui, |ui| {
+                ui.set_min_size(vec2(300.0, 160.0));
+                ui.set_max_width(300.0);
+                egui::ScrollArea::vertical().id_salt("load-stack-files").max_height(160.0).auto_shrink([false, false]).show(ui, |ui| {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                        if folder_mode && !folder(f).is_empty() {
+                            ui.label(RichText::new(folder(f)).color(t.color.text.muted.to_egui()));
                         }
-                    }
+                        for (i, p) in shown.iter().enumerate() {
+                            let row = ui.add(egui::Button::selectable(!folder_mode && sel == Some(i), file_name(p))).on_hover_text(p.as_str());
+                            if row.clicked() && !folder_mode {
+                                f.insert("selected".into(), json!(i));
+                            }
+                        }
+                    });
                 });
             });
-        });
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = t.space.gap.stack;

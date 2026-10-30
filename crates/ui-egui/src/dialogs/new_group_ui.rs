@@ -3,8 +3,8 @@
 //! the panel's New Group button. OK runs `layer.new.group` / `layer.new.groupFromLayers` with the
 //! options as one history step; explicit params from Actions, CLI and MCP run the engine directly.
 
-use egui::{Align2, Sense, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Sense, pos2, vec2};
 use photocraft_color::BlendMode;
 use photocraft_doc::LabelColor;
 use serde_json::{Map, Value, json};

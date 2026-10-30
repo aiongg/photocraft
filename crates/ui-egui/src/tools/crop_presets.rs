@@ -16,9 +16,9 @@
 //! - The dropdown shows the name of the preset whose values the fields hold, so a preset just saved
 //!   or chosen reads as selected, and the mode again once the fields change or it is deleted.
 
-use egui::vec2;
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::vec2;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -308,29 +308,32 @@ fn delete_body(app: &PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String, 
     ui.label(tl!("Select the crop presets to delete:"));
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let toggle = ui.input(|i| i.modifiers.command || i.modifiers.shift);
-    egui::Frame::NONE.stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui())).inner_margin(2.0).show(ui, |ui| {
-        egui::ScrollArea::vertical().id_salt("crop-preset-delete").max_height(220.0).auto_shrink([false, true]).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 0.0;
-            // Full-width rows, names on the left.
-            ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
-                for (name, _) in &saved {
-                    let on = selected.contains(name);
-                    let r = ui.add(egui::Button::selectable(on, name.as_str()).min_size(vec2(0.0, 22.0)));
-                    if r.clicked() {
-                        // Click picks one; Ctrl/Cmd or Shift adds or removes it.
-                        if !toggle {
-                            selected.clear();
-                            selected.push(name.clone());
-                        } else if on {
-                            selected.retain(|n| n != name);
-                        } else {
-                            selected.push(name.clone());
+    egui::Frame::NONE
+        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()))
+        .inner_margin(2.0)
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical().id_salt("crop-preset-delete").max_height(220.0).auto_shrink([false, true]).show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                // Full-width rows, names on the left.
+                ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
+                    for (name, _) in &saved {
+                        let on = selected.contains(name);
+                        let r = ui.add(egui::Button::selectable(on, name.as_str()).min_size(vec2(0.0, 22.0)));
+                        if r.clicked() {
+                            // Click picks one; Ctrl/Cmd or Shift adds or removes it.
+                            if !toggle {
+                                selected.clear();
+                                selected.push(name.clone());
+                            } else if on {
+                                selected.retain(|n| n != name);
+                            } else {
+                                selected.push(name.clone());
+                            }
                         }
                     }
-                }
+                });
             });
         });
-    });
     fields.insert("selected".into(), json!(selected));
 }
 

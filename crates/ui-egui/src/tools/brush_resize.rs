@@ -9,8 +9,8 @@
 //! journal entry (Rule 1) and, the brush being tool state, no history step. Krita's ⇧+drag (the
 //! request in #231) is not used: ⇧ is Photoshop's straight-line modifier for painting tools.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use craft_ui::theme::StrokeExt;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use egui::{Color32, Pos2, Stroke, vec2};
 use photocraft_engine::paint::MAX_BRUSH_SIZE;

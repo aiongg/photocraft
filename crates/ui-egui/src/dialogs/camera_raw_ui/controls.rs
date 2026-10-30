@@ -1,11 +1,11 @@
 use super::open::{Target, cancel, commit_open_raw, open_raw, raw_stage};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 use super::sidecar::{load_settings, report_file_error, save_settings};
 use super::{
     Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, Stroke, Tokens, ToneZone, Value, Wheel, curve_lut,
     json, pos2, vec2, widgets,
 };
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 const RAW_UNDO_LIMIT: usize = 40;
 
@@ -164,8 +164,14 @@ fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &
     painter.rect_filled(rect, t.shape.radius.control, t.color.surface.sunken.to_egui());
     for i in 1..4 {
         let f = i as f32 / 4.0;
-        painter.line_segment([pos2(rect.left() + f * side, rect.top()), pos2(rect.left() + f * side, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
-        painter.line_segment([pos2(rect.left(), rect.top() + f * side), pos2(rect.right(), rect.top() + f * side)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+        painter.line_segment(
+            [pos2(rect.left() + f * side, rect.top()), pos2(rect.left() + f * side, rect.bottom())],
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+        );
+        painter.line_segment(
+            [pos2(rect.left(), rect.top() + f * side), pos2(rect.right(), rect.top() + f * side)],
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+        );
     }
     let to_screen = |x: f32, y: f32| pos2(rect.left() + x / 255.0 * side, rect.bottom() - y / 255.0 * side);
     // The identity handles are presentation until a gesture actually edits them.
@@ -271,7 +277,8 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         let title = ERect::from_min_size(full.min, vec2(full.width(), if own_window { 0.0 } else { 30.0 }));
         if !own_window {
             painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.background.to_egui());
-            painter.line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+            painter
+                .line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
             painter.text(title.center(), Align2::CENTER_CENTER, d.window_title(), FontId::proportional(13.0), t.color.text.normal.to_egui());
         }
         let ok_label = if d.target == Target::OpenRaw { tl!("Open") } else { tl!("OK") };
@@ -309,7 +316,12 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
             crate::camera_raw_scope_ui::preview(&mut preview, d, scope, r, &response, panning);
         }
         if let Some(region) = zoom_box {
-            preview.painter().rect_stroke(region, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
+            preview.painter().rect_stroke(
+                region,
+                craft_ui::theme::scale::Radius::R0.px(),
+                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
+                egui::StrokeKind::Inside,
+            );
         }
         let toolbar = ERect::from_min_max(pos2(preview_body.left() + 16.0, view.bottom() + 8.0), preview_body.right_bottom() - vec2(16.0, 4.0));
         let mut nav_ui = ui.new_child(egui::UiBuilder::new().max_rect(toolbar).layout(egui::Layout::left_to_right(egui::Align::Center)));

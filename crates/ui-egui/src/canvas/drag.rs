@@ -1,7 +1,7 @@
 use super::view_xform::ViewXform;
+use super::{PhotocraftApp, Pos2, Rect, Stroke, Tool, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
-use super::{PhotocraftApp, Pos2, Rect, Stroke, Tool, vec2};
 
 /// An in-progress pointer gesture on the canvas.
 #[derive(Clone, Debug)]

@@ -5,8 +5,8 @@
 //! `type.insertText`, `edit.checkSpelling`); the panels only hold view state
 //! ([`TypePanelsUi`], part of the serialisable UI state so the control channel can drive it).
 
-use egui::{Align2, Color32, CornerRadius, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, CornerRadius, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -707,7 +707,12 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let cell = Rect::from_min_size(pos2(rect.left() + col as f32 * size, rect.top()), vec2(size, size));
                 let resp = ui.interact(cell, ui.scope_id().with(("glyph", c)), Sense::click());
                 let is_sel = selected.as_deref().and_then(|s| s.chars().next()) == Some(c);
-                ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(
+                    cell,
+                    craft_ui::theme::scale::Radius::R0.px(),
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                    egui::StrokeKind::Inside,
+                );
                 if is_sel {
                     ui.painter().rect_filled(cell.shrink(1.0), craft_ui::theme::scale::Radius::R0.px(), t.accent);
                 } else if resp.hovered() {

@@ -1,6 +1,6 @@
 use super::layer_drag::dropped_on;
-use craft_ui::theme::StrokeExt;
 use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, Value, empty, icons, json, pos2, vec2, widgets};
+use craft_ui::theme::StrokeExt;
 
 pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
@@ -286,7 +286,12 @@ fn snapshot_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, selected: Option<u6
         widgets::checker(ui.painter(), thumb, 4.0);
         let tex = app.snapshot_thumb(&ctx, doc_id, snap, &live);
         ui.painter().image(tex, thumb, Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-        ui.painter().rect_stroke(thumb, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), StrokeKind::Outside);
+        ui.painter().rect_stroke(
+            thumb,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            StrokeKind::Outside,
+        );
         match renaming.as_mut().filter(|(id, _)| *id == snap.id) {
             Some((_, text)) => {
                 let field = Rect::from_min_max(pos2(thumb.right() + 6.0, rect.center().y - 10.0), pos2(rect.right() - 6.0, rect.center().y + 10.0));

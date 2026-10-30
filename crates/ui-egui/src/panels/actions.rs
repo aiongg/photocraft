@@ -4,8 +4,8 @@
 //! `play` / `list` / `get` / `delete` / `move` / `rename`), so the panel, the CLI and MCP share them. This module
 //! keeps only which row is selected and which rows are expanded.
 
-use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -315,7 +315,12 @@ fn button_label_color(color: &str, t: &Tokens) -> Color32 {
 
 fn paint_check(ui: &egui::Ui, rect: Rect, on: bool, t: &Tokens) {
     let b = Rect::from_center_size(rect.center(), vec2(11.0, 11.0));
-    ui.painter().rect_stroke(b, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        b,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
+        egui::StrokeKind::Inside,
+    );
     if on {
         let pts = vec![pos2(b.left() + 2.5, b.center().y), pos2(b.left() + 4.5, b.bottom() - 3.0), pos2(b.right() - 2.5, b.top() + 2.5)];
         ui.painter().add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)));
@@ -707,7 +712,8 @@ fn drag_row(ui: &egui::Ui, response: &egui::Response, row: DragRow, t: &Tokens) 
     let slot = index.saturating_add(usize::from(after));
     let to = if from < slot { slot.saturating_sub(1) } else { slot };
     let y = if after { response.rect.bottom() } else { response.rect.top() };
-    ui.painter().line_segment([pos2(response.rect.left() + 22.0, y), pos2(response.rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
+    ui.painter()
+        .line_segment([pos2(response.rect.left() + 22.0, y), pos2(response.rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
     response.dnd_release_payload::<DragRow>().map(|source| (*source, to))
 }
 

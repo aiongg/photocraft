@@ -22,8 +22,8 @@
 //! `angle`, `focus`, `transition` and `blur`. The bounds are the engine's: the selection's when
 //! there is one, else the canvas.
 
-use egui::{Color32, Pos2, Stroke, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, Pos2, Stroke, vec2};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -674,7 +674,8 @@ pub fn canvas(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, over
 
 /// Draw a dark-edged white line from `a` to `b`, dashed when `dash` is set.
 fn draw_line(painter: &egui::Painter, a: Pos2, b: Pos2, dash: bool) {
-    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
+    let (dark, light) =
+        (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
     if dash {
         painter.extend(egui::Shape::dashed_line(&[a, b], dark, 6.0, 5.0));
         painter.extend(egui::Shape::dashed_line(&[a, b], light, 6.0, 5.0));
@@ -692,7 +693,8 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(b) = bounds(&d.fields) else { return };
     let Some(k) = kind(&d.fields) else { return };
     let sel = selected(&d.fields);
-    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
+    let (dark, light) =
+        (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
     let screen = |p: [f64; 2]| xf.to_screen(p[0] as f32, p[1] as f32);
     let handle_stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(180));
     for (i, p) in pins(&d.fields).into_iter().enumerate() {

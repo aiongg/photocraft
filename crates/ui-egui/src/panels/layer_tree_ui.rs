@@ -6,8 +6,8 @@
 //! `.pcraft` and as the PSD section divider's open/closed folder type, toggled through
 //! `layer.setExpanded` (a view change: no history step).
 
-use egui::{Rect, Sense, Shape, Stroke, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Rect, Sense, Shape, Stroke, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent};
 use serde_json::{Value, json};
 

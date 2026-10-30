@@ -6,8 +6,8 @@
 //! State is [`ShellUi`] (serialisable, part of `UiState`); saved workspaces and the lock live in
 //! `Preferences::workspaces` / `workspace_locked` so they persist with the preferences.
 
-use egui::{Align2, RichText, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Align2, RichText, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 

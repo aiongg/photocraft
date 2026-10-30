@@ -8,8 +8,8 @@
 //! Sampler points themselves live in the engine (`DocState.color_samplers`) so every front end
 //! shares them; this module only maps pointer input and draws the numbered markers.
 
-use egui::{Align2, Color32, CornerRadius, FontId, Pos2, RichText, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, CornerRadius, FontId, Pos2, RichText, Stroke, pos2, vec2};
 use photocraft_doc::{Document, Ruler};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -459,7 +459,8 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             );
             // Folded corner and text lines.
             let ink = Color32::from_black_alpha(140);
-            painter.line_segment([r.right_top() + vec2(-5.0, 0.0), r.right_top() + vec2(0.0, 5.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
+            painter
+                .line_segment([r.right_top() + vec2(-5.0, 0.0), r.right_top() + vec2(0.0, 5.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
             for k in 0..3 {
                 let y = r.top() + 7.0 + 4.0 * k as f32;
                 painter.line_segment([pos2(r.left() + 3.0, y), pos2(r.right() - 3.0, y)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));

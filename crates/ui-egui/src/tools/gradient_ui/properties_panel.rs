@@ -4,9 +4,9 @@ use super::{
     Color32, Fill, GradientStyle, Layer, LayerId, Marker, PhotocraftApp, Rect, Sense, Sink, Stroke, StrokeKind, Tokens, c32, cmds, edit_stop_color, fill_of,
     json, preset_stop_color, selection_after_edit, stops_editor_for, strip_key, vec2, widgets,
 };
+use crate::{icons, props_layout, theme};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
-use crate::{icons, props_layout, theme};
 
 const STYLES: [(GradientStyle, &str); 5] = [
     (GradientStyle::Linear, "Linear Gradient"),
@@ -128,13 +128,22 @@ fn style_button(ui: &mut egui::Ui, style: GradientStyle, selected: bool, name: &
                 GradientStyle::Diamond => (dx.abs() + dy.abs()).min(1.0),
             };
             let channel = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * amount) as u8;
-            let color = Color32::from_rgb(channel(t.color.surface.sunken.to_egui().r(), t.color.text.normal.to_egui().r()), channel(t.color.surface.sunken.to_egui().g(), t.color.text.normal.to_egui().g()), channel(t.color.surface.sunken.to_egui().b(), t.color.text.normal.to_egui().b()));
+            let color = Color32::from_rgb(
+                channel(t.color.surface.sunken.to_egui().r(), t.color.text.normal.to_egui().r()),
+                channel(t.color.surface.sunken.to_egui().g(), t.color.text.normal.to_egui().g()),
+                channel(t.color.surface.sunken.to_egui().b(), t.color.text.normal.to_egui().b()),
+            );
             let min = preview.min + vec2(x as f32, y as f32) * preview.size() / N as f32;
             mesh.add_colored_rect(Rect::from_min_size(min, preview.size() / N as f32), color);
         }
     }
     ui.painter().add(egui::Shape::mesh(mesh));
-    ui.painter().rect_stroke(preview, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()), StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        preview,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()),
+        StrokeKind::Outside,
+    );
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), selected, tl!(name)));
     response.on_hover_text(tl!(name))
 }
@@ -159,7 +168,12 @@ pub(super) fn stop_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, sink: Sink
                 let (rect, response) = ui.allocate_exact_size(vec2(88.0, 24.0), Sense::click());
                 let rgb = color.to_rgb();
                 ui.painter().rect_filled(rect.shrink(2.0), craft_ui::theme::current(ui.ctx()).shape.radius.control, c32([rgb[0], rgb[1], rgb[2], 1.0]));
-                ui.painter().rect_stroke(rect, craft_ui::theme::current(ui.ctx()).shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()), StrokeKind::Inside);
+                ui.painter().rect_stroke(
+                    rect,
+                    craft_ui::theme::current(ui.ctx()).shape.radius.control,
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()),
+                    StrokeKind::Inside,
+                );
                 response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Color")));
                 if response.on_hover_text(tl!("Color")).clicked() {
                     match sink {

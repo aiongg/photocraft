@@ -7,8 +7,8 @@
 //! dialog commits on OK). Selective Color and Color Lookup keep their editors in `adjust_ui`.
 
 use crate::point_curve as curve_edit;
-use craft_ui::theme::ToEgui;
 use crate::state::CurvesEditorState as CurveUi;
+use craft_ui::theme::ToEgui;
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};

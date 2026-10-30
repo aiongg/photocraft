@@ -3,8 +3,8 @@
 //! that still don't fit move into a » chevron menu at the end of the strip. The selected tab
 //! always stays on the strip, and no tab ever runs under the menu button.
 
-use egui::{Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
 use crate::theme::{self, Tokens};
 

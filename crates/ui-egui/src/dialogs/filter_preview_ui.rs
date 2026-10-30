@@ -8,9 +8,9 @@
 //! point whatever the proxy factor. The Preview checkbox keeps toggling the on-canvas live result
 //! (`canvas::ensure_filter_preview`), unchanged.
 
-use egui::{Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
+use egui::{Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
 use photocraft_doc::Document;
 use serde_json::{Map, Value, json};
 
@@ -123,7 +123,12 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
         crate::widgets::checker(&painter, dest, 8.0);
         painter.image(tex.id(), dest, uv, Color32::WHITE);
     }
-    painter.rect_stroke(rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
+    painter.rect_stroke(
+        rect,
+        t.shape.radius.control,
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        egui::StrokeKind::Inside,
+    );
 
     // Drag to pan (the image follows the pointer); a plain click centres on the clicked point.
     if response.dragged() {

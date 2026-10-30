@@ -1,5 +1,4 @@
 use super::begin::warps_type;
-use craft_ui::theme::StrokeExt;
 use super::drag_modes::{HandleIndicator, handle_indicator};
 use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
@@ -8,6 +7,7 @@ use super::{
     BezierMesh, Color32, DocId, HANDLE_PX, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, Stroke, TransformPreview, TransformSession, ViewXform, Warp,
     WarpDrag, WarpStyle, corners, pos2, vec2,
 };
+use craft_ui::theme::StrokeExt;
 
 /// The distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
 /// pointer over a handle. The canvas calls it from its cursor branch, so nothing is drawn where a
@@ -204,7 +204,12 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     for p in pts.iter().chain(mids.iter()) {
         let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
         painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R0.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
+            egui::StrokeKind::Inside,
+        );
     }
     // Reference point (Photoshop's crosshair circle).
     let c = scr(t.pivot);

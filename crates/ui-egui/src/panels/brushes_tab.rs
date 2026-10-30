@@ -13,8 +13,8 @@
 //! The list itself ([`preset_list`]) is shared with the Brush Preset picker (`brush_picker`), so
 //! both show, pick and organise presets the same way; each keeps its own view state.
 
-use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
@@ -414,7 +414,12 @@ fn grid_cell(ui: &mut egui::Ui, p: &BrushPreset, current: bool, presets: &[Brush
     }
     if current {
         ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.accent_soft);
-        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            r,
+            craft_ui::theme::scale::Radius::R3.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+            egui::StrokeKind::Inside,
+        );
     } else if resp.hovered() {
         ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
     }
@@ -567,7 +572,12 @@ fn preset_card(
     ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), darker(t.card, CARD_BG_SHADE));
     if current {
         ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), t.accent_soft);
-        ui.painter().rect_stroke(card, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            card,
+            craft_ui::theme::scale::Radius::R3.px(),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+            egui::StrokeKind::Inside,
+        );
     } else if resp.hovered() {
         ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), t.hover);
     }

@@ -13,8 +13,8 @@
 //! a pause on the way, neither closes it nor opens the submenu of a row crossed. The pointer
 //! resting on another row, or moving away from the submenu, switches as before.
 
-use egui::containers::menu::{MenuState, SubMenu, find_menu_root};
 use craft_ui::theme::ToEgui;
+use egui::containers::menu::{MenuState, SubMenu, find_menu_root};
 use egui::{Id, Key, Modifiers, Pos2, Rect, Sense, Ui, pos2, vec2};
 
 /// Height of a scroll-arrow strip.
@@ -524,7 +524,11 @@ pub fn level(ui: &mut Ui, depth: usize, nav: &mut Nav, rows: impl FnOnce(&mut Ui
         } else {
             vec![pos2(c.x - w, c.y - h * 0.5), pos2(c.x + w, c.y - h * 0.5), pos2(c.x, c.y + h * 0.5)]
         };
-        ui.painter().add(egui::Shape::convex_polygon(tri, if live { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui().gamma_multiply(0.5) }, egui::Stroke::NONE));
+        ui.painter().add(egui::Shape::convex_polygon(
+            tri,
+            if live { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui().gamma_multiply(0.5) },
+            egui::Stroke::NONE,
+        ));
         let id = key.with(dir < 0.0);
         let r = ui.interact(strip, id, Sense::hover());
         let label = if dir < 0.0 { "Scroll menu up" } else { "Scroll menu down" };

@@ -1,11 +1,11 @@
 use super::dialogs::open_preferences;
-use craft_ui::theme::StrokeExt;
 use super::fields::{choice_label, color_of, preference_matches};
 use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
 use craft_theme::{
     AppChoice, AppDefaults, AppId, Appearance, Mode, ModeChoice, MotionChoice, Selection, Size, SystemAppearance, ThemeDef, ThemeId, ThemePair, Variants,
 };
 use craft_theme_store::{Accepted, StoreOptions, SuiteClient, SuiteDir, SuiteWatch};
+use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.

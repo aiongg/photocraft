@@ -4,8 +4,8 @@
 //! (History: the first shell used Unicode glyphs; half of them rendered as tofu boxes because the
 //! bundled fonts lacked them. Vector icons fix that for good.)
 
-use std::sync::OnceLock;
 use craft_ui::theme::StrokeExt;
+use std::sync::OnceLock;
 
 use craft_ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
 use craft_ui::icons::{SvgIconSet, SvgStyle};

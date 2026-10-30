@@ -1,12 +1,12 @@
 use super::defaults::{apply, apply_defaults, default_styles, formatting_params, open_color_picker, shown_scale, target, type_unit};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 use super::fonts::{axis_sliders, font_picker, fonts_ready, selected_style, style_label, styles};
 use super::options_bar::{
     align_glyph, apply_kerning, direction_glyph, direction_items, icon_label, kerning_at, kerning_field, kerning_label, num_field, shown_family, styles_at,
     toggle_cell,
 };
 use super::{Color32, LayerId, PhotocraftApp, Stroke, json, text_layer};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 /// The Character panel's OpenType buttons, in Photoshop's order: (feature tag, command id,
 /// tooltip). The tooltips are the Type › OpenType menu labels.
@@ -324,7 +324,12 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                 let sw = (LABEL_W + LABEL_GAP + w - lw - LABEL_GAP).max(24.0);
                 let (rect, resp) = ui.allocate_exact_size(egui::vec2(sw, 22.0), egui::Sense::click());
                 ui.painter().rect_filled(rect, t.shape.radius.control, Color32::from_rgb(q(rgb[0]), q(rgb[1]), q(rgb[2])));
-                ui.painter().rect_stroke(rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(
+                    rect,
+                    t.shape.radius.control,
+                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+                    egui::StrokeKind::Inside,
+                );
                 let resp = resp.on_hover_text(tl!("Text color"));
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Text color")));
                 if resp.clicked() {
@@ -372,11 +377,16 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                         ui.painter().galley(pos, g, col);
                     }
                     if i == 4 {
-                        ui.painter().line_segment([egui::pos2(gr.left(), gr.bottom() - 2.0), egui::pos2(gr.right(), gr.bottom() - 2.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
+                        ui.painter().line_segment(
+                            [egui::pos2(gr.left(), gr.bottom() - 2.0), egui::pos2(gr.right(), gr.bottom() - 2.0)],
+                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
+                        );
                     }
                     if i == 5 {
-                        ui.painter()
-                            .line_segment([egui::pos2(gr.left() - 1.0, gr.center().y), egui::pos2(gr.right() + 1.0, gr.center().y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
+                        ui.painter().line_segment(
+                            [egui::pos2(gr.left() - 1.0, gr.center().y), egui::pos2(gr.right() + 1.0, gr.center().y)],
+                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
+                        );
                     }
                 });
                 if clicked {

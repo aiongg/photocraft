@@ -2,8 +2,8 @@
 //! (W/H/X/Y of the layer content, editable), Align and Distribute, the kind's sections and Quick Actions. Edits dispatch
 //! `edit.transform`, `layer.translate`, `layer.align.*` and selection commands.
 
-use egui::{Rect, Sense, Stroke, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::{Value, json};
 

@@ -9,8 +9,8 @@
 //! "add":{"a":[x,y],"b":[x,y],"orientation":"…"}, "orient":{"index":i,"orientation":"…"}, "remove":i,
 //! "commit":true | "cancel":true}}}`.
 
-use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use craft_ui::theme::StrokeExt;
+use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::transform::Interp;
 use photocraft_algo::wideangle::{self, Camera, Constraint, Orientation, WideAngle, WideModel};
 use photocraft_color::PixelFormat;

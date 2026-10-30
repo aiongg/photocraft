@@ -21,8 +21,8 @@
 //! the spell checker (`edit.checkSpelling`) checks type layers, so they head the Type tool's edit
 //! menu instead (`canvas_tool_menu`, over a misspelled word of the text being edited, #4370).
 
-use egui::text::CCursorRange;
 use craft_ui::theme::ToEgui;
+use egui::text::CCursorRange;
 use egui::{Context, Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, SurrenderFocusOn, Ui};
 
 /// One menu item.

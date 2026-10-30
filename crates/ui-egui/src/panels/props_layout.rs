@@ -2,8 +2,8 @@
 //! collapsible section header every section uses (separator, disclosure chevron, title), column
 //! widths that make field rows fill the panel, and the Quick Actions each layer kind offers.
 
-use egui::{Rect, Sense, pos2, vec2};
 use craft_ui::theme::ToEgui;
+use egui::{Rect, Sense, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 
 use crate::theme::{self, Tokens};

@@ -1,9 +1,9 @@
 use super::begin::{enter_warp, leave_warp, warps_type};
-use craft_ui::theme::StrokeExt;
 use super::commit::{cancel, commit};
 use super::pointer::point_on_quad;
 use super::warp::edit_session_warp;
 use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
+use craft_ui::theme::StrokeExt;
 
 /// How much the box enlarges its pixels: the longest edge relative to the original (picks the
 /// preview's texture level and filter).
@@ -259,7 +259,12 @@ fn anchor_grid_widget(ui: &mut egui::Ui, current_anchor: Option<usize>) -> Optio
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let tk = crate::theme::Tokens::get(ui.ctx());
     let painter = ui.painter();
-    painter.rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tk.card_border), egui::StrokeKind::Inside);
+    painter.rect_stroke(
+        rect,
+        craft_ui::theme::scale::Radius::R2.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tk.card_border),
+        egui::StrokeKind::Inside,
+    );
     let mut clicked = None;
     let pointer = resp.interact_pointer_pos();
     for row in 0..3 {

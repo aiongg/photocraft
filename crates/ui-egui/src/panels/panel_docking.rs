@@ -9,11 +9,11 @@
 //! groups and where a floated panel docks back.
 
 use crate::dock::Group;
-use craft_ui::theme::StrokeExt;
 use craft_ui::docking::{
     Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side, Target, Zone,
 };
 use craft_ui::layout::{SplitAxis, SplitSize};
+use craft_ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;

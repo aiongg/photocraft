@@ -1,8 +1,8 @@
 //! The Solid Color Fill thumbnail opens the shared Color Picker. Preview a shallow document
 //! snapshot; Cancel changes nothing and OK commits exactly one engine command.
 
-use std::hash::{Hash, Hasher};
 use craft_ui::theme::StrokeExt;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use egui::{Color32, Rect, Stroke, StrokeKind, pos2, vec2};

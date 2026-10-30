@@ -8,8 +8,8 @@
 //! an engine command (`gradient.presets.*`, `pattern.presets.*`, `style.presets.*`,
 //! `shape.presets.*`, `tool.presets.*`, `cloneSource.*`); this module only draws and dispatches.
 
-use std::collections::{BTreeMap, BTreeSet};
 use craft_ui::theme::StrokeExt;
+use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align2, Color32, ColorImage, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
 use serde::{Deserialize, Serialize};
@@ -265,7 +265,12 @@ pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &
     if let Some(p) = current {
         ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
     }
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Outside);
+    ui.painter().rect_stroke(
+        r,
+        craft_ui::theme::scale::Radius::R0.px(),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        egui::StrokeKind::Outside,
+    );
     let name = current.map_or(String::new(), |p| p.display_name().to_string());
     let resp = resp.on_hover_text(&name);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Patterns")));
@@ -538,7 +543,12 @@ pub(crate) fn browser(
                         let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("preset-drag")));
                         let gr = Rect::from_center_size(pp, vec2(28.0, 28.0));
                         lp.rect_filled(gr, craft_ui::theme::scale::Radius::R3.px(), t.card.gamma_multiply(0.8));
-                        lp.rect_stroke(gr, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside);
+                        lp.rect_stroke(
+                            gr,
+                            craft_ui::theme::scale::Radius::R3.px(),
+                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+                            egui::StrokeKind::Outside,
+                        );
                         lp.text(gr.center(), Align2::CENTER_CENTER, "+", FontId::proportional(16.0), t.accent);
                     }
                     if resp.drag_stopped()

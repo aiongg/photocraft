@@ -19,8 +19,8 @@
 //!
 //! The canvas keeps showing the pre-job state: workers never touch the session's documents.
 
-use std::sync::Arc;
 use craft_ui::theme::StrokeExt;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
 
@@ -848,7 +848,8 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     let needed = (content.height() + 2.0 * OPEN_CARD_PAD).max(OPEN_CARD_MIN_HEIGHT);
     let card = Rect::from_min_size(card.min, vec2(OPEN_CARD_WIDTH, height.max(needed)));
     ui.painter().set(fill, egui::Shape::rect_filled(card, t.radius_lg, t.card));
-    ui.painter().set(border, egui::Shape::rect_stroke(card, t.radius_lg, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside));
+    ui.painter()
+        .set(border, egui::Shape::rect_stroke(card, t.radius_lg, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside));
     if (needed - height).abs() > 0.5 {
         ui.ctx().data_mut(|d| d.insert_temp(height_id, needed));
         ui.ctx().request_repaint();
