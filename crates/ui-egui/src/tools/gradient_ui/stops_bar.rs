@@ -41,7 +41,11 @@ pub(super) fn stops_of(fill: &Fill) -> GradientStops {
         .collect();
     let mut opacity: Vec<(f32, f32)> = if opacity_stops.is_empty() { vec![(0.0, 1.0), (1.0, 1.0)] } else { opacity_stops.clone() };
     opacity.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let opacity = opacity.iter().enumerate().map(|(i, (location, opacity))| OpacityStop { location: *location, opacity: *opacity, midpoint: 0.5, tag: i as u64 + 1 }).collect();
+    let opacity = opacity
+        .iter()
+        .enumerate()
+        .map(|(i, (location, opacity))| OpacityStop { location: *location, opacity: *opacity, midpoint: 0.5, tag: i as u64 + 1 })
+        .collect();
     GradientStops { color, opacity }
 }
 
@@ -133,11 +137,7 @@ pub(super) fn show(ui: &mut Ui, key: egui::Id, fill: &Fill, midpoints: bool) -> 
     // A draft made against other stops (an undo, or another edit) is stale.
     let draft = ui.data(|d| d.get_temp::<Draft>(draft_key)).filter(|d| d.base == base);
     let shown = draft.as_ref().map_or(&base, |d| &d.value);
-    let response = GradientEditor::new(key, tl!("Gradient stops"), shown, &numbers)
-        .rows(StopRows::Split)
-        .midpoints(midpoints)
-        .labels(labels())
-        .show(ui);
+    let response = GradientEditor::new(key, tl!("Gradient stops"), shown, &numbers).rows(StopRows::Split).midpoints(midpoints).labels(labels()).show(ui);
     let action = match response.edit.event {
         Some(EditEvent::Update { value, .. }) => {
             let preview = command(&base, &value);
@@ -192,8 +192,8 @@ mod tests {
         deleted.color.remove(1);
         assert_eq!(command(&old, &deleted), Some(json!({"action": "delete", "index": 1})));
         let mut midpoint = old.clone();
-        midpoint.color[1].midpoint = 0.3;
-        assert_eq!(command(&old, &midpoint), Some(json!({"action": "midpoint", "index": 1, "location": 0.3})));
+        midpoint.color[1].midpoint = 0.25;
+        assert_eq!(command(&old, &midpoint), Some(json!({"action": "midpoint", "index": 1, "location": 0.25})));
         assert_eq!(command(&old, &old), None);
     }
 }

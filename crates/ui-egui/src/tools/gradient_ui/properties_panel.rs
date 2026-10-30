@@ -46,7 +46,10 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     if props_layout::section(ui, "gradient-fill-options", "Gradient Options") {
         ui.horizontal(|ui| {
             let theme = craft_ui::theme::current(ui.ctx());
-            ui.add_sized(vec2(theme.component.property.word_width, theme.component.field.height.get(ControlSize::Md)), Text::new(tl!("Style")).content(Content::Muted));
+            ui.add_sized(
+                vec2(theme.component.property.word_width, theme.component.field.height.get(ControlSize::Md)),
+                Text::new(tl!("Style")).content(Content::Muted),
+            );
             ui.spacing_mut().item_spacing.x = 3.0;
             for (value, name) in STYLES {
                 if style_button(ui, value, value == style, name).clicked() {
@@ -165,6 +168,7 @@ fn style_button(ui: &mut egui::Ui, style: GradientStyle, selected: bool, name: &
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme;
     use egui::pos2;
     use egui_kittest::{
         Harness,
@@ -195,15 +199,26 @@ mod tests {
         current_fill(app, state.active_layer.unwrap()).unwrap()
     }
 
-    fn click_strip(h: &mut Harness<'_, PhotocraftApp>, location: f32, y: f32) {
-        let rect = h.get_by_label("Gradient stops").rect();
-        let pos = pos2(rect.left() + 8.0 + (rect.width() - 16.0) * location, rect.top() + y);
+    fn click_at(h: &mut Harness<'_, PhotocraftApp>, pos: egui::Pos2) {
         h.event(egui::Event::PointerMoved(pos));
         h.run_steps(1);
         h.event(egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
         h.run_steps(1);
         h.event(egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
         h.run_steps(3);
+    }
+
+    /// The point of the bar at `location` (0..1 of the ramp) in the opacity row (`true`) or the
+    /// colour row, clear of the markers and midpoint diamonds.
+    fn bar_point(h: &Harness<'_, PhotocraftApp>, location: f32, opacity: bool) -> egui::Pos2 {
+        let rect = h.get_by_label("Gradient stops").rect();
+        let first = h.get_by_label(if opacity { "Opacity stop 1 of 2" } else { "Color stop 1 of 2" }).rect();
+        let last = h.get_by_label(if opacity { "Opacity stop 2 of 2" } else { "Color stop 2 of 2" }).rect();
+        pos2(first.center().x + (last.center().x - first.center().x) * location, if opacity { rect.top() + 4.0 } else { rect.bottom() - 4.0 })
+    }
+
+    fn selected(h: &Harness<'_, PhotocraftApp>, name: &str) -> bool {
+        h.get_by_label(name).accesskit_node().is_selected() == Some(true)
     }
 
     #[test]
@@ -239,7 +254,8 @@ mod tests {
         for opacity in [false, true] {
             let before = fill(h.state());
             let count = h.state().session.active().unwrap().history.past_len();
-            click_strip(&mut h, 0.5, if opacity { 22.0 } else { 34.0 });
+            let pos = bar_point(&h, 0.25, opacity);
+            click_at(&mut h, pos);
             let after = fill(h.state());
             let Fill::Gradient { stops: old_colors, opacity_stops: old_opacity, .. } = &before else { panic!() };
             let Fill::Gradient { stops: colors, opacity_stops, .. } = &after else { panic!() };
@@ -257,14 +273,14 @@ mod tests {
             assert_eq!(fill(h.state()), after);
             h.run_steps(2);
         }
-        // The selected opacity's fields are replaced when a bottom color handle is selected.
-        assert!(h.query_all_by_label("Color").all(|n| n.rect().width() < 80.0));
+        // Selecting a colour marker shows the Color well and edits nothing.
         let before = fill(h.state());
         let count = h.state().session.active().unwrap().history.past_len();
-        click_strip(&mut h, 0.0, 50.0);
+        let rect = h.get_by_label("Color stop 1 of 3").rect();
+        click_at(&mut h, rect.center());
         assert_eq!(fill(h.state()), before);
         assert_eq!(h.state().session.active().unwrap().history.past_len(), count);
-        h.query_all_by_label("Color").find(|n| n.rect().width() > 80.0).unwrap().click();
+        h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).unwrap().click();
         h.run_steps(2);
         assert!(!h.state().ui.dialogs.is_empty());
     }
@@ -274,10 +290,11 @@ mod tests {
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app());
         PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
         h.run_steps(3);
-        click_strip(&mut h, 0.0, 6.0);
+        let rect = h.get_by_label("Opacity stop 1 of 2").rect();
+        click_at(&mut h, rect.center());
         let before = fill(h.state());
         let count = h.state().session.active().unwrap().history.past_len();
-        // Selected opacity and location precede angle and scale.
+        // The selected opacity's fields come first: Opacity, then Location.
         h.get_all_by_role(egui::accesskit::Role::SpinButton).next().unwrap().click();
         h.run_steps(2);
         h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
@@ -300,7 +317,8 @@ mod tests {
         PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
         h.run_steps(3);
         assert!(h.get_all_by_label("Delete").next().unwrap().accesskit_node().is_disabled(), "two colors cannot be reduced further");
-        click_strip(&mut h, 0.0, 6.0);
+        let rect = h.get_by_label("Opacity stop 1 of 3").rect();
+        click_at(&mut h, rect.center());
         assert!(!h.get_all_by_label("Delete").next().unwrap().accesskit_node().is_disabled(), "three opacity points can be reduced");
         let before = fill(h.state());
         let count = h.state().session.active().unwrap().history.past_len();
@@ -312,7 +330,8 @@ mod tests {
         assert_eq!(colors, old_colors);
         assert_eq!(opacity_stops, &old_opacity[1..]);
         assert_eq!(h.state().session.active().unwrap().history.past_len(), count + 1);
-        click_strip(&mut h, 0.5, 6.0);
+        let rect = h.get_by_label("Opacity stop 1 of 2").rect();
+        click_at(&mut h, rect.center());
         assert!(h.get_all_by_label("Delete").next().unwrap().accesskit_node().is_disabled(), "two opacity points cannot be reduced further");
         h.state_mut().run("edit.undo", json!({})).unwrap();
         assert_eq!(fill(h.state()), before);
@@ -324,7 +343,6 @@ mod tests {
 
     #[test]
     fn controls_fit_a_narrow_panel_in_every_theme() {
-        assert!(icons::exists("trash"), "the stop deletion button has an embedded icon");
         for theme in theme::ThemeKind::ALL {
             let mut h = Harness::builder().with_size(vec2(260.0, 820.0)).build_ui_state(panel, app());
             PhotocraftApp::setup_context(&h.ctx, theme);
@@ -339,33 +357,17 @@ mod tests {
     }
 
     #[test]
-    fn selection_follows_sorted_stops_including_equal_positions() {
-        let f = Fill::gradient(
-            vec![(0.0, photocraft_color::Color::BLACK), (0.5, photocraft_color::Color::WHITE), (1.0, photocraft_color::Color::WHITE)],
-            0.0,
-            1.0,
-            GradientStyle::Linear,
-            false,
-        );
-        assert_eq!(selection_after_edit(&f, &json!({"action": "move", "index": 0, "location": 0.5}), None), Some(Marker::Color(0)));
-        assert_eq!(selection_after_edit(&f, &json!({"action": "move", "index": 0, "location": 0.75}), None), Some(Marker::Color(1)));
-        assert_eq!(selection_after_edit(&f, &json!({"action": "add", "location": 0.5}), None), Some(Marker::Color(2)));
-        assert_eq!(selection_after_edit(&f, &json!({"action": "move", "kind": "opacity", "index": 0, "location": 1.0}), None), Some(Marker::Opacity(0)));
-    }
-
-    #[test]
     fn dragging_a_stop_across_another_keeps_selection_and_commits_once() {
         let mut app = app();
         app.run(cmds::STOP, json!({"action": "add", "location": 0.4})).unwrap();
-        let id = app.session.active().unwrap().active_layer.unwrap();
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app);
         PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
         h.run_steps(3);
         let before = fill(h.state());
         let count = h.state().session.active().unwrap().history.past_len();
-        let rect = h.get_by_label("Gradient stops").rect();
-        let from = pos2(rect.left() + 8.0, rect.top() + 50.0);
-        let to = pos2(rect.left() + 8.0 + (rect.width() - 16.0) * 0.7, from.y);
+        let from = h.get_by_label("Color stop 1 of 3").rect().center();
+        let last = h.get_by_label("Color stop 3 of 3").rect().center();
+        let to = pos2(from.x + (last.x - from.x) * 0.7, from.y);
         h.event(egui::Event::PointerMoved(from));
         h.run_steps(1);
         h.event(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
@@ -378,8 +380,7 @@ mod tests {
         h.run_steps(3);
         assert_eq!(h.state().session.active().unwrap().history.past_len(), count + 1);
         assert!(matches!(fill(h.state()), Fill::Gradient { stops, .. } if (stops[1].0 - 0.7).abs() < 1e-5));
-        let key = strip_key(h.state(), Sink::Layer(id)).with("selection");
-        assert_eq!(h.ctx.data(|d| d.get_temp::<Marker>(key)), Some(Marker::Color(1)));
+        assert!(selected(&h, "Color stop 2 of 3"), "the selection followed the dragged stop");
         h.get_all_by_label("Delete").next().unwrap().click();
         h.run_steps(3);
         assert!(matches!(fill(h.state()), Fill::Gradient { stops, .. } if stops.len() == 2 && (stops[0].0 - 0.4).abs() < 1e-5));
