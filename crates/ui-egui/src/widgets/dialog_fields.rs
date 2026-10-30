@@ -19,7 +19,15 @@ pub struct NumberEdit {
 }
 
 /// [`number`] returning the response too, for a row that names its control by it.
-pub fn number_field(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str, decimals: usize) -> NumberEdit {
+pub fn number_field(
+    ui: &mut Ui,
+    id_salt: impl AsIdSalt,
+    label: &str,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    unit: &str,
+    decimals: usize,
+) -> NumberEdit {
     let numbers = LocaleNumbers::of(ui);
     let parse = |text: &str| super::numeric_expression::parse(text);
     let edit = NumberField::new(id_salt, label, *value, &numbers)
@@ -56,4 +64,16 @@ pub fn text(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, text: &mut String)
 pub struct TextEdit {
     pub changed: bool,
     pub response: egui::Response,
+}
+
+/// [`text`] for a dialog that opens on its name: the first time the field has the focus (the host
+/// focuses the first field), its text is selected so typing replaces it, as Photoshop does. `fields`
+/// holds the private `__named` marker that says it happened.
+pub fn text_opening(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, value: &mut String, fields: &mut serde_json::Map<String, serde_json::Value>) -> TextEdit {
+    let edit = text(ui, id_salt, label, value);
+    if !fields.contains_key("__named") && !ui.is_sizing_pass() && edit.response.has_focus() {
+        super::field_tab::select_all(ui.ctx(), edit.response.id, value);
+        fields.insert("__named".into(), serde_json::Value::Bool(true));
+    }
+    edit
 }

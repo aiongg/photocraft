@@ -76,7 +76,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     FormGrid::new("new-layer").show(ui, |form| {
         form.row(tl!("Name:"), |ui, _| {
             let mut name = f.get("name").and_then(Value::as_str).unwrap_or("").to_string();
-            let edit = crate::widgets::dialog_text(ui, "new-layer-name", tl!("Name:"), &mut name);
+            let edit = crate::widgets::dialog_text_opening(ui, "new-layer-name", tl!("Name:"), &mut name, f);
             if edit.changed {
                 f.insert("name".into(), json!(name));
             }

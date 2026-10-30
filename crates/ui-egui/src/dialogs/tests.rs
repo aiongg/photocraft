@@ -249,6 +249,29 @@ fn enter_closes_an_alert_but_not_the_enter_that_opened_it() {
     assert!(h.state().ui.dialogs.is_empty(), "Esc too");
 }
 
+/// The title bar keeps its drag overlay off every open modal, an Error alert included.
+#[test]
+fn an_alert_reports_where_it_is_to_the_title_bar() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 600.0)).build_ui_state(
+        move |ui, app| {
+            show(app, ui.ctx());
+            *sink.borrow_mut() = craft_ui::title_bar::ModalRects::take(ui.ctx(), ui.ctx().viewport_id()).rects().to_vec();
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(2);
+    assert!(seen.borrow().is_empty());
+    h.state_mut().ui.open_dialog(DialogKind::Error, json!({"message": "Nope"}).as_object().cloned().unwrap_or_default());
+    h.run_steps(3);
+    assert_eq!(seen.borrow().len(), 1, "the alert pushes its rect");
+}
+
 fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();

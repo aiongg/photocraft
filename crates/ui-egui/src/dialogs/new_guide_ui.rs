@@ -19,10 +19,10 @@
 //! sending the colour only when it was changed, so a guide that uses the preference colour keeps
 //! doing so.
 
-use photocraft_engine::edit_cmds::GUIDE_COLORS;
-use photocraft_engine::prefs::Unit;
 use craft_ui::composites::{FormGrid, LabelAlign, Notice, Tone};
 use craft_ui::controls::{RadioGroup, Select};
+use photocraft_engine::edit_cmds::GUIDE_COLORS;
+use photocraft_engine::prefs::Unit;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -171,7 +171,8 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 // Custom… first, then Photoshop's colours.
                 let options: Vec<(String, &str)> =
                     std::iter::once(CUSTOM).chain(GUIDE_COLORS.iter().map(|(n, ..)| *n)).map(|n| (n.to_string(), color_label(n))).collect();
-                let edit = Select::new("new-guide-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui);
+                let edit =
+                    Select::new("new-guide-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui);
                 if color == CUSTOM {
                     let hex = custom_color(f);
                     let rgb = photocraft_engine::prefs::parse_hex(&hex).unwrap_or([0x4a, 0xff, 0xff]);

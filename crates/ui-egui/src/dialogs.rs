@@ -357,6 +357,17 @@ fn filter_below(app: &PhotocraftApp, d: &Dialog, ui: &mut egui::Ui, fields: &mut
     }
 }
 
+/// Whether the dialog's fields are all library controls, which walk Tab themselves (the dialog's
+/// field order, then its buttons), so PhotoCraft's `field_tab` stands aside.
+fn library_fields(fields: &Fields) -> bool {
+    opens_on_first_field(fields)
+        || crate::guide_layout_ui::owns(fields)
+        || crate::channel_options_ui::owns(fields)
+        || crate::channel_options_ui::owns_new_spot(fields)
+        || crate::duplicate_layer_ui::owns(fields)
+        || crate::new_guide_ui::owns(fields)
+}
+
 /// Whether the dialog opens with its first field focused and selected, so typing replaces it
 /// (Photoshop's Name dialogs). Those bodies are library fields; the rest place focus themselves.
 fn opens_on_first_field(fields: &Fields) -> bool {
@@ -494,7 +505,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
         let enabled = Cell::new(enabled_for(app, &d, &fields));
         let table = Cell::new(None);
-        let tab = if interactive && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
+        let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(&fields) { crate::field_tab::take_step(ctx) } else { 0 };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
