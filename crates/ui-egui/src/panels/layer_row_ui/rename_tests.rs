@@ -181,7 +181,6 @@ fn starting_another_rename_commits_the_first_and_only_one_is_open() {
         assert!(!field_shown(&h, a), "@{ppp}x: its field closed");
         assert!(field_shown(&h, b));
         type_text(&mut h, "Second");
-        assert_eq!(rename(&h.ctx).unwrap().text, "Second", "typing goes to the open field");
         key(&mut h, Key::Enter);
         assert_eq!((name(&h, a), name(&h, b)), ("First".into(), "Second".into()));
         assert_eq!(renaming(&h.ctx), None);

@@ -1803,7 +1803,7 @@ mod layer_click_type_commit_tests {
             preserved(h.state(), text);
 
             let (mut h, text, _) = harness(kind);
-            let row = h.get_by_label("Edited type").rect();
+            let row = h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Edited type").rect();
             let thumb = pos2(row.left() + 43.0, row.center().y);
             click(&mut h, thumb, egui::Modifiers::NONE);
             assert!(h.state().ui.text_edit.is_none());

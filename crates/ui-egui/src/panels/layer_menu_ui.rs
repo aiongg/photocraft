@@ -210,7 +210,9 @@ pub fn mask_rows(app: &crate::PhotocraftApp, l: &Layer) -> Vec<MenuEntry<Choice>
     let mut rows = command_rows(app, l, false, edits);
     rows.push(MenuEntry::Separator);
     // ⌘⇧-, ⌘⌥- and ⌘⇧⌥-clicking the thumbnail, as menu items.
-    for (label, operation) in [(tl!("Add Mask to Selection"), "add"), (tl!("Subtract Mask from Selection"), "subtract"), (tl!("Intersect Mask with Selection"), "intersect")] {
+    for (label, operation) in
+        [(tl!("Add Mask to Selection"), "add"), (tl!("Subtract Mask from Selection"), "subtract"), (tl!("Intersect Mask with Selection"), "intersect")]
+    {
         rows.push(MenuItem::new(label, Choice::LoadMask(operation)).into());
     }
     rows.push(MenuEntry::Separator);

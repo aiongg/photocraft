@@ -119,7 +119,7 @@ fn right_clicking_eye_opens_color_choices_without_toggling_visibility() {
     let r = row(&h, red);
     let eye = pos2(r.left() + 17.0, r.center().y);
     click(&mut h, eye, PointerButton::Secondary, Modifiers::NONE);
-    let blue = h.get_by_label("Blue").rect().center();
+    let blue = h.query_all_by_label("Blue").last().expect("the Blue choice").rect().center();
     click(&mut h, blue, PointerButton::Primary, Modifiers::NONE);
 
     let st = h.state().session.active().unwrap();

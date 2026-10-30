@@ -127,9 +127,9 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
             assert_eq!(Focus::of(&h.ctx), Focus::Text, "clicking a value field edits it");
         }
         Place::FocusedWidget => {
-            h.get_by_role_and_label(Role::Button, "Visibility paint").scroll_to_me();
+            h.get_by_role_and_label(Role::ComboBox, "Blend Mode").scroll_to_me();
             h.run_steps(4);
-            h.get_by_role_and_label(Role::Button, "Visibility paint").focus();
+            h.get_by_role_and_label(Role::ComboBox, "Blend Mode").focus();
             h.run_steps(2);
             assert_eq!(Focus::of(&h.ctx), Focus::Widget, "a widget is focused");
         }

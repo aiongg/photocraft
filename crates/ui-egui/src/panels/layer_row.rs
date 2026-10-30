@@ -1,9 +1,9 @@
 use std::cell::{Cell, RefCell};
 
 use craft_ui::edit::{EditEvent, GestureId};
-use craft_ui::list::{OpenChange, ListRow, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
+use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
 use craft_ui::menu::{ContextMenu, OpenAt};
-use craft_ui::theme::{StrokeExt, Tokens as LibTokens, ToEgui, TokensOf as _};
+use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 
 use super::layer_drag::{MaskDrag, fx_drop, layer_drag_and_drop, mask_drag_key, start_fx_drag, starts_mask_drag};
 use super::layer_row_ui::{ICON_W, Indicator, TRIANGLE_W};
@@ -152,9 +152,18 @@ fn thumb_size_of(size: LayerThumbnailSize) -> ThumbSize {
 
 /// The trailing items of `l`'s row, outermost first: what is wrong, locks, effects and Smart
 /// Filters, the blend mode. Each records its rect in `cells` and queues its commands there.
-fn indicator_items<'a>(ui: &egui::Ui, ctx: &egui::Context, l: &'a Layer, doc: &'a photocraft_doc::Document, fx_open: bool, mut row: ListRow<'a, u64>, cells: &'a Cells) -> ListRow<'a, u64> {
+fn indicator_items<'a>(
+    ui: &egui::Ui,
+    ctx: &egui::Context,
+    l: &'a Layer,
+    doc: &'a photocraft_doc::Document,
+    fx_open: bool,
+    mut row: ListRow<'a, u64>,
+    cells: &'a Cells,
+) -> ListRow<'a, u64> {
     let t = craft_ui::theme::current(ctx);
-    let (muted, faint, normal, warn) = (t.color.text.muted.to_egui(), t.color.text.faint.to_egui(), t.color.text.normal.to_egui(), t.color.status.warn.fg.to_egui());
+    let (muted, faint, normal, warn) =
+        (t.color.text.muted.to_egui(), t.color.text.faint.to_egui(), t.color.text.normal.to_egui(), t.color.status.warn.fg.to_egui());
     let has_fx = !l.effects.items.is_empty();
     let has_smart = crate::smart_ui::has_filters(l);
     let show_blend = l.blend != BlendMode::Normal && l.blend != BlendMode::PassThrough;
@@ -401,7 +410,13 @@ pub(super) fn layer_row(
     let name_rect = (out.label.width() > 1.0).then(|| Rect::from_min_size(pos2(out.label.left(), out.label.center().y - name_size.y / 2.0), name_size));
     crate::layer_row_ui::record(
         ctx,
-        crate::layer_row_ui::RowRects { layer: l.id.0, row: rect, thumbnail: (ts > 0.0).then_some(thumb), name: name_rect, indicators: cells.indicators.take() },
+        crate::layer_row_ui::RowRects {
+            layer: l.id.0,
+            row: rect,
+            thumbnail: (ts > 0.0).then_some(thumb),
+            name: name_rect,
+            indicators: cells.indicators.take(),
+        },
     );
     let rc = RowCtx { l, doc, row, rect, ts, thumb, resp: &resp, masks: &mask_rects };
 
@@ -464,7 +479,11 @@ struct RowCtx<'a> {
 /// The eye column's cell at the row's reading start.
 fn eye_cell(rect: Rect, column: f32, rtl: bool) -> Rect {
     let width = column.min(rect.width());
-    if rtl { Rect::from_min_size(pos2(rect.right() - width, rect.top()), vec2(width, rect.height())) } else { Rect::from_min_size(rect.left_top(), vec2(width, rect.height())) }
+    if rtl {
+        Rect::from_min_size(pos2(rect.right() - width, rect.top()), vec2(width, rect.height()))
+    } else {
+        Rect::from_min_size(rect.left_top(), vec2(width, rect.height()))
+    }
 }
 
 /// The layer's colour label fills the eye column behind its icon.
@@ -685,7 +704,16 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
 /// The content of a mask's thumbnail: its image, Photoshop's red X when it is disabled and the
 /// kind badge; the library frames it.
 #[allow(clippy::too_many_arguments)]
-fn paint_mask_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui, doc: &photocraft_doc::Document, l: &Layer, kind: MaskKind, enabled: bool, r: Rect) {
+fn paint_mask_thumb(
+    app: &mut PhotocraftApp,
+    ctx: &egui::Context,
+    ui: &egui::Ui,
+    doc: &photocraft_doc::Document,
+    l: &Layer,
+    kind: MaskKind,
+    enabled: bool,
+    r: Rect,
+) {
     let t = Tokens::get(ctx);
     let painter = ui.painter();
     if ui.is_rect_visible(r) {

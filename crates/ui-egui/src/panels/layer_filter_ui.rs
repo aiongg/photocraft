@@ -164,7 +164,10 @@ pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             FilterBy::Name => {
                 let width = ui.available_width().max(48.0);
                 ui.allocate_ui_with_layout(vec2(width, height), Layout::left_to_right(Align::Center).with_main_justify(true), |ui| {
-                    let edit = SearchField::new("layer-filter-name", tl!("Search"), &app.ui.layer_filter_name, tl!("Clear")).placeholder(tl!("Search")).size(ControlSize::Sm).show(ui);
+                    let edit = SearchField::new("layer-filter-name", tl!("Search"), &app.ui.layer_filter_name, tl!("Clear"))
+                        .placeholder(tl!("Search"))
+                        .size(ControlSize::Sm)
+                        .show(ui);
                     if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event {
                         app.ui.layer_filter_name = value;
                     }
