@@ -110,10 +110,3 @@ pub struct TextEdit {
     pub changed: bool,
     pub response: egui::Response,
 }
-
-/// The response a `FormGrid` row returns for a control that keeps its own accessible name (a
-/// colour swatch named "Fill color"): the row would otherwise replace the name with its visible
-/// label. This is a nodeless stand-in at the control's position, so the row has nothing to name.
-pub fn keep_own_name(ui: &mut Ui, _control: &egui::Response) -> egui::Response {
-    ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
-}

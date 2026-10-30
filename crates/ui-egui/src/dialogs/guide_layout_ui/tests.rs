@@ -334,3 +334,39 @@ fn preview_cache_tracks_document_revision() {
     app.run(COMMAND, json!({"margin":23})).unwrap();
     assert!(preview(&app, &app.session.active().unwrap().doc).unwrap().0.vertical.contains(&23.0));
 }
+
+/// The canvas paints before the dialog, so the host writes `__preview` after the canvas read it.
+/// Toggling Preview with no further input must still reach the canvas.
+#[test]
+fn toggling_preview_updates_the_canvas_without_further_input() {
+    let mut app = app();
+    app.sync_views();
+    let id = open(&mut app);
+    app.ui.dialog_mut(id).unwrap().fields.insert("columns".into(), json!(4));
+    let shown = std::rc::Rc::new(std::cell::Cell::new(None));
+    let seen = shown.clone();
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            let ctx = ui.ctx().clone();
+            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
+            // What the canvas drew this frame.
+            seen.set(Some(preview(app, &app.session.active().unwrap().doc).is_some()));
+            crate::dialogs::show(app, &ctx);
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(4);
+    assert_eq!(shown.get(), Some(true), "the preview starts on");
+    {
+        use egui_kittest::kittest::Queryable as _;
+        h.get_by_label("Preview").click();
+    }
+    // No further input: egui's own follow-up frame after the click.
+    h.run();
+    assert_eq!(h.state_mut().ui.dialog_mut(id).unwrap().fields["__preview"], json!(false));
+    assert_eq!(shown.get(), Some(false), "the canvas stops drawing the preview");
+}

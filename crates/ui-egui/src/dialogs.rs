@@ -584,7 +584,6 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         shown.push(response.rect);
         if let Some(on) = preview.take() {
             fields.insert("__preview".into(), json!(on));
-            ctx.request_repaint();
         }
         if let Some(action) = table.take() {
             crate::color_table_ui::run(app, d.id, &fields, action);

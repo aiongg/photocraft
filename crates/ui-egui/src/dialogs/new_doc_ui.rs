@@ -5,7 +5,8 @@
 
 use craft_theme::TypeRole;
 use craft_ui::composites::{Field, SectionHeader};
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, Select, Swatch};
+use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch};
+use craft_ui::icons::Icon;
 use craft_ui::list::ListRow;
 use craft_ui::primitives::{Content, Interactive, SurfaceKind, Text};
 use craft_ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
@@ -583,9 +584,6 @@ fn category_tabs(ui: &mut egui::Ui, f: &mut Map<String, Value>, cat: &str) {
         strip = strip.selected(key);
     }
     let out = strip.show(ui, &tabs);
-    if ui.ctx().pointer_hover_pos().is_some_and(|p| out.tab_at(p).is_some()) {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
     for event in out.events {
         if let TabEvent::Activate(name) = event {
             f.insert("__category".into(), json!(name));
@@ -720,9 +718,9 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
             ui.label(crate::i18n::tr_ctx(crate::i18n::current(), "document", "Orientation"));
             let (w, h) = (get_f(f, "width", 1920.0), get_f(f, "height", 1080.0));
             let mut buttons = Vec::new();
-            for (icon, portrait) in [("rectangle-vertical", true), ("rectangle-horizontal", false)] {
-                // The library has no page-orientation icons: PhotoCraft's own button.
-                let button = crate::icons::button(ui, icon, 24.0, (h > w) == portrait, if portrait { "Portrait" } else { "Landscape" });
+            for (icon, portrait) in [(Icon::OrientationPortrait, true), (Icon::OrientationLandscape, false)] {
+                let button = ui
+                    .add(IconButton::new(icon, if portrait { tl!("Portrait") } else { tl!("Landscape") }).size(ControlSize::Md).selected((h > w) == portrait));
                 if button.clicked() {
                     // The pick also turns the presets (`oriented`), even when the size already has it.
                     f.insert("__orientation".into(), json!(if portrait { "portrait" } else { "landscape" }));

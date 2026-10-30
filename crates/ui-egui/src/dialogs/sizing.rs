@@ -3,7 +3,7 @@
 //! Field values are stored in pixels (plus a display unit), so automation can set `width`/`height`
 //! directly and the dialog maps them to `image.imageSize` / `image.canvasSize` unchanged.
 
-use craft_ui::composites::{FormGrid, SectionHeader, SectionLabel};
+use craft_ui::composites::{FieldControl, FormGrid, SectionHeader, SectionLabel};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -177,7 +177,7 @@ fn dim_cell(
     label: &str,
     editable: bool,
     changed: &mut bool,
-) -> (egui::Response, egui::Response) {
+) -> (craft_ui::composites::OwnName<egui::Response>, egui::Response) {
     let unit = f.get("__unit").and_then(Value::as_str).unwrap_or("px").to_string();
     let res = f.get("resolution").and_then(Value::as_f64).unwrap_or(num(f, "__origRes"));
     let orig = num(f, orig_key);
@@ -198,7 +198,7 @@ fn dim_cell(
         f.insert(key.into(), json!(if unit == "px" { px.round() } else { px }));
         *changed = true;
     }
-    (edit.response, unit_select(ui, f, unit_id))
+    (edit.response.own_name(), unit_select(ui, f, unit_id))
 }
 
 fn unit_select(ui: &mut egui::Ui, f: &mut Map<String, Value>, id: &str) -> egui::Response {
@@ -240,8 +240,8 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         );
         form.value(tl!("Dimensions:"), format!("{} px × {} px", w as i64, h as i64));
         form.space(craft_ui::theme::scale::Space::S6.px());
-        let w_row = form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "is-w", "is-unit-w", tl!("Width:"), editable, &mut w_changed));
-        let h_row = form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "is-h", "is-unit-h", tl!("Height:"), editable, &mut h_changed));
+        let w_row = form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "is-w", "is-unit-w", tl!("Width"), editable, &mut w_changed));
+        let h_row = form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "is-h", "is-unit-h", tl!("Height"), editable, &mut h_changed));
         rows = Some((w_row.inner, h_row.inner));
         if !resampling && (w_changed || h_changed) {
             // The edited side's new pixel count at the current resolution gives its new physical size;
@@ -271,7 +271,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         }
         form.row(tl!("Resolution:"), |ui, _| {
             let mut r = f.get("resolution").and_then(Value::as_f64).unwrap_or(72.0) as f32;
-            let edit = crate::widgets::dialog_number_field(ui, "is-res", tl!("Resolution:"), &mut r, 1.0..=30000.0, "", 2);
+            let edit = crate::widgets::dialog_number_field(ui, "is-res", tl!("Resolution"), &mut r, 1.0..=30000.0, "", 2);
             if edit.changed {
                 let r = r.max(1.0) as f64;
                 if !resampling {
@@ -290,7 +290,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 }
                 f.insert("resolution".into(), json!(r));
             }
-            (edit.response, ui.label(tl!("Pixels/Inch")))
+            (edit.response.own_name(), ui.label(tl!("Pixels/Inch")))
         });
         form.space(t.space.gap.stack);
         form.unlabelled(|ui| {
@@ -382,8 +382,8 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         .show(ui, |ui| {
             FormGrid::new("canvas-new").min_label_width(LABEL_COLUMN).show(ui, |form| {
                 let mut ignored = false;
-                form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "cs-w", "cs-unit-w", tl!("Width:"), true, &mut ignored));
-                form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "cs-h", "cs-unit-h", tl!("Height:"), true, &mut ignored));
+                form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "cs-w", "cs-unit-w", tl!("Width"), true, &mut ignored));
+                form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "cs-h", "cs-unit-h", tl!("Height"), true, &mut ignored));
                 form.unlabelled(|ui| {
                     let mut rel = relative;
                     let edit = Checkbox::bool(tl!("Relative"), &mut rel).show(ui);
