@@ -9,9 +9,7 @@
 //! groups and where a floated panel docks back.
 
 use crate::dock::Group;
-use craft_ui::docking::{
-    Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side,
-};
+use craft_ui::docking::{Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side};
 use craft_ui::layout::{SplitAxis, SplitSize};
 use craft_ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
@@ -257,6 +255,10 @@ fn commit(app: &mut PhotocraftApp, workspace: Workspace, mut returns: Returns) {
     returns.retain(|panel, _| floats(&workspace.layout, panel));
     app.ui.docking = Some(workspace);
     app.ui.docking_returns = returns;
+    // A group the native dock had collapsed is minimized in the layout from here on.
+    for group in Group::ALL {
+        app.ui.dock.set_collapsed(group, false);
+    }
     app.ui.panels.dock = true;
     sync_visibility(app);
 }
@@ -1108,7 +1110,13 @@ pub(crate) fn prepare_legacy_update(
     for group in Group::ALL {
         let expands = request.get("dockTabs").and_then(|p| p.get(group.key())).is_some()
             || request.get("panels").and_then(|p| p.get(group.key())).and_then(Value::as_bool) == Some(true);
-        let minimized = if expands { false } else if let Some((_, on)) = collapse_changes.iter().find(|(g, _)| *g == group) { *on } else { continue };
+        let minimized = if expands {
+            false
+        } else if let Some((_, on)) = collapse_changes.iter().find(|(g, _)| *g == group) {
+            *on
+        } else {
+            continue;
+        };
         if let Some(panel) = PANELS.iter().find(|p| p.2 == group && workspace.layout.contains(&p.0.to_owned())).map(|p| p.0)
             && collapsed_members(&workspace.layout).contains(panel) != minimized
         {

@@ -136,41 +136,6 @@ fn color_panel_hex_field_takes_a_typed_hex() {
     assert_eq!(srgb_bytes(h.state().session.tools.foreground), [0xff, 0x80, 0x00]);
 }
 
-/// Themes with `round_chips` (Studio) draw round chips, stacked or side by side in two tool
-/// columns, with Switch Colors right under them and Default Colors at the top-right corner
-/// (stacked) or the left edge (side by side); both buttons work in either layout.
-#[test]
-fn studio_color_chips_keep_default_and_swap_buttons_below() {
-    use egui_kittest::kittest::Queryable;
-    for (kind, two_columns) in [
-        (crate::theme::ThemeKind::Studio, false),
-        (crate::theme::ThemeKind::StudioLight, false),
-        (crate::theme::ThemeKind::Studio, true),
-        (crate::theme::ThemeKind::StudioLight, true),
-    ] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.session.tools.foreground = [1.0, 0.0, 0.0, 1.0];
-        app.session.tools.background = [0.0, 0.0, 1.0, 1.0];
-        let mut h = egui_kittest::Harness::builder().with_size(vec2(80.0, 120.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
-                let w = ui.available_width();
-                color_chips(app, ui, two_columns, w)
-            },
-            app,
-        );
-        PhotocraftApp::setup_context(&h.ctx, kind);
-        h.run_steps(2);
-        h.get_by_label("Swap colours (X)").click();
-        h.run_steps(2);
-        assert_eq!(h.state().session.tools.foreground, [0.0, 0.0, 1.0, 1.0], "{kind:?}");
-        assert_eq!(h.state().session.tools.background, [1.0, 0.0, 0.0, 1.0], "{kind:?}");
-        h.get_by_label("Default colours (D)").click();
-        h.run_steps(2);
-        assert_eq!(h.state().session.tools.foreground, [0.0, 0.0, 0.0, 1.0], "{kind:?}");
-        assert_eq!(h.state().session.tools.background, [1.0, 1.0, 1.0, 1.0], "{kind:?}");
-    }
-}
-
 /// While characters are highlighted in a type layer being edited, the Switch Colors and
 /// Default Colors buttons recolour them with the new foreground (#5690); without a selection
 /// they only change the tool colours, as before.
@@ -210,13 +175,9 @@ fn swap_and_default_colors_recolour_selected_type() {
             resize: None,
             preedit: None,
         });
-        let mut h = egui_kittest::Harness::builder().with_size(vec2(80.0, 120.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
-                let w = ui.available_width();
-                color_chips(app, ui, false, w)
-            },
-            app,
-        );
+        let mut h = egui_kittest::Harness::builder()
+            .with_size(vec2(80.0, 120.0))
+            .build_ui_state(|ui, app: &mut PhotocraftApp| color_chips(app, ui, egui::Color32::BLACK, 30.0), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(2);
         h.get_by_label("Swap colours (X)").click();
@@ -233,19 +194,6 @@ fn swap_and_default_colors_recolour_selected_type() {
         assert_eq!(h.state().session.tools.foreground, [0.0, 0.0, 0.0, 1.0]);
         assert_eq!(rgb(h.state(), id, 6), [0, 0, 0, 255], "selected: {selected}");
     }
-}
-
-/// The Studio layout (chips stacked, icons below) fits the height the toolbar reserves for
-/// the chips, so the two-column check does not change with the theme.
-#[test]
-fn studio_color_chips_fit_the_reserved_height() {
-    // Chips, then the row holding the Switch Colors curve.
-    assert!(STUDIO_CHIP.0 + STUDIO_CHIP.1 + 8.0 + 4.0 <= chips_height(false, true, false));
-    // Side by side: the chips plus the same row, and shorter than stacked.
-    assert!(STUDIO_CHIP.0 + 8.0 + 4.0 <= chips_height(false, true, true));
-    assert!(chips_height(false, true, true) < chips_height(false, true, false));
-    // The Studio block is taller than Photoshop's, and the two-column check knows it.
-    assert!(chips_height(false, true, false) > chips_height(false, false, false));
 }
 
 /// An incomplete entry never changes the colour and the field snaps back when focus leaves.

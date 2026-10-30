@@ -192,7 +192,7 @@ fn a_fresh_launch_draws_the_native_groups_beside_the_protected_canvas() {
 
     h.state_mut().ui.dock.set_collapsed(Group::Color, true);
     h.run_steps(2);
-    assert!(collapsed_members(h.state(), &legacy(h.state())).contains("swatches"));
+    assert!(collapsed_members(&legacy(h.state())).contains("swatches"));
     let color = tab_rect(&h, "color");
     assert!(tab_rect(&h, "properties").top() - color.bottom() < 12.0, "a collapsed group shows only its tabs");
 }
@@ -418,17 +418,51 @@ fn serialized_layout_actions_cover_geometry_reorder_accordion_and_atomic_rejecti
 }
 
 #[test]
-fn customization_retains_native_collapsed_groups_until_their_tab_is_activated() {
+fn customization_keeps_native_collapsed_groups_minimized_until_their_tab_is_activated() {
     let mut app = app();
     app.ui.dock.set_collapsed(Group::Color, true);
     app.run("window.panel.float", json!({"panel":"properties"})).unwrap();
-    let layout = lay(&app);
-    assert!(collapsed_members(&app, layout).contains("swatches"));
-    let saved = serde_json::to_value(&app.ui).unwrap();
-    let restored: crate::state::UiState = serde_json::from_value(saved).unwrap();
-    assert!(restored.dock.is_collapsed(Group::Color));
+    assert!(collapsed_members(lay(&app)).contains("swatches"));
+    assert!(!app.ui.dock.is_collapsed(Group::Color), "the layout holds the collapse now");
     app.run("window.panel.layout", json!({"action":{"Activate":{"panel":"swatches"}}})).unwrap();
-    assert!(!app.ui.dock.is_collapsed(Group::Color));
+    assert!(!collapsed_members(lay(&app)).contains("swatches"));
+}
+
+/// `window.panel.minimize` and `window.panel.stepGroup` are the dock's own commands; the
+/// `window.panel.group` operations collapse, expand, up and down map onto them.
+#[test]
+fn minimize_and_step_group_commands_move_groups_like_the_group_operations() {
+    let mut app = app();
+    app.run("window.panel.minimize", json!({"panel":"layers"})).unwrap();
+    assert!(collapsed_members(lay(&app)).contains("layers"));
+    app.run("window.panel.minimize", json!({"panel":"layers","minimized":false})).unwrap();
+    assert!(!collapsed_members(lay(&app)).contains("layers"));
+    app.run("window.panel.group", json!({"panel":"layers","operation":"collapse"})).unwrap();
+    assert!(collapsed_members(lay(&app)).contains("layers"));
+    app.run("window.panel.group", json!({"panel":"layers","operation":"expand"})).unwrap();
+    assert!(!collapsed_members(lay(&app)).contains("layers"));
+    let order = root_groups(lay(&app));
+    app.run("window.panel.stepGroup", json!({"panel":"layers","up":true})).unwrap();
+    let up = root_groups(lay(&app));
+    assert_ne!(up, order);
+    app.run("window.panel.group", json!({"panel":"layers","operation":"down"})).unwrap();
+    assert_eq!(root_groups(lay(&app)), order);
+}
+
+/// Workspaces saved before collapse lived in the layout list their collapsed panels as
+/// `dockingCollapsed`, and mark an intact native group with the dock's collapse flag.
+#[test]
+fn an_older_save_minimizes_its_collapsed_groups_once() {
+    let mut app = app();
+    app.run("window.panel.float", json!({"panel":"properties"})).unwrap();
+    let mut saved = json!({"docking": app.ui.docking, "dockingReturns": app.ui.docking_returns, "dockingCollapsed": ["layers", "channels", "paths"]});
+    saved["dock"] = json!({"collapsed": ["color"]});
+    let mut restored = self::app();
+    crate::dock::apply(&mut restored, &saved);
+    let collapsed = collapsed_members(lay(&restored));
+    assert!(["layers", "channels", "paths", "color", "swatches"].iter().all(|id| collapsed.contains(*id)), "{collapsed:?}");
+    assert!(!collapsed.contains("history"));
+    assert!(!restored.ui.dock.is_collapsed(Group::Color), "the flag is consumed");
 }
 
 #[test]
@@ -628,7 +662,7 @@ fn explicit_reveal_activates_existing_tab_and_expands_custom_group() {
     app.run("window.panel.group", json!({"panel":"layers","operation":"collapse"})).unwrap();
     app.run("window.panel.layers", json!({"show":true})).unwrap();
     assert!(panel_active(lay(&app), "layers"));
-    assert!(!collapsed_members(&app, lay(&app)).contains("layers"));
+    assert!(!collapsed_members(lay(&app)).contains("layers"));
     app.run("window.panel.layers", json!({"show":true})).unwrap();
     assert!(lay(&app).contains(&"layers".into()));
     let before = app.ui.docking.clone();
@@ -673,12 +707,12 @@ fn custom_group_commands_preserve_members_and_workspace_timeline() {
     assert_eq!(group_members(lay(&app), "layers"), members);
     app.ui.timeline.open = true;
     app.run("window.panel.group", json!({"panel":"layers","operation":"collapse"})).unwrap();
-    let saved = json!({"panels":app.ui.panels,"dock":app.ui.dock,"dockTabs":app.ui.dock_tabs,"docking":app.ui.docking,"dockingReturns":app.ui.docking_returns,"dockingCollapsed":app.ui.docking_collapsed,"timelineOpen":true});
+    let saved = json!({"panels":app.ui.panels,"dock":app.ui.dock,"dockTabs":app.ui.dock_tabs,"docking":app.ui.docking,"dockingReturns":app.ui.docking_returns,"timelineOpen":true});
     let mut restored = self::app();
     crate::dock::apply(&mut restored, &saved);
     assert_eq!(restored.ui.docking, app.ui.docking);
     assert!(restored.ui.timeline.open);
-    assert!(collapsed_members(&restored, lay(&restored)).contains("layers"));
+    assert!(collapsed_members(lay(&restored)).contains("layers"));
     app.run("window.panel.group", json!({"panel":"layers","operation":"close"})).unwrap();
     assert!(members.iter().all(|id| !lay(&app).contains(id)));
     assert!(members.iter().all(|id| hidden(&app, id)));
@@ -853,7 +887,7 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     let mut app = app();
     app.ui.theme = crate::theme::ThemeKind::ProMedium;
     crate::dock::apply(&mut app, &saved);
-    assert!(app.ui.docking.is_none() && app.ui.docking_returns.is_empty() && app.ui.docking_collapsed.is_empty());
+    assert!(app.ui.docking.is_none() && app.ui.docking_returns.is_empty());
     let workspace = legacy_workspace(&app);
     let layout = &workspace.layout;
     assert_eq!(

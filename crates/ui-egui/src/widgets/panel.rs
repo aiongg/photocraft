@@ -84,24 +84,9 @@ pub fn panel_footer<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
     add(&mut bar_ui)
 }
 
-/// The panel menu button (hamburger in Pro, ellipsis in Studio), matching the dock and cards.
+/// The panel menu button: the hamburger of the docks' tab strips, on a card's header.
 pub fn panel_menu_button(ui: &mut Ui) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let size = vec2(20.0, 20.0);
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-    let tint = crate::icons::button_chrome(ui, rect, false, resp.hovered());
-    if t.pro {
-        for k in 0..3 {
-            let y = rect.center().y - 3.5 + k as f32 * 3.5;
-            ui.painter()
-                .line_segment([pos2(rect.center().x - 5.0, y), pos2(rect.center().x + 5.0, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tint));
-        }
-    } else {
-        crate::icons::paint(ui, rect, "ellipsis", 14.0, tint);
-    }
-    let tip = tl!("Panel menu");
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
-    resp.on_hover_text(tip)
+    ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Menu, tl!("Panel menu")).size(craft_ui::controls::ControlSize::Sm))
 }
 
 pub fn pill_tab(ui: &mut Ui, label: &str, selected: bool) -> Response {
