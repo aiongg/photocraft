@@ -6,6 +6,7 @@
 //! The save is parked in [`Prompt`] while the modal is up (egui is immediate-mode) and written
 //! once answered. Cancel drops the save. Scripts skip the prompt by passing `tgaBits`.
 
+use craft_ui::dialog::Outcome;
 use photocraft_io::TgaBits;
 
 use crate::{ExportSettings, PhotocraftApp};
@@ -57,28 +58,20 @@ pub fn park(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static 
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.targa_options else { return };
-    let (mut ok, mut cancel) = (false, false);
     let mut bits = p.bits;
-    let modal = egui::Modal::new(egui::Id::unique("targa-options")).show(ctx, |ui| {
-        ui.set_max_width(340.0);
-        ui.label(egui::RichText::new(tl!("Targa Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        crate::widgets::section_label(ui, tl!("Resolution"));
-        ui.radio_value(&mut bits, TgaBits::Bits24, tl!("24 bits/pixel"));
-        ui.radio_value(&mut bits, TgaBits::Bits32, tl!("32 bits/pixel"));
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            ok = crate::widgets::primary_button(ui, tl!("OK"), 84.0).clicked();
-            cancel = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
+    let answer = crate::dialogs::show_prompt(ctx, "targa-options", tl!("Targa Options"), craft_ui::dialog::Width::Compact, &mut bits, |ui, bits| {
+        craft_ui::composites::SectionLabel::new(tl!("Resolution")).show(ui);
+        ui.indent("targa-options-bits", |ui| {
+            _ = craft_ui::controls::RadioGroup::new("targa-options-bits", tl!("Resolution"), bits)
+                .item(TgaBits::Bits24, tl!("24 bits/pixel"))
+                .item(TgaBits::Bits32, tl!("32 bits/pixel"))
+                .show(ui);
         });
     });
-    cancel |= modal.should_close();
     p.bits = bits;
-    // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.
-    if ok || (!cancel && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))) {
+    let outcome = answer.outcome;
+    let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));
+    if ok {
         let Some(p) = app.targa_options.take() else { return };
         let settings = ExportSettings { tga_bits: Some(p.bits), ..app.save_settings() };
         // A plain Save writes whichever file the action is played on (#3531): no path.

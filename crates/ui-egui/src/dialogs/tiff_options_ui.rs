@@ -6,6 +6,7 @@
 //! Layers and Save a Copy"). "Don't show again" clears the preference. Cancel drops the save.
 
 use crate::{ExportSettings, PhotocraftApp};
+use craft_ui::dialog::Outcome;
 
 /// A save waiting on the TIFF Options answer.
 pub struct Prompt {
@@ -43,30 +44,18 @@ pub fn park(app: &mut PhotocraftApp, path: String) -> Result<(), String> {
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.tiff_options else { return };
-    let (mut ok, mut cancel) = (false, false);
-    let (mut discard, mut dont_ask) = (p.discard_layers, p.dont_ask_again);
-    let modal = egui::Modal::new(egui::Id::unique("tiff-options")).show(ctx, |ui| {
-        ui.set_max_width(420.0);
-        ui.label(egui::RichText::new(tl!("TIFF Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        ui.label(tl!("Including layers will increase file size."));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        crate::widgets::checkbox(ui, &mut discard, tl!("Discard Layers and Save a Copy"));
-        crate::widgets::checkbox(ui, &mut dont_ask, tl!("Don't show again"));
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            ok = crate::widgets::primary_button(ui, tl!("OK"), 84.0).clicked();
-            cancel = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
+    let mut values = (p.discard_layers, p.dont_ask_again);
+    let answer =
+        crate::dialogs::show_prompt(ctx, "tiff-options", tl!("TIFF Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (discard, dont_ask)| {
+            ui.label(tl!("Including layers will increase file size."));
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            _ = craft_ui::controls::Checkbox::bool(tl!("Discard Layers and Save a Copy"), discard).show(ui);
+            _ = craft_ui::controls::Checkbox::bool(tl!("Don't show again"), dont_ask).show(ui);
         });
-    });
-    cancel |= modal.should_close();
-    p.discard_layers = discard;
-    p.dont_ask_again = dont_ask;
-    // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.
-    if ok || (!cancel && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))) {
+    (p.discard_layers, p.dont_ask_again) = values;
+    let outcome = answer.outcome;
+    let (ok, cancel) = (outcome == Some(Outcome::Ok), matches!(outcome, Some(Outcome::Cancel | Outcome::Close)));
+    if ok {
         let Some(p) = app.tiff_options.take() else { return };
         if p.dont_ask_again {
             app.session.edit_prefs(|prefs| prefs.file_handling.ask_before_saving_layered_tiff = false);

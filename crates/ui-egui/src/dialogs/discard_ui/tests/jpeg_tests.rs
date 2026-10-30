@@ -53,7 +53,7 @@ fn save_as_to_a_jpeg_asks_for_jpeg_options() {
     h.state_mut().save_as(Some("p.jpg".into())).unwrap();
     h.run_steps(2);
     assert_eq!(h.state().jpeg_options.as_ref().map(|p| (p.quality, p.format, p.copy)), Some((10, JpegFormat::Baseline, false)));
-    assert!(h.query_by_label("JPEG Options").is_some());
+    assert!(h.query_by_role_and_label(egui::accesskit::Role::Heading, "JPEG Options").is_some());
     assert!(writes.borrow().is_empty(), "nothing is written before the answer");
     assert!(h.state_mut().save_as(Some("other.jpg".into())).is_err(), "one save at a time");
     h.key_press(Key::Enter);
