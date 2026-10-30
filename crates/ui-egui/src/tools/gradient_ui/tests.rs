@@ -360,7 +360,14 @@ fn the_editor_edits_the_current_gradient_without_a_layer() {
     h.run_steps(2);
     h.state_mut().ui.panels.gradient_editor = true;
     h.run_steps(4);
-    h.get_by_label("Gradient stops").click();
+    // A click on the colour row between the end stops adds a colour stop.
+    let (first, last) = (h.get_by_label("Color stop 1 of 2").rect().center(), h.get_by_label("Color stop 2 of 2").rect().center());
+    let at = pos2(first.x + (last.x - first.x) * 0.25, h.get_by_label("Gradient stops").rect().bottom() - 4.0);
+    h.event(egui::Event::PointerMoved(at));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
     h.run_steps(3);
     assert_eq!(h.state().session.presets.gradient.stops.len(), before + 1, "the click added a stop to the current gradient");
 }

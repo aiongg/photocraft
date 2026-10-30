@@ -11,6 +11,9 @@
 //! on release: one history step. The Properties panel's stops editor ([`properties`]) previews
 //! through the same path.
 
+use craft_ui::composites::gradient::GradientSwatch;
+use craft_ui::controls::{Button, ButtonVariant, ControlSize};
+use craft_ui::primitives::{Content, Text};
 use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
@@ -31,6 +34,9 @@ use crate::widgets;
 #[cfg(test)]
 mod editor_tests;
 mod properties_panel;
+mod stops_bar;
+
+use stops_bar::BarAction;
 
 /// Id of the temporary layer previewing a new gradient while it is drawn.
 pub const PREVIEW_LAYER: LayerId = LayerId(u64::MAX - 78);
@@ -592,19 +598,16 @@ pub fn paint_thumbnail(ui: &egui::Ui, layer: LayerId, f: &Fill, rect: Rect) -> b
 /// engine-owned preset (#1651). Clicking it opens the Gradient Editor window, as Photoshop's
 /// swatch does. Returns whether it was clicked.
 pub fn preset_swatch(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
-    let t = Tokens::get(ui.ctx());
-    let stops = app.session.presets.gradient.resolve(app.session.tools.foreground, app.session.tools.background);
-    let (r, resp) = ui.allocate_exact_size(vec2(96.0, 20.0), Sense::click());
-    paint_ramp(ui.painter(), r, |u| photocraft_algo::paint::sample_stops(&stops, u));
-    ui.painter().rect_stroke(
-        r,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-        StrokeKind::Outside,
-    );
-    // Name the control for accessibility (and so tests and agents can find it).
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Gradient picker")));
-    resp.on_hover_text(tl!("Click to edit the gradient")).clicked()
+    let Some(fill) = preset_fill(app) else { return false };
+    let stops = stops_bar::stops_of(&fill);
+    // The swatch is a button named for accessibility (and so tests and agents can find it).
+    GradientSwatch::new("gradient-picker", tl!("Gradient picker"), &stops)
+        .width(96.0)
+        .size(ControlSize::Sm)
+        .has_popup(true)
+        .show(ui)
+        .on_hover_text(tl!("Click to edit the gradient"))
+        .clicked()
 }
 
 /// The selected layer when it is a gradient fill layer. Unlike [`active_gradient`] it does not
@@ -621,46 +624,51 @@ fn selected_gradient(app: &PhotocraftApp) -> Option<Layer> {
 /// below, selected-stop fields and Gradient Options. Without a gradient fill layer, the same
 /// stop controls edit the tool's current gradient and offer saving it as a preset.
 pub fn editor_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    use craft_ui::dialog::{Body, Dialog, DialogState, InitialFocus, Outcome, Resize, ResizeMax};
+
+    let state_id = egui::Id::unique("gradient-editor-state");
     if !app.ui.panels.gradient_editor {
+        // The next open starts afresh.
+        ctx.data_mut(|d| d.remove_temp::<DialogState>(state_id));
         return;
     }
-    let mut open = true;
+    let mut state = ctx.data(|d| d.get_temp::<DialogState>(state_id)).unwrap_or_default();
     let mut show_panel = false;
     // Resolved before the closure so `app` is borrowed only once inside it.
     let layer = selected_gradient(app);
-    egui::Window::new(tl!("Gradient Editor"))
-        .id(egui::Id::unique("gradient-editor"))
-        .open(&mut open)
-        .collapsible(false)
-        .resizable(true)
-        .default_width(330.0)
-        .show(ctx, |ui| match &layer {
+    let shown = Dialog::new("gradient-editor", tl!("Gradient Editor"))
+        .modeless()
+        .resizable(Resize { default: vec2(330.0, 440.0), min: vec2(280.0, 240.0), max: ResizeMax::Window })
+        .body(Body::Scroll)
+        .initial_focus(InitialFocus::None)
+        .show(ctx, &mut state, &mut (), |ui, ()| match &layer {
             Some(l) => properties_panel::editor(app, ui, l),
             None => {
                 // Photoshop's editor edits the gradient the tool paints with, so with no gradient
                 // fill layer around the strip edits the current gradient in place.
-                let t = Tokens::get(ui.ctx());
-                ui.label(egui::RichText::new(tl!("The gradient the Gradient tool paints with")).color(t.text_dim));
+                ui.add(Text::new(tl!("The gradient the Gradient tool paints with")).content(Content::Muted));
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 preset_stops_editor(app, ui);
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 ui.horizontal(|ui| {
-                    if widgets::secondary_button(ui, tl!("Save As Preset"), 0.0)
+                    if ui
+                        .add(Button::new(tl!("Save As Preset")).variant(ButtonVariant::Secondary))
                         .on_hover_text(tl!("Adds the current gradient to the Gradients panel"))
                         .clicked()
                     {
                         let _ = app.run("gradient.presets.new", json!({}));
                     }
-                    show_panel = widgets::secondary_button(ui, tl!("Gradients"), 0.0).clicked();
+                    show_panel = ui.add(Button::new(tl!("Gradients")).variant(ButtonVariant::Secondary)).clicked();
                 });
             }
         });
     if show_panel {
         let _ = crate::preset_panels::menu(app, "window.panel.gradients", &Value::Null);
     }
-    if !open {
+    if shown.outcome == Some(Outcome::Close) {
         app.ui.panels.gradient_editor = false;
     }
+    ctx.data_mut(|d| d.insert_temp(state_id, state));
 }
 
 /// Live mode: style, reverse, dither and blend mode changes in the options bar also edit the selected
@@ -716,14 +724,6 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     properties_panel::show(app, ui, layer);
 }
 
-/// Which marker of the stops editor is being dragged.
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Marker {
-    Color(usize),
-    Opacity(usize),
-    Mid(usize),
-}
-
 fn strip_key(app: &PhotocraftApp, sink: Sink) -> egui::Id {
     // Layer IDs can repeat in different documents. Tool presets belong to the session.
     let document = match sink {
@@ -743,12 +743,6 @@ enum Sink {
 }
 
 impl Sink {
-    fn fill(self, app: &PhotocraftApp) -> Option<Fill> {
-        match self {
-            Sink::Layer(id) => fill_of(app.session.active()?.doc.layer(id)?).cloned(),
-            Sink::Preset => preset_fill(app),
-        }
-    }
     /// Uniqueness for the drag state.
     fn key(self) -> egui::Id {
         match self {
@@ -818,236 +812,29 @@ fn preset_stop_color(app: &mut PhotocraftApp, i: usize) {
 
 fn stops_editor_for(app: &mut PhotocraftApp, ui: &mut egui::Ui, sink: Sink, f: Fill) {
     let key = strip_key(app, sink);
-    let selection_key = key.with("selection");
-    if ui.data(|d| d.get_temp::<Marker>(selection_key)).is_none() {
-        ui.data_mut(|d| d.insert_temp(selection_key, Marker::Color(0)));
-    }
-    let pending = match sink {
-        Sink::Layer(id) => app.gradient.panel.clone().filter(|(l, ..)| *l == id).map(|(_, _, p)| p),
-        Sink::Preset => app.gradient.preset_stop.clone(),
-    };
-    let colors = (app.session.tools.foreground, app.session.tools.background);
-    match stop_strip(ui, key, &f, sink.midpoints(), pending.as_ref(), colors) {
-        Some(StopAction::Preview(p)) => match sink {
+    match stops_bar::show(ui, key, &f, sink.midpoints()) {
+        Some(BarAction::Preview(p)) => match sink {
             Sink::Layer(id) => app.gradient.panel = Some((id, cmds::STOP, sink.params(p))),
             Sink::Preset => app.gradient.preset_stop = Some(p),
         },
-        Some(StopAction::Commit(p)) => {
-            match sink {
-                Sink::Layer(_) => app.gradient.panel = None,
-                Sink::Preset => app.gradient.preset_stop = None,
-            }
-            let selected = ui.data(|d| d.get_temp::<Marker>(selection_key));
-            let selection = selection_after_edit(&f, &p, selected);
-            if app.run(sink.cmd(), sink.params(p)).is_ok()
-                && let Some(marker) = selection
-            {
-                ui.data_mut(|d| d.insert_temp(selection_key, marker));
-            }
+        Some(BarAction::Commit(p)) => {
+            clear_pending(app, sink);
+            let _ = app.run(sink.cmd(), sink.params(p));
         }
-        Some(StopAction::Color(i)) => match sink {
+        Some(BarAction::Clear) => clear_pending(app, sink),
+        Some(BarAction::Color(i)) => match sink {
             Sink::Layer(id) => edit_stop_color(app, id, i),
             Sink::Preset => preset_stop_color(app, i),
         },
         None => {}
     }
-    properties_panel::stop_fields(app, ui, sink);
 }
 
-/// A shared stop strip keeps previews local; its caller chooses the command or paint target.
-pub(crate) enum StopAction {
-    Preview(Value),
-    Commit(Value),
-    Color(usize),
-}
-
-/// Keep selection on a stop after the engine sorts its new position.
-fn selection_after_edit(f: &Fill, p: &Value, previous: Option<Marker>) -> Option<Marker> {
-    let Fill::Gradient { stops, opacity_stops, .. } = f else { return previous };
-    let opacity = p.get("kind").and_then(Value::as_str) == Some("opacity");
-    let mut locations: Vec<f32> = if opacity {
-        if opacity_stops.is_empty() { vec![0.0, 1.0] } else { opacity_stops.iter().map(|s| s.0).collect() }
-    } else {
-        stops.iter().map(|s| s.0).collect()
-    };
-    locations.sort_by(f32::total_cmp);
-    let action = p.get("action").and_then(Value::as_str);
-    let index = p.get("index").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok());
-    let at = match action {
-        Some("move" | "add") => {
-            let location = p.get("location").and_then(Value::as_f64)? as f32;
-            locations
-                .iter()
-                .enumerate()
-                .filter(|(i, value)| Some(*i) != index && (**value < location || (**value == location && index.is_none_or(|old| *i < old))))
-                .count()
-        }
-        Some("delete") => 0,
-        _ => return previous,
-    };
-    Some(if opacity { Marker::Opacity(at) } else { Marker::Color(at) })
-}
-
-fn stop_strip(ui: &mut egui::Ui, key: egui::Id, f: &Fill, midpoints: bool, pending: Option<&Value>, colors: ([f32; 4], [f32; 4])) -> Option<StopAction> {
-    let Fill::Gradient { stops, .. } = f else { return None };
-    let t = Tokens::get(ui.ctx());
-    let w = ui.available_width().max(120.0);
-    let (outer, resp) = ui.allocate_exact_size(vec2(w, 58.0), Sense::click_and_drag());
-    // Name the strip for accessibility (and so tests and agents can find it).
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Gradient stops")));
-    let top = outer.top() + 16.0;
-    let bar = Rect::from_min_max(pos2(outer.left() + 8.0, top), pos2(outer.right() - 8.0, top + 24.0));
-    let x_of = |loc: f32| bar.left() + loc.clamp(0.0, 1.0) * bar.width();
-    let loc_of = |x: f32| ((x - bar.left()) / bar.width().max(1.0)).clamp(0.0, 1.0);
-    // The ramp being shown (with a pending drag's edit applied).
-    let (fg, bg) = colors;
-    let shown = pending.and_then(|p| cmds::apply_stop(f, p, fg, bg).ok()).unwrap_or_else(|| f.clone());
-    let mut track_fill = shown.clone();
-    if let Fill::Gradient { reverse, .. } = &mut track_fill {
-        // All markers address un-reversed positions; Reverse applies to the canvas output.
-        *reverse = false;
+fn clear_pending(app: &mut PhotocraftApp, sink: Sink) {
+    match sink {
+        Sink::Layer(_) => app.gradient.panel = None,
+        Sink::Preset => app.gradient.preset_stop = None,
     }
-    if let Some(ramp) = gf::Ramp::new(&track_fill) {
-        paint_ramp(ui.painter(), bar, |u| ramp.sample(u));
-    }
-    ui.painter().rect_stroke(
-        bar,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-        StrokeKind::Outside,
-    );
-    let (ss, os, mids) = match &shown {
-        Fill::Gradient { stops, opacity_stops, midpoints, .. } => (stops.clone(), opacity_stops.clone(), midpoints.clone()),
-        _ => (Vec::new(), Vec::new(), Vec::new()),
-    };
-    let mut sorted = ss.clone();
-    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let mut ops: Vec<(f32, f32)> = if os.is_empty() { vec![(0.0, 1.0), (1.0, 1.0)] } else { os.clone() };
-    ops.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let selection_key = key.with("selection");
-    let selected: Option<Marker> = ui.data(|d| d.get_temp(selection_key));
-    let dragging: Option<Marker> = ui.data(|d| d.get_temp(key));
-    // Markers.
-    let p = ui.painter();
-    for (i, (loc, c)) in sorted.iter().enumerate() {
-        let x = x_of(*loc);
-        let sel = dragging.or(selected) == Some(Marker::Color(i));
-        let tip = pos2(x, bar.bottom() + 1.0);
-        let body = Rect::from_center_size(pos2(x, bar.bottom() + 10.0), vec2(10.0, 10.0));
-        let rgb = c.to_rgb();
-        let color = c32([rgb[0], rgb[1], rgb[2], 1.0]);
-        p.add(egui::Shape::convex_polygon(
-            vec![tip, pos2(x + 5.0, body.top()), pos2(x - 5.0, body.top())],
-            if sel { t.accent } else { t.text_dim },
-            Stroke::NONE,
-        ));
-        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color);
-        p.rect_stroke(
-            body,
-            craft_ui::theme::scale::Radius::R2.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }),
-            StrokeKind::Outside,
-        );
-    }
-    if midpoints {
-        for i in 0..sorted.len().saturating_sub(1) {
-            let (a, b) = (sorted[i].0, sorted[i + 1].0);
-            if b - a > 1e-3 {
-                let m = mids.get(i).copied().unwrap_or(0.5);
-                let sel = dragging.or(selected) == Some(Marker::Mid(i));
-                diamond(p, pos2(x_of(a + (b - a) * m), bar.bottom() + 6.0), 3.0, if sel { t.accent } else { t.text_faint }, t.text_faint);
-            }
-        }
-    }
-    for (i, (loc, a)) in ops.iter().enumerate() {
-        let x = x_of(*loc);
-        let sel = dragging.or(selected) == Some(Marker::Opacity(i));
-        let y = bar.top() - 10.0;
-        let body = Rect::from_center_size(pos2(x, y), vec2(10.0, 10.0));
-        let color = Color32::from_gray((a.clamp(0.0, 1.0) * 255.0) as u8);
-        p.add(egui::Shape::convex_polygon(
-            vec![pos2(x, bar.top() - 1.0), pos2(x + 5.0, body.bottom()), pos2(x - 5.0, body.bottom())],
-            if sel { t.accent } else { t.text_dim },
-            Stroke::NONE,
-        ));
-        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color);
-        p.rect_stroke(
-            body,
-            craft_ui::theme::scale::Radius::R2.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if sel { t.accent } else { t.text_dim }),
-            StrokeKind::Outside,
-        );
-    }
-    // Interaction.
-    let hit = |pos: Pos2| -> Option<Marker> {
-        if pos.y > bar.bottom() {
-            if let Some(i) = sorted.iter().position(|(l, _)| (x_of(*l) - pos.x).abs() <= 6.0 && pos.y >= bar.bottom() + 3.0) {
-                return Some(Marker::Color(i));
-            }
-            if !midpoints {
-                return None;
-            }
-            return (0..sorted.len().saturating_sub(1))
-                .find(|i| {
-                    let (a, b) = (sorted[*i].0, sorted[*i + 1].0);
-                    (x_of(a + (b - a) * mids.get(*i).copied().unwrap_or(0.5)) - pos.x).abs() <= 4.0 && b - a > 1e-3
-                })
-                .map(Marker::Mid);
-        }
-        if pos.y < bar.top() {
-            return ops.iter().position(|(l, _)| (x_of(*l) - pos.x).abs() <= 6.0).map(Marker::Opacity);
-        }
-        None
-    };
-    if resp.drag_started()
-        && let Some(pos) = ui.input(|i| i.pointer.press_origin())
-        && let Some(m) = hit(pos)
-    {
-        ui.data_mut(|d| d.insert_temp(key, m));
-        ui.data_mut(|d| d.insert_temp(selection_key, m));
-    }
-    let dragging: Option<Marker> = ui.data(|d| d.get_temp(key));
-    let mut preview = None;
-    if let (Some(m), Some(pos)) = (dragging, resp.interact_pointer_pos()) {
-        let off = if pos.y > bar.bottom() + 28.0 || pos.y < bar.top() - 26.0 { 1.0 } else { 0.0 };
-        let loc = loc_of(pos.x);
-        let edit = match m {
-            Marker::Color(i) if off > 0.0 && stops.len() > 2 => json!({"action": "delete", "index": i}),
-            Marker::Color(i) => json!({"action": "move", "index": i, "location": loc}),
-            Marker::Opacity(i) if off > 0.0 && ops.len() > 2 => json!({"action": "delete", "kind": "opacity", "index": i}),
-            Marker::Opacity(i) => json!({"action": "move", "kind": "opacity", "index": i, "location": loc}),
-            Marker::Mid(i) => {
-                let (a, b) = (sorted.get(i).map_or(0.0, |s| s.0), sorted.get(i + 1).map_or(1.0, |s| s.0));
-                json!({"action": "midpoint", "index": i, "location": ((loc - a) / (b - a).max(1e-4)).clamp(0.05, 0.95)})
-            }
-        };
-        if resp.dragged() {
-            preview = Some(edit);
-        }
-    }
-    if resp.drag_stopped() {
-        ui.data_mut(|d| d.remove::<Marker>(key));
-        return preview.or_else(|| pending.cloned()).map(StopAction::Commit);
-    }
-    if resp.double_clicked()
-        && let Some(pos) = resp.interact_pointer_pos()
-        && let Some(Marker::Color(i)) = hit(pos)
-    {
-        ui.data_mut(|d| d.insert_temp(selection_key, Marker::Color(i)));
-        return Some(StopAction::Color(i));
-    }
-    if resp.clicked()
-        && let Some(pos) = resp.interact_pointer_pos()
-    {
-        if let Some(marker) = hit(pos) {
-            ui.data_mut(|d| d.insert_temp(selection_key, marker));
-            return None;
-        }
-        let loc = loc_of(pos.x);
-        let p = if pos.y < bar.center().y { json!({"action": "add", "kind": "opacity", "location": loc}) } else { json!({"action": "add", "location": loc}) };
-        return Some(StopAction::Commit(p));
-    }
-    preview.map(StopAction::Preview)
 }
 
 #[cfg(test)]
