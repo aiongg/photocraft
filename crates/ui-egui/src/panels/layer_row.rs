@@ -119,6 +119,23 @@ fn link_name(kind: MaskKind, linked: bool, layer: &str) -> String {
     crate::i18n::fmt(tl!(template), &[("verb", tl!(verb)), ("mask", tl!(what)), ("layer", layer)])
 }
 
+/// The Layers panel's least width in `ui`'s theme: the width the library gives a group row with the
+/// most required parts a layer row shows together (eye, disclosure, layer and vector mask
+/// thumbnails with their links, lock, effects triangle, `fx` badge, link chain) and the label's
+/// least width. A narrower panel clips its rows at the trailing edge.
+pub(crate) fn min_panel_width(ui: &egui::Ui, size: LayerThumbnailSize) -> f32 {
+    let thumb_size = thumb_size_of(size);
+    let fx = ui.painter().layout_no_wrap("fx".into(), theme::semibold(11.0), Color32::WHITE).size().x;
+    let mut row = ListRow::new(0u64, "").toggle(ToggleColumn::eye("", true));
+    if thumb_size != ThumbSize::None {
+        row = row.thumb(thumb_size, |_, _| {}).extra_thumb(|_, _| {}).thumb_link(true, "").extra_thumb(|_, _| {}).thumb_link(true, "");
+    }
+    for width in [ICON_W, TRIANGLE_W, fx, ICON_W] {
+        row = row.trailing_item(width, |_| {});
+    }
+    TreeRow::new(row, 0, true, true).text(tree_text()).into_row().min_width(ui)
+}
+
 /// The Layers panel's thumbnail setting as the library's.
 fn thumb_size_of(size: LayerThumbnailSize) -> ThumbSize {
     match size {
@@ -368,6 +385,7 @@ pub(super) fn layer_row(
             thumbnail: (ts > 0.0).then_some(thumb),
             name: name_rect,
             indicators: cells.indicators.take(),
+            min_width: out.min_width,
         },
     );
     let rc = RowCtx { l, doc, row, rect, ts, thumb, resp: &resp, masks: &mask_rects };

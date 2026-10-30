@@ -610,6 +610,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         dock = dock.native_input_hook(native_input_hook(ui.ctx()));
     }
     let strip = style.tab_height;
+    let layers_min = crate::panels::layer_row::min_panel_width(ui, app.ui.layers_panel_options.thumbnail_size);
     let card: std::collections::HashSet<String> =
         layout.floating.iter().filter(|window| window.id == PROPERTIES_WINDOW).flat_map(|window| window.panels().cloned()).collect();
     #[cfg(test)]
@@ -630,7 +631,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             } else {
                 // The native group's smallest height, tab strip included.
                 let height = PANELS.iter().find(|p| p.0 == id).map_or(80.0, |p| p.2.min_height() - strip);
-                craft_ui::docking::PanelLimits { min: egui::vec2(220.0, height), ..Default::default() }
+                let width = if id == "layers" { layers_min.max(220.0) } else { 220.0 };
+                craft_ui::docking::PanelLimits { min: egui::vec2(width, height), ..Default::default() }
             }
         },
         &mut PanelContent { app, collapsed: &collapsed, fillers: &fillers, card: &card, strip },

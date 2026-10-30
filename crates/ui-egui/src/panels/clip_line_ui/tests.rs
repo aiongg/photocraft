@@ -85,7 +85,14 @@ fn the_clip_cursor_shows_only_with_alt_over_a_line() {
 
 /// A 32-point-high row for `layer` starting `top` points down, with no thumbnail, name or indicators.
 fn row(layer: LayerId, top: f32) -> RowRects {
-    RowRects { layer: layer.0, row: Rect::from_min_size(pos2(0.0, top), vec2(240.0, 32.0)), thumbnail: None, name: None, indicators: Vec::new() }
+    RowRects {
+        layer: layer.0,
+        row: Rect::from_min_size(pos2(0.0, top), vec2(240.0, 32.0)),
+        thumbnail: None,
+        name: None,
+        indicators: Vec::new(),
+        min_width: 0.0,
+    }
 }
 
 /// The id of the layer called `name`, wherever it sits in the tree.

@@ -81,19 +81,27 @@ fn check(rows: &[RowRects], what: &str) {
     assert!(with_fx >= 4, "{what}: fx badges drawn ({with_fx})");
 }
 
+/// The width a dock needs to give the busy rows their least width in `theme` (the rows' own
+/// minimum plus the panel's padding around them).
+fn least_dock_width(theme: &str, ppp: f32) -> f32 {
+    let wide = harness(busy(), ppp, theme, 520.0);
+    let rows = recorded(&wide.ctx);
+    let least = rows.iter().map(|r| r.min_width).fold(0.0, f32::max);
+    assert!(least > 0.0, "{theme}: the rows report their least width");
+    let chrome = 520.0 - rows[0].row.width();
+    (least + chrome).ceil()
+}
+
 #[test]
 fn long_names_never_run_under_the_indicators() {
-    for ppp in [1.0, 1.5, 2.0] {
-        for width in [250.0, 290.0, 520.0] {
-            let h = harness(busy(), ppp, "promedium", width);
-            check(&recorded(&h.ctx), &format!("@{ppp}x {width}pt"));
+    for theme in ["pro", "promedium", "studio", "studiolight", "classic"] {
+        for ppp in [1.0, 1.5, 2.0] {
+            let least = least_dock_width(theme, ppp);
+            for width in [least, least + 40.0, 520.0] {
+                let h = harness(busy(), ppp, theme, width);
+                check(&recorded(&h.ctx), &format!("{theme} @{ppp}x {width}pt"));
+            }
         }
-    }
-    // Studio and Classic thumbnails leave a row with two masks no room for its name below about
-    // 340 pt: the masks no longer drop out for width.
-    for (theme, width) in [("pro", 250.0), ("studio", 340.0), ("studiolight", 340.0), ("classic", 340.0)] {
-        let h = harness(busy(), 1.0, theme, width);
-        check(&recorded(&h.ctx), theme);
     }
 }
 

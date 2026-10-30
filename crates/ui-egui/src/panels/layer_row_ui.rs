@@ -42,6 +42,8 @@ pub struct RowRects {
     /// The name as painted (after truncation); `None` when there was no room for it.
     pub name: Option<Rect>,
     pub indicators: Vec<(Indicator, Rect)>,
+    /// The least width the library needs for this row (indent and optional items aside).
+    pub min_width: f32,
 }
 
 /// The PSD key of the adjustment `l` holds when PhotoCraft keeps it as imported but cannot
