@@ -113,13 +113,9 @@ fn footer_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, columns: usize) {
     let tokens = Tokens::of(ui);
     let button = FlyoutButton::<&str>::style(&tokens).icon_button;
     let rail_fill = tokens.component.rail.fill.to_egui();
-    // The chips are centred in the rail's button area, not in the footer's width: a scroll bar
-    // of the tools widens that by its own width (#7316).
-    let metrics = ToolRail::<Tool>::metrics(&tokens, columns);
-    let column = metrics.width - 2.0 * metrics.pad_x;
     drop(tokens);
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    color_chips(app, ui, rail_fill, column);
+    color_chips(app, ui, rail_fill);
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let layout = match (columns > 1, crate::direction::is_rtl()) {
         (false, _) => egui::Layout::top_down(egui::Align::Min),
@@ -147,11 +143,10 @@ fn screen_mode_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ];
     let items: Vec<FlyoutItem<&str>> = modes.iter().map(|&(id, icon, label)| FlyoutItem::new(id, icon, label)).collect();
     let current = modes.iter().map(|m| m.0).find(|id| crate::view_cmds::checked(app, id).unwrap_or(false)).unwrap_or(modes[0].0);
-    let out = FlyoutButton::new("screen-mode", Icon::AppWindow, tl!("Change Screen Mode  (F)")).items(&items).current(&current).show(ui);
-    // A long press selects the shown item in the library; here it only lists the modes.
+    let out = FlyoutButton::new("screen-mode", Icon::AppWindow, tl!("Change Screen Mode  (F)")).items(&items).current(&current).hold_selects(false).show(ui);
     if let Some(id) = out.chosen {
         let _ = crate::menus::invoke(app, &ctx, id, json!({}));
-    } else if out.clicked && !out.open {
+    } else if out.clicked {
         let _ = crate::menus::invoke(app, &ctx, "view.screenMode.cycle", json!({}));
     }
 }
@@ -168,13 +163,13 @@ pub(super) fn chips_height() -> f32 {
 }
 
 /// Photoshop's foreground / background colour chips: the Default Colors (D) and Switch Colors (X)
-/// icons above them, the foreground chip over the background one, centred in `column` points
-/// from `ui`'s start. `rail_fill` is the gap between the chips.
-pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_fill: Color32, column: f32) {
+/// icons above them, the foreground chip over the background one, centred in `ui`'s width.
+/// `rail_fill` is the gap between the chips.
+pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_fill: Color32) {
     let t = super::Tokens::get(ui.ctx());
     let (chip, step) = CHIP;
     let group = chip + step;
-    let w = column.max(group);
+    let w = ui.available_width().max(group);
     let (rect, _) = ui.allocate_exact_size(vec2(w, chips_height()), Sense::hover());
     let left = (rect.left() + (w - group) / 2.0).round();
     let fg = Rect::from_min_size(pos2(left, rect.top() + CHIP_ICON + 3.0), vec2(chip, chip));

@@ -109,7 +109,6 @@ impl Tokens {
             radius_lg: r.window,
             bevel: matches!(t.shape.edge, craft_theme::Edge::Bevel { .. }),
             pro,
-            round_chips: !pro && kind != ThemeKind::Classic,
             // The Studio-layout themes paint neither (they use `hover` and `accent_soft`).
             tab_strip: if pro || kind == ThemeKind::Classic { col(t.component.tab.strip) } else { Color32::TRANSPARENT },
             row_selected: if pro || kind == ThemeKind::Classic { col(c.state.selected) } else { Color32::TRANSPARENT },
