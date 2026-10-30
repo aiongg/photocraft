@@ -58,9 +58,9 @@ fn channel_picker_opts(ui: &mut egui::Ui, id: egui::Id, opts: &[(usize, &str)], 
         let width = if opts.len() == 1 { 160.0 } else { 110.0 };
         let key = format!("{id:?}-ch");
         if translate {
-            widgets::dropdown(ui, &key, text, &mut ch, opts, width);
+            craft_ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
         } else {
-            widgets::dropdown_literal(ui, &key, text, &mut ch, opts, width);
+            craft_ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| opts[i].1).show(ui).response.changed();
         }
     });
     ui.data_mut(|d| d.insert_temp(id, ch));
@@ -227,15 +227,15 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
     let pencil = v.get("pencil").and_then(Value::as_bool).unwrap_or(false);
     let mut e = Edit::default();
     ui.horizontal(|ui| {
-        if crate::icons::button(ui, "spline", 24.0, !pencil, tl!("Edit points to modify the curve")).clicked() && pencil {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Spline, tl!("Edit points to modify the curve")).size(craft_ui::controls::ControlSize::Md).selected(!pencil)).clicked() && pencil {
             e.add(Edit::discrete(set_pencil(v, false, gray)));
         }
-        if crate::icons::button(ui, "pencil", 24.0, pencil, tl!("Draw to modify the curve")).clicked() && !pencil {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Pencil, tl!("Draw to modify the curve")).size(craft_ui::controls::ControlSize::Md).selected(pencil)).clicked() && !pencil {
             e.add(Edit::discrete(set_pencil(v, true, gray)));
         }
         let label = crate::i18n::tr_ctx(crate::i18n::current(), "curves", "Smooth");
         let smooth = ui
-            .add_enabled_ui(pencil, |ui| widgets::secondary_button(ui, label, 0.0))
+            .add_enabled_ui(pencil, |ui| ui.add(craft_ui::controls::Button::new(tl!(label)).variant(craft_ui::controls::ButtonVariant::Secondary)))
             .inner
             .on_hover_text(tl!("Smooth the curve values"))
             .on_disabled_hover_text(tl!("Smooth the curve values"));

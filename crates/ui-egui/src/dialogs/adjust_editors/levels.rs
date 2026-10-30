@@ -69,7 +69,7 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     ui.horizontal(|ui| {
         ch = channel_picker(ui, cx.mem.with("levels-ch"), chans, tl!("Channel:"));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            auto = widgets::secondary_button(ui, tl!("Auto"), 0.0).clicked();
+            auto = ui.add(craft_ui::controls::Button::new(tl!("Auto")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked();
         });
     });
     let chan = chans.get(ch).copied().unwrap_or(ToneChannel { key: "", label: "" });

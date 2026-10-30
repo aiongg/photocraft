@@ -177,7 +177,7 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
 }
 
 pub(crate) fn picker_button(ui: &mut egui::Ui, selected: bool, enabled: bool, tooltip: &str, color: egui::Color32) -> egui::Response {
-    let response = ui.add_enabled_ui(enabled, |ui| crate::icons::button(ui, "pipette", 28.0, selected, tooltip)).inner;
+    let response = ui.add_enabled_ui(enabled, |ui| ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Eyedropper, tooltip).size(craft_ui::controls::ControlSize::Md).selected(selected))).inner;
     let tokens = craft_ui::theme::current(ui.ctx());
     ui.painter().circle_filled(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, color);
     ui.painter().circle_stroke(
