@@ -373,6 +373,7 @@ fn library_fields(kind: DialogKind, fields: &Fields) -> bool {
         || crate::fill_ui::owns(fields)
         || crate::pattern_fill_ui::owns(fields)
         || crate::stroke_ui::owns(fields)
+        || crate::adjust_dialog::owns(fields)
         || fields.contains_key("__export")
 }
 
