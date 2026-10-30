@@ -6,9 +6,9 @@
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
 use craft_theme::Srgba;
+use craft_ui::composites::ColorPicker;
 use craft_ui::composites::ColorPickerLayout;
 use craft_ui::composites::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
-use craft_ui::composites::ColorPicker;
 use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::ToEgui;
 use photocraft_doc::{Fill, GradientStyle};
@@ -90,15 +90,14 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     let groups: Vec<GradientGroup> = choices
         .presets
         .iter()
-        .map(|g| GradientGroup::new(g.name.clone(), g.items.iter().map(|p| GradientItem::new(p.name.clone(), preset_stops(p, choices.fg, choices.bg))).collect()))
+        .map(|g| {
+            GradientGroup::new(g.name.clone(), g.items.iter().map(|p| GradientItem::new(p.name.clone(), preset_stops(p, choices.fg, choices.bg))).collect())
+        })
         .collect();
     let picked = ui
         .scope(|ui| {
             ui.set_width(WIDTH);
-            GradientPalette::new(id.with("gradient-presets"), tl!("Gradient presets"), &groups)
-                .recent(&recent, tl!("Recent"))
-                .max_height(120.0)
-                .show(ui)
+            GradientPalette::new(id.with("gradient-presets"), tl!("Gradient presets"), &groups).recent(&recent, tl!("Recent")).max_height(120.0).show(ui)
         })
         .inner;
     match picked.event.as_ref().and_then(|e| e.value()) {
@@ -180,7 +179,6 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
 fn edited<'a>(out: &'a mut Option<Fill>, fill: &Fill) -> &'a mut Fill {
     out.get_or_insert_with(|| fill.clone())
 }
-
 
 /// The preset's stops as the bar shows them, the tool colours resolved.
 fn preset_stops(preset: &GradientPreset, fg: [f32; 4], bg: [f32; 4]) -> GradientStops {
