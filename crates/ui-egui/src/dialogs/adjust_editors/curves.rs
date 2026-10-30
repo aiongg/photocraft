@@ -304,10 +304,6 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         d.insert_temp(cx.mem.with("curves-graph"), shown.response.rect.shrink(style.pad));
     });
 
-    if shown.response.has_focus() && !pencil {
-        // The graph deletes its selected point with Delete and Backspace.
-        crate::shortcut_dispatch::claim_delete_keys(ui.ctx(), shown.response.id);
-    }
     let before_id = cx.mem.with("curves-before");
     match shown.event {
         Some(EditEvent::Begin { .. }) => {

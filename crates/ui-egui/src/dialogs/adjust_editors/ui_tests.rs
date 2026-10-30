@@ -287,6 +287,22 @@ fn curves_points_are_added_selected_and_deleted() {
     assert_eq!(curve_of(&layer(&h).1).len(), 2, "endpoints can't be deleted");
 }
 
+/// The graph claims Delete through the library's `KeyClaim`: with it focused, Delete removes the
+/// selected point and never reaches Delete Layer, which the shortcut is bound to otherwise.
+#[test]
+fn curves_graph_keeps_delete_from_the_app_shortcuts() {
+    let mut h = app_harness("curves", "rgb", 8);
+    let (id, _) = layer(&h);
+    let g = curves_graph(&h, id);
+    click(&mut h, Pos2::new(g.center().x, g.center().y));
+    assert_eq!(curve_of(&layer(&h).1).len(), 3);
+    let layers = h.state().session.active().unwrap().doc.layer_count();
+    h.key_press(egui::Key::Delete);
+    h.run_steps(3);
+    assert_eq!(curve_of(&layer(&h).1).len(), 2, "the graph took the key");
+    assert_eq!(h.state().session.active().unwrap().doc.layer_count(), layers, "Delete Layer did not run");
+}
+
 /// Capture and history are shared with Camera Raw, but Properties commits on release.
 #[test]
 fn curves_fast_release_commits_one_edit_and_undo_restores_the_curve() {
