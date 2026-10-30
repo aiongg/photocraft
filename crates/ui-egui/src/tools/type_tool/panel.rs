@@ -1,4 +1,6 @@
 use super::defaults::{apply, apply_defaults, default_styles, formatting_params, open_color_picker, shown_scale, target, type_unit};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use super::fonts::{axis_sliders, font_picker, fonts_ready, selected_style, style_label, styles};
 use super::options_bar::{
     align_glyph, apply_kerning, direction_glyph, direction_items, icon_label, kerning_at, kerning_field, kerning_label, num_field, shown_family, styles_at,
@@ -218,7 +220,7 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
     let Some((c, para)) = styles_at(app).or_else(|| show_defaults.then(|| default_styles(app))) else { return };
     // Preferences ▸ Units & Rulers ▸ Type, as in the options bar: the model keeps points.
     let (u, unit) = type_unit(app);
-    let t = crate::theme::Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     // Row helper: `ui.horizontal` with the column gap, then the shared row gap.
     let row = |ui: &mut egui::Ui, add: &mut dyn FnMut(&mut egui::Ui)| {
         ui.horizontal(|ui| {
@@ -313,16 +315,16 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
             // Colour: label + a swatch filling the rest of the second column.
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = LABEL_GAP;
-                let g = ui.painter().layout_no_wrap(tl!("Color").into(), egui::FontId::proportional(12.0), t.text_dim);
+                let g = ui.painter().layout_no_wrap(tl!("Color").into(), egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
                 let lw = g.size().x.max(LABEL_W);
                 let (lr, _) = ui.allocate_exact_size(egui::vec2(lw, 22.0), egui::Sense::hover());
-                ui.painter().galley(egui::pos2(lr.left(), lr.center().y - g.size().y / 2.0), g, t.text_dim);
+                ui.painter().galley(egui::pos2(lr.left(), lr.center().y - g.size().y / 2.0), g, t.color.text.muted.to_egui());
                 let rgb = c.color.to_rgb();
                 let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
                 let sw = (LABEL_W + LABEL_GAP + w - lw - LABEL_GAP).max(24.0);
                 let (rect, resp) = ui.allocate_exact_size(egui::vec2(sw, 22.0), egui::Sense::click());
-                ui.painter().rect_filled(rect, t.radius_sm, Color32::from_rgb(q(rgb[0]), q(rgb[1]), q(rgb[2])));
-                ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+                ui.painter().rect_filled(rect, t.shape.radius.control, Color32::from_rgb(q(rgb[0]), q(rgb[1]), q(rgb[2])));
+                ui.painter().rect_stroke(rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
                 let resp = resp.on_hover_text(tl!("Text color"));
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Text color")));
                 if resp.clicked() {
@@ -370,11 +372,11 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                         ui.painter().galley(pos, g, col);
                     }
                     if i == 4 {
-                        ui.painter().line_segment([egui::pos2(gr.left(), gr.bottom() - 2.0), egui::pos2(gr.right(), gr.bottom() - 2.0)], Stroke::new(1.0, col));
+                        ui.painter().line_segment([egui::pos2(gr.left(), gr.bottom() - 2.0), egui::pos2(gr.right(), gr.bottom() - 2.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
                     }
                     if i == 5 {
                         ui.painter()
-                            .line_segment([egui::pos2(gr.left() - 1.0, gr.center().y), egui::pos2(gr.right() + 1.0, gr.center().y)], Stroke::new(1.0, col));
+                            .line_segment([egui::pos2(gr.left() - 1.0, gr.center().y), egui::pos2(gr.right() + 1.0, gr.center().y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
                     }
                 });
                 if clicked {
@@ -424,7 +426,7 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                         toggle_cell(ui, cw, para.align == a, tip, |ui, r, col| {
                             // The glyph keeps its size; the cell grows around it.
                             let g = egui::Rect::from_center_size(r.center(), egui::vec2(12.0, 10.0));
-                            let col = if !ui.is_enabled() || para.align == a { col } else { t.icon };
+                            let col = if !ui.is_enabled() || para.align == a { col } else { t.color.text.normal.to_egui() };
                             align_glyph(ui.painter(), g, a, col);
                         })
                     })
@@ -498,9 +500,9 @@ fn type_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let dd_w = (full - crate::props_layout::LABEL_W - LABEL_GAP - COL_GAP - orient_w).max(60.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = LABEL_GAP;
-            let t = crate::theme::Tokens::get(ui.ctx());
+            let t = craft_ui::theme::current(ui.ctx());
             let (r, resp) = ui.allocate_exact_size(egui::vec2(crate::props_layout::LABEL_W, 22.0), egui::Sense::hover());
-            ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "aa", crate::theme::semibold(11.0), t.text_dim);
+            ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "aa", crate::theme::semibold(11.0), t.color.text.muted.to_egui());
             resp.on_hover_text(tl!("Anti-aliasing method"));
             let mut cur = aa.clone();
             let opts: Vec<(String, &str)> = ["none", "sharp", "crisp", "strong", "smooth", "windowsLcd", "windows"]

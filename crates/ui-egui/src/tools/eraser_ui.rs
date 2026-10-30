@@ -2,6 +2,7 @@
 //! Background Eraser (stroke → `paint.backgroundEraser`), with their options bars.
 
 use serde_json::{Value, json};
+use craft_ui::theme::ToEgui;
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
@@ -85,8 +86,8 @@ pub fn mode_dropdown(ui: &mut egui::Ui, mode: &mut String) -> bool {
 }
 
 fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
+    let t = craft_ui::theme::current(ui.ctx());
+    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
     crate::widgets::scrub_option_label(ui, &label);
 }
 

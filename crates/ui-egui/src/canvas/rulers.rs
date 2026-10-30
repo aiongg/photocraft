@@ -3,6 +3,8 @@
 //! undoable engine commands (`view.newGuide` / `view.moveGuide` / `view.deleteGuide`).
 
 use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::Document;
 use photocraft_engine::prefs::{GuidesGridAndSlices, Unit};
 use serde_json::json;
@@ -161,7 +163,7 @@ pub fn draw_grid(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, d
         if alpha < 1.0 && g.subdivisions <= 1 {
             continue;
         }
-        let st = Stroke::new(1.0, base.gamma_multiply(alpha));
+        let st = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), base.gamma_multiply(alpha));
         let [step_x, step_y] = steps;
         if step_x * (xf.zoom_x() as f64) >= 6.0 {
             let mut x = step_x;
@@ -212,7 +214,7 @@ pub fn draw_guides(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform,
         (preview.as_ref().map(|(_, color)| *color).unwrap_or_else(|| pref_color(&g.guide_color, Color32::from_rgb(74, 255, 255))), g.guide_style);
     let line = |vertical: bool, pos: f64, color: Color32| {
         let [a, b] = guide_segment(xf, clip, vertical, pos);
-        styled_line(painter, a, b, Stroke::new(1.0, color), style);
+        styled_line(painter, a, b, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color), style);
     };
     // A guide given a colour in New Guide keeps it; the rest use the preference colour (or, while
     // New Guide Layout previews, the colour it will set). The selected guide is Photoshop's blue.
@@ -423,19 +425,19 @@ fn paint(
     xf: &ViewXform,
     doc: &photocraft_doc::Document,
 ) -> (Rect, Rect, Rect, egui::Painter, [f64; 2], [f64; 2]) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let top = Rect::from_min_max(pos2(full.left() + RULER, full.top()), pos2(full.right(), full.top() + RULER));
     let left = Rect::from_min_max(pos2(full.left(), full.top() + RULER), pos2(full.left() + RULER, full.bottom()));
     let corner = Rect::from_min_size(full.min, vec2(RULER, RULER));
     let p = ui.painter_at(full);
-    let bg = t.chrome;
+    let bg = t.color.surface.chrome.to_egui();
     for r in [top, left, corner] {
-        p.rect_filled(r, 0.0, bg);
+        p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), bg);
     }
-    p.line_segment([top.left_bottom(), top.right_bottom()], Stroke::new(1.0, t.separator));
-    p.line_segment([left.right_top(), left.right_bottom()], Stroke::new(1.0, t.separator));
+    p.line_segment([top.left_bottom(), top.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+    p.line_segment([left.right_top(), left.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
     let font = egui::FontId::proportional(9.0);
-    let tick = Stroke::new(1.0, t.text_faint);
+    let tick = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui());
     // Preferences › Units & Rulers: labels in the ruler unit (percent of the document's side).
     let unit = app.session.prefs().units_and_rulers.rulers;
     let whole = unit == Unit::Pixels;
@@ -460,11 +462,11 @@ fn paint(
                 // Labels stacked, as in Photoshop, each character centred in the ruler's width
                 // (a narrow "1" used to hug the left edge while a "0" filled the strip).
                 for (i, ch) in ruler_label(v, step, whole).chars().enumerate() {
-                    p.text(pos2(left.left() + RULER * 0.5, c + 2.0 + i as f32 * 8.5), Align2::CENTER_TOP, ch, font.clone(), t.text_dim);
+                    p.text(pos2(left.left() + RULER * 0.5, c + 2.0 + i as f32 * 8.5), Align2::CENTER_TOP, ch, font.clone(), t.color.text.muted.to_egui());
                 }
             } else {
                 p.line_segment([pos2(c, top.bottom() - RULER), pos2(c, top.bottom())], tick);
-                p.text(pos2(c + 2.0, top.top() + 1.0), Align2::LEFT_TOP, ruler_label(v, step, whole), font.clone(), t.text_dim);
+                p.text(pos2(c + 2.0, top.top() + 1.0), Align2::LEFT_TOP, ruler_label(v, step, whole), font.clone(), t.color.text.muted.to_egui());
             }
             for k in 1..10 {
                 let m = at(v + step * k as f64 / 10.0);
@@ -493,11 +495,11 @@ pub fn paint_rulers(app: &PhotocraftApp, ui: &egui::Ui, full: Rect, xf: &ViewXfo
 pub fn draw_rulers(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: Rect, xf: &ViewXform) {
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     let (top, left, corner, p, origin, ticks) = paint(app, ui, full, xf, &doc);
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let unit = app.session.prefs().units_and_rulers.rulers;
     // Pointer position markers.
     if let Some(h) = ui.ctx().pointer_hover_pos().filter(|h| full.contains(*h)) {
-        let m = Stroke::new(1.0, t.text);
+        let m = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.normal.to_egui());
         p.with_clip_rect(top).line_segment([pos2(h.x, top.top()), pos2(h.x, top.bottom())], m);
         p.with_clip_rect(left).line_segment([pos2(left.left(), h.y), pos2(left.right(), h.y)], m);
     }
@@ -562,9 +564,9 @@ fn corner_origin(app: &mut PhotocraftApp, ui: &egui::Ui, resp: &egui::Response, 
         ui.data_mut(|d| d.insert_temp(id, at));
         // Cross hairs along the document axes through the new zero point, drawn like guides so
         // they turn with a rotated view.
-        let t = Tokens::get(ui.ctx());
+        let t = craft_ui::theme::current(ui.ctx());
         for (vertical, pos) in [(true, at[0]), (false, at[1])] {
-            p.line_segment(guide_segment(xf, p.clip_rect(), vertical, pos), Stroke::new(1.0, t.text));
+            p.line_segment(guide_segment(xf, p.clip_rect(), vertical, pos), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.normal.to_egui()));
         }
     }
     if resp.drag_stopped()

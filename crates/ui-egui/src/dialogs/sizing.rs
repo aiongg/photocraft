@@ -4,6 +4,8 @@
 //! directly and the dialog maps them to `image.imageSize` / `image.canvasSize` unchanged.
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -160,16 +162,16 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 fn label(ui: &mut egui::Ui, text: &str, width: f32) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(width, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
+    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
 }
 
 fn info_row(ui: &mut egui::Ui, k: &str, v: String) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.horizontal(|ui| {
         label(ui, tl!(k), 90.0);
-        ui.label(egui::RichText::new(v).color(t.text).size(12.0));
+        ui.label(egui::RichText::new(v).color(t.color.text.normal.to_egui()).size(12.0));
     });
 }
 
@@ -209,7 +211,7 @@ fn unit_dropdown(ui: &mut egui::Ui, f: &mut Map<String, Value>, id: &str) {
 }
 
 fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (ow, oh) = (num(f, "__origW"), num(f, "__origH"));
     let bpp = num(f, "__bytesPerPixel").max(1.0);
     let resample = f.get("resample").and_then(Value::as_str).unwrap_or("bicubic").to_string();
@@ -223,7 +225,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let (w, h) = (num(f, "width").round(), num(f, "height").round());
     info_row(ui, tl!("Image Size:"), crate::i18n::fmt(tl!("{size} (was {old})"), &[("size", &human_bytes(w * h * bpp)), ("old", &human_bytes(ow * oh * bpp))]));
     info_row(ui, tl!("Dimensions:"), format!("{} px × {} px", w as i64, h as i64));
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     // Photoshop keeps width and height linked while Resample is off.
     let mut constrain = !resampling || f.get("__constrain").and_then(Value::as_bool).unwrap_or(true);
     // With Resample off, a size in pixels or percent can't change (Photoshop disables those
@@ -266,17 +268,17 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let x0 = w_row.response.rect.right().max(h_row.response.rect.right()) + 4.0;
     let bracket = Rect::from_min_max(pos2(x0, w_row.response.rect.center().y), pos2(x0 + 14.0, h_row.response.rect.center().y));
     let link = ui.interact(bracket.expand(2.0), ui.scope_id().with("constrain"), Sense::click());
-    let col = if constrain { t.text } else { t.text_faint };
+    let col = if constrain { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui() };
     if constrain {
         let p = ui.painter();
         let x = bracket.left() + 8.0;
-        p.line_segment([pos2(bracket.left(), bracket.top()), pos2(x, bracket.top())], Stroke::new(1.0, col));
-        p.line_segment([pos2(x, bracket.top()), pos2(x, bracket.center().y - 8.0)], Stroke::new(1.0, col));
-        p.line_segment([pos2(x, bracket.center().y + 8.0), pos2(x, bracket.bottom())], Stroke::new(1.0, col));
-        p.line_segment([pos2(x, bracket.bottom()), pos2(bracket.left(), bracket.bottom())], Stroke::new(1.0, col));
+        p.line_segment([pos2(bracket.left(), bracket.top()), pos2(x, bracket.top())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
+        p.line_segment([pos2(x, bracket.top()), pos2(x, bracket.center().y - 8.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
+        p.line_segment([pos2(x, bracket.center().y + 8.0), pos2(x, bracket.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
+        p.line_segment([pos2(x, bracket.bottom()), pos2(bracket.left(), bracket.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
     }
     let chain = Rect::from_center_size(pos2(bracket.left() + 8.0, bracket.center().y), vec2(14.0, 14.0));
-    ui.painter().rect_filled(chain, 2.0, if link.hovered() { t.hover } else { Color32::TRANSPARENT });
+    ui.painter().rect_filled(chain, craft_ui::theme::scale::Radius::R2.px(), if link.hovered() { t.color.state.hover.to_egui() } else { Color32::TRANSPARENT });
     crate::icons::paint(ui, chain, if constrain { "link" } else { "unlink" }, 11.0, col);
     if link.on_hover_text(tl!("Constrain proportions")).clicked() && resampling {
         constrain = !constrain;
@@ -310,9 +312,9 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             }
             f.insert("resolution".into(), json!(r));
         }
-        ui.label(egui::RichText::new(tl!("Pixels/Inch")).color(t.text_dim).size(12.0));
+        ui.label(egui::RichText::new(tl!("Pixels/Inch")).color(t.color.text.muted.to_egui()).size(12.0));
     });
-    ui.add_space(4.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         label(ui, "", 90.0);
         let mut on = resampling;
@@ -350,21 +352,21 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (ow, oh) = (num(f, "__origW"), num(f, "__origH"));
     let bpp = num(f, "__bytesPerPixel").max(1.0);
     let relative = f.get("relative").and_then(Value::as_bool).unwrap_or(false);
-    ui.label(egui::RichText::new(tl!("Current Size")).font(crate::theme::semibold(12.0)).color(t.text));
+    ui.label(egui::RichText::new(tl!("Current Size")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
     info_row(ui, tl!("Size:"), human_bytes(ow * oh * bpp));
     info_row(ui, tl!("Width:"), format!("{} px", ow as i64));
     info_row(ui, tl!("Height:"), format!("{} px", oh as i64));
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     crate::widgets::hairline(ui);
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let (nw, nh) = if relative { (ow + num(f, "width"), oh + num(f, "height")) } else { (num(f, "width"), num(f, "height")) };
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("New Size")).font(crate::theme::semibold(12.0)).color(t.text));
-        ui.label(egui::RichText::new(human_bytes(nw.max(0.0) * nh.max(0.0) * bpp)).color(t.text_dim).size(12.0));
+        ui.label(egui::RichText::new(tl!("New Size")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
+        ui.label(egui::RichText::new(human_bytes(nw.max(0.0) * nh.max(0.0) * bpp)).color(t.color.text.muted.to_egui()).size(12.0));
     });
     ui.horizontal(|ui| {
         label(ui, tl!("Width:"), 90.0);
@@ -395,7 +397,7 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             f.insert("anchor".into(), json!(a));
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         label(ui, tl!("Canvas extension color:"), 150.0);
         let mut cur = f.get("extensionColor").and_then(Value::as_str).unwrap_or("background").to_string();
@@ -414,7 +416,7 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 
 /// 3×3 anchor picker; arrows point away from the anchor in the directions the canvas grows.
 fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> Option<&'static str> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let cell = 24.0;
     let (rect, _) = ui.allocate_exact_size(vec2(cell * 3.0, cell * 3.0), Sense::hover());
     let ci = ANCHORS.iter().position(|a| *a == current).unwrap_or(4) as i32;
@@ -427,18 +429,18 @@ fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> Option<&'s
         let selected = i as i32 == ci;
         ui.painter().rect_filled(
             r,
-            2.0,
+            craft_ui::theme::scale::Radius::R2.px(),
             if selected {
-                t.field.gamma_multiply(1.6)
+                t.color.surface.sunken.to_egui().gamma_multiply(1.6)
             } else if resp.hovered() {
-                t.hover
+                t.color.state.hover.to_egui()
             } else {
-                t.field
+                t.color.surface.sunken.to_egui()
             },
         );
-        ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.separator), StrokeKind::Inside);
+        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()), StrokeKind::Inside);
         if selected {
-            ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(8.0, 8.0)), 1.0, t.text);
+            ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(8.0, 8.0)), craft_ui::theme::scale::Radius::R2.px(), t.color.text.normal.to_egui());
         } else {
             let (dx, dy) = (x - ax, y - ay);
             // Only neighbouring cells show arrows (Photoshop behaviour); direction flips when shrinking.
@@ -452,7 +454,7 @@ fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> Option<&'s
                     let tip = c + dir * 6.0;
                     let tail = c - dir * 5.0;
                     let side = vec2(-dir.y, dir.x) * 3.5;
-                    let col = t.text_dim;
+                    let col = t.color.text.muted.to_egui();
                     ui.painter().line_segment([tail, tip], Stroke::new(1.3, col));
                     ui.painter().add(egui::Shape::convex_polygon(vec![tip + dir * 1.5, tip - dir * 3.5 + side, tip - dir * 3.5 - side], col, Stroke::NONE));
                 }

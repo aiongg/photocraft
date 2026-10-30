@@ -1,4 +1,6 @@
 use super::open::{Target, cancel, commit_open_raw, open_raw, raw_stage};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use super::sidecar::{load_settings, report_file_error, save_settings};
 use super::{
     Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, Stroke, Tokens, ToneZone, Value, Wheel, curve_lut,
@@ -92,7 +94,7 @@ fn demosaic_row(ui: &mut egui::Ui, m: &mut photocraft_io::raw::Demosaic) {
         ];
         widgets::dropdown_with_tooltips(ui, "camera-raw-demosaic", tl!("Demosaic"), m, &options, 180.0);
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
 }
 
 fn temp_stops() -> Vec<Color32> {
@@ -155,15 +157,15 @@ fn wheel(ui: &mut egui::Ui, dirty: &mut bool, title: &str, w: &mut Wheel) {
 
 /// Small point-curve editor (master channel): click to add, drag to move, right-click to delete.
 fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &mut crate::state::PointCurveState) -> ERect {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let side = ui.available_width().min(260.0);
     let (rect, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click_and_drag());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, t.radius_sm, t.field);
+    painter.rect_filled(rect, t.shape.radius.control, t.color.surface.sunken.to_egui());
     for i in 1..4 {
         let f = i as f32 / 4.0;
-        painter.line_segment([pos2(rect.left() + f * side, rect.top()), pos2(rect.left() + f * side, rect.bottom())], Stroke::new(1.0, t.separator));
-        painter.line_segment([pos2(rect.left(), rect.top() + f * side), pos2(rect.right(), rect.top() + f * side)], Stroke::new(1.0, t.separator));
+        painter.line_segment([pos2(rect.left() + f * side, rect.top()), pos2(rect.left() + f * side, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+        painter.line_segment([pos2(rect.left(), rect.top() + f * side), pos2(rect.right(), rect.top() + f * side)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
     }
     let to_screen = |x: f32, y: f32| pos2(rect.left() + x / 255.0 * side, rect.bottom() - y / 255.0 * side);
     // The identity handles are presentation until a gesture actually edits them.
@@ -175,13 +177,13 @@ fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &
     // Curve (point curve after the parametric one).
     let lut = curve_lut(&points, 256);
     let pts: Vec<Pos2> = lut.iter().enumerate().map(|(i, value)| to_screen(i as f32, value * 255.0)).collect();
-    painter.add(egui::Shape::line(pts, Stroke::new(1.5, t.text)));
+    painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui())));
     for (i, c) in points.iter().enumerate() {
         let center = to_screen(c[0], c[1]);
         if state.selected == Some(i) {
-            painter.circle_filled(center, 3.0, t.accent);
+            painter.circle_filled(center, 3.0, t.color.accent.solid.to_egui());
         }
-        painter.circle_stroke(center, 4.0, Stroke::new(1.5, t.accent));
+        painter.circle_stroke(center, 4.0, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
     }
     rect
 }
@@ -207,7 +209,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let main = ctx.content_rect();
     egui::Area::new(egui::Id::unique("camera-raw-modal")).order(egui::Order::Foreground).fixed_pos(main.min).show(ctx, |ui| {
         let (r, _) = ui.allocate_exact_size(main.size(), Sense::click_and_drag());
-        ui.painter().rect_filled(r, 0.0, Tokens::get(ui.ctx()).scrim);
+        ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::current(ui.ctx()).color.surface.scrim.to_egui());
     });
     // A window of its own (title bar, moved and resized like any window), like Adobe Camera Raw.
     let builder = egui::ViewportBuilder::default().with_title(window_title).with_inner_size([1360.0, 900.0]).with_min_inner_size([900.0, 600.0]);
@@ -237,7 +239,7 @@ impl CameraRawDialog {
 /// The dialog's contents over the whole of `ctx`'s window. `own_window`: the OS window already
 /// shows the title, so none is painted.
 fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
-    let t = Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let screen = ctx.content_rect();
     let current_display = app.session.active().and_then(|st| app.session.color.canvas_display(&st.doc).ok());
     let mut action: Option<&str> = None;
@@ -265,12 +267,12 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         d.clear_recovered_error(&mut app.ui);
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::click());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, 0.0, t.chrome);
+        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.chrome.to_egui());
         let title = ERect::from_min_size(full.min, vec2(full.width(), if own_window { 0.0 } else { 30.0 }));
         if !own_window {
-            painter.rect_filled(title, 0.0, t.dock);
-            painter.line_segment([title.left_bottom(), title.right_bottom()], Stroke::new(1.0, t.separator));
-            painter.text(title.center(), Align2::CENTER_CENTER, d.window_title(), FontId::proportional(13.0), t.text);
+            painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.background.to_egui());
+            painter.line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+            painter.text(title.center(), Align2::CENTER_CENTER, d.window_title(), FontId::proportional(13.0), t.color.text.normal.to_egui());
         }
         let ok_label = if d.target == Target::OpenRaw { tl!("Open") } else { tl!("OK") };
         let footer_h = 48.0;
@@ -289,7 +291,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         let navigation = &mut app.ui.camera_raw_preview;
         let mut preview = ui.new_child(egui::UiBuilder::new().max_rect(view));
         preview.set_clip_rect(view.intersect(ui.clip_rect()));
-        preview.painter().rect_filled(view, 0.0, t.canvas);
+        preview.painter().rect_filled(view, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.canvas.to_egui());
         let (r, response, panning, zoom_box) =
             crate::camera_raw_preview_ui::interact(&mut preview, navigation, view, size, &mut scope.sampler_tool, animated_zoom);
         let tex = if d.show_before { d.before_tex.as_ref() } else { d.tex.as_ref() };
@@ -307,7 +309,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
             crate::camera_raw_scope_ui::preview(&mut preview, d, scope, r, &response, panning);
         }
         if let Some(region) = zoom_box {
-            preview.painter().rect_stroke(region, 0.0, egui::Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+            preview.painter().rect_stroke(region, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
         }
         let toolbar = ERect::from_min_max(pos2(preview_body.left() + 16.0, view.bottom() + 8.0), preview_body.right_bottom() - vec2(16.0, 4.0));
         let mut nav_ui = ui.new_child(egui::UiBuilder::new().max_rect(toolbar).layout(egui::Layout::left_to_right(egui::Align::Center)));
@@ -317,12 +319,12 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
             nav_ui.spinner();
         }
         if let Some(error) = &d.detail.error {
-            nav_ui.label(egui::RichText::new(tl!("Full-resolution preview unavailable")).color(t.text_faint)).on_hover_text(error);
+            nav_ui.label(egui::RichText::new(tl!("Full-resolution preview unavailable")).color(t.color.text.faint.to_egui())).on_hover_text(error);
         }
         // Panels.
         let right = ERect::from_min_max(pos2(body.right() - PANEL_W, body.top()), body.max);
-        painter.rect_filled(right, 0.0, t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.background.to_egui());
+        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
         let mut props = ui.new_child(egui::UiBuilder::new().max_rect(right.shrink2(vec2(14.0, 10.0))));
         // This header is outside the settings scroll area and follows the same Before/After
         // selector as the texture. Both derive from the same completed preview revision.
@@ -330,7 +332,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         d.scope.alt_tone = None;
         let mut dirty = false;
         egui::ScrollArea::vertical().id_salt("camera-raw-props").show(&mut props, |ui| {
-            ui.spacing_mut().item_spacing.y = 4.0;
+            ui.spacing_mut().item_spacing.y = t.space.gap.stack;
             let p = &mut d.params;
             let proxy = &d.proxy;
             let alt = &mut d.scope.alt_tone;
@@ -464,8 +466,8 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         }
         // Footer.
         let foot = ERect::from_min_max(pos2(full.left(), full.bottom() - footer_h), full.max);
-        painter.rect_filled(foot, 0.0, t.dock);
-        painter.line_segment([foot.left_top(), foot.right_top()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(foot, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.background.to_egui());
+        painter.line_segment([foot.left_top(), foot.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
         let mut fu = ui.new_child(egui::UiBuilder::new().max_rect(foot.shrink2(vec2(16.0, 9.0))).layout(egui::Layout::right_to_left(egui::Align::Center)));
         if let Some(role) = widgets::dialog_buttons(
             &mut fu,
@@ -476,10 +478,10 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         ) {
             action = Some(if role == widgets::ButtonRole::Default { "ok" } else { "cancel" });
         }
-        fu.add_space(12.0);
+        fu.add_space(craft_ui::theme::scale::Space::S12.px());
         widgets::checkbox(&mut fu, &mut d.show_before, tl!("Before (Y)"));
-        fu.label(egui::RichText::new(format!("{:.0} ms", d.render_ms)).color(t.text_faint));
-        fu.add_space(12.0);
+        fu.label(egui::RichText::new(format!("{:.0} ms", d.render_ms)).color(t.color.text.faint.to_egui()));
+        fu.add_space(craft_ui::theme::scale::Space::S12.px());
         if fu.button(tl!("Save Settings…")).on_hover_text(tl!("Save these settings as a Camera Raw .xmp file")).clicked() {
             action = Some("save");
         }

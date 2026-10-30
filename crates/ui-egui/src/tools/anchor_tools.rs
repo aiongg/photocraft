@@ -15,6 +15,7 @@
 //! Each click is one command and one history step; a click on nothing it can edit does nothing.
 
 use egui::{Color32, Modifiers, Pos2, Stroke};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::vector::Path;
 use photocraft_geom::Point;
 use photocraft_vector::edit::{self, Hit};
@@ -180,7 +181,7 @@ fn draw_hit(painter: &egui::Painter, to_scr: &dyn Fn([f64; 2]) -> Pos2, accent: 
         Hit::Anchor([s, k]) => {
             let Some(kn) = path.subpaths.get(s).and_then(|sp| sp.knots.get(k)) else { return };
             let c = to_scr([kn.anchor.x, kn.anchor.y]);
-            painter.rect_stroke(egui::Rect::from_center_size(c, egui::vec2(11.0, 11.0)), 0.0, Stroke::new(1.5, accent), egui::StrokeKind::Inside);
+            painter.rect_stroke(egui::Rect::from_center_size(c, egui::vec2(11.0, 11.0)), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
             crate::vector_ui::draw_anchor(painter, c, true, accent);
         }
         Hit::Handle(..) => {}

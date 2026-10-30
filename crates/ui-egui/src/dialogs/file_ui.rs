@@ -6,6 +6,7 @@
 //! dialog's fields, so the control channel can drive them with `ui.dialog.set` / `confirm`.
 
 use std::sync::Arc;
+use craft_ui::theme::ToEgui;
 
 use photocraft_engine::web_cmds::{self, Optimized, WebSettings};
 use serde_json::{Map, Value, json};
@@ -228,9 +229,9 @@ fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, 
 }
 
 fn number(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, range: std::ops::RangeInclusive<f32>, unit: &str, d: f64) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()));
         let mut v = n(f, key, d) as f32;
         crate::widgets::value_field(ui, &mut v, range, unit, 64.0).accessible_name(tl!(&label));
         f.insert(key.into(), json!(v.round()));

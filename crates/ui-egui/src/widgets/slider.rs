@@ -1,4 +1,5 @@
 use super::fields::{FieldOpts, value_field_in};
+use craft_ui::theme::StrokeExt;
 use super::panel::surface;
 use super::scrub::scrub_label_within;
 use super::{Color32, Pos2, Rect, Response, Sense, Stroke, Tokens, Ui, Vec2, pos2, vec2};
@@ -193,9 +194,9 @@ fn slider_with(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32
             }
         }
         _ => {
-            painter.rect_filled(track, 2.0, t.field_border);
+            painter.rect_filled(track, craft_ui::theme::scale::Radius::R2.px(), t.field_border);
             let filled = Rect::from_min_max(track.min, pos2(knob_x, track.max.y));
-            painter.rect_filled(filled, 2.0, if t.bevel { t.accent } else { t.text_dim });
+            painter.rect_filled(filled, craft_ui::theme::scale::Radius::R2.px(), if t.bevel { t.accent } else { t.text_dim });
         }
     }
     let knob = pos2(knob_x, rect.center().y);
@@ -207,10 +208,10 @@ fn slider_with(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32
         painter.circle_filled(knob + vec2(0.0, 1.0), kr + 0.5, Color32::from_black_alpha(90));
         painter.circle_filled(knob, kr, if t.pro { Color32::from_gray(236) } else { Color32::WHITE });
         if let Some(outline) = t.knob_outline() {
-            painter.circle_stroke(knob, kr, Stroke::new(1.0, outline));
+            painter.circle_stroke(knob, kr, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline));
         }
         if resp.hovered() || resp.dragged() {
-            painter.circle_stroke(knob, 9.5, Stroke::new(2.0, t.accent_soft));
+            painter.circle_stroke(knob, 9.5, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent_soft));
         }
     }
     resp
@@ -284,6 +285,6 @@ pub fn slider_row_prec(
         use egui::response::Flags;
         r.flags |= v.flags & (Flags::DRAG_STARTED | Flags::DRAGGED | Flags::DRAG_STOPPED);
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     r
 }

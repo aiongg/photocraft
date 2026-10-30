@@ -4,6 +4,7 @@
 //! control channel can read them (`ui.inspect`) and clear them (`ui.set`).
 
 use serde::{Deserialize, Serialize};
+use craft_ui::theme::StrokeExt;
 
 use crate::PhotocraftApp;
 
@@ -230,7 +231,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             for n in &app.ui.notices {
                 egui::Frame::NONE
                     .fill(t.card)
-                    .stroke(egui::Stroke::new(1.0, if n.error { t.warning } else { t.card_border }))
+                    .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if n.error { t.warning } else { t.card_border }))
                     .corner_radius(t.radius)
                     .inner_margin(egui::Margin::same(10))
                     .shadow(egui::Shadow { offset: [0, 2], blur: 8, spread: 0, color: t.shadow })
@@ -254,7 +255,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                             ui.label(egui::RichText::new(text).color(t.text_faint));
                         }
                     });
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
             }
         });
     if let Some(id) = dismiss_id {

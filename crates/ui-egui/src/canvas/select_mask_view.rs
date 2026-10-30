@@ -13,6 +13,8 @@
 //! normal filter-preview path composites it.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 use photocraft_color::{Color, PixelFormat};
 use photocraft_doc::{Document, Fill, Layer, LayerContent, LayerId, LayerMask};
@@ -178,10 +180,10 @@ fn keys(ctx: &egui::Context, fields: &mut Map<String, Value>) {
 /// The View Mode controls at the top of the Select and Mask dialog.
 pub fn controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
     keys(ui.ctx(), fields);
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut current = mode(fields);
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("View")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("View")).color(t.color.text.muted.to_egui()));
         let options: Vec<(Mode, &str)> = Mode::ALL.iter().map(|m| (*m, m.label())).collect();
         crate::widgets::dropdown(ui, "select-mask-view", tl!("View"), &mut current, &options, 170.0);
     });
@@ -196,15 +198,15 @@ pub fn controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
         crate::widgets::checkbox(ui, &mut on, label);
         fields.insert(field.into(), json!(on));
     }
-    ui.label(egui::RichText::new(tl!("F cycles the views; hold X to see the image")).color(t.text_dim).small());
+    ui.label(egui::RichText::new(tl!("F cycles the views; hold X to see the image")).color(t.color.text.muted.to_egui()).small());
     // Photoshop's Remember Settings, off by default: the next Select and Mask starts from these
     // settings instead of the defaults (#9423).
     let mut remember = remembers(fields);
     crate::widgets::checkbox(ui, &mut remember, tl!("Remember Settings"));
     fields.insert(REMEMBER.into(), json!(remember));
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::hairline(ui);
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     brush_controls(ui, fields);
 }
 
@@ -218,14 +220,14 @@ pub fn remembers(fields: &Map<String, Value>) -> bool {
 
 /// The Refine Edge Brush (R): painting on the canvas sets where edge refinement happens.
 fn brush_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut on = brush_on(fields);
     crate::widgets::checkbox(ui, &mut on, tl!("Refine Edge Brush (R)"));
     fields.insert("__brush".into(), json!(on));
     if on {
         let mut subtract = brush_subtract(fields);
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(tl!("Mode")).color(t.text_dim));
+            ui.label(egui::RichText::new(tl!("Mode")).color(t.color.text.muted.to_egui()));
             let options = [(false, tl!("Expand Detection Area")), (true, tl!("Restore Original Edge"))];
             crate::widgets::dropdown(ui, "select-mask-brush-mode", tl!("Mode"), &mut subtract, &options, 170.0);
         });
@@ -233,15 +235,15 @@ fn brush_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
         let mut size = brush_size(fields);
         crate::widgets::slider_row(ui, tl!("Size"), &mut size, BRUSH_SIZES.0..=BRUSH_SIZES.1, "px", None);
         fields.insert("__brushSize".into(), json!(size.round().clamp(BRUSH_SIZES.0, BRUSH_SIZES.1)));
-        ui.label(egui::RichText::new(tl!("Paint over hair or fur on the image; Alt paints the other mode")).color(t.text_dim).small());
+        ui.label(egui::RichText::new(tl!("Paint over hair or fur on the image; Alt paints the other mode")).color(t.color.text.muted.to_egui()).small());
     }
     let painted = fields.get("refineStrokes").and_then(Value::as_array).is_some_and(|a| !a.is_empty());
     if painted && crate::widgets::secondary_button(ui, tl!("Clear Brush Strokes"), 0.0).clicked() {
         fields.remove("refineStrokes");
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::hairline(ui);
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
 }
 
 /// The Refine Edge Brush's diameters (px) in the dialog.
@@ -305,11 +307,11 @@ pub fn canvas_brush(app: &mut PhotocraftApp, painter: &egui::Painter, over: egui
     // Alt paints in the other mode, as in Photoshop.
     let subtract = brush_subtract(&d.fields) != alt;
     let r = (brush_size(&d.fields) / 2.0 * zoom).max(1.5);
-    let (dark, light) = (egui::Stroke::new(1.0, egui::Color32::from_black_alpha(140)), egui::Stroke::new(1.0, egui::Color32::from_white_alpha(220)));
+    let (dark, light) = (craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220)));
     painter.circle_stroke(over, r + 0.5, dark);
     painter.circle_stroke(over, r, light);
     let arm = 3.0;
-    for stroke in [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), egui::Stroke::new(1.0, egui::Color32::from_white_alpha(220))] {
+    for stroke in [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220))] {
         painter.line_segment([over - egui::vec2(arm, 0.0), over + egui::vec2(arm, 0.0)], stroke);
         if !subtract {
             painter.line_segment([over - egui::vec2(0.0, arm), over + egui::vec2(0.0, arm)], stroke);

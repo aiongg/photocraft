@@ -187,7 +187,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         }
     });
     f.insert("tab".into(), json!(tab));
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if tab == 2 {
         toolbar_tab(ui, f);
         return;
@@ -215,7 +215,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     // The Set row, then the search (the Menus tab searches too).
     if tab == 0 {
         set_row(app, ui, f, &mut overrides, &mut alt_overrides, &items, &mut message, &mut message_warning);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
     }
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
     ui.horizontal(|ui| {
@@ -424,7 +424,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             }
         });
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if tab == 0 {
         ui.horizontal(|ui| {
             let has_sel = !selected.is_empty();

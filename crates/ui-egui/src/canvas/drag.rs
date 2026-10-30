@@ -1,4 +1,6 @@
 use super::view_xform::ViewXform;
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use super::{PhotocraftApp, Pos2, Rect, Stroke, Tool, vec2};
 
 /// An in-progress pointer gesture on the canvas.
@@ -298,9 +300,9 @@ pub(crate) fn draw_value_readout<const N: usize>(app: &PhotocraftApp, ctx: &egui
 
 /// A readout of `N` rows beside the pointer (labels left, values right-aligned), above everything.
 pub(crate) fn draw_readout<const N: usize>(ctx: &egui::Context, id: &str, cursor: Pos2, labels: [&str; N], values: [String; N]) {
-    let t = crate::theme::Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let font = egui::FontId::proportional(11.5);
-    let width = |text: &str| ctx.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), font.clone(), t.text).size().x);
+    let width = |text: &str| ctx.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), font.clone(), t.color.text.normal.to_egui()).size().x);
     let labels = labels.map(|label| tl!(label));
     let (lw, vw) = (labels.map(width), values.each_ref().map(|v| width(v)));
     let (label_col, value_col) = (lw.iter().fold(0.0f32, |a, &b| a.max(b)), vw.iter().fold(0.0f32, |a, &b| a.max(b)));
@@ -308,18 +310,18 @@ pub(crate) fn draw_readout<const N: usize>(ctx: &egui::Context, id: &str, cursor
         ctx,
         |ui| {
             egui::Frame::new()
-                .fill(t.card)
-                .stroke(Stroke::new(1.0, t.card_border))
-                .corner_radius(t.radius_sm)
+                .fill(t.color.surface.panel.to_egui())
+                .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.border.to_egui()))
+                .corner_radius(t.shape.radius.control)
                 .inner_margin(egui::Margin::symmetric(7, 4))
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing = vec2(0.0, 1.0);
                     for (i, value) in values.into_iter().enumerate() {
                         // Labels left, values right-aligned on one edge, sharing a baseline.
                         ui.horizontal(|ui| {
-                            ui.add(egui::Label::new(egui::RichText::new(labels[i]).font(font.clone()).color(t.text_dim)).extend());
+                            ui.add(egui::Label::new(egui::RichText::new(labels[i]).font(font.clone()).color(t.color.text.muted.to_egui())).extend());
                             ui.add_space(label_col - lw[i] + 12.0 + value_col - vw[i]);
-                            ui.add(egui::Label::new(egui::RichText::new(value).font(font.clone()).color(t.text)).extend());
+                            ui.add(egui::Label::new(egui::RichText::new(value).font(font.clone()).color(t.color.text.normal.to_egui())).extend());
                         });
                     }
                 });

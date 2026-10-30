@@ -14,6 +14,7 @@
 //! both show, pick and organise presets the same way; each keeps its own view state.
 
 use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
@@ -412,10 +413,10 @@ fn grid_cell(ui: &mut egui::Ui, p: &BrushPreset, current: bool, presets: &[Brush
         return;
     }
     if current {
-        ui.painter().rect_filled(r, 3.0, t.accent_soft);
-        ui.painter().rect_stroke(r, 3.0, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+        ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.accent_soft);
+        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
     } else if resp.hovered() {
-        ui.painter().rect_filled(r, 3.0, t.hover);
+        ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
     }
     let pb = &p.brush;
     let tip = brush_preview::tip_texture(ui.ctx(), &format!("brushes-tip:{}", p.name), &pb.tip, (pb.hardness, pb.angle, pb.roundness), 36, t.text);
@@ -563,12 +564,12 @@ fn preset_card(
     let card = full.shrink2(vec2((4.0 * scale).min(full.width() * 0.5), 0.0));
     // Every card carries its own background, a touch darker than the popup behind it, so the
     // cards read as tiles; the current and hover fills paint over it.
-    ui.painter().rect_filled(card, 3.0, darker(t.card, CARD_BG_SHADE));
+    ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), darker(t.card, CARD_BG_SHADE));
     if current {
-        ui.painter().rect_filled(card, 3.0, t.accent_soft);
-        ui.painter().rect_stroke(card, 3.0, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+        ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), t.accent_soft);
+        ui.painter().rect_stroke(card, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
     } else if resp.hovered() {
-        ui.painter().rect_filled(card, 3.0, t.hover);
+        ui.painter().rect_filled(card, craft_ui::theme::scale::Radius::R3.px(), t.hover);
     }
     let pb = &p.brush;
     let inner = card.shrink2(vec2(pad, pad_y));
@@ -712,7 +713,7 @@ fn group_header(ui: &mut egui::Ui, label: &str, key: &str, folder: &[String], op
     if let Some(d) = resp.dnd_hover_payload::<BrushDrag>() {
         match (&*d, folder_action(&d)) {
             (BrushDrag::Preset(_), _) | (_, Some(Action::MoveInto { before: None, .. })) => {
-                ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
             }
             (_, Some(_)) => widgets::drop_line(ui, r, false, false, &t),
             _ => {}
@@ -892,7 +893,7 @@ fn rename_bar(ui: &mut egui::Ui, st: &mut BrushesPanelState, acts: &mut Vec<Acti
     if done {
         st.renaming = None;
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
 }
 
 /// The presets in their groups, filtered by `st.filter`, as rows or tip cells (`st.view`) or as
@@ -932,7 +933,7 @@ pub fn preset_list(ui: &mut egui::Ui, presets: &[BrushPreset], current: Option<&
             }
             let d = Draw { label: &label, key: &key, presets, current, collapsed, grid, layout, show, scale: st.scale };
             draw_nodes(ui, &d, &folder_tree(&items), 0, &mut acts);
-            ui.add_space(2.0);
+            ui.add_space(craft_ui::theme::scale::Space::S2.px());
         }
         if presets.is_empty() {
             ui.label(RichText::new(tl!("No brush presets")).color(Tokens::get(ui.ctx()).text_faint));
@@ -1009,10 +1010,10 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     });
     commit_gesture(app, ui.ctx(), &before, &b);
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.text_faint);
-        ui.add_space(20.0);
+        ui.add_space(craft_ui::theme::scale::Space::S20.px());
         let search_w = (inner_w - 112.0).clamp(90.0, inner_w - 40.0);
         widgets::text_field(ui, ui.scope_id().with("brush-search"), &mut app.ui.brushes_panel.filter, tl!("Search Brushes"), search_w, false);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1031,7 +1032,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Size of the current brush above.
     ui.horizontal(|ui| {
         icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "image", 14.0, t.text_faint);
-        ui.add_space(20.0);
+        ui.add_space(craft_ui::theme::scale::Space::S20.px());
         let w = (inner_w - 112.0).clamp(90.0, inner_w - 40.0);
         ui.allocate_ui_with_layout(vec2(w, 18.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             let scale = &mut app.ui.brushes_panel.scale;
@@ -1041,12 +1042,12 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         });
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let acts = preset_list(ui, &app.session.tools.presets, app.session.tools.current_preset.as_deref(), &mut app.ui.brushes_panel, responsive_list_layout(ui));
     apply(app, acts);
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     widgets::hairline(ui);
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         ui.label(
             RichText::new(crate::i18n::trn(crate::i18n::current(), app.session.tools.presets.len() as u64, "{n} preset", "{n} presets")).color(t.text_faint),

@@ -5,6 +5,7 @@
 //! parameters scaled by the proxy factor), so what you preview is what you get.
 
 use std::sync::Arc;
+use craft_ui::theme::ToEgui;
 
 use photocraft_doc::Document;
 use photocraft_engine::color_cmds::ColorSettings;
@@ -773,7 +774,7 @@ const RESULT_FROM: &str = "__resultFrom";
 /// the sampled colour becomes it.
 fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     use photocraft_algo::tone;
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let from = f.get("color").and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex).unwrap_or([0.0; 3]);
     let picked = f.get(RESULT_PICKED).and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex);
     if let Some(to) = picked
@@ -792,10 +793,10 @@ fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let name = tl!("Result");
     let mut clicked = false;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(name).color(t.text_dim));
+        ui.label(egui::RichText::new(name).color(t.color.text.muted.to_egui()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             clicked = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(bytes[0], bytes[1], bytes[2]), name).clicked();
-            ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.text_dim).monospace());
+            ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.color.text.muted.to_egui()).monospace());
         });
     });
     if clicked {
@@ -808,7 +809,7 @@ fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 
 /// Dialog body for filter commands.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default().to_string();
     // Plug-in dialogs carry their own spec (from the plug-in's manifest).
     let spec = match f.get("__spec").and_then(Value::as_str) {
@@ -854,13 +855,13 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                     }
                     if uses_angle_dial(&cmd, &p.key) {
                         crate::widgets::angle_dial_row(ui, &label(&p.key), &mut v, min..=max);
-                        ui.add_space(4.0);
+                        ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     } else if uses_logarithmic_slider(min, max) {
                         // Keep one numeric field for direct entry and one log-scaled slider for
                         // wide ranges. slider_row would add a second, linear slider (#146).
                         ui.horizontal(|ui| {
                             let name = label(&p.key);
-                            ui.label(egui::RichText::new(&name).color(t.text_dim));
+                            ui.label(egui::RichText::new(&name).color(t.color.text.muted.to_egui()));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 crate::widgets::value_field(ui, &mut v, min..=max, unit, 74.0).accessible_name(name);
                             });
@@ -869,7 +870,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                         if crate::widgets::slider(ui, &mut lv, min.ln()..=max.ln(), None).changed() {
                             v = lv.exp();
                         }
-                        ui.add_space(4.0);
+                        ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     } else {
                         // A double-click on the slider puts it back to the filter's default.
                         let gestures = crate::widgets::RowGestures { reset: Some(default), wheel_step: None, ..Default::default() };
@@ -882,7 +883,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             }
             Kind::Choice { options, default } => {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(label(&p.key)).color(t.text_dim));
+                    ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     let initial = default.as_deref().or_else(|| options.first().map(String::as_str)).unwrap_or("");
                     let mut cur = f.get(&p.key).and_then(Value::as_str).unwrap_or(initial).to_string();
                     let labels: Vec<String> = options.iter().map(|o| choice_label(o)).collect();
@@ -940,7 +941,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             Kind::Text => {
                 let mut v = f.get(&p.key).and_then(Value::as_str).unwrap_or_default().to_string();
                 ui.horizontal(|ui| {
-                    let lp = ui.label(egui::RichText::new(label(&p.key)).color(t.text_dim));
+                    let lp = ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     ui.add(egui::TextEdit::singleline(&mut v).desired_width(200.0)).labelled_by(lp.id);
                     // Install Plug-in…: pick the .wasm file instead of typing its path (#7531).
                     if cmd == "plugin.install" && p.key == "path" && crate::widgets::secondary_button(ui, tl!("Browse…"), 0.0).clicked() {
@@ -961,7 +962,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 let mut opts: Vec<(String, &str)> = vec![("-1".to_string(), tl!("None"))];
                 opts.extend(names.iter().enumerate().map(|(i, n)| (i.to_string(), n.as_str())));
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(label(&p.key)).color(t.text_dim));
+                    ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     crate::widgets::dropdown(ui, &format!("flt-{cmd}-{}", p.key), &label(&p.key), &mut sel, &opts, 170.0);
                 });
                 match sel.parse::<i64>() {
@@ -974,7 +975,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 let mut vals: Vec<f32> =
                     f.get(&p.key).and_then(Value::as_array).map(|a| a.iter().map(|v| v.as_f64().unwrap_or(0.0) as f32).collect()).unwrap_or_default();
                 vals.resize(n, 0.0);
-                ui.label(egui::RichText::new(label(&p.key)).color(t.text_dim));
+                ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                 egui::Grid::new(format!("flt-grid-{cmd}-{}", p.key)).spacing([4.0, 4.0]).show(ui, |ui| {
                     for (i, v) in vals.iter_mut().enumerate() {
                         crate::widgets::value_field(ui, v, -999.0..=999.0, "", 44.0).accessible_name(format!("{} {}", label(&p.key), i + 1));
@@ -995,7 +996,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 let mut clicked = false;
                 let eyedropper = cmd == REPLACE_COLOR && p.key == "color";
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(&name).color(t.text_dim));
+                    ui.label(egui::RichText::new(&name).color(t.color.text.muted.to_egui()));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // PhotoCraft's Color Picker, as everywhere else (#2144).
                         clicked = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(bytes[0], bytes[1], bytes[2]), &name).clicked();
@@ -1005,7 +1006,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                                 f.insert(COLOR_EYEDROPPER.into(), json!(!armed));
                             }
                         }
-                        ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.text_dim).monospace());
+                        ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.color.text.muted.to_egui()).monospace());
                     });
                 });
                 if set.is_none() && default.is_some() {
@@ -1021,7 +1022,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             Kind::Int { default } => {
                 let mut v = f.get(&p.key).and_then(Value::as_f64).unwrap_or(default as f64) as f32;
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(label(&p.key)).color(t.text_dim));
+                    ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     crate::widgets::value_field(ui, &mut v, -30000.0..=30000.0, "", 80.0).accessible_name(label(&p.key));
                     // A seed gets a fresh random value in one click (#5710): Clouds, Add Noise,
                     // Fibers… then render a new pattern, as each run of Photoshop's does.
@@ -1038,11 +1039,11 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
     // Read-only context the dialog opener supplies (e.g. the monitor profile in use).
     if let Some(note) = f.get("__note").and_then(Value::as_str) {
-        ui.add_space(4.0);
-        ui.add(egui::Label::new(egui::RichText::new(note).color(t.text_dim)).wrap());
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add(egui::Label::new(egui::RichText::new(note).color(t.color.text.muted.to_egui())).wrap());
     }
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
         f.insert("__preview".into(), json!(preview));
     }

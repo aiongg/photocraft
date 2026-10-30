@@ -1,4 +1,5 @@
 use super::fields::choice_label;
+use craft_ui::theme::ToEgui;
 use super::{Map, PhotocraftApp, RichText, Tokens, Value, json, prefs};
 
 /// Performance › Graphics: the compositor's GPU memory budget and whether the active document's
@@ -25,14 +26,14 @@ pub(super) fn gpu_memory_lines(app: &PhotocraftApp) -> Vec<String> {
 /// Preferences › Performance: what the app renders with now, and a reset of the GPU backend
 /// (a crashed start may have moved it to a safer choice).
 pub(super) fn gpu_status_rows(ui: &mut egui::Ui, info: Option<&Value>, adapters: Option<&Value>, obj: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
-    ui.add_space(10.0);
-    ui.label(RichText::new(tl!("Graphics")).font(crate::theme::semibold(12.5)).color(t.text));
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
+    ui.label(RichText::new(tl!("Graphics")).font(crate::theme::semibold(12.5)).color(t.color.text.normal.to_egui()));
     for line in info.and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-        ui.label(RichText::new(line).color(t.text_dim));
+        ui.label(RichText::new(line).color(t.color.text.muted.to_egui()));
     }
-    ui.add_space(4.0);
-    ui.label(RichText::new(tl!("Applies at next launch.")).color(t.text_faint));
+    ui.add_space(t.space.gap.stack);
+    ui.label(RichText::new(tl!("Applies at next launch.")).color(t.color.text.faint.to_egui()));
     ui.collapsing(tl!("Advanced"), |ui| {
         ui.horizontal(|ui| {
             ui.label(tl!("GPU Backend"));
@@ -70,7 +71,7 @@ fn graphics_adapter_row(ui: &mut egui::Ui, adapters: Option<&Value>, obj: &mut M
         ui.label(tl!("GPU adapter"));
         crate::widgets::dropdown_literal(ui, "graphics-adapter", tl!("GPU adapter"), &mut current, &pairs, 320.0);
     });
-    ui.label(RichText::new(tl!("Applies at next launch.")).color(Tokens::get(ui.ctx()).text_faint));
+    ui.label(RichText::new(tl!("Applies at next launch.")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
     obj.insert("gpuAdapter".into(), json!(current));
 }
 
@@ -91,8 +92,8 @@ pub(super) fn rendering_mode_row(ui: &mut egui::Ui, obj: &mut Map<String, Value>
     ui.label(tl!("Automatic uses GPU acceleration when available and falls back to CPU rendering on errors."));
     // Next to the setting, as for System Title Bar (#1677): the renderer is picked when the
     // window opens, so a change otherwise looks like it did nothing (#7939).
-    ui.label(RichText::new(tl!("Applies at next launch.")).color(Tokens::get(ui.ctx()).text_dim));
-    ui.add_space(8.0);
+    ui.label(RichText::new(tl!("Applies at next launch.")).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
 }
 
 pub(super) fn rendering_mode_value(obj: &Map<String, Value>) -> String {
@@ -107,7 +108,7 @@ pub(super) fn rendering_mode_value(obj: &Map<String, Value>) -> String {
 
 /// Explain the per-document RAM limit separately from the graphics-memory preference.
 pub(super) fn memory_usage_row(ui: &mut egui::Ui, obj: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.group(|ui| {
         ui.label(RichText::new(tl!("Memory Usage")).strong());
         let mut mb = obj.get("memoryUsageMb").and_then(Value::as_u64).unwrap_or(8192);
@@ -122,11 +123,11 @@ pub(super) fn memory_usage_row(ui: &mut egui::Ui, obj: &mut Map<String, Value>) 
             let percent = mb as f64 * 100.0 / (ram as f64 / (1 << 20) as f64);
             ui.label(crate::i18n::fmt(tl!("Installed RAM: {ram} MB; this limit: {percent}%"), &[("ram", &installed.to_string()), ("percent", &format!("{percent:.1}"))]));
         }
-        ui.label(RichText::new(tl!("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.")).color(t.text_dim));
-        ui.label(RichText::new(tl!("Applies immediately when saved. Memory is not reserved in advance.")).color(t.text_dim));
-        ui.label(RichText::new(tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget.")).color(t.text_dim));
+        ui.label(RichText::new(tl!("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.")).color(t.color.text.muted.to_egui()));
+        ui.label(RichText::new(tl!("Applies immediately when saved. Memory is not reserved in advance.")).color(t.color.text.muted.to_egui()));
+        ui.label(RichText::new(tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget.")).color(t.color.text.muted.to_egui()));
     });
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
 }
 
 /// Settings read only when the app starts, which say "Applies at next launch." under their row.

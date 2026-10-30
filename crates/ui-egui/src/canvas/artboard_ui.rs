@@ -3,6 +3,8 @@
 //! background). Everything that changes the document is `layer.artboard.set` and friends.
 
 use egui::{Align2, Color32, Pos2, Stroke};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::{ArtboardBackground, Document, Layer};
 use serde_json::{Value, json};
 
@@ -91,14 +93,14 @@ fn subtract(r: photocraft_geom::Rect, holes: &[photocraft_geom::Rect]) -> Vec<ph
 /// Board outlines and names (the active board's name is highlighted, as in Photoshop).
 pub fn draw_frames(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(st) = app.session.active() else { return };
-    let t = Tokens::get(painter.ctx());
+    let t = craft_ui::theme::current(painter.ctx());
     let active = st.active_layer.and_then(|id| st.doc.artboard_of(id));
     for (id, name, a) in st.doc.artboards() {
         let r = xf.doc_rect(a.rect);
         let on = active == Some(id);
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, if on { t.accent } else { Color32::from_black_alpha(90) }), egui::StrokeKind::Outside);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), if on { t.color.accent.solid.to_egui() } else { Color32::from_black_alpha(90) }), egui::StrokeKind::Outside);
         let pos = Pos2::new(r.left(), r.top() - 4.0);
-        painter.text(pos, Align2::LEFT_BOTTOM, name, egui::FontId::proportional(11.0), if on { t.text } else { t.text_dim });
+        painter.text(pos, Align2::LEFT_BOTTOM, name, egui::FontId::proportional(11.0), if on { t.color.text.normal.to_egui() } else { t.color.text.muted.to_egui() });
     }
 }
 
@@ -129,18 +131,18 @@ pub fn fit_artboard(app: &mut PhotocraftApp) -> Result<Value, String> {
 /// Properties panel for an artboard.
 pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     let Some(a) = layer.artboard().cloned() else { return };
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let key = |k: &str| format!("artboard-{}-{k}", layer.id.0);
     let mut edit: Option<Value> = None;
     // The custom background swatch was clicked: its colour, for the Color Picker.
     let mut pick: Option<[f32; 3]> = None;
-    ui.label(egui::RichText::new(tl!("Artboard")).font(crate::theme::semibold(12.0)).color(t.text));
-    ui.add_space(4.0);
+    ui.label(egui::RichText::new(tl!("Artboard")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut preset = a.preset.clone();
     let mut opts: Vec<(String, &str)> = vec![(String::new(), tl!("Custom"))];
     opts.extend(photocraft_engine::artboard_cmds::PRESETS.iter().map(|(n, _, _)| (n.to_string(), *n)));
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Size")).color(t.text_dim).size(12.0));
+        ui.label(egui::RichText::new(tl!("Size")).color(t.color.text.muted.to_egui()).size(12.0));
         if crate::widgets::dropdown(ui, &key("preset"), tl!("Preset"), &mut preset, &opts, 150.0) && !preset.is_empty() {
             edit = Some(json!({"layer": layer.id.0, "preset": preset}));
         }
@@ -149,7 +151,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     // says "Width", not "W"); X/Y already name their axis, so their name comes from the call site
     // too.
     let num = |ui: &mut egui::Ui, label: &str, name: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>| -> bool {
-        ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim).size(12.0));
+        ui.label(egui::RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(12.0));
         crate::widgets::value_field(ui, v, range, "px", 64.0).accessible_name(name).changed()
     };
     let r = a.rect;
@@ -169,9 +171,9 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
             edit = Some(json!({"layer": layer.id.0, "x": x.round(), "y": y.round(), "coalesce": key("xy")}));
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Artboard Background Color")).color(t.text_dim).size(12.0));
+        ui.label(egui::RichText::new(tl!("Artboard Background Color")).color(t.color.text.muted.to_egui()).size(12.0));
     });
     ui.horizontal(|ui| {
         let mut bg = a.background.name().to_string();

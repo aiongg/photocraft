@@ -22,6 +22,7 @@
 //! menu instead (`canvas_tool_menu`, over a misspelled word of the text being edited, #4370).
 
 use egui::text::CCursorRange;
+use craft_ui::theme::ToEgui;
 use egui::{Context, Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, SurrenderFocusOn, Ui};
 
 /// One menu item.
@@ -222,12 +223,12 @@ fn draw(ctx: &Context, open: &Open) -> Option<Action> {
     let mut chosen = None;
     egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
         egui::Frame::menu(ui.style()).show(ui, |ui| {
-            let t = crate::theme::Tokens::get(ui.ctx());
+            let t = craft_ui::theme::current(ui.ctx());
             let v = &mut ui.style_mut().visuals;
             v.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
             v.widgets.inactive.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.weak_bg_fill = t.accent;
-            v.widgets.hovered.bg_fill = t.accent;
+            v.widgets.hovered.weak_bg_fill = t.color.accent.solid.to_egui();
+            v.widgets.hovered.bg_fill = t.color.accent.solid.to_egui();
             v.widgets.hovered.bg_stroke = egui::Stroke::NONE;
             v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
             v.widgets.hovered.corner_radius = egui::CornerRadius::same(3);

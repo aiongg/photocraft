@@ -1,4 +1,5 @@
 use super::basic::reset_color_balance;
+use craft_ui::theme::ToEgui;
 use super::gradient_map::{gradient_presets, is_gray, swatches};
 use super::{Adjustment, EditorCx, HistSource, LayerId, PhotocraftApp, RichText, Tokens, Value, adjust_params, editor, json, needs_histogram, space_of, tone};
 
@@ -82,18 +83,18 @@ pub fn properties_reset(ctx: &egui::Context, doc: u64, id: LayerId, adj: &Adjust
 /// The Properties-panel editor of an adjustment layer: previews live (`app.live_adjust`) while a
 /// control moves and commits one `layer.setAdjustment` per gesture.
 pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj: &Adjustment) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let kind = photocraft_engine::commands::adjustment_kind(adj);
     match adj {
         Adjustment::SelectiveColor { .. } => return crate::adjust_ui::selective_color_editor(app, ui, id, adj),
         Adjustment::ColorLookup { .. } => return crate::adjust_ui::color_lookup_editor(app, ui, id, adj),
         Adjustment::Invert => {
-            ui.label(RichText::new(tl!("Invert has no settings.")).color(t.text_faint));
+            ui.label(RichText::new(tl!("Invert has no settings.")).color(t.color.text.faint.to_egui()));
             return;
         }
         Adjustment::Unsupported { psd_key, .. } => {
             let template = "This adjustment ({key}) is kept as imported and can't be edited yet.";
-            ui.label(RichText::new(crate::i18n::fmt(tl!(template), &[("key", psd_key)])).color(t.text_faint));
+            ui.label(RichText::new(crate::i18n::fmt(tl!(template), &[("key", psd_key)])).color(t.color.text.faint.to_egui()));
             return;
         }
         _ => {}

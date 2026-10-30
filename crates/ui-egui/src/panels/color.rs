@@ -1,4 +1,5 @@
 use super::{Color32, PhotocraftApp, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, c32, pos2, theme, vec2, widgets};
+use craft_ui::theme::StrokeExt;
 
 /// The Color panel's foreground and background chips. A click picks the colour the field edits,
 /// framed; a double-click opens the Color Picker on it.
@@ -6,18 +7,18 @@ pub(crate) fn field_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, chips: Rec
     let t = Tokens::get(ui.ctx());
     let bgr = Rect::from_min_size(chips.min + vec2(13.0, 13.0), vec2(22.0, 22.0));
     let fgr = Rect::from_min_size(chips.min + vec2(3.0, 3.0), vec2(22.0, 22.0));
-    let frame = Stroke::new(1.0, t.text_dim);
+    let frame = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
     let bg_active = app.ui.color_panel.background;
     let p = ui.painter();
-    p.rect_filled(bgr, 2.0, c32(app.session.tools.background));
-    p.rect_stroke(bgr, 2.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    p.rect_filled(bgr, craft_ui::theme::scale::Radius::R2.px(), c32(app.session.tools.background));
+    p.rect_stroke(bgr, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     if bg_active {
-        p.rect_stroke(bgr.expand(2.0), 2.0, frame, StrokeKind::Outside);
+        p.rect_stroke(bgr.expand(2.0), craft_ui::theme::scale::Radius::R2.px(), frame, StrokeKind::Outside);
     }
-    p.rect_filled(fgr, 2.0, c32(app.session.tools.foreground));
-    p.rect_stroke(fgr, 2.0, Stroke::new(1.0, Color32::from_gray(210)), StrokeKind::Outside);
+    p.rect_filled(fgr, craft_ui::theme::scale::Radius::R2.px(), c32(app.session.tools.foreground));
+    p.rect_stroke(fgr, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(210)), StrokeKind::Outside);
     if !bg_active {
-        p.rect_stroke(fgr.expand(2.0), 2.0, frame, StrokeKind::Outside);
+        p.rect_stroke(fgr.expand(2.0), craft_ui::theme::scale::Radius::R2.px(), frame, StrokeKind::Outside);
     }
     // The foreground is on top, so it takes the clicks where the two overlap.
     let bg_resp = ui.interact(bgr, ui.scope_id().with("field-bg"), Sense::click());
@@ -106,7 +107,7 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if brightness { egui::ecolor::Hsva::new(x.min(0.9999), 1.0 - y, hsva.v, 1.0) } else { egui::ecolor::Hsva::new(hsva.h, x, 1.0 - y, 1.0) }
         };
         ui.painter().add(color_grid(field, 16, |x, y| hsva_color32(at(x, y))));
-        ui.painter().rect_stroke(field, 0.0, Stroke::new(1.0, t.separator), StrokeKind::Outside);
+        ui.painter().rect_stroke(field, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), StrokeKind::Outside);
         let field_pick = widgets::pick_pos(&fresp);
         if let Some(p) = field_pick {
             let x = ((p.x - field.left()) / field.width()).clamp(0.0, 1.0);
@@ -121,8 +122,8 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         let (kx, ky) = if brightness { (hsva.h, 1.0 - hsva.s) } else { (hsva.s, 1.0 - hsva.v) };
         let knob = pos2(field.left() + kx * field.width(), field.top() + ky * field.height());
-        ui.painter().circle_stroke(knob, 5.0, Stroke::new(1.5, Color32::WHITE));
-        ui.painter().circle_stroke(knob, 6.5, Stroke::new(1.0, Color32::from_black_alpha(160)));
+        ui.painter().circle_stroke(knob, 5.0, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::WHITE));
+        ui.painter().circle_stroke(knob, 6.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160)));
         // The strip: hue (red at both ends, as Photoshop's) or brightness (the colour down to black).
         let (strip, sresp) = ui.allocate_exact_size(vec2(strip_w, h), Sense::click_and_drag());
         let strip_at = |f: f32| {
@@ -152,7 +153,7 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui.data_mut(|d| d.insert_temp(key, (hsva.h, hsva.s)));
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         let mut c = if bg_active { app.session.tools.background } else { app.session.tools.foreground };
         if color_readout(ui, ui.scope_id().with(("color-field", bg_active)), &mut c) {
@@ -256,7 +257,7 @@ fn hex_edit(ui: &mut egui::Ui, id: egui::Id, color: &mut [f32; 4]) -> bool {
     let (rect, _) = ui.allocate_exact_size(vec2(64.0, 24.0), Sense::hover());
     widgets::surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     let [r, g, b] = srgb_bytes(*color);
     let typing = if ui.memory(|m| m.has_focus(id)) { ui.data(|d| d.get_temp::<String>(id)) } else { None };

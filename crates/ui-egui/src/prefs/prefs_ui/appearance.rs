@@ -1,4 +1,5 @@
 use super::dialogs::open_preferences;
+use craft_ui::theme::StrokeExt;
 use super::fields::{choice_label, color_of, preference_matches};
 use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
 use craft_theme::{
@@ -360,17 +361,17 @@ fn theme_swatch(ui: &mut egui::Ui, choice: &ThemeChoice, mode: Mode, selected: &
     let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 26.0), Sense::click());
     let painter = ui.painter();
     let inner = rect.shrink(3.0);
-    painter.rect_filled(inner, 2.0, col(c.surface.background));
-    painter.rect_filled(egui::Rect::from_min_size(inner.min, vec2(inner.width(), 5.0)), 0.0, col(c.surface.chrome));
+    painter.rect_filled(inner, craft_ui::theme::scale::Radius::R2.px(), col(c.surface.background));
+    painter.rect_filled(egui::Rect::from_min_size(inner.min, vec2(inner.width(), 5.0)), craft_ui::theme::scale::Radius::R0.px(), col(c.surface.chrome));
     painter.circle_filled(inner.right_bottom() - vec2(6.0, 6.0), 2.5, col(c.accent.solid));
     let stroke = if on {
-        egui::Stroke::new(2.0, t.accent)
+        craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
     } else if resp.hovered() {
-        egui::Stroke::new(1.0, t.text_dim)
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim)
     } else {
-        egui::Stroke::new(1.0, t.card_border)
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border)
     };
-    painter.rect_stroke(rect.shrink(1.0), 3.0, stroke, egui::StrokeKind::Inside);
+    painter.rect_stroke(rect.shrink(1.0), craft_ui::theme::scale::Radius::R3.px(), stroke, egui::StrokeKind::Inside);
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, true, on, &label));
     if resp.on_hover_text(&label).clicked() {
         *selected = id.to_string();
@@ -381,7 +382,7 @@ fn theme_swatch(ui: &mut egui::Ui, choice: &ThemeChoice, mode: Mode, selected: &
     if !(favorite || ui.rect_contains_pointer(rect.union(badge))) {
         return;
     }
-    ui.painter().circle(center, BADGE, t.card, egui::Stroke::new(1.0, t.card_border));
+    ui.painter().circle(center, BADGE, t.card, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border));
     let (icon, tint) = if favorite { ("star-filled", t.accent) } else { ("star", t.text_dim) };
     let action = if favorite { tl!("Remove from favorites") } else { tl!("Add to favorites") };
     // Interact and paint without allocating: a widget placed at `badge` would grow the row by the
@@ -410,7 +411,7 @@ fn theme_row(ui: &mut egui::Ui, title: &str, active: bool, mode: Mode, selected:
             theme_swatch(ui, choice, mode, selected, favorites);
         }
         if active {
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             ui.label(RichText::new(tl!("Active")).color(t.accent_text).small());
         }
     });

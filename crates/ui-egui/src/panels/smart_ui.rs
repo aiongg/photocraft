@@ -6,6 +6,7 @@
 //! ⌥-click to view it, ⇧-click to disable it (FILE-215-3).
 
 use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
@@ -45,17 +46,17 @@ pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
     let Some(kind) = thumb_badge_kind(l) else { return };
     let t = Tokens::get(ui.ctx());
     let r = thumb_badge_rect(thumb);
-    ui.painter().rect_filled(r, 2.0, t.field);
-    ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R2.px(), t.field);
+    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
     match kind {
         ThumbBadge::Smart => icons::paint(ui, r, "app-window", 9.0, t.icon),
         // Photoshop's shape mark: a path with an anchor point on each corner. Painted rather
         // than an icon, so the anchors stay solid squares at this size.
         ThumbBadge::Shape => {
             let path = r.shrink(SHAPE_PATH_INSET);
-            ui.painter().rect_stroke(path, 0.0, Stroke::new(1.0, t.icon), egui::StrokeKind::Middle);
+            ui.painter().rect_stroke(path, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.icon), egui::StrokeKind::Middle);
             for anchor in [path.left_top(), path.right_top(), path.right_bottom(), path.left_bottom()] {
-                ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), 0.0, t.icon);
+                ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), craft_ui::theme::scale::Radius::R0.px(), t.icon);
             }
         }
     }
@@ -93,7 +94,7 @@ pub fn has_filters(l: &Layer) -> bool {
 /// The two rings in the layer row indicate an attached Smart Filters stack.
 pub fn paint_badge(painter: &egui::Painter, center: egui::Pos2, color: Color32) {
     for dx in [-2.5, 2.5] {
-        painter.circle_stroke(center + vec2(dx, 0.0), 3.5, Stroke::new(1.0, color));
+        painter.circle_stroke(center + vec2(dx, 0.0), 3.5, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color));
     }
 }
 
@@ -123,12 +124,12 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         // Selected as in Photoshop: the row stays highlighted while its smart object is active.
         let selected = active && picked == Some((l.id.0, index));
         if selected {
-            ui.painter().rect_filled(rect, 0.0, if t.pro { t.row_selected } else { t.hover });
+            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), if t.pro { t.row_selected } else { t.hover });
         } else if resp.contains_pointer() {
-            ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.35));
+            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
         if t.pro {
-            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], Stroke::new(1.0, t.separator));
+            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         }
         let (name, on, shown) = filter_row_label(sm, index);
         let eye = Rect::from_center_size(pos2(rect.left() + indent + if index.is_none() { 9.0 } else { 41.0 }, rect.center().y), vec2(18.0, 18.0));
@@ -153,13 +154,13 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
                 let tex = app.mask_thumb_kind(ui.ctx(), doc, l.id, mask, crate::mask_thumbs_ui::THUMB_SMART_MASK);
                 ui.painter().image(tex, sw, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                 if !mask.enabled {
-                    ui.painter().line_segment([sw.left_top(), sw.right_bottom()], Stroke::new(1.0, t.danger));
-                    ui.painter().line_segment([sw.right_top(), sw.left_bottom()], Stroke::new(1.0, t.danger));
+                    ui.painter().line_segment([sw.left_top(), sw.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
+                    ui.painter().line_segment([sw.right_top(), sw.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
                 }
             } else {
-                ui.painter().rect_filled(sw, 0.0, Color32::WHITE);
+                ui.painter().rect_filled(sw, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
-            ui.painter().rect_stroke(sw, 1.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(sw, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
             if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
                 crate::mask_thumbs_ui::paint_brackets(ui.painter(), sw, t.text);
             }
@@ -356,7 +357,7 @@ pub(crate) fn drop_on_row(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: R
         return;
     }
     let t = Tokens::get(ctx);
-    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
     if ctx.input(|i| i.pointer.any_released()) {
         actions.push(drop_action(from, filter, l.id, ctx.input(|i| i.modifiers.alt)));
     }
@@ -405,7 +406,7 @@ fn reorder_drop(ui: &egui::Ui, l: &Layer, n: usize, row: Option<usize>, rect: Re
     let to = reorder_target(src, row, above, n)?;
     let t = Tokens::get(ctx);
     let y = if above && row.is_some() { rect.top() } else { rect.bottom() };
-    ui.painter().line_segment([pos2(rect.left() + 30.0, y), pos2(rect.right(), y)], Stroke::new(2.0, t.accent));
+    ui.painter().line_segment([pos2(rect.left() + 30.0, y), pos2(rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
     ctx.input(|i| i.pointer.any_released()).then(|| (to, ("layer.smartFilter.move".into(), json!({"layer": l.id.0, "index": src, "to": to}))))
 }
 

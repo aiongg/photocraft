@@ -3,6 +3,7 @@
 //! frame; it must never distort a corner). Only release dispatches `type.edit`.
 
 use std::collections::VecDeque;
+use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{CursorIcon, Modifiers, Pos2, Stroke, vec2};
@@ -407,18 +408,18 @@ pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSes
     let tokens = crate::theme::Tokens::get(painter.ctx());
     let pts = t.quad.map(|p| xf.to_screen(p[0] as f32, p[1] as f32));
     painter.add(egui::Shape::closed_line(pts.to_vec(), Stroke::new(3.0, tokens.shadow)));
-    painter.add(egui::Shape::closed_line(pts.to_vec(), Stroke::new(1.0, tokens.accent)));
+    painter.add(egui::Shape::closed_line(pts.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent)));
     let mids = [pts[0].lerp(pts[1], 0.5), pts[1].lerp(pts[2], 0.5), pts[2].lerp(pts[3], 0.5), pts[3].lerp(pts[0], 0.5)];
     for p in pts.iter().chain(mids.iter()) {
         let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
-        painter.rect_filled(r, 0.0, tokens.accent_text);
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, tokens.accent), egui::StrokeKind::Inside);
+        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), tokens.accent_text);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent), egui::StrokeKind::Inside);
     }
     let c = xf.to_screen(t.pivot[0] as f32, t.pivot[1] as f32);
-    painter.circle_stroke(c, 4.0, Stroke::new(2.0, tokens.shadow));
-    painter.circle_stroke(c, 4.0, Stroke::new(1.0, tokens.accent_text));
+    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), tokens.shadow));
+    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent_text));
     for axis in [vec2(6.0, 0.0), vec2(0.0, 6.0)] {
-        painter.line_segment([c - axis, c + axis], Stroke::new(1.0, tokens.accent));
+        painter.line_segment([c - axis, c + axis], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent));
     }
 }
 
@@ -442,7 +443,7 @@ pub(crate) fn rotation_cursor(ctx: &egui::Context, p: Pos2) {
         painter.add(egui::Shape::convex_polygon(
             vec![tip + tangent * 3.0, tip - tangent * 3.0 + normal * 3.0, tip - tangent * 3.0 - normal * 3.0],
             tokens.accent_text,
-            Stroke::new(1.0, tokens.shadow),
+            craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
         ));
     }
 }
@@ -471,7 +472,7 @@ pub(crate) fn cursor(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXfor
             // Original arrowhead indicator, above the canvas, without a proprietary cursor asset.
             let tokens = crate::theme::Tokens::get(ctx);
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-skew-cursor")));
-            painter.add(egui::Shape::convex_polygon(vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)], tokens.accent_text, Stroke::new(1.0, tokens.shadow)));
+            painter.add(egui::Shape::convex_polygon(vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)], tokens.accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
             CursorIcon::None
         }
         Some(Hit::Outside) => {

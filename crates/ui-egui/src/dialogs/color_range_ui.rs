@@ -11,6 +11,7 @@
 //! Cancel never touches the document, so the previous selection stays as it was.
 
 use std::hash::{Hash, Hasher};
+use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -428,14 +429,14 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.insert("select".into(), json!(cur));
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.add_enabled_ui(c.sampling, |ui| {
         let mut on = flag(f, "localized");
         if widgets::checkbox(ui, &mut on, tl!("Localized Color Clusters")).changed() {
             f.insert("localized".into(), json!(on));
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.add_enabled_ui(c.fuzziness, |ui| {
         if c.tonal {
             let mut v = num(f, "toneFuzziness", 20.0);
@@ -471,12 +472,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         }
     }
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal_top(|ui| {
         // Preview: the selection as a grayscale mask, or the image to pick colours from.
         let box_size = vec2(PREVIEW as f32, PREVIEW as f32);
         let (frame, resp) = ui.allocate_exact_size(box_size, Sense::click_and_drag());
-        ui.painter().rect_filled(frame, 0.0, t.canvas);
+        ui.painter().rect_filled(frame, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
         let shown = preview(app, ui.ctx(), f);
         if let Some((tex, [w, h], k)) = shown {
             let scale = (box_size.x / w.max(1) as f32).min(box_size.y / h.max(1) as f32);
@@ -499,7 +500,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         }
         // A preview that can't be drawn says why (#145) instead of staying blank.
         if let Some(e) = app.color_range.as_ref().and_then(|p| p.error.clone()) {
-            ui.painter().rect_filled(frame, 0.0, t.canvas);
+            ui.painter().rect_filled(frame, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
             let msg = format!(
                 "Preview unavailable:
 {e}"
@@ -507,13 +508,13 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let g = ui.painter().layout(msg, egui::FontId::proportional(11.0), t.text_faint, frame.width() - 16.0);
             ui.painter().galley(frame.center() - g.size() / 2.0, g, t.text_faint);
         }
-        ui.painter().rect_stroke(frame, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+        ui.painter().rect_stroke(frame, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
         let label = match app.color_range.as_ref().and_then(|p| p.error.as_deref()) {
             Some(e) => format!("Color Range preview unavailable: {e}"),
             None => tl!("Color Range preview").to_string(),
         };
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Image, ui.is_enabled(), &label));
-        ui.add_space(10.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.add_enabled_ui(c.sampling, |ui| {
                 let tool = s(f, "__tool", "sample").to_string();
@@ -542,7 +543,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     f.insert("__order".into(), json!([]));
                 }
             });
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             let mut inv = flag(f, "invert");
             // Selection invert (≠ Image › Adjustments › Invert → Đảo màu).
             if widgets::checkbox(ui, &mut inv, crate::i18n::tr_ctx(crate::i18n::current(), "colorRange", "Invert")).changed() {
@@ -550,18 +551,18 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         });
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let view = s(f, "__view", "selection").to_string();
     ui.horizontal(|ui| {
         if radio(ui, view == "selection", "Selection").clicked() {
             f.insert("__view".into(), json!("selection"));
         }
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         if radio(ui, view == "image", "Image").clicked() {
             f.insert("__view".into(), json!("image"));
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!("Selection Preview:")).color(t.text_dim));
         let mode = s(f, "__selectionPreview", "none").to_string();

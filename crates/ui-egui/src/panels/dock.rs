@@ -1,4 +1,5 @@
 use super::history::history;
+use craft_ui::theme::StrokeExt;
 use super::info::info_panel;
 use super::layers::{channels, layers};
 use super::navigator::navigator;
@@ -42,7 +43,7 @@ fn rail(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
             // The separator is on the canvas side.
             let r = ui.max_rect();
             let x = if crate::direction::is_rtl() { r.right() + 6.0 } else { r.left() - 6.0 };
-            ui.painter().line_segment([pos2(x, r.top() - 8.0), pos2(x, r.bottom() + 8.0)], Stroke::new(1.0, t.separator));
+            ui.painter().line_segment([pos2(x, r.top() - 8.0), pos2(x, r.bottom() + 8.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
             ui.spacing_mut().item_spacing.y = 4.0;
             use crate::dock::Group;
             let entries: [(&str, &str, Group); 6] = [

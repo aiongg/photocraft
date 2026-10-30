@@ -2,6 +2,7 @@
 //! Home button at the start of the options bar.
 
 use egui::{RichText, Sense, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::{Document, LayerContent};
 use serde::{Deserialize, Serialize};
 
@@ -166,7 +167,7 @@ pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.ui.views[i].zoom_anchor = None;
         app.ui.views[i].fit_pending = false;
     }
-    ui.add_space(12.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     ui.label(RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
     let (r, resp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
     if resp.hovered() {
@@ -236,7 +237,7 @@ fn status_message(app: &PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
         return;
     }
     let (r, _) = ui.allocate_exact_size(vec2(17.0, 16.0), Sense::hover());
-    ui.painter().line_segment([r.center_top(), r.center_bottom()], Stroke::new(1.0, t.separator));
+    ui.painter().line_segment([r.center_top(), r.center_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     let is_err = app.ui.status_error || app.ui.status.starts_with("Couldn");
     ui.label(RichText::new(&app.ui.status).color(if is_err { t.warning } else { t.text_faint }));
 }

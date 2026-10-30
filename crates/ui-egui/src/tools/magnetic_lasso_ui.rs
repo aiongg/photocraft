@@ -13,6 +13,7 @@
 //! the outline drawn, in one history step, and an action replays that outline.
 
 use egui::{Color32, Key, Modifiers, Pos2, Rect, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_algo::magnetic::{self, Settings};
 use photocraft_engine::magnetic_cmds::EdgeSource;
 use serde::{Deserialize, Serialize};
@@ -424,8 +425,8 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, hover:
     crate::tool_feedback::draw_solid_path(painter, &pts, false);
     for p in m.anchors.iter().filter_map(|&i| m.path.get(i)).map(screen) {
         let r = Rect::from_center_size(p, vec2(5.0, 5.0));
-        painter.rect_filled(r, 0.0, Color32::WHITE);
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, Color32::BLACK), egui::StrokeKind::Outside);
+        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::BLACK), egui::StrokeKind::Outside);
     }
     if let Some(h) = hover
         && near_start(app, xf.to_doc(h))
@@ -442,8 +443,8 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, hover:
 pub fn cursor(app: &PhotocraftApp, painter: &egui::Painter, p: Pos2, zoom: f32) -> egui::CursorIcon {
     if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise {
         let r = (app.ui.tool_options.magnetic_width.clamp(1.0, 256.0) * zoom).max(2.0);
-        painter.circle_stroke(p, r + 0.5, Stroke::new(1.0, Color32::from_black_alpha(140)));
-        painter.circle_stroke(p, r, Stroke::new(1.0, Color32::from_white_alpha(220)));
+        painter.circle_stroke(p, r + 0.5, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(140)));
+        painter.circle_stroke(p, r, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(220)));
     }
     egui::CursorIcon::Crosshair
 }

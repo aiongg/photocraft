@@ -5,6 +5,7 @@
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
 use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Rect as DRect;
 use serde_json::json;
@@ -1292,7 +1293,7 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview),
     // nor while the Crop tool hides everything outside its box (Show Cropped Area off).
     if border == photocraft_engine::prefs::CanvasBorder::Line && !beyond && !crate::crop_shield::hides_outside(app) {
-        painter.rect_stroke(edge_rect, 0.0, Stroke::new(1.0, Color32::from_gray(20)), egui::StrokeKind::Outside);
+        painter.rect_stroke(edge_rect, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20)), egui::StrokeKind::Outside);
     }
     crate::type_tool::draw_overlay(app, painter, xf);
     crate::transform_tool::draw_overlay(app, painter, xf);
@@ -1484,8 +1485,8 @@ fn draw_default_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &
                             painter.circle_stroke(sq.center(), r + px / 2.0, dark);
                             painter.circle_stroke(sq.center(), (r - px / 2.0).max(0.0), light);
                         } else {
-                            painter.rect_stroke(sq, 0.0, dark, egui::StrokeKind::Outside);
-                            painter.rect_stroke(sq, 0.0, light, egui::StrokeKind::Inside);
+                            painter.rect_stroke(sq, craft_ui::theme::scale::Radius::R0.px(), dark, egui::StrokeKind::Outside);
+                            painter.rect_stroke(sq, craft_ui::theme::scale::Radius::R0.px(), light, egui::StrokeKind::Inside);
                         }
                         // Too small to see where it is: the hotspot as well.
                         if cur.show_crosshair_in_brush_tip || sq.width() < 6.0 {
@@ -1568,8 +1569,8 @@ fn draw_default_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &
             let pupil = app.ui.tool_options.red_eye_pupil_size.clamp(1.0, 100.0);
             let r_doc = photocraft_algo::redeye::search_radius(pupil);
             let r = (r_doc * xf.zoom).max(2.0);
-            painter.circle_stroke(p, r + 0.5, Stroke::new(1.0, Color32::from_black_alpha(140)));
-            painter.circle_stroke(p, r, Stroke::new(1.0, Color32::from_white_alpha(220)));
+            painter.circle_stroke(p, r + 0.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(140)));
+            painter.circle_stroke(p, r, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_white_alpha(220)));
             for (w, c) in [(2.5, Color32::from_black_alpha(140)), (1.0, Color32::from_white_alpha(220))] {
                 painter.line_segment([p - vec2(3.0, 0.0), p + vec2(3.0, 0.0)], Stroke::new(w, c));
                 painter.line_segment([p - vec2(0.0, 3.0), p + vec2(0.0, 3.0)], Stroke::new(w, c));
@@ -1629,7 +1630,7 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
     let camera = input.camera;
     app.tool_override = None;
     if let Some(b) = layer_edges_rect(app, idx) {
-        painter.set(layer_edges, egui::Shape::rect_stroke(xf.doc_rect(b), 0, Stroke::new(1.0, LAYER_EDGES), egui::StrokeKind::Outside));
+        painter.set(layer_edges, egui::Shape::rect_stroke(xf.doc_rect(b), 0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), LAYER_EDGES), egui::StrokeKind::Outside));
     }
     // A tool drag held past the canvas edge scrolls the view toward the pointer (#4183); the
     // drag's next move then extends into what scrolled in.
@@ -1815,7 +1816,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
 
     match crate::prefs_ui::pasteboard_color(app) {
         Some(c) => {
-            ui.painter_at(rect).rect_filled(rect, 0.0, c);
+            ui.painter_at(rect).rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), c);
         }
         None => paint_dots(ui, rect, app.session.prefs().interface.show_canvas_dots),
     }

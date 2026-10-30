@@ -63,7 +63,7 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         app.ui.views[i].fit_pending = true;
                     }
                     if app.session.has_jobs() {
-                        ui.add_space(6.0);
+                        ui.add_space(craft_ui::theme::scale::Space::S6.px());
                         crate::jobs_ui::status_progress(app, ui);
                     }
                     crate::background_redraw::status(app, ui);

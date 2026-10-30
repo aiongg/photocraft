@@ -4,6 +4,8 @@
 //! Drag a point to move it, click empty space to add one, right-click a point to remove it.
 
 use egui::{Pos2, Sense, Stroke, Vec2, pos2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_engine::prefs::PressureCurve;
 use serde_json::{Value, json};
 
@@ -56,7 +58,7 @@ pub(crate) fn editor(ui: &mut egui::Ui, value: &Value) -> Option<Value> {
 /// memory key the editing square's rectangle is stored under, for tests and automation. Returns
 /// whether the points changed; they are rounded to two decimals then.
 pub(crate) fn edit_points(ui: &mut egui::Ui, rect_key: egui::Id, points: &mut Vec<[f32; 2]>) -> bool {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     if points.len() < 2 {
         *points = vec![[0.0, 0.0], [1.0, 1.0]];
     }
@@ -69,15 +71,15 @@ pub(crate) fn edit_points(ui: &mut egui::Ui, rect_key: egui::Id, points: &mut Ve
         let to_screen = |p: [f32; 2]| pos2(rect.left() + p[0] * rect.width(), rect.bottom() - p[1] * rect.height());
         let to_curve = |s: Pos2| [((s.x - rect.left()) / rect.width()).clamp(0.0, 1.0), ((rect.bottom() - s.y) / rect.height()).clamp(0.0, 1.0)];
         let painter = ui.painter_at(rect.expand(4.0));
-        painter.rect_filled(rect, 2.0, t.field);
+        painter.rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), t.color.surface.sunken.to_egui());
         for i in 1..4 {
             let f = i as f32 / 4.0;
-            let grid = Stroke::new(1.0, t.field_border);
+            let grid = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui());
             painter.line_segment([pos2(rect.left() + f * rect.width(), rect.top()), pos2(rect.left() + f * rect.width(), rect.bottom())], grid);
             painter.line_segment([pos2(rect.left(), rect.top() + f * rect.height()), pos2(rect.right(), rect.top() + f * rect.height())], grid);
         }
-        painter.rect_stroke(rect, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
-        painter.line_segment([rect.left_bottom(), rect.right_top()], Stroke::new(1.0, t.text_dim.gamma_multiply(0.35)));
+        painter.rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
+        painter.line_segment([rect.left_bottom(), rect.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui().gamma_multiply(0.35)));
 
         // The point under a press is dragged until release (kept in the egui memory).
         let drag_id = resp.id.with("dragging");
@@ -121,10 +123,10 @@ pub(crate) fn edit_points(ui: &mut egui::Ui, rect_key: egui::Id, points: &mut Ve
 
         let curve = PressureCurve::new(points);
         let line: Vec<Pos2> = (0..=64).map(|i| i as f32 / 64.0).map(|x| to_screen([x, curve.eval(x)])).collect();
-        painter.add(egui::Shape::line(line, Stroke::new(2.0, t.accent)));
+        painter.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.color.accent.solid.to_egui())));
         for (i, p) in points.iter().enumerate() {
             let active = dragging == Some(i);
-            painter.circle(to_screen(*p), if active { 5.0 } else { 4.0 }, if active { t.accent } else { t.field }, Stroke::new(1.5, t.accent));
+            painter.circle(to_screen(*p), if active { 5.0 } else { 4.0 }, if active { t.color.accent.solid.to_egui() } else { t.color.surface.sunken.to_egui() }, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
         }
         resp.on_hover_text(tl!("Click to add a point, right-click to remove"));
 

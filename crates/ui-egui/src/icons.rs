@@ -5,6 +5,7 @@
 //! bundled fonts lacked them. Vector icons fix that for good.)
 
 use std::sync::OnceLock;
+use craft_ui::theme::StrokeExt;
 
 use craft_ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
 use craft_ui::icons::{SvgIconSet, SvgStyle};
@@ -158,7 +159,7 @@ pub fn button_chrome(ui: &egui::Ui, rect: Rect, selected: bool, hovered: bool) -
     let t = Tokens::get(ui.ctx());
     if selected {
         ui.painter().rect_filled(rect, t.radius_sm, t.accent_soft);
-        ui.painter().rect_stroke(rect, t.radius_sm, egui::Stroke::new(1.0, t.accent_border), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), egui::StrokeKind::Inside);
     } else if hovered {
         ui.painter().rect_filled(rect, t.radius_sm, t.hover);
     }
@@ -189,9 +190,9 @@ pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, i
         normal: ButtonVisuals { fill: Color32::TRANSPARENT, stroke: egui::Stroke::NONE, icon: t.icon },
         hovered: ButtonVisuals { fill: t.hover, stroke: egui::Stroke::NONE, icon: t.text },
         pressed: None,
-        selected: ButtonVisuals { fill: t.accent_soft, stroke: egui::Stroke::new(1.0, t.accent_border), icon: t.accent_text },
+        selected: ButtonVisuals { fill: t.accent_soft, stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), icon: t.accent_text },
         corner_radius: t.radius_sm.into(),
-        focus_stroke: egui::Stroke::new(1.0, t.accent),
+        focus_stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
     };
     let label = if tooltip.is_empty() { name } else { tl!(tooltip) };
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |ui, rect, tint| {
@@ -206,7 +207,7 @@ pub fn rail_button(ui: &mut egui::Ui, name: &str, box_size: f32, on: bool, toolt
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(box_size), Sense::click());
     if on {
         ui.painter().rect_filled(rect, t.radius_sm, t.card);
-        ui.painter().rect_stroke(rect, t.radius_sm, egui::Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside);
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.hover);
     }

@@ -1,4 +1,5 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Tokens, Value, b, check, dropdown_str, json, n, number, params, s};
+use craft_ui::theme::StrokeExt;
 
 /// Print's Printer menu: the default printer (value ""), then every printer `file.printers`
 /// listed. A saved name the spooler no longer lists stays selectable rather than vanishing.
@@ -335,14 +336,14 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
         // Page preview.
         ui.vertical(|ui| {
             let (area, _) = ui.allocate_exact_size(egui::vec2(330.0, 400.0), egui::Sense::hover());
-            ui.painter().rect_filled(area, 0.0, t.canvas);
+            ui.painter().rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
             match photocraft_engine::print_cmds::layout(&doc, &p, "file.print") {
                 Ok(mut l) => {
                     let (pw, ph) = l.paper;
                     let k = ((area.width() - 20.0) / pw as f32).min((area.height() - 20.0) / ph as f32);
                     let page = egui::Rect::from_center_size(area.center(), egui::vec2(pw as f32 * k, ph as f32 * k));
-                    ui.painter().rect_filled(page, 0.0, egui::Color32::WHITE);
-                    ui.painter().rect_stroke(page, 0.0, egui::Stroke::new(1.0, t.separator), egui::StrokeKind::Outside);
+                    ui.painter().rect_filled(page, craft_ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
+                    ui.painter().rect_stroke(page, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
                     let mut img = print_preview_image(l, page, k);
                     let drag_id = ui.scope_id().with(("print-position", id));
                     let visible = img.intersect(page).intersect(ui.clip_rect());
@@ -386,7 +387,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                         egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0))
                     };
                     clip.image(tex.id(), img, uv, egui::Color32::WHITE);
-                    let mark = egui::Stroke::new(1.0, egui::Color32::BLACK);
+                    let mark = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), egui::Color32::BLACK);
                     if l.marks.corner_crop {
                         // Bleed puts the marks on the trim line, inside the image edge.
                         let b = l.marks.bleed as f32 * k;
@@ -420,11 +421,11 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 }
             }
         });
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.set_width(340.0);
             let head = |ui: &mut egui::Ui, s: &str| {
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 ui.label(egui::RichText::new(s).font(crate::theme::semibold(12.0)).color(t.text));
             };
             head(ui, tl!("Printer Setup"));

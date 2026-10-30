@@ -4,6 +4,7 @@
 //! options as one history step; explicit params from Actions, CLI and MCP run the engine directly.
 
 use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_color::BlendMode;
 use photocraft_doc::LabelColor;
 use serde_json::{Map, Value, json};
@@ -70,7 +71,7 @@ fn swatch(ui: &mut egui::Ui, color: LabelColor) {
     if let Some((fill, _)) = t.layer_label_colors(color) {
         p.rect_filled(r, t.radius_sm, fill);
     } else {
-        let stroke = egui::Stroke::new(1.0, t.text_dim);
+        let stroke = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
         p.rect_stroke(r, t.radius_sm, stroke, egui::StrokeKind::Inside);
         let x = r.shrink(4.0);
         p.line_segment([x.left_top(), x.right_bottom()], stroke);
@@ -113,7 +114,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if crate::widgets::dropdown(ui, "new-group-mode", tl!("Mode"), &mut mode, &options, 130.0) {
             f.insert("mode".into(), json!(crate::dialog_blend_ui::mode_key(mode)));
         }
-        ui.add_space(6.0);
+        ui.add_space(craft_ui::theme::scale::Space::S6.px());
         ui.label(egui::RichText::new(tl!("Opacity:")).size(12.0).color(Tokens::get(ui.ctx()).text_dim));
         let mut opacity = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
         if crate::widgets::value_field(ui, &mut opacity, 0.0..=100.0, "%", 64.0).changed() {

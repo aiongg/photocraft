@@ -1,5 +1,7 @@
 //! Save for Web navigation and indexed palette UI. Draft state is serialized in dialog fields.
 use super::{Arc, Map, Optimized, PhotocraftApp, Tokens, Value, WebSettings, json, n, params, s, web_cmds};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 /// Export dimensions, using the same percent/width/height precedence as web_document.
 pub fn dimensions(doc: &photocraft_doc::Document, p: &Value) -> Result<(f64, f64), String> {
@@ -83,7 +85,7 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let p = params(f);
     let Ok(settings) = WebSettings::from_params(&p, "preview") else { return };
     let Some(table) = settings.color_table else { return };
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     ui.label(egui::RichText::new(tl!("Color Table…").trim_end_matches('…')).font(crate::theme::semibold(12.0)));
     ui.scope(|ui| {
         ui.spacing_mut().interact_size = egui::vec2(14.0, 14.0);
@@ -97,8 +99,8 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                     f.insert("__selectedColor".into(), json!(i));
                 }
                 if f.get("__selectedColor").and_then(Value::as_u64) == Some(i as u64) {
-                    let t = Tokens::get(ui.ctx());
-                    ui.painter().rect_stroke(response.rect, t.radius_sm, egui::Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+                    let t = craft_ui::theme::current(ui.ctx());
+                    ui.painter().rect_stroke(response.rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()), egui::StrokeKind::Inside);
                 }
                 if response.changed() {
                     let edits = f.entry("colorTableEdits").or_insert_with(|| json!({}));

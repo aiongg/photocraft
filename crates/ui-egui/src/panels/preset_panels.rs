@@ -9,6 +9,7 @@
 //! `shape.presets.*`, `tool.presets.*`, `cloneSource.*`); this module only draws and dispatches.
 
 use std::collections::{BTreeMap, BTreeSet};
+use craft_ui::theme::StrokeExt;
 
 use egui::{Align2, Color32, ColorImage, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
 use serde::{Deserialize, Serialize};
@@ -264,7 +265,7 @@ pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &
     if let Some(p) = current {
         ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
     }
-    ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Outside);
     let name = current.map_or(String::new(), |p| p.display_name().to_string());
     let resp = resp.on_hover_text(&name);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Patterns")));
@@ -290,7 +291,7 @@ pub(crate) fn pattern_grid(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &st
             let (r, cell) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
             ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
             let (w, c) = if p.id == selected { (2.0, t.accent) } else { (1.0, t.field_border) };
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(w, c), egui::StrokeKind::Outside);
+            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(w, c), egui::StrokeKind::Outside);
             let cell = cell.on_hover_text(p.display_name());
             cell.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), p.display_name()));
             if cell.clicked() {
@@ -381,7 +382,7 @@ fn draw_group_header(ui: &mut egui::Ui, group: &GroupView, context: GroupHeaderC
     let GroupHeaderContext { panel, open, state, tokens, events } = context;
     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::click_and_drag());
     if response.hovered() || response.dragged() {
-        ui.painter().rect_filled(rect, 2.0, tokens.hover.gamma_multiply(0.5));
+        ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), tokens.hover.gamma_multiply(0.5));
     }
     let triangle = Rect::from_center_size(pos2(rect.left() + 9.0, rect.center().y), vec2(12.0, 12.0));
     crate::icons::paint(ui, triangle, if open { "chevron-down" } else { "chevron-right" }, 10.0, tokens.text_dim);
@@ -500,9 +501,9 @@ pub(crate) fn browser(
                     let is_sel = selected.as_deref() == Some(&it.key);
                     if list {
                         if is_sel {
-                            ui.painter().rect_filled(r, 0.0, t.row_selected);
+                            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
                         } else if resp.hovered() {
-                            ui.painter().rect_filled(r, 0.0, t.hover.gamma_multiply(0.5));
+                            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
                         }
                         let tr = Rect::from_min_size(r.min + vec2(24.0, 2.0), vec2(20.0, 20.0));
                         thumb(ui, tr, gi, ii);
@@ -512,13 +513,13 @@ pub(crate) fn browser(
                         // Touching cells draw no border of their own: only the selected and the
                         // hovered one are outlined, over their neighbours, as in Photoshop.
                         let stroke = if is_sel {
-                            Some((Stroke::new(2.0, t.accent), egui::StrokeKind::Outside))
+                            Some((craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside))
                         } else if resp.hovered() {
-                            Some((Stroke::new(1.0, t.text_dim), egui::StrokeKind::Outside))
+                            Some((craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), egui::StrokeKind::Outside))
                         } else if flush {
                             None
                         } else {
-                            Some((Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside))
+                            Some((craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside))
                         };
                         if let Some((stroke, kind)) = stroke {
                             ui.painter().rect_stroke(r, CornerRadius::same(if flush { 0 } else { 2 }), stroke, kind);
@@ -536,8 +537,8 @@ pub(crate) fn browser(
                         // A ghost of the swatch follows the pointer.
                         let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("preset-drag")));
                         let gr = Rect::from_center_size(pp, vec2(28.0, 28.0));
-                        lp.rect_filled(gr, 3.0, t.card.gamma_multiply(0.8));
-                        lp.rect_stroke(gr, 3.0, Stroke::new(1.0, t.accent), egui::StrokeKind::Outside);
+                        lp.rect_filled(gr, craft_ui::theme::scale::Radius::R3.px(), t.card.gamma_multiply(0.8));
+                        lp.rect_stroke(gr, craft_ui::theme::scale::Radius::R3.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside);
                         lp.text(gr.center(), Align2::CENTER_CENTER, "+", FontId::proportional(16.0), t.accent);
                     }
                     if resp.drag_stopped()
@@ -575,7 +576,7 @@ pub(crate) fn browser(
                 };
                 if let Some(r) = anchor {
                     let y = if before.is_some() { r.top() - 1.0 } else { r.bottom() + 1.0 };
-                    ui.painter().line_segment([pos2(r.left(), y), pos2(r.right(), y)], Stroke::new(2.0, t.accent));
+                    ui.painter().line_segment([pos2(r.left(), y), pos2(r.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
                 }
             }
         },
@@ -600,7 +601,7 @@ pub(crate) fn browser(
     }
     // Footer: thumbnail size | New Group, New, Delete.
     let footer_top = ui.min_rect().bottom();
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         let mut s = size;

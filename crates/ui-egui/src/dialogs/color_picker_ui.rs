@@ -6,6 +6,7 @@
 //! canvas is a pipette, and a click or drag there samples into the new colour ([`sample_at`]).
 
 use egui::{Color32, Mesh, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
@@ -429,7 +430,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 color_field(ui, f);
             });
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             let mut web = f.get("__webOnly").and_then(Value::as_bool).unwrap_or(false);
             if widgets::checkbox(ui, &mut web, tl!("Only Web Colors")).changed() {
                 f.insert("__webOnly".into(), json!(web));
@@ -437,7 +438,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
             }
             // Under the colour field, not in the action column: the dialog must still fit a
             // 760 x 480 window.
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             if let Some(rgb) = crate::screen_picker::button(ui, ui.scope_id().with("screen-color")) {
                 set_rgb(f, rgb, Keep::Nothing);
             }
@@ -451,18 +452,18 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
                     if widgets::primary_button(ui, tl!("OK"), button_width).clicked() {
                         outcome = Some(true);
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     if widgets::secondary_button(ui, tl!("Cancel"), button_width).clicked() {
                         outcome = Some(false);
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     // Handled by the dialog host, which has the app (`take_add_swatch`).
                     if widgets::secondary_button(ui, tl!("Add to Swatches"), button_width).clicked() {
                         f.insert("__addSwatch".into(), json!(true));
                     }
                 });
             });
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             let mode = f.get("__mode").and_then(Value::as_str).unwrap_or("h").to_string();
             fields(ui, f, &mode, &current(f));
         });
@@ -485,9 +486,9 @@ fn color_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if web_only { flat_grid_mesh(rect, WEB_CELLS, |x, y| web_safe(color(x, y))) } else { grid_mesh(rect, 32, color) }
     };
     ui.painter().add(mesh(field, &|x, y| field_color(&mode, fz, x, y)));
-    ui.painter().rect_stroke(field, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(field, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     let marker = pos2(field.left() + fx * field.width(), field.top() + fy * field.height());
-    ui.painter().circle_stroke(marker, 5.0, Stroke::new(1.5, if hsv[2] > 0.6 && hsv[1] < 0.4 { Color32::BLACK } else { Color32::WHITE }));
+    ui.painter().circle_stroke(marker, 5.0, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if hsv[2] > 0.6 && hsv[1] < 0.4 { Color32::BLACK } else { Color32::WHITE }));
     // Photoshop updates the colour on the press itself, not only when the button is released
     // (#6937): `is_pointer_button_down_on` is true from the press frame onwards (it covers
     // dragging too), while `clicked` fires on release and `dragged` only after a move.
@@ -539,10 +540,10 @@ fn swatches(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     };
     label(tl!("new"), pos2(sw.center().x, sw.top() - 3.0), egui::Align2::CENTER_BOTTOM);
     label(tl!("current"), pos2(sw.center().x, sw.bottom() + 3.0), egui::Align2::CENTER_TOP);
-    p.rect_filled(Rect::from_min_size(sw.min, vec2(56.0, 32.0)), 0.0, c32(rgb));
+    p.rect_filled(Rect::from_min_size(sw.min, vec2(56.0, 32.0)), craft_ui::theme::scale::Radius::R0.px(), c32(rgb));
     let cur = Rect::from_min_size(sw.min + vec2(0.0, 32.0), vec2(56.0, 32.0));
-    p.rect_filled(cur, 0.0, c32(orig));
-    p.rect_stroke(sw, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    p.rect_filled(cur, craft_ui::theme::scale::Radius::R0.px(), c32(orig));
+    p.rect_stroke(sw, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     let click_cur = ui.interact(cur, ui.scope_id().with("cp-current"), Sense::click());
     click_cur.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Click to restore the current colour")));
     if click_cur.on_hover_text(tl!("Click to restore the current colour")).clicked() {
@@ -563,8 +564,8 @@ fn swatches(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         } else {
             web_cube(p, icon, t.text);
         }
-        p.rect_filled(chip, 0.0, c32(near));
-        p.rect_stroke(chip, 0.0, Stroke::new(1.0, t.text_dim), StrokeKind::Outside);
+        p.rect_filled(chip, craft_ui::theme::scale::Radius::R0.px(), c32(near));
+        p.rect_stroke(chip, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Outside);
         let resp = ui.interact(icon.union(chip), ui.scope_id().with(("cp-warning", slot as i32)), Sense::click());
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tip));
         if resp.on_hover_text(tip).clicked() {

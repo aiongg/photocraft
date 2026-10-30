@@ -48,14 +48,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let modal = egui::Modal::new(egui::Id::unique("tiff-options")).show(ctx, |ui| {
         ui.set_max_width(420.0);
         ui.label(egui::RichText::new(tl!("TIFF Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::hairline(ui);
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         ui.label(tl!("Including layers will increase file size."));
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         crate::widgets::checkbox(ui, &mut discard, tl!("Discard Layers and Save a Copy"));
         crate::widgets::checkbox(ui, &mut dont_ask, tl!("Don't show again"));
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 10.0;
             ok = crate::widgets::primary_button(ui, tl!("OK"), 84.0).clicked();

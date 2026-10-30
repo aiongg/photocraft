@@ -13,6 +13,7 @@
 //! Everything here is a few rectangles per frame: no allocation and no per-pixel work.
 
 use egui::{Color32, CornerRadius, Id, Pos2, Rect, Sense, Ui, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 use crate::state::View;
 
@@ -173,7 +174,7 @@ pub fn show(ui: &Ui, rect: Rect, view: &mut View, flip: bool, aspect: f32, overs
     let mut over = false;
     if let (Some(r), Some(_)) = (hr, vr) {
         // The corner square where the bars meet.
-        painter.rect_filled(Rect::from_min_max(pos2(r.right(), r.top()), rect.max), 0.0, t.chrome);
+        painter.rect_filled(Rect::from_min_max(pos2(r.right(), r.top()), rect.max), craft_ui::theme::scale::Radius::R0.px(), t.chrome);
     }
     for (axis, bar, span) in [(0usize, hr, ex), (1usize, vr, ey)] {
         let (Some(bar), Some((s, e))) = (bar, span) else { continue };
@@ -230,9 +231,9 @@ pub fn show(ui: &Ui, rect: Rect, view: &mut View, flip: bool, aspect: f32, overs
             set(view, c);
         }
         // Track and thumb.
-        painter.rect_filled(bar, 0.0, t.chrome);
+        painter.rect_filled(bar, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
         let edge = if axis == 0 { [bar.left_top(), bar.right_top()] } else { [bar.left_top(), bar.left_bottom()] };
-        painter.line_segment(edge, egui::Stroke::new(1.0, t.separator));
+        painter.line_segment(edge, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let thumb = if axis == 0 {
             Rect::from_min_size(pos2(bar.left() + t0, bar.top()), vec2(tl, bar.height()))
         } else {

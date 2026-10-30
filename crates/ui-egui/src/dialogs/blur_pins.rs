@@ -23,6 +23,7 @@
 //! there is one, else the canvas.
 
 use egui::{Color32, Pos2, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -415,7 +416,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             ui.label(egui::RichText::new(tl!("No pin selected")).color(t.text_dim));
         }
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let hint = |ui: &mut egui::Ui, text: &str| ui.add(egui::Label::new(egui::RichText::new(text).color(t.text_dim).size(11.5)).wrap());
     if k == Kind::Tilt {
         hint(
@@ -443,7 +444,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         ui.ctx().request_repaint();
     }
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
         f.insert("__preview".into(), json!(preview));
     }
@@ -673,7 +674,7 @@ pub fn canvas(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, over
 
 /// Draw a dark-edged white line from `a` to `b`, dashed when `dash` is set.
 fn draw_line(painter: &egui::Painter, a: Pos2, b: Pos2, dash: bool) {
-    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), Stroke::new(1.5, Color32::from_white_alpha(235)));
+    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
     if dash {
         painter.extend(egui::Shape::dashed_line(&[a, b], dark, 6.0, 5.0));
         painter.extend(egui::Shape::dashed_line(&[a, b], light, 6.0, 5.0));
@@ -691,9 +692,9 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(b) = bounds(&d.fields) else { return };
     let Some(k) = kind(&d.fields) else { return };
     let sel = selected(&d.fields);
-    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), Stroke::new(1.5, Color32::from_white_alpha(235)));
+    let (dark, light) = (Stroke::new(3.0, Color32::from_black_alpha(150)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::from_white_alpha(235)));
     let screen = |p: [f64; 2]| xf.to_screen(p[0] as f32, p[1] as f32);
-    let handle_stroke = Stroke::new(1.0, Color32::from_black_alpha(180));
+    let handle_stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(180));
     for (i, p) in pins(&d.fields).into_iter().enumerate() {
         let c = screen(to_doc(b, p));
         if sel != Some(i) {
@@ -742,7 +743,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
             }
         }
         painter.circle_stroke(c, RING, dark);
-        painter.circle_stroke(c, RING, Stroke::new(1.0, Color32::from_white_alpha(140)));
+        painter.circle_stroke(c, RING, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(140)));
         let frac = (p.blur / k.max()) as f32;
         let steps = (frac * 64.0).ceil().max(1.0) as usize;
         let arc: Vec<Pos2> = (0..=steps)

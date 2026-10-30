@@ -230,7 +230,7 @@ pub fn show_offer(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.label(line);
             ui.label(tl!("Edit › Keyboard Shortcuts › Reset All to Defaults undoes an import."));
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             ui.horizontal(|ui| {
                 use crate::widgets::{ButtonRole, DialogButton};
                 let buttons =

@@ -16,6 +16,7 @@
 //!   resolution; Clear empties them; ⇄ and X swap W and H.
 
 use egui::{Modifiers, Stroke, StrokeKind, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};
 
@@ -291,7 +292,7 @@ fn text_field(ui: &mut egui::Ui, id: &str, value: &mut String, hint: &str, width
     let (rect, _) = ui.allocate_exact_size(vec2(width, 24.0), egui::Sense::hover());
     crate::widgets::surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     let inner = rect.shrink2(vec2(4.0, 2.0));
     let r = ui.put(

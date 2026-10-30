@@ -6,6 +6,8 @@
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
 use egui::{Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_compose::gradient_fill as gf;
 use photocraft_doc::{Fill, GradientStyle};
 use photocraft_engine::gradient_fill_cmds::apply_stop;
@@ -79,12 +81,12 @@ fn take_stops(fill: &mut Fill, from: &Fill) {
 /// The Gradient tab of the swatch `id`. Returns the edited gradient.
 pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientChoices, id: egui::Id) -> Option<Fill> {
     let Fill::Gradient { angle, scale, style, reverse, align, .. } = fill else { return None };
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut out: Option<Fill> = None;
     let mut picked = false;
     egui::ScrollArea::vertical().id_salt(id.with("gradient-presets")).max_height(120.0).show(ui, |ui| {
         ui.set_width(WIDTH);
-        let group_label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.text_dim).size(11.0));
+        let group_label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(11.0));
         if !choices.recent.is_empty() {
             group_label(ui, tl!("Recent"));
             ui.horizontal_wrapped(|ui| {
@@ -109,8 +111,8 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
                 for preset in &group.items {
                     let (r, resp) = ui.allocate_exact_size(vec2(32.0, 18.0), Sense::click());
                     crate::preset_panels::paint_gradient(ui, r, &preset.resolve(choices.fg, choices.bg));
-                    let border = if resp.hovered() { t.text_dim } else { t.field_border };
-                    ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, border), StrokeKind::Outside);
+                    let border = if resp.hovered() { t.color.text.muted.to_egui() } else { t.color.line.control_edge.to_egui() };
+                    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
                     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &preset.name));
                     if resp.on_hover_text(&preset.name).clicked() {
                         take_preset(edited(&mut out, fill), preset, choices.fg, choices.bg);
@@ -124,14 +126,14 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
         // New stops: start from the first colour stop, its colour row showing.
         ui.data_mut(|d| d.insert_temp(selection_key(id), Marker::Color(0)));
     }
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if let Some(f) = stops_strip(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
         out = Some(f);
     }
     if let Some(f) = stop_fields(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
         out = Some(f);
     }
-    ui.add_space(4.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         for (s, icon, tip) in [
@@ -149,7 +151,7 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
             }
         }
     });
-    let label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.text_dim).size(12.0));
+    let label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
     ui.horizontal(|ui| {
         label(ui, tl!("Angle"));
         let mut a = *angle;
@@ -190,12 +192,12 @@ fn edited<'a>(out: &'a mut Option<Fill>, fill: &Fill) -> &'a mut Fill {
 
 /// A gradient's ramp in `r` (un-reversed, as the stops strip shows it), outlined.
 fn paint_fill_ramp(ui: &egui::Ui, r: Rect, fill: &Fill, hovered: bool) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     if let Some(ramp) = gf::Ramp::new(&unreversed(fill)) {
         crate::gradient_ui::paint_ramp(ui.painter(), r, |u| ramp.sample(u));
     }
-    let border = if hovered { t.text_dim } else { t.field_border };
-    ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, border), StrokeKind::Outside);
+    let border = if hovered { t.color.text.muted.to_egui() } else { t.color.line.control_edge.to_egui() };
+    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
 }
 
 fn unreversed(fill: &Fill) -> Fill {
@@ -271,7 +273,7 @@ fn selection(ui: &egui::Ui, id: egui::Id, fill: &Fill) -> Marker {
 
 /// The stops strip: the ramp with opacity stops above and colour stops below (Photoshop's).
 fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (outer, resp) = ui.allocate_exact_size(vec2(WIDTH, 58.0), Sense::click_and_drag());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Gradient stops")));
     let top = outer.top() + 16.0;
@@ -281,21 +283,21 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
     if let Some(ramp) = gf::Ramp::new(&unreversed(fill)) {
         crate::gradient_ui::paint_ramp(ui.painter(), bar, |u| ramp.sample(u));
     }
-    ui.painter().rect_stroke(bar, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), StrokeKind::Outside);
     let (cs, os, mids) = sorted_stops(fill);
     let (drag_key, selection_key) = (id.with("stops-drag"), selection_key(id));
     let drag: Option<Drag> = ui.data(|d| d.get_temp(drag_key));
     let selected: Option<Marker> = Some(drag.as_ref().map_or_else(|| selection(ui, id, fill), |d| d.marker));
     let p = ui.painter();
-    let outline = |sel: bool| if sel { t.accent } else { t.text_dim };
+    let outline = |sel: bool| if sel { t.color.accent.solid.to_egui() } else { t.color.text.muted.to_egui() };
     for (i, (loc, c)) in cs.iter().enumerate() {
         let x = x_of(*loc);
         let sel = selected == Some(Marker::Color(i));
         let body = Rect::from_center_size(pos2(x, bar.bottom() + 10.0), vec2(10.0, 10.0));
         p.add(egui::Shape::convex_polygon(vec![pos2(x, bar.bottom() + 1.0), pos2(x + 5.0, body.top()), pos2(x - 5.0, body.top())], outline(sel), Stroke::NONE));
         let [r, g, b, _] = rgba_of(c);
-        p.rect_filled(body, 1.0, rgba32([r, g, b, 1.0]));
-        p.rect_stroke(body, 1.0, Stroke::new(1.0, outline(sel)), StrokeKind::Outside);
+        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), rgba32([r, g, b, 1.0]));
+        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline(sel)), StrokeKind::Outside);
     }
     let mid_x = |i: usize| -> Option<f32> {
         let (a, b) = (cs.get(i)?.0, cs.get(i + 1)?.0);
@@ -304,7 +306,7 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
     for i in 0..cs.len().saturating_sub(1) {
         if let Some(x) = mid_x(i) {
             let sel = selected == Some(Marker::Mid(i));
-            crate::gradient_ui::diamond(p, pos2(x, bar.bottom() + 6.0), 3.0, if sel { t.accent } else { t.text_faint }, t.text_faint);
+            crate::gradient_ui::diamond(p, pos2(x, bar.bottom() + 6.0), 3.0, if sel { t.color.accent.solid.to_egui() } else { t.color.text.faint.to_egui() }, t.color.text.faint.to_egui());
         }
     }
     for (i, (loc, a)) in os.iter().enumerate() {
@@ -316,8 +318,8 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
             outline(sel),
             Stroke::NONE,
         ));
-        p.rect_filled(body, 1.0, egui::Color32::from_gray((a.clamp(0.0, 1.0) * 255.0) as u8));
-        p.rect_stroke(body, 1.0, Stroke::new(1.0, outline(sel)), StrokeKind::Outside);
+        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), egui::Color32::from_gray((a.clamp(0.0, 1.0) * 255.0) as u8));
+        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline(sel)), StrokeKind::Outside);
     }
     let hit = |pos: Pos2| -> Option<Marker> {
         if pos.y > bar.bottom() {
@@ -423,11 +425,11 @@ fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
 /// The selected stop's fields under the strip: a colour stop's colour (an inline picker opened
 /// from its swatch), an opacity stop's opacity, a midpoint's position; Location and Delete.
 fn stop_fields(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let selection_key = selection_key(id);
     let selected = selection(ui, id, fill);
     let (cs, os, mids) = sorted_stops(fill);
-    let label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.text_dim).size(12.0));
+    let label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
     let mut edit: Option<Value> = None;
     let mut reselect: Option<Marker> = None;
     let (locations, index): (Vec<f32>, usize) = match selected {
@@ -443,8 +445,8 @@ fn stop_fields(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
             label(ui, tl!("Color"));
             let (r, resp) = ui.allocate_exact_size(vec2(40.0, 20.0), Sense::click());
             let [cr, cg, cb, _] = rgba_of(c);
-            ui.painter().rect_filled(r.shrink(1.0), t.radius_sm, rgba32([cr, cg, cb, 1.0]));
-            ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, if picker_open { t.accent } else { t.field_border }), StrokeKind::Inside);
+            ui.painter().rect_filled(r.shrink(1.0), t.shape.radius.control, rgba32([cr, cg, cb, 1.0]));
+            ui.painter().rect_stroke(r, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if picker_open { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }), StrokeKind::Inside);
             resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, true, tl!("Color")));
             if resp.on_hover_text(tl!("Color")).clicked() {
                 picker_open = !picker_open;

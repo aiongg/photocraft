@@ -1,4 +1,6 @@
 use super::basic::{sliders, track_stops};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use super::curves::gradient_bar;
 use super::levels::nearest;
 use super::{
@@ -63,7 +65,7 @@ pub(super) fn spectrum_bar(p: &egui::Painter, r: Rect, colors: &[Color32]) {
 }
 
 pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let range_id = cx.mem.with("hs-range");
     let mut range: usize = ui.data(|d| d.get_temp(range_id)).unwrap_or(0);
     let colorize = flag(v, "colorize", false);
@@ -141,7 +143,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         e.add(Edit::discrete(true));
     }
     // Spectrum bars: input hues above, adjusted below; the selected range's sliders between.
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     // As wide as the sliders above, whatever the panel's width (#9242).
     let w = ui.available_width();
     let (bars, bresp) = ui.allocate_exact_size(vec2(w, 40.0), Sense::click_and_drag());
@@ -163,19 +165,19 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         let band = |a: f32, z: f32, color: Color32| {
             let (xa, xz) = (xof(a), xof(z));
             if xa <= xz {
-                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(xz, mid + 3.0)), 0.0, color);
+                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(xz, mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
             } else {
-                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(bars.right(), mid + 3.0)), 0.0, color);
-                p.rect_filled(Rect::from_min_max(pos2(bars.left(), mid - 3.0), pos2(xz, mid + 3.0)), 0.0, color);
+                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(bars.right(), mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(Rect::from_min_max(pos2(bars.left(), mid - 3.0), pos2(xz, mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
             }
         };
-        band(b[0], b[3], t.text_faint);
-        band(b[1], b[2], t.text_dim);
+        band(b[0], b[3], t.color.text.faint.to_egui());
+        band(b[1], b[2], t.color.text.muted.to_egui());
         for (k, d) in b.iter().enumerate() {
             let x = xof(*d);
-            let fill = if k == 1 || k == 2 { t.text } else { t.field };
-            p.rect_filled(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), 1.0, fill);
-            p.rect_stroke(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), 1.0, Stroke::new(1.0, t.text_dim), StrokeKind::Inside);
+            let fill = if k == 1 || k == 2 { t.color.text.normal.to_egui() } else { t.color.surface.sunken.to_egui() };
+            p.rect_filled(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), craft_ui::theme::scale::Radius::R2.px(), fill);
+            p.rect_stroke(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()), StrokeKind::Inside);
         }
         let drag_id = cx.mem.with("hs-range-drag");
         let mut which: Option<u8> = ui.data(|d| d.get_temp(drag_id)).flatten();
@@ -204,7 +206,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         ui.data_mut(|d| d.insert_temp(drag_id, which));
         let lab =
             format!("{:.0}° / {:.0}°  ·  {:.0}° \\ {:.0}°", b[0].rem_euclid(360.0), b[1].rem_euclid(360.0), b[2].rem_euclid(360.0), b[3].rem_euclid(360.0));
-        ui.label(RichText::new(lab).font(crate::theme::mono(11.0)).color(t.text_faint));
+        ui.label(RichText::new(lab).font(crate::theme::mono(11.0)).color(t.color.text.faint.to_egui()));
     }
     e
 }

@@ -8,6 +8,7 @@
 //! shows the last one with the cached-data warning until the new one lands.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
 
 use egui::{Color32, Rect, Sense, pos2, vec2};
 use photocraft_color::ColorMode;
@@ -638,14 +639,14 @@ fn graph(app: &mut PhotocraftApp, ui: &mut egui::Ui, s: &Shown, channel: HistCha
     let w = ui.available_width();
     let (r, resp) = ui.allocate_exact_size(vec2(w, height), Sense::click_and_drag());
     let p = ui.painter_at(r);
-    p.rect_filled(r, 0.0, t.field);
+    p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
     let level_at = |x: f32| (((x - r.left()) / r.width().max(1.0)) * 256.0).floor().clamp(0.0, 255.0) as u8;
     let x_of = |l: u8| r.left() + (f32::from(l) + 0.5) / 256.0 * r.width();
     // The selected range behind the bars.
     if let Some([a, b]) = app.ui.histogram_range {
         let (lo, hi) = (a.min(b), a.max(b));
         let band = Rect::from_x_y_ranges(r.left() + f32::from(lo) / 256.0 * r.width()..=r.left() + (f32::from(hi) + 1.0) / 256.0 * r.width(), r.y_range());
-        p.rect_filled(band, 0.0, t.accent.gamma_multiply(0.35));
+        p.rect_filled(band, craft_ui::theme::scale::Radius::R0.px(), t.accent.gamma_multiply(0.35));
     }
     draw_channel(&p, r, &s.hist, s.mode, channel, colored, &t);
     // The original histogram outlined over the adjusted one while an adjustment previews.
@@ -658,7 +659,7 @@ fn graph(app: &mut PhotocraftApp, ui: &mut egui::Ui, s: &Shown, channel: HistCha
         let rgb = v["rgb"].as_array().map(|a| a.iter().filter_map(Value::as_f64).map(|c| (c / 255.0) as f32).collect::<Vec<_>>()).unwrap_or_default();
         let (Some(&red), Some(&green), Some(&blue)) = (rgb.first(), rgb.get(1), rgb.get(2)) else { continue };
         let x = x_of(channel_level(s.mode, mark_channel, [red, green, blue, 1.0]));
-        p.line_segment([pos2(x, r.bottom() - 9.0), pos2(x, r.bottom())], egui::Stroke::new(1.5, t.text));
+        p.line_segment([pos2(x, r.bottom() - 9.0), pos2(x, r.bottom())], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text));
         p.text(pos2(x + 2.0, r.bottom() - 9.0), egui::Align2::LEFT_BOTTOM, v["number"].to_string(), egui::FontId::proportional(9.0), t.text);
     }
     // The cached-data warning: click it (or double-click the graph) for an Uncached Refresh.
@@ -785,18 +786,18 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
     }
     if opts.show_statistics {
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         let levels = app.ui.histogram_range.or_else(|| hover.map(|l| [l, l]));
         statistics(ui, &s.hist, s.mode, channel, levels, &t);
     }
     if opts.view == HistView::AllChannels {
         for c in color_channels(s.mode) {
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             ui.label(egui::RichText::new(tl!(channel_label(s.mode, *c))).color(t.text).size(11.5));
             let w = ui.available_width();
             let (r, _) = ui.allocate_exact_size(vec2(w, 90.0), Sense::hover());
             let p = ui.painter_at(r);
-            p.rect_filled(r, 0.0, t.field);
+            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
             tone::draw_histogram(&p, r, bins(&s.hist, s.mode, *c), graph_color(*c, colored, &t));
         }
     }

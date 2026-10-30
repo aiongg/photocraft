@@ -1,4 +1,5 @@
 use super::defaults::apply;
+use craft_ui::theme::ToEgui;
 use super::{Arc, HashMap, PhotocraftApp, PoisonError, json};
 
 /// Font families: bundled, system, and those the host serves (`photocraft_text::served`, fetched
@@ -193,7 +194,7 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
         let faces = engine.lock().unwrap_or_else(PoisonError::into_inner).fonts.faces(&c.font_family);
         slider_axes(&faces, c.italic)
     };
-    let t = crate::theme::Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     for axis in &axes {
         let (min, max) = (axis.1, axis.3);
         let mut v = axis_value(c, axis);
@@ -201,7 +202,7 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
         ui.push_id(("type-axis", &axis.0), |ui| {
             ui.horizontal(|ui| {
                 let axis_name = axis_label(&axis.0);
-                ui.label(egui::RichText::new(&axis_name).color(t.text_dim));
+                ui.label(egui::RichText::new(&axis_name).color(t.color.text.muted.to_egui()));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     changed |= crate::widgets::value_field(ui, &mut v, min..=max, "", 74.0).accessible_name(axis_name).changed();
                 });
@@ -668,7 +669,7 @@ pub(crate) fn family_picker_in(
                                         }
                                     }
                                 } else {
-                                    ui.add_space(16.0);
+                                    ui.add_space(craft_ui::theme::scale::Space::S16.px());
                                 }
                                 ui.add_sized([ui.available_width(), row_h], button)
                             })
@@ -700,8 +701,8 @@ pub(crate) fn family_picker_in(
                         // The format badge (O, TT, VAR) just left of the sample.
                         if let Some(format) = format {
                             let center = egui::pos2(response.rect.right() - 8.0 - slot - FONT_BADGE_WIDTH / 2.0, response.rect.center().y);
-                            let t = crate::theme::Tokens::get(ui.ctx());
-                            ui.painter().text(center, egui::Align2::CENTER_CENTER, format.badge(), egui::FontId::proportional(10.0), t.text_dim);
+                            let t = craft_ui::theme::current(ui.ctx());
+                            ui.painter().text(center, egui::Align2::CENTER_CENTER, format.badge(), egui::FontId::proportional(10.0), t.color.text.muted.to_egui());
                             let tip = egui::Rect::from_center_size(center, egui::vec2(FONT_BADGE_WIDTH, 14.0));
                             ui.interact(tip, ui.scope_id().with(("font-format", f, recent_row)), egui::Sense::hover())
                                 .on_hover_text(crate::font_filters::format_tip(format));
@@ -725,7 +726,7 @@ pub(crate) fn family_picker_in(
                         for style in &styles {
                             let style_row = ui
                                 .horizontal(|ui| {
-                                    ui.add_space(46.0);
+                                    ui.add_space(craft_ui::theme::scale::Space::S32.px());
                                     ui.add_sized(
                                         [ui.available_width(), 22.0],
                                         egui::Button::selectable(false, style_label(style)).truncate().stroke(egui::Stroke::NONE),

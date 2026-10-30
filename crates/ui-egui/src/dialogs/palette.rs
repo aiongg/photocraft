@@ -1,6 +1,7 @@
 //! ⌘F command palette: fuzzy search over every menu command and tool.
 
 use egui::{Align2, Color32, CornerRadius, RichText, Sense, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
 
 use crate::theme::{self, Tokens};
 use crate::{PhotocraftApp, icons};
@@ -126,7 +127,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // Scrim.
     egui::Area::new(egui::Id::unique("palette-scrim")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
         let r = ui.allocate_exact_size(screen.size(), Sense::click()).1;
-        ui.painter().rect_filled(screen, 0.0, Color32::from_black_alpha(110));
+        ui.painter().rect_filled(screen, craft_ui::theme::scale::Radius::R0.px(), Color32::from_black_alpha(110));
         if r.clicked() {
             app.ui.palette_open = false;
         }
@@ -140,7 +141,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             egui::Frame::NONE
                 .fill(t.card)
-                .stroke(Stroke::new(1.0, t.card_border))
+                .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border))
                 .corner_radius(CornerRadius::same(t.radius_lg as u8))
                 .shadow(egui::Shadow { offset: [0, 18], blur: 48, spread: 0, color: t.shadow })
                 .inner_margin(egui::Margin::same(10))
@@ -163,9 +164,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                             resp.request_focus();
                         }
                     });
-                    ui.add_space(6.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
                     crate::widgets::hairline(ui);
-                    ui.add_space(6.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
                     let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
                     let menus = crate::menus::menu_items(app);
                     let recents: Vec<String> = ui.data(|d| d.get_temp(recent_id()).unwrap_or_default());
@@ -233,7 +234,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     if esc {
                         app.ui.palette_open = false;
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     ui.label(
                         RichText::new(crate::i18n::fmt(tl!("↑↓ navigate   {key} run   esc close"), &[("key", &crate::shortcuts::pretty("Enter"))]))
                             .small()

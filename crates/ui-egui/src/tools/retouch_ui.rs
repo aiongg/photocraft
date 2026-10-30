@@ -4,6 +4,7 @@
 //! and the clone-source marker.
 
 use egui::{Color32, Stroke, vec2};
+use craft_ui::theme::ToEgui;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -485,8 +486,8 @@ pub fn draw_source_marker(app: &PhotocraftApp, painter: &egui::Painter, xf: &Vie
 }
 
 fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
+    let t = craft_ui::theme::current(ui.ctx());
+    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
     // The caption scrubs and names the field or dropdown drawn right after it.
     crate::widgets::scrub_option_label(ui, &label);
 }
@@ -728,7 +729,7 @@ fn pattern_stamp_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     opt(ui, tl!("Pattern"));
     let opts_ref: Vec<(String, &str)> = opts.iter().map(|(id, n)| (id.clone(), n.as_str())).collect();
     let picked = if opts_ref.is_empty() {
-        ui.label(egui::RichText::new(tl!("No patterns")).color(Tokens::get(ui.ctx()).text_faint));
+        ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
         false
     } else {
         crate::widgets::dropdown(ui, "pattern-stamp-pat", tl!("Pattern"), &mut pat, &opts_ref, 140.0)

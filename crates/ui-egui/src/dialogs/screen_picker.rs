@@ -1,5 +1,6 @@
 //! Explicit, one-shot desktop sampling. Snapshots remain in memory until selection/cancellation.
 use crate::PhotocraftApp;
+use craft_ui::theme::StrokeExt;
 use egui::{Color32, Context, Id, Pos2, Rect, Sense, Stroke, StrokeKind, TextureOptions, vec2};
 use std::sync::{
     Arc, Mutex,
@@ -392,19 +393,19 @@ fn loupe(ui: &egui::Ui, image: &ScreenImage, screen: Rect, pos: Pos2, pixel: (us
     let at = egui::pos2(desired.x.min(screen.right() - size.x).max(screen.left()), desired.y.min(screen.bottom() - size.y).max(screen.top()));
     let area = Rect::from_min_size(at, size);
     p.rect_filled(area, t.radius, t.card);
-    p.rect_stroke(area, t.radius, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    p.rect_stroke(area, t.radius, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     let origin = at + vec2((width - 11.0 * cell) / 2.0, 6.0);
     for row in 0..11usize {
         for col in 0..11usize {
             let px = x.checked_add(col).and_then(|v| v.checked_sub(5));
             let py = y.checked_add(row).and_then(|v| v.checked_sub(5));
             let color = px.zip(py).and_then(|(x, y)| image.pixel(x, y)).unwrap_or(t.canvas);
-            p.rect_filled(Rect::from_min_size(origin + vec2(col as f32 * cell, row as f32 * cell), vec2(cell, cell)), 0.0, color);
+            p.rect_filled(Rect::from_min_size(origin + vec2(col as f32 * cell, row as f32 * cell), vec2(cell, cell)), craft_ui::theme::scale::Radius::R0.px(), color);
         }
     }
     let center = Rect::from_min_size(origin + vec2(5.0 * cell, 5.0 * cell), vec2(cell, cell));
-    p.rect_stroke(center.expand(1.0), 0.0, Stroke::new(1.0, Color32::BLACK), StrokeKind::Inside);
-    p.rect_stroke(center, 0.0, Stroke::new(1.0, Color32::WHITE), StrokeKind::Inside);
+    p.rect_stroke(center.expand(1.0), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::BLACK), StrokeKind::Inside);
+    p.rect_stroke(center, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::WHITE), StrokeKind::Inside);
     let footer = at + vec2(8.0, 11.0 * cell + 14.0);
     p.galley(footer, label, t.text);
     p.galley(footer + vec2(0.0, 20.0), hint, t.text);

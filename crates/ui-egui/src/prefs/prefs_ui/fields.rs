@@ -1,4 +1,5 @@
 use super::appearance::{AppearanceRows, appearance_rows, system_theme};
+use craft_ui::theme::StrokeExt;
 use super::dialogs::{mismatch_body, presets_body, presets_io_body, settings_height};
 use super::graphics::{gpu_memory_lines, gpu_status_rows, memory_usage_row, read_at_launch, rendering_mode_row};
 use super::shortcuts::shortcuts_body;
@@ -177,7 +178,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     {
         section = (*first).to_string();
     }
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal_top(|ui| {
         // Section list.
         ui.vertical(|ui| {
@@ -227,12 +228,12 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 || title.to_lowercase().contains(&search.trim().to_lowercase())
                 || tl!(&title).to_lowercase().contains(&search.trim().to_lowercase());
             let filter = if show_all { "" } else { search.trim() };
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             egui::ScrollArea::vertical().max_height(content_height - 30.0).id_salt("prefs-scroll").show(ui, |ui| {
                 let order: Vec<String> =
                     f.get("__order").and_then(|o| o.get(&section)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
                 if !has_visible_fields(&values, &section) {
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
                 } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
                     section_fields(ui, &section, obj, &order, lang, system, filter);
@@ -245,7 +246,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                     if section == "performance" {
                         gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
                     }
-                    ui.add_space(8.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 }
                 if search.trim().is_empty()
                     && has_visible_fields(&values, &section)
@@ -300,13 +301,13 @@ pub(super) fn tools_field_visible(obj: &Map<String, Value>, key: &str) -> bool {
 /// Presentation and Options).
 fn pref_group(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
     let t = Tokens::get(ui.ctx());
-    egui::Frame::new().stroke(egui::Stroke::new(1.0, t.card_border)).corner_radius(t.radius).inner_margin(10.0).show(ui, |ui| {
+    egui::Frame::new().stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border)).corner_radius(t.radius).inner_margin(10.0).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.label(RichText::new(tl!(title)).strong().color(t.text));
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         add(ui);
     });
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
 }
 
 /// Preferences › Interface laid out like Photoshop's: the theme and canvas settings, then UI

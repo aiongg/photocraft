@@ -7,6 +7,7 @@
 //! tool to other layers' edges and centres. The threshold is 8 screen pixels at the current zoom.
 
 use egui::{Color32, Stroke, pos2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::LayerId;
 use photocraft_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
 
@@ -581,7 +582,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
             xf.to_screen((rect[0] + d[0]) as f32, (rect[1] + d[1]) as f32),
             xf.to_screen((rect[2] + d[0]) as f32, (rect[3] + d[1]) as f32),
         );
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, crate::theme::Tokens::get(painter.ctx()).accent), egui::StrokeKind::Middle);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent), egui::StrokeKind::Middle);
     }
     if !smart_on(app) {
         return;
@@ -600,7 +601,7 @@ fn draw_line(painter: &egui::Painter, xf: &ViewXform, l: &SnapLine, color: Color
     } else {
         (xf.to_screen(l.from as f32, l.pos as f32), xf.to_screen(l.to as f32, l.pos as f32))
     };
-    painter.line_segment([pos2(a.x.round() + 0.5, a.y.round() + 0.5), pos2(b.x.round() + 0.5, b.y.round() + 0.5)], Stroke::new(1.0, color));
+    painter.line_segment([pos2(a.x.round() + 0.5, a.y.round() + 0.5), pos2(b.x.round() + 0.5, b.y.round() + 0.5)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color));
 }
 
 #[cfg(test)]

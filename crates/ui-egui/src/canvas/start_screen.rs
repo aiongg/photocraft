@@ -1,4 +1,5 @@
 use super::tabs::{open_on_double_click, paint_dots};
+use craft_ui::theme::ToEgui;
 use super::{PhotocraftApp, Rect, Sense};
 
 /// The Home screen's card is this wide when the canvas has room, and as wide as the canvas when it doesn't.
@@ -11,7 +12,7 @@ const HOME_BUTTON_WIDTH: f32 = 190.0;
 const HOME_BUTTON_GAP: f32 = 12.0;
 
 pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = crate::theme::Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let area = ui.available_rect_before_wrap();
     paint_dots(ui, area, app.session.prefs().interface.show_canvas_dots);
     open_on_double_click(app, ui, area);
@@ -33,18 +34,18 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.scope_builder(egui::UiBuilder::new().max_rect(card), |ui| {
         ui.vertical_centered(|ui| {
             ui.horizontal(|ui| {
-                let title = ui.painter().layout_no_wrap(tl!("PhotoCraft").into(), crate::theme::semibold(38.0), t.text);
-                let by = ui.painter().layout_no_wrap(tl!("open source").into(), egui::FontId::proportional(13.0), t.text_faint);
+                let title = ui.painter().layout_no_wrap(tl!("PhotoCraft").into(), crate::theme::semibold(38.0), t.color.text.normal.to_egui());
+                let by = ui.painter().layout_no_wrap(tl!("open source").into(), egui::FontId::proportional(13.0), t.color.text.faint.to_egui());
                 let total = title.size().x + by.size().x + 10.0;
                 ui.add_space(((card.width() - total) / 2.0).max(0.0));
                 let (r, _) = ui.allocate_exact_size(title.size(), Sense::hover());
-                ui.painter().galley(r.min, title, t.text);
+                ui.painter().galley(r.min, title, t.color.text.normal.to_egui());
                 let (r2, _) = ui.allocate_exact_size(egui::vec2(by.size().x + 10.0, r.height()), Sense::hover());
-                ui.painter().galley(egui::pos2(r2.left() + 10.0, r.bottom() - by.size().y - 8.0), by, t.text_faint);
+                ui.painter().galley(egui::pos2(r2.left() + 10.0, r.bottom() - by.size().y - 8.0), by, t.color.text.faint.to_egui());
             });
-            ui.add_space(6.0);
-            ui.label(egui::RichText::new(tl!("Create a new document or open an existing file.")).color(t.text_dim).size(14.0));
-            ui.add_space(22.0);
+            ui.add_space(t.space.gap.stack);
+            ui.label(egui::RichText::new(tl!("Create a new document or open an existing file.")).color(t.color.text.muted.to_egui()).size(14.0));
+            ui.add_space(craft_ui::theme::scale::Space::S24.px());
             let (mut new_clicked, mut open_clicked) = (false, false);
             if side_by_side {
                 ui.horizontal(|ui| {
@@ -65,22 +66,22 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if open_clicked {
                 let _ = app.open_dialog_file();
             }
-            ui.add_space(22.0);
+            ui.add_space(craft_ui::theme::scale::Space::S24.px());
             ui.horizontal(|ui| {
                 let msg = start_screen_drop_hint(app);
-                let g = ui.painter().layout_no_wrap(msg.to_string(), egui::FontId::proportional(12.5), t.text_faint);
+                let g = ui.painter().layout_no_wrap(msg.to_string(), egui::FontId::proportional(12.5), t.color.text.faint.to_egui());
                 ui.add_space(((card.width() - g.size().x - 24.0) / 2.0).max(0.0));
                 let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
-                crate::icons::paint(ui, r, "image", 15.0, t.text_faint);
-                ui.label(egui::RichText::new(msg).color(t.text_faint));
+                crate::icons::paint(ui, r, "image", 15.0, t.color.text.faint.to_egui());
+                ui.label(egui::RichText::new(msg).color(t.color.text.faint.to_egui()));
             });
             if !recent.is_empty() {
-                ui.add_space(22.0);
+                ui.add_space(craft_ui::theme::scale::Space::S24.px());
                 home_recent(app, ui, &recent);
             }
-            ui.add_space(26.0);
+            ui.add_space(craft_ui::theme::scale::Space::S24.px());
             crate::links::discord_button(app, ui, 190.0);
-            ui.add_space(10.0);
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
             crate::links::link_row(app, ui);
         });
     });
@@ -105,14 +106,14 @@ const HOME_RECENT_ROW: f32 = 30.0;
 /// hovered row shows a × that takes it off the list, and right-click offers Remove from Recent
 /// and Clear Recent Files (#2691).
 fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
-    let t = crate::theme::Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let width = 380.0;
     ui.horizontal(|ui| {
         // Line the heading up with the file icons.
         ui.add_space(((ui.available_width() - width) / 2.0).max(0.0) + 8.0);
-        ui.label(egui::RichText::new(tl!("Recent")).font(crate::theme::semibold(12.5)).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Recent")).font(crate::theme::semibold(12.5)).color(t.color.text.muted.to_egui()));
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut open = None;
     let mut remove = None;
     let mut clear = false;
@@ -123,20 +124,20 @@ fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
         // The × sits on top of the row, so the row counts as hovered while the pointer is on it.
         let hovered = ui.rect_contains_pointer(row);
         if hovered {
-            ui.painter().rect_filled(row, t.radius_sm, t.hover);
+            ui.painter().rect_filled(row, t.shape.radius.control, t.color.state.hover.to_egui());
         }
         let close = Rect::from_center_size(egui::pos2(row.right() - 16.0, row.center().y), egui::vec2(22.0, 22.0));
         let right = if hovered { close.left() - 4.0 } else { row.right() - 10.0 };
         let icon = Rect::from_center_size(egui::pos2(row.left() + 16.0, row.center().y), egui::vec2(16.0, 16.0));
-        crate::icons::paint(ui, icon, "file", 14.0, t.text_dim);
+        crate::icons::paint(ui, icon, "file", 14.0, t.color.text.muted.to_egui());
         let x = row.left() + 32.0;
-        let name_g = crate::tab_strip::elided(ui, &name, egui::FontId::proportional(12.5), t.text, 170.0);
+        let name_g = crate::tab_strip::elided(ui, &name, egui::FontId::proportional(12.5), t.color.text.normal.to_egui(), 170.0);
         let name_w = name_g.size().x;
-        ui.painter().galley(egui::pos2(x, row.center().y - name_g.size().y / 2.0), name_g, t.text);
+        ui.painter().galley(egui::pos2(x, row.center().y - name_g.size().y / 2.0), name_g, t.color.text.normal.to_egui());
         let folder_max = (right - (x + name_w + 14.0)).max(0.0);
         if folder_max > 20.0 && !folder.is_empty() {
-            let fg = crate::tab_strip::elided(ui, &folder, egui::FontId::proportional(11.5), t.text_faint, folder_max);
-            ui.painter().galley(egui::pos2(right - fg.size().x, row.center().y - fg.size().y / 2.0), fg, t.text_faint);
+            let fg = crate::tab_strip::elided(ui, &folder, egui::FontId::proportional(11.5), t.color.text.faint.to_egui(), folder_max);
+            ui.painter().galley(egui::pos2(right - fg.size().x, row.center().y - fg.size().y / 2.0), fg, t.color.text.faint.to_egui());
         }
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
         let resp = resp.on_hover_text(path).on_hover_cursor(egui::CursorIcon::PointingHand);

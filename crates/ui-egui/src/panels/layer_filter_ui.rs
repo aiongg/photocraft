@@ -124,7 +124,7 @@ pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.spacing_mut().item_spacing.x = 2.0;
         let by = [(FilterBy::Kind, tl!("Kind")), (FilterBy::Name, tl!("Name")), (FilterBy::Mode, tl!("Mode"))];
         widgets::dropdown(ui, "layer-filter-by", tl!("Kind"), &mut app.ui.layer_filter_by, &by, 64.0);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         match app.ui.layer_filter_by {
             FilterBy::Kind => {
                 for (kind, icon, tip) in [

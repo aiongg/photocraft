@@ -15,6 +15,7 @@
 //! does nothing.
 
 use egui::{Modifiers, Pos2};
+use craft_ui::theme::StrokeExt;
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;
@@ -154,7 +155,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, to_screen: impl Fn([f6
     let t = crate::theme::Tokens::get(painter.ctx());
     let seg = [to_screen(a), to_screen(b)];
     painter.line_segment(seg, egui::Stroke::new(3.0, t.shadow));
-    painter.line_segment(seg, egui::Stroke::new(1.0, t.accent_text));
+    painter.line_segment(seg, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent_text));
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     let deg = (-dy).atan2(dx).to_degrees();
     if let Some(h) = hover.filter(|_| deg.is_finite() && (dx != 0.0 || dy != 0.0)) {

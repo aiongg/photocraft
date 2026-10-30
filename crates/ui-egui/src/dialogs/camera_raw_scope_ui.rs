@@ -1,6 +1,7 @@
 //! Camera Raw scope interaction. View state is in UiState; filter edits still commit through
 //! the existing filter.cameraRaw command. Image analysis is cached per completed proxy revision.
 use crate::{camera_raw_ui::CameraRawDialog, state::CameraRawScopeState, theme::Tokens, widgets};
+use craft_ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::{
     camera_raw::CameraRaw,
@@ -350,7 +351,7 @@ fn warning(ui: &mut egui::Ui, rect: Rect, mask: u8, on: &mut bool, label: &str) 
     ui.painter().add(egui::Shape::convex_polygon(
         vec![pos2(r.center().x, r.top()), r.left_bottom(), r.right_bottom()],
         if mask == 0 { t.histogram_background() } else { t.histogram_color(mask) },
-        Stroke::new(1.0, if *on { t.text } else { t.text_faint }),
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if *on { t.text } else { t.text_faint }),
     ));
     if response.clicked() {
         *on = !*on;
@@ -414,7 +415,7 @@ fn graph(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawScopeSt
     if let Some(z) = d.scope.tone_drag.map(|x| x.0).or(d.scope.hovered_zone) {
         let [lo, hi] = z.range();
         let region = Rect::from_min_max(pos2(plot.left() + lo * plot.width(), plot.top()), pos2(plot.left() + hi * plot.width(), plot.bottom()));
-        ui.painter().rect_filled(region, 0.0, t.text.gamma_multiply(0.055));
+        ui.painter().rect_filled(region, craft_ui::theme::scale::Radius::R0.px(), t.text.gamma_multiply(0.055));
         response.clone().on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
         response.clone().on_hover_text(format!("{}  {:.2}", z.label(), *z.value(&mut d.params)));
         if response.double_clicked() {
@@ -436,7 +437,7 @@ fn graph(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawScopeSt
         d.scope.tone_drag = None;
     }
     context_menu(&response, d.selection.is_some(), view);
-    ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
 }
 
 /// The cloud and pixel target use exactly the same orientation and saturation radius.
@@ -480,7 +481,7 @@ fn vectorscope(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawS
         ui.painter().text(point(h, 1.11), Align2::CENTER_CENTER, label, FontId::proportional(10.0), t.scope_hue(h, 1.0));
     }
     if !view.hide_skin_line {
-        ui.painter().line_segment([center, point(23.0 / 360.0, 1.0)], Stroke::new(1.0, t.text_dim));
+        ui.painter().line_segment([center, point(23.0 / 360.0, 1.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim));
     }
     if let Some(sample) = d.hover_sample(true)
         && let Some([h, saturation]) = sample.hue_saturation
@@ -511,7 +512,7 @@ pub(crate) fn header(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut Came
             vectorscope(ui, d, view, (ui.available_height() * 0.3).clamp(100.0, 220.0));
         }
     }
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
 }
 
 pub(crate) fn floating(ctx: &egui::Context, d: &mut CameraRawDialog, view: &mut CameraRawScopeState, dock: Rect) {
@@ -675,9 +676,9 @@ pub(crate) fn preview(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut Cam
     }
     for (i, p) in view.samplers.iter().take(MAX_SAMPLERS).enumerate() {
         let q = to_screen(*p);
-        ui.painter().circle_stroke(q, 5.0, Stroke::new(1.0, t.text));
-        ui.painter().line_segment([q - vec2(8.0, 0.0), q + vec2(8.0, 0.0)], Stroke::new(1.0, t.text));
-        ui.painter().line_segment([q - vec2(0.0, 8.0), q + vec2(0.0, 8.0)], Stroke::new(1.0, t.text));
+        ui.painter().circle_stroke(q, 5.0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text));
+        ui.painter().line_segment([q - vec2(8.0, 0.0), q + vec2(8.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text));
+        ui.painter().line_segment([q - vec2(0.0, 8.0), q + vec2(0.0, 8.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text));
         let text = format!("{}  {}", i + 1, readout_text(d.readout(*p, view.lab)));
         ui.painter().text(pos2(visible.left() + 6.0, visible.top() + 6.0 + i as f32 * 16.0), Align2::LEFT_TOP, text, crate::theme::mono(11.0), t.text);
         ui.painter().text(q + vec2(7.0, 7.0), Align2::LEFT_TOP, format!("{}", i + 1), crate::theme::mono(11.0), t.text);

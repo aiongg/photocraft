@@ -1,4 +1,5 @@
 use super::defaults::{apply, formatting_params, open_color_picker, shown_scale, target, target_doc, type_unit};
+use craft_ui::theme::StrokeExt;
 use super::editing::{cancel, commit_with};
 use super::fonts::{font_picker, fonts_ready, selected_style, style_label, styles};
 use super::keys::is_vertical;
@@ -126,8 +127,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .unwrap_or(app.session.tools.foreground);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 18.0), egui::Sense::click());
     let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    ui.painter().rect_filled(rect, 2.0, Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
-    ui.painter().rect_stroke(rect, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+    ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
+    ui.painter().rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Outside);
     let resp = resp.on_hover_text(tl!("Set the text color"));
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Set the text color")));
     if resp.clicked() {
@@ -143,7 +144,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if app.ui.text_edit.is_some() {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             if crate::icons::button(
                 ui,
                 "check",
@@ -405,7 +406,7 @@ pub(super) fn toggle_cell(ui: &mut egui::Ui, w: f32, on: bool, tip: &str, paint:
     };
     ui.painter().rect_filled(r, t.radius_sm, bg);
     if on {
-        ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.accent_border), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), egui::StrokeKind::Inside);
     }
     let enabled = ui.is_enabled();
     paint(

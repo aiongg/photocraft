@@ -1,4 +1,5 @@
 use super::panel::{chevron_icon, surface};
+use craft_ui::theme::StrokeExt;
 use super::scrub::{label_scrub_response, take_label_scrub};
 use super::slider::slider;
 use super::text_field::first_field_id;
@@ -141,7 +142,7 @@ fn value_field_box(
     };
     surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     // The number's slot ends 1 pt left of the suffix, by its measured width (the suffix is drawn
     // 6 pt from the right edge), so a one-character unit like `%` leaves the number room (#3040).

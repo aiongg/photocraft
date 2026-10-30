@@ -97,7 +97,7 @@ fn inactive_blend_rows(ui: &mut egui::Ui, pro: bool) {
                 scrub_pct_label(ui, fill_label, &mut f, ui.available_width());
             });
         });
-        ui.add_space(2.0);
+        ui.add_space(craft_ui::theme::scale::Space::S2.px());
     });
 }
 
@@ -122,7 +122,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if t.pro && app.ui.layers_panel_options.show_filters {
         crate::layer_filter_ui::bar(app, ui);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
     }
     if let Some(l) = active_layer {
         // With several layers selected, blend mode, Opacity, Fill and the locks change every one
@@ -229,7 +229,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 })
             });
         });
-        ui.add_space(2.0);
+        ui.add_space(craft_ui::theme::scale::Space::S2.px());
     } else {
         inactive_blend_rows(ui, t.pro);
     }

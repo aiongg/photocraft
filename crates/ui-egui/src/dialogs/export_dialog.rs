@@ -3,6 +3,7 @@
 //! pixel count, so the dialog stays instant on 36 MP documents.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
 
@@ -797,7 +798,7 @@ fn preset_settings(f: &Map<String, Value>) -> Value {
 
 fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h: f64) {
     let t = Tokens::get(ui.ctx());
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let names: Vec<String> = app.session.presets.export_presets.iter().map(|p| p.name.clone()).collect();
     if !names.is_empty() {
         ui.horizontal(|ui| {
@@ -931,7 +932,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let mut embed = f.get("embedProfile").and_then(Value::as_bool).unwrap_or(true);
             crate::widgets::checkbox(ui, &mut embed, tl!("Embed Color Profile"));
             f.insert("embedProfile".into(), json!(embed));
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.text));
             let (bw, bh) = (n(f, "__w", f64::from(doc.size.width)), n(f, "__h", f64::from(doc.size.height)));
             size_fields(ui, f, bw, bh);
@@ -943,7 +944,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
             preset_fields(app, ui, f, bw, bh);
         });
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         // Right: preview + estimated size.
         ui.vertical(|ui| {
             let layer = f.get("__layer").and_then(Value::as_u64);
@@ -997,7 +998,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             } else {
                 ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, tl!("Preview"), egui::FontId::proportional(12.0), t.text_dim);
             }
-            ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, t.separator), egui::StrokeKind::Outside);
+            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
             #[cfg(not(target_arch = "wasm32"))]
             let exact = poll_or_start_exact_estimate(ui, key, &sig, doc.clone(), f).flatten();
             #[cfg(target_arch = "wasm32")]

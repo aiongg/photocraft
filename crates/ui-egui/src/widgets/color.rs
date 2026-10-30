@@ -1,4 +1,5 @@
 use super::dropdown::swatch_popup;
+use craft_ui::theme::StrokeExt;
 use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2};
 
 /// Cached RGB data; drawing work is bounded by the 256 display bins, never the image size.
@@ -8,7 +9,7 @@ pub fn rgb_histogram(ui: &mut Ui, histogram: &photocraft_algo::histogram::RgbHis
     ui.painter().rect_filled(rect, t.radius_sm, t.histogram_background());
     let plot = rect.shrink(4.0);
     crate::rgb_histogram::paint(ui.painter(), plot, histogram, &t);
-    ui.painter().rect_stroke(rect, t.radius_sm, egui::Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
     response
 }
 
@@ -27,14 +28,14 @@ pub fn hue_stops() -> Vec<Color32> {
 
 /// Paint a small checkerboard (transparency) in `rect`.
 pub fn checker(painter: &egui::Painter, rect: Rect, cell: f32) {
-    painter.rect_filled(rect, 0.0, Color32::from_gray(250));
+    painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(250));
     let nx = (rect.width() / cell).ceil() as i32;
     let ny = (rect.height() / cell).ceil() as i32;
     for j in 0..ny {
         for i in 0..nx {
             if (i + j) % 2 == 1 {
                 let r = Rect::from_min_size(Pos2::new(rect.left() + i as f32 * cell, rect.top() + j as f32 * cell), Vec2::splat(cell)).intersect(rect);
-                painter.rect_filled(r, 0.0, Color32::from_gray(214));
+                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(214));
             }
         }
     }
@@ -91,7 +92,7 @@ pub(crate) fn color_swatch(ui: &mut Ui, color: Color32) -> Response {
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, ui.is_enabled(), tl!("Color")));
     checker_rounded(ui.painter(), rect, 4.0, t.radius_sm);
     ui.painter().rect_filled(rect.shrink(1.0), t.radius_sm, color);
-    ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     response
 }
 
@@ -114,7 +115,7 @@ pub fn color_swatch_button(ui: &mut Ui, color: Color32, label: &str) -> Response
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, true, label));
     checker_rounded(ui.painter(), rect, 4.0, t.radius_sm);
     ui.painter().rect_filled(rect.shrink(1.0), t.radius_sm, color);
-    ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     response.on_hover_text(label)
 }
 

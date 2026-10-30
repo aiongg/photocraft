@@ -1,4 +1,5 @@
 use super::begin::warps_type;
+use craft_ui::theme::StrokeExt;
 use super::drag_modes::{HandleIndicator, handle_indicator};
 use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
@@ -51,7 +52,7 @@ fn draw_distort_cursor(ctx: &egui::Context, at: Pos2, toward: egui::Vec2) {
     // Convex decomposition: two triangles meeting along [tip, notch].
     painter.add(egui::Shape::convex_polygon(vec![tip, left, notch], tokens.accent_text, Stroke::NONE));
     painter.add(egui::Shape::convex_polygon(vec![tip, notch, right], tokens.accent_text, Stroke::NONE));
-    painter.add(egui::Shape::closed_line(vec![tip, left, notch, right], Stroke::new(1.5, tokens.shadow)));
+    painter.add(egui::Shape::closed_line(vec![tip, left, notch, right], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.shadow)));
 }
 
 /// Draws the Skew cursor at `at`: opposing parallel arrows aligned with the edge tangent `tangent`.
@@ -67,12 +68,12 @@ fn draw_skew_cursor(ctx: &egui::Context, at: Pos2, tangent: egui::Vec2) {
         let p_start = center - u * (dir * 9.0);
         let p_end = center + u * (dir * 9.0);
         painter.line_segment([p_start, p_end], Stroke::new(3.5, tokens.shadow));
-        painter.line_segment([p_start, p_end], Stroke::new(1.5, tokens.accent_text));
+        painter.line_segment([p_start, p_end], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.accent_text));
 
         let tip = p_end + u * (dir * 3.5);
         let wing1 = p_end - u * (dir * 2.5) + perp * 3.5;
         let wing2 = p_end - u * (dir * 2.5) - perp * 3.5;
-        painter.add(egui::Shape::convex_polygon(vec![tip, wing1, wing2], tokens.accent_text, Stroke::new(1.0, tokens.shadow)));
+        painter.add(egui::Shape::convex_polygon(vec![tip, wing1, wing2], tokens.accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
     }
 }
 
@@ -198,19 +199,19 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         );
     }
     let pts: Vec<Pos2> = t.quad.iter().map(|q| scr(*q)).collect();
-    painter.add(egui::Shape::closed_line(pts.clone(), Stroke::new(1.0, accent)));
+    painter.add(egui::Shape::closed_line(pts.clone(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent)));
     let mids: Vec<Pos2> = (0..4).map(|i| pts[i].lerp(pts[(i + 1) % 4], 0.5)).collect();
     for p in pts.iter().chain(mids.iter()) {
         let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
-        painter.rect_filled(r, 0.0, Color32::WHITE);
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Inside);
+        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
     }
     // Reference point (Photoshop's crosshair circle).
     let c = scr(t.pivot);
-    painter.circle_stroke(c, 5.0, Stroke::new(1.0, Color32::WHITE));
+    painter.circle_stroke(c, 5.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
     painter.circle_stroke(c, 5.0, Stroke::new(0.5, Color32::BLACK));
-    painter.line_segment([c - vec2(8.0, 0.0), c + vec2(8.0, 0.0)], Stroke::new(1.0, Color32::WHITE));
-    painter.line_segment([c - vec2(0.0, 8.0), c + vec2(0.0, 8.0)], Stroke::new(1.0, Color32::WHITE));
+    painter.line_segment([c - vec2(8.0, 0.0), c + vec2(8.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+    painter.line_segment([c - vec2(0.0, 8.0), c + vec2(0.0, 8.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
     if let Some(at) = painter.ctx().pointer_hover_pos().filter(|p| xf.rect.contains(*p)) {
         let p = xf.to_doc(at);
         let tol = HANDLE_PX / f64::from(xf.zoom.max(0.01));
@@ -478,8 +479,8 @@ fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 
             let p = scr(m.point(i, j));
             if i.is_multiple_of(3) && j.is_multiple_of(3) {
                 let r = egui::Rect::from_center_size(p, vec2(5.0, 5.0));
-                painter.rect_filled(r, 0.0, Color32::WHITE);
-                painter.rect_stroke(r, 0.0, faint, egui::StrokeKind::Inside);
+                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), faint, egui::StrokeKind::Inside);
                 continue;
             }
             let (ai, aj) = handle_anchor(i, j);
@@ -541,7 +542,7 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
             accent,
         );
     }
-    let line = Stroke::new(1.0, accent);
+    let line = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent);
     let thin = Stroke::new(0.75, accent.gamma_multiply(0.7));
     let curve = |fixed_u: Option<f64>, fixed_v: Option<f64>| -> Vec<Pos2> {
         (0..=40)

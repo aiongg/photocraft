@@ -9,6 +9,7 @@
 //! groups and where a floated panel docks back.
 
 use crate::dock::Group;
+use craft_ui::theme::StrokeExt;
 use craft_ui::docking::{
     Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side, Target, Zone,
 };
@@ -567,7 +568,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     style.active_background = t.card;
     style.text = t.text;
     style.inactive_text = t.text_dim;
-    style.border = egui::Stroke::new(1.0, t.card_border);
+    style.border = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border);
     style.accent = t.accent;
     style.right_to_left = crate::direction::is_rtl();
     style.new_dock_zones = true;

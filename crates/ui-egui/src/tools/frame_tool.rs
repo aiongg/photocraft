@@ -5,6 +5,8 @@
 //! module only turns the drag into it.
 
 use egui::{Pos2, Stroke};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::LayerContent;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -108,9 +110,9 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
 /// The frame a drag in progress would leave.
 pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(d) = app.ui.frame_tool.drag.filter(|_| app.ui.tool == Tool::Frame) else { return };
-    let t = Tokens::get(painter.ctx());
+    let t = craft_ui::theme::current(painter.ctx());
     let r = drawn(&d).map(|v| v as f32);
-    let stroke = Stroke::new(1.5, t.accent);
+    let stroke = craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.color.accent.solid.to_egui());
     let points: Vec<Pos2> = if app.ui.frame_tool.ellipse {
         let (cx, cy, rx, ry) = ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0, (r[2] - r[0]) / 2.0, (r[3] - r[1]) / 2.0);
         (0..=64).map(|i| i as f32 * std::f32::consts::TAU / 64.0).map(|a| xf.to_screen(cx + rx * a.cos(), cy + ry * a.sin())).collect()

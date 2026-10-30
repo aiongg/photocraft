@@ -3,6 +3,7 @@
 //! a preset opens it: the picker's [+] and its gear menu, the Brush Settings [+] and the Brushes
 //! tab's [+]. Nothing is saved until OK.
 use egui::{Color32, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use photocraft_paint::{BrushPreset, BrushSettings};
 use serde_json::{Map, Value, json};
 
@@ -73,14 +74,14 @@ fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str) 
 
 /// The dialog's three columns; it owns its OK and Cancel, so they stand in their own column.
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, interactive: bool) -> Option<bool> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut outcome = None;
     let brush: BrushSettings = f.get("brush").and_then(|b| serde_json::from_value(b.clone()).ok()).unwrap_or_else(|| app.session.tools.brush.clone());
     ui.horizontal_top(|ui| {
         // The tip as the preset cards draw it, and the size under it.
         let (r, _) = ui.allocate_exact_size(vec2(PREVIEW, PREVIEW), egui::Sense::hover());
-        ui.painter().rect_filled(r, t.radius_sm, t.field);
-        let tip = crate::brush_preview::tip_texture(ui.ctx(), "new-preset-tip", &brush.tip, (brush.hardness, brush.angle, brush.roundness), 64, t.text);
+        ui.painter().rect_filled(r, t.shape.radius.control, t.color.surface.sunken.to_egui());
+        let tip = crate::brush_preview::tip_texture(ui.ctx(), "new-preset-tip", &brush.tip, (brush.hardness, brush.angle, brush.roundness), 64, t.color.text.normal.to_egui());
         let side = (PREVIEW - 30.0) * crate::brush_sections::thumb_scale(brush.size);
         let tr = egui::Rect::from_center_size(pos2(r.center().x, r.top() + 8.0 + (PREVIEW - 30.0) / 2.0), vec2(side, side));
         ui.painter().image(tip.id(), tr, egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
@@ -89,9 +90,9 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
             egui::Align2::CENTER_BOTTOM,
             format!("{}", brush.size.round() as i64),
             egui::FontId::proportional(11.0),
-            t.text_dim,
+            t.color.text.muted.to_egui(),
         );
-        ui.add_space(14.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label(tl!("Name:"));
@@ -111,26 +112,26 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
                     f.insert("name".into(), json!(text));
                 }
             });
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             check(ui, f, "captureSize", tl!("Capture Brush Size in Preset"));
             check(ui, f, "toolSettings", tl!("Include Tool Settings"));
             // Include Color belongs to the tool settings: only with them, as in Photoshop.
             ui.horizontal(|ui| {
-                ui.add_space(20.0);
+                ui.add_space(craft_ui::theme::scale::Space::S20.px());
                 ui.add_enabled_ui(on(f, "toolSettings"), |ui| check(ui, f, "color", tl!("Include Color")));
             });
             if let Some(why) = problem(app, f).filter(|_| !name(f).is_empty()) {
-                ui.add_space(4.0);
-                ui.colored_label(t.text_dim, why);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                ui.colored_label(t.color.text.muted.to_egui(), why);
             }
         });
-        ui.add_space(14.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             let ok = problem(app, f).is_none();
             if ui.add_enabled_ui(ok, |ui| widgets::primary_button(ui, tl!("OK"), 84.0)).inner.clicked() {
                 outcome = Some(true);
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             if widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked() {
                 outcome = Some(false);
             }

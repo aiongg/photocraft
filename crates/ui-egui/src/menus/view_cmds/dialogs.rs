@@ -221,9 +221,9 @@ pub fn form_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 /// File Info's read-only Camera Data section (`__camera`, from the document's EXIF/XMP).
 fn camera_data(ui: &mut egui::Ui, f: &Map<String, Value>) {
     let Some(camera) = f.get("__camera").and_then(Value::as_object).filter(|c| !c.is_empty()) else { return };
-    ui.add_space(10.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     ui.label(egui::RichText::new(tl!("Camera Data")).font(crate::theme::semibold(13.0)));
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     egui::Grid::new("form-camera-data").num_columns(2).spacing([12.0, 4.0]).show(ui, |ui| {
         for (key, label) in photocraft_engine::file_cmds::CAMERA_FIELDS {
             if let Some(v) = camera.get(key).and_then(Value::as_str) {

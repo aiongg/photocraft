@@ -4,6 +4,7 @@
 //! always stays on the strip, and no tab ever runs under the menu button.
 
 use egui::{Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 
 use crate::theme::{self, Tokens};
 
@@ -147,7 +148,7 @@ pub fn pill_tabs(ui: &mut Ui, id: egui::Id, area: Rect, tabs: &[&str], selected:
             if active {
                 crate::widgets::surface(ui, r, t.hover, true);
                 if !t.bevel {
-                    ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+                    ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
                 }
             } else if resp.hovered() {
                 ui.painter().rect_filled(r, t.radius_sm, t.hover.gamma_multiply(0.6));

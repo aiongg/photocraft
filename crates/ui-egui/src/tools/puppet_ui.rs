@@ -10,6 +10,7 @@
 //! previews made the result depend on pointer history and snap to a different shape on release.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
 
 use egui::{Color32, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::puppet::{ITERATIONS, PuppetDensity, PuppetMesh, PuppetMode, PuppetPin, PuppetSolver, PuppetWarp, build_mesh};
@@ -385,8 +386,8 @@ pub fn draw(s: &PuppetSession, painter: &egui::Painter, xf: &ViewXform) {
             painter.circle_filled(c, 2.0, Color32::BLACK);
             if let Some(r) = p.rotate {
                 let a = (r as f32).to_radians();
-                painter.circle_stroke(c, 18.0, Stroke::new(1.0, Color32::WHITE));
-                painter.line_segment([c, c + vec2(a.cos(), a.sin()) * 18.0], Stroke::new(1.0, Color32::WHITE));
+                painter.circle_stroke(c, 18.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+                painter.line_segment([c, c + vec2(a.cos(), a.sin()) * 18.0], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
             }
         }
     }

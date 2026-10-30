@@ -3,6 +3,7 @@
 //! `layer.align.*` / `layer.distribute.*` command.
 
 use serde_json::json;
+use craft_ui::theme::ToEgui;
 
 use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
@@ -30,7 +31,7 @@ const DISTRIBUTE: [(&str, &str, &str); 8] = [
 
 /// The six align icons followed by a menu holding both groups with icons and names.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.spacing_mut().item_spacing.x = 0.0;
     for (cmd, icon, label) in ALIGN {
         let tip = format!("{}: {}", tl!("Align"), tl!(label));
@@ -39,15 +40,15 @@ pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let _ = app.run(cmd, json!({}));
         }
     }
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let more = icons::button(ui, "ellipsis", 24.0, false, tl!("Align and distribute"));
     egui::Popup::menu(&more).show(|ui| {
         ui.set_min_width(200.0);
         let mut section = |ui: &mut egui::Ui, title: &str, items: &[(&str, &str, &str)]| {
-            ui.label(egui::RichText::new(title).small().color(t.text_dim));
+            ui.label(egui::RichText::new(title).small().color(t.color.text.muted.to_egui()));
             for (cmd, icon, label) in items {
                 let on = app.session.is_enabled(cmd);
-                let tint = if on { t.icon } else { t.text_dim };
+                let tint = if on { t.color.text.normal.to_egui() } else { t.color.text.muted.to_egui() };
                 let button = egui::Button::image_and_text(icons::image(icon, 16.0, tint), tl!(label));
                 if ui.add_enabled(on, button).clicked() {
                     let _ = app.run(cmd, json!({}));

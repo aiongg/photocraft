@@ -110,7 +110,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if crate::widgets::dropdown(ui, "new-layer-mode", tl!("Mode"), &mut m, &options, 140.0) {
             f.insert("mode".into(), json!(m.label()));
         }
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         ui.label(tl!("Opacity:"));
         let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
         if crate::widgets::value_field(ui, &mut o, 0.0..=100.0, "%", 64.0).accessible_name(tl!("Opacity:")).changed() {

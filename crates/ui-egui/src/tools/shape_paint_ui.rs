@@ -1,6 +1,7 @@
 //! Shape fill and stroke swatches shared by the options bar and the Properties panel.
 
 use egui::{Color32, Sense, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
 
 use serde_json::{Value, json};
 
@@ -102,7 +103,7 @@ pub(crate) fn swatch(
         (None, Some(_)) => {}
         (None, None) => {
             ui.painter().rect_filled(r.shrink(1.0), t.radius_sm, t.field);
-            ui.painter().line_segment([r.shrink(3.0).left_bottom(), r.shrink(3.0).right_top()], Stroke::new(1.5, t.danger));
+            ui.painter().line_segment([r.shrink(3.0).left_bottom(), r.shrink(3.0).right_top()], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger));
         }
     };
     let border = if resp.has_focus() {
@@ -112,7 +113,7 @@ pub(crate) fn swatch(
     } else {
         t.field_border
     };
-    ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, border), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), egui::StrokeKind::Inside);
     let resp = resp.on_hover_text(tip);
     let screen_id = resp.id.with("screen-color");
     let original = current.unwrap_or(fallback);

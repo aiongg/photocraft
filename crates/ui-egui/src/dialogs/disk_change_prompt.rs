@@ -38,7 +38,7 @@ pub(crate) fn intercept(app: &mut PhotocraftApp, doc: DocId, path: &str, flat: b
 
 pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {
     ui.label(fields.get("message").and_then(Value::as_str).unwrap_or_default());
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.label(tl!("Replace it with this document, or cancel and use File › Save As to keep both."));
 }
 

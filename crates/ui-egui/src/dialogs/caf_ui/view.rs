@@ -1,4 +1,5 @@
 use super::controls::{pointer, tool_icon, tool_tip};
+use craft_ui::theme::StrokeExt;
 use super::lifecycle::{apply, bounds, cancel, commit, fill_edit, report, reset, set_sampling};
 use super::preview::{drive_preview, rebase, refresh};
 use super::{
@@ -39,7 +40,7 @@ fn caf_options_bar(bui: &mut egui::Ui, w: &mut CafWorkspace, fill_btn: &mut Opti
             if crate::icons::button(bui, "minus", 26.0, !w.brush_add, tl!("Subtract")).clicked() {
                 w.brush_add = false;
             }
-            bui.add_space(8.0);
+            bui.add_space(craft_ui::theme::scale::Space::S8.px());
             bui.label(tl!("Size:"));
             let mut size = w.brush_size as f32;
             if widgets::value_field(bui, &mut size, 1.0..=5000.0, " px", 64.0).accessible_name(tl!("Size:")).changed() {
@@ -59,7 +60,7 @@ fn caf_options_bar(bui: &mut egui::Ui, w: &mut CafWorkspace, fill_btn: &mut Opti
                     w.lasso_op = i;
                 }
             }
-            bui.add_space(8.0);
+            bui.add_space(craft_ui::theme::scale::Space::S8.px());
             if widgets::secondary_button(bui, tl!("Expand"), 70.0).clicked() {
                 *fill_btn = Some(json!({"op": "expand", "by": w.expand_by}));
             }
@@ -130,7 +131,7 @@ fn caf_props_panel(
         ui.horizontal(|ui| {
             ui.label(tl!("Color"));
             widgets::color_edit_button_srgb(ui, &mut w.opts.color);
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             ui.label(tl!("Indicates"));
             widgets::dropdown(
                 ui,
@@ -209,11 +210,11 @@ fn caf_props_panel(
 
 /// The Preview panel: the sampled result in its own pan / zoom view, and the zoom row under it.
 fn caf_preview_panel(ui: &mut egui::Ui, painter: &egui::Painter, t: &Tokens, w: &mut CafWorkspace, pv_rect: ERect) {
-    painter.rect_filled(pv_rect, 0.0, t.dock);
-    painter.line_segment([pv_rect.left_top(), pv_rect.left_bottom()], Stroke::new(1.0, t.separator));
+    painter.rect_filled(pv_rect, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+    painter.line_segment([pv_rect.left_top(), pv_rect.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     painter.text(pv_rect.left_top() + vec2(12.0, 10.0), Align2::LEFT_TOP, tl!("Preview"), FontId::proportional(12.0), t.text);
     let pv_area = ERect::from_min_max(pv_rect.min + vec2(0.0, 30.0), pv_rect.max - vec2(0.0, 44.0));
-    painter.rect_filled(pv_area, 0.0, t.canvas);
+    painter.rect_filled(pv_area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
     if w.preview.zoom <= 0.0 {
         // Opens framed on the sampling window, as Photoshop's.
         let win = w.base.window;
@@ -285,11 +286,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         w.texture_limit = ctx.input(|i| i.max_texture_side);
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::hover());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, 0.0, t.chrome);
+        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
         // Title strip.
         let title = ERect::from_min_size(full.min, vec2(full.width(), 30.0));
-        painter.rect_filled(title, 0.0, t.dock);
-        painter.line_segment([title.left_bottom(), title.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let pct = if w.zoom > 0.0 { w.zoom * 100.0 } else { 100.0 };
         painter.text(
             title.center(),
@@ -300,8 +301,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         );
         // Options bar.
         let bar = ERect::from_min_size(pos2(full.left(), title.bottom()), vec2(full.width(), BAR_H));
-        painter.rect_filled(bar, 0.0, t.dock);
-        painter.line_segment([bar.left_bottom(), bar.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(bar, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([bar.left_bottom(), bar.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut bui =
             ui.new_child(egui::UiBuilder::new().max_rect(bar.shrink2(vec2(LEFT_W + 8.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         caf_options_bar(&mut bui, w, &mut fill_btn, &mut reset_what);
@@ -309,8 +310,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let body = ERect::from_min_max(pos2(full.left(), bar.bottom()), full.max);
         // Left tool strip.
         let left = ERect::from_min_size(pos2(full.left(), title.bottom()), vec2(LEFT_W, full.height() - title.height()));
-        painter.rect_filled(left, 0.0, t.dock);
-        painter.line_segment([left.right_top(), left.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(left, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([left.right_top(), left.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut strip = ui.new_child(egui::UiBuilder::new().max_rect(left.shrink2(vec2(6.0, 8.0))));
         strip.spacing_mut().item_spacing.y = 4.0;
         for tool in [CafTool::Brush, CafTool::Lasso, CafTool::Hand, CafTool::Zoom] {
@@ -320,8 +321,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         // Right: the Content-Aware Fill panel.
         let right = ERect::from_min_size(pos2(body.right() - PANEL_W, body.top()), vec2(PANEL_W, body.height()));
-        painter.rect_filled(right, 0.0, t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut props =
             ui.new_child(egui::UiBuilder::new().max_rect(ERect::from_min_max(right.min + vec2(14.0, 12.0), pos2(right.right() - 14.0, right.bottom() - 60.0))));
         egui::ScrollArea::vertical()
@@ -349,7 +350,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         caf_preview_panel(ui, &painter, &t, w, pv_rect);
         // The document view.
         let area = ERect::from_min_max(pos2(left.right(), body.top()), pos2(pv_rect.left(), body.bottom()));
-        painter.rect_filled(area, 0.0, t.canvas);
+        painter.rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
         let (cw, chh) = (w.canvas.width() as f32, w.canvas.height() as f32);
         if w.zoom <= 0.0 {
             w.zoom = ((area.width() - 40.0) / cw).min((area.height() - 40.0) / chh).clamp(0.01, 4.0);
@@ -387,12 +388,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 for e in edges {
                     let (a, b) = (v.to_screen([f64::from(e[0][0]), f64::from(e[0][1])]), v.to_screen([f64::from(e[1][0]), f64::from(e[1][1])]));
                     let dark = ((e[0][0] + e[0][1]) as usize / 4 + phase).is_multiple_of(2);
-                    clip.line_segment([a, b], Stroke::new(1.0, if dark { Color32::BLACK } else { Color32::WHITE }));
+                    clip.line_segment([a, b], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if dark { Color32::BLACK } else { Color32::WHITE }));
                 }
             }
             None => {
                 let b = v.rect(bounds(&w.base));
-                clip.rect_stroke(b, 0.0, Stroke::new(1.0, Color32::WHITE), egui::StrokeKind::Outside);
+                clip.rect_stroke(b, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::WHITE), egui::StrokeKind::Outside);
             }
         }
         ctx.request_repaint_after(std::time::Duration::from_millis(120));
@@ -400,17 +401,17 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             && pts.len() > 1
         {
             let line: Vec<Pos2> = pts.iter().map(|p| v.to_screen(*p)).collect();
-            clip.add(egui::Shape::line(line, Stroke::new(1.0, t.accent)));
+            clip.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent)));
         }
         if let Some(hp) = resp.hover_pos() {
             if w.tool == CafTool::Brush {
                 let r = w.brush_size as f32 * 0.5 * v.zoom;
-                clip.circle_stroke(hp, r, Stroke::new(1.5, Color32::BLACK));
+                clip.circle_stroke(hp, r, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::BLACK));
                 clip.circle_stroke(hp, r, Stroke::new(0.75, Color32::WHITE));
             }
             w.hover = Some(v.to_doc(hp));
         }
-        clip.rect_stroke(img, 0.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Outside);
+        clip.rect_stroke(img, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Outside);
         // Mouse → tools (Space, the middle button or the Hand pan).
         let pan = ui.input(|i| i.key_down(egui::Key::Space) || i.pointer.middle_down()) || w.tool == CafTool::Hand;
         if pan && resp.dragged() {

@@ -70,12 +70,12 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         match &tl {
             None => {
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 ui.vertical_centered(|ui| {
                     if crate::widgets::primary_button(ui, tl!("Create Video Timeline"), 200.0).clicked() {
                         act = Some(("timeline.create", json!({ "duration": 30, "fps": 30.0 })));
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     ui.weak(tl!("30 frames @ 30 fps"));
                 });
             }
@@ -117,7 +117,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         ui.label(RichText::new(format!("{:.0} fps", tl.fps)).color(t.text_dim));
                     });
                 });
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 // Scrubber: frame playhead across the duration.
                 if tl.duration > 1 {
                     let mut frame = tl.current as f64;

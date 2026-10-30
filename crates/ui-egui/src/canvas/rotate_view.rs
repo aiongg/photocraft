@@ -7,6 +7,8 @@
 //! Trackpad; a two-finger twist on a touch screen also needs Enable Gestures (#204).
 
 use egui::{Align2, Pos2, Rect, Stroke, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -242,10 +244,10 @@ pub fn overlay(app: &PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter
     }
     let r = compass_rect(xf.rect);
     ctx.data_mut(|d| d.insert_temp(compass_id(), r));
-    let t = Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let hover = response.hover_pos().is_some_and(|p| r.contains(p));
-    painter.circle_filled(r.center(), r.width() * 0.5, if hover { t.hover } else { t.chrome });
-    painter.circle_stroke(r.center(), r.width() * 0.5 - 0.5, Stroke::new(1.0, t.separator));
+    painter.circle_filled(r.center(), r.width() * 0.5, if hover { t.color.state.hover.to_egui() } else { t.color.surface.chrome.to_egui() });
+    painter.circle_stroke(r.center(), r.width() * 0.5 - 0.5, craft_ui::theme::scale::Stroke::W1.egui(ctx, t.color.line.divider.to_egui()));
     // Document up: (0, −1) in document space, rotated then flipped like [`ViewXform::to_screen`].
     let rad = view.rotation.to_radians();
     let (c, s) = if view.rotation.abs() < 1e-6 { (1.0, 0.0) } else { (rad.cos(), rad.sin()) };
@@ -253,9 +255,9 @@ pub fn overlay(app: &PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter
     let sx = if xf.flip { -1.0 } else { 1.0 };
     let needle = vec2(rx * sx, ry) * (r.width() * 0.32);
     let tip = r.center() + needle;
-    painter.line_segment([r.center(), tip], Stroke::new(2.0, t.accent));
-    painter.circle_filled(tip, 2.5, t.accent);
-    painter.text(r.center() + vec2(0.0, r.width() * 0.18), Align2::CENTER_CENTER, "N", egui::FontId::proportional(9.0), t.text_faint);
+    painter.line_segment([r.center(), tip], craft_ui::theme::scale::Stroke::W2.egui(ctx, t.color.accent.solid.to_egui()));
+    painter.circle_filled(tip, 2.5, t.color.accent.solid.to_egui());
+    painter.text(r.center() + vec2(0.0, r.width() * 0.18), Align2::CENTER_CENTER, "N", egui::FontId::proportional(9.0), t.color.text.faint.to_egui());
     if response.clicked() && response.interact_pointer_pos().is_some_and(|p| r.contains(p)) {
         view.rotation = 0.0;
         ctx.data_mut(|d| d.remove::<RotateDrag>(id()));

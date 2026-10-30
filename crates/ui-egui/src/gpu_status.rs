@@ -280,7 +280,7 @@ pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
             } else {
                 ui.label(tl!("Retry GPU requires a restart. Save your work first."));
             }
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             ui.horizontal(|ui| {
                 use crate::widgets::{ButtonRole, DialogButton};
                 let buttons =

@@ -1,4 +1,6 @@
 use super::selection::floating_outline;
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use super::view_xform::ViewXform;
 use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Stroke, Tool, Vec2, pos2, vec2};
 
@@ -124,17 +126,17 @@ pub(super) fn begin_transform_controls_at(app: &mut PhotocraftApp, ctx: &egui::C
 /// and the outline of every selected shape layer, as in Photoshop.
 pub(super) fn draw_transform_controls(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(r) = transform_controls_rect(app, xf) else { return };
-    let accent = crate::theme::Tokens::get(painter.ctx()).accent;
+    let accent = craft_ui::theme::current(painter.ctx()).color.accent.solid.to_egui();
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     for l in transform_controls_layers(app) {
         if let LayerContent::Shape(sh) = &l.content {
             crate::vector_ui::draw_outline(painter, &sh.path, &to_scr, accent);
         }
     }
-    painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Middle);
+    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Middle);
     for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
         let h = Rect::from_center_size(p, vec2(7.0, 7.0));
-        painter.rect_filled(h, 0.0, Color32::WHITE);
-        painter.rect_stroke(h, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Inside);
+        painter.rect_filled(h, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+        painter.rect_stroke(h, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
     }
 }

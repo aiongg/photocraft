@@ -1,4 +1,5 @@
 use super::shortcuts::shortcut_items;
+use craft_ui::theme::ToEgui;
 use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Tokens, Value, json, prefs};
 
 // ------------------------------------------------------------------ menu routing
@@ -217,10 +218,10 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut kind = f.get("kind").and_then(Value::as_str).unwrap_or("brushes").to_string();
     ui.horizontal(|ui| {
-        ui.label(RichText::new(tl!("Preset Type")).color(t.text_dim));
+        ui.label(RichText::new(tl!("Preset Type")).color(t.color.text.muted.to_egui()));
         let opts = [("brushes".to_string(), tl!("Brushes")), ("customShapes".to_string(), tl!("Custom Shapes")), ("patterns".to_string(), tl!("Patterns"))];
         crate::widgets::dropdown(ui, "preset-kind", tl!("Type"), &mut kind, &opts, 180.0);
     });
@@ -240,7 +241,7 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
             }
         }
         if list.is_empty() {
-            ui.label(RichText::new(tl!("No presets of this type.")).color(t.text_faint));
+            ui.label(RichText::new(tl!("No presets of this type.")).color(t.color.text.faint.to_egui()));
         }
     });
     let mut new_name = f.get("newName").and_then(Value::as_str).unwrap_or("").to_string();
@@ -263,10 +264,10 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
 }
 
 pub(super) fn presets_io_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut action = f.get("action").and_then(Value::as_str).unwrap_or("export").to_string();
     ui.horizontal(|ui| {
-        ui.label(RichText::new(tl!("Action")).color(t.text_dim));
+        ui.label(RichText::new(tl!("Action")).color(t.color.text.muted.to_egui()));
         crate::widgets::dropdown(
             ui,
             "presets-io",
@@ -285,9 +286,9 @@ pub(super) fn presets_io_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(f.get("message").and_then(Value::as_str).unwrap_or("")).color(t.text));
-    ui.add_space(6.0);
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.label(RichText::new(f.get("message").and_then(Value::as_str).unwrap_or("")).color(t.color.text.normal.to_egui()));
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let mut action = f.get("action").and_then(Value::as_str).unwrap_or("preserve").to_string();
     let missing = f.get("missing").and_then(Value::as_bool).unwrap_or(false);
     let name = |k: &str| f.get(k).and_then(Value::as_str).unwrap_or("?").to_string();
@@ -306,7 +307,7 @@ pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     f.insert("action".into(), json!(action));
     // Remembering sets the Color Settings policy and stops asking, so it needs a mode with a policy.
     if !missing && f.get("policyKey").is_some_and(Value::is_string) {
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         let mut remember = f.get("remember").and_then(Value::as_bool).unwrap_or(false);
         crate::widgets::checkbox(ui, &mut remember, tl!("Remember this choice for future images"))
             .on_hover_text(tl!("Turn the prompt back on with Ask On Mismatch in Edit › Color Settings."));

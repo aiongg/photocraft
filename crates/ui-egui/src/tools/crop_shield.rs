@@ -10,6 +10,7 @@
 //! the area outside the box.
 
 use egui::{Color32, Key, Modifiers};
+use craft_ui::theme::ToEgui;
 use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
@@ -107,7 +108,7 @@ pub fn fill(s: &CropShield, canvas: Color32, editing: bool) -> Option<Color32> {
 /// The pasteboard colour the shield matches: Preferences › Interface's, else black in Full Screen
 /// Mode (the backdrop there) and the theme's canvas otherwise.
 pub fn canvas_color(app: &PhotocraftApp, ctx: &egui::Context) -> Color32 {
-    crate::prefs_ui::pasteboard_color(app).unwrap_or_else(|| if app.ui.view.hides_chrome() { Color32::BLACK } else { crate::theme::Tokens::get(ctx).canvas })
+    crate::prefs_ui::pasteboard_color(app).unwrap_or_else(|| if app.ui.view.hides_chrome() { Color32::BLACK } else { craft_ui::theme::current(ctx).color.surface.canvas.to_egui() })
 }
 
 /// The shield over the pending crop box now ([`fill`]).

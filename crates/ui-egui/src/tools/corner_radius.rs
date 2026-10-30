@@ -9,6 +9,7 @@
 //! changes nothing.
 
 use egui::{Color32, Modifiers, Pos2, Stroke};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::LayerContent;
 use photocraft_doc::vector::LiveShape;
 use photocraft_vector::shapes;
@@ -322,7 +323,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, to_scr: &dyn Fn([f64; 
         for i in 0..t.corners() {
             if let Some(w) = t.widget(radii, i, z) {
                 let p = to_scr(w);
-                painter.circle(p, 5.0, Color32::WHITE, Stroke::new(1.5, accent));
+                painter.circle(p, 5.0, Color32::WHITE, craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent));
                 painter.circle_filled(p, 2.5, accent);
             }
         }

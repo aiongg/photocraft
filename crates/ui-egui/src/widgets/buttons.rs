@@ -1,4 +1,5 @@
 use super::panel::surface;
+use craft_ui::theme::StrokeExt;
 use super::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2, theme, vec2};
 
 /// iOS-style toggle switch.
@@ -172,7 +173,7 @@ fn button_impl_h(ui: &mut Ui, label: &str, min_width: f32, height: Option<f32>, 
     if resp.has_focus() {
         // Keyboard focus (Tab); clicks don't focus egui buttons.
         let r = if t.pro { h / 2.0 } else { t.radius_sm } + 2.0;
-        ui.painter().rect_stroke(rect.expand(2.0), r, Stroke::new(2.0, t.accent), StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), r, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Outside);
     }
     if t.pro {
         // Spectrum buttons: fully rounded; primary = filled accent, secondary = outline.
@@ -191,7 +192,7 @@ fn button_impl_h(ui: &mut Ui, label: &str, min_width: f32, height: Option<f32>, 
             if resp.hovered() || down {
                 ui.painter().rect_filled(rect, r, t.hover);
             }
-            ui.painter().rect_stroke(rect, r, Stroke::new(1.5, if resp.hovered() { t.text } else { t.text_dim }), StrokeKind::Inside);
+            ui.painter().rect_stroke(rect, r, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if resp.hovered() { t.text } else { t.text_dim }), StrokeKind::Inside);
         }
         ui.painter().galley(rect.center() - galley.size() / 2.0, galley, fg);
         return resp;
@@ -205,7 +206,7 @@ fn button_impl_h(ui: &mut Ui, label: &str, min_width: f32, height: Option<f32>, 
     };
     surface(ui, rect, fill, !resp.is_pointer_button_down_on());
     if !t.bevel && !primary {
-        ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     ui.painter().galley(rect.center() - galley.size() / 2.0, galley, fg);
     resp
@@ -253,7 +254,7 @@ pub fn check_box_fill(on: bool, pressed: bool, t: &Tokens) -> Color32 {
 /// Paint a check box in `rect`: [`check_box_fill`] with a white tick when `on`, else an
 /// outline that brightens while `hovered` or `pressed`.
 pub fn check_box(p: &egui::Painter, rect: Rect, on: bool, hovered: bool, pressed: bool, t: &Tokens) {
-    p.rect_filled(rect, 2.0, check_box_fill(on, pressed, t));
+    p.rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), check_box_fill(on, pressed, t));
     if on {
         let a = rect.left_center() + vec2(3.0, 0.5);
         let b = rect.center_bottom() + vec2(-1.0, -3.5);
@@ -262,6 +263,6 @@ pub fn check_box(p: &egui::Painter, rect: Rect, on: bool, hovered: bool, pressed
         p.line_segment([a, b], tick);
         p.line_segment([b, c], tick);
     } else {
-        p.rect_stroke(rect, 2.0, Stroke::new(1.5, if hovered || pressed { t.text_dim } else { t.text_faint }), StrokeKind::Inside);
+        p.rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), Stroke::new(1.5, if hovered || pressed { t.text_dim } else { t.text_faint }), StrokeKind::Inside);
     }
 }

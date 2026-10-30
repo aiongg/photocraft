@@ -9,6 +9,8 @@
 //! (`canvas::ensure_filter_preview`), unchanged.
 
 use egui::{Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::Document;
 use serde_json::{Map, Value, json};
 
@@ -60,7 +62,7 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
         crate::canvas::filter_preview_factor(app, &st.doc, &cmd, &params)
     });
 
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let cache_id = egui::Id::unique(("filter-preview-ui", dialog));
     let mut cache: Cache = ui.ctx().data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Cache>(cache_id)));
     // Channel visibility and the active mask can change without a document revision. Both the
@@ -116,12 +118,12 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
     let holding = response.is_pointer_button_down_on();
     let shown = if holding { orig.as_ref() } else { filt.as_ref().or(orig.as_ref()) };
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, t.radius_sm, t.canvas);
+    painter.rect_filled(rect, t.shape.radius.control, t.color.surface.canvas.to_egui());
     if let Some((tex, _)) = shown {
         crate::widgets::checker(&painter, dest, 8.0);
         painter.image(tex.id(), dest, uv, Color32::WHITE);
     }
-    painter.rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
+    painter.rect_stroke(rect, t.shape.radius.control, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()), egui::StrokeKind::Inside);
 
     // Drag to pan (the image follows the pointer); a plain click centres on the clicked point.
     if response.dragged() {
@@ -140,7 +142,7 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
         if crate::icons::button(ui, "minus", 22.0, false, tl!("Zoom out")).clicked() {
             zoom = step_zoom(zoom, false);
         }
-        ui.label(egui::RichText::new(format!("{}%", crate::widgets::fmt_num(zoom as f64 * 100.0))).color(t.text_dim));
+        ui.label(egui::RichText::new(format!("{}%", crate::widgets::fmt_num(zoom as f64 * 100.0))).color(t.color.text.muted.to_egui()));
         if crate::icons::button(ui, "plus", 22.0, false, tl!("Zoom in")).clicked() {
             zoom = step_zoom(zoom, true);
         }

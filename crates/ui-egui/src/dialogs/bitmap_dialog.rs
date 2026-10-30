@@ -11,6 +11,7 @@
 //! state (`__resUnit`, `__freqUnit`).
 
 use serde_json::{Map, Value, json};
+use craft_ui::theme::ToEgui;
 
 use crate::PhotocraftApp;
 use crate::theme::Tokens;
@@ -64,8 +65,8 @@ fn text(f: &Map<String, Value>, key: &str, default: &str) -> String {
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.add_sized([96.0, 20.0], egui::Label::new(egui::RichText::new(text).color(t.text_dim)).truncate());
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.add_sized([96.0, 20.0], egui::Label::new(egui::RichText::new(text).color(t.color.text.muted.to_egui())).truncate());
 }
 
 /// A value stored in per-inch units, edited in per-inch or per-centimeter ones: `field` holds the
@@ -89,8 +90,8 @@ fn per_unit_row(ui: &mut egui::Ui, f: &mut Map<String, Value>, field: &str, name
 
 /// The dialog body.
 pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
-    ui.spacing_mut().item_spacing.y = 6.0;
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.spacing_mut().item_spacing.y = t.space.gap.stack;
     let res_units = [("ppi", tl!("Pixels/Inch")), ("ppcm", tl!("Pixels/Centimeter"))];
 
     crate::widgets::section_label(ui, tl!("Resolution"));
@@ -99,7 +100,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         label(ui, tl!("Input:"));
         let input = num(f, "__inputResolution", 72.0);
         let (v, unit) = if text(f, "__resUnit", "ppi") == "ppcm" { (input / CM, res_units[1].1) } else { (input, res_units[0].1) };
-        ui.label(egui::RichText::new(format!("{} {unit}", crate::widgets::fmt_num_prec(f64::from(v), 3))).color(t.text));
+        ui.label(egui::RichText::new(format!("{} {unit}", crate::widgets::fmt_num_prec(f64::from(v), 3))).color(t.color.text.normal.to_egui()));
     });
     ui.horizontal(|ui| {
         label(ui, tl!("Output:"));
@@ -107,7 +108,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, "__resUnit", res_units);
     });
 
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::section_label(ui, tl!("Method"));
     crate::widgets::hairline(ui);
     let mut method = text(f, "method", "diffusion");
@@ -124,7 +125,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
             label(ui, tl!("Custom Pattern:"));
             let pat = text(f, "pattern", "");
             if app.session.patterns.items.is_empty() {
-                ui.label(egui::RichText::new(tl!("No patterns")).color(t.text_faint));
+                ui.label(egui::RichText::new(tl!("No patterns")).color(t.color.text.faint.to_egui()));
             } else if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
                 f.insert("pattern".into(), json!(id));
             }
@@ -132,7 +133,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     });
 
     if method == "halftone" {
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::section_label(ui, tl!("Halftone Screen"));
         crate::widgets::hairline(ui);
         ui.horizontal(|ui| {
@@ -157,7 +158,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     }
 
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
         f.insert("__preview".into(), json!(preview));
     }

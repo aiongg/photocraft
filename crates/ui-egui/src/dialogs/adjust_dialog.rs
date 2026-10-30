@@ -9,6 +9,8 @@
 //! history step) and Cancel drops the preview, leaving the document untouched.
 
 use serde_json::{Map, Value, json};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 use crate::PhotocraftApp;
 use crate::adjust_editors::{self, EditorCx};
@@ -176,9 +178,9 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
 
 pub(crate) fn picker_button(ui: &mut egui::Ui, selected: bool, enabled: bool, tooltip: &str, color: egui::Color32) -> egui::Response {
     let response = ui.add_enabled_ui(enabled, |ui| crate::icons::button(ui, "pipette", 28.0, selected, tooltip)).inner;
-    let tokens = crate::theme::Tokens::get(ui.ctx());
+    let tokens = craft_ui::theme::current(ui.ctx());
     ui.painter().circle_filled(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, color);
-    ui.painter().circle_stroke(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, egui::Stroke::new(1.0, tokens.field_border));
+    ui.painter().circle_stroke(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tokens.color.line.control_edge.to_egui()));
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, enabled, selected, tooltip));
     response
 }
@@ -188,8 +190,8 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
     let current = picker(fields.get(CURVE_PICKER));
     let mut chosen = None;
     ui.horizontal(|ui| {
-        let tokens = crate::theme::Tokens::get(ui.ctx());
-        ui.label(egui::RichText::new(tl!("Eyedroppers:")).color(tokens.text_dim).size(12.0));
+        let tokens = craft_ui::theme::current(ui.ctx());
+        ui.label(egui::RichText::new(tl!("Eyedroppers:")).color(tokens.color.text.muted.to_egui()).size(12.0));
         // The swatch is the tone the picker maps the sample to (image data, like the Curves
         // gradient bars), not chrome, so it is the same in every theme; its ring is a token.
         for (id, eyedropper, label, tone) in [
@@ -203,7 +205,7 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
             }
         }
         if !matches!(mode, photocraft_doc::ColorMode::Rgb | photocraft_doc::ColorMode::Grayscale) {
-            ui.label(egui::RichText::new(tl!("Unavailable in this color mode")).color(tokens.text_faint).size(11.0));
+            ui.label(egui::RichText::new(tl!("Unavailable in this color mode")).color(tokens.color.text.faint.to_egui()).size(11.0));
         }
     });
     if let Some((id, selected)) = chosen
@@ -331,7 +333,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String,
     let mode = curve_mode(app, &kind);
     if matches!(kind.as_str(), "levels" | "curves") {
         picker_controls(ui, fields, mode);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
     }
     let mut values = crate::filter_dialog::params_of(fields);
     let active = fields
@@ -382,7 +384,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String,
         }
     }
     let mut preview = fields.get("__preview").and_then(Value::as_bool).unwrap_or(true);
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if crate::widgets::checkbox(ui, &mut preview, tl!("Preview")).changed() {
         fields.insert("__preview".into(), json!(preview));
     }

@@ -2,6 +2,7 @@ use super::{
     Color32, CurveUi, Edit, EditorCx, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, ToneSpace, Value, adjust_params, curve_edit, json, label, pos2,
     space_of, tone, vec2, widgets,
 };
+use craft_ui::theme::StrokeExt;
 
 // ---------------------------------------------------------------------------------------------
 // Channels of Levels / Curves
@@ -274,7 +275,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let mut pts = read_curve(v, key);
     let mut map = read_map(v, key);
     let side = curve_side(ui);
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let (full, resp) = ui.allocate_exact_size(vec2(side, side + 14.0), Sense::click_and_drag());
     let graph = curve_graph(full, side);
     ui.data_mut(|d| d.insert_temp(cx.mem.with("curves-graph"), graph));
@@ -310,20 +311,20 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
 
     // Draw: histogram, quarter grid, baseline, gradient bars, other channels, the curve, points.
     let p = ui.painter_at(full.expand(2.0));
-    p.rect_filled(graph, 0.0, t.field);
+    p.rect_filled(graph, craft_ui::theme::scale::Radius::R0.px(), t.field);
     if let Some(h) = &cx.hist {
         tone::draw_histogram(&p, graph, &h[hist_i], Color32::from_gray(if t.pro { 88 } else { 190 }).gamma_multiply(0.75));
     }
     for i in 1..4 {
         let f = i as f32 / 4.0;
-        let g = Stroke::new(1.0, t.separator);
+        let g = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator);
         p.line_segment([pos2(graph.left() + f * graph.width(), graph.top()), pos2(graph.left() + f * graph.width(), graph.bottom())], g);
         p.line_segment([pos2(graph.left(), graph.top() + f * graph.height()), pos2(graph.right(), graph.top() + f * graph.height())], g);
     }
-    p.line_segment([graph.left_bottom(), graph.right_top()], Stroke::new(1.0, t.separator.gamma_multiply(1.6)));
+    p.line_segment([graph.left_bottom(), graph.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(1.6)));
     p.rect_stroke(
         graph,
-        0.0,
+        craft_ui::theme::scale::Radius::R0.px(),
         Stroke::new(if resp.has_focus() { 1.5 } else { 1.0 }, if resp.has_focus() { t.accent } else { t.field_border }),
         StrokeKind::Outside,
     );
@@ -365,16 +366,16 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     for (i, q) in pts.iter().enumerate().filter(|_| !pencil) {
         let r = Rect::from_center_size(to_scr(*q), vec2(CURVE_HANDLE_SIZE, CURVE_HANDLE_SIZE));
         if Some(i) == st.gesture.selected {
-            p.rect_filled(r, 0.0, t.text);
-            p.rect_stroke(r, 0.0, Stroke::new(1.0, Color32::BLACK), StrokeKind::Outside);
+            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.text);
+            p.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::BLACK), StrokeKind::Outside);
         } else {
-            p.rect_filled(r, 0.0, t.field);
-            p.rect_stroke(r, 0.0, Stroke::new(1.0, t.text), StrokeKind::Inside);
+            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
+            p.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text), StrokeKind::Inside);
         }
     }
 
     // Input / Output of the selected point.
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         let i = st.gesture.selected.filter(|i| *i < pts.len() && !pencil);
         let (mut vi, mut vo) = i.map_or((0.0, 0.0), |i| (pts[i][0], pts[i][1]));

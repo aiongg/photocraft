@@ -17,6 +17,8 @@
 //!   or chosen reads as selected, and the mode again once the fields change or it is deleted.
 
 use egui::vec2;
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -304,9 +306,9 @@ fn delete_body(app: &PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String, 
     let mut selected: Vec<String> =
         fields.get("selected").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default();
     ui.label(tl!("Select the crop presets to delete:"));
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let toggle = ui.input(|i| i.modifiers.command || i.modifiers.shift);
-    egui::Frame::NONE.stroke(egui::Stroke::new(1.0, crate::theme::Tokens::get(ui.ctx()).field_border)).inner_margin(2.0).show(ui, |ui| {
+    egui::Frame::NONE.stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui())).inner_margin(2.0).show(ui, |ui| {
         egui::ScrollArea::vertical().id_salt("crop-preset-delete").max_height(220.0).auto_shrink([false, true]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
             // Full-width rows, names on the left.

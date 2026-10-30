@@ -7,6 +7,7 @@
 //! `layer.setExpanded` (a view change: no history step).
 
 use egui::{Rect, Sense, Shape, Stroke, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use photocraft_doc::{Document, Layer, LayerContent};
 use serde_json::{Value, json};
 
@@ -57,7 +58,7 @@ pub fn disclosure(ui: &mut egui::Ui, row: Rect, x: &mut f32, l: &Layer, actions:
     let LayerContent::Group(g) = &l.content else { return false };
     let hit = triangle_rect(row, *x);
     let resp = ui.interact(hit, ui.scope_id().with(("disclosure", l.id.0)), Sense::click());
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let c = pos2(*x + TRIANGLE_W / 2.0 - 1.0, row.center().y);
     let s = 3.5;
     let pts = if g.expanded {
@@ -65,7 +66,7 @@ pub fn disclosure(ui: &mut egui::Ui, row: Rect, x: &mut f32, l: &Layer, actions:
     } else {
         vec![pos2(c.x - s * 0.6, c.y - s), pos2(c.x + s * 0.6, c.y), pos2(c.x - s * 0.6, c.y + s)]
     };
-    let color = if resp.hovered() { t.text } else { t.icon };
+    let color = if resp.hovered() { t.color.text.normal.to_egui() } else { t.color.text.normal.to_egui() };
     ui.painter().add(Shape::convex_polygon(pts, color, Stroke::NONE));
     *x += TRIANGLE_W;
     let clicked = resp.clicked();

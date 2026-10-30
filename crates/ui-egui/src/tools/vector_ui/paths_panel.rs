@@ -1,4 +1,5 @@
 use super::overlay::path_lines;
+use craft_ui::theme::StrokeExt;
 use super::shapes::hex;
 use super::{Color32, Document, LayerContent, Path, PhotocraftApp, Rect, Sense, Stroke, Tokens, Value, json, pos2, vec2};
 
@@ -9,16 +10,16 @@ fn thumb(ui: &egui::Ui, r: Rect, path: &Path, doc: &Document) {
     let t = Tokens::get(ui.ctx());
     // At the document's aspect ratio, like the Channels thumbnails.
     let r = crate::channels_panel::fit_thumb(r, doc.size.width, doc.size.height).0;
-    ui.painter().rect_filled(r, 0.0, Color32::from_gray(if t.pro { 222 } else { 240 }));
+    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(if t.pro { 222 } else { 240 }));
     let (w, h) = (doc.size.width.max(1) as f64, doc.size.height.max(1) as f64);
     let s = (r.width() as f64 / w).min(r.height() as f64 / h);
     let off = r.center() - vec2((w * s) as f32 / 2.0, (h * s) as f32 / 2.0);
     let map = |q: [f64; 2]| pos2(off.x + (q[0] * s) as f32, off.y + (q[1] * s) as f32);
     for (pts, closed) in path_lines(path, &map) {
         if closed && pts.len() >= 3 {
-            ui.painter().add(egui::Shape::closed_line(pts, Stroke::new(1.0, Color32::from_gray(40))));
+            ui.painter().add(egui::Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(40))));
         } else {
-            ui.painter().add(egui::Shape::line(pts, Stroke::new(1.0, Color32::from_gray(40))));
+            ui.painter().add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(40))));
         }
     }
 }
@@ -208,9 +209,9 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, name));
                 let sel = app.ui.selected_path.as_deref() == Some(key.as_str());
                 if sel {
-                    ui.painter().rect_filled(r, 0.0, t.row_selected);
+                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
                 } else if resp.hovered() {
-                    ui.painter().rect_filled(r, 0.0, t.hover.gamma_multiply(0.5));
+                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
                 }
                 let thumbnail = Rect::from_min_size(pos2(r.left() + 8.0, r.top() + 4.0), vec2(28.0, 28.0));
                 thumb(ui, thumbnail, path, &doc);
@@ -307,7 +308,7 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         }
                     });
                 });
-                ui.painter().line_segment([r.left_bottom(), r.right_bottom()], Stroke::new(1.0, t.separator));
+                ui.painter().line_segment([r.left_bottom(), r.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
             }
             // Clicking the empty area deselects the path, as in Photoshop: new fill and
             // adjustment layers then take the selection as their mask instead (#1419).

@@ -7,6 +7,7 @@
 //! `Preferences::workspaces` / `workspace_locked` so they persist with the preferences.
 
 use egui::{Align2, RichText, vec2};
+use craft_ui::theme::ToEgui;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -404,19 +405,19 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some((kind, mut f)) = app.ui.shell.dialog.clone() else { return };
-    let t = Tokens::get(ctx);
+    let t = craft_ui::theme::current(ctx);
     let title = title(&kind);
     let names: Vec<String> = app.session.prefs().workspaces.keys().cloned().collect();
     let mut result: Option<bool> = None;
     egui::Window::new(title).id(egui::Id::unique("shell-dialog")).collapsible(false).resizable(false).anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0)).show(
         ctx,
         |ui| {
-            ui.label(RichText::new(tl!(&title)).color(t.text).size(13.0).strong());
+            ui.label(RichText::new(tl!(&title)).color(t.color.text.normal.to_egui()).size(13.0).strong());
             crate::widgets::hairline(ui);
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             let text = |ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(tl!(&label)).color(t.text_dim).size(11.0));
+                    ui.label(RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(11.0));
                     let mut v = f.get(key).and_then(Value::as_str).unwrap_or("").to_string();
                     if ui.add(egui::TextEdit::singleline(&mut v).desired_width(180.0)).accessible_name(tl!(label)).changed() {
                         f.insert(key.into(), json!(v));
@@ -431,7 +432,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
             };
             let number = |ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, range: std::ops::RangeInclusive<f32>| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(tl!(&label)).color(t.text_dim).size(11.0));
+                    ui.label(RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(11.0));
                     let mut v = f.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
                     if crate::widgets::slider(ui, &mut v, range.clone(), None).changed()
                         | crate::widgets::value_field(ui, &mut v, range, "", 60.0).accessible_name(tl!(&label)).changed()
@@ -443,10 +444,10 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
             match kind.as_str() {
                 "newWorkspace" => {
                     text(ui, &mut f, "name", tl!("Name:"));
-                    ui.label(RichText::new(tl!("Capture")).color(t.text_dim).size(11.0));
+                    ui.label(RichText::new(tl!("Capture")).color(t.color.text.muted.to_egui()).size(11.0));
                     ui.label(
                         RichText::new(tl!("Panel locations are saved in the workspace. Keyboard shortcuts, menus and toolbar are optional."))
-                            .color(t.text_faint)
+                            .color(t.color.text.faint.to_egui())
                             .size(10.5),
                     );
                     check(ui, &mut f, "keyboardShortcuts", tl!("Keyboard Shortcuts"));
@@ -494,7 +495,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     }
                 }
             }
-            ui.add_space(8.0);
+            ui.add_space(t.space.gap.stack);
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let ok = if kind == "deleteWorkspace" { tl!("Delete") } else { tl!("OK") };

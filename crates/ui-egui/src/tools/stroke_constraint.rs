@@ -12,6 +12,7 @@
 //! and Smoothing treat them like any other stroke points.
 
 use crate::state::Tool;
+use craft_ui::theme::StrokeExt;
 
 /// Screen points the pointer must travel before a ⇧-constrained stroke locks its direction.
 const LOCK_DISTANCE: f64 = 3.0;
@@ -118,8 +119,8 @@ pub fn draw_line_preview(
     use photocraft_engine::prefs::PaintingCursor;
     if matches!(app.session.prefs().cursors.painting, PaintingCursor::Standard | PaintingCursor::Precise) {
         let r = (app.session.tools.brush.size / 2.0 * xf.zoom).max(1.0);
-        painter.circle_stroke(pointer, r + 0.5, Stroke::new(1.0, Color32::from_black_alpha(140)));
-        painter.circle_stroke(pointer, r, Stroke::new(1.0, Color32::from_white_alpha(220)));
+        painter.circle_stroke(pointer, r + 0.5, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(140)));
+        painter.circle_stroke(pointer, r, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(220)));
     }
     Some([a, pointer])
 }

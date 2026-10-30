@@ -199,9 +199,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let modal = egui::Modal::new(egui::Id::unique("jpeg-options")).show(ctx, |ui| {
         ui.set_max_width(360.0);
         ui.label(egui::RichText::new(tl!("JPEG Options")).font(crate::theme::semibold(15.0)));
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::hairline(ui);
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         crate::widgets::section_label(ui, tl!("Image Options"));
         ui.horizontal(|ui| {
             let quality_caption = ui.label(tl!("Quality"));
@@ -217,12 +217,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             let _ = preset.response.accessible_name(tl!("Preset"));
         });
         ui.add(egui::Slider::new(&mut quality, 0..=MAX_QUALITY).show_value(false)).accessible_name(tl!("Quality"));
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         crate::widgets::section_label(ui, tl!("Format Options"));
         ui.radio_value(&mut format, JpegFormat::Baseline, tl!("Baseline (\"Standard\")"));
         ui.radio_value(&mut format, JpegFormat::Optimized, tl!("Baseline Optimized"));
         ui.radio_value(&mut format, JpegFormat::Progressive, tl!("Progressive"));
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 10.0;
             ok = crate::widgets::primary_button(ui, tl!("OK"), 84.0).clicked();

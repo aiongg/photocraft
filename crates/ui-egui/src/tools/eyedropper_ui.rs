@@ -6,6 +6,7 @@
 //! eyedropper, the dialog eyedroppers and the Info panel, as in Photoshop.
 
 use crate::PhotocraftApp;
+use craft_ui::theme::ToEgui;
 use crate::theme::Tokens;
 use crate::widgets;
 
@@ -34,8 +35,8 @@ pub fn layer_options() -> [(String, &'static str); 5] {
 }
 
 fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(egui::RichText::new(text).color(t.text_dim).size(12.0));
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.label(egui::RichText::new(text).color(t.color.text.muted.to_egui()).size(12.0));
 }
 
 /// The options bar for the Eyedropper tool.
@@ -47,13 +48,13 @@ pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     widgets::dropdown(ui, "eyedropper-sample", tl!("Source"), &mut o.eyedropper_sample, &layer_options(), 190.0);
     widgets::checkbox(ui, &mut o.eyedropper_ring, tl!("Show Sampling Ring"));
     widgets::vline(ui, 22.0);
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     ui.label(
         egui::RichText::new(crate::i18n::fmt(
             tl!("Click to sample the foreground colour  ·  {key}-click for background"),
             &[("key", &crate::shortcuts::pretty("Alt"))],
         ))
-        .color(t.text_faint),
+        .color(t.color.text.faint.to_egui()),
     );
 }
 

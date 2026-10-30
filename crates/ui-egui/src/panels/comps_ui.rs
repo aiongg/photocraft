@@ -6,6 +6,7 @@
 //! `layerComp.*` engine command; the selection is `UiState::layer_comp_selected`.
 
 use egui::{Align2, Rect, Sense, Stroke, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -95,12 +96,12 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // Last Document State.
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
         if applied.is_none() {
-            ui.painter().rect_filled(rect, 0.0, t.row_selected);
+            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
         } else if resp.hovered() {
-            ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
+            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
         }
         let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-        ui.painter().rect_stroke(marker, 2.0, Stroke::new(1.0, t.text_faint), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(marker, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint), egui::StrokeKind::Inside);
         if applied.is_none() {
             crate::icons::paint(ui, marker, "check", 10.0, t.icon);
         }
@@ -114,10 +115,10 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if resp.clicked() && doc.last_document_state.is_some() && applied.is_some() {
             action = Some(("layerComp.restoreLastDocumentState", json!({})));
         }
-        ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.separator));
+        ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
 
         if doc.layer_comps.is_empty() {
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             ui.label(
                 egui::RichText::new(tl!("Capture the visibility, position and style of every layer with + below, then switch between versions."))
                     .color(t.text_faint)
@@ -135,7 +136,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let after = ui.input(|i| i.pointer.hover_pos().is_some_and(|p| p.y >= rect.center().y));
                 let to = drop_index(from, index, after);
                 let y = if after { rect.bottom() } else { rect.top() };
-                ui.painter().line_segment([pos2(rect.left(), y), pos2(rect.right(), y)], Stroke::new(2.0, t.accent));
+                ui.painter().line_segment([pos2(rect.left(), y), pos2(rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
                 if resp.dnd_release_payload::<DragComp>().is_some() && from != to {
                     select = Some(source.comp);
                     action = Some(("layerComp.reorder", json!({"comp":source.comp, "index":to})));
@@ -154,13 +155,13 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
             });
             if selected == Some(c.id) {
-                ui.painter().rect_filled(rect, 0.0, t.row_selected);
+                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
             } else if resp.hovered() {
-                ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
+                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
             }
             // Apply marker (click to apply).
             let marker = Rect::from_center_size(pos2(rect.left() + 14.0, rect.center().y), vec2(12.0, 12.0));
-            ui.painter().rect_stroke(marker, 2.0, Stroke::new(1.0, t.text_faint), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(marker, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint), egui::StrokeKind::Inside);
             if applied == Some(c.id) {
                 crate::icons::paint(ui, marker, "check", 10.0, t.accent);
             }
@@ -176,7 +177,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let r = Rect::from_center_size(pos2(x, rect.center().y), vec2(20.0, 20.0));
                 let hov = ui.rect_contains_pointer(r);
                 if hov {
-                    ui.painter().rect_filled(r, 3.0, t.hover);
+                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
                 }
                 crate::icons::paint(ui, r, icon, 13.0, if *on { t.icon } else { t.text_faint.gamma_multiply(0.45) });
                 if hov && resp.clicked() {
@@ -242,11 +243,11 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     action = Some(("layerComp.apply", json!({"comp": c.id})));
                 }
             }
-            ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.separator.gamma_multiply(0.5)));
+            ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(0.5)));
         }
     });
     // Footer: apply previous, apply next | update, new, delete (Photoshop's order).
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let has = !doc.layer_comps.is_empty();
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;

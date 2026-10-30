@@ -1,4 +1,5 @@
 use super::begin::{enter_warp, leave_warp, warps_type};
+use craft_ui::theme::StrokeExt;
 use super::commit::{cancel, commit};
 use super::pointer::point_on_quad;
 use super::warp::edit_session_warp;
@@ -258,7 +259,7 @@ fn anchor_grid_widget(ui: &mut egui::Ui, current_anchor: Option<usize>) -> Optio
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let tk = crate::theme::Tokens::get(ui.ctx());
     let painter = ui.painter();
-    painter.rect_stroke(rect, 1.0, egui::Stroke::new(1.0, tk.card_border), egui::StrokeKind::Inside);
+    painter.rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tk.card_border), egui::StrokeKind::Inside);
     let mut clicked = None;
     let pointer = resp.interact_pointer_pos();
     for row in 0..3 {
@@ -297,7 +298,7 @@ pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t
         }
         pivot = new_p;
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut px = pivot[0] as f32;
     let mut py = pivot[1] as f32;
     lbl(ui, "X:");
@@ -504,7 +505,7 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
     let c = rect.center();
     let stroke = Stroke::new(1.15, ink);
     let box_r = egui::Rect::from_center_size(c, vec2(13.0, 13.0));
-    ui.painter().rect_stroke(box_r, 2.0, stroke, egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(box_r, craft_ui::theme::scale::Radius::R2.px(), stroke, egui::StrokeKind::Inside);
     let h = 5.2;
     match kind {
         "vertical" => {
@@ -530,7 +531,7 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
 /// Warp switch, cancel and commit, kept on the right of the options bar.
 /// `mode_switch`: the Free Transform / Warp switch (not for Content-Aware Scale, which only scales).
 fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, mode_switch: bool) {
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let commit_tip = if warping {
         crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
     } else {

@@ -1,4 +1,5 @@
 use super::hue_saturation::RANGE_LABELS;
+use craft_ui::theme::StrokeExt;
 use super::{
     Color32, Edit, EditorCx, HUE_RANGES, PHOTO_FILTERS, RichText, Sense, Stroke, StrokeKind, Tokens, Value, adjust_params, color_button, flag, json, label,
     num, nums, pos2, rgb_of, round, tone, vec2, widgets,
@@ -74,15 +75,15 @@ pub(super) fn threshold(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit
     let (hr, _) = ui.allocate_exact_size(vec2(w, 90.0), Sense::hover());
     let hr = hr.shrink2(vec2(6.0, 0.0));
     let p = ui.painter_at(hr.expand(1.0));
-    p.rect_filled(hr, 0.0, t.field);
+    p.rect_filled(hr, craft_ui::theme::scale::Radius::R0.px(), t.field);
     if let Some(h) = &cx.hist {
         tone::draw_histogram(&p, hr, &h[0], Color32::from_gray(if t.pro { 150 } else { 110 }));
     }
     let level = num(v, "level", 128.0);
     let x = hr.left() + level / 255.0 * hr.width();
-    p.line_segment([pos2(x, hr.top()), pos2(x, hr.bottom())], Stroke::new(1.0, t.accent));
-    p.rect_stroke(hr, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
-    ui.add_space(4.0);
+    p.line_segment([pos2(x, hr.top()), pos2(x, hr.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent));
+    p.rect_stroke(hr, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     sliders(ui, v, &[("level", tl!("Threshold Level"), 1.0, 255.0, 128.0, "", None)])
 }
 
@@ -168,7 +169,7 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
         }
         e.add(r);
     }
-    ui.add_space(2.0);
+    ui.add_space(craft_ui::theme::scale::Space::S2.px());
     ui.horizontal(|ui| {
         let mut on = flag(v, "tint", false);
         if widgets::checkbox(ui, &mut on, tl!("Tint")).changed() {

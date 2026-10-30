@@ -1,4 +1,5 @@
 use super::editing::edit_home;
+use craft_ui::theme::StrokeExt;
 use super::ime_edit::{ime_offsets, ime_preedit_is_current};
 use super::layout::layout;
 use super::{Color32, LayerId, PhotocraftApp, Point, Pos2, Stroke, ViewXform, byte_of, text_layer};
@@ -50,7 +51,7 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
     // Frame: paragraph text shows its box with handles; point text an underline per line.
     let mods = crate::workspace_ui::sticky_mods(app, painter.ctx().input(|i| i.modifiers));
     let has_transform = crate::type_transform::draw(app, painter, xf, mods);
-    let frame = Stroke::new(1.0, t.accent);
+    let frame = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent);
     match shape {
         Some(photocraft_doc::text::TextShape::Box { x, y, width, height }) => {
             if !has_transform {
@@ -59,8 +60,8 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
                 let mids = [c[0].lerp(c[1], 0.5), c[1].lerp(c[2], 0.5), c[2].lerp(c[3], 0.5), c[3].lerp(c[0], 0.5)];
                 for p in c.iter().chain(mids.iter()) {
                     let r = egui::Rect::from_center_size(*p, egui::vec2(7.0, 7.0));
-                    painter.rect_filled(r, 0.0, Color32::WHITE);
-                    painter.rect_stroke(r, 0.0, frame, egui::StrokeKind::Inside);
+                    painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), frame, egui::StrokeKind::Inside);
                 }
             }
         }
@@ -79,7 +80,7 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
             for ln in &l.lines {
                 // Horizontal: just under the baseline; vertical: the column's centre line.
                 let y = if l.vertical { ln.baseline } else { ln.baseline + ln.descent * 0.25 };
-                painter.add(egui::Shape::line(run(ln.x0.min(0.0), ln.x1.max(ln.x0 + 1.0), y), Stroke::new(1.0, t.accent.gamma_multiply(0.8))));
+                painter.add(egui::Shape::line(run(ln.x0.min(0.0), ln.x1.max(ln.x0 + 1.0), y), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent.gamma_multiply(0.8))));
             }
         }
     }
@@ -95,7 +96,7 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
             let (x0, x1) = xs.iter().fold((f32::MAX, f32::MIN), |(lo, hi), (p, q)| (lo.min(*p), hi.max(*q)));
             if x0 < x1 {
                 let y = ln.baseline + ln.descent * 0.5;
-                painter.add(egui::Shape::line(run(x0, x1, y), Stroke::new(1.5, t.accent)));
+                painter.add(egui::Shape::line(run(x0, x1, y), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.accent)));
             }
         }
     }

@@ -20,6 +20,8 @@
 //! with [`apply`], so every change is a journaled command (Rule 1).
 
 use egui::{CursorIcon, RichText, Stroke, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE, TipShape};
 use serde_json::{Value, json};
@@ -217,7 +219,7 @@ pub fn body(
     st: &mut BrushesPanelState,
     size: egui::Vec2,
 ) -> Vec<Pick> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut picks = Vec::new();
     // The picker is its dragged (or remembered) size: at least that tall even when every group
     // is closed, so reopening one has the room to show it.
@@ -231,7 +233,7 @@ pub fn body(
         ui.set_max_width(ui.available_width().min(HEAD_MAX_W));
         // Size: value field plus a logarithmic slider (small sizes get most of the travel).
         ui.horizontal(|ui| {
-            ui.label(RichText::new(tl!("Size")).color(t.text_dim));
+            ui.label(RichText::new(tl!("Size")).color(t.color.text.muted.to_egui()));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let mut size = b.size;
                 if widgets::value_field(ui, &mut size, 1.0..=MAX_BRUSH_SIZE, "px", 72.0).accessible_name(tl!("Size")).changed() {
@@ -254,12 +256,12 @@ pub fn body(
             dismiss_popup(&hardness);
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(t.space.gap.stack);
     widgets::hairline(ui);
-    ui.add_space(6.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
-        icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.text_faint);
-        ui.add_space(20.0);
+        icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.color.text.faint.to_egui());
+        ui.add_space(craft_ui::theme::scale::Space::S20.px());
         widgets::text_field(ui, ui.scope_id().with("brush-picker-search"), &mut st.filter, tl!("Search Brushes"), (size.x - 118.0).max(60.0), false);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             gear_menu(ui, current, presets, st, &mut picks);
@@ -273,7 +275,7 @@ pub fn body(
             }
         });
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     // The list takes the picker's height past the controls above it and the footer below.
     let mut layout = LIST;
     layout.max_height = (size.y - (ui.cursor().min.y - top) - FOOTER_H).max(80.0);
@@ -328,14 +330,14 @@ pub fn clamp_size(size: [f32; 2], screen: egui::Vec2) -> egui::Vec2 {
 /// a limit (the minimum, the screen), the overshoot isn't banked, so coming back the picker grows
 /// only once the pointer reaches the corner again — it waits for the pointer.
 pub fn resize_grip(ui: &mut egui::Ui, frame: egui::Rect, content: egui::Vec2) -> Option<egui::Vec2> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let grip = egui::Rect::from_min_size(frame.right_bottom() - vec2(16.0, 16.0), vec2(16.0, 16.0));
     let resp = ui.interact(grip, ui.scope_id().with("brush-picker-resize"), egui::Sense::drag());
     dismiss_popup(&resp);
     let corner = grip.right_bottom() - vec2(3.0, 3.0);
     for i in 0..3 {
         let o = i as f32 * 4.0;
-        ui.painter().line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], Stroke::new(1.0, t.text_faint));
+        ui.painter().line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui()));
     }
     if resp.hovered() || resp.dragged() {
         ui.ctx().set_cursor_icon(CursorIcon::ResizeNwSe);

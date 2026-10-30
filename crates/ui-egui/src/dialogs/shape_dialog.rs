@@ -6,6 +6,7 @@
 //! (`widthUnit`, `heightUnit`; not remembered, as in Photoshop).
 
 use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use photocraft_engine::prefs::Unit;
@@ -155,9 +156,9 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(96.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
+    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
 }
 
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {

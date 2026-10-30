@@ -1,4 +1,5 @@
 use super::path_ops::active_path_name;
+use craft_ui::theme::ToEgui;
 use super::shapes::is_shape_tool;
 use super::{GradientChoices, LayerContent, PaintChange, PhotocraftApp, Tokens, Tool, Value, json, paint_param, swatch};
 
@@ -15,9 +16,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     {
         return false;
     }
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let lbl = |ui: &mut egui::Ui, s: &str| {
-        let label = ui.label(egui::RichText::new(s).color(t.text_dim).size(12.0));
+        let label = ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
         // The caption scrubs and names the control drawn right after it.
         crate::widgets::scrub_option_label(ui, &label);
     };
@@ -166,7 +167,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     }) else {
         return;
     };
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut edit: Option<Value> = None;
     let doc_id = app.session.active().map(|st| st.doc.id);
     let key = |k: &str| format!("shape-{doc_id:?}-{}-{k}", id.0);
@@ -177,7 +178,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     // Prefs "Appearance" is theme chrome (Giao diện); shape fill/stroke is Diện mạo.
     if crate::props_layout::section(ui, "appearance", crate::i18n::tr_ctx(crate::i18n::current(), "shape", "Appearance")) {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(tl!("Fill")).color(t.text_dim).size(12.0));
+            ui.label(egui::RichText::new(tl!("Fill")).color(t.color.text.muted.to_egui()).size(12.0));
             let (fg, bg) = (app.session.tools.foreground, app.session.tools.background);
             let mut gradients = GradientChoices {
                 presets: &app.session.presets.gradients,
@@ -194,8 +195,8 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
                 };
                 edit = Some(json!({"fill": fill, "coalesce": coalesce("fill")}));
             }
-            ui.add_space(12.0);
-            ui.label(egui::RichText::new(tl!("Stroke")).color(t.text_dim).size(12.0));
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.label(egui::RichText::new(tl!("Stroke")).color(t.color.text.muted.to_egui()).size(12.0));
             if let Some(change) = swatch(ui, sh.stroke.as_ref().map(|s| &s.paint), fg, tl!("Set shape stroke type"), &mut gradients) {
                 let width = enabled_stroke_width(sh.stroke.as_ref().map_or(0.0, |s| s.width));
                 let stroke = match change {
@@ -233,7 +234,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
         && crate::props_layout::section(ui, "liveShape", tl!("Shape"))
     {
         let num = |ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str| -> bool {
-            ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim).size(12.0));
+            ui.label(egui::RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(12.0));
             crate::widgets::value_field(ui, v, range, unit, 64.0).accessible_name(tl!(&label)).changed()
         };
         match live {

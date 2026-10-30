@@ -8,6 +8,7 @@
 //!   the param Cancel restores.
 
 use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::Contour;
 use photocraft_doc::adjust::CurvePoint;
 use photocraft_engine::layer_style::{CONTOURS, contour_from_param, contour_param, contour_to_shc, contours_from_shc};
@@ -50,7 +51,7 @@ fn sample(l: &[f32], x: f32) -> f32 {
 
 /// Draws `c` into `r` (field background, the curve, a border).
 pub(super) fn draw(p: &egui::Painter, r: Rect, c: &Contour, line: Color32, t: &Tokens) {
-    p.rect_filled(r, 0.0, t.field);
+    p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
     let inner = r.shrink(2.0);
     let l = lut_of(c);
     let n = (inner.width() as usize).clamp(8, 512);
@@ -61,7 +62,7 @@ pub(super) fn draw(p: &egui::Painter, r: Rect, c: &Contour, line: Color32, t: &T
         })
         .collect();
     p.add(egui::Shape::line(pts, Stroke::new(1.2, line)));
-    p.rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    p.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(1.0, t.field_border), StrokeKind::Inside);
 }
 
 fn picker_target(effect: &str, key: &str) -> Value {
@@ -103,7 +104,7 @@ pub(super) fn row(
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         if label.is_empty() {
-            ui.add_space(16.0);
+            ui.add_space(craft_ui::theme::scale::Space::S16.px());
         } else {
             ui.label(RichText::new(tl!(label)).color(t.text_dim));
         }
@@ -111,7 +112,7 @@ pub(super) fn row(
         let (r, thumb) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::click());
         draw(ui.painter(), r, &c, t.text, &t);
         if thumb.hovered() {
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.accent), StrokeKind::Outside);
+            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), StrokeKind::Outside);
         }
         if thumb.on_hover_text(tl!("Contour Editor")).clicked() {
             open_editor(f, effect, key);
@@ -142,7 +143,7 @@ pub(super) fn row(
                     let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
                     draw(ui.painter(), r, &preset, t.text, &t);
                     if preset == c || resp.hovered() {
-                        ui.painter().rect_stroke(r, 0.0, Stroke::new(1.5, t.accent), StrokeKind::Outside);
+                        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), StrokeKind::Outside);
                     }
                     if resp.on_hover_text(tl!(name)).clicked() {
                         chosen = Some(name);
@@ -154,13 +155,13 @@ pub(super) fn row(
             });
             // The user's own contours follow the standard ones (Contour Editor › New…).
             if !user.is_empty() {
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 egui::Grid::new(("contour-user", effect, key)).spacing(vec2(4.0, 4.0)).show(ui, |ui| {
                     for (i, u) in user.iter().enumerate() {
                         let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
                         draw(ui.painter(), r, u, t.text, &t);
                         if *u == c || resp.hovered() {
-                            ui.painter().rect_stroke(r, 0.0, Stroke::new(1.5, t.accent), StrokeKind::Outside);
+                            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), StrokeKind::Outside);
                         }
                         let name = name_of(u).to_string();
                         let resp = resp.on_hover_text(name.as_str());
@@ -343,7 +344,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
     let mut preset: Option<String> = None;
     let modal = egui::Modal::new(mem.with("modal")).show(&ctx, |ui| {
         ui.label(RichText::new(tl!("Contour Editor")).font(crate::theme::semibold(14.0)).color(t.text));
-        ui.add_space(6.0);
+        ui.add_space(craft_ui::theme::scale::Space::S6.px());
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -354,7 +355,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                         preset = Some(cur);
                     }
                 });
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 let side = 220.0;
                 let (graph, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click_and_drag());
                 let before = pts.clone();
@@ -364,10 +365,10 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     store(f, &effect, &key, name_of(&c), &pts, &corners);
                 }
                 let p = ui.painter_at(graph.expand(4.0));
-                p.rect_filled(graph, 0.0, t.field);
+                p.rect_filled(graph, craft_ui::theme::scale::Radius::R0.px(), t.field);
                 for i in 1..4 {
                     let k = i as f32 / 4.0;
-                    let g = Stroke::new(1.0, t.separator);
+                    let g = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator);
                     p.line_segment([pos2(graph.left() + k * graph.width(), graph.top()), pos2(graph.left() + k * graph.width(), graph.bottom())], g);
                     p.line_segment([pos2(graph.left(), graph.top() + k * graph.height()), pos2(graph.right(), graph.top() + k * graph.height())], g);
                 }
@@ -383,10 +384,10 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                         pos2(graph.left() + x * graph.width(), graph.bottom() - sample(&l, x) * graph.height())
                     })
                     .collect();
-                p.add(egui::Shape::line(line, Stroke::new(1.5, t.text)));
+                p.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)));
                 p.rect_stroke(
                     graph,
-                    0.0,
+                    craft_ui::theme::scale::Radius::R0.px(),
                     Stroke::new(if resp.has_focus() { 1.5 } else { 1.0 }, if resp.has_focus() { t.accent } else { t.field_border }),
                     StrokeKind::Outside,
                 );
@@ -395,13 +396,13 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     let r = Rect::from_center_size(at, vec2(7.0, 7.0));
                     let corner = corners.get(i).copied().unwrap_or(false);
                     if Some(i) == st.selected {
-                        p.rect_filled(r, 0.0, t.text);
+                        p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.text);
                     } else {
-                        p.rect_filled(r, 0.0, t.field);
-                        p.rect_stroke(r, if corner { 0.0 } else { 3.5 }, Stroke::new(1.0, t.text), StrokeKind::Inside);
+                        p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
+                        p.rect_stroke(r, if corner { 0.0 } else { 3.5 }, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text), StrokeKind::Inside);
                     }
                 }
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 if let Some(name) = naming.as_mut() {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new(tl!("Name:")).color(t.text_dim));
@@ -414,7 +415,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                             commit_name = true;
                         }
                     });
-                    ui.add_space(6.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 }
                 let sel = st.selected.filter(|i| *i < pts.len());
                 ui.horizontal(|ui| {
@@ -439,20 +440,20 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     }
                 });
             });
-            ui.add_space(10.0);
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
             ui.vertical(|ui| {
                 if widgets::primary_button(ui, tl!("OK"), 84.0).clicked() {
                     close = Some(true);
                 }
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 if widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked() {
                     close = Some(false);
                 }
-                ui.add_space(12.0);
+                ui.add_space(craft_ui::theme::scale::Space::S12.px());
                 load = widgets::secondary_button(ui, tl!("Load…"), 84.0).clicked();
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 save = widgets::secondary_button(ui, tl!("Save…"), 84.0).clicked();
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 new_clicked = widgets::secondary_button(ui, tl!("New…"), 84.0).clicked();
             });
         });

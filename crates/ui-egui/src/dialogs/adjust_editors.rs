@@ -7,6 +7,7 @@
 //! dialog commits on OK). Selective Color and Color Lookup keep their editors in `adjust_ui`.
 
 use crate::point_curve as curve_edit;
+use craft_ui::theme::ToEgui;
 use crate::state::CurvesEditorState as CurveUi;
 use std::sync::Arc;
 
@@ -217,8 +218,8 @@ fn color_button(ui: &mut egui::Ui, c: &mut [f32; 3]) -> Edit {
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
+    let t = craft_ui::theme::current(ui.ctx());
+    ui.label(RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
 }
 
 #[cfg(test)]

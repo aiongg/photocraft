@@ -120,7 +120,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             let t = crate::theme::Tokens::get(ctx);
             ui.label(crate::i18n::fmt(crate::i18n::t("Installed version: {version}"), &[("version", photocraft_engine::build_info::VERSION)]));
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             match &status {
                 Status::Checking => {
                     ui.horizontal(|ui| {

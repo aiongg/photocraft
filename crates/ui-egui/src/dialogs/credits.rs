@@ -480,7 +480,7 @@ fn header_cell(ui: &mut egui::Ui, t: &crate::theme::Tokens, label: &str, numeric
         ui.painter().add(egui::Shape::convex_polygon(pts, t.accent, egui::Stroke::NONE));
     }
     let line = egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 1.0), rect.max);
-    ui.painter().rect_filled(line, 0.0, t.separator);
+    ui.painter().rect_filled(line, craft_ui::theme::scale::Radius::R0.px(), t.separator);
     resp
 }
 

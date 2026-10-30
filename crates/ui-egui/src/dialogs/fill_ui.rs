@@ -7,6 +7,7 @@
 //! which are saved to disk, so the dialog opens with them again after a restart.
 
 use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -134,9 +135,9 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(112.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
+    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
 }
 
 fn get_str(f: &Map<String, Value>, k: &str, d: &str) -> String {
@@ -179,14 +180,14 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
                 label(ui, tl!("Custom Pattern:"));
                 let pat = get_str(f, "pattern", "");
                 if app.session.patterns.items.is_empty() {
-                    ui.label(egui::RichText::new(tl!("No patterns")).color(Tokens::get(ui.ctx()).text_faint));
+                    ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
                 } else {
                     // Photoshop shows the pattern itself and opens a grid of swatches.
                     if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
                         f.insert("pattern".into(), json!(id));
                     }
                     let name = app.session.patterns.items.iter().find(|p| p.id == get_str(f, "pattern", "")).map(|p| p.display_name().to_string());
-                    ui.label(egui::RichText::new(name.unwrap_or_default()).color(Tokens::get(ui.ctx()).text_dim));
+                    ui.label(egui::RichText::new(name.unwrap_or_default()).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
                 }
             });
         }

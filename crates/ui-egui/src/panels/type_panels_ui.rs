@@ -6,6 +6,7 @@
 //! ([`TypePanelsUi`], part of the serialisable UI state so the control channel can drive it).
 
 use egui::{Align2, Color32, CornerRadius, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -170,7 +171,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     });
                 });
                 crate::widgets::hairline(ui);
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 styles_panel(app, ui, app.ui.type_panels.styles_tab == 1);
             });
         if close {
@@ -196,7 +197,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     });
                 });
                 crate::widgets::hairline(ui);
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 glyphs_panel(app, ui);
             });
         if close {
@@ -239,11 +240,11 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool)
             let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
             let is_cur = has_target && cur_id == Some(id);
             if is_cur {
-                ui.painter().rect_filled(rect, 0.0, t.row_selected);
+                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
             } else if selected == Some(id) {
-                ui.painter().rect_filled(rect, 0.0, t.hover);
+                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover);
             } else if resp.hovered() {
-                ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
+                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
             }
             let label = if is_cur && over { format!("{name}+") } else { name.to_string() };
             let color = if id == 0 { t.text_dim } else { t.text };
@@ -277,9 +278,9 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool)
             });
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::hairline(ui);
-    ui.add_space(2.0);
+    ui.add_space(craft_ui::theme::scale::Space::S2.px());
     let sel = selected.filter(|i| *i != 0 || paragraph);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
@@ -327,7 +328,7 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool)
         && para == paragraph
     {
         if let Some(s) = styles.iter().find(|s| s["id"].as_u64() == Some(u64::from(id))) {
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             crate::widgets::hairline(ui);
             options_editor(app, ui, paragraph, s);
         } else {
@@ -348,7 +349,7 @@ fn options_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool, s
     let mut set: Option<Value> = None;
     let mut clear: Vec<&str> = Vec::new();
     let mut open_color = false;
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Style Options")).color(t.text).size(11.5).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -668,10 +669,10 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut activated: Option<String> = None;
     // Recently used.
     let recent = app.ui.type_panels.glyph_recent.clone();
-    ui.add_space(2.0);
+    ui.add_space(craft_ui::theme::scale::Space::S2.px());
     ui.label(RichText::new(tl!("Recently Used")).color(t.text_faint).size(10.5));
     let (rr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
-    ui.painter().rect_filled(rr, 2.0, t.field);
+    ui.painter().rect_filled(rr, craft_ui::theme::scale::Radius::R2.px(), t.field);
     for (i, g) in recent.iter().enumerate() {
         let cell = Rect::from_min_size(pos2(rr.left() + 2.0 + i as f32 * 26.0, rr.top() + 1.0), vec2(24.0, 24.0));
         if cell.right() > rr.right() {
@@ -679,7 +680,7 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         let resp = ui.interact(cell, ui.scope_id().with(("glyph-recent", i)), Sense::click());
         if resp.hovered() {
-            ui.painter().rect_filled(cell, 2.0, t.hover);
+            ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R2.px(), t.hover);
         }
         if let Some(c) = g.chars().next() {
             let tex = glyph_texture(&ctx, &family, &style, c, (20.0 * ppp) as u32);
@@ -689,7 +690,7 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             activated = Some(g.clone());
         }
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     // Grid.
     let cmap = charmap(&ctx, &family, &style);
     let chars: Vec<char> = cmap.iter().copied().filter(|c| photocraft_text::glyphs::in_category(*c, &cat)).collect();
@@ -706,11 +707,11 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let cell = Rect::from_min_size(pos2(rect.left() + col as f32 * size, rect.top()), vec2(size, size));
                 let resp = ui.interact(cell, ui.scope_id().with(("glyph", c)), Sense::click());
                 let is_sel = selected.as_deref().and_then(|s| s.chars().next()) == Some(c);
-                ui.painter().rect_stroke(cell, 0.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator), egui::StrokeKind::Inside);
                 if is_sel {
-                    ui.painter().rect_filled(cell.shrink(1.0), 0.0, t.accent);
+                    ui.painter().rect_filled(cell.shrink(1.0), craft_ui::theme::scale::Radius::R0.px(), t.accent);
                 } else if resp.hovered() {
-                    ui.painter().rect_filled(cell.shrink(1.0), 0.0, t.hover);
+                    ui.painter().rect_filled(cell.shrink(1.0), craft_ui::theme::scale::Radius::R0.px(), t.hover);
                 }
                 let tex = glyph_texture(&ctx, &family, &style, c, px);
                 let tint = if is_sel { Color32::WHITE } else { t.text };
@@ -725,7 +726,7 @@ pub fn glyphs_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     });
     // Footer: family name, size slider.
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         let info = selected
             .as_deref()
@@ -802,7 +803,7 @@ fn spelling_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     });
                 }
             });
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
                     ui.set_width(250.0);
@@ -816,10 +817,10 @@ fn spelling_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         String::new()
                     };
                     ui.add_enabled(false, egui::TextEdit::singleline(&mut shown.clone()).desired_width(240.0)).accessible_name(tl!("Not in Dictionary:"));
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     let change_label = ui.label(RichText::new(tl!("Change To:")).color(t.text_dim).size(11.5));
                     ui.add_enabled(item.is_some(), egui::TextEdit::singleline(&mut change_to).desired_width(240.0)).labelled_by(change_label.id);
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     ui.label(RichText::new(tl!("Suggestions:")).color(t.text_dim).size(11.5));
                     egui::Frame::NONE.fill(t.field).corner_radius(CornerRadius::same(3)).inner_margin(egui::Margin::same(4)).show(ui, |ui| {
                         ui.set_min_size(vec2(240.0, 110.0));
@@ -837,7 +838,7 @@ fn spelling_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                             }
                         });
                     });
-                    ui.add_space(4.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     if crate::widgets::checkbox(ui, &mut all_layers, tl!("Check All Layers")).changed() {
                         act = Some("relist");
                     }
@@ -851,7 +852,7 @@ fn spelling_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     if crate::widgets::primary_button(ui, tl!("Done"), 100.0).clicked() {
                         act = Some("done");
                     }
-                    ui.add_space(6.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
                     ui.add_enabled_ui(item.is_some(), |ui| {
                         for (label, a) in [
                             (tl!("Ignore"), "ignore"),

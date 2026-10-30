@@ -4,6 +4,8 @@
 //! Loading Layers. Statistics adds Stack Mode and always creates a smart object. OK runs the
 //! corresponding engine command with the list or the folder.
 use egui::{RichText, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
@@ -112,7 +114,7 @@ fn browse(app: &mut PhotocraftApp, id: u64, folder: bool) {
 
 /// The dialog's body (dialog `id`); OK and Cancel are the standard ones below it.
 pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, id: u64) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     if statistics(f) {
         ui.horizontal(|ui| {
             ui.label(tl!("Choose Stack Mode:"));
@@ -122,10 +124,10 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 f.insert("mode".into(), json!(mode));
             }
         });
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
     }
     ui.label(RichText::new(tl!("Source Files")).font(crate::theme::semibold(13.0)));
-    ui.add_space(4.0);
+    ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         ui.label(tl!("Use:"));
         let mut mode = usize::from(folder_mode(f));
@@ -135,7 +137,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.remove("selected");
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let folder_mode = folder_mode(f);
     let mut browse_now = false;
     ui.horizontal_top(|ui| {
@@ -146,13 +148,13 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             files(f)
         };
         let sel = selected(f);
-        egui::Frame::NONE.fill(t.field).stroke(egui::Stroke::new(1.0, t.field_border)).corner_radius(t.radius_sm).inner_margin(4.0).show(ui, |ui| {
+        egui::Frame::NONE.fill(t.color.surface.sunken.to_egui()).stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui())).corner_radius(t.shape.radius.control).inner_margin(4.0).show(ui, |ui| {
             ui.set_min_size(vec2(300.0, 160.0));
             ui.set_max_width(300.0);
             egui::ScrollArea::vertical().id_salt("load-stack-files").max_height(160.0).auto_shrink([false, false]).show(ui, |ui| {
                 ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
                     if folder_mode && !folder(f).is_empty() {
-                        ui.label(RichText::new(folder(f)).color(t.text_dim));
+                        ui.label(RichText::new(folder(f)).color(t.color.text.muted.to_egui()));
                     }
                     for (i, p) in shown.iter().enumerate() {
                         let row = ui.add(egui::Button::selectable(!folder_mode && sel == Some(i), file_name(p))).on_hover_text(p.as_str());
@@ -163,9 +165,9 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 });
             });
         });
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 4.0;
+            ui.spacing_mut().item_spacing.y = t.space.gap.stack;
             if widgets::secondary_button(ui, tl!("Browse…"), 120.0).clicked() {
                 browse_now = true;
             }
@@ -190,7 +192,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         });
     });
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     for (key, label) in [("align", tl!("Attempt to Automatically Align Source Images")), ("smartObject", tl!("Create Smart Object after Loading Layers"))] {
         if statistics(f) && key == "smartObject" {
             continue;

@@ -1,4 +1,5 @@
 use super::curves::{ToneChannel, bar_color, channel_picker, gradient_bar, hist_color, tone_channels};
+use craft_ui::theme::StrokeExt;
 use super::{Color32, Edit, EditorCx, Sense, Stroke, StrokeKind, Tokens, Value, json, label, pos2, round, space_of, tone, vec2, widgets};
 
 // ---------------------------------------------------------------------------------------------
@@ -88,11 +89,11 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let (hr, _) = ui.allocate_exact_size(vec2(w, 110.0), Sense::hover());
     let hr = hr.shrink2(vec2(6.0, 0.0));
     let p = ui.painter_at(hr.expand(1.0));
-    p.rect_filled(hr, 0.0, t.field);
+    p.rect_filled(hr, craft_ui::theme::scale::Radius::R0.px(), t.field);
     if let Some(h) = &cx.hist {
         tone::draw_histogram(&p, hr, &h[ch], hist_color(&chan, &t));
     }
-    p.rect_stroke(hr, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    p.rect_stroke(hr, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     // Input sliders: black, gamma, white.
     let (sr, sresp) = ui.allocate_exact_size(vec2(w, 14.0), Sense::click_and_drag());
     let track = sr.shrink2(vec2(6.0, 0.0));
@@ -152,7 +153,7 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         }
     });
     // Output levels.
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     label(ui, tl!("Output Levels:"));
     let (ob_r, _) = ui.allocate_exact_size(vec2(w, 10.0), Sense::hover());
     gradient_bar(ui.painter(), ob_r.shrink2(vec2(6.0, 0.0)), Color32::BLACK, bar_color(&chan, &t), false);

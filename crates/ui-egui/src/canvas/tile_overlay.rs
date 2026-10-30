@@ -15,6 +15,7 @@
 //! grouped by that 64-bit hash of their bytes.
 
 use std::collections::HashMap;
+use craft_ui::theme::StrokeExt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -155,7 +156,7 @@ pub fn paint(app: &PhotocraftApp, ctx: &egui::Context, painter: &Painter, xf: &V
     // The grid over the document, so the cells without a stored tile show too.
     let bounds = st.doc.bounds();
     if let Some((tx0, ty0, tx1, ty1)) = cell_range(visible.intersect(&bounds)) {
-        let line = Stroke::new(1.0, EMPTY_LINE);
+        let line = craft_ui::theme::scale::Stroke::W1.egui(ctx, EMPTY_LINE);
         let edge = |t: i32| t.saturating_mul(TILE_SIZE);
         let (top, bottom) = (bounds.y0.max(edge(ty0)) as f32, bounds.y1.min(edge(ty1.saturating_add(1))) as f32);
         let (left, right) = (bounds.x0.max(edge(tx0)) as f32, bounds.x1.min(edge(tx1.saturating_add(1))) as f32);
@@ -180,7 +181,7 @@ pub fn paint(app: &PhotocraftApp, ctx: &egui::Context, painter: &Painter, xf: &V
         let pts = quad(xf, r).to_vec();
         let fill = Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), FILL_ALPHA);
         painter.add(Shape::convex_polygon(pts.clone(), fill, Stroke::NONE));
-        painter.add(Shape::closed_line(pts, Stroke::new(1.0, c)));
+        painter.add(Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(ctx, c)));
         if size >= LABEL_MIN {
             let mid = xf.to_screen(r.x0 as f32 + TILE_SIZE as f32 / 2.0, r.y0 as f32 + TILE_SIZE as f32 / 2.0);
             let label = format!("{},{}", t.coord.tx, t.coord.ty);

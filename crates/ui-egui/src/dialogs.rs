@@ -343,7 +343,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
             for l in &lines {
                 ui.add(egui::Label::new(egui::RichText::new(l).font(crate::theme::mono(12.0))).selectable(true));
             }
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             if crate::widgets::secondary_button(ui, tl!("Copy"), 84.0).clicked() {
                 ui.ctx().copy_text(crate::gpu_status::system_info(app).join("\n"));
             }
@@ -363,7 +363,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
             if chosen != tab {
                 fields.insert("tab".into(), json!(chosen));
             }
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             about_tab_body(app, ui, chosen);
         }
         DialogKind::Command => outcome = command_body(app, ui, d, fields, id, interactive),
@@ -640,9 +640,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             if let Some(r) = close_rect {
                 close_clicked = close_box(ui, r);
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             crate::widgets::hairline(ui);
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             crate::field_tab::begin(ui.ctx());
             if let Some(done) = dialog_body(app, ui, &d, &mut fields, id, interactive) {
                 outcome = Some(done);
@@ -662,7 +662,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 if matches!(d.kind, DialogKind::Command) && crate::color_table_ui::owns(&fields) {
                     crate::color_table_ui::buttons(app, ui, d.id, &mut fields);
                 }
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 // Align::Min, not Center: a centred row fills the height left over from last frame's
                 // (larger) size, so a dialog whose body gets shorter would never shrink back.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
@@ -757,13 +757,13 @@ fn about_tab_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, tab: &str) {
         _ => {
             ui.label(tl!("PhotoCraft — an open-source, native image editor written in Rust."));
             ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &photocraft_engine::build_info::long_version())]));
-            ui.add_space(12.0);
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
             ui.vertical_centered(|ui| {
                 crate::links::discord_button(app, ui, 220.0);
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 crate::links::link_row(app, ui);
             });
-            ui.add_space(10.0);
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
             ui.weak("egui · wgpu · photocraft-engine");
         }
     }

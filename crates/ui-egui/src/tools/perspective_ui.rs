@@ -8,6 +8,7 @@
 //! pushed through the same piecewise-homography map the engine uses.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
 
 use egui::{Color32, Pos2, Stroke, TextureHandle, pos2};
 use photocraft_algo::perspective::{PerspectiveMap, Plane, Straighten, linked_corners, plane_point, straighten};
@@ -295,7 +296,7 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
         }
         let q = if warp { &p.dst } else { &p.src };
         let pts: Vec<Pos2> = q.iter().map(|c| scr(*c)).collect();
-        painter.add(egui::Shape::closed_line(pts.clone(), Stroke::new(1.5, accent)));
+        painter.add(egui::Shape::closed_line(pts.clone(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
         for c in pts {
             painter.circle_filled(c, 4.5, Color32::WHITE);
             painter.circle_stroke(c, 4.5, Stroke::new(1.25, accent));
@@ -303,7 +304,7 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
     }
     if let Some(Drag::NewPlane { start, cur }) = &s.drag {
         let r = egui::Rect::from_two_pos(scr(*start), scr(*cur));
-        painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
     }
 }
 

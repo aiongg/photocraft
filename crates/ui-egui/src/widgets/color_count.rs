@@ -1,6 +1,7 @@
 //! Integer-only Indexed Color field and a linear slider with common palette sizes.
 
 use super::{Align2, Color32, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, pos2, surface, theme, vec2};
+use craft_ui::theme::StrokeExt;
 
 const STOPS: [u32; 6] = [8, 16, 32, 64, 128, 256];
 
@@ -34,7 +35,7 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
             let (rect, _) = ui.allocate_exact_size(vec2(74.0, 24.0), Sense::hover());
             surface(ui, rect, t.field, false);
             if !t.bevel {
-                ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+                ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
             }
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(4.0, 2.0))));
             child.style_mut().visuals.widgets.inactive.bg_fill = Color32::TRANSPARENT;
@@ -74,7 +75,7 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
     painter.rect_filled(Rect::from_min_max(track.min, pos2(x, track.bottom())), t.radius_sm, t.accent);
     for stop in STOPS {
         let sx = position(track, stop);
-        painter.line_segment([pos2(sx, track.bottom() + 3.0), pos2(sx, track.bottom() + 6.0)], Stroke::new(1.0, t.text_faint));
+        painter.line_segment([pos2(sx, track.bottom() + 3.0), pos2(sx, track.bottom() + 6.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
         painter.text(
             pos2(sx, track.bottom() + 9.0),
             if stop == 256 { Align2::RIGHT_TOP } else { Align2::CENTER_TOP },
@@ -89,13 +90,13 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
     } else {
         painter.circle_filled(knob, 6.0, t.text);
         if response.hovered() || response.dragged() {
-            painter.circle_stroke(knob, 8.0, Stroke::new(2.0, t.accent_soft));
+            painter.circle_stroke(knob, 8.0, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent_soft));
         }
     }
     if *count != before {
         response.mark_changed();
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     response
 }
 

@@ -3,6 +3,7 @@
 //! widths that make field rows fill the panel, and the Quick Actions each layer kind offers.
 
 use egui::{Rect, Sense, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use photocraft_doc::{Layer, LayerContent};
 
 use crate::theme::{self, Tokens};
@@ -21,11 +22,11 @@ pub const COL_GAP: f32 = 8.0;
 /// stacked in one column share a centre (#7314): the widest of `column` stays flush right, and the narrower ones
 /// are centred on it rather than pushed against its right edge.
 pub fn stacked_label(ui: &mut egui::Ui, s: &str, column: &[&str], w: f32, pad: f32) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let font = egui::FontId::proportional(12.0);
-    let widest = column.iter().map(|c| ui.painter().layout_no_wrap((*c).to_owned(), font.clone(), t.text_dim).size().x).fold(0.0, f32::max);
+    let widest = column.iter().map(|c| ui.painter().layout_no_wrap((*c).to_owned(), font.clone(), t.color.text.muted.to_egui()).size().x).fold(0.0, f32::max);
     let (r, _) = ui.allocate_exact_size(vec2(w, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - pad - widest / 2.0, r.center().y), egui::Align2::CENTER_CENTER, s, font, t.text_dim);
+    ui.painter().text(pos2(r.right() - pad - widest / 2.0, r.center().y), egui::Align2::CENTER_CENTER, s, font, t.color.text.muted.to_egui());
 }
 
 /// Icon for a layer kind (the same glyphs as the Layers panel's kind filter).
@@ -52,22 +53,22 @@ pub fn kind_label(layer: &Layer) -> String {
 
 /// Header row: kind icon, the layer's name, and its kind right-aligned in the dim text colour.
 pub fn header(ui: &mut egui::Ui, layer: &Layer) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
     let icon_r = Rect::from_center_size(pos2(r.left() + 10.0, r.center().y), vec2(20.0, 20.0));
-    crate::icons::paint(ui, icon_r, kind_icon(&layer.content), 15.0, t.icon);
+    crate::icons::paint(ui, icon_r, kind_icon(&layer.content), 15.0, t.color.text.normal.to_egui());
     let kind = kind_label(layer);
-    let kind_g = ui.painter().layout_no_wrap(tl!(&kind).to_owned(), egui::FontId::proportional(11.0), t.text_faint);
+    let kind_g = ui.painter().layout_no_wrap(tl!(&kind).to_owned(), egui::FontId::proportional(11.0), t.color.text.faint.to_egui());
     let kind_w = kind_g.size().x;
     // The name takes what's left between the icon and the kind (elided when long).
     let name_x = r.left() + 26.0;
     let name_w = (r.right() - kind_w - 8.0 - name_x).max(0.0);
-    let mut job = egui::text::LayoutJob::simple_singleline(layer.name.clone(), theme::medium(12.5), t.text);
+    let mut job = egui::text::LayoutJob::simple_singleline(layer.name.clone(), theme::medium(12.5), t.color.text.normal.to_egui());
     job.wrap = egui::text::TextWrapping::truncate_at_width(name_w);
     let name_g = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(name_x, r.center().y - name_g.size().y / 2.0), name_g, t.text);
+    ui.painter().galley(pos2(name_x, r.center().y - name_g.size().y / 2.0), name_g, t.color.text.normal.to_egui());
     if r.width() > kind_w + 60.0 {
-        ui.painter().galley(pos2(r.right() - kind_w - 2.0, r.center().y - kind_g.size().y / 2.0), kind_g, t.text_faint);
+        ui.painter().galley(pos2(r.right() - kind_w - 2.0, r.center().y - kind_g.size().y / 2.0), kind_g, t.color.text.faint.to_egui());
     }
     let name = layer.name.clone();
     resp.widget_info(move || egui::WidgetInfo::labeled(egui::Role::Label, true, format!("{name} — {kind}")));
@@ -76,7 +77,7 @@ pub fn header(ui: &mut egui::Ui, layer: &Layer) {
 /// A collapsible section: a separator, then a chevron + title row. Returns whether it's open.
 /// Every Properties section uses this, so headers look and behave alike.
 pub fn section(ui: &mut egui::Ui, id: &str, title: &str) -> bool {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let key = egui::Id::unique(("props-section", id));
     let mut open = ui.data(|d| d.get_temp::<bool>(key)).unwrap_or(true);
     ui.add_space(theme::ROW_GAP);
@@ -90,9 +91,9 @@ pub fn section(ui: &mut egui::Ui, id: &str, title: &str) -> bool {
         Rect::from_center_size(pos2(r.left() + 7.0, r.center().y), vec2(12.0, 12.0)),
         if open { "chevron-down" } else { "chevron-right" },
         11.0,
-        t.text_dim,
+        t.color.text.muted.to_egui(),
     );
-    ui.painter().text(pos2(r.left() + 18.0, r.center().y), egui::Align2::LEFT_CENTER, tl!(title), theme::semibold(12.0), t.text);
+    ui.painter().text(pos2(r.left() + 18.0, r.center().y), egui::Align2::LEFT_CENTER, tl!(title), theme::semibold(12.0), t.color.text.normal.to_egui());
     if resp.clicked() {
         open = !open;
         ui.data_mut(|d| d.insert_temp(key, open));

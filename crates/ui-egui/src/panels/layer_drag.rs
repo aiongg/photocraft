@@ -1,4 +1,5 @@
 use super::layers::footer_label;
+use craft_ui::theme::StrokeExt;
 use super::{Layer, LayerId, MaskKind, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Value, icons, json, pos2, vec2};
 
 /// Scroll the Layers panel while holding a layer drag over its top/bottom edge or past them.
@@ -43,7 +44,7 @@ pub(crate) fn dropped_on(ui: &egui::Ui, button: &egui::Response) -> bool {
         return false;
     }
     let t = Tokens::get(ui.ctx());
-    ui.painter().rect_stroke(button.rect, t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
+    ui.painter().rect_stroke(button.rect, t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
     ui.ctx().input(|i| i.pointer.any_released())
 }
 
@@ -124,9 +125,9 @@ pub(super) fn layer_drag_and_drop(
             let position = if (p.y - rect.top()) / rect.height() < 0.5 { "above" } else { "below" };
             let painter = ui.painter();
             if position == "above" {
-                painter.line_segment([rect.left_top(), rect.right_top()], Stroke::new(2.0, t.accent));
+                painter.line_segment([rect.left_top(), rect.right_top()], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
             } else {
-                painter.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(2.0, t.accent));
+                painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
             }
             let mut payload = layer_drop_payload(dragged, l.id, position, &selected);
             if let Some(o) = payload.as_object_mut() {
@@ -161,13 +162,13 @@ pub(super) fn layer_drag_and_drop(
     let painter = ui.painter();
     match position {
         "into" => {
-            painter.rect_stroke(rect.shrink(1.0), t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
+            painter.rect_stroke(rect.shrink(1.0), t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
         }
         "above" => {
-            painter.line_segment([rect.left_top(), rect.right_top()], Stroke::new(2.0, t.accent));
+            painter.line_segment([rect.left_top(), rect.right_top()], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
         }
         _ => {
-            painter.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(2.0, t.accent));
+            painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
         }
     }
     if copy && let Some(o) = payload.as_object_mut() {
@@ -206,7 +207,7 @@ pub(super) fn layer_drop_zone(
     }
     let t = Tokens::get(ctx);
     let line = if position == "above" { [target.1.left_top(), target.1.right_top()] } else { [target.1.left_bottom(), target.1.right_bottom()] };
-    ui.painter().line_segment(line, Stroke::new(2.0, t.accent));
+    ui.painter().line_segment(line, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
     let mut payload = layer_drop_payload(dragged, target.0, position, &selected);
     if ctx.input(|i| i.modifiers.alt)
         && let Some(o) = payload.as_object_mut()
@@ -292,7 +293,7 @@ pub(super) fn fx_drop(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect,
         return;
     }
     let t = Tokens::get(ctx);
-    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
     if ctx.input(|i| i.pointer.any_released()) {
         actions.push(fx_drop_action(from, effect, l.id, ctx.input(|i| i.modifiers.alt)));
     }
@@ -320,10 +321,10 @@ pub(super) fn effect_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer,
             continue;
         }
         if resp.hovered() {
-            ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.35));
+            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
         if t.pro {
-            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], Stroke::new(1.0, t.separator));
+            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         }
         // Nested under the layer's eye column so an effect does not read as its own layer (#4572).
         let eye = Rect::from_min_size(pos2(rect.left() + 36.0, rect.center().y - 9.0), vec2(18.0, 18.0));

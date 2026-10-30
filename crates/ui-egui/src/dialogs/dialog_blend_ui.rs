@@ -4,6 +4,7 @@
 //! Keeping one widget and validation implementation prevents their options diverging.
 
 use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::theme::Tokens;
@@ -20,7 +21,7 @@ pub fn valid(key: &str, v: &Value) -> bool {
 
 /// UI for the identical Blending section of Fill and Stroke.
 pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::section_label(ui, tl!("Blending"));
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
@@ -48,9 +49,9 @@ pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(112.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
+    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
 }
 
 /// The `mode` param naming a blend mode ("normal", "colorBurn"…), parsed by the engine.

@@ -1,4 +1,5 @@
 use super::start_screen::start_screen;
+use craft_ui::theme::StrokeExt;
 use super::textures::retain_gpu_documents;
 use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, TextureOptions, canvas_view, fmt_zoom, json, mode_label, pos2};
 
@@ -81,8 +82,8 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     app.session.set_active(d);
                 }
             }
-            let stroke = if d == idx { Stroke::new(1.5, t.accent) } else { Stroke::new(1.0, Color32::from_black_alpha(160)) };
-            ui.painter().rect_stroke(cell, 0, stroke, egui::StrokeKind::Inside);
+            let stroke = if d == idx { craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent) } else { craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160)) };
+            ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Inside);
         }
         return;
     }
@@ -169,13 +170,13 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
             doc_tabs.push((i, r));
             if sel {
                 ui.painter().rect_filled(r, t.radius_sm, t.card);
-                ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside);
             } else if resp.hovered() {
                 ui.painter().rect_filled(r, t.radius_sm, t.hover.gamma_multiply(0.5));
             }
             if dragging.is_some_and(|p| r.contains(p)) {
                 drag_over = Some(i);
-                ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
             }
             let color = if sel { t.text } else { t.text_dim };
             let ny = r.center().y - name_g.size().y / 2.0;
@@ -184,7 +185,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
             let xr = Rect::from_center_size(egui::pos2(r.right() - 12.0, r.center().y), egui::vec2(16.0, 16.0));
             let xresp = ui.interact(xr, ui.scope_id().with(("dtabx", i)), Sense::click());
             if xresp.hovered() {
-                ui.painter().rect_filled(xr, 4.0, t.hover);
+                ui.painter().rect_filled(xr, craft_ui::theme::scale::Radius::R4.px(), t.hover);
             }
             crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_faint });
             let resp = if cut { resp.on_hover_text(name) } else { resp };
@@ -212,7 +213,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
             let resp = ui.interact(r, ui.scope_id().with(("dtabjob", job.0)), Sense::click());
             if sel {
                 ui.painter().rect_filled(r, t.radius_sm, t.card);
-                ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside);
             } else if resp.hovered() {
                 ui.painter().rect_filled(r, t.radius_sm, t.hover.gamma_multiply(0.5));
             }
@@ -223,7 +224,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
             let xr = Rect::from_center_size(egui::pos2(r.right() - 12.0, r.center().y), egui::vec2(16.0, 16.0));
             let xresp = ui.interact(xr, ui.scope_id().with(("dtabjobx", job.0)), Sense::click());
             if xresp.hovered() {
-                ui.painter().rect_filled(xr, 4.0, t.hover);
+                ui.painter().rect_filled(xr, craft_ui::theme::scale::Radius::R4.px(), t.hover);
             }
             crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_faint });
             if xresp.on_hover_text(tl!("Cancel opening")).clicked() {
@@ -336,7 +337,7 @@ fn tab_drag(ui: &egui::Ui, resp: &egui::Response, i: usize, r: Rect, strip: Rect
             let ghost = Rect::from_min_size(p - egui::vec2(40.0, 12.0), egui::vec2(240.0, 160.0));
             let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, ui.scope_id().with("tab-tear-off")));
             painter.rect_filled(ghost, t.radius_sm, t.accent.gamma_multiply(0.12));
-            painter.rect_stroke(ghost, t.radius_sm, Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+            painter.rect_stroke(ghost, t.radius_sm, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
         } else {
             tab_drop_line(ui, placed, p.x, t);
         }
@@ -485,7 +486,7 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
     let font = egui::FontId::proportional(if large_tabs { 13.0 } else { 11.5 });
     let tab_h = if large_tabs { 34.0 } else { 26.0 };
     let (strip, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), tab_h), Sense::hover());
-    ui.painter().rect_filled(strip, 0.0, t.tab_strip);
+    ui.painter().rect_filled(strip, craft_ui::theme::scale::Radius::R0.px(), t.tab_strip);
     // Files opening in the background (#210) are tabs too ("name (Opening… 45%)" with a progress
     // underline); they share the fit's index space, after the documents.
     let opening = crate::jobs_ui::open_tabs(app);
@@ -514,15 +515,15 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
         let resp = ui.interact(r, ui.scope_id().with(("ptab", i)), Sense::click_and_drag());
         let sel = Some(i) == active;
         if sel {
-            ui.painter().rect_filled(r, 0.0, t.chrome);
+            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r, 0.0, t.hover.gamma_multiply(0.35));
+            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
         if dragging.is_some_and(|p| r.contains(p)) {
             drag_over = Some(i);
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
         }
-        ui.painter().line_segment([r.right_top(), r.right_bottom()], Stroke::new(1.0, t.separator));
+        ui.painter().line_segment([r.right_top(), r.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let (xr, at) = pro_tab_layout(r, g.size().y, mac);
         let xresp = ui.interact(xr, ui.scope_id().with(("ptabx", i)), Sense::click());
         // Painted: name the tab and its × for accessibility (and so tests and agents can find them).
@@ -555,11 +556,11 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
         let resp = ui.interact(r, ui.scope_id().with(("ptabjob", job.0)), Sense::click());
         let sel = app.jobs.focus == Some(*job);
         if sel {
-            ui.painter().rect_filled(r, 0.0, t.chrome);
+            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r, 0.0, t.hover.gamma_multiply(0.35));
+            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
         }
-        ui.painter().line_segment([r.right_top(), r.right_bottom()], Stroke::new(1.0, t.separator));
+        ui.painter().line_segment([r.right_top(), r.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         crate::jobs_ui::tab_underline(ui, r, *frac, &t);
         let (xr, at) = pro_tab_layout(r, g.size().y, mac);
         let xresp = ui.interact(xr, ui.scope_id().with(("ptabjobx", job.0)), Sense::click());

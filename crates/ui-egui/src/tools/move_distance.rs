@@ -11,6 +11,7 @@
 //! so a pointer resting on the canvas costs nothing per frame.
 
 use egui::{Color32, Pos2, Stroke, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_engine::snap::{layer_rect, union};
 
@@ -174,13 +175,13 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
     let (dpi, size) = (f64::from(st.doc.resolution_dpi), st.doc.size);
     let ur = &app.session.prefs().units_and_rulers;
     let color = crate::snap_ui::smart_color(app);
-    let stroke = Stroke::new(1.0, color);
+    let stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
     let px = |p: Pos2| pos2(p.x.round() + 0.5, p.y.round() + 0.5);
     for e in &overlay.extensions {
         let (a, b) = (xf.to_screen(e[0] as f32, e[1] as f32), xf.to_screen(e[2] as f32, e[3] as f32));
         painter.add(egui::Shape::dashed_line(&[px(a), px(b)], stroke, 3.0, 3.0));
     }
-    let t = crate::theme::Tokens::get(painter.ctx());
+    let t = craft_ui::theme::current(painter.ctx());
     let font = egui::FontId::proportional(11.0);
     for m in &overlay.measures {
         let (a, b) = if m.horizontal {
@@ -201,7 +202,7 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
         let galley = painter.layout_no_wrap(text, font.clone(), on(color));
         let mid = a + (b - a) / 2.0;
         let r = egui::Rect::from_center_size(mid, galley.size() + vec2(8.0, 4.0));
-        painter.rect_filled(r, t.radius_sm, color);
+        painter.rect_filled(r, t.shape.radius.control, color);
         painter.galley(r.center() - galley.size() / 2.0, galley, on(color));
     }
 }

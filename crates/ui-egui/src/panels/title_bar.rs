@@ -65,7 +65,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let side = if t.pro { 18.0 } else { 20.0 };
                     let (mark, _) = ui.allocate_exact_size(vec2(side, side), Sense::hover());
                     crate::brand::paint_mark(ui, mark);
-                    ui.add_space(6.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 }
                 // With the macOS menu bar the menus are at the top of the screen instead. Either way
                 // this is the menus' inner edge, facing the title.

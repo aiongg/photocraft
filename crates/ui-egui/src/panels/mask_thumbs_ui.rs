@@ -10,6 +10,7 @@
 //! mask to load it as a selection, and click the vector mask to target it (brackets).
 
 use egui::{Color32, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::{Document, Layer, LayerId, VectorMask};
 use serde_json::{Value, json};
 
@@ -141,7 +142,7 @@ pub fn paint(
             }
             if !enabled {
                 // Photoshop's red X over a disabled mask.
-                let st = Stroke::new(1.5, t.danger);
+                let st = craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger);
                 let k = r.shrink(1.0);
                 painter.line_segment([k.left_top(), k.right_bottom()], st);
                 painter.line_segment([k.right_top(), k.left_bottom()], st);
@@ -150,13 +151,13 @@ pub fn paint(
         if app.ui.layers_panel_options.show_layer_mask_badges {
             // Distinguish pixel and vector masks without altering their thumbnails.
             let badge = Rect::from_min_size(pos2(r.right() - 9.0, r.bottom() - 9.0), vec2(9.0, 9.0));
-            painter.rect_filled(badge, 1.0, t.card);
+            painter.rect_filled(badge, craft_ui::theme::scale::Radius::R2.px(), t.card);
             crate::icons::paint(ui, badge, if kind == MaskKind::Vector { "pen-tool" } else { "circle-dot" }, 8.0, t.text);
         }
         painter.rect_stroke(
             r,
             if t.pro { 0.0 } else { 4.0 },
-            Stroke::new(1.0, if t.pro { Color32::from_gray(20) } else { t.field_border }),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if t.pro { Color32::from_gray(20) } else { t.field_border }),
             StrokeKind::Outside,
         );
         out.thumbs.push((kind, r));
@@ -189,8 +190,8 @@ pub fn forget(ctx: &egui::Context, id: u64) {
 fn paint_chain(painter: &Painter, c: Pos2, color: Color32) {
     let st = Stroke::new(1.2, color);
     let link = vec2(5.0, 7.0);
-    painter.rect_stroke(Rect::from_center_size(c - vec2(0.0, 2.5), link), 2.0, st, StrokeKind::Middle);
-    painter.rect_stroke(Rect::from_center_size(c + vec2(0.0, 2.5), link), 2.0, st, StrokeKind::Middle);
+    painter.rect_stroke(Rect::from_center_size(c - vec2(0.0, 2.5), link), craft_ui::theme::scale::Radius::R2.px(), st, StrokeKind::Middle);
+    painter.rect_stroke(Rect::from_center_size(c + vec2(0.0, 2.5), link), craft_ui::theme::scale::Radius::R2.px(), st, StrokeKind::Middle);
 }
 
 /// The command a click on mask thumbnail `kind` issues with modifiers `m`, if it is one that
@@ -242,7 +243,7 @@ pub fn has_vector_mask(st: &photocraft_engine::DocState) -> bool {
 pub fn paint_brackets(painter: &Painter, r: Rect, color: Color32) {
     let r = r.expand(3.0);
     let k = 6.0;
-    let st = Stroke::new(1.5, color);
+    let st = craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), color);
     for (c, dx, dy) in [(r.left_top(), 1.0, 1.0), (r.right_top(), -1.0, 1.0), (r.right_bottom(), -1.0, -1.0), (r.left_bottom(), 1.0, -1.0)] {
         painter.line_segment([c, c + vec2(k * dx, 0.0)], st);
         painter.line_segment([c, c + vec2(0.0, k * dy)], st);

@@ -6,6 +6,7 @@
 //! so `ui.dialog.set` / `ui.dialog.confirm` drive it like any dialog.
 
 use std::hash::{Hash, Hasher};
+use craft_ui::theme::ToEgui;
 use std::sync::Arc;
 
 use photocraft_doc::{DocId, Document, Fill, LayerContent};
@@ -161,11 +162,11 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     ui.horizontal(|ui| {
         let pat = f.get("pattern").and_then(Value::as_str).unwrap_or_default().to_string();
         if app.session.patterns.items.is_empty() {
-            ui.label(egui::RichText::new(tl!("No patterns")).color(Tokens::get(ui.ctx()).text_faint));
+            ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
         } else if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
             f.insert("pattern".into(), json!(id));
         }
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         // Photoshop: Snap to Origin puts the pattern's origin back at the layer's (or canvas's).
         if crate::widgets::secondary_button(ui, tl!("Snap to Origin"), 110.0).clicked() {
             f.insert("phase".into(), json!([0.0, 0.0]));
@@ -178,7 +179,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     let (min, max) = cmds::SCALE_RANGE;
     let mut scale = num(f, "scale", 100.0);
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Scale:")).color(Tokens::get(ui.ctx()).text_dim));
+        ui.label(egui::RichText::new(tl!("Scale:")).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
         if crate::widgets::value_field(ui, &mut scale, min as f32..=max as f32, "%", 70.0).accessible_name(tl!("Scale:")).changed() {
             f.insert("scale".into(), json!(scale.clamp(min as f32, max as f32)));
         }

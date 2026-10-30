@@ -5,6 +5,7 @@
 //! the full parameter set; Color Lookup commits on every change (its table isn't in the params).
 
 use std::sync::{Arc, Mutex, PoisonError};
+use craft_ui::theme::ToEgui;
 
 use photocraft_doc::{Adjustment, LayerId};
 use photocraft_engine::adjust_cmds::RANGES;
@@ -29,7 +30,7 @@ pub fn selective_values(adj: &Adjustment) -> Value {
 }
 
 pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj: &Adjustment) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let committed = selective_values(adj);
     let mut values = match &app.live_adjust {
         Some((l, v)) if *l == id && v.get("reds").is_some() => v.clone(),
@@ -38,13 +39,13 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
     let key = egui::Id::unique(("selc-range", id.0));
     let mut range: usize = ui.data(|d| d.get_temp(key)).unwrap_or(0);
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Colors")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("Colors")).color(t.color.text.muted.to_egui()));
         let opts: Vec<(usize, &str)> = RANGE_LABELS.iter().copied().enumerate().collect();
         if widgets::dropdown(ui, &format!("selc-colors-{}", id.0), tl!("Color"), &mut range, &opts, 150.0) {
             ui.data_mut(|d| d.insert_temp(key, range));
         }
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut live = false;
     let mut commit = false;
     for (k, label) in [tl!("Cyan"), tl!("Magenta"), tl!("Yellow"), tl!("Black")].iter().enumerate() {
@@ -58,7 +59,7 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
             commit = true;
         }
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut method = values["method"].as_str().unwrap_or("relative").to_string();
     ui.horizontal(|ui| {
         for (m, label) in [("relative", tl!("Relative")), ("absolute", tl!("Absolute"))] {
@@ -173,7 +174,7 @@ fn lookup_params(key: &str) -> Value {
 }
 
 pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj: &Adjustment) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let Adjustment::ColorLookup { name, lut, size, tetrahedral, dither, .. } = adj else {
         return;
     };
@@ -206,7 +207,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
     });
     let mut cycling_preview = false;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("3D LUT File")).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!("3D LUT File")).color(t.color.text.muted.to_egui()));
         let (chosen, _) = widgets::dropdown_wheel_hovered(ui, &format!("clrl-{}", id.0), tl!("Color"), &mut sel, &opts, 170.0);
         if !chosen.is_empty() {
             if cycle_input {
@@ -247,7 +248,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
         app.ui.status = e;
         app.ui.status_error = true;
     }
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let mut tet = *tetrahedral;
     ui.horizontal(|ui| {
         for (on, label) in [(false, tl!("Trilinear")), (true, tl!("Tetrahedral"))] {

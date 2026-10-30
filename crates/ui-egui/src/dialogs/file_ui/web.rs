@@ -1,4 +1,6 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Tokens, Value, WebSettings, b, check, dropdown_str, json, n, number, params, s, web_cmds, web_preview};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 const WEB_FORMATS: [(&str, &str); 6] = [("gif", "GIF"), ("png8", "PNG-8"), ("png24", "PNG-24"), ("jpeg", "JPEG"), ("webp", "WebP"), ("wbmp", "WBMP")];
 
@@ -87,7 +89,7 @@ pub(super) type WebCache = (String, Arc<egui::TextureHandle>, Option<(usize, Opt
 
 /// Renders one preview pane: the original (`None`) or an optimised variant.
 fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<&Value>, f: &mut Map<String, Value>, pane: usize, frame: Option<usize>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let Some(st) = app.session.active() else { return };
     let doc = st.doc.clone();
     let rev = st.revision;
@@ -159,7 +161,7 @@ fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<
         }
         crate::widgets::checker(ui.painter(), r, 8.0);
         web_preview::paint(ui, r, &response, &tex, source_size, f);
-        ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, t.separator), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()), egui::StrokeKind::Inside);
         let (l1, l2) = match (p, info) {
             (None, _) => ("Original".to_string(), format!("{}  ·  {} × {} px", doc.name, doc.size.width, doc.size.height)),
             (Some(_), Some((bytes, colors, ext))) => {
@@ -173,8 +175,8 @@ fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<
             (Some(_), None) => ("—".into(), String::new()),
         };
         let l1 = if ratio > 1.001 { format!("{l1}  ·  Proxy preview") } else { l1 };
-        ui.add(egui::Label::new(egui::RichText::new(l1).color(t.text).size(11.5)).truncate());
-        ui.add(egui::Label::new(egui::RichText::new(l2).color(t.text_dim).size(11.0)).truncate());
+        ui.add(egui::Label::new(egui::RichText::new(l1).color(t.color.text.normal.to_egui()).size(11.5)).truncate());
+        ui.add(egui::Label::new(egui::RichText::new(l2).color(t.color.text.muted.to_egui()).size(11.0)).truncate());
     });
 }
 
@@ -244,7 +246,7 @@ pub(super) fn web_frame_document(doc: &photocraft_doc::Document, frame: Option<u
 }
 
 pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     ui.horizontal(|ui| {
         let mut view = s(f, "__view", "2up");
@@ -257,11 +259,11 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
         }
         f.insert("__view".into(), json!(view));
     });
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let frame = web_playback(ui, f, &doc);
     web_preview::controls(ui, f);
     if let Err(error) = web_preview::prepare_table(app, f) {
-        ui.colored_label(t.text_dim, error);
+        ui.colored_label(t.color.text.muted.to_egui(), error);
     }
     let p = params(f);
     f.insert("__previewRects".into(), json!([]));
@@ -293,12 +295,12 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 }
             }
         });
-        ui.add_space(10.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         // Settings scroll independently on smaller windows.
         ui.vertical(|ui| {
             ui.set_width(250.0);
             egui::ScrollArea::vertical().id_salt("web-settings").max_height(area.y).show(ui, |ui| {
-                ui.label(egui::RichText::new(tl!("Preset")).color(t.text_dim));
+                ui.label(egui::RichText::new(tl!("Preset")).color(t.color.text.muted.to_egui()));
                 let mut preset = s(f, "__preset", "");
                 let mut opts: Vec<(String, &str)> = vec![("".into(), "[Unnamed]")];
                 opts.extend(web_cmds::PRESETS.iter().map(|p| (p.to_string(), *p)));
@@ -308,9 +310,9 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                     }
                     f.insert("__preset".into(), json!(preset));
                 }
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 dropdown_str(ui, "web-format", tl!("Format"), f, "format", &WEB_FORMATS, 230.0);
-                ui.add_space(4.0);
+                ui.add_space(craft_ui::theme::scale::Space::S4.px());
                 let fmt = s(f, "format", "jpeg");
                 match fmt.as_str() {
                     "gif" | "png8" => {
@@ -376,17 +378,17 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 }
                 if !matches!(fmt.as_str(), "png24" | "webp") || !b(f, "transparency", true) {
                     ui.horizontal(|ui| {
-                        let matte_label = ui.label(egui::RichText::new(tl!("Matte")).color(t.text_dim));
+                        let matte_label = ui.label(egui::RichText::new(tl!("Matte")).color(t.color.text.muted.to_egui()));
                         let mut m = s(f, "matte", "#ffffff");
                         if ui.add(egui::TextEdit::singleline(&mut m).desired_width(80.0)).labelled_by(matte_label.id).changed() {
                             f.insert("matte".into(), json!(m));
                         }
                     });
                 }
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 check(ui, f, "convertToSrgb", tl!("Convert to sRGB"), true);
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Metadata")).color(t.text_dim));
+                    ui.label(egui::RichText::new(tl!("Metadata")).color(t.color.text.muted.to_egui()));
                     dropdown_str(
                         ui,
                         "web-meta",
@@ -405,13 +407,13 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 if matches!(fmt.as_str(), "gif" | "png8") {
                     web_preview::table(ui, f);
                 }
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.text));
+                ui.add_space(t.space.gap.stack);
+                ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
                 web_size(ui, f, &doc);
                 let nslices = photocraft_doc::slices::resolve(&doc).len();
                 if !doc.slices.is_empty() {
-                    ui.add_space(6.0);
-                    ui.label(egui::RichText::new(crate::i18n::trn(crate::i18n::current(), nslices as u64, "{n} slice", "{n} slices")).color(t.text_dim));
+                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                    ui.label(egui::RichText::new(crate::i18n::trn(crate::i18n::current(), nslices as u64, "{n} slice", "{n} slices")).color(t.color.text.muted.to_egui()));
                     check(ui, f, "html", tl!("Save HTML and Images"), true);
                     dropdown_str(ui, "web-slices", tl!("Slices"), f, "slices", &[("all", tl!("All Slices")), ("user", tl!("All User Slices"))], 150.0);
                 }
@@ -424,10 +426,10 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
 /// value when it changed, compared with the value the widget was given so a field that only
 /// clamps does not count as an edit.
 fn size_field(ui: &mut egui::Ui, label: &str, shown: f64, range: std::ops::RangeInclusive<f32>, unit: &str, decimals: u32) -> Option<f64> {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let passed = (shown as f32).clamp(*range.start(), *range.end());
     let mut v = passed;
-    ui.label(egui::RichText::new(label).color(t.text_dim));
+    ui.label(egui::RichText::new(label).color(t.color.text.muted.to_egui()));
     crate::widgets::value_field_prec(ui, &mut v, range, unit, 90.0, decimals).accessible_name(tl!(&label));
     ui.end_row();
     (v != passed).then_some(f64::from(v))
@@ -481,7 +483,7 @@ fn web_size(ui: &mut egui::Ui, f: &mut Map<String, Value>, doc: &photocraft_doc:
         }
     }
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!("Resample")).color(Tokens::get(ui.ctx()).text_dim));
+        ui.label(egui::RichText::new(tl!("Resample")).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
         // Photoshop's Save for Web list, in its order.
         dropdown_str(
             ui,

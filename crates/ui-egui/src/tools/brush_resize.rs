@@ -10,6 +10,7 @@
 //! request in #231) is not used: ⇧ is Photoshop's straight-line modifier for painting tools.
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use craft_ui::theme::StrokeExt;
 
 use egui::{Color32, Pos2, Stroke, vec2};
 use photocraft_engine::paint::MAX_BRUSH_SIZE;
@@ -145,8 +146,8 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) -> boo
     let c = xf.to_screen(r.anchor[0] as f32, r.anchor[1] as f32);
     let radius = (b.size / 2.0 * xf.zoom).max(1.0);
     tip_preview(painter, c, b.size / 2.0, xf.zoom, b.hardness, preview_tint(app));
-    painter.circle_stroke(c, radius + 0.5, Stroke::new(1.0, Color32::from_black_alpha(140)));
-    painter.circle_stroke(c, radius, Stroke::new(1.0, Color32::from_white_alpha(220)));
+    painter.circle_stroke(c, radius + 0.5, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(140)));
+    painter.circle_stroke(c, radius, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(220)));
     // Photoshop hides the pointer while the circle stays put.
     painter.ctx().set_cursor_icon(egui::CursorIcon::None);
     let at = painter.ctx().pointer_latest_pos().unwrap_or(c);

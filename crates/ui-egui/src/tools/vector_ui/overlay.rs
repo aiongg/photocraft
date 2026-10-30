@@ -1,4 +1,5 @@
 use super::curvature::curvature_refresh;
+use craft_ui::theme::StrokeExt;
 use super::path_ops::{active_type_path, targeted_vector_mask, work_path_shown_in};
 use super::pen::{closing, over_first_anchor, shift_45};
 use egui::{Color32, Pos2, Rect, Stroke, pos2, vec2};
@@ -85,9 +86,9 @@ pub(crate) fn path_lines(path: &Path, xf: &dyn Fn([f64; 2]) -> Pos2) -> Vec<(Vec
 pub(crate) fn draw_outline(painter: &egui::Painter, p: &Path, to_scr: &dyn Fn([f64; 2]) -> Pos2, accent: Color32) {
     for (pts, closed) in path_lines(p, to_scr) {
         if closed {
-            painter.add(egui::Shape::closed_line(pts, Stroke::new(1.0, accent)));
+            painter.add(egui::Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent)));
         } else {
-            painter.add(egui::Shape::line(pts, Stroke::new(1.0, accent)));
+            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent)));
         }
     }
 }
@@ -95,13 +96,13 @@ pub(crate) fn draw_outline(painter: &egui::Painter, p: &Path, to_scr: &dyn Fn([f
 /// An anchor point's square: filled with the accent when selected, else hollow (white).
 pub(crate) fn draw_anchor(painter: &egui::Painter, c: Pos2, selected: bool, accent: Color32) {
     let r = Rect::from_center_size(c, vec2(6.0, 6.0));
-    painter.rect_filled(r, 0.0, if selected { accent } else { Color32::WHITE });
-    painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Inside);
+    painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), if selected { accent } else { Color32::WHITE });
+    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Inside);
 }
 
 /// A direction handle: the line from its anchor and the round handle end.
 pub(crate) fn draw_handle(painter: &egui::Painter, anchor: Pos2, handle: Pos2, accent: Color32) {
-    painter.line_segment([anchor, handle], Stroke::new(1.0, accent));
+    painter.line_segment([anchor, handle], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent));
     painter.circle_filled(handle, 3.0, accent);
 }
 
@@ -197,7 +198,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         for w in knots.windows(2) {
             pts.extend(curve_points(w[0][0], w[0][2], w[1][1], w[1][0], &to_scr));
         }
-        painter.add(egui::Shape::line(pts, Stroke::new(1.5, accent)));
+        painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
         // No rubber band where a click adds or deletes an anchor of this path instead (#6140).
         let auto = app.hover_doc.is_some_and(|h| crate::anchor_tools::pen_auto(app, tool, painter.ctx().input(|i| i.modifiers), h).is_some());
         if let (Some(last), Some(h)) = (pen.knots.last(), app.hover_doc)
@@ -212,13 +213,13 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
                 curvature_refresh(&mut next, false);
                 if let [.., a, b] = next.knots.as_slice() {
                     let pts = curve_points(a[0], a[2], b[1], b[0], &to_scr);
-                    painter.add(egui::Shape::dashed_line(&pts, Stroke::new(1.0, accent), 4.0, 3.0));
+                    painter.add(egui::Shape::dashed_line(&pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), 4.0, 3.0));
                 }
             } else {
                 // The rubber band ends where a ⇧-click would put the next anchor.
                 let shift = painter.ctx().input(|i| i.modifiers.shift);
                 let h = if pen.curvature { h } else { shift_45(last[0], h, shift) };
-                painter.add(egui::Shape::dashed_line(&[to_scr(last[0]), to_scr(h)], Stroke::new(1.0, accent), 4.0, 3.0));
+                painter.add(egui::Shape::dashed_line(&[to_scr(last[0]), to_scr(h)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), 4.0, 3.0));
             }
         }
         for (i, k) in pen.knots.iter().enumerate() {
@@ -238,8 +239,8 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             && let Some(first) = pen.knots.first()
         {
             let c = to_scr(first[0]);
-            painter.rect_filled(Rect::from_center_size(c, vec2(8.0, 8.0)), 0.0, accent);
-            painter.circle_stroke(c + vec2(11.0, 11.0), 3.5, Stroke::new(1.5, accent));
+            painter.rect_filled(Rect::from_center_size(c, vec2(8.0, 8.0)), craft_ui::theme::scale::Radius::R0.px(), accent);
+            painter.circle_stroke(c + vec2(11.0, 11.0), 3.5, craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent));
         }
     }
     // The segment the Pen's Auto Add/Delete would add an anchor to, or the anchor it would delete,

@@ -30,6 +30,7 @@
 //! out), with transparency out to the frame, under the shield ([`shows_beyond_canvas`]).
 
 use egui::{CursorIcon, Modifiers};
+use craft_ui::theme::StrokeExt;
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;
@@ -1056,7 +1057,7 @@ pub fn draw_turn_cursor(ctx: &egui::Context, p: egui::Pos2, toward: egui::Vec2) 
     let at = |a: f32| c + egui::vec2(a.cos(), a.sin()) * R;
     let points: Vec<egui::Pos2> = (0..=16).map(|i| at(mid - HALF + 2.0 * HALF * i as f32 / 16.0)).collect();
     painter.add(egui::Shape::line(points.clone(), egui::Stroke::new(3.5, tokens.shadow)));
-    painter.add(egui::Shape::line(points, egui::Stroke::new(1.5, tokens.accent_text)));
+    painter.add(egui::Shape::line(points, craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.accent_text)));
     for (a, sign) in [(mid - HALF, -1.0f32), (mid + HALF, 1.0)] {
         let tip = at(a) + egui::vec2(-a.sin(), a.cos()) * (sign * 2.0);
         let tangent = egui::vec2(-a.sin(), a.cos()) * sign;
@@ -1064,7 +1065,7 @@ pub fn draw_turn_cursor(ctx: &egui::Context, p: egui::Pos2, toward: egui::Vec2) 
         painter.add(egui::Shape::convex_polygon(
             vec![tip + tangent * 3.5, tip - tangent * 3.0 + normal * 3.5, tip - tangent * 3.0 - normal * 3.5],
             tokens.accent_text,
-            egui::Stroke::new(1.0, tokens.shadow),
+            craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
         ));
     }
 }

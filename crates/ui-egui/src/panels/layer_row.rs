@@ -1,4 +1,5 @@
 use super::layer_drag::{MaskDrag, fx_drop, layer_drag_and_drop, mask_drag_key, start_fx_drag, starts_mask_drag};
+use craft_ui::theme::StrokeExt;
 use super::layers::simple_lock_toggle;
 use super::{
     Color32, CornerRadius, Layer, LayerContent, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Value, icons, json, pos2, theme, vec2, widgets,
@@ -107,7 +108,7 @@ fn swept_pointer_range(ctx: &egui::Context) -> Option<(f32, f32)> {
 /// Marker in the clipped row's existing 12-point slot, beside its thumbnail.
 pub(super) fn paint_clipping_indicator(painter: &egui::Painter, at: Pos2, color: Color32) {
     let tip = at + vec2(5.0, 3.0);
-    let stroke = Stroke::new(1.0, color);
+    let stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
     painter.add(egui::Shape::line(vec![at + vec2(9.0, -4.0), at + vec2(5.0, -4.0), tip], stroke));
     painter.add(egui::Shape::line(vec![at + vec2(2.0, 0.0), tip, at + vec2(8.0, 0.0)], stroke));
 }
@@ -280,26 +281,26 @@ fn eye_cell(rect: Rect) -> Rect {
 fn paint_row_background(painter: &egui::Painter, t: &Tokens, l: &Layer, rect: Rect, selected: bool, is_hovered: bool) {
     if t.pro {
         if selected {
-            painter.rect_filled(rect, 0.0, t.row_selected);
+            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
         } else if is_hovered {
-            painter.rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
-            painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.12));
+            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
+            painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.accent.gamma_multiply(0.12));
         }
     } else if selected {
         painter.rect_filled(rect, t.radius, t.hover);
-        painter.rect_stroke(rect, t.radius, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        painter.rect_stroke(rect, t.radius, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.field_border), StrokeKind::Inside);
     } else if is_hovered {
         painter.rect_filled(rect, t.radius, t.hover.gamma_multiply(0.5));
         painter.rect_filled(rect, t.radius, t.accent.gamma_multiply(0.12));
     }
     let eye_cell = eye_cell(rect);
     if let Some((_, background)) = t.layer_label_colors(l.label) {
-        painter.rect_filled(eye_cell, 0.0, background);
+        painter.rect_filled(eye_cell, craft_ui::theme::scale::Radius::R0.px(), background);
     }
     if t.pro {
         // Paint dividers over the label so the eye column stays distinct.
-        painter.line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], Stroke::new(1.0, t.separator));
-        painter.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
+        painter.line_segment([rect.left_bottom(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.separator));
     }
 }
 
@@ -506,7 +507,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
     let p = ui.painter();
     match &l.content {
         LayerContent::Adjustment(_) | LayerContent::Group(_) => {
-            p.rect_filled(rect, 6.0, t.field);
+            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), t.field);
             let icon = if l.is_group() { "folder" } else { "contrast" };
             icons::paint(ui, rect, icon, 18.0, t.icon);
         }
@@ -522,7 +523,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
         }
         LayerContent::Fill(_) => {
             let c = [128, 128, 128, 255];
-            p.rect_filled(rect, 6.0, Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3]));
+            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3]));
         }
         _ => {
             // Keep row layout and outside thumbnail decorations when the image is clipped.
@@ -537,11 +538,11 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
         }
     }
     let stroke = if t.pro {
-        Stroke::new(1.0, Color32::from_gray(20))
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20))
     } else if selected {
-        Stroke::new(1.5, t.text)
+        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)
     } else {
-        Stroke::new(1.0, t.field_border)
+        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border)
     };
     p.rect_stroke(rect, CornerRadius::same(if t.pro { 0 } else { 5 }), stroke, StrokeKind::Outside);
     crate::smart_ui::thumb_badge(ui, l, rect);

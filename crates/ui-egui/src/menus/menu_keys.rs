@@ -15,6 +15,7 @@
 //! menu bar replaces the in-window one and this never runs.
 
 use egui::{Color32, Event, Id, Key, Modifiers, Stroke, Ui};
+use craft_ui::theme::StrokeExt;
 
 use crate::menu_nav::Nav;
 
@@ -187,7 +188,7 @@ pub fn mnemonic_text(ui: &Ui, prefix: &str, label: &str, mnemonic: Option<char>,
     };
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = f32::INFINITY;
-    let underlined = egui::TextFormat { underline: Stroke::new(1.0, color), ..plain.clone() };
+    let underlined = egui::TextFormat { underline: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), color), ..plain.clone() };
     let before = format!("{prefix}{}", &label[..i]);
     if !before.is_empty() {
         job.append(&before, 0.0, plain.clone());
@@ -233,7 +234,7 @@ pub fn menu_row_text(ui: &Ui, checked: bool, label: &str, mnemonic: Option<char>
     for (k, part) in parts.into_iter().enumerate() {
         let Some(part) = part.filter(|p| !p.is_empty()) else { continue };
         let format =
-            if k == 1 && at.is_some() { egui::TextFormat { underline: Stroke::new(1.0, Color32::PLACEHOLDER), ..plain.clone() } } else { plain.clone() };
+            if k == 1 && at.is_some() { egui::TextFormat { underline: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::PLACEHOLDER), ..plain.clone() } } else { plain.clone() };
         job.append(part, lead, format);
         lead = 0.0;
     }

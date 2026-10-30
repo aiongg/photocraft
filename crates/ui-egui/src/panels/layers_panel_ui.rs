@@ -1,6 +1,7 @@
 //! Layers panel flyout and display preferences, observed from Photoshop's panel menu.
 //! UI options do not edit document pixels or add history steps.
 use egui::{self, Context, Ui};
+use craft_ui::theme::StrokeExt;
 use photocraft_doc::Document;
 use serde_json::json;
 
@@ -121,7 +122,7 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
         let y0 = n as f32 / 22.0;
         let y1 = (n + 1) as f32 / 22.0;
         let f = n as f32 / 22.0;
-        painter.rect_filled(UiRect::from_min_max(point(0.0, y0), point(1.0, y1)), 0.0, Color32::from_gray((119.0 + f * 30.0) as u8));
+        painter.rect_filled(UiRect::from_min_max(point(0.0, y0), point(1.0, y1)), craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray((119.0 + f * 30.0) as u8));
     }
     painter.add(Shape::convex_polygon(
         vec![point(0.0, 0.60), point(0.22, 0.36), point(0.46, 0.56), point(0.72, 0.33), point(1.0, 0.62)],
@@ -170,7 +171,7 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
         let r = unit * if n % 2 == 0 { 0.16 } else { 0.21 };
         painter.circle_filled(center + vec2(theta.cos(), theta.sin()) * r, (side * 0.008).max(0.3), Color32::from_gray(119));
     }
-    painter.rect_stroke(rect, 0.0, Stroke::new(1.0, Color32::from_gray(92)), egui::StrokeKind::Inside);
+    painter.rect_stroke(rect, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(92)), egui::StrokeKind::Inside);
 }
 
 /// Returns both the actual thumbnail width and the height allocated by the Layers
@@ -198,14 +199,14 @@ fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
     ui.group(|ui| {
         ui.set_min_width(308.0);
         ui.label(egui::RichText::new(tl!("Thumbnail Size")).strong());
-        ui.add_space(7.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         // The original Photoshop dialog has None with a label, then progressively
         // larger previews, with the radio controls aligned vertically.
         ui.horizontal(|ui| {
             let r = ui.radio_value(&mut draft.thumbnail_size, LayerThumbnailSize::None, tl!("None"));
             r.on_hover_text(tl!("None"));
         });
-        ui.add_space(3.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         for (size, side, name) in [
             (LayerThumbnailSize::Small, 38.0, tl!("Small")),
             (LayerThumbnailSize::Medium, 68.0, tl!("Medium")),
@@ -216,7 +217,7 @@ fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
                 // size. The accessible/hover label still names the setting.
                 let radio = ui.radio_value(&mut draft.thumbnail_size, size, "");
                 radio.on_hover_text(name);
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 let (rect, response) = ui.allocate_exact_size(egui::vec2(side, side), egui::Sense::click());
                 paint_flower_example(ui, rect);
                 if response.clicked() {
@@ -224,28 +225,28 @@ fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
                 }
                 response.on_hover_text(name);
             });
-            ui.add_space(5.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
         }
     });
-    ui.add_space(9.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     ui.group(|ui| {
         ui.set_min_width(308.0);
         ui.label(egui::RichText::new(tl!("Thumbnail Contents")).strong());
-        ui.add_space(10.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.radio_value(&mut draft.thumbnail_contents, LayerThumbnailContents::LayerBounds, tl!("Layer Bounds"));
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         ui.radio_value(&mut draft.thumbnail_contents, LayerThumbnailContents::EntireDocument, tl!("Entire Document"));
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
     });
-    ui.add_space(9.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     ui.checkbox(&mut draft.use_default_masks_on_fill_layers, tl!("Use Default Masks on Fill Layers"));
-    ui.add_space(3.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.checkbox(&mut draft.expand_new_effects, tl!("Expand New Effects"));
-    ui.add_space(3.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.checkbox(&mut draft.add_copy_to_copied_layers_and_groups, tl!("Add “copy” to Copied Layers and Groups"));
-    ui.add_space(3.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.checkbox(&mut draft.preview_on_canvas_when_reordering_layers, tl!("Preview on canvas when reordering layers"));
-    ui.add_space(3.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     ui.checkbox(&mut draft.show_layer_mask_badges, tl!("Show layer mask badges"));
 }
 
@@ -278,13 +279,13 @@ pub fn show_dialog(app: &mut PhotocraftApp, ctx: &Context) {
                         ui.set_width(345.0);
                         ui.vertical(|ui| options_body(ui, opts));
                     });
-                    ui.add_space(10.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S12.px());
                     ui.vertical(|ui| {
                         ui.set_min_width(74.0);
                         if ui.add_sized([74.0, 29.0], egui::Button::new(tl!("OK"))).clicked() {
                             confirmed = true;
                         }
-                        ui.add_space(6.0);
+                        ui.add_space(craft_ui::theme::scale::Space::S6.px());
                         if ui.add_sized([74.0, 29.0], egui::Button::new(tl!("Cancel"))).clicked() {
                             cancelled = true;
                         }
@@ -304,7 +305,7 @@ pub fn show_dialog(app: &mut PhotocraftApp, ctx: &Context) {
             }
         }
         if !matches!(dialog, LayersPanelDialog::PanelOptions(_)) {
-            ui.add_space(10.0);
+            ui.add_space(craft_ui::theme::scale::Space::S12.px());
             ui.horizontal(|ui| {
                 if ui.button(tl!("OK")).clicked() {
                     confirmed = true;

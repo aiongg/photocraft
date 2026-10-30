@@ -154,7 +154,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut color = f.get("color").and_then(Value::as_str).filter(|c| is_color_name(c)).unwrap_or(DEFAULT_COLOR).to_string();
     if let Some(error) = f.get("__error").and_then(Value::as_str) {
         ui.colored_label(ui.visuals().error_fg_color, error);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
     }
     egui::Grid::new("new-guide-dialog").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
         ui.label(tl!("Orientation"));

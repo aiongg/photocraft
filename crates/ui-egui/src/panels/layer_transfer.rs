@@ -13,6 +13,7 @@
 //! would copy just the selected pixels, which is not supported yet.
 
 use photocraft_doc::{DocId, LayerId};
+use craft_ui::theme::StrokeExt;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -172,7 +173,7 @@ pub fn ghost(ctx: &egui::Context, p: egui::Pos2, label: &str) {
     let g = painter.layout_no_wrap(label.to_string(), egui::FontId::proportional(12.0), t.text);
     let r = egui::Rect::from_min_size(p + egui::vec2(12.0, -10.0), g.size() + egui::vec2(16.0, 8.0));
     painter.rect_filled(r, t.radius_sm, t.card.gamma_multiply(0.95));
-    painter.rect_stroke(r, t.radius_sm, egui::Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+    painter.rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ctx, t.accent), egui::StrokeKind::Inside);
     painter.galley(r.min + egui::vec2(8.0, 4.0), g, t.text);
 }
 

@@ -24,6 +24,7 @@
 //! out, and Photoshop's Presets.
 
 use std::sync::Arc;
+use craft_ui::theme::StrokeExt;
 
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_doc::{DocId, Document, LayerId};
@@ -1497,7 +1498,7 @@ fn section(ui: &mut egui::Ui, id: &str, title: &str, body: impl FnOnce(&mut egui
 fn options_bar(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace) -> Option<Value> {
     let mut edit = None;
     crate::icons::button(ui, w.tool.icon(), 26.0, false, &w.tool.tip());
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if w.tool.edits() {
         if crate::icons::button(ui, "plus", 26.0, w.add, tl!("Add")).clicked() {
             w.add = true;
@@ -1505,7 +1506,7 @@ fn options_bar(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace) -> Option<Value> 
         if crate::icons::button(ui, "minus", 26.0, !w.add, tl!("Subtract")).clicked() {
             w.add = false;
         }
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
     }
     if w.tool.brushes() {
         ui.label(tl!("Size:"));
@@ -1513,18 +1514,18 @@ fn options_bar(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace) -> Option<Value> 
         if widgets::value_field(ui, &mut size, 1.0..=5000.0, " px", 64.0).changed() {
             w.set_size(f64::from(size));
         }
-        ui.add_space(6.0);
+        ui.add_space(craft_ui::theme::scale::Space::S6.px());
     }
     if w.tool == SmTool::Brush {
         ui.label(tl!("Hardness:"));
         widgets::value_field(ui, &mut w.hardness, 0.0..=100.0, "%", 56.0);
-        ui.add_space(6.0);
+        ui.add_space(craft_ui::theme::scale::Space::S6.px());
     }
     if matches!(w.tool, SmTool::Quick | SmTool::RefineEdge | SmTool::Object) && widgets::checkbox(ui, &mut w.sample_all, tl!("Sample All Layers")).changed() {
         w.stale();
     }
     if w.tool.edits() {
-        ui.add_space(8.0);
+        ui.add_space(craft_ui::theme::scale::Space::S8.px());
         if widgets::secondary_button(ui, tl!("Select Subject"), 0.0).clicked() {
             edit = Some(json!({"tool": "subject", "sampleAllLayers": w.sample_all}));
         }
@@ -1574,7 +1575,7 @@ fn properties(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace, t: &Tokens) -> Opt
             ui.horizontal(|ui| {
                 ui.label(tl!("Color"));
                 widgets::color_edit_button_srgb(ui, &mut w.opts.overlay_color);
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 ui.label(tl!("Indicates"));
                 widgets::dropdown(
                     ui,
@@ -1682,7 +1683,7 @@ fn paint_canvas(ui: &mut egui::Ui, ctx: &egui::Context, w: &mut SelectMaskWorksp
         for e in edges {
             let (a, b) = (v.to_screen([f64::from(e[0][0]), f64::from(e[0][1])]), v.to_screen([f64::from(e[1][0]), f64::from(e[1][1])]));
             let dark = ((e[0][0] + e[0][1]) as usize / 4 + phase).is_multiple_of(2);
-            clip.line_segment([a, b], Stroke::new(1.0, if dark { Color32::BLACK } else { Color32::WHITE }));
+            clip.line_segment([a, b], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if dark { Color32::BLACK } else { Color32::WHITE }));
         }
         ctx.request_repaint_after(std::time::Duration::from_millis(120));
     }
@@ -1707,11 +1708,11 @@ fn paint_canvas(ui: &mut egui::Ui, ctx: &egui::Context, w: &mut SelectMaskWorksp
                 }
             }
             SmTool::Lasso => {
-                clip.add(egui::Shape::line(line, Stroke::new(1.0, t.accent)));
+                clip.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent)));
             }
             SmTool::Object => {
                 if let (Some(a), Some(b)) = (line.first(), line.last()) {
-                    clip.rect_stroke(ERect::from_two_pos(*a, *b), 0.0, Stroke::new(1.0, t.accent), egui::StrokeKind::Middle);
+                    clip.rect_stroke(ERect::from_two_pos(*a, *b), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Middle);
                 }
             }
             _ => {}
@@ -1722,7 +1723,7 @@ fn paint_canvas(ui: &mut egui::Ui, ctx: &egui::Context, w: &mut SelectMaskWorksp
         if let Some(hp) = resp.hover_pos() {
             line.push(hp);
         }
-        clip.add(egui::Shape::line(line, Stroke::new(1.0, t.accent)));
+        clip.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent)));
     }
 }
 
@@ -1741,10 +1742,10 @@ fn paint_cursor(ctx: &egui::Context, w: &mut SelectMaskWorkspace, clip: &egui::P
             ctx.set_cursor_icon(egui::CursorIcon::Grab);
         } else if w.tool.brushes() {
             let r = (w.size() as f32 * 0.5 * v.zoom).max(2.0);
-            clip.circle_stroke(hp, r, Stroke::new(1.5, Color32::BLACK));
+            clip.circle_stroke(hp, r, craft_ui::theme::scale::Stroke::W1_5.egui(ctx, Color32::BLACK));
             clip.circle_stroke(hp, r, Stroke::new(0.75, Color32::WHITE));
             let add = w.add != alt;
-            for s in [Stroke::new(2.5, Color32::from_black_alpha(140)), Stroke::new(1.0, Color32::from_white_alpha(220))] {
+            for s in [Stroke::new(2.5, Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(ctx, Color32::from_white_alpha(220))] {
                 clip.line_segment([hp - vec2(3.0, 0.0), hp + vec2(3.0, 0.0)], s);
                 if add {
                     clip.line_segment([hp - vec2(0.0, 3.0), hp + vec2(0.0, 3.0)], s);
@@ -1759,7 +1760,7 @@ fn paint_cursor(ctx: &egui::Context, w: &mut SelectMaskWorkspace, clip: &egui::P
             });
         }
     }
-    clip.rect_stroke(img, 0.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Outside);
+    clip.rect_stroke(img, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ctx, t.separator), egui::StrokeKind::Outside);
 }
 
 /// Pan, zoom-click and tool gestures on the document, as events for `pointer`.
@@ -1832,11 +1833,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         w.texture_limit = ctx.input(|i| i.max_texture_side);
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::hover());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, 0.0, t.chrome);
+        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
         // The options bar across the top, as Photoshop's.
         let bar = ERect::from_min_size(full.min, vec2(full.width(), BAR_H));
-        painter.rect_filled(bar, 0.0, t.dock);
-        painter.line_segment([bar.left_bottom(), bar.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(bar, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([bar.left_bottom(), bar.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(bar.shrink2(vec2(8.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         if let Some(e) = options_bar(&mut bui, w) {
             edit = Some(e);
@@ -1844,8 +1845,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let body = ERect::from_min_max(pos2(full.left(), bar.bottom()), full.max);
         // The tools on the left: Lasso and Polygonal Lasso share a slot (right-click to pick).
         let left = ERect::from_min_size(body.min, vec2(LEFT_W, body.height()));
-        painter.rect_filled(left, 0.0, t.dock);
-        painter.line_segment([left.right_top(), left.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(left, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([left.right_top(), left.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut strip = ui.new_child(egui::UiBuilder::new().max_rect(left.shrink2(vec2(6.0, 8.0))));
         strip.spacing_mut().item_spacing.y = 4.0;
         for slot in [SmTool::Quick, SmTool::RefineEdge, SmTool::Brush, SmTool::Object, w.l_tool, SmTool::Hand, SmTool::Zoom] {
@@ -1869,10 +1870,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         // The Properties panel on the right.
         let right = ERect::from_min_size(pos2(body.right() - PANEL_W, body.top()), vec2(PANEL_W, body.height()));
-        painter.rect_filled(right, 0.0, t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let head = ERect::from_min_size(right.min, vec2(PANEL_W, TAB_H));
-        painter.line_segment([head.left_bottom(), head.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.line_segment([head.left_bottom(), head.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         painter.text(head.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, tl!("Properties"), FontId::proportional(12.0), t.text);
         let mut props = ui.new_child(
             egui::UiBuilder::new().max_rect(ERect::from_min_max(head.left_bottom() + vec2(14.0, 10.0), pos2(right.right() - 14.0, right.bottom() - 56.0))),
@@ -1884,7 +1885,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
         // Reset at the left, OK and Cancel against the right edge.
         let foot = ERect::from_min_size(pos2(right.left() + 10.0, right.bottom() - 46.0), vec2(PANEL_W - 20.0, 32.0));
-        painter.line_segment([pos2(right.left(), foot.top() - 6.0), pos2(right.right(), foot.top() - 6.0)], Stroke::new(1.0, t.separator));
+        painter.line_segment([pos2(right.left(), foot.top() - 6.0), pos2(right.right(), foot.top() - 6.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut fb = ui.new_child(egui::UiBuilder::new().max_rect(foot).layout(egui::Layout::right_to_left(egui::Align::Center)));
         if widgets::secondary_button(&mut fb, tl!("Cancel"), 70.0).clicked() {
             action = Some("cancel");
@@ -1900,16 +1901,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // The document under its tab.
         let doc_area = ERect::from_min_max(pos2(left.right(), body.top()), pos2(right.left(), body.bottom()));
         let tab = ERect::from_min_size(doc_area.min, vec2(doc_area.width(), TAB_H));
-        painter.rect_filled(tab, 0.0, t.dock);
-        painter.line_segment([tab.left_bottom(), tab.right_bottom()], Stroke::new(1.0, t.separator));
+        painter.rect_filled(tab, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([tab.left_bottom(), tab.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let title = title.clone().unwrap_or_default();
         let galley = painter.layout_no_wrap(title, FontId::proportional(12.0), t.text);
         let tab_w = (galley.size().x + 28.0).min(tab.width());
         let active_tab = ERect::from_min_size(tab.min, vec2(tab_w, TAB_H));
-        painter.rect_filled(active_tab, 0.0, t.canvas);
+        painter.rect_filled(active_tab, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
         painter.galley(pos2(active_tab.left() + 14.0, active_tab.center().y - galley.size().y / 2.0), galley, t.text);
         let area = ERect::from_min_max(pos2(doc_area.left(), tab.bottom()), doc_area.max);
-        painter.rect_filled(area, 0.0, t.canvas);
+        painter.rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
         let (cw, chh) = (w.canvas.width() as f32, w.canvas.height() as f32);
         if w.zoom <= 0.0 {
             w.zoom = ((area.width() - 40.0) / cw.max(1.0)).min((area.height() - 40.0) / chh.max(1.0)).clamp(0.01, 4.0);

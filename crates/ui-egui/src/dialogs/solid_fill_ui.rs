@@ -2,6 +2,7 @@
 //! snapshot; Cancel changes nothing and OK commits exactly one engine command.
 
 use std::hash::{Hash, Hasher};
+use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Rect, Stroke, StrokeKind, pos2, vec2};
@@ -182,7 +183,7 @@ pub(crate) fn paint_thumbnail(ui: &egui::Ui, color: Color, rect: Rect) {
     thumbnail_frame(ui, rect, |swatch| {
         let [r, g, b, a] = color.to_rgba8();
         crate::widgets::checker(ui.painter(), swatch, 3.0);
-        ui.painter().rect_filled(swatch, 0.0, Color32::from_rgba_unmultiplied(r, g, b, a));
+        ui.painter().rect_filled(swatch, craft_ui::theme::scale::Radius::R0.px(), Color32::from_rgba_unmultiplied(r, g, b, a));
     });
 }
 
@@ -196,9 +197,9 @@ pub(crate) fn thumbnail_frame(ui: &egui::Ui, rect: Rect, contents: impl FnOnce(R
     let bar_height = (size.y * 0.17).max(2.0);
     let swatch = Rect::from_min_max(sample.min, pos2(sample.right(), sample.bottom() - bar_height));
     contents(swatch);
-    p.rect_stroke(sample, 0.0, Stroke::new(1.0, t.text), StrokeKind::Outside);
+    p.rect_stroke(sample, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text), StrokeKind::Outside);
     let y = swatch.bottom();
-    p.line_segment([pos2(sample.left(), y), pos2(sample.right(), y)], Stroke::new(1.0, t.text));
+    p.line_segment([pos2(sample.left(), y), pos2(sample.right(), y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text));
     let x = sample.center().x;
     p.add(egui::Shape::convex_polygon(
         vec![pos2(x, y + 1.0), pos2(x - bar_height * 0.6, sample.bottom()), pos2(x + bar_height * 0.6, sample.bottom())],

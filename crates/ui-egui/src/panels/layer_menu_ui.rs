@@ -3,6 +3,7 @@
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
 use photocraft_doc::{LabelColor, Layer, LayerContent};
+use craft_ui::theme::StrokeExt;
 use serde_json::{Value, json};
 
 /// One entry: label, command id. `None` = separator.
@@ -302,7 +303,7 @@ fn color_button(ui: &mut egui::Ui, color: LabelColor, checked: bool) -> egui::Re
         if let Some((swatch, _)) = t.layer_label_colors(color) {
             p.rect_filled(rect, t.radius_sm, swatch);
         } else {
-            let stroke = Stroke::new(1.0, t.text_dim);
+            let stroke = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
             p.rect_stroke(rect, t.radius_sm, stroke, StrokeKind::Inside);
             let r = rect.shrink(4.0);
             p.line_segment([r.left_top(), r.right_bottom()], stroke);

@@ -1,4 +1,5 @@
 use super::hue_saturation::spectrum_bar;
+use craft_ui::theme::StrokeExt;
 use super::{
     Color32, Edit, EditorCx, GradientPreset, Group, PhotocraftApp, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, Value, adjust_params, color_button,
     color32, flag, json, label, pos2, rgb_of, round, vec2, widgets,
@@ -132,7 +133,7 @@ fn gradient_map_strip(ui: &mut egui::Ui, stops: &mut Vec<Stop>, cx: &EditorCx, s
     // Markers address un-reversed locations, as in the Gradient Tool; Reverse changes the image.
     let cols: Vec<Color32> = (0..=48).map(|i| color32(sample_stops(stops, i as f32 / 48.0))).collect();
     spectrum_bar(ui.painter(), bar, &cols);
-    ui.painter().rect_stroke(bar, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     for (i, (at, color)) in stops.iter().enumerate() {
         let x = x_of(*at);
         let border = if i == *selected { t.accent } else { t.text_dim };
@@ -142,8 +143,8 @@ fn gradient_map_strip(ui: &mut egui::Ui, stops: &mut Vec<Stop>, cx: &EditorCx, s
             border,
             Stroke::NONE,
         ));
-        ui.painter().rect_filled(body, 1.0, color32(*color));
-        ui.painter().rect_stroke(body, 1.0, Stroke::new(1.0, border), StrokeKind::Outside);
+        ui.painter().rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), color32(*color));
+        ui.painter().rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
     }
     edit
 }

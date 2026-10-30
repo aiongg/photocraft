@@ -7,6 +7,7 @@
 //! colour the panel isn't editing, and a right-click opens the ramp menu.
 
 use std::f32::consts::TAU;
+use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Mesh, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -249,12 +250,12 @@ fn track(ui: &egui::Ui, r: Rect, resp: &egui::Response, value: &mut f32, lo: f32
         mesh.add_triangle(a, a + 3, a + 2);
     }
     ui.painter().add(mesh);
-    ui.painter().rect_stroke(bar, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     if web {
         // Ticks at the web steps.
         for k in 0..=5 {
             let x = bar.left() + bar.width() * k as f32 / 5.0;
-            ui.painter().line_segment([pos2(x, bar.bottom() + 1.0), pos2(x, bar.bottom() + 3.0)], Stroke::new(1.0, t.text_faint));
+            ui.painter().line_segment([pos2(x, bar.bottom() + 1.0), pos2(x, bar.bottom() + 3.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
         }
     }
     let mut changed = false;
@@ -278,7 +279,7 @@ fn track(ui: &egui::Ui, r: Rect, resp: &egui::Response, value: &mut f32, lo: f32
     let x = bar.left() + bar.width() * f;
     let y = bar.bottom() + 1.0;
     let thumb = vec![pos2(x, y), pos2(x + 5.0, y + 7.0), pos2(x - 5.0, y + 7.0)];
-    ui.painter().add(egui::Shape::convex_polygon(thumb, t.text, Stroke::new(1.0, t.field_border)));
+    ui.painter().add(egui::Shape::convex_polygon(thumb, t.text, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border)));
     changed
 }
 
@@ -289,7 +290,7 @@ fn hex_pair(ui: &mut egui::Ui, id: egui::Id, value: &mut f32) -> bool {
     let (rect, _) = ui.allocate_exact_size(vec2(FIELD_W, ROW_H), Sense::hover());
     widgets::surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     let byte = value.clamp(0.0, 255.0).round() as u8;
     let typing = if ui.memory(|m| m.has_focus(id)) { ui.data(|d| d.get_temp::<String>(id)) } else { None };
@@ -338,7 +339,7 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, mode: ColorPanelMode) {
     if let Some(v) = edited {
         apply_values(app, ui, model, v);
     }
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let fill = ui.data(|d| d.get_temp::<f32>(color_field_fill_id()));
     let gaps = 2.0 * ui.spacing().item_spacing.y + 6.0;
     let ramp_h = fill.filter(|f| f.is_finite()).map_or(36.0, |f| (f - top_h - gaps).clamp(28.0, 2000.0));
@@ -364,8 +365,8 @@ pub(crate) fn alerts(app: &mut PhotocraftApp, ui: &mut egui::Ui, col: Rect, rgb:
         } else {
             crate::color_picker_ui::warning_triangle(ui.painter(), icon, t.text_dim, t.card);
         }
-        ui.painter().rect_filled(chip, 0.0, rgb32(near));
-        ui.painter().rect_stroke(chip, 0.0, Stroke::new(1.0, t.text_dim), StrokeKind::Outside);
+        ui.painter().rect_filled(chip, craft_ui::theme::scale::Radius::R0.px(), rgb32(near));
+        ui.painter().rect_stroke(chip, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Outside);
         let resp = ui.interact(icon.union(chip), ui.scope_id().with(("color-panel-alert", slot)), Sense::click());
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tip));
         if resp.on_hover_text(tl!(tip)).clicked() {
@@ -488,12 +489,12 @@ fn ramp(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
     };
     let colors = ramp_colors(ui, cp.ramp, cp.web_safe_ramp, fg, bg);
     ui.painter().add(ramp_mesh(bar, &colors, cp.web_safe_ramp));
-    ui.painter().rect_stroke(bar, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_stroke(bar, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     let (white, black) =
         (Rect::from_min_max(boxes.min, pos2(boxes.right(), boxes.center().y)), Rect::from_min_max(pos2(boxes.left(), boxes.center().y), boxes.max));
-    ui.painter().rect_filled(white, 0.0, Color32::WHITE);
-    ui.painter().rect_filled(black, 0.0, Color32::BLACK);
-    ui.painter().rect_stroke(boxes, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+    ui.painter().rect_filled(white, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+    ui.painter().rect_filled(black, craft_ui::theme::scale::Radius::R0.px(), Color32::BLACK);
+    ui.painter().rect_stroke(boxes, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     let resp = ui.interact(bar, ramp_id, Sense::click_and_drag());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Unknown, ui.is_enabled(), "Color Ramp"));
     let mods = ui.input(|i| i.modifiers);
@@ -555,7 +556,7 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     let mut v = edited.unwrap_or(v);
     let mut changed = edited.is_some();
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     let fill = ui.data(|d| d.get_temp::<f32>(color_field_fill_id()));
     let w = ui.available_width();
     // The wheel takes what the dock group has left under the sliders as drawn (they stand taller
@@ -612,14 +613,14 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ring_knob = center + vec2(a.cos(), -a.sin()) * (inner + ring_w / 2.0);
     let tri_knob = triangle_point(tri, s, b);
     for k in [ring_knob, tri_knob] {
-        ui.painter().circle_stroke(k, 5.0, Stroke::new(1.5, Color32::WHITE));
-        ui.painter().circle_stroke(k, 6.5, Stroke::new(1.0, Color32::from_black_alpha(160)));
+        ui.painter().circle_stroke(k, 5.0, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::WHITE));
+        ui.painter().circle_stroke(k, 6.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160)));
     }
     // Photoshop's add-to-swatches button under the wheel.
     let add = Rect::from_min_size(pos2(area.right() - 16.0, area.bottom() - 16.0), vec2(14.0, 14.0));
-    ui.painter().rect_stroke(add, 1.0, Stroke::new(1.0, t.text_dim), StrokeKind::Inside);
-    ui.painter().line_segment([pos2(add.center().x, add.top() + 3.5), pos2(add.center().x, add.bottom() - 3.5)], Stroke::new(1.0, t.text_dim));
-    ui.painter().line_segment([pos2(add.left() + 3.5, add.center().y), pos2(add.right() - 3.5, add.center().y)], Stroke::new(1.0, t.text_dim));
+    ui.painter().rect_stroke(add, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Inside);
+    ui.painter().line_segment([pos2(add.center().x, add.top() + 3.5), pos2(add.center().x, add.bottom() - 3.5)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim));
+    ui.painter().line_segment([pos2(add.left() + 3.5, add.center().y), pos2(add.right() - 3.5, add.center().y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim));
     let add_resp = ui.interact(add, ui.scope_id().with("color-wheel-add"), Sense::click());
     add_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), "Add to Swatches"));
     if add_resp.on_hover_text(tl!("Create new swatch")).clicked()

@@ -3,18 +3,20 @@
 //! dialogs (#3152) share it, as Photoshop's dialogs do.
 
 use super::{Response, Sense, Stroke, Tokens, Ui, value_field, vec2};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 
 /// `Label (dial) [field°]` for a direction in document angles: counter-clockwise from three
 /// o'clock, y up. The dial points anywhere in -180..=180; the result is clamped to `range`, and
 /// the field accepts the whole of `range` (Motion Blur takes -360..=360, so a typed or
 /// remembered 270° stays 270°).
 pub fn angle_dial_row(ui: &mut Ui, label: &str, angle: &mut f32, range: std::ops::RangeInclusive<f32>) -> Response {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     // The dial clamps with max/min, not `f32::clamp`, which panics if a malformed spec
     // reverses the range.
     let (lo, hi) = (*range.start(), *range.end());
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tl!(label)).color(t.text_dim));
+        ui.label(egui::RichText::new(tl!(label)).color(t.color.text.muted.to_egui()));
         let (rect, mut dial) = ui.allocate_exact_size(vec2(42.0, 42.0), Sense::click_and_drag());
         dial.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Slider, ui.is_enabled(), tl!(label)));
         if (dial.clicked() || dial.dragged())
@@ -28,13 +30,13 @@ pub fn angle_dial_row(ui: &mut Ui, label: &str, angle: &mut f32, range: std::ops
         }
         let painter = ui.painter();
         let radius = rect.width() / 2.0 - 2.0;
-        painter.circle(rect.center(), radius, t.field, Stroke::new(1.0, t.field_border));
+        painter.circle(rect.center(), radius, t.color.surface.sunken.to_egui(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
         let radians = angle.to_radians();
         let tip = rect.center() + vec2(radians.cos(), -radians.sin()) * (radius - 4.0);
-        painter.line_segment([rect.center(), tip], Stroke::new(2.0, t.accent));
-        painter.circle_filled(rect.center(), 2.0, t.text_dim);
+        painter.line_segment([rect.center(), tip], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.color.accent.solid.to_egui()));
+        painter.circle_filled(rect.center(), 2.0, t.color.text.muted.to_egui());
         if dial.has_focus() {
-            painter.circle_stroke(rect.center(), radius + 2.0, Stroke::new(1.0, t.accent));
+            painter.circle_stroke(rect.center(), radius + 2.0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()));
             let step = ui.input(|i| {
                 i.num_presses(egui::Key::ArrowRight) as f32 + i.num_presses(egui::Key::ArrowUp) as f32
                     - i.num_presses(egui::Key::ArrowLeft) as f32

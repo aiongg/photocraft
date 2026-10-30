@@ -11,6 +11,7 @@
 //! from the desktop's button layout. The shapes are drawn here, not read from the icon theme.
 
 use egui::{Color32, CursorIcon, Id, LayerId, Order, PointerButton, Pos2, Rect, ResizeDirection, Sense, Stroke, Ui, ViewportCommand, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -278,9 +279,9 @@ pub fn caption_buttons(app: &mut PhotocraftApp, ui: &mut Ui, bar: Rect) {
                 (_, true) => t.hover,
                 _ => Color32::TRANSPARENT,
             };
-            ui.painter().rect_filled(r, 0.0, fill);
+            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), fill);
             let ink = if close && resp.hovered() { t.caption_close_text } else { t.icon };
-            paint_windows_glyph(ui, c, max, r.center(), Stroke::new(1.0, ink));
+            paint_windows_glyph(ui, c, max, r.center(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink));
         } else {
             paint_round(ui, &t, &s, c, max, centre, resp.hovered(), pressed);
         }
@@ -317,11 +318,11 @@ fn paint_windows_glyph(ui: &Ui, c: Caption, maximized: bool, at: egui::Pos2, s: 
         // Restore: a front square with the corner of the one behind it.
         Caption::Maximize if maximized => {
             let front = Rect::from_min_max(g.min + vec2(0.0, 2.0), g.max - vec2(2.0, 0.0));
-            p.rect_stroke(front, 0.0, s, egui::StrokeKind::Middle);
+            p.rect_stroke(front, craft_ui::theme::scale::Radius::R0.px(), s, egui::StrokeKind::Middle);
             p.line(vec![g.min + vec2(2.0, 2.0), g.min + vec2(2.0, 0.0), g.right_top(), g.max - vec2(0.0, 2.0), g.max - vec2(2.0, 2.0)], s);
         }
         Caption::Maximize => {
-            p.rect_stroke(g, 0.0, s, egui::StrokeKind::Middle);
+            p.rect_stroke(g, craft_ui::theme::scale::Radius::R0.px(), s, egui::StrokeKind::Middle);
         }
         Caption::Close => {
             p.line_segment([g.left_top(), g.right_bottom()], s);
@@ -387,7 +388,7 @@ fn paint_round(ui: &Ui, t: &Tokens, s: &CaptionStyle, c: Caption, maximized: boo
     let at = |x: f32, y: f32| centre + vec2(x - 8.0, y - 8.0) * k;
     if family == CaptionFamily::Breeze {
         // Breeze: 1 pt chevrons (down to minimize, up to maximize), a diamond to restore, an X.
-        let s = Stroke::new(1.0, ink);
+        let s = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink);
         match c {
             Caption::Minimize => {
                 p.line(vec![at(2.5, 5.5), at(8.0, 11.0), at(13.5, 5.5)], s);
@@ -409,11 +410,11 @@ fn paint_round(ui: &Ui, t: &Tokens, s: &CaptionStyle, c: Caption, maximized: boo
         let frame = |a: f32, b: f32| Rect::from_min_max(at(a, a), at(b, b));
         match c {
             Caption::Minimize => {
-                p.rect_filled(Rect::from_min_max(at(4.0, 10.0), at(12.0, 12.0)), 0.0, ink);
+                p.rect_filled(Rect::from_min_max(at(4.0, 10.0), at(12.0, 12.0)), craft_ui::theme::scale::Radius::R0.px(), ink);
             }
             Caption::Maximize => {
                 let square = if maximized { frame(5.0, 11.0) } else { frame(4.0, 12.0) };
-                p.rect_stroke(square, 0.0, Stroke::new(2.0 * k, ink), egui::StrokeKind::Inside);
+                p.rect_stroke(square, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(2.0 * k, ink), egui::StrokeKind::Inside);
             }
             Caption::Close => {
                 let s = Stroke::new(1.5 * k, ink);

@@ -4,6 +4,7 @@
 //! Create runs `file.new` with them.
 
 use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
 
 use photocraft_engine::prefs::UnitsAndRulers;
@@ -309,7 +310,7 @@ fn card_title(painter: &egui::Painter, title: &str, width: f32, color: egui::Col
 fn page_icon(ui: &egui::Ui, r: Rect, w: u32, h: u32, t: &Tokens) {
     let s = 30.0 / (w.max(h) as f32);
     let page = Rect::from_center_size(r.center(), vec2(w as f32 * s, h as f32 * s));
-    ui.painter().rect_stroke(page, 1.0, Stroke::new(1.2, t.text_dim), StrokeKind::Inside);
+    ui.painter().rect_stroke(page, craft_ui::theme::scale::Radius::R2.px(), Stroke::new(1.2, t.text_dim), StrokeKind::Inside);
 }
 
 /// The Background Contents menu's entry for a colour of the user's own ([`body`]).
@@ -472,7 +473,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
                 });
                 let s = &preset.settings;
                 small_label(ui, &format!("{} × {} px @ {} ppi · {}/{}", s.width, s.height, s.resolution, s.mode.to_uppercase(), s.depth));
-                ui.add_space(8.0);
+                ui.add_space(craft_ui::theme::scale::Space::S8.px());
             });
         }
     });
@@ -480,7 +481,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
 }
 
 fn save_preset(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    ui.add_space(12.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     if f.get("__savingPreset").and_then(Value::as_bool) != Some(true) {
         if widgets::secondary_button(ui, tl!("Save Preset…"), 240.0).clicked() {
             f.insert("__savingPreset".into(), json!(true));
@@ -542,16 +543,16 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                 .add(egui::Label::new(RichText::new(label).size(13.0).color(if on { t.text } else { t.text_dim })).selectable(false).sense(Sense::click()))
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             if on {
-                ui.painter().line_segment([r.rect.left_bottom() + vec2(0.0, 3.0), r.rect.right_bottom() + vec2(0.0, 3.0)], Stroke::new(2.0, t.text));
+                ui.painter().line_segment([r.rect.left_bottom() + vec2(0.0, 3.0), r.rect.right_bottom() + vec2(0.0, 3.0)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.text));
             }
             if r.clicked() {
                 f.insert("__category".into(), json!(name));
             }
         }
     });
-    ui.add_space(6.0);
+    ui.add_space(craft_ui::theme::scale::Space::S6.px());
     widgets::hairline(ui);
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let units = app.session.prefs().units_and_rulers.clone();
     let presets: Vec<Card> = match CATEGORIES.iter().find(|c| c.0 == cat) {
         Some(c) if c.0 != CATEGORIES[0].0 => c.1.iter().copied().map(Card::Builtin).collect(),
@@ -574,7 +575,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                 return;
             }
             ui.label(RichText::new(crate::i18n::fmt(tl!("BLANK DOCUMENT PRESETS ({n})"), &[("n", &presets.len().to_string())])).size(11.0).color(t.text_faint));
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             let card = vec2(164.0, 112.0);
             // Up to 20 recent documents: scroll past three rows rather than grow the dialog.
             egui::ScrollArea::vertical().id_salt("new-document-presets").max_height(3.0 * (card.y + 8.0)).show(ui, |ui| {
@@ -601,7 +602,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                                 },
                             );
                             if on {
-                                ui.painter().rect_stroke(r, t.radius, Stroke::new(1.5, t.accent), StrokeKind::Inside);
+                                ui.painter().rect_stroke(r, t.radius, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), StrokeKind::Inside);
                             }
                             page_icon(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 34.0), vec2(40.0, 40.0)), w, h, &t);
                             let title = card_title(ui.painter(), tl!(c.title()), card.x - 12.0, t.text);
@@ -634,16 +635,16 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                             }
                         }
                     });
-                    ui.add_space(8.0);
+                    ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 }
             });
         });
-        ui.add_space(10.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         // Right: Preset Details.
         ui.vertical(|ui| {
             ui.set_width(260.0);
             ui.label(RichText::new(tl!("PRESET DETAILS")).size(11.0).color(t.text_faint));
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             // Keep the canonical English default in state; only the TextEdit shows a translation.
             let raw = get_s(f, "name", "Untitled-1");
             let mut name = if raw == "Untitled-1" { tl!("Untitled-1").to_string() } else { raw };
@@ -661,7 +662,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             if r.gained_focus() {
                 crate::field_tab::select_all(ui.ctx(), r.id, &name);
             }
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
             let ppi = get_f(f, "resolution", 72.0);
             let mut unit = get_s(f, "__unit", "px");
             // A typed unit (`210mm` while in pixels) converts at the new document's resolution.
@@ -686,7 +687,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                 {
                     set_size(f, "height", h, &unit, ppi);
                 }
-                ui.add_space(6.0);
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 // Page orientation (≠ Type › Orientation → Hướng chữ).
                 small_label(ui, crate::i18n::tr_ctx(crate::i18n::current(), "document", "Orientation"));
                 let (w, h) = (get_f(f, "width", 1920.0), get_f(f, "height", 1080.0));
@@ -706,7 +707,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             if widgets::checkbox(ui, &mut artboard, tl!("Artboards")).changed() {
                 f.insert("artboard".into(), json!(artboard));
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             small_label(ui, tl!("Resolution"));
             ui.horizontal(|ui| {
                 let per_cm = get_s(f, "__resUnit", "in") == "cm";
@@ -727,7 +728,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     f.remove("__savedPreset");
                 }
             });
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             small_label(ui, tl!("Color Mode"));
             ui.horizontal(|ui| {
                 let mut mode = get_s(f, "mode", "rgb");
@@ -756,7 +757,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     f.remove("__savedPreset");
                 }
             });
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             // Photoshop's Advanced Options › Color Profile (#321): the working space by default,
             // or another profile of the mode's colour space, built in or installed in the system.
             small_label(ui, tl!("Color Profile"));
@@ -782,7 +783,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     f.remove("__savedPreset");
                 }
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             small_label(ui, tl!("Background Contents"));
             // A custom colour is kept as its "#rrggbb", which `file.new` takes as is (#4789).
             let current = get_s(f, "background", "white");
@@ -816,13 +817,13 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                     Some(c) => {
                         ui.painter().rect_filled(
                             r,
-                            2.0,
+                            craft_ui::theme::scale::Radius::R2.px(),
                             egui::Color32::from_rgb((c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8),
                         );
                     }
                     None => widgets::checker(ui.painter(), r, 4.0),
                 }
-                ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, Tokens::get(ui.ctx()).field_border), StrokeKind::Inside);
+                ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Tokens::get(ui.ctx()).field_border), StrokeKind::Inside);
                 let resp = resp.on_hover_text(tl!("Custom background color")).on_hover_cursor(egui::CursorIcon::PointingHand);
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Custom background color")));
                 if resp.clicked() {

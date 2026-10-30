@@ -1,6 +1,8 @@
 //! Photoshop-style guide layout dialog. Its preview is a pure guide overlay, never an edit.
 
 use egui::{Color32, Stroke};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 
@@ -209,9 +211,9 @@ fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: egu
         Some(v) if v.is_number() => v.to_string(),
         _ => String::new(),
     };
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let response = ui
-        .add(egui::TextEdit::singleline(&mut value).id_salt(key).desired_width(60.0).font(crate::theme::mono(12.0)).background_color(t.field))
+        .add(egui::TextEdit::singleline(&mut value).id_salt(key).desired_width(60.0).font(crate::theme::mono(12.0)).background_color(t.color.surface.sunken.to_egui()))
         .labelled_by(label);
     if ui.is_enabled() {
         crate::field_tab::register(ui.ctx(), response.id);
@@ -226,8 +228,8 @@ fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: egu
 }
 
 fn group<R>(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let t = Tokens::get(ui.ctx());
-    egui::Frame::new().stroke(Stroke::new(1.0, t.field_border)).inner_margin(8).show(ui, |ui| ui.vertical(content).inner).inner
+    let t = craft_ui::theme::current(ui.ctx());
+    egui::Frame::new().stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui())).inner_margin(8).show(ui, |ui| ui.vertical(content).inner).inner
 }
 
 fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
@@ -241,7 +243,7 @@ fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
         if enabled && f.get(count).and_then(Value::as_f64) == Some(0.0) {
             f.insert(count.into(), json!(1));
         }
-        ui.add_space(6.0);
+        ui.add_space(craft_ui::theme::scale::Space::S6.px());
         ui.add_enabled_ui(enabled, |ui| {
             egui::Grid::new(count).spacing([8.0, 6.0]).show(ui, |ui| {
                 ui.label(tl!("Number"));
@@ -310,7 +312,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         }
         ui.end_row();
     });
-    ui.add_space(10.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     group(ui, |ui| {
         ui.label(tl!("Color"));
         ui.horizontal(|ui| {
@@ -320,23 +322,23 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
             if widgets::dropdown(ui, "guide-color", tl!("Color"), &mut color, &colors, 174.0) {
                 f.insert("color".into(), json!(color));
             }
-            let shown = rgb(&color).unwrap_or(Tokens::get(ui.ctx()).accent);
+            let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
             if widgets::color_swatch_button(ui, shown, tl!("Guide color")).clicked() {
                 crate::color_picker_ui::request(f, tl!("Guide color"));
             }
         });
     });
-    ui.add_space(10.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     ui.horizontal_top(|ui| {
         axis(ui, f, false);
-        ui.add_space(4.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         axis(ui, f, true);
     });
-    ui.add_space(10.0);
+    ui.add_space(craft_ui::theme::scale::Space::S12.px());
     group(ui, |ui| {
         let enabled = check(ui, f, "__marginEnabled", tl!("Margin"), true);
         let mut margins = f.get("margin").and_then(Value::as_array).cloned().unwrap_or_else(|| vec![json!(0); 4]);
-        ui.add_space(5.0);
+        ui.add_space(craft_ui::theme::scale::Space::S4.px());
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {
                 for (value, label) in margins.iter_mut().zip([tl!("Top:"), tl!("Left:"), tl!("Bottom:"), tl!("Right:")]) {
@@ -352,7 +354,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         });
         f.insert("margin".into(), Value::Array(margins));
     });
-    ui.add_space(8.0);
+    ui.add_space(craft_ui::theme::scale::Space::S8.px());
     check(ui, f, "centerColumns", tl!("Center Columns"), false);
     check(ui, f, "clearExisting", tl!("Clear Existing Guides"), false);
     // A typed edit makes a named preset custom; changing target/colour/preview does not.
@@ -373,17 +375,17 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
         ui.vertical(|ui| {
             main_fields(app, ui, f);
         });
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             let valid = validate(app, f).is_ok();
             if ui.add_enabled_ui(valid, |ui| widgets::primary_button(ui, tl!("OK"), 96.0)).inner.clicked() {
                 outcome = Some(true);
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             if widgets::secondary_button(ui, tl!("Cancel"), 96.0).clicked() {
                 outcome = Some(false);
             }
-            ui.add_space(6.0);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
             check(ui, f, "__preview", tl!("Preview"), true);
         });
     });
@@ -394,7 +396,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
             f.insert("__previewSource".into(), source(app));
         }
         Err(error) => {
-            ui.colored_label(Tokens::get(ui.ctx()).text_dim, tl!("Invalid guide layout")).on_hover_text(error);
+            ui.colored_label(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui(), tl!("Invalid guide layout")).on_hover_text(error);
         }
     }
     if outcome.is_none() && interactive && validate(app, f).is_ok() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {

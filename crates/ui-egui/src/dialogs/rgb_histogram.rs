@@ -1,5 +1,6 @@
 //! Camera Raw-style continuous RGB ribbons. Raw bins remain exact; display filtering is local.
 use crate::theme::Tokens;
+use craft_ui::theme::StrokeExt;
 use egui::{Mesh, Rect, pos2};
 use photocraft_algo::histogram::{BINS, RgbHistogram};
 
@@ -141,7 +142,7 @@ pub(crate) fn paint_with(painter: &egui::Painter, rect: Rect, h: &RgbHistogram, 
             points.push(pos2(rect.left() + (i as f32 + 0.5) / BINS as f32 * rect.width(), rect.bottom() - v * rect.height()));
         }
         points.push(pos2(rect.right(), rect.bottom() - values[BINS - 1] * rect.height()));
-        painter.add(egui::Shape::line(points, egui::Stroke::new(1.0, t.histogram_color(1 << channel))));
+        painter.add(egui::Shape::line(points, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.histogram_color(1 << channel))));
     }
 }
 
@@ -158,7 +159,7 @@ pub(crate) fn paint_sample(painter: &egui::Painter, rect: Rect, rgb: [f32; 3], t
     let color = t.histogram_color(7);
     let left = (x - 1.0).round();
     let band = Rect::from_min_max(pos2(left, rect.top()), pos2(left + 2.0, rect.bottom()));
-    painter.rect_filled(band, 0.0, color.gamma_multiply(0.40));
+    painter.rect_filled(band, craft_ui::theme::scale::Radius::R0.px(), color.gamma_multiply(0.40));
 }
 
 #[cfg(test)]

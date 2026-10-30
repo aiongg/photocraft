@@ -6,6 +6,8 @@
 //! pointer resting on the canvas costs nothing per frame.
 
 use egui::{Pos2, Stroke};
+use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use photocraft_doc::{DocId, Document, Layer, LayerContent, LayerId};
 use photocraft_geom::Rect;
 
@@ -126,8 +128,8 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
         painter.ctx().request_repaint();
     }
     let Some(b) = outline_rect else { return };
-    let accent = crate::theme::Tokens::get(painter.ctx()).accent;
-    painter.rect_stroke(xf.doc_rect(b), 0.0, Stroke::new(1.5, accent), egui::StrokeKind::Outside);
+    let accent = craft_ui::theme::current(painter.ctx()).color.accent.solid.to_egui();
+    painter.rect_stroke(xf.doc_rect(b), craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent), egui::StrokeKind::Outside);
 }
 
 #[cfg(test)]

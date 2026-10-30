@@ -7,6 +7,7 @@
 //! it is Photoshop's Layer Mask Display Options: just the rubylith's colour and opacity.
 
 use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::theme::ToEgui;
 use photocraft_doc::ColorIndicates;
 use serde_json::{Map, Value, json};
 
@@ -96,9 +97,9 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(84.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
+    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
@@ -131,7 +132,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         f.insert("indicates".into(), json!(indicates));
     }
     let spot = indicates == "spot";
-    ui.add_space(4.0);
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
     crate::widgets::section_label(ui, tl!("Color"));
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
@@ -142,7 +143,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(c[0], c[1], c[2]), what).clicked() {
             crate::color_picker_ui::request(f, &crate::color_picker_ui::title_for(what));
         }
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         let caption = if spot { tl!("Solidity:") } else { tl!("Opacity:") };
         ui.label(caption);
         let mut pct = f.get("opacity").and_then(Value::as_f64).unwrap_or(50.0) as f32;
@@ -161,7 +162,7 @@ fn mask_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(c[0], c[1], c[2]), tl!("Overlay Color")).clicked() {
             crate::color_picker_ui::request(f, &crate::color_picker_ui::title_for(tl!("Overlay Color")));
         }
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.label(tl!("Opacity:"));
         let mut pct = f.get("opacity").and_then(Value::as_f64).unwrap_or(50.0) as f32;
         if crate::widgets::value_field(ui, &mut pct, 0.0..=100.0, "%", 64.0).accessible_name(tl!("Opacity:")).changed() {
@@ -242,7 +243,7 @@ pub fn new_spot_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         if crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(c[0], c[1], c[2]), tl!("Spot Color")).clicked() {
             crate::color_picker_ui::request(f, &crate::color_picker_ui::title_for(tl!("Spot Color")));
         }
-        ui.add_space(12.0);
+        ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.label(tl!("Solidity:"));
         let mut pct = f.get("solidity").and_then(Value::as_f64).unwrap_or(0.0) as f32;
         if crate::widgets::value_field(ui, &mut pct, 0.0..=100.0, "%", 64.0).accessible_name(tl!("Solidity:")).changed() {

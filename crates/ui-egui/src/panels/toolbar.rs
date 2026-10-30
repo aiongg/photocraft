@@ -1,4 +1,5 @@
 use super::options_bar::reveal_focused_control;
+use craft_ui::theme::StrokeExt;
 use super::{Align2, Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, c32, icons, json, pos2, vec2};
 
 // ----------------------------------------------------------------------------- toolbar
@@ -101,7 +102,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if resp.clicked() {
                 app.ui.panels.toolbar_double = !double;
             }
-            ui.add_space(4.0);
+            ui.add_space(craft_ui::theme::scale::Space::S4.px());
             // Subtle violet wash at the bottom of the toolbar.
             let full = ui.max_rect();
             if !t.bevel && !t.pro && t.dark() {
@@ -146,10 +147,10 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     for (si, section) in sections.iter().enumerate() {
                         // Photoshop 2026 draws one uninterrupted column (no group dividers).
                         if si > 0 && !t.pro {
-                            ui.add_space(4.0);
+                            ui.add_space(craft_ui::theme::scale::Space::S4.px());
                             let (r, _) = ui.allocate_exact_size(vec2(if double { bx * 2.0 + 2.0 } else { bx }, 1.0), Sense::hover());
-                            ui.painter().line_segment([r.left_center() + vec2(8.0, 0.0), r.right_center() - vec2(8.0, 0.0)], Stroke::new(1.0, t.separator));
-                            ui.add_space(4.0);
+                            ui.painter().line_segment([r.left_center() + vec2(8.0, 0.0), r.right_center() - vec2(8.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+                            ui.add_space(craft_ui::theme::scale::Space::S4.px());
                         }
                         let rows: Vec<&[(usize, Vec<Tool>)]> = if double { section.chunks(2).collect() } else { section.chunks(1).collect() };
                         for row in rows {
@@ -238,12 +239,12 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                                     for &item in slot.iter() {
                                                         let (r, ir) = ui.allocate_exact_size(vec2(fw, 26.0), Sense::click());
                                                         if ir.hovered() {
-                                                            ui.painter().rect_filled(r, 3.0, t.hover);
+                                                            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
                                                         }
                                                         if item == tool {
                                                             ui.painter().rect_filled(
                                                                 Rect::from_center_size(pos2(r.left() + 8.0, r.center().y), vec2(4.0, 4.0)),
-                                                                0.0,
+                                                                craft_ui::theme::scale::Radius::R0.px(),
                                                                 t.text,
                                                             );
                                                         }
@@ -307,7 +308,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             // Centred in the tool column as it is before the tools scroll: a scroll bar widens the
             // UI it is in, and the chips moved over by its width (#7316).
             color_chips(app, ui, double, full.width());
-            ui.add_space(8.0);
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
 
             let layout = if double { egui::Layout::left_to_right(egui::Align::Min) } else { egui::Layout::top_down(egui::Align::Min) };
 
@@ -453,8 +454,8 @@ pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, two_column
         let dot = |r: Rect, color: Color32| {
             p.circle_filled(r.center(), r.width() / 2.0, color);
             // A light line inside a dark one, so any colour reads against the toolbar.
-            p.circle_stroke(r.center(), r.width() / 2.0 - 0.5, Stroke::new(1.0, t.text.gamma_multiply(0.9)));
-            p.circle_stroke(r.center(), r.width() / 2.0 + 0.5, Stroke::new(1.0, t.field_border));
+            p.circle_stroke(r.center(), r.width() / 2.0 - 0.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text.gamma_multiply(0.9)));
+            p.circle_stroke(r.center(), r.width() / 2.0 + 0.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border));
         };
         dot(bg, c32(app.session.tools.background));
         // The foreground chip sits on the background one, a toolbar-coloured gap between them.
@@ -463,8 +464,8 @@ pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, two_column
     } else {
         let frame = |r: Rect| {
             // A light line inside a dark one, so any colour reads against the toolbar.
-            p.rect_stroke(r, radius, Stroke::new(1.0, t.text.gamma_multiply(0.9)), StrokeKind::Inside);
-            p.rect_stroke(r, radius, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
+            p.rect_stroke(r, radius, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text.gamma_multiply(0.9)), StrokeKind::Inside);
+            p.rect_stroke(r, radius, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
         };
         p.rect_filled(bg, radius, c32(app.session.tools.background));
         frame(bg);
@@ -513,7 +514,7 @@ pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, two_column
         // Switch Colors: a shallow curve hugging the bottom chip, with a filled head at each end.
         // It glows on hover instead of getting a button box.
         let hot = s.hovered();
-        let stroke = Stroke::new(1.5, ink(&s));
+        let stroke = craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), ink(&s));
         let (c, rad) = (pos2(sr.center().x, sr.center().y - 5.0), 9.0);
         let (from, to) = (0.45, std::f32::consts::PI - 0.45);
         let arc: Vec<_> = (0..=12)
@@ -544,11 +545,11 @@ pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, two_column
     if let (Some(dr), Some(d)) = (dr, d.as_ref()) {
         let small = 7.0;
         let (b, w) = (Rect::from_min_size(dr.min + vec2(1.0, 1.0), vec2(small, small)), Rect::from_min_size(dr.min + vec2(5.0, 5.0), vec2(small, small)));
-        p.rect_filled(w, 1.0, Color32::WHITE);
-        p.rect_stroke(w, 1.0, Stroke::new(1.0, ink(d)), StrokeKind::Inside);
+        p.rect_filled(w, craft_ui::theme::scale::Radius::R2.px(), Color32::WHITE);
+        p.rect_stroke(w, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink(d)), StrokeKind::Inside);
         p.rect_filled(b.expand(1.0), 1.5, t.chrome);
-        p.rect_filled(b, 1.0, Color32::BLACK);
-        p.rect_stroke(b, 1.0, Stroke::new(1.0, ink(d)), StrokeKind::Inside);
+        p.rect_filled(b, craft_ui::theme::scale::Radius::R2.px(), Color32::BLACK);
+        p.rect_stroke(b, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink(d)), StrokeKind::Inside);
     }
     if let Some(d) = &d {
         d.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Default colours (D)")));
