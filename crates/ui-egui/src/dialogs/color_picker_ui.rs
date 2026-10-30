@@ -432,7 +432,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
             });
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
             let mut web = f.get("__webOnly").and_then(Value::as_bool).unwrap_or(false);
-            if widgets::checkbox(ui, &mut web, tl!("Only Web Colors")).changed() {
+            if craft_ui::controls::Checkbox::bool(tl!("Only Web Colors"), &mut web).show(ui).response.changed() {
                 f.insert("__webOnly".into(), json!(web));
                 set_rgb(f, current(f).rgb, Keep::Nothing);
             }
@@ -449,16 +449,16 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
                 // As wide as the longest label, at the right edge like Photoshop's.
                 let button_width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
                 ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
-                    if widgets::primary_button(ui, tl!("OK"), button_width).clicked() {
+                    if ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width)).clicked() {
                         outcome = Some(true);
                     }
                     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                    if widgets::secondary_button(ui, tl!("Cancel"), button_width).clicked() {
+                    if ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked() {
                         outcome = Some(false);
                     }
                     ui.add_space(craft_ui::theme::scale::Space::S4.px());
                     // Handled by the dialog host, which has the app (`take_add_swatch`).
-                    if widgets::secondary_button(ui, tl!("Add to Swatches"), button_width).clicked() {
+                    if ui.add(craft_ui::controls::Button::new(tl!("Add to Swatches")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked() {
                         f.insert("__addSwatch".into(), json!(true));
                     }
                 });
