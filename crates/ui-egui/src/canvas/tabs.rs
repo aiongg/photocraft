@@ -138,7 +138,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, previous: Option<
         .and_then(|&(i, _)| app.session.documents().get(i))
         .map(|st| DocTab::Doc(st.doc.id));
     let marker = drop_slot(app, ui, previous);
-    let text = TabStripText { more: tl!("More documents").to_owned(), close: tl!("Close").to_owned(), ..TabStripText::default() };
+    let text = TabStripText { more: tl!("More documents").to_owned(), close: tl!("Close").to_owned(), modified: tl!("{tab}, modified").to_owned(), ..TabStripText::default() };
     let mut builder = LibStrip::new("documents", tl!("Documents"), TabKind::Document)
         .large(app.session.prefs().workspace.large_tabs)
         .tear_off(true)
