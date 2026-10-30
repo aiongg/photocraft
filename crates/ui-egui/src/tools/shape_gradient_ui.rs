@@ -175,13 +175,13 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     });
     ui.horizontal(|ui| {
         let mut rev = *reverse;
-        if crate::widgets::checkbox(ui, &mut rev, tl!("Reverse")).changed()
+        if craft_ui::controls::Checkbox::bool(tl!("Reverse"), &mut rev).show(ui).response.changed()
             && let Fill::Gradient { reverse, .. } = edited(&mut out, fill)
         {
             *reverse = rev;
         }
         let mut al = *align;
-        if crate::widgets::checkbox(ui, &mut al, tl!("Align with layer")).changed()
+        if craft_ui::controls::Checkbox::bool(tl!("Align with layer"), &mut al).show(ui).response.changed()
             && let Fill::Gradient { align, .. } = edited(&mut out, fill)
         {
             *align = al;
@@ -507,7 +507,7 @@ fn stop_fields(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [
                 });
             }
             // A gradient keeps at least two stops of each kind.
-            if locations.len() > 2 && crate::widgets::secondary_button(ui, tl!("Delete"), 0.0).clicked() {
+            if locations.len() > 2 && ui.add(craft_ui::controls::Button::new(tl!("Delete")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
                 edit = Some(json!({"action": "delete", "kind": kind, "index": index}));
                 reselect = Some(match selected {
                     Marker::Opacity(_) => Marker::Opacity(index.saturating_sub(1)),

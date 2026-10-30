@@ -174,7 +174,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
             .icon(widgets::chevron_icon)
             .close_behavior(close)
             .show_ui(ui, |ui| {
-                let gear = crate::icons::button(ui, "settings", 24.0, false, tl!("Gradient Preset Options"));
+                let gear = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Settings, tl!("Gradient Preset Options")).size(craft_ui::controls::ControlSize::Md));
                 egui::containers::menu::SubMenu::new().show(ui, &gear, |ui| {
                     if ui.button(tl!("Import .GRD")).clicked() {
                         e.import_gradients = true;
@@ -223,7 +223,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
             changed |= r.changed;
             e.add(r);
             ui.add_enabled_ui(can_remove, |ui| {
-                remove = crate::icons::button(ui, "x", 20.0, false, tl!("Remove stop")).clicked();
+                remove = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Close, tl!("Remove stop")).size(craft_ui::controls::ControlSize::Sm)).clicked();
             });
         });
         ui.horizontal(|ui| {
@@ -246,7 +246,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         changed = true;
         e.add(Edit::discrete(true));
     }
-    if stops.len() < 64 && widgets::secondary_button(ui, tl!("Add Stop"), 0.0).clicked() {
+    if stops.len() < 64 && ui.add(craft_ui::controls::Button::new(tl!("Add Stop")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
         // Halfway along the widest gap, in the gradient's colour there.
         let mut sorted = stops.clone();
         sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -265,7 +265,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
     ui.horizontal(|ui| {
         for (key, text) in [("reverse", tl!("Reverse")), ("dither", tl!("Dither"))] {
             let mut b = flag(v, key, false);
-            if widgets::checkbox(ui, &mut b, text).changed() {
+            if craft_ui::controls::Checkbox::bool(tl!(text), &mut b).show(ui).response.changed() {
                 v[key] = json!(b);
                 e.add(Edit::discrete(true));
             }
