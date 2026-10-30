@@ -6,7 +6,7 @@ use craft_ui::theme::StrokeExt;
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     if t.pro {
-        return checkbox(ui, on, label);
+        return craft_ui::controls::Checkbox::bool(tl!(label), on).show(ui).response;
     }
     let mut resp = ui
         .horizontal(|ui| {
@@ -125,7 +125,7 @@ pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRol
             for b in buttons.iter().filter(|b| b.role.slot(mac) == slot) {
                 let r = ui
                     .add_enabled_ui(b.enabled, |ui| {
-                        if b.role == ButtonRole::Default { primary_button(ui, b.label, b.min_width) } else { secondary_button(ui, b.label, b.min_width) }
+                        if b.role == ButtonRole::Default { ui.add(craft_ui::controls::Button::new(tl!(b.label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(b.min_width)) } else { ui.add(craft_ui::controls::Button::new(tl!(b.label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(b.min_width)) }
                     })
                     .inner;
                 if b.focus && b.enabled {

@@ -339,7 +339,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
                 ui.add(egui::Label::new(egui::RichText::new(l).font(crate::theme::mono(12.0))).selectable(true));
             }
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            if crate::widgets::secondary_button(ui, tl!("Copy"), 84.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Copy")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked() {
                 ui.ctx().copy_text(crate::gpu_status::system_info(app).join("\n"));
             }
         }
@@ -422,14 +422,14 @@ fn button_row(
         let shown_before = ui.ctx().data(|m| m.get_temp::<bool>(seen).unwrap_or(false));
         ui.ctx().data_mut(|m| m.insert_temp(seen, true));
         let enter = interactive && shown_before && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        if dialog_buttons(ui, &[DialogButton::new(ButtonRole::Default, tl!("OK"), 84.0)]).is_some() || enter {
+        if craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Default, tl!("OK")).min_width(84.0)]).show(ui).clicked.map(|c| c.role).is_some() || enter {
             outcome = Some(false);
         }
     } else {
         let ok_label = ok_label(d);
         // Dialogs that need an input first (a preset name, a selection) grey OK out.
         let can_ok = crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields);
-        let ok = DialogButton::new(ButtonRole::Default, ok_label, 84.0).enabled(can_ok);
+        let ok = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Default, tl!(ok_label)).min_width(84.0).enabled(can_ok);
         // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open).
         // Dialogs opt in via `dialog_alt_reset::supported` (per marker).
         let reset = ui.input(|i| i.modifiers.alt) && crate::dialog_alt_reset::supported(fields);
@@ -440,15 +440,15 @@ fn button_row(
         } else {
             tl!("Cancel")
         };
-        let cancel = DialogButton::new(ButtonRole::Cancel, cancel_label, 84.0);
+        let cancel = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Cancel, tl!(cancel_label)).min_width(84.0);
         let clicked = if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
             let changed = crate::prefs_ui::preferences_changed(app, fields);
-            dialog_buttons(ui, &[ok, cancel, DialogButton::new(ButtonRole::Apply, tl!("Apply"), 84.0).enabled(changed)])
+            craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![ok, cancel, craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Apply, tl!("Apply")).min_width(84.0).enabled(changed)]).show(ui).clicked.map(|c| c.role)
         } else if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
             // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
-            let apply = DialogButton::new(ButtonRole::Default, tl!("Apply"), 84.0).enabled(crate::mask_trash_prompt::can_apply(fields));
-            let delete = DialogButton::new(ButtonRole::Alternate, tl!("Delete"), 84.0);
-            let hit = dialog_buttons(ui, &[apply, cancel, delete]);
+            let apply = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Default, tl!("Apply")).min_width(84.0).enabled(crate::mask_trash_prompt::can_apply(fields));
+            let delete = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Alternate, tl!("Delete")).min_width(84.0);
+            let hit = craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![apply, cancel, delete]).show(ui).clicked.map(|c| c.role);
             if hit == Some(ButtonRole::Alternate) {
                 fields.insert("choice".into(), json!("delete"));
             } else if hit == Some(ButtonRole::Default) {
@@ -457,12 +457,12 @@ fn button_row(
             hit
         } else if crate::rasterize_prompt::is_filter(fields) {
             // Photoshop: Convert to Smart Object / Rasterize / Cancel (#4303).
-            let rasterize = DialogButton::new(ButtonRole::Default, tl!("Rasterize"), 84.0);
+            let rasterize = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Default, tl!("Rasterize")).min_width(84.0);
             let hit = if crate::rasterize_prompt::offers_smart_object(fields) {
-                let convert = DialogButton::new(ButtonRole::Alternate, tl!("Convert to Smart Object"), 160.0);
-                dialog_buttons(ui, &[rasterize, cancel, convert])
+                let convert = craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Alternate, tl!("Convert to Smart Object")).min_width(160.0);
+                craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![rasterize, cancel, convert]).show(ui).clicked.map(|c| c.role)
             } else {
-                dialog_buttons(ui, &[rasterize, cancel])
+                craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![rasterize, cancel]).show(ui).clicked.map(|c| c.role)
             };
             if hit == Some(ButtonRole::Alternate) {
                 fields.insert("choice".into(), json!("smartObject"));
@@ -471,7 +471,7 @@ fn button_row(
             }
             hit
         } else {
-            dialog_buttons(ui, &[ok, cancel])
+            craft_ui::dialog::FooterButtons::new("dialog_buttons", vec![ok, cancel]).show(ui).clicked.map(|c| c.role)
         };
         match clicked {
             Some(ButtonRole::Cancel) if reset => crate::dialog_alt_reset::apply(app, ui.ctx(), fields),

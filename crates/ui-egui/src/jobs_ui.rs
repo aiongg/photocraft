@@ -759,7 +759,7 @@ pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
         ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            cancel_it = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
+            cancel_it = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked();
             ui.label(RichText::new(tl!("Esc to cancel")).color(t.text_faint).size(11.0));
         });
     });
@@ -829,7 +829,7 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     child.horizontal(|ui| {
         ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = crate::widgets::secondary_button(ui, tl!("Cancel"), 76.0);
+            let r = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(76.0));
             cancel_it = r.clicked();
             cancel_rect = r.rect;
         });
