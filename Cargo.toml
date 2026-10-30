@@ -10,6 +10,8 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 
 [workspace.dependencies]
+craft-theme = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45", features = ["serde", "ecolor"] }
+craft-theme-store = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45", features = ["serde"] }
 craft-ui = { git = "https://github.com/aiongg/craft-libs", rev = "13796bddecc339dc11927c913837f4ad56c04c45", features = ["serde"] }
 # internal
 photocraft-geom = { path = "crates/geom" }

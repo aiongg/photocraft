@@ -45,10 +45,6 @@ impl PhotocraftApp {
         self.sync_views();
         crate::type_font_preview::follow_hover(self, ctx);
         self.check_gpu(ctx);
-        #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
-        if self.live_tokens.poll(ctx, self.ui.theme) {
-            self.checker = None;
-        }
         // Finish or expire outstanding captures first, so a new request admitted in this pass
         // sees their released budget.
         self.drain_captures(ctx);
