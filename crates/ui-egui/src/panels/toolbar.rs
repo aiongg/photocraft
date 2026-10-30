@@ -1,8 +1,11 @@
-use super::{Color32, PhotocraftApp, Rect, Sense, StrokeKind, Tool, c32, icons, json, pos2, vec2};
+use super::{Color32, PhotocraftApp, Tool, icons, json};
+use craft_theme::Srgba;
+use craft_ui::composites::{PairWell, SwatchPair, Well};
 use craft_ui::controls::IconButton;
 use craft_ui::icons::Icon;
+use craft_ui::localized::LocaleNumbers;
 use craft_ui::patterns::{FlyoutButton, FlyoutItem, LastUsed, RailTool, ToolRail, ToolSlot};
-use craft_ui::theme::{StrokeExt, ToEgui, Tokens, TokensOf};
+use craft_ui::theme::{ToEgui, Tokens, TokensOf};
 
 // ----------------------------------------------------------------------------- toolbar
 
@@ -115,7 +118,7 @@ fn footer_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, columns: usize) {
     let rail_fill = tokens.component.rail.fill.to_egui();
     drop(tokens);
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    color_chips(app, ui, rail_fill);
+    color_pair(app, ui, rail_fill);
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     let layout = match (columns > 1, crate::direction::is_rtl()) {
         (false, _) => egui::Layout::top_down(egui::Align::Min),
@@ -151,78 +154,35 @@ fn screen_mode_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Colour chips: chip size and the background chip's offset (points).
-const CHIP: (f32, f32) = (18.0, 10.0);
-
-/// Height of the default-colours and swap icons over the chips.
-const CHIP_ICON: f32 = 13.0;
-
-/// Height of the colour chips block.
-pub(super) fn chips_height() -> f32 {
-    CHIP_ICON + 3.0 + CHIP.0 + CHIP.1
-}
-
-/// Photoshop's foreground / background colour chips: the Default Colors (D) and Switch Colors (X)
-/// icons above them, the foreground chip over the background one, centred in `ui`'s width.
-/// `rail_fill` is the gap between the chips.
-pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_fill: Color32) {
-    let t = super::Tokens::get(ui.ctx());
-    let (chip, step) = CHIP;
-    let group = chip + step;
-    let w = ui.available_width().max(group);
-    let (rect, _) = ui.allocate_exact_size(vec2(w, chips_height()), Sense::hover());
-    let left = (rect.left() + (w - group) / 2.0).round();
-    let fg = Rect::from_min_size(pos2(left, rect.top() + CHIP_ICON + 3.0), vec2(chip, chip));
-    let bg = fg.translate(vec2(step, step));
-    let radius = t.radius_sm.min(3.0);
-    let p = ui.painter();
-    let frame = |r: Rect| {
-        // A light line inside a dark one, so any colour reads against the toolbar.
-        p.rect_stroke(r, radius, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text.gamma_multiply(0.9)), StrokeKind::Inside);
-        p.rect_stroke(r, radius, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
-    };
-    p.rect_filled(bg, radius, c32(app.session.tools.background));
-    frame(bg);
-    p.rect_filled(fg.expand(2.0), radius + 2.0, rail_fill);
-    p.rect_filled(fg, radius, c32(app.session.tools.foreground));
-    frame(fg);
-    // Photoshop: clicking a chip opens the Color Picker for that colour.
-    let bg_resp = ui.interact(bg, ui.scope_id().with("bgchip"), Sense::click());
-    let fg_resp = ui.interact(fg, ui.scope_id().with("fgchip"), Sense::click());
-    if fg_resp.on_hover_text(tl!("Set foreground color")).clicked() {
-        crate::color_picker_ui::open(app, "foreground");
-    } else if bg_resp.on_hover_text(tl!("Set background color")).clicked() {
-        crate::color_picker_ui::open(app, "background");
-    }
-    // Default Colors at the left, Switch Colors at the right, over the chips.
-    let icon = |x: f32| Rect::from_min_size(pos2(x, rect.top()), vec2(CHIP_ICON, CHIP_ICON));
-    let (dr, sr) = (icon(left), icon(left + group - CHIP_ICON));
-    let d = ui.interact(dr, ui.scope_id().with("default-colors"), Sense::click());
-    let s = ui.interact(sr, ui.scope_id().with("swap-colors"), Sense::click());
-    let p = ui.painter();
-    for (r, resp) in [(dr, &d), (sr, &s)] {
-        if resp.hovered() {
-            p.rect_filled(r.expand(2.0), radius, t.hover);
+/// Photoshop's foreground / background colour chips on craft-ui's `SwatchPair`: the Default Colors
+/// (D) and Switch Colors (X) icons above them. A click on a chip opens PhotoCraft's Color Picker
+/// for that colour; the foreground stays in front. `rail_fill` is the gap between the chips.
+pub(super) fn color_pair(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_fill: Color32) {
+    let numbers = LocaleNumbers::of(ui);
+    let srgba = |c: [f32; 4]| Srgba::new(c[0], c[1], c[2], c[3]);
+    let tools = &app.session.tools;
+    let wells = [PairWell::new(tl!("Set foreground color"), srgba(tools.foreground)), PairWell::new(tl!("Set background color"), srgba(tools.background))];
+    let out = SwatchPair::new("color-chips", tl!("Colors"), wells, &numbers)
+        .popover(false)
+        .click_activates(false)
+        .active(Well::Primary)
+        .backdrop(rail_fill)
+        .swap_button(tl!("Swap colours (X)"))
+        .default_button(tl!("Default colours (D)"))
+        .show(ui);
+    match out.clicked {
+        Some(Well::Primary) => {
+            let _ = crate::color_picker_ui::open(app, "foreground");
         }
+        Some(Well::Secondary) => {
+            let _ = crate::color_picker_ui::open(app, "background");
+        }
+        None => {}
     }
-    let ink = |resp: &egui::Response| if resp.hovered() { t.text } else { t.icon };
-    // Switch Colors: the compact clockwise bend has left- and down-pointing heads.
-    // swap_arrow.rs owns its geometry and the pixel-level render regression test.
-    crate::swap_arrow::paint(p, sr.min, ink(&s));
-    // Default Colors: a small black chip over a small white one.
-    let small = 7.0;
-    let (b, w) = (Rect::from_min_size(dr.min + vec2(1.0, 1.0), vec2(small, small)), Rect::from_min_size(dr.min + vec2(5.0, 5.0), vec2(small, small)));
-    p.rect_filled(w, craft_ui::theme::scale::Radius::R2.px(), Color32::WHITE);
-    p.rect_stroke(w, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink(&d)), StrokeKind::Inside);
-    p.rect_filled(b.expand(1.0), 1.5, rail_fill);
-    p.rect_filled(b, craft_ui::theme::scale::Radius::R2.px(), Color32::BLACK);
-    p.rect_stroke(b, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), ink(&d)), StrokeKind::Inside);
-    d.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Default colours (D)")));
-    s.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Swap colours (X)")));
-    if s.on_hover_text(tl!("Swap colours (X)")).clicked() {
+    if out.swap {
         chip_command(app, "tools.swapColors");
     }
-    if d.on_hover_text(tl!("Default colours (D)")).clicked() {
+    if out.defaults {
         chip_command(app, "tools.defaultColors");
     }
 }
