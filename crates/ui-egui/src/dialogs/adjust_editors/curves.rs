@@ -1,4 +1,4 @@
-use super::{Color32, Edit, EditorCx, Rect, ToneSpace, Value, adjust_params, json, label, space_of};
+use super::{Edit, EditorCx, ToneSpace, Value, adjust_params, json, label, space_of};
 use craft_ui::composites::{ChannelColor, Curve, CurveChannel, CurveEditor, HistogramData};
 use craft_ui::edit::EditEvent;
 use craft_ui::localized::LocaleNumbers;
@@ -77,25 +77,6 @@ pub(super) fn channel_color(key: &str) -> ChannelColor {
         "yellow" | "b" => ChannelColor::Yellow,
         _ => ChannelColor::Neutral,
     }
-}
-
-/// Horizontal (or vertical) black → `to` gradient bar.
-pub(super) fn gradient_bar(p: &egui::Painter, r: Rect, from: Color32, to: Color32, vertical: bool) {
-    let mut mesh = egui::Mesh::default();
-    let (a, b, c, d) = if vertical {
-        (r.left_bottom(), r.right_bottom(), r.right_top(), r.left_top())
-    } else {
-        (r.left_top(), r.right_top(), r.right_bottom(), r.left_bottom())
-    };
-    let (ca, cb) = if vertical { (from, from) } else { (from, to) };
-    let (cc, cd) = if vertical { (to, to) } else { (to, from) };
-    mesh.colored_vertex(a, ca);
-    mesh.colored_vertex(b, cb);
-    mesh.colored_vertex(c, cc);
-    mesh.colored_vertex(d, cd);
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    p.add(mesh);
 }
 
 // ---------------------------------------------------------------------------------------------

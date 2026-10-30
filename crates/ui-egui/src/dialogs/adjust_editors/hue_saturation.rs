@@ -1,12 +1,10 @@
 use super::basic::{sliders, track_stops};
-use super::curves::gradient_bar;
-use super::levels::nearest;
-use super::{
-    Color32, Edit, EditorCx, HUE_RANGES, HueRange, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, Value, color32, flag, hue_color, json, num, nums, pos2,
-    vec2, widgets,
-};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use super::{Color32, Edit, EditorCx, HUE_RANGES, HueRange, Rect, Row, Value, apply_event, color32, flag, hue_color, json, num, nums, pos2, vec2, widgets};
+use craft_theme::{Srgba, TypeRole};
+use craft_ui::composites::gradient::GradientRamp;
+use craft_ui::controls::{Thumb, ThumbRow};
+use craft_ui::primitives::{Content, Text};
+use craft_ui::theme::{ToEgui, Tokens as LibTokens, TokensOf as _};
 
 // ---------------------------------------------------------------------------------------------
 // Hue/Saturation
@@ -55,13 +53,11 @@ fn adjusted_spectrum(v: &Value, n: usize) -> Vec<Color32> {
     buf.px.iter().map(|p| color32([p[0], p[1], p[2]])).collect()
 }
 
-pub(super) fn spectrum_bar(p: &egui::Painter, r: Rect, colors: &[Color32]) {
-    let n = colors.len().saturating_sub(1).max(1);
-    for (i, w) in colors.windows(2).enumerate() {
-        let x0 = r.left() + r.width() * i as f32 / n as f32;
-        let x1 = r.left() + r.width() * (i + 1) as f32 / n as f32;
-        gradient_bar(p, Rect::from_min_max(pos2(x0, r.top()), pos2(x1, r.bottom())), w[0], w[1], false);
-    }
+/// A spectrum bar of `colors`, spread evenly across `r`.
+fn spectrum_bar(ui: &egui::Ui, r: Rect, colors: &[Color32]) {
+    let last = colors.len().saturating_sub(1).max(1) as f32;
+    let stops: Vec<(f32, Srgba)> = colors.iter().enumerate().map(|(i, c)| (i as f32 / last, Srgba::from(*c))).collect();
+    GradientRamp::paint_colors(ui.painter(), r, &stops, &LibTokens::of(ui));
 }
 
 pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
@@ -74,7 +70,13 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
     }
     ui.horizontal(|ui| {
         let opts: Vec<(usize, &str)> = std::iter::once((0, tl!("Master"))).chain(RANGE_LABELS.iter().enumerate().map(|(i, l)| (i + 1, *l))).collect();
-        ui.add_enabled_ui(!colorize, |ui| widgets::dropdown(ui, &format!("{range_id:?}"), tl!("Range"), &mut range, &opts, 120.0));
+        ui.add_enabled_ui(!colorize, |ui| {
+            craft_ui::controls::Select::new(&format!("{range_id:?}"), tl!("Range"), &mut range)
+                .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
+                .show(ui)
+                .response
+                .changed()
+        });
     });
     ui.data_mut(|d| d.insert_temp(range_id, range));
     let mut e = Edit::default();
@@ -82,27 +84,27 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
     if range == 0 {
         let (hlo, hhi, slo) = if colorize { (0.0, 360.0, 0.0) } else { (-180.0, 180.0, -100.0) };
         let mut h = num(v, "hue", 0.0).clamp(hlo, hhi);
-        let r = widgets::slider_row(ui, tl!("Hue"), &mut h, hlo..=hhi, "°", track_stops(cx, &hue_grad));
-        if r.changed() {
+        let r = Row::new(tl!("Hue"), hlo..=hhi).unit("°").track(track_stops(cx, &hue_grad)).show(ui, &mut h);
+        if r.changed {
             v["hue"] = json!(h.round());
         }
-        e.add(Edit::of(&r));
+        e.add(r);
         // The Saturation track follows the current hue; the Lightness track is a fixed
         // black-grey-white ramp, as in Photoshop (UI-217-16).
         let sat_track = saturation_track(h);
         let mut s = num(v, "saturation", 0.0).clamp(slo, 100.0);
-        let r = widgets::slider_row(ui, tl!("Saturation"), &mut s, slo..=100.0, "%", track_stops(cx, &sat_track));
-        if r.changed() {
+        let r = Row::new(tl!("Saturation"), slo..=100.0).unit("%").track(track_stops(cx, &sat_track)).show(ui, &mut s);
+        if r.changed {
             v["saturation"] = json!(s.round());
         }
-        e.add(Edit::of(&r));
+        e.add(r);
         let light_track = lightness_track();
         let mut l = num(v, "lightness", 0.0).clamp(-100.0, 100.0);
-        let r = widgets::slider_row(ui, tl!("Lightness"), &mut l, -100.0..=100.0, "%", track_stops(cx, &light_track));
-        if r.changed() {
+        let r = Row::new(tl!("Lightness"), -100.0..=100.0).unit("%").track(track_stops(cx, &light_track)).show(ui, &mut l);
+        if r.changed {
             v["lightness"] = json!(l.round());
         }
-        e.add(Edit::of(&r));
+        e.add(r);
     } else {
         let key = HUE_RANGES[range - 1];
         if !v.get(key).is_some_and(Value::is_object) {
@@ -111,11 +113,11 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         let mut o = v[key].clone();
         let mut sub = Edit::default();
         let mut h = num(&o, "hue", 0.0);
-        let r = widgets::slider_row(ui, tl!("Hue"), &mut h, -180.0..=180.0, "°", track_stops(cx, &hue_grad));
-        if r.changed() {
+        let r = Row::new(tl!("Hue"), -180.0..=180.0).unit("°").track(track_stops(cx, &hue_grad)).show(ui, &mut h);
+        if r.changed {
             o["hue"] = json!(h.round());
         }
-        sub.add(Edit::of(&r));
+        sub.add(r);
         sub.add(sliders(
             ui,
             &mut o,
@@ -127,7 +129,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         e.add(sub);
     }
     let mut c = colorize;
-    if widgets::checkbox(ui, &mut c, tl!("Colorize")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Colorize"), &mut c).show(ui).response.changed() {
         v["colorize"] = json!(c);
         let h = num(v, "hue", 0.0);
         v["hue"] = json!(if c {
@@ -142,76 +144,59 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         }
         e.add(Edit::discrete(true));
     }
-    // Spectrum bars: input hues above, adjusted below; the selected range's sliders between.
+    // Spectrum bars: input hues above, adjusted below; the selected range's thumbs between.
     ui.add_space(craft_ui::theme::scale::Space::S6.px());
     // As wide as the sliders above, whatever the panel's width (#9242).
     let w = ui.available_width();
-    let (bars, bresp) = ui.allocate_exact_size(vec2(w, 40.0), Sense::click_and_drag());
+    let tokens = LibTokens::of(ui);
+    let style = ThumbRow::<4>::style(&tokens);
+    let bar = 10.0;
+    let height = if range > 0 { bar * 2.0 + style.height } else { bar * 2.0 + 20.0 };
+    let (_, bars) = ui.allocate_space(vec2(w, height));
     ui.data_mut(|d| d.insert_temp(cx.mem.with("hs-bars"), bars));
-    let top = Rect::from_min_size(bars.min, vec2(w, 10.0));
-    let bottom = Rect::from_min_size(pos2(bars.left(), bars.bottom() - 10.0), vec2(w, 10.0));
-    let p = ui.painter_at(bars.expand(4.0));
     let input: Vec<Color32> = (0..=36).map(|i| hue_color(i as f32 * 10.0)).collect();
-    spectrum_bar(&p, top, &input);
-    spectrum_bar(&p, bottom, &adjusted_spectrum(v, 37));
+    spectrum_bar(ui, Rect::from_min_size(bars.min, vec2(w, bar)), &input);
+    spectrum_bar(ui, Rect::from_min_size(pos2(bars.left(), bars.bottom() - bar), vec2(w, bar)), &adjusted_spectrum(v, 37));
+    let middle = Rect::from_min_max(pos2(bars.left(), bars.top() + bar), pos2(bars.right(), bars.bottom() - bar));
     if range > 0 {
         let key = HUE_RANGES[range - 1];
         let neutral = photocraft_doc::adjust::HueRange::neutral(range - 1).bounds;
-        let mut b = HueRange::canonical_bounds(nums(&v[key], "range", neutral));
-        let xof = |deg: f32| bars.left() + deg.rem_euclid(360.0) / 360.0 * w;
-        let deg_of = |x: f32| ((x - bars.left()) / w * 360.0).clamp(0.0, 360.0);
-        let mid = bars.center().y;
-        // Range band (fully affected) and fall-off.
+        let b = HueRange::canonical_bounds(nums(&v[key], "range", neutral));
+        // Range band (fully affected) and fall-off, drawn along the top of the thumbs.
+        let band_rect = Rect::from_min_size(middle.min, vec2(w, 6.0));
+        let xof = |deg: f32| band_rect.left() + deg.rem_euclid(360.0) / 360.0 * w;
         let band = |a: f32, z: f32, color: Color32| {
             let (xa, xz) = (xof(a), xof(z));
+            let strip = |x0: f32, x1: f32| Rect::from_min_max(pos2(x0, band_rect.top()), pos2(x1, band_rect.bottom()));
+            let p = ui.painter();
             if xa <= xz {
-                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(xz, mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(xa, xz), craft_ui::theme::scale::Radius::R0.px(), color);
             } else {
-                p.rect_filled(Rect::from_min_max(pos2(xa, mid - 3.0), pos2(bars.right(), mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
-                p.rect_filled(Rect::from_min_max(pos2(bars.left(), mid - 3.0), pos2(xz, mid + 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(xa, band_rect.right()), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(band_rect.left(), xz), craft_ui::theme::scale::Radius::R0.px(), color);
             }
         };
         band(b[0], b[3], t.color.text.faint.to_egui());
         band(b[1], b[2], t.color.text.muted.to_egui());
-        for (k, d) in b.iter().enumerate() {
-            let x = xof(*d);
-            let fill = if k == 1 || k == 2 { t.color.text.normal.to_egui() } else { t.color.surface.sunken.to_egui() };
-            p.rect_filled(Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)), craft_ui::theme::scale::Radius::R2.px(), fill);
-            p.rect_stroke(
-                Rect::from_center_size(pos2(x, mid), vec2(5.0, 12.0)),
-                craft_ui::theme::scale::Radius::R2.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()),
-                StrokeKind::Inside,
-            );
+        let faces = [t.color.surface.sunken, t.color.text.normal, t.color.text.normal, t.color.surface.sunken].map(|c| c.to_egui());
+        let names = [tl!("Range start"), tl!("Fully affected start"), tl!("Fully affected end"), tl!("Range end")];
+        let thumbs = std::array::from_fn(|k| Thumb::new(names[k], faces[k]));
+        let shown = b.map(|d| f64::from(d.rem_euclid(360.0)));
+        let row = ThumbRow::new(cx.mem.with("hs-range-row"), shown, &(0.0..=360.0), Some(1.0), thumbs).wrap_from(360.0, 0, 359.0).width(w);
+        let out = row.show(&mut ui.new_child(egui::UiBuilder::new().max_rect(middle)), &style);
+        let mut moved = b;
+        let r = apply_event(ui, cx.mem.with("hs-range-before"), out.edit.event, &mut moved, |value| {
+            let k = (0..4).find(|&k| (value[k] - shown[k]).abs() > 1e-6);
+            k.map_or(b, |k| move_hue_range_handle(b, k, value[k] as f32))
+        });
+        if moved != b {
+            v[key]["range"] = json!(moved.map(f32::round));
         }
-        let drag_id = cx.mem.with("hs-range-drag");
-        let mut which: Option<u8> = ui.data(|d| d.get_temp(drag_id)).flatten();
-        if bresp.is_pointer_button_down_on()
-            && ui.input(|i| i.pointer.primary_pressed())
-            && let Some(pos) = ui.input(|i| i.pointer.press_origin())
-        {
-            which = nearest(&b.map(xof), pos.x).filter(|k| (xof(b[*k as usize]) - pos.x).abs() < 10.0);
-        }
-        if bresp.is_pointer_button_down_on()
-            && let (Some(k), Some(pos)) = (which, ui.input(|i| i.pointer.interact_pos()))
-        {
-            let k = k as usize;
-            let deg = deg_of(pos.x);
-            let before = b;
-            b = move_hue_range_handle(b, k, deg);
-            if b != before {
-                v[key]["range"] = json!(b.map(|x| x.round()));
-                e.changed = true;
-            }
-        }
-        if which.is_some() && !bresp.is_pointer_button_down_on() {
-            which = None;
-            e.commit = true;
-        }
-        ui.data_mut(|d| d.insert_temp(drag_id, which));
+        e.add(r);
+        let b = moved;
         let lab =
             format!("{:.0}° / {:.0}°  ·  {:.0}° \\ {:.0}°", b[0].rem_euclid(360.0), b[1].rem_euclid(360.0), b[2].rem_euclid(360.0), b[3].rem_euclid(360.0));
-        ui.label(RichText::new(lab).font(crate::theme::mono(11.0)).color(t.color.text.faint.to_egui()));
+        ui.add(Text::new(lab).role(TypeRole::Mono).content(Content::Faint));
     }
     e
 }

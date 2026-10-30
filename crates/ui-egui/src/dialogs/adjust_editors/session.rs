@@ -1,7 +1,8 @@
 use super::basic::reset_color_balance;
 use super::gradient_map::{gradient_presets, is_gray, swatches};
-use super::{Adjustment, EditorCx, HistSource, LayerId, PhotocraftApp, RichText, Tokens, Value, adjust_params, editor, json, needs_histogram, space_of, tone};
+use super::{Adjustment, EditorCx, HistSource, LayerId, PhotocraftApp, Value, adjust_params, editor, json, needs_histogram, space_of, tone};
 use craft_ui::theme::ToEgui;
+use egui::RichText;
 
 /// Root of an adjustment layer's Properties editor view state in egui memory.
 pub fn layer_mem(id: LayerId) -> egui::Id {
