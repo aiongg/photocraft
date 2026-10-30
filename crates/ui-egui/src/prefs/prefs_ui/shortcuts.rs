@@ -1,5 +1,6 @@
 use super::dialogs::toolbar_tab;
 use super::{BTreeMap, Map, PhotocraftApp, RichText, Tokens, Value, default_shortcut, json, prefs, vec2};
+use craft_ui::theme::ToEgui;
 
 /// Every shortcut-bearing command (engine registry plus shell commands): (id, label, menu path,
 /// default shortcut), menu items first in Photoshop order.
@@ -176,7 +177,7 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
 /// Keyboard Shortcuts and Menus: a searchable list of commands by menu with editable shortcuts
 /// (click a shortcut, press keys; ⌫ removes it), menu visibility and colours, toolbar tools.
 pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let mut tab = f.get("tab").and_then(Value::as_u64).unwrap_or(0);
     ui.horizontal(|ui| {
         for (i, name) in [tl!("Keyboard Shortcuts"), tl!("Menus"), tl!("Toolbar")].iter().enumerate() {
@@ -219,7 +220,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     }
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
     ui.horizontal(|ui| {
-        ui.label(RichText::new(tl!("Search")).color(t.text_dim));
+        ui.label(RichText::new(tl!("Search")).color(t.color.text.muted.to_egui()));
         ui.add(egui::TextEdit::singleline(&mut filter).desired_width(260.0).hint_text(tl!("command or shortcut")));
     });
     f.insert("filter".into(), json!(filter));
@@ -347,7 +348,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 }
                 let top = shown_path.first().cloned().unwrap_or_else(|| tl!("Other").into());
                 if top != last_top {
-                    ui.label(RichText::new(&top).font(crate::theme::semibold(12.5)).color(t.text));
+                    ui.label(RichText::new(&top).font(crate::theme::semibold(12.5)).color(t.color.text.normal.to_egui()));
                     ui.label("");
                     ui.label("");
                     ui.end_row();
@@ -358,7 +359,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     _ => shown_label,
                 };
                 let sel = selected == *id;
-                let name_row = ui.selectable_label(sel, RichText::new(format!("   {name}")).color(t.text_dim));
+                let name_row = ui.selectable_label(sel, RichText::new(format!("   {name}")).color(t.color.text.muted.to_egui()));
                 if name_row.clicked() {
                     selected = id.clone();
                 }
@@ -370,7 +371,12 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     };
                     let changed = overrides.contains_key(id) || alt_overrides.contains_key(id);
                     let r = ui.add(
-                        egui::Button::new(RichText::new(tl!(&text)).size(12.0).color(if changed { t.accent_text } else { t.text })).min_size(vec2(120.0, 18.0)),
+                        egui::Button::new(RichText::new(tl!(&text)).size(12.0).color(if changed {
+                            t.color.accent.text.to_egui()
+                        } else {
+                            t.color.text.normal.to_egui()
+                        }))
+                        .min_size(vec2(120.0, 18.0)),
                     );
                     // An unassigned shortcut shows no text: name it by the command it binds.
                     let r = if text.is_empty() { r.labelled_by(name_row.id) } else { r };
@@ -385,7 +391,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // lists them as rows of their own (#3665).
                     ui.horizontal(|ui| {
                         for k in &alts {
-                            let b = egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(11.0).color(t.text)).small();
+                            let b =
+                                egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(11.0).color(t.color.text.normal.to_egui()))
+                                    .small();
                             if ui.add(b).on_hover_text(tl!("Delete Shortcut")).clicked() {
                                 alt_overrides.insert(id.clone(), alts.iter().filter(|x| *x != k).cloned().collect());
                                 selected = id.clone();
@@ -394,10 +402,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                             }
                         }
                         if sel && capture && capture_alt {
-                            ui.label(RichText::new(tl!("Press keys…")).size(11.0).color(t.accent_text));
+                            ui.label(RichText::new(tl!("Press keys…")).size(11.0).color(t.color.accent.text.to_egui()));
                         }
                         if changed {
-                            ui.label(RichText::new(tl!("modified")).color(t.text_faint).size(10.5));
+                            ui.label(RichText::new(tl!("modified")).color(t.color.text.faint.to_egui()).size(10.5));
                         }
                     });
                 } else {
@@ -465,7 +473,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         colors.clear();
     }
     if !message.is_empty() {
-        ui.label(RichText::new(&message).color(if message_warning { t.warning } else { t.text_dim }));
+        ui.label(RichText::new(&message).color(if message_warning { t.color.status.warn.fg.to_egui() } else { t.color.text.muted.to_egui() }));
     }
     // The conflict describes the bindings as the capture left them: any later change (Use
     // Default, Delete, ×, Reset All, another command or set) makes it stale, and it goes.

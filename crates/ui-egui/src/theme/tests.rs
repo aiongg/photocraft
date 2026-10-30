@@ -129,7 +129,7 @@ fn pro_light_gray_and_light_themes() {
             assert!(contrast(t.text_dim, bg) >= 3.0, "{kind:?} dim text on {bg:?}");
         }
         assert!(contrast(t.text_faint, t.card) >= 2.0, "{kind:?} faint text");
-        assert!(contrast(t.accent_text, t.card) >= 3.0, "{kind:?} accent text");
+        assert!(contrast(accent_text(kind), t.card) >= 3.0, "{kind:?} accent text");
     }
     // The four Pro levels step from darkest to lightest, as in Photoshop.
     let cards = [ThemeKind::Pro, ThemeKind::ProMedium, ThemeKind::ProLightGray, ThemeKind::ProLight].map(|k| Tokens::for_kind(k).card.r());
@@ -202,6 +202,15 @@ fn studio_text_contrast_is_high() {
     let lum = |c: Color32| 0.2126 * c.r() as f32 + 0.7152 * c.g() as f32 + 0.0722 * c.b() as f32;
     assert!(lum(t.text) - lum(t.card) > 180.0);
     assert!(lum(t.text_dim) - lum(t.card) > 90.0);
+}
+
+/// The library `accent.text` of `kind`, the colour accent-coloured text and lines draw in.
+fn accent_text(kind: ThemeKind) -> Color32 {
+    let sel = selection_for(kind);
+    let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size };
+    let base =
+        craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
+    craft_ui::theme::ToEgui::to_egui(base.shown(kind.mode()).resolved.tokens.color.accent.text)
 }
 
 /// WCAG 2 contrast ratio, the measure libadwaita's own palette is held to.
@@ -283,7 +292,7 @@ fn soft_themes_parse_and_hold_text_contrast() {
         };
         let surfaces = [t.chrome, t.canvas, t.dock, t.card, t.field, t.hover, t.pressed, tint(t.dock), tint(t.card)];
         for (i, surface) in surfaces.into_iter().enumerate() {
-            for (name, colour) in [("text", t.text), ("dim", t.text_dim), ("faint", t.text_faint), ("accent text", t.accent_text)] {
+            for (name, colour) in [("text", t.text), ("dim", t.text_dim), ("faint", t.text_faint), ("accent text", accent_text(kind))] {
                 assert!(contrast(colour, surface) >= 4.5, "{kind:?}: {name} on {surface:?}");
             }
             // Status colours are marks on hovered or selected surfaces (3:1), text on resting ones.
@@ -334,7 +343,7 @@ fn breeze_themes_parse_and_meet_text_contrast() {
         let resting = [t.chrome, t.canvas, t.dock, t.card, t.field];
         let active = [t.hover, t.pressed, tint(t.chrome), tint(t.dock), tint(t.card), tint(t.field)];
         for surface in resting.into_iter().chain(active) {
-            for (name, colour) in [("text", t.text), ("dim text", t.text_dim), ("faint text", t.text_faint), ("accent text", t.accent_text)] {
+            for (name, colour) in [("text", t.text), ("dim text", t.text_dim), ("faint text", t.text_faint), ("accent text", accent_text(kind))] {
                 assert!(contrast(colour, surface) >= 4.5, "{kind:?}: {name} on {surface:?}");
             }
         }

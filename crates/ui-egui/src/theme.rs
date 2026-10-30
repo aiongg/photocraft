@@ -182,7 +182,6 @@ pub struct Tokens {
     pub accent: Color32,
     pub accent_soft: Color32,
     pub accent_border: Color32,
-    pub accent_text: Color32,
     pub separator: Color32,
     pub shadow: Color32,
     pub primary_bg: Color32,

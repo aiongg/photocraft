@@ -5,6 +5,7 @@
 //! bundled fonts lacked them. Vector icons fix that for good.)
 
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use std::sync::OnceLock;
 
 use craft_ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
@@ -156,19 +157,24 @@ pub fn tool_icon(t: Tool) -> &'static str {
 
 /// Selected and hover fill shared by square icon buttons. Returns the icon tint.
 pub fn button_chrome(ui: &egui::Ui, rect: Rect, selected: bool, hovered: bool) -> Color32 {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     if selected {
-        ui.painter().rect_filled(rect, t.radius_sm, t.accent_soft);
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), egui::StrokeKind::Inside);
+        ui.painter().rect_filled(rect, t.shape.radius.control, t.color.accent.soft.to_egui());
+        ui.painter().rect_stroke(
+            rect,
+            t.shape.radius.control,
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.border.to_egui()),
+            egui::StrokeKind::Inside,
+        );
     } else if hovered {
-        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
+        ui.painter().rect_filled(rect, t.shape.radius.control, t.color.state.hover.to_egui());
     }
     if selected {
-        t.accent_text
+        t.color.text.on_selected.to_egui()
     } else if hovered {
-        t.text
+        t.color.text.normal.to_egui()
     } else {
-        t.icon
+        t.color.text.normal.to_egui()
     }
 }
 
@@ -185,14 +191,18 @@ pub fn button_with_icon_size(ui: &mut egui::Ui, name: &str, box_size: f32, icon_
 /// [`button_with_icon_size`] whose tooltip shows only when `show_tip`; the tooltip text still
 /// names the button (for screen readers and tests) when it is hidden.
 pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, icon_size: f32, selected: bool, tooltip: &str, show_tip: bool) -> Response {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let style = IconButtonStyle {
-        normal: ButtonVisuals { fill: Color32::TRANSPARENT, stroke: egui::Stroke::NONE, icon: t.icon },
-        hovered: ButtonVisuals { fill: t.hover, stroke: egui::Stroke::NONE, icon: t.text },
+        normal: ButtonVisuals { fill: Color32::TRANSPARENT, stroke: egui::Stroke::NONE, icon: t.color.text.normal.to_egui() },
+        hovered: ButtonVisuals { fill: t.color.state.hover.to_egui(), stroke: egui::Stroke::NONE, icon: t.color.text.normal.to_egui() },
         pressed: None,
-        selected: ButtonVisuals { fill: t.accent_soft, stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), icon: t.accent_text },
-        corner_radius: t.radius_sm.into(),
-        focus_stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
+        selected: ButtonVisuals {
+            fill: t.color.accent.soft.to_egui(),
+            stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.border.to_egui()),
+            icon: t.color.text.on_selected.to_egui(),
+        },
+        corner_radius: t.shape.radius.control.into(),
+        focus_stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
     };
     let label = if tooltip.is_empty() { name } else { tl!(tooltip) };
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |ui, rect, tint| {
@@ -203,15 +213,20 @@ pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, i
 
 /// Rail toggle: "on" gets a quiet filled background and full-strength icon (no accent).
 pub fn rail_button(ui: &mut egui::Ui, name: &str, box_size: f32, on: bool, tooltip: &str) -> Response {
-    let t = Tokens::get(ui.ctx());
+    let t = craft_ui::theme::current(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(box_size), Sense::click());
     if on {
-        ui.painter().rect_filled(rect, t.radius_sm, t.card);
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside);
+        ui.painter().rect_filled(rect, t.shape.radius.control, t.color.surface.panel.to_egui());
+        ui.painter().rect_stroke(
+            rect,
+            t.shape.radius.control,
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.border.to_egui()),
+            egui::StrokeKind::Inside,
+        );
     } else if resp.hovered() {
-        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
+        ui.painter().rect_filled(rect, t.shape.radius.control, t.color.state.hover.to_egui());
     }
-    let tint = if on || resp.hovered() { t.text } else { t.text_faint };
+    let tint = if on || resp.hovered() { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui() };
     paint(ui, rect, name, (box_size * 0.52).round(), tint);
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), on, tl!(tooltip)));
     resp.on_hover_text(tl!(tooltip))

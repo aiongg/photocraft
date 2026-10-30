@@ -1598,7 +1598,7 @@ fn the_rotate_zone_draws_the_turn_arrow_where_the_pointer_is_hidden() {
     h.run_steps(3);
     let tol = handle_tolerance(h.state());
     let xf = ViewXform::active(h.state()).unwrap();
-    let accent = crate::theme::Tokens::get(&h.ctx).accent_text;
+    let accent = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(&h.ctx).color.accent.text);
     // The arrow's bright stroke: a 17-point arc in the accent colour around the pointer.
     let arrows = |h: &egui_kittest::Harness<'_, PhotocraftApp>, at: egui::Pos2| {
         h.output()

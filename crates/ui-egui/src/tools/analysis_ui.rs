@@ -715,7 +715,11 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                 Value::Null => String::new(),
                                 other => other.to_string(),
                             });
-                            let txt = RichText::new(v.unwrap_or_default()).size(10.5).color(if on { t.accent_text } else { t.text });
+                            let txt = RichText::new(v.unwrap_or_default()).size(10.5).color(if on {
+                                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.text.on_selected)
+                            } else {
+                                t.text
+                            });
                             let resp = if k == 0 { ui.selectable_label(on, txt) } else { ui.label(txt) };
                             if k == 0 && resp.clicked() {
                                 if on {

@@ -30,6 +30,7 @@
 //! out), with transparency out to the frame, under the shield ([`shows_beyond_canvas`]).
 
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::ToEgui;
 use egui::{CursorIcon, Modifiers};
 
 use crate::PhotocraftApp;
@@ -1048,7 +1049,7 @@ pub fn draw_turn_cursor(ctx: &egui::Context, p: egui::Pos2, toward: egui::Vec2) 
         return;
     }
     let u = toward / len;
-    let tokens = crate::theme::Tokens::get(ctx);
+    let tokens = craft_ui::theme::current(ctx);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("crop-turn-cursor")));
     const R: f32 = 12.0;
     const HALF: f32 = 0.75;
@@ -1056,16 +1057,16 @@ pub fn draw_turn_cursor(ctx: &egui::Context, p: egui::Pos2, toward: egui::Vec2) 
     let mid = (-u.y).atan2(-u.x);
     let at = |a: f32| c + egui::vec2(a.cos(), a.sin()) * R;
     let points: Vec<egui::Pos2> = (0..=16).map(|i| at(mid - HALF + 2.0 * HALF * i as f32 / 16.0)).collect();
-    painter.add(egui::Shape::line(points.clone(), egui::Stroke::new(3.5, tokens.shadow)));
-    painter.add(egui::Shape::line(points, craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.accent_text)));
+    painter.add(egui::Shape::line(points.clone(), egui::Stroke::new(3.5, tokens.color.surface.shadow.to_egui())));
+    painter.add(egui::Shape::line(points, craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.color.accent.text.to_egui())));
     for (a, sign) in [(mid - HALF, -1.0f32), (mid + HALF, 1.0)] {
         let tip = at(a) + egui::vec2(-a.sin(), a.cos()) * (sign * 2.0);
         let tangent = egui::vec2(-a.sin(), a.cos()) * sign;
         let normal = egui::vec2(a.cos(), a.sin());
         painter.add(egui::Shape::convex_polygon(
             vec![tip + tangent * 3.5, tip - tangent * 3.0 + normal * 3.5, tip - tangent * 3.0 - normal * 3.5],
-            tokens.accent_text,
-            craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
+            tokens.color.accent.text.to_egui(),
+            craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.color.surface.shadow.to_egui()),
         ));
     }
 }

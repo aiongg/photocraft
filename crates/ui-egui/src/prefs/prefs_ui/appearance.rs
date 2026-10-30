@@ -412,7 +412,7 @@ fn theme_row(ui: &mut egui::Ui, title: &str, active: bool, mode: Mode, selected:
         }
         if active {
             ui.add_space(craft_ui::theme::scale::Space::S6.px());
-            ui.label(RichText::new(tl!("Active")).color(t.accent_text).small());
+            ui.label(RichText::new(tl!("Active")).color(craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.accent.text)).small());
         }
     });
     ui.end_row();

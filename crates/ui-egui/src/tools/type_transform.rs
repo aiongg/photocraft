@@ -406,13 +406,14 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
 /// Content-Aware Move's Transform On Drop.
 pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSession) {
     let tokens = crate::theme::Tokens::get(painter.ctx());
+    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(painter.ctx()).color.accent.text);
     let pts = t.quad.map(|p| xf.to_screen(p[0] as f32, p[1] as f32));
     painter.add(egui::Shape::closed_line(pts.to_vec(), Stroke::new(3.0, tokens.shadow)));
     painter.add(egui::Shape::closed_line(pts.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent)));
     let mids = [pts[0].lerp(pts[1], 0.5), pts[1].lerp(pts[2], 0.5), pts[2].lerp(pts[3], 0.5), pts[3].lerp(pts[0], 0.5)];
     for p in pts.iter().chain(mids.iter()) {
         let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
-        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), tokens.accent_text);
+        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), accent_text);
         painter.rect_stroke(
             r,
             craft_ui::theme::scale::Radius::R0.px(),
@@ -422,7 +423,7 @@ pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSes
     }
     let c = xf.to_screen(t.pivot[0] as f32, t.pivot[1] as f32);
     painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), tokens.shadow));
-    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent_text));
+    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent_text));
     for axis in [vec2(6.0, 0.0), vec2(0.0, 6.0)] {
         painter.line_segment([c - axis, c + axis], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent));
     }
@@ -430,6 +431,7 @@ pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSes
 
 pub(crate) fn rotation_cursor(ctx: &egui::Context, p: Pos2) {
     let tokens = crate::theme::Tokens::get(ctx);
+    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-rotate-cursor")));
     let first = -std::f32::consts::FRAC_PI_4;
     let last = std::f32::consts::PI + std::f32::consts::FRAC_PI_4;
@@ -440,14 +442,14 @@ pub(crate) fn rotation_cursor(ctx: &egui::Context, p: Pos2) {
         })
         .collect();
     painter.add(egui::Shape::line(points.clone(), Stroke::new(3.0, tokens.shadow)));
-    painter.add(egui::Shape::line(points, Stroke::new(1.25, tokens.accent_text)));
+    painter.add(egui::Shape::line(points, Stroke::new(1.25, accent_text)));
     for (angle, sign) in [(first, -1.0), (last, 1.0)] {
         let tip = p + vec2(angle.cos(), angle.sin()) * 7.0;
         let tangent = vec2(-angle.sin(), angle.cos()) * sign;
         let normal = vec2(angle.cos(), angle.sin());
         painter.add(egui::Shape::convex_polygon(
             vec![tip + tangent * 3.0, tip - tangent * 3.0 + normal * 3.0, tip - tangent * 3.0 - normal * 3.0],
-            tokens.accent_text,
+            accent_text,
             craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
         ));
     }
@@ -476,10 +478,11 @@ pub(crate) fn cursor(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXfor
         Some(Hit::Edge(_)) => {
             // Original arrowhead indicator, above the canvas, without a proprietary cursor asset.
             let tokens = crate::theme::Tokens::get(ctx);
+            let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-skew-cursor")));
             painter.add(egui::Shape::convex_polygon(
                 vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)],
-                tokens.accent_text,
+                accent_text,
                 craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
             ));
             CursorIcon::None

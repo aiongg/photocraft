@@ -98,7 +98,6 @@ impl Tokens {
             accent: col(c.accent.solid),
             accent_soft: col(c.accent.soft),
             accent_border: col(c.accent.border),
-            accent_text: if (pro && dark) || kind == ThemeKind::Classic { col(c.text.on_accent) } else { col(c.accent.text) },
             separator: col(c.line.divider),
             shadow: col(c.surface.shadow),
             primary_bg: col(primary.fill.rest),

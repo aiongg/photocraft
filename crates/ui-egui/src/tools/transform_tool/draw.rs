@@ -38,6 +38,7 @@ fn draw_distort_cursor(ctx: &egui::Context, at: Pos2, toward: egui::Vec2) {
     let u = if len.is_finite() && len > 1e-6 { toward / len } else { vec2(-1.0, -1.0).normalized() };
     let perp = vec2(-u.y, u.x);
     let tokens = crate::theme::Tokens::get(ctx);
+    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("transform-distort-cursor")));
 
     // An arrowhead dart pointing along `u` with tip at `at`.
@@ -50,8 +51,8 @@ fn draw_distort_cursor(ctx: &egui::Context, at: Pos2, toward: egui::Vec2) {
     let notch = tip - u * (LENGTH * 0.65);
 
     // Convex decomposition: two triangles meeting along [tip, notch].
-    painter.add(egui::Shape::convex_polygon(vec![tip, left, notch], tokens.accent_text, Stroke::NONE));
-    painter.add(egui::Shape::convex_polygon(vec![tip, notch, right], tokens.accent_text, Stroke::NONE));
+    painter.add(egui::Shape::convex_polygon(vec![tip, left, notch], accent_text, Stroke::NONE));
+    painter.add(egui::Shape::convex_polygon(vec![tip, notch, right], accent_text, Stroke::NONE));
     painter.add(egui::Shape::closed_line(vec![tip, left, notch, right], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.shadow)));
 }
 
@@ -61,6 +62,7 @@ fn draw_skew_cursor(ctx: &egui::Context, at: Pos2, tangent: egui::Vec2) {
     let u = if len.is_finite() && len > 1e-6 { tangent / len } else { vec2(1.0, 0.0) };
     let perp = vec2(-u.y, u.x);
     let tokens = crate::theme::Tokens::get(ctx);
+    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("transform-skew-cursor")));
 
     for (offset, dir) in [(4.0f32, 1.0f32), (-4.0f32, -1.0f32)] {
@@ -68,12 +70,12 @@ fn draw_skew_cursor(ctx: &egui::Context, at: Pos2, tangent: egui::Vec2) {
         let p_start = center - u * (dir * 9.0);
         let p_end = center + u * (dir * 9.0);
         painter.line_segment([p_start, p_end], Stroke::new(3.5, tokens.shadow));
-        painter.line_segment([p_start, p_end], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.accent_text));
+        painter.line_segment([p_start, p_end], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, accent_text));
 
         let tip = p_end + u * (dir * 3.5);
         let wing1 = p_end - u * (dir * 2.5) + perp * 3.5;
         let wing2 = p_end - u * (dir * 2.5) - perp * 3.5;
-        painter.add(egui::Shape::convex_polygon(vec![tip, wing1, wing2], tokens.accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
+        painter.add(egui::Shape::convex_polygon(vec![tip, wing1, wing2], accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
     }
 }
 
