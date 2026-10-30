@@ -7,6 +7,7 @@ line numbers, and rewrites only exact mappings, so a re-run after a rebase is sa
 run changes nothing.  See README.md.
 """
 import argparse
+import os
 import bisect
 import datetime
 import json
@@ -23,7 +24,7 @@ from pathlib import Path
 COLOR_FIELDS = {
     # DS-43 B2: the port normalises glyph colour to `text.normal`
     "icon": "color.text.normal",
-    "chrome": "color.surface.panel",
+    "chrome": "color.surface.chrome",
     "card": "color.surface.panel",
     "dock": "color.surface.background",
     "canvas": "color.surface.canvas",
@@ -46,6 +47,8 @@ COLOR_FIELDS = {
     "caption_close": "color.caption.close_hover",
     "caption_close_text": "color.caption.close_text",
     "scrim": "color.surface.scrim",
+    "accent_border": "color.accent.border",
+    "shadow": "color.surface.shadow",
     # component layer
     "primary_bg": "component.button.primary.fill.rest",
     "primary_text": "component.button.primary.text.rest",
@@ -53,9 +56,7 @@ COLOR_FIELDS = {
 }
 # Fields with no single token (themes.md Table 0/2): left, with the reason.
 AMBIGUOUS_FIELDS = {
-    "accent_border": "DS-43 B3: per use (selected look, `ToggleButton`/`Segmented`, or `accent.solid` stroke)",
     "canvas_dot": "DS-43 B4: app-side (canvas colour moved 0.06 in OKLCH lightness)",
-    "shadow": "DS-43 B5: two uses (floating-panel shadow -> `shadow.popup/dialog`; cursor halo -> `overlay.halo`)",
     "histogram_level": "DS-43 B6: dropped; `histogram_color`/`scope_hue` move to `data.*`",
 }
 RADIUS_FIELDS = {"radius_sm": "control", "radius": "popup", "radius_lg": "window"}
@@ -76,6 +77,58 @@ STROKE_HINT = {
     2.5: "halo: component token or app canvas ink", 3.0: "halo: component token or app canvas ink", 3.5: "halo: component token or app canvas ink",
     4.5: "halo: component token or app canvas ink", 5.0: "tool-button arc: DS-35 Toolbar",
 }
+
+# ---------------------------------------------------------------- token paths against craft-libs
+
+DEFAULT_REF = "origin/design-system"
+COLOR_GROUPS = {"surface": "SurfaceColors", "text": "TextColors", "line": "LineColors", "accent": "AccentColors", "state": "StateColors",
+                "overlay": "OverlayColors", "data": "DataColors", "caption": "CaptionColors", "edge": "EdgeColors"}
+
+
+def libs_show(libs, ref, path):
+    try:
+        return subprocess.run(["git", "-C", libs, "show", f"{ref}:{path}"], capture_output=True, text=True, check=True).stdout
+    except Exception:
+        return None
+
+
+def struct_fields(text, name):
+    mm = re.search(r"pub struct " + name + r"(?:<[^>]*>)?\s*\{(.*?)\n\}", text, re.S)
+    return set(re.findall(r"pub (\w+):", mm.group(1))) if mm else set()
+
+
+def verify_paths(libs, ref):
+    """(checked count, {field: reason}) for every emitted token path; None when the checkout cannot be read."""
+    tokens = libs_show(libs, ref, "crates/theme/src/tokens.rs")
+    comps = libs_show(libs, ref, "crates/theme/src/components/mod.rs")
+    if tokens is None or comps is None:
+        return None
+    missing, n = {}, 0
+    for field, path in COLOR_FIELDS.items():
+        parts = path.split(".")
+        n += 1
+        if parts[0] == "color":
+            if parts[1] == "status":
+                ok = parts[2] in struct_fields(tokens, "Status") and parts[3] in struct_fields(tokens, "StatusColors")
+            else:
+                ok = parts[1] in COLOR_GROUPS and parts[2] in struct_fields(tokens, COLOR_GROUPS[parts[1]])
+        else:
+            fam = parts[1]
+            fm = re.search(r"^\s+" + fam + r": (\w+) =>", comps, re.M)
+            text = libs_show(libs, ref, f"crates/theme/src/components/{fam}.rs") if fm else None
+            ok = bool(fm and text and parts[2] in struct_fields(text, fm.group(1)))
+        if not ok:
+            missing[field] = f"`{path}` is not in craft-libs `{ref}`"
+    for role in RADIUS_FIELDS.values():
+        n += 1
+        if role not in struct_fields(tokens, "RadiusSet"):
+            missing["radius*"] = f"`shape.radius.{role}` is not in craft-libs `{ref}`"
+    for role in GAP_VALUES:
+        n += 1
+        if role not in struct_fields(tokens, "Gaps"):
+            missing["gap"] = f"`space.gap.{role}` is not in craft-libs `{ref}`"
+    return n, missing
+
 
 PATTERNS = [
     ("token", "`t.<field>` token reads"),
@@ -559,6 +612,15 @@ def apply_edits(text: str, edits):
 
 # ---------------------------------------------------------------- report
 
+def verified_line(args):
+    if not args.verified:
+        return "- Token paths: not checked against craft-libs (checkout or ref not readable)."
+    n, missing = args.verified
+    if not missing:
+        return f"- Token paths: all {n} emitted token paths exist in craft-libs `{args.libs_short}`."
+    return f"- Token paths: {len(missing)} of {n} emitted paths are missing in craft-libs `{args.libs_short}` and were left instead: " + ", ".join(sorted(missing)) + "."
+
+
 def md_report(scan: Scan, commit: str, args) -> str:
     today = datetime.date.today().isoformat()
     out = [
@@ -567,7 +629,8 @@ def md_report(scan: Scan, commit: str, args) -> str:
         f"- Run date: {today}",
         f"- Source: PhotoCraft `{commit}`, `{args.src}` (script `scripts/codemods/pc2b/pc2b.py`, mode `{'apply' if args.apply else 'dry-run'}`)",
         f"- Scope: {scan.files} non-test `.rs` files, {scan.lines:,} lines (test files, `#[cfg(test)]`-gated modules and inline test blocks cut). `theme.rs` is scanned but never rewritten; its hits are in the last column.",
-        f"- Target: craft-libs `design-system` @ `01e20c71` (API as built in DS-43). Scale paths are written as `{args.scale}::Space::S4.px()` etc.",
+        f"- Target: craft-libs `{args.libs_short}`" + (f" (`{args.craft_libs_ref}`)" if not args.libs_short.startswith(args.craft_libs_ref) else "") + f". Scale paths are written as `{args.scale}::Space::S4.px()` etc.",
+        verified_line(args),
         "",
         "## Totals",
         "",
@@ -605,18 +668,16 @@ def md_report(scan: Scan, commit: str, args) -> str:
             "| Site | Role | Literal | Compact | Comfortable |", "|---|---|---|---|---|"]
     for pat, f, ln, v, c, k, role in sorted(scan.shifted_sites, key=lambda x: (x[1], x[2])):
         out.append(f"| `{f}:{ln}` | {pat.replace('item_spacing', 'item_spacing')} gap.{role} | {fmt(v)} | {fmt(c)} | {fmt(k)} |")
-    out += ["", MISSING, ""]
+    out += ["", MISSING.replace("{libs}", args.libs_short), ""]
     return "\n".join(out)
 
 
 MISSING = """## Missing in craft-libs
 
-Checked against `design-system` @ `01e20c71`. The scale re-export (`craft_ui::theme::scale`), `StrokeExt::egui`, `craft_ui::theme::current(&Context)`, `ToEgui` and the f32 radii (`t.shape.radius.*` through the `UiTokens` deref) all exist, and every token path the script emits was found in `crates/theme/src/tokens.rs` and `components/`. The removed tokens `menu.tint_alpha` and `histogram.fill_alpha` are not emitted. Nothing in craft-libs blocks a rewrite. What is left is decided in DS-43 as port or app work, so it is not a craft-libs gap:
+Checked against craft-libs `{libs}` (the header line says whether every emitted token path was found there). The scale re-export (`craft_ui::theme::scale`), `StrokeExt::egui`, `craft_ui::theme::current(&Context)`, `ToEgui` and the f32 radii (`t.shape.radius.*` through the `UiTokens` deref) all exist. The removed tokens `menu.tint_alpha`, `histogram.fill_alpha`, `histogram.marker_alpha`, `elevation.dialog` and `button.default_frame` are not emitted. `accent_border`, `chrome` and `shadow` now map to `color.accent.border`, `color.surface.chrome` and `color.surface.shadow`. Nothing in craft-libs blocks a rewrite. What is left is decided in DS-43 as port or app work, so it is not a craft-libs gap:
 
 | Left | Decision (DS-43) | Where |
 |---|---|---|
-| `shadow` reads | B5: floating-panel shadow becomes `UiTokens.shadow.popup/dialog` by size, a cursor halo becomes `overlay.halo`; chosen per use | token table |
-| `accent_border` reads | B3: per use (selected look, `ToggleButton`/`Segmented`, or an `accent.solid` stroke) | token table |
 | `canvas_dot` reads | B4: app-side, derived from the canvas colour in use | token table |
 | `histogram_level` | B6: dropped with `histogram_color`/`scope_hue` moving to `data.*` | token table |
 | Off-scale `Stroke` widths | B10: no new steps; glyphs become `Icon`/`Disclosure`, halos component tokens (`handle.halo`, `gradient_line.halo`, `marquee.drawing_halo`) or app canvas ink | stroke table, hints in the reasons |
@@ -625,7 +686,7 @@ Checked against `design-system` @ `01e20c71`. The scale re-export (`craft_ui::th
 
 ## Notes
 
-- `chrome` and `card` both map to `surface.panel`; they differ in the Studio family (themes.md Table 0). Pin the difference in the theme files.
+- `card` maps to `surface.panel` and `chrome` to `surface.chrome`, which follows `panel` unless a theme pins it (themes.md Table 0: they differ in the Studio family). A cursor halo drawn with `shadow` (crop and transform overlays) gets the shadow colour too; `overlay.halo` is the dedicated token if the port wants one.
 - `icon` maps to `text.normal` and `radius_sm/radius/radius_lg` to `t.shape.radius.control/popup/window` (f32), as DS-43 B2 and B7 decide. A rewritten `t.radius_sm - 1.0` keeps its f32 type.
 - Radius literals map to the scale step with the same value (`Radius::R4.px()`), not to the roles of codemods.md Table 4: a role changes the value per theme.
 - Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. A rounded value that gets a role token is counted as role and shifted only, not as rounded.
@@ -647,6 +708,8 @@ def main():
     ap.add_argument("--scale", default="craft_ui::theme::scale", help="module path of Space/Radius/Stroke in emitted code")
     ap.add_argument("--exact-only", action="store_true", help="skip the DS-43 B8/B9 roundings (Space 3, 10, 14, ..; Radius 1)")
     ap.add_argument("--report", help="write the markdown report here")
+    ap.add_argument("--craft-libs", default=os.environ.get("CRAFT_LIBS", "../craft-libs"), help="craft-libs checkout whose tokens are checked (default: $CRAFT_LIBS or ../craft-libs)")
+    ap.add_argument("--craft-libs-ref", default=DEFAULT_REF, help=f"craft-libs ref the tokens are read from (default: {DEFAULT_REF})")
     ap.add_argument("--source-commit", help="commit named in the report (default: HEAD of the checkout)")
     ap.add_argument("--json", help="write raw counts here")
     ap.add_argument("--dump-left", help="write every left site (pattern, reason, file:line) to this file")
@@ -661,6 +724,13 @@ def main():
     commit = subprocess.run(["git", "-C", str(root), "rev-parse", "--short=10", "HEAD"], capture_output=True, text=True).stdout.strip()
     commit = args.source_commit or commit
 
+    args.libs_short = subprocess.run(["git", "-C", args.craft_libs, "rev-parse", "--short=8", args.craft_libs_ref], capture_output=True, text=True).stdout.strip() or args.craft_libs_ref
+    args.verified = verify_paths(args.craft_libs, args.craft_libs_ref)
+    if args.verified:
+        for field, why in args.verified[1].items():
+            if field in COLOR_FIELDS:
+                AMBIGUOUS_FIELDS[field] = why  # never emit a path the library lacks
+                del COLOR_FIELDS[field]
     scan = Scan()
     texts = {}
     for p in collect_files(src):

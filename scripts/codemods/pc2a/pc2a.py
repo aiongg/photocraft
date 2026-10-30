@@ -109,7 +109,7 @@ def is_test_file(rel):
 # ---------------------------------------------------------------- icons manifest
 
 # PhotoCraft icon file name -> manifest name (DS-43 "Icon manifest additions"). A name is used
-# only when the manifest on origin/design-system lists it; the others are reported as missing.
+# only when the manifest at the craft-libs ref lists it; the others are reported as missing.
 ALIASES = {
     "x": "close", "undo-2": "undo", "ellipsis": "more", "pipette": "eyedropper", "file-plus": "new_file",
     "link-2": "link", "message-square": "note", "square-plus": "new_layer", "folder-plus": "new_folder",
@@ -121,10 +121,13 @@ ALIASES = {
 }
 
 
-def load_icons(craft_libs):
+DEFAULT_REF = "origin/design-system"
+
+
+def load_icons(craft_libs, ref=DEFAULT_REF):
     """manifest names -> Icon variant, or None when the manifest cannot be read."""
     try:
-        t = subprocess.run(["git", "-C", craft_libs, "show", "origin/design-system:crates/ui/icons/icons.toml"],
+        t = subprocess.run(["git", "-C", craft_libs, "show", f"{ref}:crates/ui/icons/icons.toml"],
                            capture_output=True, text=True, check=True).stdout
     except Exception:
         return None
@@ -132,9 +135,20 @@ def load_icons(craft_libs):
     return {n: "".join(w[:1].upper() + w[1:] for w in n.split("_")) for n in names}
 
 
+def resolve_ref(craft_libs, ref):
+    """Short hash of ref in the craft-libs checkout, or the ref text when git cannot say."""
+    try:
+        return subprocess.run(["git", "-C", craft_libs, "rev-parse", "--short=8", ref], capture_output=True, text=True, check=True).stdout.strip()
+    except Exception:
+        return ref
+
+
 def icon_variant(file_name, icons):
     """(variant, None) or (None, manifest name wanted)."""
-    want = ALIASES.get(file_name, file_name.replace("-", "_"))
+    plain = file_name.replace("-", "_")
+    want = ALIASES.get(file_name, plain)
+    if want not in icons and plain in icons:
+        want = plain  # the manifest has since added the icon under its own name
     return (icons[want], None) if want in icons else (None, want)
 
 
@@ -164,6 +178,9 @@ rule("slider", ["slider", "slider_row", "slider_row_with", "slider_row_prec"], "
 rule("pill_tab", ["pill_tab", "pill_tabs"], "widgets")
 rule("text_field", ["text_field", "text_field_ex"], "widgets")
 rule("dialog_buttons", ["dialog_buttons"], "widgets")
+rule("DialogButton::new", [r"DialogButton::new"], None)
+rule("section_label", ["section_label"], "widgets")
+rule("panel_footer", ["panel_footer"], "widgets")
 rule("radio", ["radio", "radio_value"], "widgets", bare=False)
 rule("panel_menu", ["panel_menu_button", "panel_menu"], "widgets")
 rule("menu_scroll", ["menu_scroll"], "widgets")
@@ -181,13 +198,13 @@ COUNT_ONLY = collections.OrderedDict([
 ])
 
 HAND_REASON = {
-    "value_field": "needs the app-side adapter `widgets/bound.rs` (DS-43: host, doc and `apply` for the undo step); `value_field` also has no label argument for the accessible name. craft-ui now takes f32 values, so this is app code, not a rename",
-    "slider": "needs the app-side adapter `widgets/bound.rs` (DS-43: host, doc and `apply` for the undo step); gradient/suffix arguments map to `track_colors`/`Unit`",
+    "value_field": "needs the app-side adapter `widgets/bound.rs` (host, doc and `apply` for the undo step) and a `&LocaleNumbers`; `value_field` also has no label argument for the accessible name. `NumberField` reports `EditEvent`s, so this is app code, not a rename",
+    "slider": "`Slider`/`SliderRow` report `EditEvent`s (Begin/Update/Commit) and take no `&mut f32`; callers use the returned `Response` (`changed`, `drag_stopped`), so the site needs the app-side adapter `widgets/bound.rs` (host, doc, `apply` for the undo step). Arguments map exactly: gradient to `track_colors`, suffix to `Unit`, `decimals` to `SliderRow::decimals`, `RowGestures` to `default_value`/`wheel_step`; `SliderRow` also needs a `&LocaleNumbers`",
     "pill_tab": "one tab per call; DS-43 A12: each group becomes one `Segmented` (2-4 items) or a `TabStrip`, by hand",
     "text_field": "no label argument for the accessible name, and the event's String must be written back; DS-43 A10: hint = `placeholder`, width = layout",
-    "dialog_buttons": "DialogFooter (DS-33) is not built in craft-libs",
+    "dialog_buttons": "argument is neither a `&[..]` literal nor a plain `&name` (the row is built by a helper)",
     "radio": "RadioGroup/RadioSet take the whole group; sites are single rows",
-    "panel_menu": "PanelHeader menu (DS-31) is not built; per-panel bodies",
+    "panel_menu": "`PanelHeader` (menu button on by default) exists; the site is the dock's own panel menu button, replaced with the dock, not by a call rewrite",
     "menu_scroll": "closure wrapper that Menu makes unnecessary; removal needs the surrounding popup ported first",
     "style_spectrum_popup_menu": "removal is only right once the popup is a craft_ui Menu; until then it styles the egui popup",
 }
@@ -222,8 +239,8 @@ def plain_path(a):
     return re.fullmatch(r"&?[\w.]+(::\w+)*", a.strip()) is not None
 
 
-def build(label, name, args, opts, icons):
-    """Returns (replacement, None) or (None, reason)."""
+def build(label, name, args, opts, icons, after="", toggle=None):
+    """Returns (replacement, None) or (None, reason). after: masked text following the call; toggle: bool path of a flip-on-click site."""
     a = [x.strip() for x in args]
     n = len(a)
     if label == "checkbox":
@@ -242,7 +259,7 @@ def build(label, name, args, opts, icons):
         return f"{ui_expr(a[0])}.add({CU}Button::new({translated(a[1])}).variant({CU}ButtonVariant::{v}){w})", None
     if label == "icons::button":
         if name == "rail_button":
-            return None, "rail look (quiet filled 'on' state, no accent): belongs to DS-31 `Rail`"
+            return None, "rail look (quiet filled 'on' state, no accent): the dock's iconic column (`DockLook::iconic_width`, `DockContent::paint_icon`) or `patterns::PanelRail` draws it; not an `IconButton`"
         want = {"button": 5, "button_with_icon_size": 6, "button_with_icon_size_tip": 7}[name]
         if n != want:
             return None, "unexpected argument count"
@@ -265,7 +282,9 @@ def build(label, name, args, opts, icons):
         if tip in ('""', ""):
             return None, "empty tooltip: IconButton needs a label"
         out = f"{ui_expr(a[0])}.add({CU}IconButton::new(craft_ui::icons::Icon::{var}, {tip}).size({CU}ControlSize::{sz})"
-        if sel != "false":
+        if toggle:
+            out += f".toggle(&mut {toggle})"
+        elif sel != "false":
             out += f".selected({sel})"
         if name == "button_with_icon_size_tip" and a[6] != "true":
             out += f".show_tooltip({a[6]})"
@@ -307,6 +326,22 @@ def build(label, name, args, opts, icons):
         if n != 3:
             return None, "unexpected argument count"
         return f"{ui_expr(a[0])}.add({CU}Button::new({translated(a[1])}).size({CU}ControlSize::Sm))", None
+    if label == "DialogButton::new":
+        if n != 3:
+            return None, "unexpected argument count"
+        role = re.fullmatch(r"(?:\w+::)*ButtonRole::(Default|Alternate|Cancel|Apply)", a[0])
+        if not role:
+            return None, "role is not a `ButtonRole::X` literal: the row is built from PhotoCraft's own `ButtonRole` values"
+        if after.lstrip().startswith(".focus("):
+            return None, "`.focus(..)`: FooterButtons moves focus by arrow keys; the initial focus is the dialog's (`InitialFocus`)"
+        w = "" if is_zero(a[2]) else f".min_width({a[2]})"
+        return f"craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::{role.group(1)}, {translated(a[1])}){w}", None
+    if label == "section_label":
+        if n != 2:
+            return None, "unexpected argument count"
+        if not after.lstrip().startswith(";"):
+            return None, "call is used as an expression (SectionLabel::show returns a Response)"
+        return f"craft_ui::composites::SectionLabel::new({translated(a[1])}).show({a[0]})", None
     if label in HAND_REASON:
         return None, HAND_REASON[label]
     return None, "no rule"
@@ -328,6 +363,60 @@ def split_top(s):
     return parts
 
 
+def toggle_site(m, start, end, sel, after):
+    """(path, span start, span end) when the call is `if <call>.clicked() { P = !P; }` with P the selected argument."""
+    sel = sel.strip()
+    if not re.fullmatch(r"\*?[A-Za-z_][\w.]*", sel):
+        return None, start, end
+    tail = re.match(r"\.clicked\(\)\s*\{\s*(\*?[A-Za-z_][\w.]*)\s*=\s*!\s*(\*?[A-Za-z_][\w.]*)\s*;\s*\}", after)
+    head = re.search(r"(?<![\w.])if\s+$", m[max(0, start - 40):start])
+    if not tail or not head or tail.group(1) != sel or tail.group(2) != sel:
+        return None, start, end
+    if re.search(r"\belse\s+$", m[max(0, start - 60):start - len(head.group(0))]):
+        return None, start, end
+    path = sel.lstrip("*")
+    return path, start - len(head.group(0)), end + tail.end()
+
+
+BAD_BUTTON = re.compile(r"DialogButton::new\(\s*(?!(?:\w+::)*ButtonRole::(?:Default|Alternate|Cancel|Apply)\b)|\.focus\(")
+
+
+def binding_ok(m, name, call_start):
+    """True when `let name` is bound shortly before the call and its DialogButton::new calls all have an exact rewrite."""
+    lets = list(re.finditer(rf"\blet\s+(?:mut\s+)?{re.escape(name)}\b", m[max(0, call_start - 6000):call_start]))
+    if not lets:
+        return False
+    seg = m[max(0, call_start - 6000) + lets[-1].start():call_start]
+    return "DialogButton::new" in seg and not BAD_BUTTON.search(seg)
+
+
+def dialog_row_edits(src, spans, end, call_start, args):
+    """Edits that turn `dialog_buttons(ui, ROW)` into a FooterButtons row, or (None, reason). ROW is `&[..]` or `&name`."""
+    if len(args) != 2:
+        return None, "unexpected argument count"
+    sa, sb = spans[1]
+    text = src[sa:sb]
+    lead, trail = len(text) - len(text.lstrip()), len(text) - len(text.rstrip())
+    a0, b0 = sa + lead, sb - trail
+    row = src[a0:b0]
+    head = f'craft_ui::dialog::FooterButtons::new("dialog_buttons", '
+    tail = f".show({args[0].strip()}).clicked.map(|c| c.role)"
+    m = mask(src)
+    idents = [x for x in split_top(row[2:-1]) if re.fullmatch(r"\s*[A-Za-z_]\w*\s*", x)] if row.startswith("&[") and row.endswith("]") else []
+    if re.fullmatch(r"&[A-Za-z_][\w.]*", row):
+        idents = [row[1:]]
+    for x in idents:
+        if not binding_ok(m, x.strip().split(".")[0], call_start):
+            return None, f"`{x.strip()}` is built elsewhere (or with a role/`.focus` that has no exact rewrite): hand work"
+    if BAD_BUTTON.search(mask(row)):
+        return None, "a button in the row has a non-literal role or `.focus(..)`: hand work"
+    if row.startswith("&[") and row.endswith("]"):
+        return [(call_start, a0 + 2, head + "vec!["), (b0 - 1, end, "])" + tail)], None
+    if re.fullmatch(r"&[A-Za-z_][\w.]*", row):
+        return [(call_start, a0 + 1, head), (b0, end, ".to_vec())" + tail)], None
+    return None, HAND_REASON["dialog_buttons"]
+
+
 # ---------------------------------------------------------------- per-file processing
 
 
@@ -344,13 +433,20 @@ def process(rel, src, opts, icons, sites, counts_only):
                 continue
             if not prefix and not r["bare"]:
                 continue
-            if prefix and r["qual"] not in prefix:
+            if prefix and r["qual"] and r["qual"] not in prefix:
                 continue
             if not prefix and name in local_fns and not rel.startswith("widgets/") and rel != "widgets.rs":
                 continue  # a local function of the same name, not the wrapper
             end0 = mt.end()
-            parsed = split_args(m, end0)
             line = src.count("\n", 0, mt.start()) + 1
+            if label == "panel_footer":
+                # same signature as PanelFooter::show; the closure argument stops argument parsing, so only the callee changes
+                site = Site(label, rel, line, src[mt.start():mt.start() + 90].split("\n")[0])
+                sites.append(site)
+                site.status, site.new = "rewritten", "craft_ui::composites::PanelFooter::show("
+                edits.append((mt.start(), end0, site.new, site))
+                continue
+            parsed = split_args(m, end0)
             site = Site(label, rel, line, src[mt.start():mt.start() + 90].split("\n")[0])
             sites.append(site)
             if not parsed:
@@ -358,12 +454,27 @@ def process(rel, src, opts, icons, sites, counts_only):
                 continue
             spans, end = parsed
             args = [src[a:b] for a, b in spans]
-            new, why = build(label, name, args, opts, icons)
+            if label == "dialog_buttons":
+                multi, why = dialog_row_edits(src, spans, end, mt.start(), args)
+                if multi is None:
+                    site.reason = why
+                    continue
+                site.status, site.new = "rewritten", "craft_ui::dialog::FooterButtons::new(..).show(ui).clicked.map(|c| c.role)"
+                edits.extend((a, b, t, site) for a, b, t in multi)
+                continue
+            after = m[end:end + 120]
+            toggle, tstart, tend = None, mt.start(), end
+            if label == "icons::button" and len(args) >= 5:
+                toggle, tstart, tend = toggle_site(m, mt.start(), end, args[3] if name == "button" else args[4], after)
+            new, why = build(label, name, args, opts, icons, after=after, toggle=toggle)
             if new is None:
                 site.reason = why
                 continue
+            if toggle:
+                new += ";"
+                site.reason = "flip-on-click folded into IconButton::toggle"
             site.status, site.new = "rewritten", new
-            edits.append((mt.start(), end, new, site))
+            edits.append((tstart, tend, new, site))
     for label, rx in COUNT_ONLY.items():
         for mt in rx.finditer(m, 0, limit):
             line = src.count("\n", 0, mt.start()) + 1
@@ -394,13 +505,15 @@ def main():
     ap.add_argument("--apply", action="store_true", help="rewrite files in place (default: dry run)")
     ap.add_argument("--craft-libs", default=os.environ.get("CRAFT_LIBS", "../craft-libs"),
                     help="craft-libs checkout with an origin/design-system ref (default: $CRAFT_LIBS or ../craft-libs)")
+    ap.add_argument("--craft-libs-ref", default=DEFAULT_REF, help=f"craft-libs ref the icon manifest is read from (default: {DEFAULT_REF})")
+    ap.add_argument("--source-commit", help="PhotoCraft commit named in the report (default: HEAD of the checkout)")
     ap.add_argument("--diff", help="write a unified diff of the rewrites to FILE")
     ap.add_argument("--report", help="write the markdown report to FILE")
     ap.add_argument("--json", help="write every site as JSON to FILE")
     opts = ap.parse_args()
     root = os.path.abspath(opts.root)
     base = os.path.join(root, SRC_REL)
-    icons = load_icons(opts.craft_libs)
+    icons = load_icons(opts.craft_libs, opts.craft_libs_ref)
     sites, counts_only, diffs, nfiles, changed_files = [], [], [], 0, 0
     for d, _, files in os.walk(base):
         for f in sorted(files):
@@ -424,7 +537,7 @@ def main():
         json.dump([s.__dict__ for s in sites + counts_only], open(opts.json, "w"), indent=1)
     summary(sites, counts_only, nfiles, changed_files, opts, root)
     if opts.report:
-        report(sites, counts_only, nfiles, changed_files, opts, root)
+        report(sites, counts_only, nfiles, changed_files, opts, root, icons)
 
 
 def commit(root):
@@ -459,12 +572,14 @@ def summary(sites, counts_only, nfiles, changed, opts, root):
         print(f"{rule_:36} {len(ss):4} (hand)")
 
 
-def report(sites, counts_only, nfiles, changed, opts, root):
+def report(sites, counts_only, nfiles, changed, opts, root, icons=None):
     L = []
     L.append("# PC-2a dry-run report: wrapper calls to craft-libs components\n")
     L.append(f"- Run date: {datetime.date.today().isoformat()}")
-    L.append(f"- Source: PhotoCraft `{commit(root)}`, `{SRC_REL}` ({nfiles} non-test `.rs` files; test files and inline `#[cfg(test)] mod` blocks excluded)")
+    L.append(f"- Source: PhotoCraft `{opts.source_commit or commit(root)}`, `{SRC_REL}` ({nfiles} non-test `.rs` files; test files and inline `#[cfg(test)] mod` blocks excluded)")
     L.append(f"- Mode: dry run{' '}; script `scripts/codemods/pc2a/pc2a.py`")
+    short = resolve_ref(opts.craft_libs, opts.craft_libs_ref)
+    L.append(f"- craft-libs: `{short}`" + ("" if short.startswith(opts.craft_libs_ref) else f" (`{opts.craft_libs_ref}`)") + (f" ({len(icons)} icons in the manifest)" if icons else " (icon manifest not readable)"))
     L.append(f"- Files that would change: {changed}\n")
     L.append("## Totals\n")
     L.append("| Pattern | Found | Rewritten | Left for hand work |")
