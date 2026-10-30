@@ -8,8 +8,6 @@
 //! through the filter-preview machinery (`__filter` + `__preview`). OK runs the command once (one
 //! history step) and Cancel drops the preview, leaving the document untouched.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -114,12 +112,12 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
     }
     let Some(sample) = crate::canvas::composite_color(app, x, y) else { return true };
     let gray = adjust_editors::is_gray(mode);
-    let (shown, shown_key) = match &isolated {
-        Some(c) => (0, c.key),
+    let shown_key = match &isolated {
+        Some(c) => c.key,
         None => {
             let ch: usize = ctx.data(|d| d.get_temp(dialog_mem("curves").with("curves-ch"))).unwrap_or(0);
             let chans = adjust_editors::tone_channels(adjust_editors::space_of(&values), gray);
-            (ch, chans.get(ch).map_or("", |c| c.key))
+            chans.get(ch).map_or("", |c| c.key)
         }
     };
     let keys: &[&str] = if every_channel && !gray && isolated.is_none() { &["red", "green", "blue"] } else { &[shown_key] };
@@ -153,14 +151,10 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
             selected = Some(i);
         }
     }
-    if let Some(i) = selected {
-        let state = dialog_mem("curves").with("curves");
-        ctx.data_mut(|d| {
-            let mut st: crate::state::CurvesEditorState = d.get_temp(state).unwrap_or_default();
-            st.channel = shown;
-            st.gesture = crate::state::PointCurveState { selected: Some(i), drag: None };
-            d.insert_temp(state, st);
-        });
+    if let Some(i) = selected
+        && let Some(editor) = ctx.data(|d| d.get_temp::<egui::Id>(dialog_mem("curves").with("curves-editor")))
+    {
+        craft_ui::composites::CurveEditor::select(ctx, editor, Some(i));
     }
     if changed
         && let Some(dialog) = app.ui.dialog_mut(id)
@@ -177,16 +171,13 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
 }
 
 pub(crate) fn picker_button(ui: &mut egui::Ui, selected: bool, enabled: bool, tooltip: &str, color: egui::Color32) -> egui::Response {
-    let response = ui.add_enabled_ui(enabled, |ui| ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Eyedropper, tooltip).size(craft_ui::controls::ControlSize::Md).selected(selected))).inner;
-    let tokens = craft_ui::theme::current(ui.ctx());
-    ui.painter().circle_filled(response.rect.right_bottom() - egui::vec2(5.5, 5.5), 3.5, color);
-    ui.painter().circle_stroke(
-        response.rect.right_bottom() - egui::vec2(5.5, 5.5),
-        3.5,
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tokens.color.line.control_edge.to_egui()),
-    );
-    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, enabled, selected, tooltip));
-    response
+    ui.add(
+        craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Eyedropper, tooltip)
+            .size(craft_ui::controls::ControlSize::Md)
+            .selected(selected)
+            .badge(color)
+            .enabled(enabled),
+    )
 }
 
 fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: photocraft_doc::ColorMode) {
@@ -194,10 +185,9 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
     let current = picker(fields.get(CURVE_PICKER));
     let mut chosen = None;
     ui.horizontal(|ui| {
-        let tokens = craft_ui::theme::current(ui.ctx());
-        ui.label(egui::RichText::new(tl!("Eyedroppers:")).color(tokens.color.text.muted.to_egui()).size(12.0));
-        // The swatch is the tone the picker maps the sample to (image data, like the Curves
-        // gradient bars), not chrome, so it is the same in every theme; its ring is a token.
+        ui.add(craft_ui::primitives::Text::new(tl!("Eyedroppers:")).role(craft_theme::TypeRole::Label).content(craft_ui::primitives::Content::Muted));
+        // The badge is the tone the picker maps the sample to (image data, like the Curves
+        // gradient bars), not chrome, so it is the same in every theme.
         for (id, eyedropper, label, tone) in [
             ("black", CurvesEyedropper::Black, tl!("Set Black Point"), 0),
             ("gray", CurvesEyedropper::NeutralGray, tl!("Set Neutral Gray Point"), 128),
@@ -209,7 +199,11 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
             }
         }
         if !matches!(mode, photocraft_doc::ColorMode::Rgb | photocraft_doc::ColorMode::Grayscale) {
-            ui.label(egui::RichText::new(tl!("Unavailable in this color mode")).color(tokens.color.text.faint.to_egui()).size(11.0));
+            ui.add(
+                craft_ui::primitives::Text::new(tl!("Unavailable in this color mode"))
+                    .role(craft_theme::TypeRole::Caption)
+                    .content(craft_ui::primitives::Content::Faint),
+            );
         }
     });
     if let Some((id, selected)) = chosen

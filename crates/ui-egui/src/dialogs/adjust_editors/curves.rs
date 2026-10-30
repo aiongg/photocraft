@@ -1,8 +1,7 @@
-use super::{
-    Color32, CurveUi, Edit, EditorCx, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Tokens, ToneSpace, Value, adjust_params, curve_edit, json, label, pos2,
-    space_of, tone, vec2, widgets,
-};
-use craft_ui::theme::StrokeExt;
+use super::{Color32, Edit, EditorCx, Rect, ToneSpace, Value, adjust_params, json, label, space_of};
+use craft_ui::composites::{ChannelColor, Curve, CurveChannel, CurveEditor, HistogramData};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::LocaleNumbers;
 
 // ---------------------------------------------------------------------------------------------
 // Channels of Levels / Curves
@@ -55,7 +54,6 @@ fn channel_picker_opts(ui: &mut egui::Ui, id: egui::Id, opts: &[(usize, &str)], 
     }
     ui.horizontal(|ui| {
         label(ui, text);
-        let width = if opts.len() == 1 { 160.0 } else { 110.0 };
         let key = format!("{id:?}-ch");
         if translate {
             craft_ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
@@ -67,17 +65,17 @@ fn channel_picker_opts(ui: &mut egui::Ui, id: egui::Id, opts: &[(usize, &str)], 
     ch
 }
 
-pub(super) fn hist_color(ch: &ToneChannel, t: &Tokens) -> Color32 {
-    match ch.key {
-        "" | "lightness" | "black" => Color32::from_gray(if t.pro { 150 } else { 110 }),
-        k => tone::channel_color(k, t),
-    }
-}
-
-pub(super) fn bar_color(ch: &ToneChannel, t: &Tokens) -> Color32 {
-    match ch.key {
-        "" | "lightness" | "black" => Color32::WHITE,
-        k => tone::channel_color(k, t),
+/// The library colour of a channel, by its params key: the composite, Lightness and CMYK Black are
+/// neutral, Lab a and b take magenta and yellow.
+pub(super) fn channel_color(key: &str) -> ChannelColor {
+    match key {
+        "red" => ChannelColor::Red,
+        "green" => ChannelColor::Green,
+        "blue" => ChannelColor::Blue,
+        "cyan" => ChannelColor::Cyan,
+        "magenta" | "a" => ChannelColor::Magenta,
+        "yellow" | "b" => ChannelColor::Yellow,
+        _ => ChannelColor::Neutral,
     }
 }
 
@@ -103,50 +101,7 @@ pub(super) fn gradient_bar(p: &egui::Painter, r: Rect, from: Color32, to: Color3
 // ---------------------------------------------------------------------------------------------
 // Curves
 
-pub(super) const CURVE_HANDLE_SIZE: f32 = 7.0;
-
-const CURVE_GRAPH_PADDING: f32 = 5.0;
-
 const CURVE_SAMPLES: usize = 256;
-
-/// One entry per editor/channel, independent of selection, tint and stroke width.
-#[derive(Clone, Default)]
-struct CurvePolyline {
-    points: Vec<[f32; 2]>,
-    graph: Option<Rect>,
-    line: Vec<Pos2>,
-}
-
-impl CurvePolyline {
-    /// Returns whether the screen geometry changed. Moving the graph also invalidates screen
-    /// coordinates (for example when scrolling the Properties panel or moving the dialog).
-    fn update(&mut self, points: &[[f32; 2]], graph: Rect) -> bool {
-        if self.points == points && self.graph == Some(graph) {
-            return false;
-        }
-        let cp: Vec<photocraft_doc::adjust::CurvePoint> =
-            points.iter().map(|q| photocraft_doc::adjust::CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect();
-        self.line = photocraft_compose::adjust::curve_samples::<CURVE_SAMPLES>(&cp)
-            .into_iter()
-            .enumerate()
-            .map(|(i, y)| pos2(graph.left() + i as f32 / (CURVE_SAMPLES - 1) as f32 * graph.width(), graph.bottom() - y * graph.height()))
-            .collect();
-        self.points.clear();
-        self.points.extend_from_slice(points);
-        self.graph = Some(graph);
-        true
-    }
-}
-
-fn cached_curve_line(ctx: &egui::Context, id: egui::Id, points: &[[f32; 2]], graph: Rect) -> Vec<Pos2> {
-    ctx.data_mut(|d| {
-        let cache = d.get_temp_mut_or_default::<CurvePolyline>(id);
-        cache.update(points, graph);
-        // egui owns the submitted path. Only this small copy is needed on a cache hit;
-        // normalization, spline solving, sampling and screen mapping are all skipped.
-        cache.line.clone()
-    })
-}
 
 /// The room left on screen for the Curves dialog's other rows (title, channel and mode, Input and
 /// Output, eyedroppers, buttons) when its graph is as tall as it can be.
@@ -168,11 +123,6 @@ fn curve_side(ui: &egui::Ui) -> f32 {
 /// the dialog's other rows, and never under the old 300 points. The Curves dialog is no wider.
 pub(crate) fn curve_side_max(ctx: &egui::Context) -> f32 {
     (ctx.content_rect().height() - CURVES_CHROME).max(CURVE_SIDE.1)
-}
-
-pub(super) fn curve_graph(full: Rect, side: f32) -> Rect {
-    let base = Rect::from_min_size(full.min + vec2(14.0, 0.0), vec2(side - 14.0, side - 14.0));
-    Rect::from_min_max(base.min + vec2(CURVE_GRAPH_PADDING, CURVE_GRAPH_PADDING), base.max - vec2(CURVE_GRAPH_PADDING, CURVE_GRAPH_PADDING))
 }
 
 pub(crate) fn read_curve(v: &Value, key: &str) -> Vec<[f32; 2]> {
@@ -249,273 +199,119 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
     e
 }
 
+
+/// The curve the params hold for `key`: the pencil's drawing or the points.
+fn read_shape(v: &Value, key: &str, pencil: bool) -> Curve {
+    if pencil { Curve::Map(read_map(v, key)) } else { Curve::smooth(read_curve(v, key)) }
+}
+
+/// Writes `curve` into the params of `key`.
+fn write_shape(v: &mut Value, key: &str, space: ToneSpace, curve: &Curve) {
+    match curve {
+        Curve::Points { points, .. } => v[key] = json!(points.iter().map(|q| [q[0].round(), q[1].round()]).collect::<Vec<_>>()),
+        Curve::Map(map) => write_map(v, key, map),
+    }
+    if space == ToneSpace::Lab
+        && let Some(o) = v.as_object_mut()
+    {
+        // Lab has no composite: "points" would alias lightness.
+        o.remove("points");
+    }
+}
+
+/// The photocraft curve through `points`: one output level per input level.
+fn sample_levels(points: &[[f32; 2]]) -> Vec<f32> {
+    let cp: Vec<photocraft_doc::adjust::CurvePoint> = points.iter().map(|q| photocraft_doc::adjust::CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect();
+    photocraft_compose::adjust::curve_samples::<CURVE_SAMPLES>(&cp).into_iter().map(|y| y * 255.0).collect()
+}
+
 pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
-    let t = Tokens::get(ui.ctx());
     let space = space_of(v);
     let chans = tone_channels(space, cx.gray);
-    let state_id = cx.mem.with("curves");
-    let mut st: CurveUi = ui.data(|d| d.get_temp(state_id)).unwrap_or_default();
     let isolated = cx.isolated_curve.as_ref();
     let ch = if let Some(iso) = isolated {
         channel_picker_opts(ui, cx.mem.with("curves-ch"), &[(0, iso.name.as_str())], tl!("Channel:"), iso.translate)
     } else {
         channel_picker(ui, cx.mem.with("curves-ch"), chans, tl!("Channel:"))
     };
-    if ch != st.channel {
-        st = CurveUi { channel: ch, ..Default::default() };
-    }
     let chan =
         if let Some(iso) = isolated { ToneChannel { key: iso.key, label: "" } } else { chans.get(ch).copied().unwrap_or(ToneChannel { key: "", label: "" }) };
-    let overlay_others = isolated.is_none();
-    let tinted = isolated.is_some_and(|c| c.tint) || (isolated.is_none() && ch != 0);
+    let overlay_others = isolated.is_none() && ch == 0;
+    let tinted = isolated.map_or(ch != 0, |c| c.tint);
     let hist_i = isolated.map_or(ch, |c| c.hist);
     let key = curve_key(&chan);
     let mut e = curves_mode_row(ui, v, key, cx.gray);
     let pencil = v.get("pencil").and_then(Value::as_bool).unwrap_or(false);
-    let mut pts = read_curve(v, key);
-    let mut map = read_map(v, key);
-    let side = curve_side(ui);
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    let (full, resp) = ui.allocate_exact_size(vec2(side, side + 14.0), Sense::click_and_drag());
-    let graph = curve_graph(full, side);
-    ui.data_mut(|d| d.insert_temp(cx.mem.with("curves-graph"), graph));
-    let to_scr = |q: [f32; 2]| pos2(graph.left() + q[0] / 255.0 * graph.width(), graph.bottom() - q[1] / 255.0 * graph.height());
-    let mut changed = false;
-    let mut drawn = false;
-    if pencil {
-        // Pencil: a stroke draws while the button is down and commits on release; Shift
-        // continues from the previous stroke's end in a straight line.
-        let stroke_id = cx.mem.with("curves-pencil");
-        let (mut active, mut last): (bool, Option<[f32; 2]>) = ui.data(|d| d.get_temp(stroke_id)).unwrap_or_default();
-        if resp.is_pointer_button_down_on()
-            && let Some(pos) = resp.interact_pointer_pos()
-        {
-            let q = [
-                ((pos.x - graph.left()) / graph.width().max(1.0) * 255.0).clamp(0.0, 255.0),
-                ((graph.bottom() - pos.y) / graph.height().max(1.0) * 255.0).clamp(0.0, 255.0),
-            ];
-            let from = if active || ui.input(|i| i.modifiers.shift) { last.unwrap_or(q) } else { q };
-            drawn = curve_edit::pencil_line(&mut map, from, q);
-            active = true;
-            last = Some(q);
-        } else if active {
-            active = false;
-            e.commit = true;
-        }
-        ui.data_mut(|d| d.insert_temp(stroke_id, (active, last)));
-    } else {
-        let interaction = crate::point_curve::interact(ui, &resp, graph, &mut pts, &mut st.gesture);
-        changed = interaction.changed;
-        e.commit |= interaction.commit;
-    }
 
-    // Draw: histogram, quarter grid, baseline, gradient bars, other channels, the curve, points.
-    let p = ui.painter_at(full.expand(2.0));
-    p.rect_filled(graph, craft_ui::theme::scale::Radius::R0.px(), t.field);
-    if let Some(h) = &cx.hist {
-        tone::draw_histogram(&p, graph, &h[hist_i], Color32::from_gray(if t.pro { 88 } else { 190 }).gamma_multiply(0.75));
-    }
-    for i in 1..4 {
-        let f = i as f32 / 4.0;
-        let g = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator);
-        p.line_segment([pos2(graph.left() + f * graph.width(), graph.top()), pos2(graph.left() + f * graph.width(), graph.bottom())], g);
-        p.line_segment([pos2(graph.left(), graph.top() + f * graph.height()), pos2(graph.right(), graph.top() + f * graph.height())], g);
-    }
-    p.line_segment([graph.left_bottom(), graph.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator.gamma_multiply(1.6)));
-    p.rect_stroke(
-        graph,
-        craft_ui::theme::scale::Radius::R0.px(),
-        Stroke::new(if resp.has_focus() { 1.5 } else { 1.0 }, if resp.has_focus() { t.accent } else { t.field_border }),
-        StrokeKind::Outside,
-    );
-    let hbar = Rect::from_min_max(pos2(graph.left(), graph.bottom() + 4.0), pos2(graph.right(), graph.bottom() + 12.0));
-    let vbar = Rect::from_min_max(pos2(full.left(), graph.top()), pos2(full.left() + 8.0, graph.bottom()));
-    gradient_bar(&p, hbar, Color32::BLACK, bar_color(&chan, &t), false);
-    gradient_bar(&p, vbar, Color32::BLACK, bar_color(&chan, &t), true);
-    let draw_curve = |key: &str, pts: &[[f32; 2]], color: Color32, width: f32| {
-        let line = cached_curve_line(ui.ctx(), cx.mem.with(("curves-polyline", key)), pts, graph);
-        p.add(egui::Shape::line(line, Stroke::new(width, color)));
+    let neutral = |c: ChannelColor| if tinted { c } else { ChannelColor::Neutral };
+    let channels: Vec<CurveChannel> = match isolated {
+        Some(iso) => vec![CurveChannel::new(if iso.translate { tl!(iso.name.as_str()).to_owned() } else { iso.name.clone() }, neutral(channel_color(iso.key)))],
+        None => chans.iter().map(|c| CurveChannel::new(tl!(c.label), channel_color(c.key))).collect(),
     };
-    let draw_map = |map: &[f32], color: Color32, width: f32| {
-        let last = map.len().saturating_sub(1).max(1) as f32;
-        let line: Vec<Pos2> = map.iter().enumerate().map(|(k, o)| to_scr([k as f32 / last * 255.0, *o])).collect();
-        p.add(egui::Shape::line(line, Stroke::new(width, color)));
-    };
-    if overlay_others && ch == 0 {
+    let overlays: Vec<Curve> = if overlay_others {
         // Photoshop overlays the edited channel curves on the composite.
-        for c in chans.iter().skip(1) {
-            if pencil {
-                let m = read_map(v, c.key);
-                if m.iter().enumerate().any(|(k, o)| (o - k as f32).abs() > 0.5) {
-                    draw_map(&m, bar_color(c, &t).gamma_multiply(0.8), 1.0);
-                }
-                continue;
-            }
-            let cp = read_curve(v, c.key);
-            if cp.len() > 2 || cp.first().is_some_and(|q| q[1] != 0.0) || cp.last().is_some_and(|q| q[1] != 255.0) {
-                draw_curve(c.key, &cp, bar_color(c, &t).gamma_multiply(0.8), 1.0);
-            }
-        }
-    }
-    let color = if tinted { bar_color(&chan, &t) } else { t.text };
-    if pencil {
-        draw_map(&map, color, 1.5);
+        chans.iter().enumerate().map(|(i, c)| if i == 0 { Curve::identity(255.0) } else { read_shape(v, c.key, pencil) }).collect()
     } else {
-        draw_curve(key, &pts, color, 1.5);
-    }
-    for (i, q) in pts.iter().enumerate().filter(|_| !pencil) {
-        let r = Rect::from_center_size(to_scr(*q), vec2(CURVE_HANDLE_SIZE, CURVE_HANDLE_SIZE));
-        if Some(i) == st.gesture.selected {
-            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.text);
-            p.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::BLACK), StrokeKind::Outside);
-        } else {
-            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
-            p.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text), StrokeKind::Inside);
-        }
-    }
-
-    // Input / Output of the selected point.
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
-    ui.horizontal(|ui| {
-        let i = st.gesture.selected.filter(|i| *i < pts.len() && !pencil);
-        let (mut vi, mut vo) = i.map_or((0.0, 0.0), |i| (pts[i][0], pts[i][1]));
-        label(ui, tl!("Input:"));
-        let ri = ui.add_enabled_ui(i.is_some(), |ui| widgets::value_field(ui, &mut vi, 0.0..=255.0, "", 52.0).accessible_name(tl!("Input:"))).inner;
-        label(ui, tl!("Output:"));
-        let ro = ui.add_enabled_ui(i.is_some(), |ui| widgets::value_field(ui, &mut vo, 0.0..=255.0, "", 52.0).accessible_name(tl!("Output:"))).inner;
-        if let Some(i) = i
-            && (ri.changed() || ro.changed())
-            && curve_edit::move_to(&mut pts, i, [vi, vo])
-        {
-            changed = true;
-            e.commit |= !(ri.dragged() || ro.dragged());
-        }
-        if ri.drag_stopped() || ro.drag_stopped() {
-            e.commit = true;
-        }
-    });
-    let t2 = Tokens::get(ui.ctx());
+        Vec::new()
+    };
+    let curve = read_shape(v, key, pencil);
+    let histogram = cx.hist.as_ref().and_then(|h| h.ch.get(hist_i)).map(|bins| HistogramData::tone(bins.as_slice(), ChannelColor::Neutral));
     let hint = if pencil {
         crate::i18n::fmt(tl!("Drag to draw the curve · {key}-click draws a straight line"), &[("key", &crate::shortcuts::pretty("Shift"))])
     } else {
         crate::i18n::fmt(tl!("Click to add a point · drag off or {key}-click or Delete to remove"), &[("key", &crate::shortcuts::pretty("Cmd"))])
     };
-    ui.label(RichText::new(hint).color(t2.text_faint).size(11.0));
-    ui.data_mut(|d| d.insert_temp(state_id, st));
-    if drawn {
-        write_map(v, key, &map);
-        if space == ToneSpace::Lab
-            && let Some(o) = v.as_object_mut()
-        {
-            o.remove("points");
-        }
-        e.changed = true;
+    let numbers = LocaleNumbers::of(ui);
+    let sampler: &craft_ui::composites::Sampler = &sample_levels;
+    let mut editor = CurveEditor::new(cx.mem.with("curves-editor-salt"), tl!("Curve"), &curve, &numbers)
+        .channels(&channels)
+        .channel(if isolated.is_some() { 0 } else { ch })
+        .sampler(sampler)
+        .side(curve_side(ui))
+        .pencil(pencil)
+        .overlays(&overlays)
+        .hint(hint)
+        .labels(craft_ui::composites::CurveLabels { input: tl!("Input:").into(), output: tl!("Output:").into(), ..Default::default() });
+    if let Some(h) = &histogram {
+        editor = editor.histogram(h);
     }
-    if changed && !pencil {
-        v[key] = json!(pts.iter().map(|q| [q[0].round(), q[1].round()]).collect::<Vec<_>>());
-        if space == ToneSpace::Lab {
-            // Lab has no composite: "points" would alias lightness.
-            if let Some(o) = v.as_object_mut() {
-                o.remove("points");
+    let shown = editor.show(ui);
+    // The graph's value area, for the tests' pointer input and the canvas pick.
+    let style = CurveEditor::style(&craft_ui::theme::current(ui.ctx()));
+    ui.data_mut(|d| {
+        d.insert_temp(cx.mem.with("curves-graph"), shown.response.rect.shrink(style.pad));
+        d.insert_temp(cx.mem.with("curves-editor"), shown.response.id);
+    });
+
+    let before_id = cx.mem.with("curves-before");
+    match shown.event {
+        Some(EditEvent::Begin { .. }) => {
+            ui.data_mut(|d| d.insert_temp(before_id, curve.clone()));
+        }
+        Some(EditEvent::Update { value, .. }) => {
+            write_shape(v, key, space, &value);
+            e.changed = true;
+        }
+        Some(EditEvent::Commit { value, changed, .. }) => {
+            if changed {
+                write_shape(v, key, space, &value);
+                e.changed = true;
+            }
+            e.commit |= changed;
+        }
+        Some(EditEvent::Set { value, .. }) => {
+            write_shape(v, key, space, &value);
+            e.changed = true;
+            e.commit = true;
+        }
+        Some(EditEvent::Cancel { .. }) => {
+            if let Some(before) = ui.data(|d| d.get_temp::<Curve>(before_id)) {
+                write_shape(v, key, space, &before);
+                e.changed = true;
             }
         }
-        e.changed = true;
+        _ => {}
     }
     e
-}
-
-#[cfg(test)]
-mod polyline_tests {
-    use super::*;
-
-    #[test]
-    fn curve_polyline_reuses_static_geometry_and_refreshes_edits_and_rect() {
-        let mut cache = CurvePolyline::default();
-        let mut points = [[0.0, 0.0], [128.0, 180.0], [255.0, 255.0]];
-        let graph = Rect::from_min_size(pos2(20.0, 30.0), vec2(256.0, 256.0));
-        assert!(cache.update(&points, graph));
-        assert_eq!(cache.line.len(), CURVE_SAMPLES);
-        assert_eq!(cache.line.first(), Some(&graph.left_bottom()));
-        assert_eq!(cache.line.last(), Some(&graph.right_top()));
-        let line = cache.line.clone();
-        assert!(!cache.update(&points, graph));
-        assert_eq!(cache.line, line);
-
-        points[1][1] = 80.0;
-        assert!(cache.update(&points, graph));
-        assert_ne!(cache.line, line);
-        points[1][1] = 180.0; // Undo/preset restore must also invalidate.
-        assert!(cache.update(&points, graph));
-        assert_eq!(cache.line, line);
-
-        let moved = graph.translate(vec2(13.0, 25.0));
-        assert!(cache.update(&points, moved));
-        for (before, after) in line.iter().zip(&cache.line) {
-            assert!((*after - (*before + vec2(13.0, 25.0))).length() < 1e-4);
-        }
-        let resized = Rect::from_min_size(moved.min, vec2(128.0, 180.0));
-        assert!(cache.update(&points, resized));
-        assert_eq!(cache.line.last(), Some(&resized.right_top()));
-        assert!(!cache.update(&points, resized));
-    }
-
-    #[test]
-    fn curve_polyline_memory_is_separate_per_editor_and_channel() {
-        let ctx = egui::Context::default();
-        let graph = Rect::from_min_size(Pos2::ZERO, vec2(256.0, 256.0));
-        let identity = [[0.0, 0.0], [255.0, 255.0]];
-        let inverted = [[0.0, 255.0], [255.0, 0.0]];
-        let editor = egui::Id::unique("dialog");
-        let master = editor.with(("curves-polyline", "points"));
-        let red = editor.with(("curves-polyline", "red"));
-        let other_editor = egui::Id::unique("properties").with(("curves-polyline", "points"));
-        let line = cached_curve_line(&ctx, master, &identity, graph);
-        assert_ne!(cached_curve_line(&ctx, red, &inverted, graph), line);
-        assert_ne!(cached_curve_line(&ctx, other_editor, &inverted, graph), line);
-        assert_eq!(cached_curve_line(&ctx, master, &identity, graph), line);
-        ctx.data_mut(|d| {
-            assert!(!d.get_temp_mut_or_default::<CurvePolyline>(master).update(&identity, graph));
-            assert!(!d.get_temp_mut_or_default::<CurvePolyline>(red).update(&inverted, graph));
-            assert!(!d.get_temp_mut_or_default::<CurvePolyline>(other_editor).update(&inverted, graph));
-        });
-        assert_ne!(cached_curve_line(&ctx, master, &inverted, graph), line);
-    }
-
-    #[test]
-    #[ignore = "release timing probe; run on GitHub Actions with --release --ignored --nocapture"]
-    fn curve_polyline_release_comparison() {
-        use std::{hint::black_box, time::Instant};
-        let graph = Rect::from_min_size(pos2(20.0, 30.0), vec2(300.0, 300.0));
-        let points = [[0.0, 0.0], [64.0, 48.0], [192.0, 208.0], [255.0, 255.0]];
-        let iterations = 10_000;
-        let start = Instant::now();
-        for _ in 0..iterations {
-            let cp: Vec<_> = black_box(&points).iter().map(|q| photocraft_doc::adjust::CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect();
-            let lut = photocraft_compose::adjust::curve_lut(&cp);
-            let line: Vec<_> = lut
-                .iter()
-                .enumerate()
-                .step_by(16)
-                .map(|(i, y)| pos2(graph.left() + i as f32 / 4095.0 * graph.width(), graph.bottom() - y * graph.height()))
-                .collect();
-            black_box(line);
-        }
-        let old = start.elapsed();
-        let start = Instant::now();
-        for _ in 0..iterations {
-            let mut cache = CurvePolyline::default();
-            cache.update(black_box(&points), graph);
-            black_box(cache.line.clone());
-        }
-        let miss = start.elapsed();
-        let ctx = egui::Context::default();
-        let id = egui::Id::unique("curve-perf");
-        cached_curve_line(&ctx, id, &points, graph);
-        let start = Instant::now();
-        for _ in 0..iterations {
-            black_box(cached_curve_line(&ctx, id, black_box(&points), graph));
-        }
-        let hit = start.elapsed();
-        println!("{iterations} polylines: old 4096 samples {old:?}; direct 256 samples {miss:?}; cached screen line {hit:?}");
-    }
 }
