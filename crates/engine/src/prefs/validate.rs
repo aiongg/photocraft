@@ -48,6 +48,11 @@ pub const HIDDEN_UNTIL_IMPLEMENTED: &[&str] = &[
     "plugIns.allowScriptsToConnect",
     "type.textEngine",
     "enhancedControls.scrubbySliderAcceleration",
+    // Appearance: the one-time import marker is internal, and the legacy theme slots are aliases
+    // that automation can still set; the Appearance page shows the library theme pickers instead.
+    "interface.appearanceImported",
+    "interface.darkTheme",
+    "interface.lightTheme",
 ];
 
 /// Is the preference at `path` (`"section.key"`) hidden from the Preferences dialog?
