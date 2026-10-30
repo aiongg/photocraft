@@ -39,7 +39,8 @@ pub(super) fn close_children(ctx: &egui::Context, key: &str) {
 fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selected: bool, width: f32, opener: bool, enabled: bool) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let font = egui::TextStyle::Button.resolve(ui.style());
-    let color = if selected && t.bevel { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text };
+    let color =
+        if selected && t.bevel { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text };
     let galley = ui.painter().layout_no_wrap(tl!(label).to_owned(), font, color);
     let height = (galley.size().y + if opener { 8.0 } else { 14.0 }).max(if opener { 24.0 } else { 32.0 });
     let (rect, response) = ui.allocate_exact_size(vec2(width.max(galley.size().x + 92.0), height), Sense::click());
@@ -62,7 +63,16 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
     ui.painter().rect_stroke(
         rect,
         t.radius_sm,
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if selected { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_border) } else if active { t.accent_border } else { t.field_border }),
+        craft_ui::theme::scale::Stroke::W1.egui(
+            ui.ctx(),
+            if selected {
+                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_border)
+            } else if active {
+                t.accent_border
+            } else {
+                t.field_border
+            },
+        ),
         egui::StrokeKind::Inside,
     );
     ui.painter().galley(pos2(rect.left() + 8.0, rect.center().y - galley.size().y / 2.0), galley.clone(), color);

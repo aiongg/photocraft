@@ -10,11 +10,11 @@
 //! `PHOTOCRAFT_CAPTION_ICONS` (an icon theme, or `none` for PhotoCraft's own glyphs) override what
 //! is found.
 
+use craft_platform::appearance::EguiService;
 #[cfg(target_os = "linux")]
 use craft_window::Layout;
 #[cfg(target_os = "linux")]
 use craft_window::policy::{CaptionFamily, DesktopKind, Frame, LayoutWatch};
-use craft_platform::appearance::EguiService;
 #[cfg(target_os = "linux")]
 use photocraft_ui_egui::{CaptionIcon, CaptionIcons, CaptionStyle, Captions};
 
