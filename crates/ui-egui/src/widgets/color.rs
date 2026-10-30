@@ -1,5 +1,5 @@
 use super::dropdown::swatch_popup;
-use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2};
+use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui, Vec2, pos2};
 use craft_ui::theme::StrokeExt;
 
 /// Cached RGB data; drawing work is bounded by the 256 display bins, never the image size.

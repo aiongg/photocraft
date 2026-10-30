@@ -385,7 +385,7 @@ fn graph(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawScopeSt
     let sample = d.hover_sample(false);
     if let Some(sample) = &sample {
         let [r, g, b] = sample.rgb.map(|v| v.clamp(0.0, 1.0));
-        histogram = histogram.marker(Some((0.2126 * r + 0.7152 * g + 0.0722 * b) * 255.0));
+        histogram = histogram.marker(Some((0.2126 * r + 0.7152 * g + 0.0722 * b) * 256.0 - 0.5));
     }
     let rect = histogram.show(ui).response.rect;
     let plot = rect;

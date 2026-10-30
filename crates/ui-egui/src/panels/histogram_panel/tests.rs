@@ -1,5 +1,6 @@
 use super::*;
 use crate::PhotocraftApp;
+use egui::Rect;
 use serde_json::json;
 
 fn app_with(params: Value) -> PhotocraftApp {

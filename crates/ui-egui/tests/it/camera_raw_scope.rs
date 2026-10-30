@@ -685,19 +685,19 @@ fn pixel_hover_gpu_badge_single_band_and_crosshair_appear_and_clear_in_all_theme
                 .any(|y| (r.left().ceil() as u32..r.right().floor() as u32).any(|x| no_hover.get_pixel(x, y) != hovered.get_pixel(x, y)))
         };
         let badge = Rect::from_center_size(pos2(histogram.center().x, histogram.top() + 13.0), vec2(140.0, 18.0));
-        let bands = Rect::from_min_max(pos2(histogram.left() + 4.0, histogram.center().y), pos2(histogram.right() - 4.0, histogram.bottom() - 4.0));
+        let bands = Rect::from_min_max(pos2(histogram.left(), histogram.center().y), pos2(histogram.right(), histogram.bottom()));
         assert!(area_changed(badge), "{theme:?}: RGB badge");
-        assert!(area_changed(bands), "{theme:?}: translucent tone band");
-        let y = histogram.center().y as u32;
+        assert!(area_changed(bands), "{theme:?}: tone marker");
+        let y = histogram.bottom() as u32 - 2;
         let changed: Vec<_> =
             (histogram.left().ceil() as u32..histogram.right().floor() as u32).filter(|&x| no_hover.get_pixel(x, y) != hovered.get_pixel(x, y)).collect();
         let first = *changed.first().expect("visible tone marker");
         let last = *changed.last().unwrap();
-        assert_eq!(last - first, 1, "{theme:?}: exactly one two-pixel band, without a wide or blurred halo: {changed:?}");
+        assert!(last - first <= 2, "{theme:?}: one narrow tick, without a wide or blurred halo: {changed:?}");
         assert_eq!(changed.len(), (last - first + 1) as usize, "{theme:?}: one connected band");
         let rgb = inspect(&h)["hoverSample"]["rgb"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<_>>();
         let tone = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-        let plot = histogram.shrink(4.0);
+        let plot = histogram;
         let expected = plot.left() as f64 + tone * plot.width() as f64;
         assert!((f64::from(first + last) * 0.5 - expected).abs() <= 1.0, "{theme:?}: marker follows the pixel tone");
         assert!(area_changed(scope), "{theme:?}: vectorscope target");
