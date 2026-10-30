@@ -412,7 +412,7 @@ fn eyedropper(ui: &mut egui::Ui, badge: &str, selected: bool, label: &str) -> eg
             egui::Align2::CENTER_CENTER,
             badge,
             crate::theme::semibold(12.0),
-            if selected { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.text.on_selected) } else { t.text },
+            if selected { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text },
         );
     }
     r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), selected, label));

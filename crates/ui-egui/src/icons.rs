@@ -158,19 +158,20 @@ pub fn tool_icon(t: Tool) -> &'static str {
 /// Selected and hover fill shared by square icon buttons. Returns the icon tint.
 pub fn button_chrome(ui: &egui::Ui, rect: Rect, selected: bool, hovered: bool) -> Color32 {
     let t = craft_ui::theme::current(ui.ctx());
+    let on = &t.component.icon_button.selected;
     if selected {
-        ui.painter().rect_filled(rect, t.shape.radius.control, t.color.accent.soft.to_egui());
+        ui.painter().rect_filled(rect, t.shape.radius.control, on.on_fill.to_egui());
         ui.painter().rect_stroke(
             rect,
             t.shape.radius.control,
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.border.to_egui()),
+            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
             egui::StrokeKind::Inside,
         );
     } else if hovered {
         ui.painter().rect_filled(rect, t.shape.radius.control, t.color.state.hover.to_egui());
     }
     if selected {
-        t.color.text.on_selected.to_egui()
+        on.on_text.to_egui()
     } else if hovered {
         t.color.text.normal.to_egui()
     } else {
@@ -192,14 +193,15 @@ pub fn button_with_icon_size(ui: &mut egui::Ui, name: &str, box_size: f32, icon_
 /// names the button (for screen readers and tests) when it is hidden.
 pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, icon_size: f32, selected: bool, tooltip: &str, show_tip: bool) -> Response {
     let t = craft_ui::theme::current(ui.ctx());
+    let on = &t.component.icon_button.selected;
     let style = IconButtonStyle {
         normal: ButtonVisuals { fill: Color32::TRANSPARENT, stroke: egui::Stroke::NONE, icon: t.color.text.normal.to_egui() },
         hovered: ButtonVisuals { fill: t.color.state.hover.to_egui(), stroke: egui::Stroke::NONE, icon: t.color.text.normal.to_egui() },
         pressed: None,
         selected: ButtonVisuals {
-            fill: t.color.accent.soft.to_egui(),
-            stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.border.to_egui()),
-            icon: t.color.text.on_selected.to_egui(),
+            fill: on.on_fill.to_egui(),
+            stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
+            icon: on.on_text.to_egui(),
         },
         corner_radius: t.shape.radius.control.into(),
         focus_stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),

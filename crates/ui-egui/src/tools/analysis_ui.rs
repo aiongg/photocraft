@@ -716,7 +716,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                 other => other.to_string(),
                             });
                             let txt = RichText::new(v.unwrap_or_default()).size(10.5).color(if on {
-                                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.text.on_selected)
+                                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text)
                             } else {
                                 t.text
                             });
