@@ -405,9 +405,7 @@ fn collect(r: &mut Redraw, p: Piece) {
 /// The active document's redraw in the status bar: "Redrawing" and how much is done.
 pub(crate) fn status(app: &PhotocraftApp, ui: &mut egui::Ui) {
     let Some(r) = app.session.active().and_then(|st| app.redraws.get(&st.doc.id)) else { return };
-    let t = crate::theme::Tokens::get(ui.ctx());
-    ui.label(egui::RichText::new(tl!("Redrawing")).color(t.text_dim).size(12.0));
-    ui.label(egui::RichText::new(format!("{:.0}%", r.fraction() * 100.0)).color(t.text_dim).size(11.5).monospace());
+    craft_ui::patterns::StatusBar::info(ui, &crate::i18n::fmt(tl!("Redrawing {percent}"), &[("percent", &format!("{:.0}%", r.fraction() * 100.0))]));
 }
 
 /// Stop document `doc`'s redraw (its canvas was redrawn some other way, or is gone).

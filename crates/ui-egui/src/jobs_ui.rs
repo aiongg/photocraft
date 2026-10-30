@@ -24,13 +24,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
 
-use egui::{Color32, Rect, RichText, Sense, Stroke, vec2};
+use egui::{Color32, Rect, RichText, Sense, vec2};
 use photocraft_doc::DocId;
 use photocraft_engine::jobs::{JobCtx, JobEvent, JobId, JobInfo, JobOutcome, OPEN_JOB, OpenSource, Started};
 use serde_json::{Value, json};
 
 use crate::theme::Tokens;
 use crate::{ControlResponse, ExportSettings, PhotocraftApp, SaveFileFn, notices};
+use craft_ui::patterns::{StatusBar, StatusProgress};
 
 /// Delay before the modal progress dialog appears (quick jobs finish without it).
 pub const DIALOG_DELAY_MS: f64 = 250.0;
@@ -650,16 +651,16 @@ pub fn bar(ui: &egui::Ui, rect: Rect, frac: Option<f32>, t: &Tokens) {
     }
 }
 
+/// The "Name (+N)" label of a job while `more` other jobs run.
+fn with_more(name: String, more: usize) -> String {
+    if more > 0 { format!("{name} (+{more})") } else { name }
+}
+
 /// A print job has already reached the spool worker; cancellation belongs to the system queue.
 fn print_status_progress(app: &PhotocraftApp, ui: &mut egui::Ui, j: &JobInfo) {
     let t = Tokens::get(ui.ctx());
-    let (bar_w, bar_h) = if t.pro { (120.0, 6.0) } else { (140.0, 6.0) };
     let more = app.session.jobs().len().saturating_sub(1);
-    let label = if more > 0 { format!("{} (+{more})", tl!(&j.label)) } else { tl!(&j.label).to_owned() };
-    ui.label(RichText::new(label).color(t.text_dim).size(12.0));
-    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
-    bar(ui, br, shown_fraction(j), &t);
-    ui.label(RichText::new(percent(j)).color(t.text_dim).size(11.5).monospace());
+    StatusBar::progress(ui, StatusProgress::new(with_more(tl!(&j.label).to_owned(), more), shown_fraction(j)).percent(percent(j)));
     let (xr, xresp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::hover());
     if xresp.hovered() {
         ui.painter().rect_filled(xr, t.radius_sm, t.hover);
@@ -700,32 +701,21 @@ pub fn save_progress(app: &PhotocraftApp, doc: DocId) -> Option<String> {
 pub fn status_progress(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(j) = job_in_view(app) else { return };
     let saving = app.jobs.saves.iter().any(|s| s.job == j.id);
-    let t = Tokens::get(ui.ctx());
-    let (bar_w, bar_h) = if t.pro { (120.0, 6.0) } else { (140.0, 6.0) };
     let more = app.session.jobs().len().saturating_sub(1);
     if matches!(j.command.as_str(), "file.print" | "file.printOneCopy") {
         print_status_progress(app, ui, &j);
         return;
     }
-    // In reading order: label, bar, percentage, ×.
     let name = if saving { saving_percent(&j) } else { tl!(&j.label).to_owned() };
-    let label = if more > 0 { format!("{name} (+{more})") } else { name };
-    let resp = ui.label(RichText::new(label).color(t.text_dim).size(12.0));
-    if saving {
-        resp.on_hover_text(tl!(&j.label));
-    }
-    let (br, _) = ui.allocate_exact_size(vec2(bar_w, bar_h), Sense::hover());
-    bar(ui, br, shown_fraction(&j), &t);
+    let mut progress = StatusProgress::new(with_more(name, more), shown_fraction(&j)).cancel(tl!("Cancel (Esc)"));
     if !saving {
-        ui.label(RichText::new(percent(&j)).color(t.text_dim).size(11.5).monospace());
+        progress = progress.percent(percent(&j));
     }
-    let (xr, xresp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
-    if xresp.hovered() {
-        ui.painter().rect_filled(xr, t.radius_sm, t.hover);
+    let out = StatusBar::progress(ui, progress);
+    if saving {
+        out.response.on_hover_text(tl!(&j.label));
     }
-    crate::icons::paint(ui, xr, "x", 11.0, if xresp.hovered() { t.text } else { t.text_dim });
-    let xresp = xresp.on_hover_text(tl!("Cancel (Esc)"));
-    if xresp.clicked() {
+    if out.cancel {
         cancel(app, j.id);
     }
 }
