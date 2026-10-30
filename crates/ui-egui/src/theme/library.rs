@@ -76,8 +76,8 @@ impl Tokens {
         let pro = kind.is_pro();
         let primary = &t.component.button.primary;
         let canvas = col(c.surface.canvas);
-        // Studio-layout themes draw the canvas dots one step off the canvas colour.
-        let canvas_dot = if pro || kind == ThemeKind::Classic { canvas } else { canvas.lerp_to_gamma(col(c.text.normal), if dark { 0.14 } else { 0.07 }) };
+        // The library's canvas pattern colour. The Pro layouts never show dots (#4542: tiling an invisible pattern filled the surround with blocks on one GPU), and the library's Artcraft pattern is the dock colour, a step off its canvas.
+        let canvas_dot = if pro { canvas } else { col(c.surface.canvas_pattern) };
         let r = &t.shape.radius;
         Tokens {
             kind,
