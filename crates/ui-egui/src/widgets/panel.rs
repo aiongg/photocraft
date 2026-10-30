@@ -133,9 +133,7 @@ pub fn section_label(ui: &mut Ui, text: &str) {
 
 /// Hairline separator.
 pub fn hairline(ui: &mut Ui) {
-    let t = Tokens::get(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
-    ui.painter().line_segment([r.left_center(), r.right_center()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+    craft_ui::primitives::Divider::horizontal().show(ui);
 }
 
 /// Vertical hairline for horizontal layouts.

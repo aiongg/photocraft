@@ -212,7 +212,7 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
     let mut outcome: Option<bool> = None;
     match d.kind {
         _ if crate::open_prompt::owns_damage(fields) => crate::open_prompt::damage_body(ui, fields),
-        _ if crate::guide_layout_ui::owns(fields) => outcome = crate::guide_layout_ui::body(app, ui, fields, interactive),
+        _ if crate::guide_layout_ui::owns(fields) => crate::guide_layout_ui::body(app, ui, fields),
         _ if crate::brush_preset_dialog::owns(fields) => outcome = crate::brush_preset_dialog::body(app, ui, fields, interactive),
         _ if crate::fill_ui::owns(fields) => crate::fill_ui::body(app, ui, fields),
         _ if crate::pattern_fill_ui::owns(fields) => crate::pattern_fill_ui::body(app, ui, fields),
@@ -384,6 +384,8 @@ fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool)
         (crate::mask_trash_prompt::can_apply(fields), true)
     } else if crate::rasterize_prompt::is_filter(fields) {
         (true, true)
+    } else if crate::guide_layout_ui::owns(fields) {
+        (crate::guide_layout_ui::validate(app, fields).is_ok(), true)
     } else {
         (crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields), true)
     }
@@ -398,8 +400,12 @@ fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>) -> Footer<'a> {
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
     }
-    if crate::guide_layout_ui::owns(fields) || crate::brush_preset_dialog::owns(fields) || crate::color_picker_ui::owns(fields) {
+    if crate::brush_preset_dialog::owns(fields) || crate::color_picker_ui::owns(fields) {
         return Footer::none();
+    }
+    if crate::guide_layout_ui::owns(fields) {
+        // OK and Cancel at the body's side, as in Photoshop.
+        return Footer::side().labels(dialog_labels()).ok(tl!("OK")).cancel(tl!("Cancel")).ok_enabled_with(move || enabled.get().0);
     }
     let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
     footer = footer.labels(dialog_labels());

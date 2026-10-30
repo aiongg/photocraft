@@ -6,7 +6,10 @@ use egui::{Color32, Stroke};
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 
-use crate::{PhotocraftApp, theme::Tokens, widgets};
+use craft_ui::composites::{FormGrid, LabelAlign};
+use craft_ui::controls::Select;
+
+use crate::{PhotocraftApp, widgets};
 
 const COMMAND: &str = "view.newGuideLayout";
 const MARK: &str = "__guideLayout";
@@ -192,45 +195,29 @@ fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, 
     value
 }
 
-fn number(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, name: &str, count: bool) {
+fn number(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, name: &str, count: bool) -> egui::Response {
     let mut value = f.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-    if widgets::value_field(ui, &mut value, (if count { 1.0 } else { 0.0 })..=if count { 1000.0 } else { 300_000.0 }, if count { "" } else { "px" }, 68.0)
-        .accessible_name(tl!(name))
-        .changed()
-        // A disabled field still clamps its value into range (a zero count to 1); writing that
-        // back would switch the axis on through its `positive` fallback (#5625).
-        && ui.is_enabled()
-    {
+    let (range, unit, decimals) = if count { (1.0..=1000.0, "{n}", 0) } else { (0.0..=300_000.0, "{n} px", 2) };
+    let edit = widgets::dialog_number_field(ui, ("guide-layout", key), tl!(name), &mut value, range, unit, decimals);
+    // A disabled field still clamps its value into range (a zero count to 1); writing that back
+    // would switch the axis on through its `positive` fallback (#5625).
+    if edit.changed && ui.is_enabled() {
         f.insert(key.into(), if count { json!(value.round() as u64) } else { json!(value) });
     }
+    edit.response
 }
 
-fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: egui::Id) {
+fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, name: &str) -> egui::Response {
     let mut value = match f.get(key) {
         Some(Value::String(s)) => s.clone(),
         Some(v) if v.is_number() => v.to_string(),
         _ => String::new(),
     };
-    let t = craft_ui::theme::current(ui.ctx());
-    let response = ui
-        .add(
-            egui::TextEdit::singleline(&mut value)
-                .id_salt(key)
-                .desired_width(60.0)
-                .font(crate::theme::mono(12.0))
-                .background_color(t.color.surface.sunken.to_egui()),
-        )
-        .labelled_by(label);
-    if ui.is_enabled() {
-        crate::field_tab::register(ui.ctx(), response.id);
-    }
-    if response.gained_focus() {
-        crate::field_tab::select_all(ui.ctx(), response.id, &value);
-    }
-    if response.changed() {
+    let edit = widgets::dialog_text(ui, ("guide-layout", key), name, &mut value);
+    if edit.changed {
         f.insert(key.into(), json!(value));
     }
-    response.on_hover_text(tl!("Leave empty for automatic size"));
+    edit.response.on_hover_text(tl!("Leave empty for automatic size"))
 }
 
 fn group<R>(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui) -> R) -> R {
@@ -255,16 +242,10 @@ fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
         }
         ui.add_space(craft_ui::theme::scale::Space::S6.px());
         ui.add_enabled_ui(enabled, |ui| {
-            egui::Grid::new(count).spacing([8.0, 6.0]).show(ui, |ui| {
-                ui.label(tl!("Number"));
-                number(ui, f, count, "Number", true);
-                ui.end_row();
-                let size_label_resp = ui.label(size_label);
-                optional(ui, f, size, size_label_resp.id);
-                ui.end_row();
-                ui.label(tl!("Spacing"));
-                number(ui, f, gap, "Spacing", false);
-                ui.end_row();
+            FormGrid::new(count).label_align(LabelAlign::Start).show(ui, |form| {
+                form.row(tl!("Number"), |ui, _| number(ui, f, count, "Number", true));
+                form.row(size_label, |ui, _| optional(ui, f, size, size_label));
+                form.row(tl!("Spacing"), |ui, _| number(ui, f, gap, "Spacing", false));
             });
         });
     });
@@ -272,10 +253,18 @@ fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
 
 fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let before: Map<String, Value> = f.iter().filter(|(key, _)| !key.starts_with("__preview")).map(|(k, v)| (k.clone(), v.clone())).collect();
-    egui::Grid::new("guide-header").spacing([8.0, 6.0]).show(ui, |ui| {
-        ui.label(tl!("Preset:"));
+    FormGrid::new("guide-header").label_align(LabelAlign::Start).show(ui, |form| {
         let mut preset = f.get("__preset").and_then(Value::as_str).unwrap_or("custom").to_string();
-        if craft_ui::controls::Select::new("guide-preset", tl!("Preset:"), &mut preset).fit(true).option("custom".into(), tl!("Custom")).option("five".into(), tl!("5 Columns, 3 Rows")).option("eight".into(), tl!("8 Columns")).option("twelve".into(), tl!("12 Columns")).show(ui).response.changed() {
+        let edit = form.row(tl!("Preset:"), |ui, _| {
+            Select::new("guide-preset", tl!("Preset:"), &mut preset)
+                .fit(true)
+                .option("custom".into(), tl!("Custom"))
+                .option("five".into(), tl!("5 Columns, 3 Rows"))
+                .option("eight".into(), tl!("8 Columns"))
+                .option("twelve".into(), tl!("12 Columns"))
+                .show(ui)
+        });
+        if edit.inner.response.changed() {
             f.insert("__preset".into(), json!(preset));
             match preset.as_str() {
                 "five" | "eight" | "twelve" => {
@@ -303,32 +292,38 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
                 _ => {}
             }
         }
-        ui.end_row();
-        ui.label(tl!("Target:"));
         let mut target = f.get("target").and_then(Value::as_str).unwrap_or("document").to_string();
         let mut options = vec![("document".to_string(), "Document")];
         if !photocraft_engine::guide_layout::selected_artboards(&app.session).is_empty() {
             options.push(("selectedArtboards".into(), "Selected Artboards"));
         }
-        if craft_ui::controls::Select::new("guide-target", tl!("Target"), &mut target).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
+        let edit = form.row(tl!("Target:"), |ui, _| {
+            Select::new("guide-target", tl!("Target"), &mut target).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui)
+        });
+        if edit.inner.response.changed() {
             f.insert("target".into(), json!(target));
         }
-        ui.end_row();
     });
     ui.add_space(craft_ui::theme::scale::Space::S12.px());
     group(ui, |ui| {
         ui.label(tl!("Color"));
-        ui.horizontal(|ui| {
-            ui.label(tl!("Color:"));
-            let mut color = f.get("color").and_then(Value::as_str).unwrap_or("#4affff").to_string();
-            let colors = color_options(&color);
-            if craft_ui::controls::Select::new("guide-color", tl!("Color"), &mut color).rows(colors.len(), |i| colors[i].0.clone(), |i| tl!(colors[i].1)).show(ui).response.changed() {
-                f.insert("color".into(), json!(color));
-            }
-            let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
-            if widgets::color_swatch_button(ui, shown, tl!("Guide color")).clicked() {
-                crate::color_picker_ui::request(f, tl!("Guide color"));
-            }
+        FormGrid::new("guide-color-row").label_align(LabelAlign::Start).show(ui, |form| {
+            form.row(tl!("Color:"), |ui, _| {
+                ui.horizontal(|ui| {
+                    let mut color = f.get("color").and_then(Value::as_str).unwrap_or("#4affff").to_string();
+                    let colors = color_options(&color);
+                    let edit = Select::new("guide-color", tl!("Color"), &mut color).rows(colors.len(), |i| colors[i].0.clone(), |i| tl!(colors[i].1)).show(ui);
+                    if edit.response.changed() {
+                        f.insert("color".into(), json!(color));
+                    }
+                    let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
+                    if widgets::color_swatch_button(ui, shown, tl!("Guide color")).clicked() {
+                        crate::color_picker_ui::request(f, tl!("Guide color"));
+                    }
+                    edit
+                })
+                .inner
+            });
         });
     });
     ui.add_space(craft_ui::theme::scale::Space::S12.px());
@@ -348,7 +343,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
                     ui.vertical(|ui| {
                         ui.label(label);
                         let mut n = value.as_f64().unwrap_or(0.0) as f32;
-                        if widgets::value_field(ui, &mut n, 0.0..=300_000.0, "px", 64.0).accessible_name(label).changed() {
+                        if widgets::dialog_number(ui, ("guide-layout-margin", label), label, &mut n, 0.0..=300_000.0, "{n} px", 2) {
                             *value = json!(n);
                         }
                     });
@@ -370,28 +365,13 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
     }
 }
 
-/// Own the action rail as well as the body, so OK/Cancel/Preview follow Photoshop's arrangement.
-pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, interactive: bool) -> Option<bool> {
+/// The dialog's fields and the live preview; OK and Cancel are the host's side column.
+pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let before = (params(f), on(f, "__preview", true), f.get("color").cloned());
-    let mut outcome = None;
-    ui.horizontal_top(|ui| {
-        ui.vertical(|ui| {
-            main_fields(app, ui, f);
-        });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.vertical(|ui| {
-            let valid = validate(app, f).is_ok();
-            if ui.add_enabled_ui(valid, |ui| ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(96.0))).inner.clicked() {
-                outcome = Some(true);
-            }
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
-            if ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(96.0)).clicked() {
-                outcome = Some(false);
-            }
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
-            check(ui, f, "__preview", tl!("Preview"), true);
-        });
-    });
+    main_fields(app, ui, f);
+    // The side footer has no slot for a check box, so Preview sits under the options.
+    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    check(ui, f, "__preview", tl!("Preview"), true);
     match calculate(app, f) {
         Ok(guides) => {
             f.insert("__previewGuides".into(), json!(guides));
@@ -402,14 +382,10 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
             ui.colored_label(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui(), tl!("Invalid guide layout")).on_hover_text(error);
         }
     }
-    if outcome.is_none() && interactive && validate(app, f).is_ok() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-        outcome = Some(true);
-    }
     // The canvas paints before the dialog. Schedule the frame that displays this draft edit.
     if before != (params(f), on(f, "__preview", true), f.get("color").cloned()) {
         ui.ctx().request_repaint();
     }
-    outcome
 }
 
 #[cfg(test)]
