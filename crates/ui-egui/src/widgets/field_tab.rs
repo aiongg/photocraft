@@ -140,7 +140,7 @@ mod tests {
     }
 
     /// Hue/Saturation: Tab goes Hue → Saturation → Lightness (never the dropdown or the
-    /// sliders), ⇧Tab back, and ↑ / ↓ step the focused field by 1 (⇧: 10).
+    /// sliders), then the footer buttons and back to Hue, ⇧Tab back, and ↑ / ↓ step the focused field by 1 (⇧: 10).
     #[test]
     fn hue_saturation_tabs_through_its_fields_and_arrows_step_them() {
         let mut s = photocraft_engine::Session::new();
@@ -149,8 +149,16 @@ mod tests {
         crate::adjust_dialog::open(h.state_mut(), "image.adjustments.hueSaturation").unwrap();
         h.run_steps(3);
         assert_eq!(h.ctx.memory(|m| m.focused()), None, "nothing is focused to begin with");
-        tab(&mut h);
-        assert!(h.query_all_by_role(Role::SpinButton).next().is_some_and(|n| n.is_focused()), "the first Tab lands on Hue");
+        // The library walks the title bar's close button, then the fields, then the footer buttons.
+        let mut reached = false;
+        for _ in 0..2 {
+            tab(&mut h);
+            reached = h.query_all_by_role(Role::SpinButton).next().is_some_and(|n| n.is_focused());
+            if reached {
+                break;
+            }
+        }
+        assert!(reached, "Tab reaches Hue's field");
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::NONE);
         assert_eq!(num(&h, "hue"), 1.0);
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::SHIFT);
@@ -166,11 +174,17 @@ mod tests {
         tab(&mut h);
         arrow(&mut h, egui::Key::ArrowDown, egui::Modifiers::SHIFT);
         assert_eq!(num(&h, "lightness"), -10.0, "the third is Lightness");
-        tab(&mut h);
+        // Past Lightness: OK, Cancel, then the wrap to Hue (the close button is not in the cycle).
+        for _ in 0..3 {
+            tab(&mut h);
+        }
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::NONE);
         assert_eq!(num(&h, "hue"), -4.0, "Tab wraps around to Hue");
-        h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
-        h.run_steps(2);
+        // ⇧Tab from Hue wraps back to Cancel, then OK, then Lightness.
+        for _ in 0..3 {
+            h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+            h.run_steps(2);
+        }
         arrow(&mut h, egui::Key::ArrowUp, egui::Modifiers::NONE);
         assert_eq!(num(&h, "lightness"), -9.0, "⇧Tab goes back to Lightness");
         // The range clamps.
