@@ -70,7 +70,7 @@ fn hex_field_takes_every_paste_with_or_without_hash() {
         h.run_steps(2);
         assert_eq!(color(&h), want, "paste {paste:?}");
         // The library's field shows what was pasted while it has the focus.
-        let shown = h.get_by_role(Role::TextInput).value().unwrap_or_default().to_ascii_lowercase().trim_start_matches('#').to_string();
+        let shown = h.get_by_role(Role::TextInput).value().unwrap_or_default().to_ascii_lowercase().trim().trim_start_matches('#').to_string();
         assert_eq!(shown, want[1..], "paste {paste:?}");
     }
     h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
