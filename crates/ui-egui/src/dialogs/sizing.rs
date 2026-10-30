@@ -226,13 +226,13 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
     let (w, h) = (num(f, "width").round(), num(f, "height").round());
     // Photoshop keeps width and height linked while Resample is off.
-    let mut constrain = !resampling || f.get("__constrain").and_then(Value::as_bool).unwrap_or(true);
+    let constrain = !resampling || f.get("__constrain").and_then(Value::as_bool).unwrap_or(true);
     // With Resample off, a size in pixels or percent can't change (Photoshop disables those
     // fields); a physical size (inches, cm…) changes the resolution instead.
     let unit = f.get("__unit").and_then(Value::as_str).unwrap_or("px").to_string();
     let editable = resampling || !matches!(unit.as_str(), "px" | "percent");
     let (mut w_changed, mut h_changed) = (false, false);
-    let mut rows = None;
+    let mut link_on = constrain;
     FormGrid::new("image-size").show(ui, |form| {
         form.value(
             tl!("Image Size:"),
@@ -240,9 +240,10 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         );
         form.value(tl!("Dimensions:"), format!("{} px × {} px", w as i64, h as i64));
         form.space(craft_ui::theme::scale::Space::S6.px());
-        let w_row = form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "is-w", "is-unit-w", tl!("Width"), editable, &mut w_changed));
-        let h_row = form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "is-h", "is-unit-h", tl!("Height"), editable, &mut h_changed));
-        rows = Some((w_row.inner, h_row.inner));
+        form.linked(tl!("Constrain proportions"), &mut link_on, |form| {
+            form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "is-w", "is-unit-w", tl!("Width"), editable, &mut w_changed));
+            form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "is-h", "is-unit-h", tl!("Height"), editable, &mut h_changed));
+        });
         if !resampling && (w_changed || h_changed) {
             // The edited side's new pixel count at the current resolution gives its new physical size;
             // keep the pixels and fit the resolution to that size instead.
@@ -311,28 +312,8 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             edit
         });
     });
-    let Some(((w_field, w_unit), (h_field, h_unit))) = rows else { return };
-    // Photoshop's chain bracket linking width and height (right of the unit menus). PhotoCraft's
-    // own widget: the library has no link between stacked rows.
-    let x0 = w_unit.rect.right().max(h_unit.rect.right()) + 4.0;
-    let bracket = Rect::from_min_max(pos2(x0, w_field.rect.center().y), pos2(x0 + 14.0, h_field.rect.center().y));
-    let link = ui.interact(bracket.expand(2.0), ui.scope_id().with("constrain"), Sense::click());
-    link.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Constrain proportions")));
-    let col = if constrain { t.color.text.normal.to_egui() } else { t.color.text.faint.to_egui() };
-    if constrain {
-        let p = ui.painter();
-        let x = bracket.left() + 8.0;
-        p.line_segment([pos2(bracket.left(), bracket.top()), pos2(x, bracket.top())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
-        p.line_segment([pos2(x, bracket.top()), pos2(x, bracket.center().y - 8.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
-        p.line_segment([pos2(x, bracket.center().y + 8.0), pos2(x, bracket.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
-        p.line_segment([pos2(x, bracket.bottom()), pos2(bracket.left(), bracket.bottom())], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col));
-    }
-    let chain = Rect::from_center_size(pos2(bracket.left() + 8.0, bracket.center().y), vec2(14.0, 14.0));
-    ui.painter().rect_filled(chain, craft_ui::theme::scale::Radius::R2.px(), if link.hovered() { t.color.state.hover.to_egui() } else { Color32::TRANSPARENT });
-    crate::icons::paint(ui, chain, if constrain { "link" } else { "unlink" }, 11.0, col);
-    if link.on_hover_text(tl!("Constrain proportions")).clicked() && resampling {
-        constrain = !constrain;
-        f.insert("__constrain".into(), json!(constrain));
+    if link_on != constrain && resampling {
+        f.insert("__constrain".into(), json!(link_on));
     }
 }
 

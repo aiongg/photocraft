@@ -28,12 +28,12 @@ pub fn number_field(
     unit: &str,
     decimals: usize,
 ) -> NumberEdit {
-    number_field_parsed(ui, id_salt, label, value, range, unit, decimals, |text| super::numeric_expression::parse(text))
+    number_field_parsed(ui, id_salt, label, value, range, unit, decimals, decimals, |text| super::numeric_expression::parse(text))
 }
 
 /// A size field in `units.unit` with no suffix of its own (a unit menu sits beside it): typed
 /// arithmetic applies, and a number may carry a unit (`2in`, `5mm`) that converts at `units`'
-/// resolution. The field shows `decimals` places (the unit's precision, #2434) but keeps two
+/// resolution. The field shows `decimals` places (the unit's precision, #2434) but commits two
 /// more of what the user types, so `72.27 pt` stays one inch.
 pub fn number_field_in_units(
     ui: &mut Ui,
@@ -51,15 +51,9 @@ pub fn number_field_in_units(
             Some(super::numeric_expression::Units { unit: Some(units.unit), suffix: "", dpi: units.dpi, ppi: units.ppi, extent: None }),
         )
     };
-    let places = decimals as i32;
-    let scale = 10f64.powi(places);
-    let mut shown = ((f64::from(*value) * scale).round() / scale) as f32;
-    let before = shown;
-    let mut edit = number_field_parsed(ui, id_salt, label, &mut shown, range, "", decimals + if decimals > 0 { 2 } else { 0 }, read);
-    edit.changed = shown != before;
-    if edit.changed {
-        *value = shown;
-    }
+    let before = *value;
+    let mut edit = number_field_parsed(ui, id_salt, label, value, range, "", decimals, decimals + if decimals > 0 { 2 } else { 0 }, read);
+    edit.changed = *value != before;
     edit
 }
 
@@ -72,12 +66,14 @@ fn number_field_parsed(
     range: std::ops::RangeInclusive<f32>,
     unit: &str,
     decimals: usize,
+    commit_decimals: usize,
     parse: impl Fn(&str) -> Option<f64>,
 ) -> NumberEdit {
     let numbers = LocaleNumbers::of(ui);
     let edit = NumberField::new(id_salt, label, *value, &numbers)
         .range(f64::from(*range.start())..=f64::from(*range.end()))
         .decimals(0..=decimals)
+        .commit_decimals(commit_decimals)
         .unit(Unit::new(unit))
         .or_parse(parse)
         .show(ui);
