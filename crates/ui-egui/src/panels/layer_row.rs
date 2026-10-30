@@ -119,21 +119,22 @@ fn link_name(kind: MaskKind, linked: bool, layer: &str) -> String {
     crate::i18n::fmt(tl!(template), &[("verb", tl!(verb)), ("mask", tl!(what)), ("layer", layer)])
 }
 
-/// The Layers panel's least width in `ui`'s theme: the width the library gives a group row with the
-/// most required parts a layer row shows together (eye, disclosure, layer and vector mask
-/// thumbnails with their links, lock, effects triangle, `fx` badge, link chain) and the label's
-/// least width. A narrower panel clips its rows at the trailing edge.
+/// The Layers panel's least column width in `ui`'s theme: the width the library gives the common group
+/// row (eye, disclosure, layer thumbnail, one mask with its link, `fx` badge) with the label's
+/// least width. A narrower panel clips the rarer extras (a second mask, lock, link chain, effects
+/// triangle) at the row's trailing edge; the masks never drop.
 pub(crate) fn min_panel_width(ui: &egui::Ui, size: LayerThumbnailSize) -> f32 {
     let thumb_size = thumb_size_of(size);
     let fx = ui.painter().layout_no_wrap("fx".into(), theme::semibold(11.0), Color32::WHITE).size().x;
     let mut row = ListRow::new(0u64, "").toggle(ToggleColumn::eye("", true));
     if thumb_size != ThumbSize::None {
-        row = row.thumb(thumb_size, |_, _| {}).extra_thumb(|_, _| {}).thumb_link(true, "").extra_thumb(|_, _| {}).thumb_link(true, "");
+        row = row.thumb(thumb_size, |_, _| {}).extra_thumb(|_, _| {}).thumb_link(true, "");
     }
-    for width in [ICON_W, TRIANGLE_W, fx, ICON_W] {
-        row = row.trailing_item(width, |_| {});
-    }
-    TreeRow::new(row, 0, true, true).text(tree_text()).into_row().min_width(ui)
+    row = row.trailing_item(fx, |_| {});
+    // The column holds the row inside the panel body's margin and the scroll bar's lane.
+    let pro = Tokens::get(ui.ctx()).pro;
+    let chrome = widgets::body_margin(pro).sum().x + ui.spacing().scroll.allocated_width();
+    TreeRow::new(row, 0, true, true).text(tree_text()).into_row().min_width(ui) + chrome
 }
 
 /// The Layers panel's thumbnail setting as the library's.

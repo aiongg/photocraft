@@ -14,6 +14,15 @@ const LONG: &str = "Button / Primary / Hover state — a very long descriptive l
 
 /// Long-named layers with every indicator, nested four groups deep.
 fn busy() -> photocraft_engine::Session {
+    layers(true)
+}
+
+/// The common row of the Layers panel: long-named layers with one mask and effects.
+fn common() -> photocraft_engine::Session {
+    layers(false)
+}
+
+fn layers(all: bool) -> photocraft_engine::Session {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
     let mut prev = None;
@@ -22,14 +31,18 @@ fn busy() -> photocraft_engine::Session {
         s.execute("edit.fill", json!({"contents": "color", "color": "#336699"})).unwrap();
         s.execute("layer.layerStyle.dropShadow", json!({"layer": a})).unwrap();
         // #153: the vector mask thumbnail and both link chains take row width too.
-        s.execute("layer.vectorMask.revealAll", json!({"layer": a})).unwrap();
         s.execute("layer.layerMask.revealAll", json!({"layer": a})).unwrap();
-        s.execute("layer.setProps", json!({"layer": a, "blend": "Multiply", "locks": {"all": true}})).unwrap();
+        if all {
+            s.execute("layer.vectorMask.revealAll", json!({"layer": a})).unwrap();
+            s.execute("layer.setProps", json!({"layer": a, "blend": "Multiply", "locks": {"all": true}})).unwrap();
+        }
         let b = s.execute("layer.new.layer", json!({"name": format!("{LONG} b{depth}")})).unwrap()["layer"].as_u64().unwrap();
-        s.execute("layer.setProps", json!({"layer": b, "clipped": true})).unwrap();
-        s.execute("layer.select", json!({"layer": a})).unwrap();
-        s.execute("layer.select", json!({"layer": b, "mode": "toggle"})).unwrap();
-        s.execute("layer.linkLayers", json!({})).unwrap();
+        if all {
+            s.execute("layer.setProps", json!({"layer": b, "clipped": true})).unwrap();
+            s.execute("layer.select", json!({"layer": a})).unwrap();
+            s.execute("layer.select", json!({"layer": b, "mode": "toggle"})).unwrap();
+            s.execute("layer.linkLayers", json!({})).unwrap();
+        }
         if let Some(p) = prev {
             s.execute("layer.select", json!({"layer": p, "mode": "toggle"})).unwrap();
         }
@@ -81,28 +94,68 @@ fn check(rows: &[RowRects], what: &str) {
     assert!(with_fx >= 4, "{what}: fx badges drawn ({with_fx})");
 }
 
-/// The width a dock needs to give the busy rows their least width in `theme` (the rows' own
-/// minimum plus the panel's padding around them).
-fn least_dock_width(theme: &str, ppp: f32) -> f32 {
-    let wide = harness(busy(), ppp, theme, 520.0);
+/// The width a dock needs to give `session`'s rows their own least width in `theme`: the rows' minimum
+/// plus the panel's padding around them.
+fn rows_dock_width(session: photocraft_engine::Session, theme: &str, ppp: f32) -> f32 {
+    let wide = harness(session, ppp, theme, 520.0);
     let rows = recorded(&wide.ctx);
     let least = rows.iter().map(|r| r.min_width).fold(0.0, f32::max);
     assert!(least > 0.0, "{theme}: the rows report their least width");
-    let chrome = 520.0 - rows[0].row.width();
-    (least + chrome).ceil()
+    (least + 520.0 - rows[0].row.width()).ceil()
+}
+
+/// The Layers panel's least width in `theme`, as the dock limits its column, and the panel's padding.
+fn panel_least(theme: &str, ppp: f32) -> (f32, f32) {
+    let wide = harness(common(), ppp, theme, 520.0);
+    let chrome = 520.0 - recorded(&wide.ctx)[0].row.width();
+    (crate::panel_docking::last_layers_min(&wide.ctx), chrome)
+}
+
+/// Rows narrower than their parts need: the names start inside the row and clear of the
+/// indicators, the indicators in `kept` stay inside it, and the others are cut at its trailing edge.
+fn check_clipped(rows: &[RowRects], kept: &[Indicator], what: &str) {
+    assert!(rows.len() >= 8, "{what}: rows drawn ({})", rows.len());
+    for r in rows {
+        let name = r.name.unwrap_or_else(|| panic!("{what}: layer {} has no room for its name", r.layer));
+        assert!(name.left() < r.row.right(), "{what}: name starts inside its row");
+        for (k, ind) in &r.indicators {
+            assert!(!overlaps(name, *ind), "{what}: layer {} name {name:?} overlaps {k:?} {ind:?}", r.layer);
+            assert!(!kept.contains(k) || ind.right() <= r.row.right() + 0.01, "{what}: {k:?} stays inside the row");
+        }
+    }
 }
 
 #[test]
 fn long_names_never_run_under_the_indicators() {
     for theme in ["pro", "promedium", "studio", "studiolight", "classic"] {
         for ppp in [1.0, 1.5, 2.0] {
-            let least = least_dock_width(theme, ppp);
-            for width in [least, least + 40.0, 520.0] {
-                let h = harness(busy(), ppp, theme, width);
+            // At the panel's least width the common row keeps its thumbnails, mask, link and fx
+            // badge; its effects triangle, outermost, is cut at the edge. Wider, everything fits.
+            let (least, _) = panel_least(theme, ppp);
+            let h = harness(common(), ppp, theme, least.ceil());
+            check_clipped(&recorded(&h.ctx), &[Indicator::Fx], &format!("{theme} @{ppp}x {least}pt"));
+            for width in [rows_dock_width(common(), theme, ppp), 520.0] {
+                let h = harness(common(), ppp, theme, width);
                 check(&recorded(&h.ctx), &format!("{theme} @{ppp}x {width}pt"));
             }
+            // The busiest rows are cut at the trailing edge below their own least width.
+            let h = harness(busy(), ppp, theme, least.ceil());
+            check_clipped(&recorded(&h.ctx), &[], &format!("busy {theme} @{ppp}x {least}pt"));
+            let width = rows_dock_width(busy(), theme, ppp);
+            let h = harness(busy(), ppp, theme, width);
+            check(&recorded(&h.ctx), &format!("busy {theme} @{ppp}x {width}pt"));
         }
     }
+}
+
+/// `ui.set dockWidth` below the Layers panel's least width is clamped up to it.
+#[test]
+fn a_dock_width_below_the_layers_minimum_is_raised_to_it() {
+    let (least, chrome) = panel_least("studio", 1.0);
+    assert!(least > crate::panels::DOCK_MIN_WIDTH, "the minimum ({least}) exceeds the dock's own: the test means something");
+    let h = harness(common(), 1.0, "studio", crate::panels::DOCK_MIN_WIDTH);
+    let width = recorded(&h.ctx)[0].row.width() + chrome;
+    assert!((width - least).abs() <= 2.0, "dock {width} vs least {least}");
 }
 
 /// A primary click at `at`: hover, press and release a frame apart, then let the panel settle.
