@@ -250,7 +250,7 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::smart_filter_dialog::owns(fields) => crate::smart_filter_dialog::body(app, ui, fields),
         _ if crate::adjust_dialog::owns(fields) => crate::adjust_dialog::body(app, ui, fields),
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
-        _ if fields.contains_key("__filter") => filter_body(app, ui, fields, id),
+        _ if is_filter_route(fields) => filter_body(app, ui, fields, id),
         _ if crate::new_guide_ui::owns(fields) => crate::new_guide_ui::body(ui, fields),
         _ if fields.contains_key("__form") => crate::view_cmds::form_body(ui, fields),
         _ => {}
@@ -303,6 +303,21 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
     outcome
 }
 
+/// Whether the fields route to [`filter_body`] rather than to one of the editors that come before
+/// it in [`command_body_more`] (the adjustments, Smart Filters, blur pins, sizing and the files).
+fn is_filter_route(fields: &Fields) -> bool {
+    fields.contains_key("__filter")
+        && !(crate::file_ui::owns(fields)
+            || crate::color_picker_ui::owns(fields)
+            || crate::color_range_ui::owns(fields)
+            || crate::prefs_ui::owns(fields)
+            || fields.contains_key("__export")
+            || fields.contains_key("__sizing")
+            || crate::smart_filter_dialog::owns(fields)
+            || crate::adjust_dialog::owns(fields)
+            || crate::blur_pins::owns(fields))
+}
+
 /// A filter-style dialog's parameters. The library scrolls them (`Body::Scroll`) above the
 /// in-dialog preview window, which [`filter_below`] draws.
 fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, id: egui::Id) {
@@ -328,7 +343,7 @@ fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, 
 /// The in-dialog preview window under a filter dialog's scrolling parameters (#3769), so it never
 /// shifts them.
 fn filter_below(app: &PhotocraftApp, d: &Dialog, ui: &mut egui::Ui, fields: &mut Fields) {
-    if d.kind == DialogKind::Command && fields.contains_key("__filter") {
+    if d.kind == DialogKind::Command && is_filter_route(fields) {
         crate::filter_preview_ui::window(app, d.id, ui, fields);
     }
 }
@@ -469,7 +484,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             None => dialog.width(width_of(&d)),
         };
 
-        if d.kind == DialogKind::Command && fields.contains_key("__filter") {
+        if d.kind == DialogKind::Command && is_filter_route(&fields) {
             dialog = dialog.body(Body::Scroll);
         }
         let body_outcome = Cell::new(None::<bool>);

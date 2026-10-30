@@ -144,14 +144,15 @@ fn preferences_search_matches_editable_fields_across_sections() {
 
 #[test]
 fn preferences_dialog_width_follows_its_resizable_area() {
+    use craft_ui::dialog::Width;
     let prefs = serde_json::json!({"__prefsui": "prefs"});
     let prefs = prefs.as_object().unwrap();
-    assert_eq!(super::width(prefs, 200.0), Some(380.0));
-    assert_eq!(super::width(prefs, 800.0), Some(800.0));
+    assert_eq!(super::width(prefs, 200.0), Some(Width::Fixed(380.0)));
+    assert_eq!(super::width(prefs, 800.0), Some(Width::Fixed(800.0)));
     // A dialog resized wider than it opens is filled, not left with empty space (#7420).
-    assert_eq!(super::width(prefs, 3000.0), Some(3000.0));
+    assert_eq!(super::width(prefs, 3000.0), Some(Width::Fixed(3000.0)));
     let shortcuts = serde_json::json!({"__prefsui": "shortcuts"});
-    assert_eq!(super::width(shortcuts.as_object().unwrap(), 3000.0), Some(720.0));
+    assert_eq!(super::width(shortcuts.as_object().unwrap(), 3000.0), Some(Width::Range { min: 460.0, max: 720.0 }));
 }
 
 #[test]
