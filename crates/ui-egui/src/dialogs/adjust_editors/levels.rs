@@ -125,8 +125,3 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     }
     e
 }
-
-/// Which handle of a slider row a press at `x` grabs (nearest), among `xs`.
-pub(super) fn nearest(xs: &[f32], x: f32) -> Option<u8> {
-    xs.iter().enumerate().min_by(|a, b| (a.1 - x).abs().total_cmp(&(b.1 - x).abs())).map(|(i, _)| i as u8)
-}

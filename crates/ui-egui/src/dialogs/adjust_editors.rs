@@ -6,10 +6,14 @@
 //! and `commit` when a gesture ends (the Properties host then runs one `layer.setAdjustment`; a
 //! dialog commits on OK). Selective Color and Color Lookup keep their editors in `adjust_ui`.
 
-use craft_ui::theme::ToEgui;
+use craft_theme::{Srgba, TypeRole};
+use craft_ui::composites::{ColorPopover, SliderRow};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::{LocaleNumbers, Unit};
+use craft_ui::primitives::{Content, Text};
 use std::sync::Arc;
 
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{Color32, Rect, pos2, vec2};
 use photocraft_doc::adjust::{HueRange, ToneSpace};
 use photocraft_doc::{Adjustment, LayerId};
 use photocraft_engine::adjust_params::{self, HUE_RANGES, PHOTO_FILTERS};
@@ -18,7 +22,6 @@ use photocraft_engine::presets::gradients::GradientPreset;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 use crate::tone::{self, HistSource, Histograms};
 use crate::widgets::{self, hue_color};
 
@@ -92,9 +95,6 @@ impl Edit {
     }
     fn discrete(changed: bool) -> Self {
         Edit { changed, commit: changed, ..Default::default() }
-    }
-    fn of(r: &egui::Response) -> Self {
-        Edit { changed: r.changed(), commit: r.drag_stopped() || (r.changed() && !r.dragged()), ..Default::default() }
     }
 }
 
@@ -202,20 +202,114 @@ fn color32(c: [f32; 3]) -> Color32 {
     Color32::from_rgb(b(c[0]), b(c[1]), b(c[2]))
 }
 
-/// A colour swatch button (egui's picker); returns the edit.
-fn color_button(ui: &mut egui::Ui, c: &mut [f32; 3]) -> Edit {
-    let mut srgb = [c[0], c[1], c[2]].map(|x| (x.clamp(0.0, 1.0) * 255.0).round() as u8);
-    let r = crate::widgets::color_edit_button_srgb(ui, &mut srgb);
-    if r.changed() {
-        *c = srgb.map(|x| f32::from(x) / 255.0);
+/// Applies one control's edit event to `cur`, which the host keeps in its parameter set: updates
+/// preview, a commit or one-shot change commits, and a cancelled gesture restores the value it
+/// began with. `from` reads the control's value.
+fn apply_event<T, U: Clone + Send + Sync + 'static>(ui: &egui::Ui, id: egui::Id, event: Option<EditEvent<T>>, cur: &mut U, from: impl Fn(&T) -> U) -> Edit {
+    let mut e = Edit::default();
+    match event {
+        Some(EditEvent::Begin { .. }) => {
+            ui.data_mut(|d| d.insert_temp(id, cur.clone()));
+        }
+        Some(EditEvent::Update { value, .. }) => {
+            *cur = from(&value);
+            e.changed = true;
+        }
+        Some(EditEvent::Commit { value, changed, .. }) => {
+            if changed {
+                *cur = from(&value);
+                e.changed = true;
+                e.commit = true;
+            }
+        }
+        Some(EditEvent::Set { value, .. }) => {
+            *cur = from(&value);
+            e = Edit::discrete(true);
+        }
+        Some(EditEvent::Cancel { .. }) => {
+            if let Some(before) = ui.data(|d| d.get_temp::<U>(id)) {
+                *cur = before;
+                e.changed = true;
+            }
+        }
+        _ => {}
     }
-    // The popup edits continuously; each change is a complete value.
-    Edit::discrete(r.changed())
+    e
+}
+
+/// A labelled slider row of an adjustment editor: the library [`SliderRow`] over one number.
+pub(crate) struct Row<'a> {
+    label: &'a str,
+    range: std::ops::RangeInclusive<f32>,
+    unit: &'a str,
+    decimals: Option<usize>,
+    default: Option<f32>,
+    track: Option<&'a [Color32]>,
+    wheel: Option<f32>,
+}
+
+impl<'a> Row<'a> {
+    pub(crate) fn new(label: &'a str, range: std::ops::RangeInclusive<f32>) -> Self {
+        Self { label, range, unit: "", decimals: None, default: None, track: None, wheel: None }
+    }
+    /// The unit after the number (`%`, `°`).
+    pub(crate) fn unit(mut self, unit: &'a str) -> Self {
+        self.unit = unit;
+        self
+    }
+    pub(crate) fn decimals(mut self, decimals: Option<u32>) -> Self {
+        self.decimals = decimals.map(|d| d as usize);
+        self
+    }
+    /// The value a double-click on the slider sets.
+    pub(crate) fn default_value(mut self, value: f32) -> Self {
+        self.default = Some(value);
+        self
+    }
+    pub(crate) fn track(mut self, stops: Option<&'a [Color32]>) -> Self {
+        self.track = stops;
+        self
+    }
+    /// The wheel steps the slider by this much (the dialogs').
+    pub(crate) fn wheel(mut self, step: Option<f32>) -> Self {
+        self.wheel = step;
+        self
+    }
+
+    pub(crate) fn show(self, ui: &mut egui::Ui, x: &mut f32) -> Edit {
+        let numbers = LocaleNumbers::of(ui);
+        let mut row = SliderRow::new(self.label, self.label, f64::from(*x), f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
+            .unit(Unit::new(&format!("{{n}}{}", self.unit)));
+        if let Some(d) = self.decimals {
+            row = row.decimals(d);
+        }
+        if let Some(d) = self.default {
+            row = row.default_value(f64::from(d));
+        }
+        if let Some(stops) = self.track {
+            row = row.track_colors(stops.iter().copied());
+        }
+        if let Some(step) = self.wheel {
+            row = row.wheel(true).wheel_step(f64::from(step));
+        }
+        let before = ui.make_persistent_id((self.label, "before"));
+        let mut e = Edit::default();
+        for event in row.show(ui).edits() {
+            e.add(apply_event(ui, before, Some(event), x, |v| *v as f32));
+        }
+        e
+    }
+}
+
+/// A colour swatch button opening the library's picker popup; returns the edit.
+fn color_button(ui: &mut egui::Ui, salt: &str, label: &str, c: &mut [f32; 3]) -> Edit {
+    let numbers = LocaleNumbers::of(ui);
+    let r = ColorPopover::new(salt, label, Srgba::rgb(c[0], c[1], c[2]), &numbers).show(ui);
+    apply_event(ui, ui.make_persistent_id((salt, "before")), r.edit.event, c, |p| [p.color.r, p.color.g, p.color.b])
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.label(RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
+    ui.add(Text::new(tl!(&text)).role(TypeRole::Label).content(Content::Muted));
 }
 
 #[cfg(test)]

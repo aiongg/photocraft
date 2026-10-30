@@ -1,8 +1,9 @@
 use super::hue_saturation::RANGE_LABELS;
-use super::{
-    Color32, Edit, EditorCx, HUE_RANGES, PHOTO_FILTERS, RichText, Tokens, Value, adjust_params, color_button, flag, json, label, num, nums, rgb_of, round,
-    widgets,
-};
+use super::{Color32, Edit, EditorCx, HUE_RANGES, PHOTO_FILTERS, Row, Value, adjust_params, color_button, flag, json, label, num, nums, rgb_of, round};
+use craft_theme::TypeRole;
+use craft_ui::controls::RadioSet;
+use craft_ui::primitives::{Content, Text};
+use craft_ui::theme::{ToEgui as _, Tokens as LibTokens, TokensOf as _};
 
 /// Labelled slider rows over top-level keys: (key, label, min, max, default, unit).
 /// A row of [`sliders`]: params key, label, range, default, unit, and its decimal places (None:
@@ -26,19 +27,17 @@ pub(super) fn sliders(ui: &mut egui::Ui, v: &mut Value, rows: &[SliderRow]) -> E
     for &(key, text, min, max, default, unit, decimals) in rows {
         let mut x = num(v, key, default).clamp(min, max);
         // A double-click on the slider puts it back to its default (Photoshop).
-        let gestures = widgets::RowGestures { reset: Some(default), wheel_step: None, ..Default::default() };
-        let r = widgets::slider_row_prec(ui, text, &mut x, min..=max, unit, None, gestures, decimals);
-        if r.changed() {
+        let r = Row::new(tl!(text), min..=max).unit(unit).decimals(decimals).default_value(default).show(ui, &mut x);
+        if r.changed {
             v[key] = json!(row_value(x, min, max, decimals));
         }
-        e.add(Edit::of(&r));
+        e.add(r);
     }
     e
 }
 
 fn gradient_slider(ui: &mut egui::Ui, text: &str, x: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str, stops: [Color32; 2], dynamic: bool) -> Edit {
-    let r = widgets::slider_row(ui, text, x, range, unit, dynamic.then_some(&stops));
-    Edit::of(&r)
+    Row::new(tl!(text), range).unit(unit).track(dynamic.then_some(&stops[..])).show(ui, x)
 }
 
 /// Preferences ▸ Interface ▸ Dynamic Color Sliders: the colour track for a slider, or the plain
@@ -111,14 +110,14 @@ pub fn reset_adjustment_editor(ctx: &egui::Context, kind: &str, mem: egui::Id, v
 pub(super) fn color_balance(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let tone_id = color_balance_tone_id(cx.mem);
     let mut tone_ix: usize = ui.data(|d| d.get_temp(tone_id)).unwrap_or(1);
+    let mut tones = RadioSet::new(cx.mem.with("cb-tone-set"), tl!("Tone:"), &mut tone_ix).item(0).item(1).item(2).begin(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Tone:"));
         for (i, l) in [tl!("Shadows"), tl!("Midtones"), tl!("Highlights")].iter().enumerate() {
-            if ui.radio(tone_ix == i, *l).clicked() {
-                tone_ix = i;
-            }
+            tones.radio(ui, i, l);
         }
     });
+    let _ = tones.end(ui);
     ui.data_mut(|d| d.insert_temp(tone_id, tone_ix));
     let key = ["shadows", "midtones", "highlights"][tone_ix.min(2)];
     let mut vals = nums(v, key, [0.0; 3]);
@@ -130,10 +129,9 @@ pub(super) fn color_balance(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
     ];
     // Photoshop: a double-click on a slider zeroes it (this tone only); the dialog's sliders step
     // with the wheel; Up/Down step the fields; Shift makes those steps 10.
-    let gestures = widgets::RowGestures { reset: Some(0.0), wheel_step: cx.dialog.then_some(1.0), ..Default::default() };
     let mut changed = false;
     for (i, (text, a, b)) in rows.iter().enumerate() {
-        let r = Edit::of(&widgets::slider_row_with(ui, text, &mut vals[i], -100.0..=100.0, "", Some(&[*a, *b]), gestures));
+        let r = Row::new(text, -100.0..=100.0).default_value(0.0).wheel(cx.dialog.then_some(1.0)).track(Some(&[*a, *b])).show(ui, &mut vals[i]);
         changed |= r.changed;
         e.add(r);
     }
@@ -172,7 +170,7 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
             e.add(Edit::discrete(true));
         }
         let mut c = rgb_of(v, "tintColor", [0.882, 0.827, 0.702]);
-        let r = ui.add_enabled_ui(on, |ui| color_button(ui, &mut c)).inner;
+        let r = ui.add_enabled_ui(on, |ui| color_button(ui, "bw-tint", tl!("Tint Color"), &mut c)).inner;
         if r.changed {
             v["tintColor"] = json!(adjust_params::hex(c));
         }
@@ -197,16 +195,25 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
     let preset = PHOTO_FILTERS.iter().find(|f| adjust_params::hex(f.2.map(|x| f32::from(x) / 255.0)) == hex).map(|f| f.0);
     let mode_id = cx.mem.with("pf-mode");
     let mut use_color: bool = ui.data(|d| d.get_temp(mode_id)).unwrap_or(preset.is_none());
+    let mut mode = usize::from(use_color);
+    let mut modes = RadioSet::new(cx.mem.with("pf-mode-set"), tl!("Source"), &mut mode).item(0).item(1).begin(ui);
+    use_color = mode == 1;
     ui.horizontal(|ui| {
-        if ui.radio(!use_color, tl!("Filter:")).clicked() {
-            use_color = false;
-        }
+        modes.radio(ui, 0, tl!("Filter:"));
         let mut sel = preset.unwrap_or("custom").to_string();
         let mut opts: Vec<(String, &str)> = PHOTO_FILTERS.iter().map(|f| (f.0.to_string(), f.1)).collect();
         if preset.is_none() {
             opts.insert(0, ("custom".into(), "Custom"));
         }
-        let changed = ui.add_enabled_ui(!use_color, |ui| craft_ui::controls::Select::new(&format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()).inner;
+        let changed = ui
+            .add_enabled_ui(!use_color, |ui| {
+                craft_ui::controls::Select::new(&format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel)
+                    .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
+                    .show(ui)
+                    .response
+                    .changed()
+            })
+            .inner;
         if changed && let Some(f) = PHOTO_FILTERS.iter().find(|f| f.0 == sel) {
             c = f.2.map(|x| f32::from(x) / 255.0);
             v["color"] = json!(adjust_params::hex(c));
@@ -214,16 +221,15 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         }
     });
     ui.horizontal(|ui| {
-        if ui.radio(use_color, tl!("Color:")).clicked() {
-            use_color = true;
-        }
-        let r = ui.add_enabled_ui(use_color, |ui| color_button(ui, &mut c)).inner;
+        modes.radio(ui, 1, tl!("Color:"));
+        let r = ui.add_enabled_ui(use_color, |ui| color_button(ui, "pf-color", tl!("Color"), &mut c)).inner;
         if r.changed {
             v["color"] = json!(adjust_params::hex(c));
         }
         e.add(r);
     });
-    ui.data_mut(|d| d.insert_temp(mode_id, use_color));
+    let _ = modes.end(ui);
+    ui.data_mut(|d| d.insert_temp(mode_id, mode == 1));
     e.add(sliders(ui, v, &[("density", tl!("Density"), 0.0, 100.0, 25.0, "%", None)]));
     let mut pl = flag(v, "preserveLuminosity", true);
     if craft_ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
@@ -237,7 +243,6 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
 // Channel Mixer
 
 pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
-    let t = Tokens::get(ui.ctx());
     let mono = flag(v, "monochrome", false);
     let out_id = cx.mem.with("cm-out");
     let mut out: usize = ui.data(|d| d.get_temp(out_id)).unwrap_or(0);
@@ -247,7 +252,11 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
     }
     ui.horizontal(|ui| {
         label(ui, tl!("Output Channel:"));
-        craft_ui::controls::Select::new(&format!("{out_id:?}"), tl!("Output Channel:"), &mut out).rows(outs.len(), |i| outs[i].0.clone(), |i| tl!(outs[i].1)).show(ui).response.changed();
+        craft_ui::controls::Select::new(&format!("{out_id:?}"), tl!("Output Channel:"), &mut out)
+            .rows(outs.len(), |i| outs[i].0.clone(), |i| tl!(outs[i].1))
+            .show(ui)
+            .response
+            .changed();
     });
     ui.data_mut(|d| d.insert_temp(out_id, out));
     let key = if mono { "gray" } else { ["red", "green", "blue"][out] };
@@ -263,12 +272,15 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
     let total = row[0] + row[1] + row[2];
     ui.horizontal(|ui| {
         label(ui, tl!("Total:"));
-        let warn = total > 100.0;
-        ui.label(RichText::new(format!("{total:+.0}%")).font(crate::theme::mono(12.0)).color(if warn { t.warning } else { t.text }));
+        let mut format = Text::format(&LibTokens::of(ui), TypeRole::Mono, Content::Normal);
+        if total > 100.0 {
+            format.color = craft_ui::theme::current(ui.ctx()).color.status.warn.fg.to_egui();
+        }
+        ui.label(egui::text::LayoutJob::single_section(format!("{total:+.0}%"), format));
     });
-    let r = widgets::slider_row(ui, tl!("Constant"), &mut row[3], -200.0..=200.0, "%", None);
-    changed |= r.changed();
-    e.add(Edit::of(&r));
+    let r = Row::new(tl!("Constant"), -200.0..=200.0).unit("%").show(ui, &mut row[3]);
+    changed |= r.changed;
+    e.add(r);
     if changed {
         v[key] = json!(row.map(f32::round));
     }
