@@ -53,8 +53,8 @@ fn fresh_cache(app: &mut PhotocraftApp, ui: &egui::Ui) -> ItemCache {
     let keys =
         ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, key, modifiers, .. } if modifiers.alt || *key == egui::Key::F10)));
     let hovered = ctx.pointer_hover_pos().is_some_and(|p| ui.max_rect().contains(p));
-    let input = crate::native_menu::had_input(ctx);
-    let state = crate::native_menu::state_hash(app, None);
+    let input = craft_menu::had_input(ctx);
+    let state = super::state::state_hash(app, None);
     let language = lang.code().to_string();
     match kept {
         Some(c) if c.language == language && !((open || hovered || keys) && (c.state != state || (open && input))) => c,

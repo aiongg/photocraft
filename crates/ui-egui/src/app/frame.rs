@@ -1,6 +1,6 @@
 use super::{
     PhotocraftApp, analysis_ui, brush_panel, brush_picker, camera_raw_ui, canvas, dds_options_ui, dialogs, discard_ui, distort_ui, field_wheel, file_open,
-    gpu_canvas, gpu_status, gradient_ui, i18n, jobs_ui, jpeg_options_ui, kys_import, last_brush, layers_panel_ui, monitor_status, native_menu, notices,
+    gpu_canvas, gpu_status, gradient_ui, i18n, jobs_ui, jpeg_options_ui, kys_import, last_brush, layers_panel_ui, mac_bar, monitor_status, notices,
     paint_mouse, palette, panels, prefs_ui, preset_panels, rasterize_prompt, screen_picker, shape_stroke_ui, shortcuts, targa_options_ui, text_field_menu,
     theme, tiff_options_ui, timeline_ui, titlebar, tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, updates_ui, vector_ui, view_cmds,
     wide_angle_ui, work_area, workspace_ui,
@@ -52,7 +52,7 @@ impl PhotocraftApp {
         // sees their released budget.
         self.drain_captures(ctx);
         self.drain_control(ctx);
-        native_menu::run(self, ctx);
+        mac_bar::run(self, ctx);
         // Switching tools commits, also between the Type and Type Mask tools.
         if self.ui.text_edit.as_ref().is_some_and(|ed| !self.ui.tool.is_type() || ed.mask != self.ui.tool.is_type_mask()) {
             type_tool::commit(self);
@@ -325,7 +325,7 @@ impl PhotocraftApp {
         panels::remember_panel_state(&ctx);
         self.automation_input = false;
         shape_stroke_ui::finish_frame(self, &ctx);
-        native_menu::sync(self, &ctx);
+        mac_bar::sync(self, &ctx);
         if screen_picker::busy(&ctx) {
             // Block input without a backdrop: the worker may still be capturing the screen.
             egui::Modal::new(egui::Id::unique("screen-color-wait")).frame(egui::Frame::NONE).backdrop_color(egui::Color32::TRANSPARENT).show(&ctx, |_| {});

@@ -18,8 +18,8 @@ fn mask_toggle_label_follows_history_and_selected_layer() {
         assert_eq!(item.enabled, label.is_some());
         assert_eq!(item.label, label.unwrap_or("Enable Layer Mask"));
         for lang in [crate::i18n::Lang::EN, crate::i18n::Lang::from_pref("fr")] {
-            let layout = crate::native_menu::photocraft_layout(&crate::menus::menu_items(app), lang, lang.code());
-            let native = layout.bar.find(toggle).unwrap();
+            let layout = crate::mac_bar::mac_layout(&crate::menus::menu_items(app), lang, lang.code());
+            let native = layout.bar.find(&toggle.into()).unwrap();
             assert_eq!(native.label, crate::i18n::tr(lang, &item.label));
             assert_eq!(native.enabled, item.enabled);
         }

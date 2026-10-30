@@ -17,7 +17,7 @@
 //! crashes inside the driver also falls back by itself next time (see `gpu_startup`).
 //!
 //! `--in-window-menus` (or `PHOTOCRAFT_IN_WINDOW_MENUS=1`) keeps the menus inside the window on
-//! macOS instead of the macOS menu bar (`mac_menu`).
+//! macOS instead of the macOS menu bar (`photocraft_ui_egui::mac_bar`).
 //!
 //! `--control <port>` (or `PHOTOCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control server.
 //! The first line must authenticate; subsequent request lines get reply lines.
@@ -43,8 +43,6 @@ mod gpu_startup;
 #[cfg(target_os = "linux")]
 #[cfg(target_os = "linux")]
 mod launch_args;
-#[cfg(target_os = "macos")]
-mod mac_menu;
 #[cfg(target_os = "macos")]
 mod mac_window;
 // Pure logic is tested on every platform; only Linux runs the check.
@@ -606,7 +604,7 @@ fn main() -> eframe::Result {
                 app.services.quit = Some(Box::new(mac_window::terminate_later));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
-                    app.services.native_menu = mac_menu::install(&cc.egui_ctx, &app);
+                    app.services.native_menu = photocraft_ui_egui::mac_bar::install(&cc.egui_ctx, &app);
                 }
             }
             #[cfg(not(target_os = "macos"))]

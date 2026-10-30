@@ -1,7 +1,4 @@
-use super::{
-    CaptionStyle, Document, FileDialogFn, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, native_menu, screen_picker,
-    targa_options_ui,
-};
+use super::{CaptionStyle, Document, FileDialogFn, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, screen_picker, targa_options_ui};
 
 /// The error a save gets while another save waits on its format prompt.
 pub(crate) const SAVE_OPTIONS_OPEN: &str = "Answer the TIFF, Targa, DDS or JPEG Options before starting another save";
@@ -444,7 +441,7 @@ pub struct Services {
     /// `monitor_status`). Without one, the canvas uses the profile chosen in Color Settings, or sRGB.
     pub read_displays: Option<monitor_status::ReadDisplaysFn>,
     /// The macOS menu bar, when the desktop app installed one; the in-window menus are hidden then.
-    pub native_menu: Option<native_menu::NativeMenu>,
+    pub native_menu: Option<craft_menu::NativeMenu>,
     /// Ends the app once leaving is settled (nothing unsaved, or the prompt answered), instead of
     /// letting eframe close the window. macOS: `-[NSApplication terminate:]`. Closing the window
     /// while AppKit's run loop is still going crashes or hangs Touch Bar Macs (#1575, #1458).

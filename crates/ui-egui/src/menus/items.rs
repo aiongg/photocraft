@@ -260,7 +260,7 @@ pub(super) fn menu_tint(name: &str) -> Option<egui::Color32> {
 
 /// The menus' rows for the library bar, kept between frames.
 pub(crate) struct ItemCache {
-    /// [`crate::native_menu::state_hash`] of the state the rows were built from.
+    /// [`super::state::state_hash`] of the state the rows were built from.
     pub(super) state: u64,
     /// The UI language the rows are written in.
     pub(super) language: String,

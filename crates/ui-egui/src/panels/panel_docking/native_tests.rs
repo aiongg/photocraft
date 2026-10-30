@@ -260,13 +260,14 @@ fn keys_pressed_in_a_panel_window_run_photocrafts_shortcuts() {
 }
 
 /// The Mac menu bar, reporting one key equivalent.
-struct MenuKey(Vec<crate::native_menu::Event>);
+struct MenuKey(Vec<craft_menu::Event>);
 
-impl crate::native_menu::Backend for MenuKey {
-    fn sync(&mut self, _: &crate::native_menu::MenuBar) {}
-    fn drain(&mut self) -> Vec<crate::native_menu::Event> {
+impl craft_menu::Backend for MenuKey {
+    fn sync(&mut self, _: &craft_menu::MenuBar) {}
+    fn drain(&mut self) -> Vec<craft_menu::Event> {
         std::mem::take(&mut self.0)
     }
+    fn attach(&mut self, _: craft_menu::Dispatch) {}
 }
 
 #[test]
@@ -284,8 +285,9 @@ fn a_menu_key_typed_in_a_panel_windows_text_field_goes_to_the_field() {
 
     let layers = |desktop: &Desktop| desktop.h.state().session.active().unwrap().doc.layers.len();
     let before = layers(&desktop);
-    let paste = crate::native_menu::Chord::parse("Cmd+V").unwrap();
-    desktop.h.state_mut().services.native_menu = Some(crate::native_menu::NativeMenu::new(Box::new(MenuKey(vec![crate::native_menu::Event::Key(paste)]))));
+    let paste = "Cmd+V".parse::<craft_menu::Chord>().unwrap();
+    desktop.h.state_mut().services.native_menu =
+        Some(craft_menu::NativeMenu::new(Box::new(MenuKey(vec![craft_menu::Event::Key(paste)]))).clipboard_keys(craft_menu::ClipboardKeys::Raw));
     let mut raw = egui::RawInput { viewports: desktop.host.borrow().infos(), ..Default::default() };
     let ctx = desktop.h.ctx.clone();
     eframe::App::raw_input_hook(desktop.h.state_mut(), &ctx, &mut raw);

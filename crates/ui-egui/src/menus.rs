@@ -9,8 +9,8 @@ mod bar;
 pub mod enable_rules;
 mod invoke;
 mod items;
+pub mod mac_bar;
 mod model;
-pub mod native_menu;
 pub mod parity;
 pub mod plugin_ui;
 mod state;
@@ -252,19 +252,19 @@ mod window_documents_tests {
     #[test]
     fn document_names_are_shown_as_they_are_and_follow_a_rename() {
         let mut app = app(1);
-        let before = crate::native_menu::state_hash(&app, None);
+        let before = state::state_hash(&app, None);
         if let Some(d) = app.session.active_mut() {
             d.saved_to("/tmp/Layers".into());
         }
-        assert_ne!(crate::native_menu::state_hash(&app, None), before, "a rename updates the native menu");
+        assert_ne!(state::state_hash(&app, None), before, "a rename updates the native menu");
         let de = crate::i18n::Lang::from_code("de").unwrap();
         let items = menu_items(&app);
         let row = items.iter().find(|i| i.id == "window.document.0").unwrap();
         assert_eq!(translated_menu_label(de, row), "Layers");
-        let bar = crate::native_menu::photocraft_layout(&items, de, "de").bar;
-        assert_eq!(bar.find("window.document.0").map(|i| i.label.as_str()), Some("Layers"));
+        let bar = crate::mac_bar::mac_layout(&items, de, "de").bar;
+        assert_eq!(bar.find(&"window.document.0".into()).map(|i| i.label.as_str()), Some("Layers"));
         let panel = items.iter().find(|i| i.path == ["Window"] && i.label == "Layers").unwrap();
-        assert_eq!(bar.find(&panel.id).map(|i| i.label.clone()), Some(translated_menu_label(de, panel)), "Window › Layers is still translated");
+        assert_eq!(bar.find(&panel.id.as_str().into()).map(|i| i.label.clone()), Some(translated_menu_label(de, panel)), "Window › Layers is still translated");
     }
 
     /// The rows go through the control channel's `ui.menu.invoke`, like a click.

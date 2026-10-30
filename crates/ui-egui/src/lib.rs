@@ -190,7 +190,7 @@ pub use input::stylus;
 use input::tool_shortcuts;
 pub use input::touch_twins;
 pub use menus::enable_rules;
-pub use menus::native_menu;
+pub use menus::mac_bar;
 pub use menus::parity;
 pub use menus::plugin_ui;
 pub use menus::view_cmds;

@@ -2,11 +2,11 @@ use super::services::{ExportSettings, FormatChoices, SAVE_OPTIONS_OPEN, SaveKind
 use super::{
     ControlRequest, DocId, Document, HashMap, PhotocraftApp, Receiver, Session, SyntheticTarget, Tool, UiState, Value, actions, analysis_ui, brush_panel,
     brush_picker, camera_raw_ui, canvas, dds_options_ui, delete_layer_prompt, dialogs, discard_ui, distort_ui, dock, field_wheel, file_open, gpu_canvas,
-    gpu_status, gradient_ui, histogram_panel, i18n, jobs_ui, jpeg_options_ui, json, kys_import, last_brush, layers_panel_ui, mask_thumbs_ui, mask_trash_prompt,
-    monitor_status, native_menu, notices, open_prompt, paint_mouse, palette, panel_docking, panels, prefs_ui, preset_files_ui, preset_panels, rasterize_prompt,
-    screen_picker, shape_stroke_ui, shortcuts, single_line_drag, state, stroke_trace, stylus, targa_options_ui, text_field_menu, theme, tiff_options_ui,
-    timeline_ui, titlebar, tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, type_transform, updates_ui, vector_ui, view_cmds, wheel_nav,
-    wide_angle_ui, widgets, work_area, workspace_ui,
+    gpu_status, gradient_ui, histogram_panel, i18n, jobs_ui, jpeg_options_ui, json, kys_import, last_brush, layers_panel_ui, mac_bar, mask_thumbs_ui,
+    mask_trash_prompt, monitor_status, notices, open_prompt, paint_mouse, palette, panel_docking, panels, prefs_ui, preset_files_ui, preset_panels,
+    rasterize_prompt, screen_picker, shape_stroke_ui, shortcuts, single_line_drag, state, stroke_trace, stylus, targa_options_ui, text_field_menu, theme,
+    tiff_options_ui, timeline_ui, titlebar, tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, type_transform, updates_ui, vector_ui,
+    view_cmds, wheel_nav, wide_angle_ui, widgets, work_area, workspace_ui,
 };
 
 mod clipboard;
@@ -241,7 +241,7 @@ impl eframe::App for PhotocraftApp {
         if self.ui.view.hides_chrome() && self.tab_runs_toggle_panels(raw_input) && craft_ui::shell::take_tab_toggle(ctx, raw_input) {
             craft_ui::shell::AppShell::toggle_reveal(ctx, &Self::window_key());
         }
-        // Native menu key equivalents become the key presses they were (see `native_menu`).
+        // Native menu key equivalents become the key presses they were (see `mac_bar`).
         if let Some(menu) = self.services.native_menu.as_mut() {
             menu.raw_input(raw_input);
         }

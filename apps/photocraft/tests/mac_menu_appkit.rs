@@ -1,16 +1,9 @@
 //! The macOS menu bar end to end, on the main thread (`harness = false`): install it through the
-//! real muda backend (`src/mac_menu.rs`), read AppKit's menu bar back, open a document and see the
+//! real craft-menu backend (`photocraft_ui_egui::mac_bar`), read AppKit's menu bar back, open a document and see the
 //! items update in place, then choose items the two ways AppKit can: a key equivalent (a real ⌘R
 //! key-down through `-[NSMenu performKeyEquivalent:]`) must reach egui as the key press it was, and
 //! a click (`-[NSMenu performActionForItemAtIndex:]`) must run as a click, also when the click is
 //! ↩ inside the open menu.
-
-// The app's own module, built into this test (cargo builds harness = false tests with cfg(test), so its
-// unit tests compile here too without a harness to run them).
-#[cfg(target_os = "macos")]
-#[path = "../src/mac_menu.rs"]
-#[allow(unused_imports, dead_code)]
-mod mac_menu;
 
 #[cfg(target_os = "macos")]
 fn main() {
@@ -19,7 +12,7 @@ fn main() {
     use objc2_app_kit::{NSApplication, NSEvent, NSEventMask, NSEventModifierFlags, NSEventSubtype, NSEventType, NSMenu};
     use objc2_foundation::{NSPoint, NSString};
     use photocraft_ui_egui::PhotocraftApp;
-    use photocraft_ui_egui::native_menu;
+    use photocraft_ui_egui::mac_bar;
     use serde_json::json;
 
     // Without a harness nothing answers cargo-nextest's `--list`, so it ran the whole test as its
@@ -97,13 +90,13 @@ fn main() {
     let ctx = egui::Context::default();
     let frame = |app: &mut PhotocraftApp, raw: egui::RawInput| {
         let mut out = ctx.run_ui(raw, |ui| {
-            native_menu::run(app, ui.ctx());
+            mac_bar::run(app, ui.ctx());
             photocraft_ui_egui::shortcuts::handle(app, ui.ctx());
-            native_menu::sync(app, ui.ctx());
+            mac_bar::sync(app, ui.ctx());
         });
         out.textures_delta.clear();
     };
-    app.services.native_menu = mac_menu::install(&ctx, &app);
+    app.services.native_menu = mac_bar::install(&ctx, &app);
     assert!(app.services.native_menu.is_some(), "the menu bar installed");
 
     // The Mac layout, as AppKit has it.

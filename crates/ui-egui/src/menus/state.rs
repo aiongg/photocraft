@@ -2,6 +2,7 @@ use super::invoke::{panel_alias, proof_preset, workspace_name};
 #[cfg(test)]
 use super::items::MenuItem;
 use super::{DOCUMENT_ITEM, PhotocraftApp, Value};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if crate::tool_shortcuts::tool(id).is_some() {
@@ -234,4 +235,31 @@ pub(super) fn translated_label(lang: crate::i18n::Lang, id: &str, label: &str) -
         return crate::i18n::tr_id(lang, id, "Quick Export as PNG").replace("PNG", fmt);
     }
     crate::i18n::tr_id(lang, id, label).to_string()
+}
+
+/// What the menus' rows depend on, cheaply: commands run, the documents (their names, in tab
+/// order, for the Window menu) and the active one's revision,
+/// selection, recent files, panels and view state, the language. `input` forces a change on
+/// frames with a click or key press, which covers state the hash doesn't list.
+pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
+    let mut h = DefaultHasher::new();
+    input.hash(&mut h);
+    let s = &app.session;
+    s.journal.len().hash(&mut h);
+    s.active_index().hash(&mut h);
+    for d in s.documents() {
+        (d.doc.id.0, &d.doc.name).hash(&mut h);
+    }
+    s.clipboard.is_some().hash(&mut h);
+    // A running job greys the commands that would change its document.
+    s.has_jobs().hash(&mut h);
+    if let Some(d) = s.active() {
+        (d.doc.id.0, d.revision, d.active_layer.map(|l| l.0), d.selected_layers.len(), d.isolated_layers.len()).hash(&mut h);
+    }
+    let ui = &app.ui;
+    (&ui.recent_files, &ui.workspace, ui.palette_open, ui.transform.is_some(), ui.text_edit.is_some(), ui.dialogs.len()).hash(&mut h);
+    (app.discard.is_some(), app.camera_raw.is_some(), crate::distort_ui::modal_workspace(app)).hash(&mut h);
+    serde_json::to_string(&(&ui.panels, &ui.extras, &ui.view, ui.theme, ui.tool)).unwrap_or_default().hash(&mut h);
+    s.prefs().interface.language.hash(&mut h);
+    h.finish()
 }

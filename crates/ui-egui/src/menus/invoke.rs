@@ -682,8 +682,8 @@ fn invoke_window_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str)
             app.set_theme(ctx, theme);
             Some(Ok(Value::Null))
         }
-        _ if id.starts_with(crate::native_menu::LANGUAGE_PREFIX) => {
-            let code = &id[crate::native_menu::LANGUAGE_PREFIX.len()..];
+        _ if id.starts_with(super::mac_bar::LANGUAGE_PREFIX) => {
+            let code = &id[super::mac_bar::LANGUAGE_PREFIX.len()..];
             if code != "auto" && !crate::i18n::Lang::all().any(|lang| lang.code() == code) {
                 Some(Err(format!("unknown UI language `{code}`")))
             } else {
