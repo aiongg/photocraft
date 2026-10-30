@@ -286,10 +286,12 @@ class Scan:
 
 # PhotoCraft keeps a flat `Tokens` (theme/library.rs, `Tokens::from_library`) next to the library's
 # `UiTokens`. These fields exist only on the flat struct, or differ from the library token in some
-# theme (dark `danger`/`warning` use the solid colour, `accent_text` on Pro dark and Classic, the
-# Studio layouts clear `tab_strip`/`row_selected`), so a file that reads one keeps its flat
+# theme (the Studio layouts clear `tab_strip`/`row_selected`), so a file that reads one keeps its flat
 # `Tokens` bindings and none of its token reads or `Tokens::get` calls are rewritten.
-FLAT_FIELDS = ("pro", "bevel", "kind", "round_chips", "canvas_dot", "histogram_level", "danger", "warning", "accent_text", "tab_strip", "row_selected")
+FLAT_FIELDS = ("pro", "bevel", "kind", "round_chips", "canvas_dot", "histogram_level", "tab_strip", "row_selected")
+# `accent_text` is rewritten by role: content drawn on a selected fill reads `text.on_selected`
+# (the files below); accent-coloured text and lines on a panel or canvas read `accent.text`.
+ACCENT_TEXT_ON_SELECTED = {"icons.rs", "dialogs/color_range_ui.rs", "tools/analysis_ui.rs", "tools/shape_stroke_ui/editor.rs"}
 FLAT_METHODS = ("histogram_color", "histogram_fill", "layer_label_colors", "layer_label_icon", "scope_hue", "histogram_background", "field_selection", "knob_outline", "dark")
 # Files found flat by compile feedback: the flat value is handed on (a `&Tokens` parameter, a
 # struct field) or shadowed.
@@ -476,6 +478,8 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
             rewrite("token", a, b, f"{recv}.shape.radius.{role}", f"{field} -> shape.radius.{role}")
             continue
         tok = COLOR_FIELDS[field]
+        if field == "accent_text" and str(rel) in ACCENT_TEXT_ON_SELECTED:
+            tok = "color.text.on_selected"
         rewrite("token", a, b, f"{recv}.{tok}.to_egui()", f"{field} -> {tok}")
 
     # ---- 2. Tokens::get
@@ -498,7 +502,8 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if field in RADIUS_FIELDS:
             end, suffix = close + 1 + chain.end(), f".shape.radius.{RADIUS_FIELDS[field]}"
         elif field:
-            end, suffix = close + 1 + chain.end(), f".{COLOR_FIELDS[field]}.to_egui()"
+            tok = "color.text.on_selected" if field == "accent_text" and str(rel) in ACCENT_TEXT_ON_SELECTED else COLOR_FIELDS[field]
+            end, suffix = close + 1 + chain.end(), f".{tok}.to_egui()"
         am = re.fullmatch(r"&?\s*(\w+)\.ctx\(\)", arg)
         if am and re.fullmatch(r"(?:\w*_)?ui(?:_\w+)?|ui\d*", am.group(1)):
             rewrite("tokens_get", mm.start(), end, f"craft_ui::theme::current({am.group(1)}.ctx()){suffix}", "Tokens::get(ui.ctx()) -> craft_ui::theme::current(ui.ctx())")
