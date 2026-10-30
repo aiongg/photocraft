@@ -109,7 +109,7 @@ fn home_recent(ui: &mut egui::Ui, recent: &[String]) -> Option<RecentAction> {
             let remove_label = crate::i18n::fmt(tl!("Remove {name} from Recent"), &[("name", &name)]);
             let close = ControlSize::Sm;
             let mut removed = false;
-            let mut row = ListRow::new(path.as_str(), name.clone()).icon(Icon::File);
+            let mut row = ListRow::new(path.clone(), name.clone()).icon(Icon::File);
             if !folder.is_empty() {
                 row = row.detail(folder);
             }

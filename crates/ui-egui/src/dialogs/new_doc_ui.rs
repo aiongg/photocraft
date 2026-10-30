@@ -453,7 +453,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
             let s = &preset.settings;
             let detail = format!("{} × {} px @ {} ppi · {}/{}", s.width, s.height, s.resolution, s.mode.to_uppercase(), s.depth);
             let mut delete = false;
-            let row = ListRow::new(preset.name.as_str(), preset.name.as_str())
+            let row = ListRow::new(preset.name.clone(), preset.name.as_str())
                 .detail(detail)
                 .selected(selected)
                 .trailing_item(84.0, |ui| {
