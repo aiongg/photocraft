@@ -10,9 +10,9 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 
 [workspace.dependencies]
-craft-theme = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee", features = ["serde", "ecolor"] }
-craft-theme-store = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee", features = ["serde"] }
-craft-ui = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee", features = ["serde", "window-frame"] }
+craft-theme = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa", features = ["serde", "ecolor"] }
+craft-theme-store = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa", features = ["serde"] }
+craft-ui = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa", features = ["serde", "window-frame"] }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
@@ -41,15 +41,15 @@ photocraft-tablet = { path = "crates/tablet" }
 photocraft-ipp = { path = "crates/ipp" }
 
 # external
-craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
-craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
-craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
-craft-menu = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
-craft-keymap = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
-craft-platform = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee", features = ["appearance", "egui"] }
-craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee" }
+craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
+craft-docpath = { version = "0.1.0", git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
+craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
+craft-menu = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
+craft-keymap = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
+craft-platform = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa", features = ["appearance", "egui"] }
+craft-window = { git = "https://github.com/aiongg/craft-libs", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa" }
 # craft-update: app-specific pretend versions apply to startup and manual checks.
-craft-update = { git = "https://github.com/aiongg/craft-libs", version = "=0.1.0", rev = "a6ddc7420627d829a98fee3a98d29e6c6dc329ee", features = ["egui"] }
+craft-update = { git = "https://github.com/aiongg/craft-libs", version = "=0.1.0", rev = "5849d0ca2d3bc8bbad387a713d48f5a639648efa", features = ["egui"] }
 thiserror = "2"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
