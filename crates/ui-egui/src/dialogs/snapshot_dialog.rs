@@ -3,12 +3,10 @@
 //! document, its layers merged, or only the current layer). The command stays directly callable
 //! with the same params by agents and Actions.
 
-use craft_ui::theme::ToEgui;
-use egui::{Align2, Sense, pos2, vec2};
+use craft_ui::composites::FormGrid;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 pub const COMMAND: &str = "history.newSnapshot";
 const MARK: &str = "__newSnapshot";
@@ -33,40 +31,29 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     app.run(COMMAND, json!({"name": f.get("name"), "from": f.get("from")}))
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(64.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.color.text.muted.to_egui());
-}
-
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    ui.spacing_mut().item_spacing.y = 6.0;
-    ui.horizontal(|ui| {
-        label(ui, tl!("Name:"));
-        let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
-        let r = ui.add(egui::TextEdit::singleline(&mut name).desired_width(260.0));
-        // Opens on the name, selected, so typing replaces it (Photoshop).
-        if !ui.is_sizing_pass() && !f.contains_key("__named") {
-            r.request_focus();
-            if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), r.id) {
-                let all = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(name.chars().count()));
-                state.cursor.set_char_range(Some(all));
-                state.store(ui.ctx(), r.id);
+    use craft_ui::controls::Select;
+    FormGrid::new("new-snapshot").show(ui, |form| {
+        form.row(tl!("Name:"), |ui, _| {
+            let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
+            let edit = crate::widgets::dialog_text(ui, "new-snapshot-name", tl!("Name:"), &mut name);
+            if edit.changed {
+                f.insert("name".into(), json!(name));
             }
-            f.insert("__named".into(), json!(true));
-        }
-        f.insert("name".into(), json!(name));
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("From:"));
-        let mut from = f.get("from").and_then(Value::as_str).unwrap_or("fullDocument").to_string();
-        let opts = [
-            ("fullDocument".to_string(), tl!("Full Document")),
-            ("mergedLayers".to_string(), tl!("Merged Layers")),
-            ("currentLayer".to_string(), tl!("Current Layer")),
-        ];
-        if craft_ui::controls::Select::new("new-snapshot-from", tl!("From"), &mut from).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
-            f.insert("from".into(), json!(from));
-        }
+            edit.response
+        });
+        form.row(tl!("From:"), |ui, _| {
+            let mut from = f.get("from").and_then(Value::as_str).unwrap_or("fullDocument").to_string();
+            let opts = [
+                ("fullDocument".to_string(), tl!("Full Document")),
+                ("mergedLayers".to_string(), tl!("Merged Layers")),
+                ("currentLayer".to_string(), tl!("Current Layer")),
+            ];
+            let edit = Select::new("new-snapshot-from", tl!("From"), &mut from).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
+            if edit.response.changed() {
+                f.insert("from".into(), json!(from));
+            }
+            edit
+        });
     });
 }

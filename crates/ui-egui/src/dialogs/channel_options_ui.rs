@@ -13,7 +13,6 @@ use photocraft_doc::ColorIndicates;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 pub const COMMAND: &str = "channel.options";
 const MARK: &str = "__channelOptions";

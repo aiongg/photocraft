@@ -2,7 +2,7 @@
 
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
-use egui::{Color32, Stroke};
+use egui::Color32;
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 

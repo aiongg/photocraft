@@ -53,16 +53,38 @@ fn pending(app: &PhotocraftApp, fields: &Map<String, Value>) -> Option<(Vec<[u8;
     Some((t.colors, t.transparent.map(u16::from)))
 }
 
-/// Load…/Save… row for the Color Table dialog (`id` finds its fields after the file picker
-/// answers, as the picker is asynchronous).
-pub fn buttons(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: u64, fields: &mut Map<String, Value>) {
-    // `fields` is the frame's copy that the dialog writes back and OK sends: drop the loaded
-    // table there once a preset is picked, so OK applies what the Table menu shows.
+/// What the Load… and Save… buttons asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Action {
+    Load,
+    Save,
+}
+
+/// Drops the loaded table from the frame's copy of `fields` (the one the dialog writes back and OK
+/// sends) once a preset is picked, so OK applies what the Table menu shows.
+pub fn body_done(fields: &mut Map<String, Value>) {
     drop_loaded_unless_custom(fields);
-    let fields = &*fields;
-    ui.horizontal(|ui| {
-        if ui.button(tl!("Load…")).clicked()
-            && let Err(e) = app.pick_file_bytes_filtered(&["act"], move |app, name, bytes| {
+}
+
+/// The Load… and Save… buttons at the footer's trailing edge: the button pressed, if any.
+pub fn buttons(ui: &mut egui::Ui) -> Option<Action> {
+    use craft_ui::controls::{Button, ButtonVariant};
+    let mut action = None;
+    if ui.add(Button::new(tl!("Load…")).variant(ButtonVariant::Secondary)).clicked() {
+        action = Some(Action::Load);
+    }
+    if ui.add(Button::new(tl!("Save…")).variant(ButtonVariant::Secondary)).clicked() {
+        action = Some(Action::Save);
+    }
+    action
+}
+
+/// Runs a pressed button. `id` finds the dialog's fields after the file picker answers, as the
+/// picker is asynchronous; `fields` is the dialog's current copy.
+pub fn run(app: &mut PhotocraftApp, id: u64, fields: &Map<String, Value>, action: Action) {
+    match action {
+        Action::Load => {
+            if let Err(e) = app.pick_file_bytes_filtered(&["act"], move |app, name, bytes| {
                 let (colors, transparent) =
                     photocraft_engine::swatch_cmds::act_table(&bytes).map_err(|e| format!("{}: {e}", crate::file_open::display_name(&name)))?;
                 // The dialog may close while the picker is open; then there is nothing to fill.
@@ -71,13 +93,13 @@ pub fn buttons(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: u64, fields: &mut
                 d.fields.insert("colors".into(), Value::Array(colors.into_iter().map(Value::String).collect()));
                 d.fields.insert("transparent".into(), transparent.map_or(Value::Null, |i| json!(i)));
                 Ok(Value::Null)
-            })
-            && e != crate::file_dialog::CANCELLED
-        {
-            app.ui.status = e;
-            app.ui.status_error = true;
+            }) && e != crate::file_dialog::CANCELLED
+            {
+                app.ui.status = e;
+                app.ui.status_error = true;
+            }
         }
-        if ui.button(tl!("Save…")).clicked() {
+        Action::Save => {
             let Some((colors, transparent)) = pending(app, fields) else {
                 app.ui.status = tl!("There is no color table to save.").into();
                 app.ui.status_error = true;
@@ -106,7 +128,7 @@ pub fn buttons(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: u64, fields: &mut
                 app.ui.status_error = true;
             }
         }
-    });
+    }
 }
 
 #[cfg(test)]

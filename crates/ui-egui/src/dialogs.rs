@@ -357,6 +357,12 @@ fn filter_below(app: &PhotocraftApp, d: &Dialog, ui: &mut egui::Ui, fields: &mut
     }
 }
 
+/// Whether the dialog opens with its first field focused and selected, so typing replaces it
+/// (Photoshop's Name dialogs). Those bodies are library fields; the rest place focus themselves.
+fn opens_on_first_field(fields: &Fields) -> bool {
+    crate::new_layer_ui::owns(fields) || crate::new_group_ui::owns(fields) || crate::snapshot_dialog::owns(fields)
+}
+
 /// The default button's label: what OK means for this dialog.
 fn ok_label(d: &Dialog) -> &'static str {
     if d.kind == DialogKind::NewDocument {
@@ -395,7 +401,7 @@ fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool)
 /// dialog has them. `None` for the dialogs that draw their own buttons (Guide Layout, Brush Preset
 /// and the Color Picker: a column at the body's side that validates Enter itself). OK and Apply
 /// are enabled as `(ok, apply)` says once the body has run.
-fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>) -> Footer<'a> {
+fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>, table: &'a Cell<Option<crate::color_table_ui::Action>>) -> Footer<'a> {
     let fields = &d.fields;
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
@@ -422,6 +428,10 @@ fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>) -> Footer<'a> {
         return if crate::rasterize_prompt::offers_smart_object(fields) { footer.alternate(tl!("Convert to Smart Object")) } else { footer };
     }
     footer = footer.ok(ok_label(d)).ok_enabled_with(move || enabled.get().0);
+    // The Color Table dialog loads and saves `.act` files, as in Photoshop.
+    if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
+        footer = footer.trailing_extra(move |ui| table.set(crate::color_table_ui::buttons(ui).or(table.get())));
+    }
     // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open). Dialogs opt in via
     // `dialog_alt_reset::supported` (per marker).
     if crate::dialog_alt_reset::supported(fields) {
@@ -483,16 +493,17 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let color_picker = crate::color_picker_ui::owns(&fields);
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
         let enabled = Cell::new(enabled_for(app, &d, &fields));
+        let table = Cell::new(None);
         let tab = if interactive && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
-            .footer(footer_for(&d, &enabled))
+            .footer(footer_for(&d, &enabled, &table))
             .history(d.kind == DialogKind::Command)
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(InitialFocus::None);
+            .initial_focus(if opens_on_first_field(&fields) { InitialFocus::FirstField } else { InitialFocus::None });
         if let Some(offset) = crate::blur_pins::first_place(&d.fields, ctx) {
             dialog = dialog.first_place(move |_| Some(offset));
         }
@@ -524,7 +535,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 }
                 // The Color Table dialog loads and saves `.act` files, as in Photoshop.
                 if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
-                    crate::color_table_ui::buttons(&mut app, ui, d.id, fields);
+                    crate::color_table_ui::body_done(fields);
                 }
                 enabled.set(enabled_for(&app, &d, fields));
                 *private.borrow_mut() = fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -533,6 +544,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         );
         drop(app_cell);
         shown.push(response.rect);
+        if let Some(action) = table.take() {
+            crate::color_table_ui::run(app, d.id, &fields, action);
+        }
 
         // ⌘Z / ⇧⌘Z stepped the settings back: the private keys are not part of the history.
         if response.history.is_some() {
