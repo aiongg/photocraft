@@ -277,7 +277,6 @@ impl PhotocraftApp {
         workspace_ui::windows(self, &ctx);
         palette::show(self, &ctx);
         dialogs::show(self, &ctx);
-        layers_panel_ui::show_dialog(self, &ctx);
         rasterize_prompt::run_pending(self, &ctx);
         jobs_ui::dialog(self, &ctx);
         discard_ui::show(self, &ctx);

@@ -658,7 +658,6 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// a job's progress) from the frame after it first shows.
 pub(crate) fn modal_open(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
     !app.ui.dialogs.is_empty()
-        || app.ui.layers_panel_dialog.is_some()
         || app.discard.is_some()
         || app.camera_raw.is_some()
         || crate::distort_ui::modal_workspace(app).is_some()

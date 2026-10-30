@@ -1,12 +1,14 @@
 //! Layers panel flyout and display preferences, observed from Photoshop's panel menu.
 //! UI options do not edit document pixels or add history steps.
+use craft_ui::composites::GroupBox;
+use craft_ui::controls::{Checkbox, RadioGroup, RadioSet};
 use craft_ui::theme::StrokeExt;
-use egui::{self, Context, Ui};
+use egui::{self, Ui};
 use photocraft_doc::Document;
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::{LayerThumbnailContents, LayerThumbnailSize, LayersPanelDialog, LayersPanelOptions};
+use crate::state::{DialogKind, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions};
 
 const OPTIONS_PREF: &str = "ui.layersPanelOptions";
 
@@ -202,148 +204,143 @@ pub(crate) fn thumbnail_geometry(size: LayerThumbnailSize, pro: bool) -> (f32, f
     (thumb, row)
 }
 
+/// Marks the Layers panel's own dialogs (Panel Options, Lock Layers); its value names which.
+const MARK: &str = "__layersPanel";
+
+pub fn owns(fields: &Map<String, Value>) -> bool {
+    fields.contains_key(MARK)
+}
+
+fn is_lock(fields: &Map<String, Value>) -> bool {
+    fields.get(MARK).and_then(Value::as_str) == Some("lock")
+}
+
+/// The content width of the dialog with `fields`.
+pub fn width(fields: &Map<String, Value>) -> craft_ui::dialog::Width {
+    if is_lock(fields) { craft_ui::dialog::Width::Compact } else { craft_ui::dialog::Width::Fixed(360.0) }
+}
+
+/// The Panel Options dialog's `fields`: the options under their saved names, and Thumbnail Contents
+/// (`thumbnailContents`), which is saved in the shared preference instead.
+fn fields_of(options: &LayersPanelOptions) -> Map<String, Value> {
+    let mut fields = match serde_json::to_value(options) {
+        Ok(Value::Object(map)) => map,
+        _ => Map::new(),
+    };
+    fields.insert("thumbnailContents".into(), json!(options.thumbnail_contents));
+    fields
+}
+
+fn options_of(fields: &Map<String, Value>) -> LayersPanelOptions {
+    let mut options: LayersPanelOptions = serde_json::from_value(Value::Object(fields.clone())).unwrap_or_default();
+    options.thumbnail_contents = fields.get("thumbnailContents").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+    options
+}
+
+/// Opens Panel Options. Cancel never changes the persisted options.
+pub fn open_options(app: &mut PhotocraftApp) -> u64 {
+    let mut options = app.ui.layers_panel_options.clone();
+    options.thumbnail_contents = thumbnail_contents(app);
+    let mut fields = fields_of(&options);
+    fields.insert(MARK.into(), json!("options"));
+    fields.insert("__label".into(), json!("Layers Panel Options"));
+    app.ui.open_dialog(DialogKind::Command, fields)
+}
+
+/// Opens Lock Layers (the panel menu's), with Lock All set as the dialog has always started.
+pub fn open_lock(app: &mut PhotocraftApp) -> u64 {
+    let mut fields = Map::new();
+    fields.insert(MARK.into(), json!("lock"));
+    fields.insert("__label".into(), json!("Lock Layers"));
+    for key in LOCKS.map(|(key, _)| key) {
+        fields.insert(key.into(), json!(key == "all"));
+    }
+    app.ui.open_dialog(DialogKind::Command, fields)
+}
+
+/// The locks of Lock Layers, in the order the dialog lists them.
+const LOCKS: [(&str, &str); 5] = [
+    ("transparency", "Transparency"),
+    ("pixels", "Image"),
+    ("position", "Position"),
+    ("artboard", "Prevent Auto-Nesting"),
+    ("all", "All"),
+];
+
+pub fn body(ui: &mut Ui, fields: &mut Map<String, Value>) {
+    if is_lock(fields) {
+        lock_body(ui, fields);
+    } else {
+        options_body(ui, fields);
+    }
+}
+
+fn lock_body(ui: &mut Ui, fields: &mut Map<String, Value>) {
+    for (key, label) in LOCKS {
+        let mut on = fields.get(key).and_then(Value::as_bool).unwrap_or(false);
+        if Checkbox::bool(tl!(label), &mut on).show(ui).response.changed() {
+            fields.insert(key.into(), json!(on));
+        }
+    }
+}
+
 /// Content column of the Photoshop-style dialog, with fixed-size radio/preview
 /// slots rather than text labels that change the position of each thumbnail.
-fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
-    ui.group(|ui| {
-        ui.set_min_width(308.0);
-        ui.label(egui::RichText::new(tl!("Thumbnail Size")).strong());
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+fn options_body(ui: &mut Ui, fields: &mut Map<String, Value>) {
+    let mut draft = options_of(fields);
+    let before = draft.clone();
+    GroupBox::new(tl!("Thumbnail Size")).show(ui, |ui| {
         // The original Photoshop dialog has None with a label, then progressively
         // larger previews, with the radio controls aligned vertically.
-        ui.horizontal(|ui| {
-            let r = ui.radio_value(&mut draft.thumbnail_size, LayerThumbnailSize::None, tl!("None"));
-            r.on_hover_text(tl!("None"));
-        });
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        for (size, side, name) in [
-            (LayerThumbnailSize::Small, 38.0, tl!("Small")),
-            (LayerThumbnailSize::Medium, 68.0, tl!("Medium")),
-            (LayerThumbnailSize::Large, 96.0, tl!("Large")),
-        ] {
+        let sizes = [LayerThumbnailSize::None, LayerThumbnailSize::Small, LayerThumbnailSize::Medium, LayerThumbnailSize::Large];
+        let mut picked = None;
+        let mut set = RadioSet::new("layers-thumbnail-size", tl!("Thumbnail Size"), &mut draft.thumbnail_size);
+        for size in sizes {
+            set = set.item(size);
+        }
+        let mut set = set.begin(ui);
+        set.radio(ui, 0, tl!("None"));
+        for (index, side, name) in [(1, 38.0, tl!("Small")), (2, 68.0, tl!("Medium")), (3, 96.0, tl!("Large"))] {
             ui.horizontal(|ui| {
                 // Empty radio captions are intentional: the sample itself conveys
                 // size. The accessible/hover label still names the setting.
-                let radio = ui.radio_value(&mut draft.thumbnail_size, size, "");
-                radio.on_hover_text(name);
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                set.radio_named(ui, index, "", name).on_hover_text(name);
                 let (rect, response) = ui.allocate_exact_size(egui::vec2(side, side), egui::Sense::click());
                 paint_flower_example(ui, rect);
                 if response.clicked() {
-                    draft.thumbnail_size = size;
+                    picked = Some(sizes[index]);
                 }
                 response.on_hover_text(name);
             });
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        }
+        let _ = set.end(ui);
+        if let Some(size) = picked {
+            draft.thumbnail_size = size;
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    ui.group(|ui| {
-        ui.set_min_width(308.0);
-        ui.label(egui::RichText::new(tl!("Thumbnail Contents")).strong());
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.radio_value(&mut draft.thumbnail_contents, LayerThumbnailContents::LayerBounds, tl!("Layer Bounds"));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        ui.radio_value(&mut draft.thumbnail_contents, LayerThumbnailContents::EntireDocument, tl!("Entire Document"));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    GroupBox::new(tl!("Thumbnail Contents")).show(ui, |ui| {
+        let _ = RadioGroup::new("layers-thumbnail-contents", tl!("Thumbnail Contents"), &mut draft.thumbnail_contents)
+            .item(LayerThumbnailContents::LayerBounds, tl!("Layer Bounds"))
+            .item(LayerThumbnailContents::EntireDocument, tl!("Entire Document"))
+            .show(ui);
     });
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    ui.checkbox(&mut draft.use_default_masks_on_fill_layers, tl!("Use Default Masks on Fill Layers"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    ui.checkbox(&mut draft.expand_new_effects, tl!("Expand New Effects"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    ui.checkbox(&mut draft.add_copy_to_copied_layers_and_groups, tl!("Add “copy” to Copied Layers and Groups"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    ui.checkbox(&mut draft.preview_on_canvas_when_reordering_layers, tl!("Preview on canvas when reordering layers"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    ui.checkbox(&mut draft.show_layer_mask_badges, tl!("Show layer mask badges"));
+    let _ = Checkbox::bool(tl!("Use Default Masks on Fill Layers"), &mut draft.use_default_masks_on_fill_layers).show(ui);
+    let _ = Checkbox::bool(tl!("Expand New Effects"), &mut draft.expand_new_effects).show(ui);
+    let _ = Checkbox::bool(tl!("Add “copy” to Copied Layers and Groups"), &mut draft.add_copy_to_copied_layers_and_groups).show(ui);
+    let _ = Checkbox::bool(tl!("Preview on canvas when reordering layers"), &mut draft.preview_on_canvas_when_reordering_layers).show(ui);
+    let _ = Checkbox::bool(tl!("Show layer mask badges"), &mut draft.show_layer_mask_badges).show(ui);
+    if draft != before {
+        *fields = fields_of(&draft).into_iter().chain(fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone()))).collect();
+    }
 }
 
-/// Show the pending Layers panel dialog (Panel Options, New Layer, New Group, Lock Layers) as a modal and apply it on OK.
-pub fn show_dialog(app: &mut PhotocraftApp, ctx: &Context) {
-    let Some(mut dialog) = app.ui.layers_panel_dialog.take() else { return };
-    let mut confirmed = false;
-    let mut cancelled = ctx.input(|i| i.key_pressed(egui::Key::Escape));
-    let title = match &dialog {
-        LayersPanelDialog::PanelOptions(_) => tl!("Layers Panel Options"),
-        LayersPanelDialog::NewLayer(_) => tl!("New Layer"),
-        LayersPanelDialog::NewGroup(_) => tl!("New Group"),
-        LayersPanelDialog::LockLayers { .. } => tl!("Lock Layers"),
-    };
-    egui::Modal::new(egui::Id::unique("layers-panel-options-modal")).show(ctx, |ui| {
-        ui.set_width(if matches!(dialog, LayersPanelDialog::PanelOptions(_)) { 480.0 } else { 380.0 });
-        ui.horizontal(|ui| {
-            ui.heading(title);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("×").on_hover_text(tl!("Cancel")).clicked() {
-                    cancelled = true;
-                }
-            });
-        });
-        ui.separator();
-        match &mut dialog {
-            LayersPanelDialog::PanelOptions(opts) => {
-                ui.horizontal_top(|ui| {
-                    ui.vertical(|ui| {
-                        ui.set_width(345.0);
-                        ui.vertical(|ui| options_body(ui, opts));
-                    });
-                    ui.add_space(craft_ui::theme::scale::Space::S12.px());
-                    ui.vertical(|ui| {
-                        ui.set_min_width(74.0);
-                        if ui.add_sized([74.0, 29.0], egui::Button::new(tl!("OK"))).clicked() {
-                            confirmed = true;
-                        }
-                        ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                        if ui.add_sized([74.0, 29.0], egui::Button::new(tl!("Cancel"))).clicked() {
-                            cancelled = true;
-                        }
-                    });
-                });
-            }
-            LayersPanelDialog::NewLayer(name) | LayersPanelDialog::NewGroup(name) => {
-                ui.label(tl!("Name:"));
-                ui.text_edit_singleline(name);
-            }
-            LayersPanelDialog::LockLayers { transparency, pixels, position, artboard, all } => {
-                ui.checkbox(transparency, tl!("Transparency"));
-                ui.checkbox(pixels, tl!("Image"));
-                ui.checkbox(position, tl!("Position"));
-                ui.checkbox(artboard, tl!("Prevent Auto-Nesting"));
-                ui.checkbox(all, tl!("All"));
-            }
-        }
-        if !matches!(dialog, LayersPanelDialog::PanelOptions(_)) {
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
-            ui.horizontal(|ui| {
-                if ui.button(tl!("OK")).clicked() {
-                    confirmed = true;
-                }
-                if ui.button(tl!("Cancel")).clicked() {
-                    cancelled = true;
-                }
-            });
-        }
-    });
-    if confirmed && !cancelled {
-        let r = match dialog {
-            LayersPanelDialog::PanelOptions(options) => apply_options(app, options),
-            LayersPanelDialog::NewLayer(name) => {
-                app.run("layer.new.layer", if name.trim().is_empty() { json!({}) } else { json!({"name": name.trim()}) }).map(|_| ())
-            }
-            LayersPanelDialog::NewGroup(name) => {
-                app.run("layer.new.group", if name.trim().is_empty() { json!({}) } else { json!({"name": name.trim()}) }).map(|_| ())
-            }
-            LayersPanelDialog::LockLayers { transparency, pixels, position, artboard, all } => app
-                .run("layer.lockLayers", json!({"transparency": transparency, "pixels": pixels, "position": position, "artboard": artboard, "all": all}))
-                .map(|_| ()),
-        };
-        if let Err(e) = r {
-            app.ui.status = e;
-            app.ui.status_error = true;
-        }
-    } else if !cancelled {
-        app.ui.layers_panel_dialog = Some(dialog);
+/// OK in either dialog: Panel Options sets the options, Lock Layers runs `layer.lockLayers`.
+pub fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> Result<Value, String> {
+    if is_lock(fields) {
+        let params: Map<String, Value> = LOCKS.iter().map(|(key, _)| (key.to_string(), json!(fields.get(*key).and_then(Value::as_bool).unwrap_or(false)))).collect();
+        app.run("layer.lockLayers", Value::Object(params))
+    } else {
+        apply_options(app, options_of(fields)).map(|()| Value::Null)
     }
 }
 
@@ -384,18 +381,38 @@ mod tests {
         assert!(!app.session.prefs().interface.clip_thumbnails_to_layer_bounds);
     }
 
-    /// The options survive a UiState round trip; an open dialog is view state and is never serialized.
+    /// The options survive a UiState round trip.
     #[test]
-    fn options_round_trip_without_a_pending_dialog() {
+    fn options_round_trip() {
         let mut ui = crate::state::UiState::default();
         ui.layers_panel_options.thumbnail_size = LayerThumbnailSize::Large;
         ui.layers_panel_options.show_filters = false;
-        ui.layers_panel_dialog = Some(LayersPanelDialog::NewGroup("test".into()));
         let json = serde_json::to_value(&ui).unwrap();
-        assert!(json.get("layers_panel_dialog").is_none());
         let restored: crate::state::UiState = serde_json::from_value(json).unwrap();
         assert_eq!(restored.layers_panel_options, ui.layers_panel_options);
-        assert!(restored.layers_panel_dialog.is_none());
+    }
+
+    /// Panel Options is a dialog of JSON fields: setting them and confirming applies the options,
+    /// Thumbnail Contents included, and cancelling changes nothing.
+    #[test]
+    fn panel_options_dialog_applies_its_fields_on_confirm() {
+        let mut session = photocraft_engine::Session::new();
+        session.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
+        let mut app = PhotocraftApp::new(session, crate::Services::default());
+        let id = open_options(&mut app);
+        let fields = &mut app.ui.dialog_mut(id).unwrap().fields;
+        assert_eq!(fields["thumbnailSize"], "medium");
+        fields.insert("thumbnailSize".into(), json!("large"));
+        fields.insert("thumbnailContents".into(), json!("layerBounds"));
+        crate::dialogs::cancel(&mut app, id).unwrap();
+        assert_eq!(app.ui.layers_panel_options.thumbnail_size, LayerThumbnailSize::Medium);
+        let id = open_options(&mut app);
+        let fields = &mut app.ui.dialog_mut(id).unwrap().fields;
+        fields.insert("thumbnailSize".into(), json!("large"));
+        fields.insert("thumbnailContents".into(), json!("layerBounds"));
+        crate::dialogs::confirm(&mut app, id).unwrap();
+        assert_eq!(app.ui.layers_panel_options.thumbnail_size, LayerThumbnailSize::Large);
+        assert_eq!(thumbnail_contents(&app), LayerThumbnailContents::LayerBounds);
     }
 
     /// With the option off a new fill layer has no mask and the mask is not targeted; with it on the new layer's mask is targeted.
