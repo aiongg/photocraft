@@ -259,13 +259,8 @@ pub fn open_lock(app: &mut PhotocraftApp) -> u64 {
 }
 
 /// The locks of Lock Layers, in the order the dialog lists them.
-const LOCKS: [(&str, &str); 5] = [
-    ("transparency", "Transparency"),
-    ("pixels", "Image"),
-    ("position", "Position"),
-    ("artboard", "Prevent Auto-Nesting"),
-    ("all", "All"),
-];
+const LOCKS: [(&str, &str); 5] =
+    [("transparency", "Transparency"), ("pixels", "Image"), ("position", "Position"), ("artboard", "Prevent Auto-Nesting"), ("all", "All")];
 
 pub fn body(ui: &mut Ui, fields: &mut Map<String, Value>) {
     if is_lock(fields) {
@@ -337,7 +332,8 @@ fn options_body(ui: &mut Ui, fields: &mut Map<String, Value>) {
 /// OK in either dialog: Panel Options sets the options, Lock Layers runs `layer.lockLayers`.
 pub fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> Result<Value, String> {
     if is_lock(fields) {
-        let params: Map<String, Value> = LOCKS.iter().map(|(key, _)| (key.to_string(), json!(fields.get(*key).and_then(Value::as_bool).unwrap_or(false)))).collect();
+        let params: Map<String, Value> =
+            LOCKS.iter().map(|(key, _)| (key.to_string(), json!(fields.get(*key).and_then(Value::as_bool).unwrap_or(false)))).collect();
         app.run("layer.lockLayers", Value::Object(params))
     } else {
         apply_options(app, options_of(fields)).map(|()| Value::Null)

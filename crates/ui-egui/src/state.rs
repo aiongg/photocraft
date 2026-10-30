@@ -11,8 +11,8 @@ mod transform;
 
 pub use color_panel::{ColorPanelMode, ColorPanelState, ColorRamp, DockTabs};
 pub use panel_state::{
-    CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions,
-    PointCurveDrag, PointCurveState,
+    CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions, PointCurveDrag,
+    PointCurveState,
 };
 pub use tool::Tool;
 pub use tool_options::{SampleAllLayers, ToolOptions};

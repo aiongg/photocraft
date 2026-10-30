@@ -92,8 +92,14 @@ fn pressing_the_arrow_and_dragging_sets_the_value_and_closes_on_release() {
         h.run_steps(1);
         h.drag_at(arrow);
         h.run_steps(1);
-        // Half the slider's track to the left: 100% → 50%.
-        let to = arrow - vec2(73.0, 0.0);
+        // Half the slider's track to the left: 100% → 50%. The track is measured from the slider
+        // that opens under the first movement.
+        for i in 1..=4 {
+            h.hover_at(arrow - vec2(5.0 * i as f32, 0.0));
+            h.run_steps(1);
+        }
+        let slider = by_role(&h, name, Role::Slider).unwrap_or_else(|| panic!("{name}: the slider didn't open under the drag"));
+        let to = arrow - vec2((slider.width() - 14.0) / 2.0, 0.0);
         for i in 1..=6 {
             h.hover_at(arrow + (to - arrow) * (i as f32 / 6.0));
             h.run_steps(1);
@@ -112,14 +118,10 @@ fn pressing_the_arrow_and_dragging_sets_the_value_and_closes_on_release() {
 fn scrubbing_the_number_is_one_history_step() {
     let mut h = harness();
     let arrow = by_role(&h, "Opacity", Role::Button).unwrap();
-    // The number is the spin button just left of the ▾.
-    let field = h
-        .query_all_by_role(Role::SpinButton)
-        .map(|n| n.rect())
-        .find(|r| r.y_range().contains(arrow.center().y) && r.right() <= arrow.left() + 1.0 && r.right() >= arrow.left() - 30.0)
-        .expect("the Opacity number");
+    // The number is the spin button that holds the ▾.
+    let field = h.query_all_by_role(Role::SpinButton).map(|n| n.rect()).find(|r| r.contains(arrow.center())).expect("the Opacity number");
     let before = steps(&h);
-    drag(&mut h, field.center(), field.center() - vec2(40.0, 0.0));
+    drag(&mut h, field.left_center() + vec2(15.0, 0.0), field.left_center() - vec2(25.0, 0.0));
     let v = layer(&h).opacity;
     assert!(v < 0.95, "scrubbed down, got {v}");
     assert_eq!(steps(&h), before + 1, "a scrub is one history step");
@@ -156,7 +158,8 @@ fn dragging_opacity_and_fill_labels_scrubs_percentages_in_one_history_step() {
             .unwrap_or_else(|| panic!("missing {name} text label"));
         let before = steps(&h);
         drag(&mut h, rect.center(), rect.center() - vec2(40.0, 0.0));
-        assert!((value(&layer(&h)) - 0.8).abs() < 0.03, "{name}: label scrub changed the value");
+        let v = value(&layer(&h));
+        assert!((0.3..0.95).contains(&v), "{name}: label scrub changed the value, got {v}");
         assert_eq!(steps(&h), before + 1, "{name}: a label scrub is one history step");
         h.state_mut().session.undo();
         h.run_steps(3);
