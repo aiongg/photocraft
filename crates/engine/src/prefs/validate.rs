@@ -1,5 +1,5 @@
-use super::shortcuts::normalize_shortcut;
 use super::appearance;
+use super::shortcuts::normalize_shortcut;
 use super::{
     AppSize, AppearanceMode, Ask, CanvasBorder, CanvasColor, CheckerColors, CheckerSize, ColorPicker, DarkTheme, ExportLocation, ExportMetadata, FontPreview,
     GpuBackend, Interpolation, LightTheme, LineStyle, LinuxDisplayServer, LogDestination, LogDetail, OtherCursor, PaintingCursor, PointSize, PressureCurve,

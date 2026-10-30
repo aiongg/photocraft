@@ -71,11 +71,11 @@ mod save;
 mod shortcuts;
 mod startup;
 
-#[cfg(test)]
-use appearance::{display_scale, favorite_theme_groups, selected_theme};
 pub use appearance::SuiteRt;
 pub(crate) use appearance::{appearance_context_menu, cycle_appearance, pick_theme, step_brightness, sync_appearance};
 pub use appearance::{canvas_style, pasteboard_color};
+#[cfg(test)]
+use appearance::{display_scale, favorite_theme_groups, selected_theme};
 pub use dialogs::{
     PREFERENCES_SIZE, apply, confirm, invoke, is_preferences, open_mismatch, open_preferences, open_shortcuts, owns, preferences_changed, width,
 };

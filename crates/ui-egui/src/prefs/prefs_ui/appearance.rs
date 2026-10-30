@@ -1,7 +1,9 @@
 use super::dialogs::open_preferences;
 use super::fields::{choice_label, color_of, preference_matches};
 use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
-use craft_theme::{AppChoice, AppDefaults, AppId, Appearance, Mode, ModeChoice, MotionChoice, Selection, Size, SystemAppearance, ThemeDef, ThemeId, ThemePair, Variants};
+use craft_theme::{
+    AppChoice, AppDefaults, AppId, Appearance, Mode, ModeChoice, MotionChoice, Selection, Size, SystemAppearance, ThemeDef, ThemeId, ThemePair, Variants,
+};
 use craft_theme_store::{Accepted, StoreOptions, SuiteClient, SuiteDir, SuiteWatch};
 use std::sync::Arc;
 
@@ -191,7 +193,10 @@ fn default_size(id: &str) -> Option<&'static str> {
 /// Picks library theme `id` for the light or dark slot, with the Size it implies, and shows that
 /// appearance mode.
 pub(crate) fn pick_theme(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, dark: bool) {
-    let mut sets = vec![(if dark { "interface.themeDark" } else { "interface.themeLight" }, json!(id)), ("interface.appearanceMode", json!(if dark { "dark" } else { "light" }))];
+    let mut sets = vec![
+        (if dark { "interface.themeDark" } else { "interface.themeLight" }, json!(id)),
+        ("interface.appearanceMode", json!(if dark { "dark" } else { "light" })),
+    ];
     if let Some(size) = default_size(id) {
         sets.push(("interface.size", json!(size)));
     }
@@ -289,10 +294,7 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if app.prefs_rt.suite.client.is_none() {
         open_suite(app, ctx);
     }
-    let system = SystemAppearance {
-        mode: system_theme(app, ctx).map(|t| if t == egui::Theme::Dark { Mode::Dark } else { Mode::Light }),
-        ..Default::default()
-    };
+    let system = SystemAppearance { mode: system_theme(app, ctx).map(|t| if t == egui::Theme::Dark { Mode::Dark } else { Mode::Light }), ..Default::default() };
     let defaults = app_defaults();
     let (sel, generation) = {
         let interface = &app.session.prefs().interface;
@@ -479,7 +481,13 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
     obj.insert("themeDark".into(), json!(dark));
     obj.insert("favoriteThemes".into(), json!(favorites));
     // A built-in theme picked here brings the Size that keeps its geometry.
-    let picked = if light != was_light { Some(&light) } else if dark != was_dark { Some(&dark) } else { None };
+    let picked = if light != was_light {
+        Some(&light)
+    } else if dark != was_dark {
+        Some(&dark)
+    } else {
+        None
+    };
     if let Some(size) = picked.and_then(|id| default_size(id)) {
         obj.insert("size".into(), json!(size));
     }
@@ -489,7 +497,8 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
             size = "suite".into();
         }
         ui.label(RichText::new(tl!("Size")).color(t.text_dim));
-        let sizes: [(String, &str); 3] = [("suite".into(), tl!("Suite default")), ("compact".into(), tl!("Compact")), ("comfortable".into(), tl!("Comfortable"))];
+        let sizes: [(String, &str); 3] =
+            [("suite".into(), tl!("Suite default")), ("compact".into(), tl!("Compact")), ("comfortable".into(), tl!("Comfortable"))];
         let pairs: Vec<(String, &str)> = sizes.iter().map(|(id, label)| (id.clone(), *label)).collect();
         crate::widgets::dropdown(ui, "appearance-size", tl!("Size"), &mut size, &pairs, 220.0);
         obj.insert("size".into(), json!(size));

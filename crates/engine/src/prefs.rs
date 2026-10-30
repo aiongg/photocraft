@@ -455,8 +455,8 @@ impl Default for Tools {
 /// since a whole-section update or a hand-edited preferences file can store anything.
 pub use photocraft_paint::ResponseCurve as PressureCurve;
 
-mod cmds;
 pub mod appearance;
+mod cmds;
 mod customize;
 mod files;
 mod shortcuts;

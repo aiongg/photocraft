@@ -18,7 +18,7 @@
 //!
 //! Widgets read [`Tokens::get`] instead of hard-coding colours, so every theme applies everywhere.
 
-use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle, Visuals};
+use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId};
 use photocraft_engine::prefs::UiFontSize;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -476,7 +476,8 @@ pub fn mono(size: f32) -> FontId {
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     let sel = selection_for(kind);
     let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size };
-    let base = craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
+    let base =
+        craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
     install_base(ctx, &base, kind);
 }
 
@@ -487,6 +488,42 @@ pub fn install_base(ctx: &egui::Context, base: &craft_ui::theme::Base, kind: The
     let shown = base.shown(kind.mode());
     let t = Tokens::from_library(kind, &shown.resolved.tokens, shown.appearance);
     ctx.data_mut(|d| d.insert_temp(egui::Id::unique("photocraft-theme"), t));
+    keep_photocraft_metrics(ctx, t.pro);
+}
+
+/// PhotoCraft's layout is built on one set of egui metrics for every theme (a theme changes
+/// colours, radii and, through Size, the library's own components, not the spacing of PhotoCraft's
+/// panels), so they stay after the library installs its style.
+// TODO(library): drop once the PhotoCraft panels are on library components that read Size.
+fn keep_photocraft_metrics(ctx: &egui::Context, pro: bool) {
+    let body = if pro { 12.0 } else { 12.5 };
+    ctx.all_styles_mut(|s| {
+        s.text_styles = [
+            (egui::TextStyle::Small, FontId::proportional(10.5)),
+            (egui::TextStyle::Body, FontId::proportional(body)),
+            (egui::TextStyle::Button, FontId::proportional(body)),
+            (egui::TextStyle::Heading, semibold(15.0)),
+            (egui::TextStyle::Monospace, FontId::monospace(12.0)),
+        ]
+        .into();
+        s.spacing.item_spacing = egui::vec2(8.0, 6.0);
+        s.spacing.button_padding = egui::vec2(10.0, 4.0);
+        s.spacing.interact_size = egui::vec2(24.0, 24.0);
+        s.spacing.slider_width = 150.0;
+        s.spacing.combo_width = 120.0;
+        s.spacing.menu_margin = egui::Margin::same(6);
+        s.spacing.window_margin = egui::Margin::same(16);
+        s.spacing.icon_width = 14.0;
+        s.spacing.tooltip_width = 280.0;
+        s.visuals.indent_has_left_vline = false;
+        // Thin overlay scrollbars that appear on hover; thin bars stay visible while the pointer
+        // is on them (the stock thin style fades the handle into the track, #4611).
+        let mut scroll = egui::style::ScrollStyle::thin();
+        scroll.interact_handle_opacity = 1.0;
+        scroll.interact_background_opacity = 0.4;
+        scroll.floating_width = 4.0;
+        s.spacing.scroll = scroll;
+    });
 }
 
 /// Seconds the pointer rests on a control before its tooltip shows.

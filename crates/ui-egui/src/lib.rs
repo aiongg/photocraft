@@ -108,6 +108,7 @@ pub use canvas::wheel_nav;
 pub use canvas::zoom_hold;
 pub use canvas::zoom_levels;
 pub use canvas::zoom_window_fit;
+pub use craft_theme_store::SuiteDir;
 pub use dialogs::adjust_dialog;
 pub use dialogs::adjust_editors;
 pub use dialogs::adjust_preview;
@@ -244,7 +245,6 @@ pub use services::{
     FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenUrlFn, OsEventsFn, PhotoshopShortcutsFn, QuitFn, RecoverFn, Recoverable, RightButtonDownFn,
     SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, WindowFrameFn, WriteFn,
 };
-pub use craft_theme_store::SuiteDir;
 pub use text::bidi_text;
 pub use text::cjk_fonts;
 pub use text::direction;

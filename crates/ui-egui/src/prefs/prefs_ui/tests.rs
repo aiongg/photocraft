@@ -305,8 +305,7 @@ fn assert_palette(ctx: &egui::Context, kind: ThemeKind) {
         assert_eq!(style.visuals.widgets.noninteractive.fg_stroke.color, t.text);
         assert_eq!(style.visuals.widgets.inactive.bg_fill, t.field);
         assert_eq!(style.visuals.dark_mode, t.dark());
-        // The Size (Compact 12, Comfortable 13) is one setting for both slots, set by the last theme picked.
-        assert!([12.0, 13.0].contains(&style.text_styles[&egui::TextStyle::Body].size));
+        assert_eq!(style.text_styles[&egui::TextStyle::Body].size, if t.pro { 12.0 } else { 12.5 });
     }
 }
 

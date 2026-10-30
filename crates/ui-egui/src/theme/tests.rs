@@ -1,4 +1,5 @@
 use super::*;
+use egui::TextStyle;
 
 fn text_sizes(ctx: &egui::Context) -> Vec<egui::Vec2> {
     let mut sizes = Vec::new();
@@ -356,4 +357,3 @@ fn breeze_themes_parse_and_meet_text_contrast() {
         assert!(contrast(t.caption_close_text, t.caption_close) >= 4.5, "{kind:?}: close button glyph");
     }
 }
-
