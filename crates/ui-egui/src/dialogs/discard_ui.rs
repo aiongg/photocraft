@@ -10,7 +10,7 @@ use photocraft_doc::DocId;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::widgets::{ButtonRole, DialogButton};
+use craft_ui::dialog::ButtonRole;
 
 const EXIT: &str = "file.exit";
 
@@ -21,8 +21,6 @@ pub struct Prompt {
     /// The document the command was aimed at (`document` param, else the active one), if it has one.
     target: Option<DocId>,
     docs: Vec<DocId>,
-    /// The document whose question has already put keyboard focus on its default answer.
-    focused: Option<DocId>,
 }
 
 fn index_of(app: &PhotocraftApp, id: DocId) -> Option<usize> {
@@ -79,7 +77,7 @@ pub fn intercept(app: &mut PhotocraftApp, id: &str, params: &Value) -> bool {
         log::warn!("quitting a window that lost its GPU device before its unsaved work could be saved for recovery");
         return false;
     }
-    let prompt = Prompt { id: id.to_string(), params: params.clone(), target, docs, focused: None };
+    let prompt = Prompt { id: id.to_string(), params: params.clone(), target, docs };
     match &app.discard {
         None => ask(app, prompt),
         // Quitting overrides whatever is pending: it covers every document, so nothing is lost.
@@ -261,9 +259,6 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // Wait for all three; cancellation or a failed save brings us back.
     if app.file_dialog_open() || app.save_options_open() || app.saving() {
         // Hidden meanwhile: the question takes focus again when it comes back.
-        if let Some(p) = app.discard.as_mut() {
-            p.focused = None;
-        }
         return;
     }
     let Some(p) = &app.discard else { return };
@@ -284,56 +279,25 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         };
         (tl!("Unsaved changes"), crate::i18n::fmt(template, &[("name", &name)]))
     };
-    // Each question comes up with its default answer focused, as in Photoshop: the arrow keys then
-    // move between the answers and Enter presses the focused one (#6441).
-    let focus = p.focused != Some(doc);
-    if let Some(p) = app.discard.as_mut() {
-        p.focused = Some(doc);
-    }
-    let mac = ctx.os() == egui::os::OperatingSystem::Mac;
-    // The answers in the platform's words; `dialog_buttons` puts them in its order. Windows (and
-    // Linux) ask Yes / No / Cancel with Y, N and Esc, as Photoshop does there; macOS asks
-    // Don't Save / Cancel / Save. Esc always cancels (the modal closes on it).
-    // Yes/No already show Y/N. Cancel gets C on every platform (#4582). macOS still hides the
-    // letters and keeps the shortcut.
-    let cancel = (ButtonRole::Cancel, "Cancel", Some(Key::C), 84.0, Answer::Cancel);
+    // The answers in the platform's words; the prompt puts them in its order. Windows (and Linux)
+    // ask Yes / No / Cancel with Y, N and Esc, as Photoshop does there; macOS asks
+    // Don't Save / Cancel / Save. Esc always cancels. Yes/No already show Y/N. Cancel gets C on
+    // every platform (#4582). macOS still hides the letters and keeps the shortcut. Each question
+    // comes up with its default answer focused, as in Photoshop (#6441); a prompt of its own per
+    // document starts afresh for the next one.
+    let mut prompt = craft_ui::dialog::Prompt::new(("discard", doc), tl!(title), message);
+    let cancel = (ButtonRole::Cancel, "Cancel", Key::C, Answer::Cancel);
     let buttons = if reverts {
-        vec![(ButtonRole::Default, "Revert", Some(Key::R), 84.0, Answer::Discard), cancel]
-    } else if mac {
-        vec![
-            (ButtonRole::Default, "Save", Some(Key::S), 84.0, Answer::Save),
-            (ButtonRole::Alternate, "Don't Save", Some(Key::D), 100.0, Answer::Discard),
-            cancel,
-        ]
+        vec![(ButtonRole::Default, "Revert", Key::R, Answer::Discard), cancel]
+    } else if ctx.os() == egui::os::OperatingSystem::Mac {
+        vec![(ButtonRole::Default, "Save", Key::S, Answer::Save), (ButtonRole::Alternate, "Don't Save", Key::D, Answer::Discard), cancel]
     } else {
-        vec![(ButtonRole::Default, "Yes", Some(Key::Y), 84.0, Answer::Save), (ButtonRole::Alternate, "No", Some(Key::N), 84.0, Answer::Discard), cancel]
+        vec![(ButtonRole::Default, "Yes", Key::Y, Answer::Save), (ButtonRole::Alternate, "No", Key::N, Answer::Discard), cancel]
     };
-    let mut answer = ctx.input_mut(|i| buttons.iter().find(|b| b.2.is_some_and(|k| i.consume_key(egui::Modifiers::NONE, k))).map(|b| b.4));
-    let labels = button_labels(mac, &buttons.iter().map(|b| (b.1, b.2)).collect::<Vec<_>>());
-    let row: Vec<DialogButton> =
-        buttons.iter().zip(&labels).map(|(b, label)| DialogButton::new(b.0, label, b.3).focus(focus && b.0 == ButtonRole::Default)).collect();
-    let modal = egui::Modal::new(egui::Id::unique("discard-prompt")).show(ctx, |ui| {
-        ui.set_max_width(420.0);
-        ui.label(egui::RichText::new(tl!(&title)).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        ui.label(message);
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            if let Some(role) = crate::widgets::dialog_buttons(ui, &row) {
-                answer = buttons.iter().find(|b| b.0 == role).map(|b| b.4);
-            }
-        });
-    });
-    if modal.should_close() {
-        answer = Some(Answer::Cancel);
+    for (role, label, key, _) in &buttons {
+        prompt = prompt.answer(*role, tl!(*label), Some(*key));
     }
-    // Enter takes the default answer, unless Tab focused a button: that one took the Enter as a click.
-    if answer.is_none() && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Enter)) {
-        answer = buttons.iter().find(|b| b.0 == ButtonRole::Default).map(|b| b.4);
-    }
+    let answer = prompt.show(ctx).and_then(|role| buttons.iter().find(|b| b.0 == role).map(|b| b.3));
     if let Some(answer) = answer {
         apply(app, ctx, doc, answer);
     }
@@ -403,33 +367,6 @@ enum Answer {
     Save,
     Discard,
     Cancel,
-}
-
-/// macOS keeps the plain button wording even though the keyboard shortcuts still work.
-#[cfg(test)]
-fn button_label(mac: bool, label: &str, key: Option<Key>) -> String {
-    button_labels(mac, &[(label, key)]).into_iter().next().unwrap_or_default()
-}
-
-/// The labels of one dialog's buttons, each with its key in the same style: "(Y)es" when every
-/// translation starts with its key, otherwise appended to all ("Ja (Y)", "Nein (N)") (#5564).
-fn button_labels(mac: bool, buttons: &[(&str, Option<Key>)]) -> Vec<String> {
-    let starts_with_key = |label: &str, k: Key| label.split_at_checked(1).is_some_and(|(first, _)| first.eq_ignore_ascii_case(k.name()));
-    let inline = buttons.iter().all(|&(label, key)| key.is_none_or(|k| starts_with_key(tl!(label), k)));
-    buttons
-        .iter()
-        .map(|&(label, key)| {
-            let text = tl!(label);
-            match key {
-                None => text.to_string(),
-                Some(_) if mac => text.to_string(),
-                Some(k) => match text.split_at_checked(1) {
-                    Some((first, rest)) if inline => format!("({first}){rest}"),
-                    _ => format!("{text} ({})", k.name()),
-                },
-            }
-        })
-        .collect()
 }
 
 #[cfg(test)]

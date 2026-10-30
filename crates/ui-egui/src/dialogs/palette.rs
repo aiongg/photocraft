@@ -402,7 +402,10 @@ mod tests {
                 .find(|d| d.fields.get("__prefsui").and_then(|v| v.as_str()) == Some("shortcuts"))
                 .map(|d| d.id)
                 .unwrap_or_else(|| panic!("#536: the Keyboard Shortcuts dialog did not open (with_doc={with_doc})"));
-            // The dialog keeps its own Enter: a second press is its OK and closes it.
+            // The dialog keeps its own Enter: a second press is its OK and closes it (after the first
+            // press is released: a key repeat doesn't answer a dialog).
+            h.event(Event::Key { key: Key::Enter, physical_key: None, pressed: false, repeat: false, modifiers: Modifiers::NONE });
+            h.run_steps(1);
             h.event(Event::Key { key: Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
             h.run_steps(3);
             assert!(h.state().ui.dialogs.iter().all(|d| d.id != dialog), "a second Enter closes the dialog as its OK (with_doc={with_doc})");

@@ -726,48 +726,52 @@ pub fn status_progress(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// foreground (Save in Background off), and then at once, so nothing can be clicked meanwhile; a
 /// background save shows its progress in the tab and the status bar instead.
 pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let state_id = egui::Id::unique("job-progress-state");
     let j = match foreground_save(app) {
         Some(j) => j,
-        None => {
-            let Some(j) = app.session.active_job() else { return };
-            if j.elapsed_ms < DIALOG_DELAY_MS || app.jobs.saves.iter().any(|s| s.job == j.id) {
+        None => match app.session.active_job() {
+            Some(j) if j.elapsed_ms >= DIALOG_DELAY_MS && !app.jobs.saves.iter().any(|s| s.job == j.id) => j,
+            _ => {
+                // The next job's window opens afresh.
+                ctx.data_mut(|d| d.remove_temp::<craft_ui::dialog::DialogState>(state_id));
                 return;
             }
-            j
-        }
+        },
     };
     let t = Tokens::get(ctx);
-    let mut cancel_it = false;
-    // Photoshop doesn't dim the window behind its progress dialog either.
-    let modal = egui::Modal::new(egui::Id::unique("job-progress")).backdrop_color(Color32::from_black_alpha(36)).show(ctx, |ui| {
-        ui.set_width(360.0);
-        ui.label(RichText::new(tl!(&j.label)).font(crate::theme::semibold(15.0)));
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        crate::widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        let msg = if j.message.is_empty() || j.message == j.label { tl!("Working…").to_string() } else { j.message.clone() };
-        ui.label(RichText::new(msg).color(t.text_dim));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        let (br, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
-        bar(ui, br, shown_fraction(&j), &t);
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(RichText::new(elapsed(j.elapsed_ms)).color(t.text_faint).size(11.5));
+    let mut state = ctx.data(|d| d.get_temp::<craft_ui::dialog::DialogState>(state_id)).unwrap_or_default();
+    let hint = tl!("Esc to cancel");
+    // No close box and no OK: Cancel stops the work. A click on the backdrop doesn't cancel it, and
+    // Esc is handled in `tick`.
+    let shown = craft_ui::dialog::Dialog::new("job-progress", tl!(&j.label))
+        .backdrop(craft_ui::dialog::Backdrop::Scrim)
+        .close_label(None)
+        .width(craft_ui::dialog::Width::Fixed(360.0))
+        .initial_focus(craft_ui::dialog::InitialFocus::None)
+        .footer(
+            craft_ui::dialog::Footer::standard()
+                .without_ok()
+                .cancel(tl!("Cancel"))
+                .trailing_extra(move |ui| _ = ui.label(RichText::new(hint).color(t.text_faint).size(11.0))),
+        )
+        .show(ctx, &mut state, &mut (), |ui, ()| {
+            let msg = if j.message.is_empty() || j.message == j.label { tl!("Working…").to_string() } else { j.message.clone() };
+            ui.label(RichText::new(msg).color(t.text_dim));
+            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            let (br, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
+            bar(ui, br, shown_fraction(&j), &t);
+            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(RichText::new(elapsed(j.elapsed_ms)).color(t.text_faint).size(11.5));
+                });
             });
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            cancel_it = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
-            ui.label(RichText::new(tl!("Esc to cancel")).color(t.text_faint).size(11.0));
-        });
-    });
-    // A click on the backdrop doesn't cancel the work; Esc is handled in `tick`.
-    let _ = modal;
-    if cancel_it {
+    if shown.outcome.is_some_and(|o| o.closes()) {
         cancel(app, j.id);
     }
+    ctx.data_mut(|d| d.insert_temp(state_id, state));
 }
 
 fn elapsed(ms: f64) -> String {
@@ -829,7 +833,7 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     child.horizontal(|ui| {
         ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = crate::widgets::secondary_button(ui, tl!("Cancel"), 76.0);
+            let r = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(76.0));
             cancel_it = r.clicked();
             cancel_rect = r.rect;
         });

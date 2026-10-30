@@ -89,7 +89,7 @@ mod tests {
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         open(h.state_mut());
         h.run_steps(3);
-        h.get_by_label("History Options");
+        h.get_by_role_and_label(egui::accesskit::Role::Heading, "History Options");
         h.get_by_label("Allow Non-Linear History");
         h.get_by_label("Make Layer Visibility Changes Undoable");
         h.get_by_label("OK");

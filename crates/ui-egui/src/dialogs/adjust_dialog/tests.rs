@@ -234,7 +234,7 @@ fn curves_dialog_fits_its_graph_and_controls() {
                 PhotocraftApp::setup_context(&h.ctx, theme);
                 let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
                 h.run_steps(4);
-                let window = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).unwrap();
+                let window = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).unwrap();
                 let graph = h.ctx.data(|d| d.get_temp::<egui::Rect>(dialog_mem("curves").with("curves-graph"))).unwrap();
                 assert!(window.right() - graph.right() < 40.0, "blank right column: window {window:?}, graph {graph:?}");
                 assert!(graph.width() > 270.0, "keep the graph usable: {graph:?}");
@@ -256,7 +256,7 @@ fn curves_dialog_resizes_with_its_graph_and_reopens_at_that_size() {
     let mut h = Harness::builder().with_size(egui::vec2(1600.0, 1100.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     let graph = |h: &Harness<'_, PhotocraftApp>| h.ctx.data(|d| d.get_temp::<egui::Rect>(dialog_mem("curves").with("curves-graph"))).unwrap();
-    let window = |h: &Harness<'_, PhotocraftApp>, id: u64| h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).unwrap();
+    let window = |h: &Harness<'_, PhotocraftApp>, id: u64| h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).unwrap();
     let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
     h.run_steps(4);
     let (opened, small) = (window(&h, id), graph(&h));
@@ -302,7 +302,7 @@ fn curves_graph_never_pushes_the_dialog_off_a_short_window() {
     let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
     h.run_steps(5);
     let graph = h.ctx.data(|d| d.get_temp::<egui::Rect>(dialog_mem("curves").with("curves-graph"))).unwrap();
-    let window = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).unwrap();
+    let window = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).unwrap();
     assert!(graph.height() <= 700.0 - 360.0, "{graph:?}");
     assert!(window.height() <= 700.0, "{window:?}");
     assert!(window.contains_rect(h.get_by_label("OK").rect()));
@@ -325,7 +325,7 @@ fn curves_graph_never_pushes_the_dialog_off_a_short_window() {
     });
     h.run_steps(5);
     let graph = h.ctx.data(|d| d.get_temp::<egui::Rect>(dialog_mem("curves").with("curves-graph"))).unwrap();
-    let window = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).unwrap();
+    let window = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(id))).unwrap();
     assert!(window.right() - graph.right() < 40.0, "no blank column: window {window:?}, graph {graph:?}");
 }
 

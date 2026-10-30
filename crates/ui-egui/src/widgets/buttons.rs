@@ -6,7 +6,7 @@ use craft_ui::theme::StrokeExt;
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     if t.pro {
-        return checkbox(ui, on, label);
+        return craft_ui::controls::Checkbox::bool(tl!(label), on).show(ui).response;
     }
     let mut resp = ui
         .horizontal(|ui| {
@@ -54,32 +54,9 @@ pub fn compact_button(ui: &mut Ui, label: &str, height: f32) -> Response {
     button_impl_h(ui, label, 0.0, Some(height), t.field, t.text, false)
 }
 
-/// What a dialog button does, which decides where the platform's button order puts it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ButtonRole {
-    /// The default answer (OK, Save, Yes), drawn as the primary button.
-    Default,
-    /// Another answer that closes the dialog (Don't Save, No).
-    Alternate,
-    /// Closes the dialog without acting.
-    Cancel,
-    /// Acts but keeps the dialog open (Apply).
-    Apply,
-}
-
-impl ButtonRole {
-    /// Position from the left in the platform's order. Windows and Linux put the default action
-    /// first (OK Cancel Apply, Yes No Cancel); macOS puts it last, in the corner, with Cancel beside
-    /// it and the other answers further left (Don't Save, Cancel, Save).
-    fn slot(self, mac: bool) -> u8 {
-        match (self, mac) {
-            (Self::Default, false) | (Self::Alternate, true) => 0,
-            (Self::Alternate, false) | (Self::Cancel, true) => 1,
-            (Self::Cancel, false) | (Self::Apply, true) => 2,
-            (Self::Apply, false) | (Self::Default, true) => 3,
-        }
-    }
-}
+/// What a dialog button does, which decides where the platform's button order puts it: the
+/// library's role and order rule.
+pub use craft_ui::dialog::ButtonRole;
 
 /// One button of a [`dialog_buttons`] row.
 #[derive(Clone, Copy)]
@@ -108,12 +85,12 @@ impl<'a> DialogButton<'a> {
     }
 }
 
-/// A dialog's button row at the cursor, in the platform's order (see [`ButtonRole`]): every modal
-/// draws its buttons through this, so they all agree. Inside a right-to-left row it sits at the
+/// A button row at the cursor, in the platform's order (see [`ButtonRole`]), for the windows that
+/// are not hosted by `craft_ui::dialog::Dialog` (the workspaces, the modeless tool windows). Inside a right-to-left row it sits at the
 /// right edge. The buttons are laid out left to right, so Tab walks them in reading order.
 /// Returns the role of the button clicked this frame.
 pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRole> {
-    let mac = ui.ctx().os() == egui::os::OperatingSystem::Mac;
+    let platform = craft_ui::dialog::Platform::of(ui.ctx());
     let gap = ui.spacing().item_spacing.x;
     let size = buttons.iter().fold(Vec2::ZERO, |acc, b| {
         let s = button_size(ui, b.label, b.min_width);
@@ -121,19 +98,16 @@ pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRol
     }) + vec2(gap * buttons.len().saturating_sub(1) as f32, 0.0);
     ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
         let mut hit = None;
-        for slot in 0..4 {
-            for b in buttons.iter().filter(|b| b.role.slot(mac) == slot) {
-                let r = ui
-                    .add_enabled_ui(b.enabled, |ui| {
-                        if b.role == ButtonRole::Default { primary_button(ui, b.label, b.min_width) } else { secondary_button(ui, b.label, b.min_width) }
-                    })
-                    .inner;
-                if b.focus && b.enabled {
-                    r.request_focus();
-                }
-                if r.clicked() {
-                    hit = Some(b.role);
-                }
+        let roles: Vec<(ButtonRole, ())> = buttons.iter().map(|b| (b.role, ())).collect();
+        for i in craft_ui::dialog::order(&roles, platform) {
+            let b = &buttons[i];
+            let variant = if b.role == ButtonRole::Default { craft_ui::controls::ButtonVariant::Primary } else { craft_ui::controls::ButtonVariant::Secondary };
+            let r = ui.add_enabled(b.enabled, craft_ui::controls::Button::new(tl!(b.label)).variant(variant).min_width(b.min_width));
+            if b.focus && b.enabled {
+                r.request_focus();
+            }
+            if r.clicked() {
+                hit = Some(b.role);
             }
         }
         hit

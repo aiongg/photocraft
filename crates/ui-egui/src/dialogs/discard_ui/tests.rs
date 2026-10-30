@@ -181,13 +181,6 @@ fn exit_is_held_back_until_confirmed() {
     assert!(app.allow_close);
 }
 
-#[test]
-fn mnemonic_labels_bracket_the_key() {
-    assert_eq!(button_label(false, "Don't Save", Some(Key::D)), "(D)on't Save");
-    assert_eq!(button_label(false, "Guardar", Some(Key::S)), "Guardar (S)");
-    assert_eq!(button_label(false, "保存", Some(Key::S)), "保存 (S)");
-}
-
 type Prompted = egui_kittest::Harness<'static, PhotocraftApp>;
 
 /// The unsaved-changes prompt for `command` over `app`'s dirty documents, as `os` draws it (with
@@ -223,18 +216,20 @@ fn drawn_order<'a>(h: &Prompted, labels: [&'a str; 3]) -> Vec<&'a str> {
     v.into_iter().map(|(_, l)| l).collect()
 }
 
-/// Tab walks `labels` left to right from the focused default answer, `labels[default]`, and
-/// wraps; Shift+Tab steps back.
-fn tab_walks(h: &mut Prompted, labels: [&str; 3], default: usize) {
+/// The arrow keys walk the buttons from the focused default answer, `labels[default]` (at one end
+/// of the row), to the far end and back. `labels` are in drawn order. Plain Tab visits a dialog's
+/// fields only.
+fn arrows_walk(h: &mut Prompted, labels: [&str; 3], default: usize) {
     assert_eq!(focused(h, &labels), Some(labels[default]));
-    for step in 1..=3 {
-        h.key_press(Key::Tab);
+    let (forward, back) = if default == 0 { (Key::ArrowRight, Key::ArrowLeft) } else { (Key::ArrowLeft, Key::ArrowRight) };
+    for step in 1..=2 {
+        h.key_press(forward);
         h.run_steps(2);
-        assert_eq!(focused(h, &labels), Some(labels[(default + step) % 3]));
+        assert_eq!(focused(h, &labels), Some(labels[default.abs_diff(step)]));
     }
-    h.key_press_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+    h.key_press(back);
     h.run_steps(2);
-    assert_eq!(focused(h, &labels), Some(labels[(default + 2) % 3]));
+    assert_eq!(focused(h, &labels), Some(labels[default.abs_diff(1)]));
 }
 
 fn docs_left(h: &Prompted) -> Option<usize> {
@@ -276,7 +271,7 @@ fn windows_and_linux_ask_yes_no_cancel_with_the_default_first() {
         let mut h = prompt_on(os);
         let labels = ["(Y)es", "(N)o", "(C)ancel"];
         assert_eq!(drawn_order(&h, labels), labels, "{os:?}");
-        tab_walks(&mut h, labels, 0);
+        arrows_walk(&mut h, labels, 0);
         h.key_press(Key::N);
         h.run_steps(2);
         assert_eq!(docs_left(&h), Some(1), "N answered the first document");
@@ -344,35 +339,11 @@ fn cancel_after_no_keeps_the_unanswered_documents_and_the_app_open() {
 }
 
 #[test]
-fn macos_hides_mnemonics_but_other_platforms_keep_them() {
-    assert_eq!(button_label(true, "Don't Save", Some(Key::D)), tl!("Don't Save"));
-    assert_eq!(button_label(true, "Cancel", Some(Key::C)), tl!("Cancel"));
-    assert_eq!(button_label(false, "Don't Save", Some(Key::D)), "(D)on't Save");
-    assert_eq!(button_label(false, "Cancel", Some(Key::C)), "(C)ancel");
-}
-
-/// German "Ja" doesn't start with Y, so every button appends its key rather than mixing
-/// "Ja (Y)" with "(N)ein" (#5564).
-#[test]
-fn one_dialog_shows_every_key_in_the_same_style() {
-    let buttons = [("Yes", Some(Key::Y)), ("No", Some(Key::N)), ("Cancel", Some(Key::C))];
-    assert_eq!(button_labels(false, &buttons), ["(Y)es", "(N)o", "(C)ancel"]);
-    let german = crate::i18n::Lang::from_code("de").unwrap();
-    crate::i18n::with_language(german, || {
-        let shown: Vec<&str> = buttons.iter().map(|(label, _)| crate::i18n::tr(german, label)).collect();
-        assert_eq!(button_labels(true, &buttons), shown);
-        let labels = button_labels(false, &buttons);
-        let appended: Vec<String> = shown.iter().zip(&buttons).map(|(text, (_, key))| format!("{text} ({})", key.map_or("", |k| k.name()))).collect();
-        assert!(labels.iter().all(|label| label.starts_with('(')) || labels == appended, "{labels:?}");
-    });
-}
-
-#[test]
 fn macos_asks_dont_save_cancel_save_with_the_default_last() {
     let mut h = prompt_on(egui::os::OperatingSystem::Mac);
     let labels = ["Don't Save", "Cancel", "Save"];
     assert_eq!(drawn_order(&h, labels), labels);
-    tab_walks(&mut h, labels, 2);
+    arrows_walk(&mut h, labels, 2);
     h.key_press(Key::D);
     h.run_steps(2);
     assert_eq!(docs_left(&h), Some(1), "D answered the first document");
@@ -409,8 +380,8 @@ fn enter_takes_the_default_answer_or_the_focused_button() {
     h.run_steps(2);
     assert_eq!(asked.borrow().len(), 1, "Enter answered Yes, which saves");
     assert_eq!(docs_left(&h), Some(2));
-    // Tab from the focused Yes to No: Enter now presses it.
-    h.key_press(Key::Tab);
+    // The arrow key from the focused Yes to No (Tab visits a dialog's fields only): Enter now presses it.
+    h.key_press(Key::ArrowRight);
     h.run_steps(2);
     h.key_press(Key::Enter);
     h.run_steps(2);

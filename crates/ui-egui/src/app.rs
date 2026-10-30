@@ -162,7 +162,7 @@ impl PhotocraftApp {
             pending_raw_open: None,
             raw_redevelop: Vec::new(),
             wide_angle: None,
-            dialog_edits: Default::default(),
+            dialog_chrome: Default::default(),
             pending_after_prompt: None,
             tone_hist: None,
             doc_hist: None,

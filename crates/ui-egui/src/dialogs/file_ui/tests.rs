@@ -499,7 +499,7 @@ fn web_preview_grows_with_resize_and_accepts_zoom_and_pan() {
         )
     };
     let before = pane(&h);
-    let rects: Vec<egui::Rect> = h.ctx.data(|m| m.get_temp(egui::Id::unique("pc-dialog-rects"))).unwrap();
+    let rects = crate::dialogs::rects(&h);
     let corner = rects[0].max - egui::vec2(14.0, 14.0);
     h.event(egui::Event::PointerMoved(corner));
     h.step();

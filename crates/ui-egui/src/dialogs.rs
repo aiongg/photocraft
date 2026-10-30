@@ -1,11 +1,20 @@
 //! Dialogs rendered from `UiState::dialogs`. Field values live in the dialog data, so automation can
 //! set them (`ui.dialog.set`) and confirm (`ui.dialog.confirm`) exactly like a user.
+//!
+//! The frame, footer buttons, placement, stacking, Alt-reset, local undo and pass-through are
+//! `craft_ui::dialog::Dialog`; [`show`] feeds it the dialog's JSON fields (as [`Settings`]).
+//! A dialog body plugs in with four pieces:
+//! - a marker key in its fields and an `owns(fields)` test, routed in `command_body` (body),
+//!   `confirm_command` and [`ROUTES`] (confirm);
+//! - `body(ui, fields)`, which draws the controls only: no title, rule or buttons;
+//! - the footer in `footer_for` (labels, roles, enabled state), chosen from the same markers;
+//! - its width class in `width_of`, or its sizes in `resize_of`.
 
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::{Dialog, DialogKind};
-use crate::widgets::{ButtonRole, DialogButton, dialog_buttons};
+use craft_ui::dialog::{Alert, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
 
 /// A dialog body sets this field to the key of the text field whose Browse… button was clicked;
 /// [`show`] takes it out again and opens the matching file or folder dialog.
@@ -45,104 +54,31 @@ fn fill_field(app: &mut PhotocraftApp, id: u64, key: &str, path: String) -> Resu
     Ok(Value::Null)
 }
 
-/// Where this frame's dialogs are on screen (the canvas reads last frame's: it draws first).
-const RECTS: &str = "pc-dialog-rects";
-
-fn rects(ctx: &egui::Context) -> Vec<egui::Rect> {
-    ctx.data(|m| m.get_temp(egui::Id::unique(RECTS))).unwrap_or_default()
-}
-
-/// Whether the press that is being held began on a dialog (#6810). The dialog follows the pointer
-/// while its title is dragged, so the press origin ends up outside the (moved) dialog and a canvas
-/// check against the dialog rects alone would take the drag for a canvas drag. Remembered from the
-/// frame of the press, which is the only frame that carries the press event.
-fn press_began_on_dialog(ctx: &egui::Context, rects: &[egui::Rect]) -> bool {
-    let key = egui::Id::unique("pc-dialog-press-grabbed");
-    let pressed = ctx.input(|i| {
-        i.events.iter().rev().find_map(|e| match e {
-            egui::Event::PointerButton { pos, pressed: true, .. } => Some(*pos),
-            _ => None,
-        })
-    });
-    if let Some(p) = pressed {
-        let on_dialog = rects.iter().any(|r| r.contains(p));
-        ctx.data_mut(|m| m.insert_temp(key, on_dialog));
-        return on_dialog;
-    }
-    ctx.data(|m| m.get_temp::<bool>(key)).unwrap_or(false)
-}
-
-/// With a dialog open the rest of the window is inert (egui's modal layer), but like Photoshop the
-/// image can still be panned and zoomed under it. The pointer position when it is over `canvas`
-/// and not over a dialog or one of its popups.
-pub fn free_pointer_over(ctx: &egui::Context, canvas: egui::Rect) -> Option<egui::Pos2> {
-    if egui::Popup::is_any_open(ctx) {
-        return None;
-    }
-    let p = ctx.pointer_hover_pos()?;
-    let rects = rects(ctx);
-    (canvas.contains(p) && !rects.iter().any(|r| r.contains(p))).then_some(p)
-}
-
-/// Pan drag under an open dialog: Space-drag, middle-drag, or a drag with the Hand tool, started on
-/// the free canvas. Returns this frame's pointer movement.
-pub fn pan_delta(ctx: &egui::Context, canvas: egui::Rect, hand: bool) -> Option<egui::Vec2> {
-    let rects = rects(ctx);
-    let grabbed = press_began_on_dialog(ctx, &rects);
-    let (origin, panning, delta) = ctx.input(|i| {
-        let p = &i.pointer;
-        (p.press_origin(), p.middle_down() || (p.primary_down() && (hand || i.key_down(egui::Key::Space))), p.delta())
-    });
-    let origin = origin?;
-    (panning && !grabbed && canvas.contains(origin) && !rects.iter().any(|r| r.contains(origin))).then_some(delta)
-}
+// Canvas input under an open dialog (pan, zoom, eyedropper picks) is the library's: the dialogs
+// shown by `craft_ui::dialog` record where they are.
+pub use craft_ui::dialog::pass::{free_pointer_over, free_press, pan_delta};
 
 /// The primary button's drag and click on the free canvas under an open dialog, as the canvas
 /// response would report them if it weren't inert: for the held Zoom (⌘Space / ⌥Space, #6460).
-/// A drag counts from egui's drag threshold, like `drag_started`.
 pub fn free_buttons(ctx: &egui::Context, canvas: egui::Rect) -> crate::paint_mouse::Buttons {
-    let id = egui::Id::unique("pc-dialog-free-drag");
-    let was = ctx.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
-    let rects = rects(ctx);
-    let open_popup = egui::Popup::is_any_open(ctx);
-    let free = |p: egui::Pos2| !open_popup && canvas.contains(p) && !rects.iter().any(|r| r.contains(p));
-    let (down, dragging, clicked) = ctx.input(|i| {
-        let p = &i.pointer;
-        let dragging = p.primary_down() && p.is_decidedly_dragging() && (was || p.press_origin().is_some_and(free));
-        (p.primary_down(), dragging, p.primary_clicked() && p.interact_pos().is_some_and(free))
-    });
-    ctx.data_mut(|d| d.insert_temp(id, dragging));
-    crate::paint_mouse::Buttons { started: dragging && !was, dragged: dragging, stopped: was && !down, clicked }
+    let b = craft_ui::dialog::pass::free_buttons(ctx, canvas);
+    crate::paint_mouse::Buttons { started: b.started, dragged: b.dragged, stopped: b.stopped, clicked: b.clicked }
 }
 
-/// A click or drag with the primary button started on the free canvas under an open dialog, Space
-/// not held: where the pointer is this frame. The press itself counts even when it is released in
-/// the same frame (a quick click, `ui.click`); the drag only while it stays on the free canvas.
-pub fn free_press(ctx: &egui::Context, canvas: egui::Rect) -> Option<egui::Pos2> {
-    if egui::Popup::is_any_open(ctx) {
-        return None;
-    }
-    let rects = rects(ctx);
-    let free = |p: egui::Pos2| canvas.contains(p) && !rects.iter().any(|r| r.contains(p));
-    let grabbed = press_began_on_dialog(ctx, &rects);
-    ctx.input(|i| {
-        if i.key_down(egui::Key::Space) {
-            return None;
-        }
-        let pressed = i.events.iter().rev().find_map(|e| match e {
-            egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: true, .. } => Some(*pos),
-            _ => None,
-        });
-        if let Some(p) = pressed {
-            return free(p).then_some(p);
-        }
-        let held = i.pointer.primary_down() && !grabbed && i.pointer.press_origin().is_some_and(free);
-        i.pointer.latest_pos().filter(|p| held && free(*p))
-    })
+/// The egui id of the area dialog `id` is drawn in.
+#[cfg(test)]
+pub(crate) fn area_id(id: u64) -> egui::Id {
+    craft_ui::dialog::dialog_id(id)
 }
 
-/// Height of a dialog's title, rule, button row and frame margins (points), around a body that
-/// scrolls.
+/// Where the open dialogs are on screen.
+#[cfg(test)]
+pub(crate) fn rects(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Vec<egui::Rect> {
+    h.state().ui.dialogs.iter().filter_map(|d| h.ctx.memory(|m| m.area_rect(area_id(d.id)))).collect()
+}
+
+/// Height of a dialog's title, rule, button row and frame margins (points), around a filter body
+/// that scrolls above its preview window (the library's scrolling body has no region under it).
 const DIALOG_CHROME: f32 = 150.0;
 
 /// Draw a dialog body that opens on its first number, selected, as Photoshop's value dialogs do:
@@ -170,23 +106,34 @@ fn place_id(d: &Dialog) -> egui::Id {
     }
 }
 
-/// Whether another dialog is drawn above `live` (egui's layer order, back to front).
-fn older_dialog_above(ctx: &egui::Context, live: egui::LayerId, dialogs: &[Dialog]) -> bool {
-    let others: Vec<egui::LayerId> =
-        dialogs.iter().map(|d| egui::LayerId::new(egui::Order::Foreground, egui::Id::unique(("dialog", d.id)))).filter(|l| *l != live).collect();
-    ctx.memory(|m| m.layer_ids().skip_while(|l| *l != live).skip(1).any(|l| others.contains(&l)))
+/// A dialog's fields as the library's dialog keeps them: the whole map, but two maps are equal
+/// when their public keys are. The private `__` keys (preview toggle, command, label…) are chrome
+/// and not a step of the dialog's own undo (#4697).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Settings(pub Fields);
+
+impl Settings {
+    fn public(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.0.iter().filter(|(k, _)| !k.starts_with("__"))
+    }
 }
 
-/// The size a resizable dialog opens at, or `None` for a dialog sized by its contents.
-fn resizable_dialog(fields: &serde_json::Map<String, Value>) -> Option<egui::Vec2> {
-    if crate::prefs_ui::is_preferences(fields) {
-        Some(crate::prefs_ui::PREFERENCES_SIZE)
-    } else if fields.contains_key("__web") {
-        Some(egui::vec2(960.0, 900.0))
-    } else if is_curves(fields) {
-        Some(CURVES_SIZE)
-    } else {
-        None
+impl PartialEq for Settings {
+    fn eq(&self, other: &Self) -> bool {
+        self.public().count() == other.public().count() && self.public().all(|(k, v)| other.0.get(k) == Some(v))
+    }
+}
+
+impl std::ops::Deref for Settings {
+    type Target = Fields;
+    fn deref(&self) -> &Fields {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Settings {
+    fn deref_mut(&mut self) -> &mut Fields {
+        &mut self.0
     }
 }
 
@@ -198,69 +145,58 @@ fn is_curves(fields: &serde_json::Map<String, Value>) -> bool {
 /// The size the Curves dialog first opens at: the 300-point graph it had before it could be
 /// resized (#5113); it grows to fit its controls below the graph.
 const CURVES_SIZE: egui::Vec2 = egui::vec2(300.0, 420.0);
-/// The smallest a resizable dialog is dragged to: Curves keeps a usable graph (#8984), the others
-/// their two-column layouts.
-fn resizable_min(fields: &serde_json::Map<String, Value>) -> egui::Vec2 {
-    if is_curves(fields) { egui::vec2(300.0, 420.0) } else { egui::vec2(560.0, 400.0) }
-}
 
-/// Where the size the user last gave a resizable dialog is kept (#8984), beside its place.
-fn size_id(place: egui::Id) -> egui::Id {
-    place.with("size")
-}
-
-/// The largest a resizable dialog of `fields` with smallest size `min` is dragged to: the window
-/// less a margin, and for Curves no wider than its graph can grow (#8984), so no blank column.
-fn resizable_max(ctx: &egui::Context, fields: &serde_json::Map<String, Value>, min: egui::Vec2) -> egui::Vec2 {
-    let mut max = (ctx.content_rect().size() - egui::vec2(40.0, 40.0)).max(min);
-    if is_curves(fields) {
-        max.x = max.x.min(crate::adjust_editors::curve_side_max(ctx)).max(min.x);
+/// The sizes of a resizable dialog and whether it reopens at the size it was left at (Curves only,
+/// #8984), or `None` for a dialog sized by its contents. The smallest size keeps Curves a usable
+/// graph (#8984) and the others their two-column layouts; Curves is no wider than its graph can
+/// grow, so no blank column.
+fn resize_of(ctx: &egui::Context, fields: &Fields) -> Option<(craft_ui::dialog::Resize, bool)> {
+    use craft_ui::dialog::{Resize, ResizeMax};
+    let min = egui::vec2(560.0, 400.0);
+    if crate::prefs_ui::is_preferences(fields) {
+        Some((Resize { default: crate::prefs_ui::PREFERENCES_SIZE, min, max: ResizeMax::Window }, false))
+    } else if fields.contains_key("__web") {
+        Some((Resize { default: egui::vec2(960.0, 900.0), min, max: ResizeMax::Window }, false))
+    } else if is_curves(fields) {
+        let max = ResizeMax::Fixed(egui::vec2(crate::adjust_editors::curve_side_max(ctx), f32::MAX));
+        Some((Resize { default: CURVES_SIZE, min: CURVES_SIZE, max }, true))
+    } else {
+        None
     }
-    max
 }
 
-fn show_modal<T>(
-    modal: egui::Modal,
-    ctx: &egui::Context,
-    id: egui::Id,
-    resizable: Option<(egui::Vec2, egui::Vec2, egui::Vec2)>,
-    interactive: bool,
-    contents: impl FnOnce(&mut egui::Ui) -> T,
-) -> egui::ModalResponse<T> {
-    modal.show(ctx, |ui| {
-        // Disable the entire older modal, including its resize grip, not just its body.
-        if !interactive {
-            ui.disable();
-        }
-        if let Some((size, min, max)) = resizable {
-            // No stroke: Resize outlines its contents 2 points out, an inner box inside the
-            // dialog's frame that left the title and buttons flush against it (#8199).
-            egui::Resize::default().id(id.with("resize")).with_stroke(false).default_size(size.min(max)).min_size(min).max_size(max).show(ui, contents)
-        } else {
-            contents(ui)
-        }
-    })
+/// The content width class of a dialog that isn't resizable.
+fn width_of(d: &Dialog) -> craft_ui::dialog::Width {
+    use craft_ui::dialog::Width;
+    let f = &d.fields;
+    // The About window: room for the contributor table, the same width on every tab.
+    let about_tabs = d.kind == DialogKind::About && f.get("systemInfo").and_then(Value::as_bool) != Some(true);
+    if crate::duplicate_layer_ui::owns(f) {
+        // A fixed small grid (labels + 260 pt fields ≈ 352 pt).
+        Width::Fixed(360.0)
+    } else if let Some(w) = crate::file_ui::dialog_width(f) {
+        Width::Fixed(w)
+    } else if crate::color_picker_ui::owns(f) {
+        Width::Fixed(crate::color_picker_ui::CONTENT_WIDTH)
+    } else if d.kind == DialogKind::NewDocument {
+        Width::Fixed(800.0)
+    } else if about_tabs {
+        Width::Fixed(700.0)
+    } else if let Some(w) = crate::prefs_ui::width(f, 0.0) {
+        Width::Fixed(w)
+    } else if f.contains_key("__compact") {
+        // A dialog of a few short fields (Fit Image) is narrower (#4673).
+        Width::Compact
+    } else if d.kind == DialogKind::LayerStyle || f.contains_key("__export") {
+        Width::Wide
+    } else {
+        Width::Standard
+    }
 }
 
 /// Whether dialogs have a close box (×) in their title bar (#5496). Photoshop's modal dialogs have
 /// one on Windows, where clicking it is Cancel, and none on macOS; Linux and the web follow Windows.
 pub(crate) const CLOSE_BOX: bool = !cfg!(target_os = "macos");
-
-/// The side of the close box's square, in points.
-const CLOSE_BOX_SIZE: f32 = 20.0;
-
-/// The close box's square: flush with the title band's right end `right`, centred on the title
-/// row at height `centre_y`.
-fn close_box_rect(right: f32, centre_y: f32) -> egui::Rect {
-    egui::Rect::from_min_size(egui::pos2(right - CLOSE_BOX_SIZE, centre_y - CLOSE_BOX_SIZE / 2.0), egui::vec2(CLOSE_BOX_SIZE, CLOSE_BOX_SIZE))
-}
-
-/// Draws a title bar's close box in `rect`, the same × icon button the floating panels close with,
-/// and says whether it was clicked. Its own child `Ui`, so the title row's layout is unchanged.
-pub(crate) fn close_box(ui: &mut egui::Ui, rect: egui::Rect) -> bool {
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::right_to_left(egui::Align::Center)));
-    crate::icons::button(&mut child, "x", CLOSE_BOX_SIZE, false, tl!("Close")).clicked()
-}
 
 /// The dialog's contents under the title rule, picked by its kind and the marker field that routes
 /// it. Returns `Some(true)` / `Some(false)` when the body itself answered OK / Cancel.
@@ -339,7 +275,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
                 ui.add(egui::Label::new(egui::RichText::new(l).font(crate::theme::mono(12.0))).selectable(true));
             }
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            if crate::widgets::secondary_button(ui, tl!("Copy"), 84.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Copy")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked() {
                 ui.ctx().copy_text(crate::gpu_status::system_info(app).join("\n"));
             }
         }
@@ -400,91 +336,6 @@ fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
     }
 }
 
-/// The OK / Cancel row (with Apply, Alternate or Reset where the dialog has them), drawn in the
-/// right-to-left layout. Returns what the buttons (or Enter) answered and whether Apply was hit.
-/// `popup_blocks_enter` is true when a web dialog has a popup open, which keeps Enter for the popup.
-fn button_row(
-    app: &mut PhotocraftApp,
-    ui: &mut egui::Ui,
-    d: &Dialog,
-    fields: &mut Fields,
-    id: egui::Id,
-    interactive: bool,
-    popup_blocks_enter: bool,
-) -> (Option<bool>, bool) {
-    let mut outcome: Option<bool> = None;
-    let mut apply_requested = false;
-    if matches!(d.kind, DialogKind::About | DialogKind::Error) {
-        // ↩ is OK too, as on every other dialog (#4872), from the frame after the
-        // alert appeared: the ↩ that raised it (committing a locked layer's Free
-        // Transform, say) must not close it again at once.
-        let seen = id.with("alert-seen");
-        let shown_before = ui.ctx().data(|m| m.get_temp::<bool>(seen).unwrap_or(false));
-        ui.ctx().data_mut(|m| m.insert_temp(seen, true));
-        let enter = interactive && shown_before && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        if dialog_buttons(ui, &[DialogButton::new(ButtonRole::Default, tl!("OK"), 84.0)]).is_some() || enter {
-            outcome = Some(false);
-        }
-    } else {
-        let ok_label = ok_label(d);
-        // Dialogs that need an input first (a preset name, a selection) grey OK out.
-        let can_ok = crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields);
-        let ok = DialogButton::new(ButtonRole::Default, ok_label, 84.0).enabled(can_ok);
-        // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open).
-        // Dialogs opt in via `dialog_alt_reset::supported` (per marker).
-        let reset = ui.input(|i| i.modifiers.alt) && crate::dialog_alt_reset::supported(fields);
-        let cancel_label = if reset {
-            tl!("Reset")
-        } else if d.kind == DialogKind::NewDocument {
-            tl!("Close")
-        } else {
-            tl!("Cancel")
-        };
-        let cancel = DialogButton::new(ButtonRole::Cancel, cancel_label, 84.0);
-        let clicked = if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
-            let changed = crate::prefs_ui::preferences_changed(app, fields);
-            dialog_buttons(ui, &[ok, cancel, DialogButton::new(ButtonRole::Apply, tl!("Apply"), 84.0).enabled(changed)])
-        } else if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
-            // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
-            let apply = DialogButton::new(ButtonRole::Default, tl!("Apply"), 84.0).enabled(crate::mask_trash_prompt::can_apply(fields));
-            let delete = DialogButton::new(ButtonRole::Alternate, tl!("Delete"), 84.0);
-            let hit = dialog_buttons(ui, &[apply, cancel, delete]);
-            if hit == Some(ButtonRole::Alternate) {
-                fields.insert("choice".into(), json!("delete"));
-            } else if hit == Some(ButtonRole::Default) {
-                fields.insert("choice".into(), json!("apply"));
-            }
-            hit
-        } else if crate::rasterize_prompt::is_filter(fields) {
-            // Photoshop: Convert to Smart Object / Rasterize / Cancel (#4303).
-            let rasterize = DialogButton::new(ButtonRole::Default, tl!("Rasterize"), 84.0);
-            let hit = if crate::rasterize_prompt::offers_smart_object(fields) {
-                let convert = DialogButton::new(ButtonRole::Alternate, tl!("Convert to Smart Object"), 160.0);
-                dialog_buttons(ui, &[rasterize, cancel, convert])
-            } else {
-                dialog_buttons(ui, &[rasterize, cancel])
-            };
-            if hit == Some(ButtonRole::Alternate) {
-                fields.insert("choice".into(), json!("smartObject"));
-            } else if hit == Some(ButtonRole::Default) {
-                fields.insert("choice".into(), json!("rasterize"));
-            }
-            hit
-        } else {
-            dialog_buttons(ui, &[ok, cancel])
-        };
-        match clicked {
-            Some(ButtonRole::Cancel) if reset => crate::dialog_alt_reset::apply(app, ui.ctx(), fields),
-            Some(ButtonRole::Cancel) => outcome = Some(false),
-            Some(ButtonRole::Apply) => apply_requested = true,
-            Some(_) => outcome = Some(true),
-            None if interactive && can_ok && !popup_blocks_enter && ui.input(|i| i.key_pressed(egui::Key::Enter)) => outcome = Some(true),
-            None => {}
-        }
-    }
-    (outcome, apply_requested)
-}
-
 /// The default button's label: what OK means for this dialog.
 fn ok_label(d: &Dialog) -> &'static str {
     if d.kind == DialogKind::NewDocument {
@@ -502,29 +353,69 @@ fn ok_label(d: &Dialog) -> &'static str {
     }
 }
 
-/// The widest a dialog grows when its body names no width of its own.
-fn default_max_width(d: &Dialog, compact: bool, curves: bool, about_tabs: bool, available: f32) -> f32 {
-    if d.kind == DialogKind::NewDocument {
-        800.0
-    } else if about_tabs {
-        700.0
-    } else if d.kind == DialogKind::LayerStyle || d.fields.contains_key("__export") || crate::color_picker_ui::owns(&d.fields) {
-        600.0
-    } else if compact {
-        260.0
-    } else if curves {
-        available.max(300.0)
-    } else {
-        440.0
+/// The button area of a dialog: OK and Cancel, with Apply, an Alternate or Alt-Reset where the
+/// dialog has them. `None` for the dialogs that draw their own buttons (Guide Layout, Brush Preset
+/// and the Color Picker: a column at the body's side that validates Enter itself).
+fn footer_for(app: &PhotocraftApp, d: &Dialog) -> Footer<'static> {
+    let fields = &d.fields;
+    if matches!(d.kind, DialogKind::About | DialogKind::Error) {
+        return Footer::standard().ok(tl!("OK")).without_cancel();
+    }
+    if crate::guide_layout_ui::owns(fields) || crate::brush_preset_dialog::owns(fields) || crate::color_picker_ui::owns(fields) {
+        return Footer::none();
+    }
+    let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
+    footer = footer.labels(dialog_labels());
+    if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
+        return footer.ok(ok_label(d)).apply(tl!("Apply")).apply_enabled(crate::prefs_ui::preferences_changed(app, fields));
+    }
+    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
+        // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
+        return footer.ok(tl!("Apply")).ok_enabled(crate::mask_trash_prompt::can_apply(fields)).alternate(tl!("Delete"));
+    }
+    if crate::rasterize_prompt::is_filter(fields) {
+        // Photoshop: Convert to Smart Object / Rasterize / Cancel (#4303).
+        footer = footer.ok(tl!("Rasterize"));
+        return if crate::rasterize_prompt::offers_smart_object(fields) { footer.alternate(tl!("Convert to Smart Object")) } else { footer };
+    }
+    // Dialogs that need an input first (a preset name, a selection) grey OK out.
+    footer = footer.ok(ok_label(d)).ok_enabled(crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields));
+    // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open). Dialogs opt in via
+    // `dialog_alt_reset::supported` (per marker).
+    if crate::dialog_alt_reset::supported(fields) {
+        footer = footer.reset(Reset::AltCancel(tl!("Reset").into()));
+    }
+    footer
+}
+
+/// The footer's own strings in the UI language.
+fn dialog_labels() -> DialogLabels {
+    let mut labels = DialogLabels::default();
+    labels.default_hint = tl!("Default").into();
+    labels
+}
+
+/// What the answer to a prompt that offers a choice (`choice` field) is, for the role pressed.
+fn set_choice(fields: &mut Fields, outcome: Outcome) {
+    let alternate = outcome == Outcome::Alternate;
+    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
+        fields.insert("choice".into(), json!(if alternate { "delete" } else { "apply" }));
+    } else if crate::rasterize_prompt::is_filter(fields) {
+        fields.insert("choice".into(), json!(if alternate { "smartObject" } else { "rasterize" }));
     }
 }
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     crate::layer_style::color_picker::prune(app);
     crate::type_panels_ui::color_picker::prune(app);
-    crate::edit_history::track_dialogs(app, ctx);
     let dialogs = app.ui.dialogs.clone();
-    let top = dialogs.last().map(|d| d.id);
+    app.dialog_chrome.retain(|id, _| dialogs.iter().any(|d| d.id == *id));
+    // The open dialogs in the order they were opened: only the last takes input, and it is drawn
+    // above the others.
+    let mut stack = DialogStack::default();
+    for d in &dialogs {
+        stack.push(dialog_id(d.id), None);
+    }
     let mut shown = Vec::new();
     for d in dialogs {
         let lang = if crate::prefs_ui::is_preferences(&d.fields) {
@@ -533,190 +424,89 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::i18n::current()
         };
         let _language = crate::i18n::language_scope(lang);
-        let interactive = top == Some(d.id);
-        let mut fields = d.fields.clone();
-        let mut outcome: Option<bool> = None; // Some(true)=OK, Some(false)=Cancel
-        let mut apply_requested = false;
+        let interactive = stack.is_top(dialog_id(d.id));
         let title = display_title(&d);
+        if d.kind == DialogKind::Error {
+            let message = d.fields.get("message").and_then(Value::as_str).unwrap_or("Error");
+            if Alert::new(d.id, title, message).ok_label(tl!("OK")).stack(&stack).show(ctx) {
+                let _ = cancel(app, d.id);
+            }
+            continue;
+        }
         let id = egui::Id::unique(("dialog", d.id));
-        // Opens where the same dialog was last left (centred the first time), then its top-left
-        // stays put (offset from the window's top-left, moved by dragging the title bar; view
-        // state only, so egui memory): a dialog whose body grows, like Layer Style switching
-        // effects, extends down and right instead of re-centring.
-        let pinned: Option<egui::Vec2> = ctx.data(|m| m.get_temp(id));
-        let place = place_id(&d);
-        let start = pinned.or_else(|| ctx.data_mut(|m| m.get_persisted::<egui::Vec2>(place))).or_else(|| crate::blur_pins::first_place(&d.fields, ctx));
-        let mut drag = egui::Vec2::ZERO;
-        let mut close_clicked = false;
-        let mut sizing = false;
-        let area = match start {
-            Some(offset) => egui::Modal::default_area(id).anchor(egui::Align2::LEFT_TOP, offset),
-            None => egui::Modal::default_area(id),
-        };
-        // Only the last dialog takes input, and egui only lets the modal drawn on top take input,
-        // so the last one must be drawn above the others. egui can raise an older one (it raises an
-        // area that is pressed or wasn't drawn the frame before), which left a greyed-out dialog
-        // in front and the live one unreachable behind it. Raise the live one only then: every
-        // frame would also cover its own popups.
-        if interactive && older_dialog_above(ctx, area.layer(), &app.ui.dialogs) {
-            ctx.move_to_top(area.layer());
-        }
+        let mut chrome = app.dialog_chrome.remove(&d.id).unwrap_or_default();
+        let mut fields = Settings(d.fields.clone());
         let color_picker = crate::color_picker_ui::owns(&fields);
-        let mut modal = egui::Modal::new(id).area(area).backdrop_color(egui::Color32::TRANSPARENT);
-        if color_picker {
-            modal = modal.frame(egui::Frame::popup(&ctx.global_style()).inner_margin(16));
-        }
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
-        let tab = if top == Some(d.id) && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
-        // Photoshop doesn't dim the window behind dialogs: previews must be judged at true contrast.
-        let web = fields.contains_key("__web");
-        let web_popup_open = web && egui::Popup::is_any_open(ctx);
-        let resizable = resizable_dialog(&fields);
-        // Curves reopens at the size it was left at (#8984).
-        let remembered = if is_curves(&fields) { ctx.data_mut(|m| m.get_persisted::<egui::Vec2>(size_id(place))) } else { None };
-        let resize = resizable.map(|size| {
-            let min = resizable_min(&fields);
-            (remembered.unwrap_or(size), min, resizable_max(ctx, &fields, min))
-        });
-        let mut given = None;
-        let modal = show_modal(modal, ctx, id, resize, interactive, |ui| {
-            sizing = ui.is_sizing_pass();
-            let available = ui.available_size();
-            given = Some(available);
-            // A dialog of a few short fields (`__compact`, Fit Image) is narrower (#4673): the title
-            // rule and the button row fill the width they are given, so it needs its own maximum too.
-            let compact = d.fields.contains_key("__compact");
-            // The curve editor's graph is as wide as the dialog lets it be (#5113, #8984).
-            let curves = is_curves(&fields);
-            if !compact {
-                ui.set_min_width(if curves { 300.0 } else { 380.0 });
-            }
-            // A resizable dialog's contents fill its resizable area (#7420), the others the window.
-            let room = if resizable.is_some() { available.x } else { (ctx.content_rect().width() - 48.0).max(380.0) };
-            let wide = crate::prefs_ui::width(&d.fields, room);
-            if let Some(w) = wide {
-                ui.set_min_width(w.min(460.0));
-            }
-            if d.kind == DialogKind::NewDocument {
-                ui.set_min_width(800.0);
-            }
-            // The About window: room for the contributor table, the same width on every tab.
-            let about_tabs = d.kind == DialogKind::About && d.fields.get("systemInfo").and_then(Value::as_bool) != Some(true);
-            if about_tabs {
-                ui.set_min_width(700.0);
-            }
-            ui.set_max_width(wide.unwrap_or_else(|| default_max_width(&d, compact, curves, about_tabs, available.x)));
-            if web {
-                ui.set_max_width(available.x);
-                ui.set_min_size(available);
-            } else if let Some(w) = crate::file_ui::dialog_width(&d.fields) {
-                ui.set_min_width(w);
-                ui.set_max_width(w);
-            }
-            // Duplicate Layer… is a fixed small grid (labels + 260 pt fields ≈ 352 pt):
-            // the generic 380 pt minimum left a dead strip on its right.
-            if crate::duplicate_layer_ui::owns(&d.fields) {
-                ui.set_min_width(360.0);
-                ui.set_max_width(360.0);
-            }
-            if color_picker {
-                ui.set_width(crate::color_picker_ui::CONTENT_WIDTH);
-            }
-            let label = egui::Label::new(egui::RichText::new(&title).font(crate::theme::semibold(15.0))).selectable(false);
-            let t = if crate::color_picker_ui::owns(&fields) { ui.add_sized(egui::vec2(ui.available_width(), 22.0), label).rect } else { ui.add(label).rect };
-            // The whole title band drags (#1921): the full width plus a little of the popup's
-            // padding around it and the gap above the hairline, but none of the controls below.
-            // The close box (#5496) sits at the band's right end and is left out of the drag area:
-            // egui would let a drag that starts on a button move the dialog.
-            let close_rect = CLOSE_BOX.then(|| close_box_rect(ui.max_rect().right(), t.center().y));
-            let bar_right = close_rect.map_or(ui.max_rect().right() + 7.0, |r| r.left());
-            let bar = egui::Rect::from_min_max(t.min - egui::vec2(7.0, 7.0), egui::pos2(bar_right, t.bottom() + 4.0));
-            drag = ui.interact(bar, id.with("title"), egui::Sense::drag()).drag_delta();
-            if let Some(r) = close_rect {
-                close_clicked = close_box(ui, r);
-            }
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
-            crate::widgets::hairline(ui);
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        let tab = if interactive && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
+        let mut dialog = HostDialog::new(d.id, title)
+            .stack(&stack)
+            .place_key(PlaceKey(place_id(&d)))
+            .footer(footer_for(app, &d))
+            .history(d.kind == DialogKind::Command)
+            .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
+            .roomy(color_picker)
+            // The dialogs that take the keyboard themselves open with their focus where they put it.
+            .initial_focus(InitialFocus::None);
+        if let Some(offset) = crate::blur_pins::first_place(&d.fields, ctx) {
+            dialog = dialog.first_place(move |_| Some(offset));
+        }
+        dialog = match resize_of(ctx, &fields) {
+            Some((resize, remember)) => dialog.resizable(resize).remember_size(remember),
+            None => dialog.width(width_of(&d)),
+        };
+
+        let body_outcome = std::cell::Cell::new(None::<bool>);
+        let private = std::cell::RefCell::new(Fields::new());
+        let response = dialog.show(ctx, &mut chrome, &mut fields, |ui, fields| {
             crate::field_tab::begin(ui.ctx());
-            if let Some(done) = dialog_body(app, ui, &d, &mut fields, id, interactive) {
-                outcome = Some(done);
+            if let Some(done) = dialog_body(app, ui, &d, fields, id, interactive) {
+                body_outcome.set(Some(done));
             }
             crate::field_tab::end(ui.ctx(), tab);
             if let Some(Value::String(key)) = fields.remove(BROWSE_FIELD) {
-                browse_field(app, d.id, &fields, &key);
+                browse_field(app, d.id, fields, &key);
             }
-            if crate::guide_layout_ui::owns(&fields) || crate::brush_preset_dialog::owns(&fields) {
-                // These dialogs own their right-side actions and validate Enter themselves.
-            } else if crate::color_picker_ui::owns(&fields) {
-                if interactive && outcome.is_none() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    outcome = Some(true);
-                }
-            } else {
-                // The Color Table dialog loads and saves `.act` files, as in Photoshop.
-                if matches!(d.kind, DialogKind::Command) && crate::color_table_ui::owns(&fields) {
-                    crate::color_table_ui::buttons(app, ui, d.id, &mut fields);
-                }
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
-                // Align::Min, not Center: a centred row fills the height left over from last frame's
-                // (larger) size, so a dialog whose body gets shorter would never shrink back.
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    ui.spacing_mut().item_spacing.x = 10.0;
-                    let (done, apply) = button_row(app, ui, &d, &mut fields, id, interactive, web && (web_popup_open || egui::Popup::is_any_open(ui.ctx())));
-                    outcome = done.or(outcome);
-                    apply_requested |= apply;
-                });
+            // The Color Table dialog loads and saves `.act` files, as in Photoshop.
+            if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
+                crate::color_table_ui::buttons(app, ui, d.id, fields);
             }
-            // The frame around the content (Frame::popup's margin and stroke).
-            ui.min_rect().expand(ui.spacing().menu_margin.sum().max_elem() + 2.0)
+            *private.borrow_mut() = fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
         });
-        // The picker has a larger frame margin; include that whole frame in the canvas hit guard.
-        shown.push(if color_picker { modal.response.rect } else { modal.inner });
-        // The size Curves was given (dragged or grown to fit) is the one it reopens at (#8984).
-        // A size at the window's limit is the window's, not the user's: a large remembered size
-        // squeezed into a small window is kept for a larger one.
-        if let (false, true, Some(size), Some((opened, _, max))) = (sizing, is_curves(&fields), given.filter(|g| g.is_finite()), resize)
-            && size != opened.min(max)
-            && size.x < max.x - 0.5
-            && size.y < max.y - 0.5
-            && remembered != Some(size)
-        {
-            ctx.data_mut(|m| m.insert_persisted(size_id(place), size));
+        shown.push(response.rect);
+
+        // ⌘Z / ⇧⌘Z stepped the settings back: the private keys are not part of the history.
+        if response.history.is_some() {
+            fields.retain(|k, _| !k.starts_with("__"));
+            fields.extend(private.take());
         }
-        // Pin once laid out at its real size (the first frame is an invisible sizing pass).
-        if !sizing && (web || pinned.is_none() || drag != egui::Vec2::ZERO) {
-            let screen = ctx.content_rect();
-            // Keep the whole dialog (and so its title bar) on screen.
-            let room = (screen.size() - modal.response.rect.size()).max(egui::Vec2::ZERO);
-            let offset = (pinned.unwrap_or(modal.response.rect.min - screen.min) + drag).clamp(egui::Vec2::ZERO, room);
-            ctx.data_mut(|m| m.insert_temp(id, offset));
-            // A dialog the user moved reopens there (Photoshop remembers each dialog's place).
-            if drag != egui::Vec2::ZERO {
-                ctx.data_mut(|m| m.insert_persisted(place, offset));
+        let mut done = match response.outcome {
+            Some(Outcome::Ok) if matches!(d.kind, DialogKind::About) => Some(false),
+            Some(Outcome::Ok | Outcome::Alternate) => {
+                set_choice(&mut fields, response.outcome.unwrap_or(Outcome::Ok));
+                Some(true)
             }
+            Some(Outcome::Cancel | Outcome::Close) => Some(false),
+            _ => body_outcome.get(),
+        };
+        // Enter confirms the Color Picker, which draws no button row.
+        if done.is_none() && color_picker && response.active && ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+            done = Some(true);
         }
-        // Esc and the title bar's close box cancel (topmost dialog, no popup open for Esc). A click
-        // outside does nothing: Photoshop keeps the dialog, and the pointer may be panning or
-        // zooming the canvas under it.
-        if interactive
-            && outcome.is_none()
-            && (close_clicked
-                || modal.response.should_close()
-                || (modal.is_top_modal && !modal.any_popup_open && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))))
-        {
-            outcome = Some(false);
+        if response.outcome == Some(Outcome::Reset) {
+            crate::dialog_alt_reset::apply(app, ctx, &mut fields);
         }
         if let Some(dm) = app.ui.dialog_mut(d.id) {
-            dm.fields = fields;
+            dm.fields = fields.0;
         }
         // A colour swatch (Edit › Fill, Edit › Stroke) opens the Color Picker over the dialog.
-        if outcome.is_none() {
+        if done.is_none() {
             crate::color_picker_ui::open_requested(app, d.id);
         }
-        if apply_requested && outcome.is_none() {
+        if response.outcome == Some(Outcome::Apply) && done.is_none() {
             let _ = crate::prefs_ui::apply(app, d.id);
         }
-        match outcome {
+        match done {
             Some(true) => {
                 if let Err(error) = confirm(app, d.id) {
                     app.ui.status = error;
@@ -726,16 +516,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 let _ = cancel(app, d.id);
             }
             None => {
+                app.dialog_chrome.insert(d.id, chrome);
                 if let Err(error) = crate::layer_style::color_picker::take_request(app, d.id) {
                     app.ui.status = error;
                 }
             }
         }
     }
-    for rect in &shown {
-        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), *rect);
+    for rect in shown {
+        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
     }
-    ctx.data_mut(|m| m.insert_temp(egui::Id::unique(RECTS), shown));
 }
 
 /// The About window's tabs, as stored in its `tab` field.
@@ -1142,15 +932,17 @@ mod preference_resize_tests {
 
     #[test]
     fn preferences_can_resize_while_standard_native_dialogs_keep_their_layout() {
+        let ctx = egui::Context::default();
         let prefs = json!({"__prefsui": "prefs"});
         let shortcuts = json!({"__prefsui": "shortcuts"});
         let ordinary = json!({});
         let web = json!({"__web": true});
+        let size = |fields: &serde_json::Value| resize_of(&ctx, fields.as_object().unwrap()).map(|(resize, _)| resize.default);
 
-        assert_eq!(resizable_dialog(prefs.as_object().unwrap()), Some(crate::prefs_ui::PREFERENCES_SIZE));
-        assert_eq!(resizable_dialog(shortcuts.as_object().unwrap()), None);
-        assert_eq!(resizable_dialog(ordinary.as_object().unwrap()), None);
-        assert_eq!(resizable_dialog(web.as_object().unwrap()), Some(egui::vec2(960.0, 900.0)));
+        assert_eq!(size(&prefs), Some(crate::prefs_ui::PREFERENCES_SIZE));
+        assert_eq!(size(&shortcuts), None);
+        assert_eq!(size(&ordinary), None);
+        assert_eq!(size(&web), Some(egui::vec2(960.0, 900.0)));
     }
 
     /// Drags the dialog's resize grip (its frame's bottom-right corner) by `by`.
@@ -1167,8 +959,7 @@ mod preference_resize_tests {
     }
 
     fn frame(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> egui::Rect {
-        let rects: Vec<egui::Rect> = h.ctx.data(|m| m.get_temp(egui::Id::unique(RECTS))).unwrap();
-        rects[0]
+        rects(h)[0]
     }
 
     /// The button row sits in the frame's bottom-right corner (its order follows the platform):

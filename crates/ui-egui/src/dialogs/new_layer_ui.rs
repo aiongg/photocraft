@@ -202,7 +202,7 @@ mod tests {
         );
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.run_steps(4);
-        assert!(h.query_by_label("New Layer").is_some());
+        assert!(h.query_by_role_and_label(egui::accesskit::Role::Heading, "New Layer").is_some());
         assert!(h.query_by_label("Use Previous Layer to Create Clipping Mask").is_some());
         let fill = h.get_by_label("(No neutral color exists for Normal mode.)");
         assert!(fill.accesskit_node().is_disabled());

@@ -328,8 +328,7 @@ impl PhotocraftApp {
         mac_bar::sync(self, &ctx);
         if screen_picker::busy(&ctx) {
             // Block input without a backdrop: the worker may still be capturing the screen.
-            egui::Modal::new(egui::Id::unique("screen-color-wait")).frame(egui::Frame::NONE).backdrop_color(egui::Color32::TRANSPARENT).show(&ctx, |_| {});
-            ctx.set_cursor_icon(egui::CursorIcon::Wait);
+            craft_ui::dialog::BlockingOverlay::new("screen-color-wait").show(&ctx);
         }
         true
     }
