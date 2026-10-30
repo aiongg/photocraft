@@ -1,13 +1,11 @@
 //! Indexed Color count: an integer field over a slider with the common palette sizes marked.
 
-use super::{Response, Ui, pos2};
-use craft_theme::{ControlSize, TypeRole};
+use super::{Response, Ui};
+use craft_theme::ControlSize;
 use craft_ui::composites::PropertyRow;
 use craft_ui::controls::{NumberField, Slider};
 use craft_ui::edit::EditEvent;
 use craft_ui::localized::LocaleNumbers;
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 
 const STOPS: [u32; 6] = [8, 16, 32, 64, 128, 256];
 
@@ -30,26 +28,15 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
     if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = field.event {
         *count = (value.round() as u32).clamp(2, 256);
     }
-    let marks = STOPS.map(f64::from);
-    let slider = Slider::new(("color-count-slider", name), name, f64::from(*count), 2.0..=256.0).step(1.0).marks(&marks).width(ui.available_width()).show(ui);
+    let slider = Slider::new(("color-count-slider", name), name, f64::from(*count), 2.0..=256.0)
+        .step(1.0)
+        .marks_labelled(STOPS.map(|stop| (f64::from(stop), stop.to_string())))
+        .width(ui.available_width())
+        .show(ui);
     if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = slider.event {
         *count = (value.round() as u32).clamp(2, 256);
     }
     let mut response = slider.response.clone();
-    // The library draws the marks as ticks; the sizes are written under them.
-    let tokens = LibTokens::of(ui);
-    let style = Slider::style(&tokens, ControlSize::Md);
-    let format = Text::format(&tokens, TypeRole::Caption, Content::Faint);
-    let rect = response.rect;
-    let (x0, x1) = (rect.left() + style.thumb_width / 2.0, rect.right() - style.thumb_width / 2.0);
-    let top = rect.center().y + style.track_height / 2.0 + 2.0 * style.mark;
-    for stop in STOPS {
-        let x = x0 + (stop - 2) as f32 / 254.0 * (x1 - x0);
-        let galley = ui.painter().layout_no_wrap(stop.to_string(), format.font_id.clone(), format.color);
-        let left = if stop == 256 { x - galley.size().x } else { x - galley.size().x / 2.0 };
-        ui.painter().galley(pos2(left, top), galley, format.color);
-    }
-    ui.add_space(top + 12.0 - rect.bottom());
     if *count != before {
         response.mark_changed();
     }
@@ -59,7 +46,7 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::widgets::vec2;
+    use crate::widgets::{pos2, vec2};
     use egui_kittest::{Harness, kittest::Queryable};
 
     fn harness(start: u32) -> Harness<'static, u32> {
@@ -94,8 +81,8 @@ mod tests {
             let rect = harness.get_by_role(egui::accesskit::Role::Slider).rect();
             let style = Slider::style(&craft_ui::theme::current(&harness.ctx), ControlSize::Md);
             let (x0, x1) = (rect.left() + style.thumb_width / 2.0, rect.right() - style.thumb_width / 2.0);
-            let at = |value: f32| pos2(x0 + (value - 2.0) / 254.0 * (x1 - x0), rect.center().y);
-            let point = pos2(at(count as f32).x - 2.0, rect.center().y);
+            let at = |value: f32| pos2(x0 + (value - 2.0) / 254.0 * (x1 - x0), (rect.top() + style.height / 2.0));
+            let point = pos2(at(count as f32).x - 2.0, (rect.top() + style.height / 2.0));
             harness.event(egui::Event::PointerMoved(point));
             for pressed in [true, false] {
                 harness.event(egui::Event::PointerButton { pos: point, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
