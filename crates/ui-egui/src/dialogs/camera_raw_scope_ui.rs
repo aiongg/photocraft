@@ -1,6 +1,6 @@
 //! Camera Raw scope interaction. View state is in UiState; filter edits still commit through
 //! the existing filter.cameraRaw command. Image analysis is cached per completed proxy revision.
-use crate::{camera_raw_ui::CameraRawDialog, state::CameraRawScopeState, theme::Tokens, widgets};
+use crate::{camera_raw_ui::CameraRawDialog, state::CameraRawScopeState, theme::Tokens};
 use craft_ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::{
@@ -365,31 +365,34 @@ fn context_menu(response: &egui::Response, has_selection: bool, view: &mut Camer
 }
 
 fn context(ui: &mut egui::Ui, has_selection: bool, view: &mut CameraRawScopeState) {
-    craft_ui::controls::Checkbox::bool(tl!("Show Lab Color Readouts"), &mut view.lab).show(ui);
-    craft_ui::controls::Checkbox::bool(tl!("Show Vectorscope"), &mut view.vectorscope).show(ui);
+    craft_ui::controls::Checkbox::bool(tl!("Show Lab Color Readouts"), &mut view.lab).show(ui).response;
+    craft_ui::controls::Checkbox::bool(tl!("Show Vectorscope"), &mut view.vectorscope).show(ui).response;
     if view.vectorscope {
         if has_selection {
-            craft_ui::controls::Checkbox::bool(tl!("Show Selected Region"), &mut view.selected_region).show(ui);
+            craft_ui::controls::Checkbox::bool(tl!("Show Selected Region"), &mut view.selected_region).show(ui).response;
         }
-        craft_ui::controls::Checkbox::bool(tl!("Show Red at 3 o'clock"), &mut view.red_right).show(ui);
+        craft_ui::controls::Checkbox::bool(tl!("Show Red at 3 o'clock"), &mut view.red_right).show(ui).response;
         let mut skin = !view.hide_skin_line;
-        craft_ui::controls::Checkbox::bool(tl!("Show Skin Tone Indicator"), &mut skin).show(ui);
+        craft_ui::controls::Checkbox::bool(tl!("Show Skin Tone Indicator"), &mut skin).show(ui).response;
         view.hide_skin_line = !skin;
     }
 }
 
 fn graph(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawScopeState, height: f32) {
     let t = Tokens::get(ui.ctx());
-    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width().max(1.0), height), Sense::click_and_drag());
-    d.scope.rect = Some(rect);
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Unknown, ui.is_enabled(), tl!("Tone Histogram")));
-    ui.painter().rect_filled(rect, t.radius_sm, t.histogram_background());
-    let plot = rect.shrink(4.0);
     // Camera Raw's scale: the typical columns set it and a shadow or highlight spike runs off the top.
-    crate::rgb_histogram::paint_with(ui.painter(), plot, d.histogram(), &t, crate::rgb_histogram::Spikes::Clip);
+    let mut histogram = crate::rgb_histogram::histogram("camera-raw-scope-histogram", tl!("Tone Histogram"), d.histogram(), true).height(height).bordered(true);
+    let sample = d.hover_sample(false);
+    if let Some(sample) = &sample {
+        let [r, g, b] = sample.rgb.map(|v| v.clamp(0.0, 1.0));
+        histogram = histogram.marker(Some((0.2126 * r + 0.7152 * g + 0.0722 * b) * 255.0));
+    }
+    let rect = histogram.show(ui).response.rect;
+    let plot = rect;
+    let response = ui.interact(rect, ui.make_persistent_id("camera-raw-scope-drag"), Sense::click_and_drag());
+    d.scope.rect = Some(rect);
     let corner = 18.0;
-    if let Some(sample) = d.hover_sample(false) {
-        crate::rgb_histogram::paint_sample(ui.painter(), plot, sample.rgb, &t);
+    if let Some(sample) = sample {
         let [r, g, b] = sample.rgb.map(|x| x * 255.0);
         let text = format!("R {r:.0}   G {g:.0}   B {b:.0}");
         let font = crate::theme::mono(11.0);
@@ -437,7 +440,6 @@ fn graph(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut CameraRawScopeSt
         d.scope.tone_drag = None;
     }
     context_menu(&response, d.selection.is_some(), view);
-    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
 }
 
 /// The cloud and pixel target use exactly the same orientation and saturation radius.

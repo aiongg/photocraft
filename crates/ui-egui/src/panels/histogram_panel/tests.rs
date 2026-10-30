@@ -267,17 +267,6 @@ fn every_view_and_channel_draws_without_panicking() {
 }
 
 #[test]
-fn overlaid_colors_mix_where_channels_overlap() {
-    let ctx = egui::Context::default();
-    ctx.begin_pass(Default::default());
-    let p = ctx.layer_painter(egui::LayerId::background());
-    let h = [100u32; 256];
-    draw_overlaid(&p, Rect::from_min_size(egui::Pos2::ZERO, vec2(256.0, 50.0)), &[(&h, Color32::RED), (&h, Color32::GREEN)], false);
-    draw_overlaid(&p, Rect::from_min_size(egui::Pos2::ZERO, vec2(256.0, 50.0)), &[], true);
-    ctx.end_pass().textures_delta.clear();
-}
-
-#[test]
 fn ui_set_drives_the_panel() {
     let mut app = app_with(json!({"width": 16, "height": 16}));
     let ctx = egui::Context::default();
@@ -301,30 +290,6 @@ fn ui_set_drives_the_panel() {
         assert_eq!(r["ok"], false, "{bad}: {r}");
     }
     assert_eq!(app.ui.histogram_panel.view, HistView::AllChannels, "a rejected call changes nothing");
-}
-
-/// The Colors overlay follows the same outline as a single channel: straight lines between bin
-/// centres, not one flat step per level, and its bands tile without gaps where outlines cross.
-#[test]
-fn colors_overlay_is_a_continuous_outline_not_steps() {
-    let r = Rect::from_min_size(egui::Pos2::ZERO, vec2(512.0, 100.0));
-    let ramp: [u32; 256] = std::array::from_fn(|i| i as u32 * 10);
-    let fall: [u32; 256] = std::array::from_fn(|i| (255 - i) as u32 * 10);
-    let mesh = overlaid_mesh(r, &[(&ramp, Color32::RED), (&fall, Color32::GREEN)], false);
-    let quads: Vec<&[egui::epaint::Vertex]> = mesh.vertices.chunks(4).collect();
-    assert!(!quads.is_empty());
-    // Every band's top edge slopes on a ramp: no flat steps.
-    let sloped = quads.iter().filter(|q| (q[1].pos.y - q[2].pos.y).abs() > 1e-4).count();
-    assert!(sloped * 10 > quads.len() * 9, "{sloped} of {} bands slope", quads.len());
-    // The two ramps cross mid-way: there the overlap is yellow and each side keeps its own colour.
-    let colors: std::collections::HashSet<_> = mesh.vertices.iter().map(|v| v.color).collect();
-    assert!(colors.contains(&Color32::from_rgb(255, 255, 0)) && colors.contains(&Color32::RED) && colors.contains(&Color32::GREEN));
-    // Nothing is drawn above the taller outline at any x.
-    for q in &quads {
-        for v in q.iter() {
-            assert!(v.pos.y >= r.top() - 1e-3 && v.pos.y <= r.bottom() + 1e-3);
-        }
-    }
 }
 
 /// A white Background under a black layer, with the Background selected: the entire image is

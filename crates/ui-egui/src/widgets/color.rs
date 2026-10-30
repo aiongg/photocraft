@@ -4,13 +4,7 @@ use craft_ui::theme::StrokeExt;
 
 /// Cached RGB data; drawing work is bounded by the 256 display bins, never the image size.
 pub fn rgb_histogram(ui: &mut Ui, histogram: &photocraft_algo::histogram::RgbHistogram, height: f32) -> egui::Response {
-    let t = Tokens::get(ui.ctx());
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(ui.available_width().max(1.0), height.max(1.0)), egui::Sense::hover());
-    ui.painter().rect_filled(rect, t.radius_sm, t.histogram_background());
-    let plot = rect.shrink(4.0);
-    crate::rgb_histogram::paint(ui.painter(), plot, histogram, &t);
-    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
-    response
+    crate::rgb_histogram::histogram("rgb-histogram", tl!("Histogram"), histogram, false).height(height.max(1.0)).show(ui).response
 }
 
 /// The fully saturated colour at hue `deg` (degrees), built on sRGB values as Photoshop's hue

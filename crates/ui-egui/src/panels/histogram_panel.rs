@@ -7,10 +7,10 @@
 //! revision, source and preview they describe, and kept until one of those changes; the panel
 //! shows the last one with the cached-data warning until the new one lands.
 
-use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
-use egui::{Color32, Rect, Sense, pos2, vec2};
+use craft_ui::composites::{ChannelColor, Histogram};
+use egui::vec2;
 use photocraft_color::ColorMode;
 use photocraft_doc::adjust::ToneSpace;
 use photocraft_doc::{DocId, Document, LayerContent};
@@ -188,21 +188,22 @@ fn channel_id(channel: HistChannel) -> String {
     serde_json::to_value(channel).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()
 }
 
-/// The colour a single channel draws in (saturated, as in All Channels View).
-pub fn channel_paint(channel: HistChannel) -> Option<Color32> {
+/// The library colour a single channel draws in: its own when colourised, else the neutral grey.
+/// Lab a and b take magenta and yellow, the composite, Luminosity and CMYK Black the neutral.
+pub fn channel_color(channel: HistChannel, colored: bool) -> ChannelColor {
     use HistChannel::*;
-    Some(match channel {
-        Red => Color32::from_rgb(235, 30, 30),
-        Green => Color32::from_rgb(30, 235, 30),
-        Blue => Color32::from_rgb(40, 40, 240),
-        Cyan => Color32::from_rgb(0, 200, 235),
-        Magenta => Color32::from_rgb(230, 0, 160),
-        Yellow => Color32::from_rgb(240, 220, 0),
-        Black => Color32::from_gray(110),
-        A => Color32::from_rgb(220, 90, 140),
-        B => Color32::from_rgb(200, 180, 60),
-        _ => return None,
-    })
+    if !colored {
+        return ChannelColor::Neutral;
+    }
+    match channel {
+        Red => ChannelColor::Red,
+        Green => ChannelColor::Green,
+        Blue => ChannelColor::Blue,
+        Cyan => ChannelColor::Cyan,
+        Magenta | A => ChannelColor::Magenta,
+        Yellow | B => ChannelColor::Yellow,
+        _ => ChannelColor::Neutral,
+    }
 }
 
 /// The level of `channel` at a straight RGBA 0..1 pixel, as the histogram bins it (the Color
@@ -530,177 +531,54 @@ fn shown(app: &mut PhotocraftApp) -> Option<Shown> {
 // ---------------------------------------------------------------------------------------------
 // Drawing
 
-/// One histogram and its colour, for [`draw_overlaid`].
-type Layer<'a> = (&'a [u32; 256], Color32);
-
-/// The colour of a band covered by `covering`: additive for light channels (red over green is
-/// yellow, all three grey), multiplied for inks (cyan over magenta is blue).
-fn mix(covering: impl Iterator<Item = Color32>, multiply: bool) -> Color32 {
-    if multiply {
-        covering.fold(Color32::WHITE, |a, b| {
-            Color32::from_rgb(
-                (u16::from(a.r()) * u16::from(b.r()) / 255) as u8,
-                (u16::from(a.g()) * u16::from(b.g()) / 255) as u8,
-                (u16::from(a.b()) * u16::from(b.b()) / 255) as u8,
-            )
-        })
-    } else {
-        covering.fold(Color32::BLACK, |a, b| Color32::from_rgb(a.r().saturating_add(b.r()), a.g().saturating_add(b.g()), a.b().saturating_add(b.b())))
-    }
-}
-
-/// Draws `layers` overlaid on one shared scale, each outlined like [`tone::draw_histogram`]
-/// (straight lines between the bin centres, down to the baseline at both ends). Where several
-/// cover a band it takes their [`mix`]ed colour. Each span between two centres is split where
-/// outlines cross, so the channel order is constant within every piece and the bands are exact
-/// trapezoids: no steps, and no draw-order-dependent blending.
-fn draw_overlaid(p: &egui::Painter, r: Rect, layers: &[Layer<'_>], multiply: bool) {
-    p.add(overlaid_mesh(r, layers, multiply));
-}
-
-fn overlaid_mesh(r: Rect, layers: &[Layer<'_>], multiply: bool) -> egui::Mesh {
-    let top = layers.iter().map(|(h, _)| tone::histogram_scale_top(h)).fold(1.0f32, f32::max);
-    // Outline points: the left baseline, the 256 bin centres, the right baseline (heights 0..1).
-    let xs: Vec<f32> =
-        std::iter::once(r.left()).chain((0..256).map(|i| r.left() + (i as f32 + 0.5) / 256.0 * r.width())).chain(std::iter::once(r.right())).collect();
-    let height = |h: &[u32; 256], i: usize| if i == 0 || i > 256 { 0.0 } else { (h.get(i - 1).copied().unwrap_or(0) as f32 / top).min(1.0) };
-    let mut mesh = egui::Mesh::default();
-    let y = |v: f32| r.bottom() - v * r.height();
-    for i in 0..xs.len().saturating_sub(1) {
-        let (Some(&x0), Some(&x1)) = (xs.get(i), xs.get(i + 1)) else { continue };
-        let a: Vec<f32> = layers.iter().map(|(h, _)| height(h, i)).collect();
-        let b: Vec<f32> = layers.iter().map(|(h, _)| height(h, i + 1)).collect();
-        // Where any two outlines cross within the span (as a fraction of it).
-        let mut cuts = vec![0.0f32, 1.0];
-        for j in 0..layers.len() {
-            for k in j + 1..layers.len() {
-                let (Some(aj), Some(bj), Some(ak), Some(bk)) = (a.get(j), b.get(j), a.get(k), b.get(k)) else { continue };
-                let d = (bj - aj) - (bk - ak);
-                if d.abs() > f32::EPSILON {
-                    let t = (ak - aj) / d;
-                    if t > 0.0 && t < 1.0 {
-                        cuts.push(t);
-                    }
-                }
-            }
-        }
-        cuts.sort_by(f32::total_cmp);
-        for w in cuts.windows(2) {
-            let (t0, t1) = (w[0], w[1]);
-            if t1 - t0 <= f32::EPSILON {
-                continue;
-            }
-            let at = |t: f32| -> Vec<f32> { a.iter().zip(&b).map(|(a, b)| a + (b - a) * t).collect() };
-            let (left, right, mid) = (at(t0), at(t1), at((t0 + t1) / 2.0));
-            let mut order: Vec<usize> = (0..layers.len()).collect();
-            order.sort_by(|&m, &n| mid.get(m).copied().unwrap_or(0.0).total_cmp(&mid.get(n).copied().unwrap_or(0.0)));
-            let (px0, px1) = (x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1);
-            // Bottom up: each band is covered by the channels at least that tall.
-            let (mut below_l, mut below_r) = (0.0f32, 0.0f32);
-            for (n, &c) in order.iter().enumerate() {
-                let (Some(&tl), Some(&tr)) = (left.get(c), right.get(c)) else { continue };
-                if tl > below_l || tr > below_r {
-                    let color = mix(order.iter().skip(n).filter_map(|&m| layers.get(m).map(|l| l.1)), multiply);
-                    let v = mesh.vertices.len() as u32;
-                    for q in [pos2(px0, y(below_l)), pos2(px0, y(tl)), pos2(px1, y(tr)), pos2(px1, y(below_r))] {
-                        mesh.colored_vertex(q, color);
-                    }
-                    mesh.add_triangle(v, v + 1, v + 2);
-                    mesh.add_triangle(v, v + 2, v + 3);
-                }
-                (below_l, below_r) = (tl.max(below_l), tr.max(below_r));
-            }
-        }
-    }
-    mesh
-}
-
-/// The colour a single-channel graph draws in: its channel colour when colourised, else the
-/// composite grey.
-fn graph_color(channel: HistChannel, colored: bool, t: &Tokens) -> Color32 {
-    let grey = if t.pro { Color32::from_gray(215) } else { Color32::from_gray(70) };
-    if colored { channel_paint(channel).unwrap_or(grey) } else { grey }
-}
-
-/// Draws `channel` of `h` in `r` (Colors overlays the colour channels).
-fn draw_channel(p: &egui::Painter, r: Rect, h: &Histograms, mode: ColorMode, channel: HistChannel, colored: bool, t: &Tokens) {
-    if channel == HistChannel::Colors {
-        let layers: Vec<Layer<'_>> = color_channels(mode).iter().filter_map(|c| Some((bins(h, mode, *c), channel_paint(*c)?))).collect();
-        draw_overlaid(p, r, &layers, tone_space(mode) == ToneSpace::Cmyk);
-    } else {
-        tone::draw_histogram(p, r, bins(h, mode, channel), graph_color(channel, colored, t));
+/// `channel` of `h` as a library [`Histogram`] (Colors overlays the colour channels: added light
+/// in RGB, multiplied inks in CMYK).
+fn plot(id: &str, h: &Histograms, mode: ColorMode, channel: HistChannel, colored: bool) -> Histogram {
+    let histogram = Histogram::new(id, tl!("Histogram")).value(tl!(channel_label(mode, channel)));
+    let of = |c| &bins(h, mode, c)[..];
+    match (channel, tone_space(mode)) {
+        (HistChannel::Colors, ToneSpace::Rgb) => histogram.rgb([of(HistChannel::Red), of(HistChannel::Green), of(HistChannel::Blue)]),
+        (HistChannel::Colors, ToneSpace::Cmyk) => histogram.channels(&[
+            (of(HistChannel::Cyan), ChannelColor::Cyan),
+            (of(HistChannel::Magenta), ChannelColor::Magenta),
+            (of(HistChannel::Yellow), ChannelColor::Yellow),
+            (of(HistChannel::Black), ChannelColor::Neutral),
+        ]),
+        _ => histogram.tone(of(channel), channel_color(channel, colored)),
     }
 }
 
 /// The histogram graph with its marks and pointer interaction. Returns the levels under the
 /// pointer (hover) for the statistics.
 fn graph(app: &mut PhotocraftApp, ui: &mut egui::Ui, s: &Shown, channel: HistChannel, colored: bool, height: f32) -> Option<u8> {
-    let t = Tokens::get(ui.ctx());
-    let w = ui.available_width();
-    let (r, resp) = ui.allocate_exact_size(vec2(w, height), Sense::click_and_drag());
-    let p = ui.painter_at(r);
-    p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
-    let level_at = |x: f32| (((x - r.left()) / r.width().max(1.0)) * 256.0).floor().clamp(0.0, 255.0) as u8;
-    let x_of = |l: u8| r.left() + (f32::from(l) + 0.5) / 256.0 * r.width();
-    // The selected range behind the bars.
-    if let Some([a, b]) = app.ui.histogram_range {
-        let (lo, hi) = (a.min(b), a.max(b));
-        let band = Rect::from_x_y_ranges(r.left() + f32::from(lo) / 256.0 * r.width()..=r.left() + (f32::from(hi) + 1.0) / 256.0 * r.width(), r.y_range());
-        p.rect_filled(band, craft_ui::theme::scale::Radius::R0.px(), t.accent.gamma_multiply(0.35));
-    }
-    draw_channel(&p, r, &s.hist, s.mode, channel, colored, &t);
+    let mark_channel = if channel == HistChannel::Colors { HistChannel::Composite } else { channel };
+    // The Color Samplers' levels.
+    let marks: Vec<(f32, String)> = crate::panels::sampler_readouts(app)
+        .iter()
+        .filter_map(|v| {
+            let rgb: Vec<f32> = v["rgb"].as_array()?.iter().filter_map(Value::as_f64).map(|c| (c / 255.0) as f32).collect();
+            let level = channel_level(s.mode, mark_channel, [*rgb.first()?, *rgb.get(1)?, *rgb.get(2)?, 1.0]);
+            Some((f32::from(level), v["number"].to_string()))
+        })
+        .collect();
+    let mut histogram = plot("hist-graph", &s.hist, s.mode, channel, colored)
+        .height(height)
+        .selection(app.ui.histogram_range.map(|[a, b]| f32::from(a.min(b))..=f32::from(a.max(b))))
+        .markers(&marks)
+        .stale(s.stale || s.hist.level > 1)
+        .on_stale_click(tl!("Click to refresh histogram with uncached data"));
     // The original histogram outlined over the adjusted one while an adjustment previews.
     if let Some(o) = &s.original {
-        outline(&p, r, bins(o, s.mode, if channel == HistChannel::Colors { HistChannel::Composite } else { channel }), t.text);
+        histogram = histogram.outline(&bins(o, s.mode, mark_channel)[..], ChannelColor::Neutral);
     }
-    // The Color Samplers' levels.
-    let mark_channel = if channel == HistChannel::Colors { HistChannel::Composite } else { channel };
-    for v in crate::panels::sampler_readouts(app).iter() {
-        let rgb = v["rgb"].as_array().map(|a| a.iter().filter_map(Value::as_f64).map(|c| (c / 255.0) as f32).collect::<Vec<_>>()).unwrap_or_default();
-        let (Some(&red), Some(&green), Some(&blue)) = (rgb.first(), rgb.get(1), rgb.get(2)) else { continue };
-        let x = x_of(channel_level(s.mode, mark_channel, [red, green, blue, 1.0]));
-        p.line_segment([pos2(x, r.bottom() - 9.0), pos2(x, r.bottom())], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text));
-        p.text(pos2(x + 2.0, r.bottom() - 9.0), egui::Align2::LEFT_BOTTOM, v["number"].to_string(), egui::FontId::proportional(9.0), t.text);
-    }
-    // The cached-data warning: click it (or double-click the graph) for an Uncached Refresh.
-    if s.stale || s.hist.level > 1 {
-        let icon = Rect::from_min_size(r.right_top() + vec2(-18.0, 2.0), vec2(16.0, 16.0));
-        crate::icons::paint(ui, icon, "triangle-alert", 12.0, t.warning);
-        let warn =
-            ui.interact(icon, ui.scope_id().with("hist-cached-warning"), Sense::click()).on_hover_text(tl!("Click to refresh histogram with uncached data"));
-        if warn.clicked() {
-            uncached_refresh(app);
-        }
-    }
-    if resp.double_clicked() {
+    let shown = histogram.show(ui);
+    if shown.clicked || shown.double_clicked() {
         uncached_refresh(app);
     }
-    let pointer = resp.interact_pointer_pos().or_else(|| resp.hover_pos());
-    let id = ui.scope_id().with("hist-drag-from");
-    if resp.drag_started()
-        && let Some(pos) = resp.interact_pointer_pos()
-    {
-        ui.data_mut(|d| d.insert_temp(id, level_at(pos.x)));
+    if let Some(range) = shown.selection {
+        app.ui.histogram_range = range.map(|r| [r.start().round().clamp(0.0, 255.0) as u8, r.end().round().clamp(0.0, 255.0) as u8]);
     }
-    if resp.dragged()
-        && let (Some(from), Some(pos)) = (ui.data(|d| d.get_temp::<u8>(id)), pointer)
-    {
-        app.ui.histogram_range = Some([from, level_at(pos.x)]);
-    } else if resp.clicked() {
-        app.ui.histogram_range = None;
-    }
-    pointer.filter(|_| resp.hovered() || resp.dragged()).map(|pos| level_at(pos.x))
-}
-
-/// The outline of `h` (the original histogram over an adjusted one).
-fn outline(p: &egui::Painter, r: Rect, h: &[u32; 256], color: Color32) {
-    let top = tone::histogram_scale_top(h);
-    let pts: Vec<_> = h
-        .iter()
-        .enumerate()
-        .map(|(i, v)| pos2(r.left() + (i as f32 + 0.5) / 256.0 * r.width(), r.bottom() - (*v as f32 / top).min(1.0) * r.height()))
-        .collect();
-    p.add(egui::Shape::line(pts, egui::Stroke::new(1.0, color.gamma_multiply(0.8))));
+    shown.hovered_level.map(|l| l.round().clamp(0.0, 255.0) as u8)
 }
 
 /// The statistics grid: Mean, Std Dev, Median, Pixels | Level, Count, Percentile, Cache Level.
@@ -794,11 +672,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         for c in color_channels(s.mode) {
             ui.add_space(craft_ui::theme::scale::Space::S4.px());
             ui.label(egui::RichText::new(tl!(channel_label(s.mode, *c))).color(t.text).size(11.5));
-            let w = ui.available_width();
-            let (r, _) = ui.allocate_exact_size(vec2(w, 90.0), Sense::hover());
-            let p = ui.painter_at(r);
-            p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
-            tone::draw_histogram(&p, r, bins(&s.hist, s.mode, *c), graph_color(*c, colored, &t));
+            plot(&format!("hist-all-{}", channel_id(*c)), &s.hist, s.mode, *c, colored).height(90.0).show(ui);
         }
     }
     if changed {
