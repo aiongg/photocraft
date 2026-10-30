@@ -414,7 +414,7 @@ mod dialog {
         let mut h = harness_with_store(&store);
         h.get_by_label("Saved").click();
         h.run_steps(2);
-        h.get_by_label("Product square").click();
+        h.get_by(|n| is_preset_row(n.label(), "Product square")).click();
         h.run_steps(2);
         assert!(h.state().session.documents().is_empty(), "selection only populates the form");
         assert_eq!(fields(&h)["name"], "Untitled-1");
@@ -473,6 +473,11 @@ mod dialog {
         h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         h
+    }
+
+    /// Whether an AccessKit name is a saved preset's row: one node named by its name and its detail line ("Name, detail").
+    fn is_preset_row(label: Option<String>, name: &str) -> bool {
+        label.is_some_and(|l| l.strip_prefix(name).is_some_and(|rest| rest.starts_with(", ")))
     }
 
     fn click_at(h: &mut Harness<'static, PhotocraftApp>, at: egui::Pos2) {
@@ -684,7 +689,7 @@ mod dialog {
         set_fields(&mut h, f);
         h.get_by_label("Saved").click();
         h.run_steps(2);
-        let at = h.get_by_label("Saved proof").rect().center();
+        let at = h.get_by(|n| is_preset_row(n.label(), "Saved proof")).rect().center();
         click_at(&mut h, at);
         assert_eq!(fields(&h)["__savedPreset"], "Saved proof");
         assert_eq!(fields(&h)["__unit"], "mm");
