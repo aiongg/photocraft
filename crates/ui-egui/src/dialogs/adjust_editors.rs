@@ -278,7 +278,13 @@ impl<'a> Row<'a> {
 
     pub(crate) fn show(self, ui: &mut egui::Ui, x: &mut f32) -> Edit {
         let numbers = LocaleNumbers::of(ui);
-        let mut row = SliderRow::new(self.label, self.label, f64::from(*x), f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
+        // The control's gesture holds the exact value it reports, and a host value that differs
+        // from it ends the gesture. The host keeps rounded values, so the control shows the
+        // gesture's value until the gesture ends.
+        let before = ui.make_persistent_id((self.label, "before"));
+        let draft = before.with("draft");
+        let shown = ui.data(|d| d.get_temp::<f64>(draft)).unwrap_or(f64::from(*x));
+        let mut row = SliderRow::new(self.label, self.label, shown, f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
             .unit(Unit::new(&format!("{{n}}{}", self.unit)));
         if let Some(d) = self.decimals {
             row = row.decimals(d);
@@ -292,20 +298,46 @@ impl<'a> Row<'a> {
         if let Some(step) = self.wheel {
             row = row.wheel(true).wheel_step(f64::from(step));
         }
-        let before = ui.make_persistent_id((self.label, "before"));
         let mut e = Edit::default();
         for event in row.show(ui).edits() {
+            match &event {
+                EditEvent::Update { value, .. } => {
+                    ui.data_mut(|d| d.insert_temp(draft, *value));
+                }
+                EditEvent::Commit { .. } | EditEvent::Set { .. } | EditEvent::Cancel { .. } => {
+                    ui.data_mut(|d| d.remove::<f64>(draft));
+                }
+                _ => {}
+            }
             e.add(apply_event(ui, before, Some(event), x, |v| *v as f32));
         }
         e
     }
 }
 
-/// A colour swatch button opening the library's picker popup; returns the edit.
+/// A colour swatch button opening the library's picker popup; returns the edit. The popup shows
+/// the colour as the gesture has it until the gesture ends, since the host keeps 8-bit hex.
 fn color_button(ui: &mut egui::Ui, salt: &str, label: &str, c: &mut [f32; 3]) -> Edit {
     let numbers = LocaleNumbers::of(ui);
-    let r = ColorPopover::new(salt, label, Srgba::rgb(c[0], c[1], c[2]), &numbers).show(ui);
-    apply_event(ui, ui.make_persistent_id((salt, "before")), r.edit.event, c, |p| [p.color.r, p.color.g, p.color.b])
+    let before = ui.make_persistent_id((salt, "before"));
+    let draft = before.with("draft");
+    let shown = ui.data(|d| d.get_temp::<[f32; 3]>(draft)).unwrap_or(*c);
+    let r = ColorPopover::new(salt, label, Srgba::rgb(shown[0], shown[1], shown[2]), &numbers).show(ui);
+    let mut e = Edit::default();
+    if let Some(event) = r.edit.event {
+        match &event {
+            EditEvent::Update { value, .. } => {
+                let c = [value.color.r, value.color.g, value.color.b];
+                ui.data_mut(|d| d.insert_temp(draft, c));
+            }
+            EditEvent::Commit { .. } | EditEvent::Set { .. } | EditEvent::Cancel { .. } => {
+                ui.data_mut(|d| d.remove::<[f32; 3]>(draft));
+            }
+            _ => {}
+        }
+        e = apply_event(ui, before, Some(event), c, |p| [p.color.r, p.color.g, p.color.b]);
+    }
+    e
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {

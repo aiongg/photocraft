@@ -415,7 +415,13 @@ fn color_balance_sliders_reset_and_step_like_photoshop() {
     h.run_steps(3);
     clicks_with(&mut h, label.center(), 2, egui::Modifiers::NONE);
     assert_eq!(cb(&h).1, [40.0, -30.0, 20.0], "double-click on the label");
-    // The panel's sliders ignore the wheel.
+    // The panel's sliders ignore the wheel until focused (the library steps a focused slider).
+    h.ctx.memory_mut(|m| {
+        if let Some(id) = m.focused() {
+            m.surrender_focus(id);
+        }
+    });
+    h.run_steps(2);
     wheel_at(&mut h, on_track, 3.0, egui::Modifiers::NONE);
     wheel_at(&mut h, on_track, 3.0, egui::Modifiers::SHIFT);
     assert_eq!(cb(&h).1, [40.0, -30.0, 20.0], "wheel over a Properties slider");
@@ -876,6 +882,30 @@ fn hue_saturation_bars_fill_the_panel_width() {
         let avail = h.ctx.data(|d| d.get_temp::<f32>(egui::Id::unique("hs-avail"))).unwrap();
         assert!((bars.width() - avail).abs() < 0.5, "{width}: bars {} of {avail}", bars.width());
     }
+}
+
+/// Dragging a handle of the Hue/Saturation range bar moves that bound, wrapping past 360 and
+/// keeping the bounds in order; the others stay.
+#[test]
+fn hue_range_bar_handles_drag_and_wrap() {
+    let mut h = editor_harness("hueSaturation", json!({"reds": {"range": [-45.0, -15.0, 15.0, 45.0]}}));
+    h.ctx.data_mut(|d| d.insert_temp(egui::Id::unique("precision").with("hs-range"), 1usize));
+    h.run_steps(3);
+    let handle = |h: &Harness<'static, serde_json::Value>, name: &str| h.get_by_label(name).rect().center();
+    let from = handle(&h, "Fully affected end");
+    h.hover_at(from);
+    h.run_steps(1);
+    h.drag_at(from);
+    h.run_steps(1);
+    for i in 1..=6 {
+        h.hover_at(from + vec2(4.0 * i as f32, 0.0));
+        h.run_steps(1);
+    }
+    h.drop_at(from + vec2(24.0, 0.0));
+    h.run_steps(3);
+    let range: Vec<f64> = h.state()["reds"]["range"].as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert_eq!((range[0], range[1], range[3]), (-45.0, -15.0, 45.0), "{range:?}");
+    assert!(range[2] > 15.0 && range[2] <= 45.0, "the inner end moved right, within the outer one: {range:?}");
 }
 
 /// Types `text` into the `index`th number field and commits it with Enter.

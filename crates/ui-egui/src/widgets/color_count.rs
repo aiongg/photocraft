@@ -19,7 +19,12 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
     let name = tl!(label);
     let field = PropertyRow::word(name)
         .show(ui, |ui, _| {
-            NumberField::new(("color-count-field", name), name, f64::from(*count), &numbers).range(2.0..=256.0).decimals(0..=0).size(ControlSize::Md).show(ui)
+            NumberField::new(("color-count-field", name), name, f64::from(*count), &numbers)
+                .range(2.0..=256.0)
+                .decimals(0..=0)
+                .or_parse(super::parse_num)
+                .size(ControlSize::Md)
+                .show(ui)
         })
         .inner;
     if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = field.event {
@@ -87,7 +92,7 @@ mod tests {
         for count in STOPS {
             let mut harness = harness(2);
             let rect = harness.get_by_role(egui::accesskit::Role::Slider).rect();
-            let style = Slider::style(&LibTokens::of(&harness.ctx), ControlSize::Md);
+            let style = Slider::style(&craft_ui::theme::current(&harness.ctx), ControlSize::Md);
             let (x0, x1) = (rect.left() + style.thumb_width / 2.0, rect.right() - style.thumb_width / 2.0);
             let at = |value: f32| pos2(x0 + (value - 2.0) / 254.0 * (x1 - x0), rect.center().y);
             let point = pos2(at(count as f32).x - 2.0, rect.center().y);
