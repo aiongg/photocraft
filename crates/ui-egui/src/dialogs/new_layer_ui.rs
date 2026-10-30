@@ -76,7 +76,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     FormGrid::new("new-layer").show(ui, |form| {
         form.row(tl!("Name:"), |ui, _| {
             let mut name = f.get("name").and_then(Value::as_str).unwrap_or("").to_string();
-            let edit = crate::widgets::dialog_text_opening(ui, "new-layer-name", tl!("Name:"), &mut name, f);
+            let edit = crate::widgets::dialog_text(ui, "new-layer-name", tl!("Name:"), &mut name);
             if edit.changed {
                 f.insert("name".into(), json!(name));
             }
@@ -101,21 +101,20 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         });
         let mut m = mode(f);
         form.row(tl!("Mode:"), |ui, _| {
-            ui.horizontal(|ui| {
+            {
                 let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
                 let edit = Select::new("new-layer-mode", tl!("Mode"), &mut m).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
                 if edit.response.changed() {
                     f.insert("mode".into(), json!(m.label()));
                 }
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
                 ui.label(tl!("Opacity:"));
                 let mut o = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
-                if crate::widgets::dialog_number(ui, "new-layer-opacity", tl!("Opacity:"), &mut o, 0.0..=100.0, "{n}%", 0) {
+                let field = crate::widgets::dialog_number_field(ui, "new-layer-opacity", tl!("Opacity:"), &mut o, 0.0..=100.0, "{n}%", 0);
+                if field.changed {
                     f.insert("opacity".into(), json!(o.clamp(0.0, 100.0)));
                 }
-                edit
-            })
-            .inner
+                (edit, field.response)
+            }
         });
         form.unlabelled(|ui| {
             let available = neutral_color(m).is_some();
