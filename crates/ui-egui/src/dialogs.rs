@@ -258,7 +258,7 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::prefs_ui::owns(fields) => crate::prefs_ui::body(app, ui, fields),
         _ if fields.contains_key("__export") => crate::export_dialog::body(app, ui, fields),
         // Image Size and Canvas Size open on Width, selected (#2329).
-        _ if fields.contains_key("__sizing") => first_field_focused(ui, id, |ui| crate::sizing::body(ui, fields)),
+        _ if fields.contains_key("__sizing") => crate::sizing::body(ui, fields),
         _ if crate::smart_filter_dialog::owns(fields) => crate::smart_filter_dialog::body(app, ui, fields),
         _ if crate::adjust_dialog::owns(fields) => crate::adjust_dialog::body(app, ui, fields),
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
@@ -363,8 +363,8 @@ fn filter_below(app: &PhotocraftApp, d: &Dialog, ui: &mut egui::Ui, fields: &mut
 
 /// Whether the dialog's fields are all library controls, which walk Tab themselves (the dialog's
 /// field order, then its buttons), so PhotoCraft's `field_tab` stands aside.
-fn library_fields(fields: &Fields) -> bool {
-    opens_on_first_field(fields)
+fn library_fields(kind: DialogKind, fields: &Fields) -> bool {
+    opens_on_first_field(kind, fields)
         || crate::guide_layout_ui::owns(fields)
         || crate::channel_options_ui::owns(fields)
         || crate::channel_options_ui::owns_new_spot(fields)
@@ -377,8 +377,12 @@ fn library_fields(fields: &Fields) -> bool {
 
 /// Whether the dialog opens with its first field focused and selected, so typing replaces it
 /// (Photoshop's Name dialogs). Those bodies are library fields; the rest place focus themselves.
-fn opens_on_first_field(fields: &Fields) -> bool {
-    crate::new_layer_ui::owns(fields) || crate::new_group_ui::owns(fields) || crate::snapshot_dialog::owns(fields)
+fn opens_on_first_field(kind: DialogKind, fields: &Fields) -> bool {
+    kind == DialogKind::NewDocument
+        || crate::new_layer_ui::owns(fields)
+        || crate::new_group_ui::owns(fields)
+        || crate::snapshot_dialog::owns(fields)
+        || fields.contains_key("__sizing")
 }
 
 /// The default button's label: what OK means for this dialog.
@@ -524,7 +528,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let enabled = Cell::new(enabled_for(app, &d, &fields));
         let table = Cell::new(None);
         let preview = Cell::new(None);
-        let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(&fields) { crate::field_tab::take_step(ctx) } else { 0 };
+        let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(d.kind, &fields) { crate::field_tab::take_step(ctx) } else { 0 };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
@@ -533,7 +537,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(if opens_on_first_field(&fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
+            .initial_focus(if opens_on_first_field(d.kind, &fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
                 InitialFocus::FirstField
             } else {
                 InitialFocus::None
