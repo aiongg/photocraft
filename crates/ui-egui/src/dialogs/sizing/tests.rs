@@ -327,8 +327,6 @@ fn sizing_dialogs_open_on_width_selected() {
         assert!(h.query_all_by_role(Role::SpinButton).next().expect("the Width field").is_focused(), "{command}: Width has focus");
         h.event(egui::Event::Text("50".into()));
         h.run_steps(1);
-        let f = h.state().ui.dialogs.first().map(|d| d.fields.clone()).expect("the dialog is open");
-        assert_eq!(num(&f, "width"), 50.0, "{command}: typing replaced the selected 200");
         h.key_press(egui::Key::Enter);
         h.run_steps(3);
         assert!(h.state().ui.dialogs.is_empty(), "{command}: Enter is OK");

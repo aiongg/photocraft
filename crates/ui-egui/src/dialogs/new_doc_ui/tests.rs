@@ -202,7 +202,8 @@ fn preset_card_titles_fit_the_card_in_every_language() {
         for lang in crate::i18n::Lang::all() {
             for p in CATEGORIES.iter().flat_map(|c| c.1.iter()) {
                 let title = crate::i18n::tr(lang, p.0);
-                let g = card_title(ui.painter(), title, 152.0, egui::Color32::WHITE);
+                let format = egui::TextFormat::simple(egui::FontId::proportional(12.0), egui::Color32::WHITE);
+                let g = card_title(ui.painter(), title, 152.0, &format);
                 assert!(g.size().x <= 152.0 && g.rows.len() <= 2 && !g.elided, "{}: {title}", lang.code());
             }
         }
@@ -572,6 +573,7 @@ mod dialog {
         let mut h = harness();
         let label_at = |h: &Harness<'static, PhotocraftApp>, text: &str| {
             h.query_all_by_label(text)
+                .chain(h.query_all_by_value(text))
                 .find(|n| n.accesskit_node().role() == Role::Label)
                 .map(|n| n.rect().center())
                 .unwrap_or_else(|| panic!("a {text:?} label"))
