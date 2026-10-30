@@ -532,7 +532,8 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         }
         actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
-        let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"));
+        let adj_open = ui.id().with("adjustment_menu_open");
+        let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"), was_open(ui, adj_open));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).
         crate::press_menu::show(&adj, |ui, menu| {
             ui.set_min_width(190.0);
@@ -549,6 +550,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 actions.push(("layer.newFillLayer.gradient".into(), json!({})));
             }
         });
+        remember_open(ui, adj_open, &adj);
         // Like Photoshop the button never replaces a mask (#2075): with a layer mask it adds a
         // vector mask, and with both it is greyed.
         let alt = ui.input(|i| i.modifiers.alt);
@@ -570,7 +572,8 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
-        let fx = PanelFooter::menu_button(ui, Icon::Fx, tl!("Add a layer style"));
+        let fx_open = ui.id().with("style_menu_open");
+        let fx = PanelFooter::menu_button(ui, Icon::Fx, tl!("Add a layer style"), was_open(ui, fx_open));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);
             if menu.item(ui, tl!("Blending Options…")) {
@@ -583,6 +586,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
             }
         });
+        remember_open(ui, fx_open, &fx);
         // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
         let can_link = app.session.is_enabled("layer.linkLayers");
         if ui.add_enabled_ui(can_link, |ui| PanelFooter::button(ui, Icon::Link, tl!("Link layers"))).inner.clicked() {
@@ -635,6 +639,17 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         let _ = app.run(&id, p);
     }
+}
+
+/// Whether a footer button's press menu was open after the last pass: `PanelFooter::menu_button`
+/// reports it as the button's expanded state, and the menu's id is known only from the button.
+fn was_open(ui: &egui::Ui, key: egui::Id) -> bool {
+    ui.data(|d| d.get_temp(key)).unwrap_or(false)
+}
+
+fn remember_open(ui: &egui::Ui, key: egui::Id, button: &egui::Response) {
+    let open = egui::Popup::is_id_open(ui.ctx(), egui::Popup::default_response_id(button));
+    ui.data_mut(|d| d.insert_temp(key, open));
 }
 
 pub(super) fn footer_label(command: &str) -> &'static str {
