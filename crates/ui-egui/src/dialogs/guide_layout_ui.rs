@@ -1,6 +1,5 @@
 //! Photoshop-style guide layout dialog. Its preview is a pure guide overlay, never an edit.
 
-use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 use egui::Color32;
 use photocraft_doc::{Document, Guides};
