@@ -5,38 +5,18 @@
 //! While it is the top dialog the image is its eyedropper, as in Photoshop: the pointer over the
 //! canvas is a pipette, and a click or drag there samples into the new colour ([`sample_at`]).
 
-use craft_ui::theme::StrokeExt;
-use egui::{Color32, Mesh, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
+use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
+use craft_ui::controls::{Button, ButtonVariant};
+use craft_ui::localized::LocaleNumbers;
+use craft_ui::theme::scale::Space;
+use egui::{Color32, Rect, Stroke, UiBuilder, pos2, vec2};
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::DialogKind;
-use crate::theme::Tokens;
 use crate::widgets;
-
-/// Radio components, Photoshop order: H, S, B, R, G, B.
-pub const MODES: &[(&str, &str)] = &[("h", "H:"), ("s", "S:"), ("v", "B:"), ("r", "R:"), ("g", "G:"), ("b", "B:")];
-/// Lab radio components (Photoshop's right-hand column): L, a, b.
-pub const LAB_MODES: &[(&str, &str)] = &[("lab_l", "L:"), ("lab_a", "a:"), ("lab_b", "b:")];
-
-/// The Lab colour at field position (x, y) in 0..1 (y down) with the slider at `z`, for a Lab
-/// `mode`, as Photoshop 25.4 lays them out: L shows a across and b upwards; a shows b across and L
-/// upwards; b shows a across and L upwards (a and b run -128..127, L 0..100).
-fn field_lab(mode: &str, z: f32, x: f32, y: f32) -> Option<[f32; 3]> {
-    let ab = |t: f32| t * 255.0 - 128.0;
-    match mode {
-        "lab_l" => Some([z * 100.0, ab(x), ab(1.0 - y)]),
-        "lab_a" => Some([(1.0 - y) * 100.0, ab(z), ab(x)]),
-        "lab_b" => Some([(1.0 - y) * 100.0, ab(x), ab(z)]),
-        _ => None,
-    }
-}
-
-/// Lab → sRGB, clamped to what the field can show.
-fn lab_rgb(lab: [f32; 3]) -> [f32; 3] {
-    photocraft_color::convert::lab_to_srgb(lab).map(|c| c.clamp(0.0, 1.0))
-}
 
 /// Colour differences the CMYK round trip leaves inside the printable gamut (ΔE ≤ 0.4, black ≈ 1.4
 /// with black-point compensation) stay below this; out-of-gamut colours move far more.
@@ -71,71 +51,6 @@ pub fn parse_hex(s: &str) -> Option<[f32; 3]> {
     // `get`, not `[..]`: typed text may be multi-byte, and a byte range can split a character.
     let c = |i: usize| u8::from_str_radix(h.get(i..i + 2)?, 16).ok().map(|v| f32::from(v) / 255.0);
     Some([c(0)?, c(2)?, c(4)?])
-}
-
-/// The colour at field position (x, y) in 0..1 (y down) for `mode` with the slider at `z` (0..1),
-/// given the current HSV/RGB (used for the components the field doesn't vary).
-pub fn field_color(mode: &str, z: f32, x: f32, y: f32) -> [f32; 3] {
-    if let Some(lab) = field_lab(mode, z, x, y) {
-        return lab_rgb(lab);
-    }
-    match mode {
-        "s" => hsb_to_rgb([x * 360.0, z, 1.0 - y]),
-        "v" => hsb_to_rgb([x * 360.0, 1.0 - y, z]),
-        "r" => [z, 1.0 - y, x],
-        "g" => [1.0 - y, z, x],
-        "b" => [x, 1.0 - y, z],
-        _ => hsb_to_rgb([z * 360.0, x, 1.0 - y]),
-    }
-}
-
-/// Field position and slider value of a colour in `mode` (inverse of [`field_color`]).
-pub fn locate(mode: &str, hsv: [f32; 3], rgb: [f32; 3], lab: [f32; 3]) -> (f32, f32, f32) {
-    let h = hsv[0] / 360.0;
-    let ab = |v: f32| ((v + 128.0) / 255.0).clamp(0.0, 1.0);
-    let l = (lab[0] / 100.0).clamp(0.0, 1.0);
-    match mode {
-        "lab_l" => (ab(lab[1]), 1.0 - ab(lab[2]), l),
-        "lab_a" => (ab(lab[2]), 1.0 - l, ab(lab[1])),
-        "lab_b" => (ab(lab[1]), 1.0 - l, ab(lab[2])),
-        "s" => (h, 1.0 - hsv[2], hsv[1]),
-        "v" => (h, 1.0 - hsv[1], hsv[2]),
-        "r" => (rgb[2], 1.0 - rgb[1], rgb[0]),
-        "g" => (rgb[2], 1.0 - rgb[0], rgb[1]),
-        "b" => (rgb[0], 1.0 - rgb[1], rgb[2]),
-        _ => (hsv[1], 1.0 - hsv[2], h),
-    }
-}
-
-/// Colour for slider position `z` (0..1) in `mode`, other components from the current colour.
-fn slider_color(mode: &str, z: f32, hsv: [f32; 3], rgb: [f32; 3], lab: [f32; 3]) -> [f32; 3] {
-    if let Some(l) = slider_lab(mode, z, lab) {
-        return lab_rgb(l);
-    }
-    match mode {
-        "s" => hsb_to_rgb([hsv[0], z, hsv[2]]),
-        "v" => hsb_to_rgb([hsv[0], hsv[1], z]),
-        "r" => [z, rgb[1], rgb[2]],
-        "g" => [rgb[0], z, rgb[2]],
-        "b" => [rgb[0], rgb[1], z],
-        _ => hsb_to_rgb([z * 360.0, 1.0, 1.0]),
-    }
-}
-
-/// The Lab colour with the slider of a Lab `mode` at `z`, the other components kept.
-fn slider_lab(mode: &str, z: f32, lab: [f32; 3]) -> Option<[f32; 3]> {
-    let ab = z * 255.0 - 128.0;
-    match mode {
-        "lab_l" => Some([z * 100.0, lab[1], lab[2]]),
-        "lab_a" => Some([lab[0], ab, lab[2]]),
-        "lab_b" => Some([lab[0], lab[1], ab]),
-        _ => None,
-    }
-}
-
-fn c32(c: [f32; 3]) -> Color32 {
-    let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    Color32::from_rgb(q(c[0]), q(c[1]), q(c[2]))
 }
 
 /// Open the picker for the foreground or background colour.
@@ -361,225 +276,195 @@ fn set_rgb(f: &mut Map<String, Value>, rgb: [f32; 3], keep: Keep) {
     }
 }
 
-fn grid_mesh(rect: Rect, n: usize, color: impl Fn(f32, f32) -> [f32; 3]) -> Mesh {
-    let mut m = Mesh::default();
-    for j in 0..=n {
-        for i in 0..=n {
-            let (x, y) = (i as f32 / n as f32, j as f32 / n as f32);
-            m.colored_vertex(pos2(rect.left() + x * rect.width(), rect.top() + y * rect.height()), c32(color(x, y)));
-        }
-    }
-    let w = (n + 1) as u32;
-    for j in 0..n as u32 {
-        for i in 0..n as u32 {
-            let a = j * w + i;
-            m.add_triangle(a, a + 1, a + w + 1);
-            m.add_triangle(a, a + w + 1, a + w);
-        }
-    }
-    m
-}
-
-/// Cells per side of the banded Only Web Colors field: fine enough that the band edges follow the
-/// colour model, coarse enough to stay cheap to draw each frame.
-const WEB_CELLS: usize = 64;
-
 /// Snap each channel to the web-safe ramp (00, 33, 66, 99, CC, FF).
 fn web_safe(c: [f32; 3]) -> [f32; 3] {
     c.map(|v| (v.clamp(0.0, 1.0) * 5.0).round() / 5.0)
-}
-
-/// Like [`grid_mesh`], but every cell is one flat colour sampled at its centre, so a quantized
-/// field shows hard bands instead of blending between the snapped corners.
-fn flat_grid_mesh(rect: Rect, n: usize, color: impl Fn(f32, f32) -> [f32; 3]) -> Mesh {
-    let mut m = Mesh::default();
-    let n = n.max(1);
-    let (cw, ch) = (rect.width() / n as f32, rect.height() / n as f32);
-    for j in 0..n {
-        for i in 0..n {
-            let c = c32(color((i as f32 + 0.5) / n as f32, (j as f32 + 0.5) / n as f32));
-            let (x0, y0) = (rect.left() + i as f32 * cw, rect.top() + j as f32 * ch);
-            let a = m.vertices.len() as u32;
-            for (dx, dy) in [(0.0, 0.0), (cw, 0.0), (cw, ch), (0.0, ch)] {
-                m.colored_vertex(pos2(x0 + dx, y0 + dy), c);
-            }
-            m.add_triangle(a, a + 1, a + 2);
-            m.add_triangle(a, a + 2, a + 3);
-        }
-    }
-    m
 }
 
 /// Room for both component columns, including units, without overflowing the title's width; with
 /// the frame and title the window fits Photoshop's (about 534 x 376 points).
 pub(crate) const CONTENT_WIDTH: f32 = 488.0;
 /// Side of the colour field (Photoshop's is about 256 points).
-const FIELD: f32 = 200.0;
-/// Width of the component fields.
-const VALUE_W: f32 = 42.0;
-
 /// Draw the picker and its top-right actions. `Some(true)` confirms, `Some(false)` cancels.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
     ui.set_width(CONTENT_WIDTH);
-    ui.spacing_mut().item_spacing.y = 4.0;
+    let now = current(f);
+    let orig = f.get("__orig").and_then(Value::as_str).and_then(parse_hex).unwrap_or(now.rgb);
+    let mut mode = area_mode(f.get("__mode").and_then(Value::as_str).unwrap_or("h"));
+    let mut web = f.get("__webOnly").and_then(Value::as_bool).unwrap_or(false);
+    let web_before = web;
+    let cmyk = CmykModel(picked_cmyk(f));
+    let models: [&dyn ColorModel; 4] = [&HsbModel, &RgbModel, &LabModel, &cmyk];
+    let numbers = LocaleNumbers::of(ui);
+    let screen_id = ui.scope_id().with("screen-color");
+    let source = srgba(now.rgb);
+    let mut picker = ColorPicker::new("color-picker", tl!("Color"), source, &numbers)
+        .layout(ColorPickerLayout::Full)
+        .models(models)
+        .mode(&mut mode)
+        .web_colors(&mut web)
+        .compare(srgba(orig))
+        .focus_on_open(false)
+        .eyedropper(tl!("Pick screen color"))
+        .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
+        .text(word);
+    // Photoshop's warnings beside the swatch, each over a chip of the nearest colour that passes
+    // (a click takes it): out of gamut for printing on top, not a web colour below.
+    if let Some(near) = out_of_gamut(now.rgb) {
+        picker = picker.warning(ColorWarning::new(tl!("Out of gamut for printing: click for the nearest printable colour"), srgba(near)));
+    }
+    if let Some(near) = not_web_safe(now.rgb) {
+        picker = picker.warning(ColorWarning::web_colors(tl!("Not a web colour: click for the nearest web colour"), srgba(near)));
+    }
+    let shown = picker.show(ui);
+    // The hex field takes the focus, its text selected, once the dialog is on show: the library
+    // asks on the first pass, which a window's hidden sizing pass spends.
+    if ui.is_visible() && !f.contains_key("__focused") {
+        f.insert("__focused".into(), json!(true));
+        ColorPicker::focus_hex(ui.ctx(), shown.edit.response.id);
+    }
+    if shown.eyedropper_requested {
+        crate::screen_picker::request(ui.ctx(), screen_id);
+    }
+    if let Some(rgb) = crate::screen_picker::take(ui.ctx(), screen_id) {
+        ColorPicker::sampled(ui.ctx(), shown.edit.response.id, srgba(rgb));
+    }
+    if web != web_before {
+        f.insert("__webOnly".into(), json!(web));
+    }
+    if mode_key(mode) != f.get("__mode").and_then(Value::as_str).unwrap_or("h") {
+        f.insert("__mode".into(), json!(mode_key(mode)));
+    }
+    if let Some(picked) = shown.edit.event.as_ref().and_then(|e| e.value()) {
+        apply_picked(f, picked);
+    }
+    actions(ui, f, shown.edit.response.rect.top())
+}
+
+/// OK, Cancel and Add to Swatches in a column at the picker's top-right corner, beside the
+/// compare swatch and above the channel fields, as Photoshop's are. `top` is the picker's top.
+fn actions(ui: &mut egui::Ui, f: &mut Map<String, Value>, top: f32) -> Option<bool> {
     let mut outcome = None;
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 12.0;
-        ui.vertical(|ui| {
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                color_field(ui, f);
-            });
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            let mut web = f.get("__webOnly").and_then(Value::as_bool).unwrap_or(false);
-            if widgets::checkbox(ui, &mut web, tl!("Only Web Colors")).changed() {
-                f.insert("__webOnly".into(), json!(web));
-                set_rgb(f, current(f).rgb, Keep::Nothing);
-            }
-            // Under the colour field, not in the action column: the dialog must still fit a
-            // 760 x 480 window.
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
-            if let Some(rgb) = crate::screen_picker::button(ui, ui.scope_id().with("screen-color")) {
-                set_rgb(f, rgb, Keep::Nothing);
-            }
-        });
-        ui.vertical(|ui| {
-            ui.horizontal_top(|ui| {
-                swatches(ui, f);
-                // As wide as the longest label, at the right edge like Photoshop's.
-                let button_width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
-                ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
-                    if widgets::primary_button(ui, tl!("OK"), button_width).clicked() {
-                        outcome = Some(true);
-                    }
-                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                    if widgets::secondary_button(ui, tl!("Cancel"), button_width).clicked() {
-                        outcome = Some(false);
-                    }
-                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                    // Handled by the dialog host, which has the app (`take_add_swatch`).
-                    if widgets::secondary_button(ui, tl!("Add to Swatches"), button_width).clicked() {
-                        f.insert("__addSwatch".into(), json!(true));
-                    }
-                });
-            });
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
-            let mode = f.get("__mode").and_then(Value::as_str).unwrap_or("h").to_string();
-            fields(ui, f, &mode, &current(f));
-        });
-    });
+    // As wide as the longest label, at the right edge like Photoshop's.
+    let width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
+    let right = ui.max_rect().right();
+    let rect = Rect::from_min_max(pos2(right - width, top), pos2(right, top + 120.0));
+    let mut column = ui.new_child(UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Max)));
+    let ui = &mut column;
+    if ui.add(Button::new(tl!("OK")).variant(ButtonVariant::Primary).min_width(width)).clicked() {
+        outcome = Some(true);
+    }
+    ui.add_space(Space::S4.px());
+    if ui.add(Button::new(tl!("Cancel")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
+        outcome = Some(false);
+    }
+    ui.add_space(Space::S4.px());
+    // Handled by the dialog host, which has the app (`take_add_swatch`).
+    if ui.add(Button::new(tl!("Add to Swatches")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
+        f.insert("__addSwatch".into(), json!(true));
+    }
     outcome
 }
 
-/// The Color Picker's colour field and component slider, editing the colour in f.
-fn color_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
-    let mode = f.get("__mode").and_then(Value::as_str).unwrap_or("h").to_string();
-    let now = current(f);
-    let (rgb, hsv, lab) = (now.rgb, now.hsv, now.lab);
-    let (fx, fy, fz) = locate(&mode, hsv, rgb, lab);
-    // Colour field.
-    let (field, resp) = ui.allocate_exact_size(vec2(FIELD, FIELD), Sense::click_and_drag());
-    let web_only = f.get("__webOnly").and_then(Value::as_bool).unwrap_or(false);
-    // Only Web Colors bands the field to the 216 web-safe colours, as in Photoshop (#4107).
-    let mesh = |rect: Rect, color: &dyn Fn(f32, f32) -> [f32; 3]| {
-        if web_only { flat_grid_mesh(rect, WEB_CELLS, |x, y| web_safe(color(x, y))) } else { grid_mesh(rect, 32, color) }
+/// Stores what the picker reported: the colour, and the values of the model it was edited in
+/// while they still give it (greys keep their hue, a typed Lab or CMYK colour outside sRGB its
+/// values).
+fn apply_picked(f: &mut Map<String, Value>, picked: &PickedColor) {
+    let rgb = [picked.color.r, picked.color.g, picked.color.b];
+    let keep = match picked.model {
+        Some(m) if m.model == HsbModel.id() => Keep::Hsv([m.values[0], m.values[1] / 100.0, m.values[2] / 100.0]),
+        Some(m) if m.model == LabModel.id() => Keep::Lab([m.values[0], m.values[1], m.values[2]]),
+        Some(m) if m.model == CMYK_ID => Keep::Cmyk([0, 1, 2, 3].map(|i| m.values[i] / 100.0)),
+        _ => Keep::Nothing,
     };
-    ui.painter().add(mesh(field, &|x, y| field_color(&mode, fz, x, y)));
-    ui.painter().rect_stroke(
-        field,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-        StrokeKind::Outside,
-    );
-    let marker = pos2(field.left() + fx * field.width(), field.top() + fy * field.height());
-    ui.painter().circle_stroke(
-        marker,
-        5.0,
-        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if hsv[2] > 0.6 && hsv[1] < 0.4 { Color32::BLACK } else { Color32::WHITE }),
-    );
-    // Photoshop updates the colour on the press itself, not only when the button is released
-    // (#6937): `is_pointer_button_down_on` is true from the press frame onwards (it covers
-    // dragging too), while `clicked` fires on release and `dragged` only after a move.
-    if let Some(p) = widgets::pick_pos(&resp) {
-        let (x, y) = (((p.x - field.left()) / field.width()).clamp(0.0, 1.0), ((p.y - field.top()) / field.height()).clamp(0.0, 1.0));
-        let c = field_color(&mode, fz, x, y);
-        let keep = match mode.as_str() {
-            "h" => Keep::Hsv([fz * 360.0, x, 1.0 - y]),
-            "s" => Keep::Hsv([x * 360.0, fz, 1.0 - y]),
-            "v" => Keep::Hsv([x * 360.0, 1.0 - y, fz]),
-            m => field_lab(m, fz, x, y).map_or(Keep::Nothing, Keep::Lab),
-        };
-        set_rgb(f, c, keep);
-    }
-    // Component slider (hue runs 360° at the top to 0° at the bottom, like Photoshop).
-    let (strip, sresp) = ui.allocate_exact_size(vec2(18.0, FIELD), Sense::click_and_drag());
-    ui.painter().add(mesh(strip, &|_, y| slider_color(&mode, 1.0 - y, hsv, rgb, lab)));
-    let sy = strip.top() + (1.0 - fz) * strip.height();
-    for (x, dir) in [(strip.left() - 1.0, 1.0f32), (strip.right() + 1.0, -1.0)] {
-        let tri = vec![pos2(x, sy), pos2(x - 6.0 * dir, sy - 4.0), pos2(x - 6.0 * dir, sy + 4.0)];
-        ui.painter().add(egui::Shape::convex_polygon(tri, t.text, Stroke::NONE));
-    }
-    if let Some(p) = widgets::pick_pos(&sresp) {
-        let z = 1.0 - ((p.y - strip.top()) / strip.height()).clamp(0.0, 1.0);
-        let h = match mode.as_str() {
-            "h" => Some([z * 360.0, hsv[1], hsv[2]]),
-            "s" => Some([hsv[0], z, hsv[2]]),
-            "v" => Some([hsv[0], hsv[1], z]),
-            _ => None,
-        };
-        match (h, slider_lab(&mode, z, lab)) {
-            (Some(h), _) => set_rgb(f, hsb_to_rgb(h), Keep::Hsv(h)),
-            (None, Some(l)) => set_rgb(f, lab_rgb(l), Keep::Lab(l)),
-            (None, None) => set_rgb(f, slider_color(&mode, z, hsv, rgb, lab), Keep::Nothing),
-        }
+    if hex(rgb) != f.get("color").and_then(Value::as_str).unwrap_or_default() || !matches!(keep, Keep::Nothing) {
+        set_rgb(f, rgb, keep);
     }
 }
 
-fn swatches(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
-    let rgb = current(f).rgb;
-    let orig = f.get("__orig").and_then(Value::as_str).and_then(parse_hex).unwrap_or(rgb);
-    let (area, _) = ui.allocate_exact_size(vec2(56.0 + 24.0, 92.0), Sense::hover());
-    // new / current swatches, labelled above and below.
-    let sw = Rect::from_min_size(area.min + vec2(0.0, 16.0), vec2(56.0, 64.0));
-    let p = ui.painter();
-    let label = |text: &str, at: egui::Pos2, align: egui::Align2| {
-        p.text(at, align, text, egui::FontId::proportional(11.0), t.text_dim);
+fn srgba(c: [f32; 3]) -> Srgba {
+    Srgba::rgb(c[0], c[1], c[2])
+}
+
+/// Area modes in the order of the `__mode` field's keys.
+const MODE_KEYS: [(&str, AreaMode); 9] = [
+    ("h", AreaMode::Hue),
+    ("s", AreaMode::Saturation),
+    ("v", AreaMode::Brightness),
+    ("r", AreaMode::Red),
+    ("g", AreaMode::Green),
+    ("b", AreaMode::Blue),
+    ("lab_l", AreaMode::LabL),
+    ("lab_a", AreaMode::LabA),
+    ("lab_b", AreaMode::LabB),
+];
+
+fn area_mode(key: &str) -> AreaMode {
+    MODE_KEYS.iter().find(|(k, _)| *k == key).map_or(AreaMode::Hue, |(_, m)| *m)
+}
+
+fn mode_key(mode: AreaMode) -> &'static str {
+    MODE_KEYS.iter().find(|(_, m)| *m == mode).map_or("h", |(k, _)| k)
+}
+
+/// The picker's words, in PhotoCraft's: the channel fields and radios keep their "H:" names, the
+/// hex field its "Color" name and the compare swatch its restore tip.
+fn word(key: &str) -> String {
+    let text: &str = match key {
+        "Hue" => tl!("H:"),
+        "Saturation" => tl!("S:"),
+        "Brightness" | "Blue" => tl!("B:"),
+        "Red" => tl!("R:"),
+        "Green" => tl!("G:"),
+        "Lightness" => tl!("L:"),
+        "Green-red" => tl!("a:"),
+        "Blue-yellow" => tl!("b:"),
+        "Cyan" => tl!("C:"),
+        "Magenta" => tl!("M:"),
+        "Yellow" => tl!("Y:"),
+        "Black" => tl!("K:"),
+        "Hex colour" => tl!("Color"),
+        "Restore current colour" => tl!("Click to restore the current colour"),
+        other => tl!(other),
     };
-    label(tl!("new"), pos2(sw.center().x, sw.top() - 3.0), egui::Align2::CENTER_BOTTOM);
-    label(tl!("current"), pos2(sw.center().x, sw.bottom() + 3.0), egui::Align2::CENTER_TOP);
-    p.rect_filled(Rect::from_min_size(sw.min, vec2(56.0, 32.0)), craft_ui::theme::scale::Radius::R0.px(), c32(rgb));
-    let cur = Rect::from_min_size(sw.min + vec2(0.0, 32.0), vec2(56.0, 32.0));
-    p.rect_filled(cur, craft_ui::theme::scale::Radius::R0.px(), c32(orig));
-    p.rect_stroke(sw, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
-    let click_cur = ui.interact(cur, ui.scope_id().with("cp-current"), Sense::click());
-    click_cur.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Click to restore the current colour")));
-    if click_cur.on_hover_text(tl!("Click to restore the current colour")).clicked() {
-        set_rgb(f, orig, Keep::Nothing);
+    text.to_string()
+}
+
+const CMYK_ID: &str = "cmyk";
+
+const CMYK_CHANNELS: [Channel; 4] = [
+    Channel { name: "Cyan", qualified: "CMYK cyan", label: "C", min: 0.0, max: 100.0, unit: "%", decimals: 0, step: 1.0, track_stops: 2 },
+    Channel { name: "Magenta", qualified: "CMYK magenta", label: "M", min: 0.0, max: 100.0, unit: "%", decimals: 0, step: 1.0, track_stops: 2 },
+    Channel { name: "Yellow", qualified: "CMYK yellow", label: "Y", min: 0.0, max: 100.0, unit: "%", decimals: 0, step: 1.0, track_stops: 2 },
+    Channel { name: "Black", qualified: "CMYK black", label: "K", min: 0.0, max: 100.0, unit: "%", decimals: 0, step: 1.0, track_stops: 2 },
+];
+
+/// CMYK through PhotoCraft's profile conversion, in percent. The inks the colour was picked as
+/// (#4196) are the model's values for that colour while they still give it.
+struct CmykModel(Option<[f32; 4]>);
+
+impl ColorModel for CmykModel {
+    fn id(&self) -> &'static str {
+        CMYK_ID
     }
-    // Photoshop's warnings beside the swatch, each over a chip of the nearest colour that passes
-    // (a click takes it): out of gamut for printing on top, not a web colour below.
-    let x = sw.right() + 8.0;
-    let gamut = tl!("Out of gamut for printing: click for the nearest printable colour");
-    let web = tl!("Not a web colour: click for the nearest web colour");
-    for (slot, warning, tip) in [(0.0, out_of_gamut(rgb), gamut), (34.0, not_web_safe(rgb), web)] {
-        let Some(near) = warning else { continue };
-        let icon = Rect::from_min_size(pos2(x, sw.top() + 2.0 + slot), vec2(13.0, 13.0));
-        let chip = Rect::from_min_size(pos2(x + 1.5, icon.bottom() + 3.0), vec2(10.0, 10.0));
-        let p = ui.painter();
-        if slot == 0.0 {
-            warning_triangle(p, icon, t.text, t.chrome);
-        } else {
-            web_cube(p, icon, t.text);
-        }
-        p.rect_filled(chip, craft_ui::theme::scale::Radius::R0.px(), c32(near));
-        p.rect_stroke(chip, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Outside);
-        let resp = ui.interact(icon.union(chip), ui.scope_id().with(("cp-warning", slot as i32)), Sense::click());
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tip));
-        if resp.on_hover_text(tip).clicked() {
-            set_rgb(f, near, Keep::Nothing);
-        }
+    fn name(&self) -> &'static str {
+        "CMYK"
+    }
+    fn channels(&self) -> &[Channel] {
+        &CMYK_CHANNELS
+    }
+    fn from_srgb(&self, color: Srgba) -> ModelValues {
+        let rgb = [color.r, color.g, color.b];
+        let inks =
+            self.0.filter(|k| hex(photocraft_color::convert::cmyk_to_rgb(*k)) == hex(rgb)).unwrap_or_else(|| photocraft_color::convert::rgb_to_cmyk(rgb));
+        ModelValues::new(CMYK_ID, &inks.map(|v| v * 100.0))
+    }
+    fn to_srgb(&self, values: &[f32; MAX_CHANNELS]) -> Srgba {
+        let rgb = photocraft_color::convert::cmyk_to_rgb([0, 1, 2, 3].map(|i| values[i] / 100.0)).map(|c| c.clamp(0.0, 1.0));
+        srgba(rgb)
+    }
+    fn default_on(&self) -> DefaultOn {
+        DefaultOn { full: true, compact: false }
     }
 }
 
@@ -605,160 +490,6 @@ pub(crate) fn web_cube(p: &egui::Painter, r: Rect, ink: Color32) {
     for k in [1.0, 3.0, 5.0] {
         p.line_segment([c, corner(k)], stroke);
     }
-}
-
-/// A component radio: true when clicked.
-fn radio(ui: &mut egui::Ui, on: bool, label: &str) -> bool {
-    let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::click());
-    ui.painter().circle_stroke(r.center(), 5.5, Stroke::new(1.2, if on { t.accent } else { t.text_faint }));
-    if on {
-        ui.painter().circle_filled(r.center(), 3.0, t.accent);
-    }
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, ui.is_enabled(), on, label));
-    resp.clicked()
-}
-
-/// Component radios and numeric fields: HSB, RGB, Lab, CMYK and hex.
-fn fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, mode: &str, now: &Components) {
-    let t = Tokens::get(ui.ctx());
-    let &Components { rgb, hsv, lab, cmyk } = now;
-    let mut edit: Option<([f32; 3], Keep)> = None;
-    let mut new_mode: Option<&str> = None;
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 10.0;
-        ui.vertical(|ui| {
-            egui::Grid::new("cp-hsb-rgb").min_row_height(0.0).num_columns(4).spacing([4.0, 2.0]).show(ui, |ui| {
-                let vals = [hsv[0], hsv[1] * 100.0, hsv[2] * 100.0, rgb[0] * 255.0, rgb[1] * 255.0, rgb[2] * 255.0];
-                let units = ["°", "%", "%", "", "", ""];
-                let ranges = [0.0..=360.0, 0.0..=100.0, 0.0..=100.0, 0.0..=255.0, 0.0..=255.0, 0.0..=255.0];
-                for i in 0..6 {
-                    let (key, label) = MODES[i];
-                    let on = mode == key;
-                    if radio(ui, on, label) {
-                        new_mode = Some(key);
-                    }
-                    ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim));
-                    let mut v = vals[i].round();
-                    if widgets::value_field(ui, &mut v, ranges[i].clone(), "", VALUE_W).accessible_name(tl!(&label)).changed() {
-                        let (mut h, mut c) = (hsv, rgb);
-                        if i < 3 {
-                            h[i] = if i == 0 { v } else { v / 100.0 };
-                            c = hsb_to_rgb(h);
-                            edit = Some((c, Keep::Hsv(h)));
-                        } else {
-                            c[i - 3] = v / 255.0;
-                            edit = Some((c, Keep::Nothing));
-                        }
-                    }
-                    ui.label(egui::RichText::new(units[i]).color(t.text_faint));
-                    ui.end_row();
-                    if i == 2 {
-                        ui.allocate_exact_size(vec2(0.0, 3.0), Sense::hover());
-                        ui.end_row();
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                ui.label(egui::RichText::new("#").color(t.text_dim));
-                // While the field has focus it shows what is being typed, not the colour: rebuilding it from
-                // the colour every frame would throw away every keystroke until six valid digits were in.
-                let id = ui.scope_id().with("cp-hex");
-                crate::field_tab::register(ui.ctx(), id);
-                if !f.contains_key("__focused") {
-                    f.insert("__focused".into(), json!(true));
-                    crate::field_tab::focus(ui.ctx(), id);
-                    let current_hex = hex(rgb);
-                    crate::field_tab::select_all(ui.ctx(), id, current_hex.trim_start_matches('#'));
-                    ui.memory_mut(|m| m.request_focus(id));
-                }
-                let focused = ui.memory(|m| m.has_focus(id));
-                let pasted = if focused { take_hex_paste(ui) } else { None };
-                let typing = if focused { ui.data(|d| d.get_temp::<String>(id)) } else { None };
-                // Drop stale typing when another path (web snap, field drag, Current) changed `color`.
-                let shown = hex(rgb);
-                let mut h = match pasted {
-                    Some(c) => hex(c).trim_start_matches('#').to_ascii_uppercase(),
-                    None => match typing {
-                        Some(t) if parse_hex(&t).is_none() || parse_hex(&t).map(hex).as_deref() == Some(shown.as_str()) => t,
-                        _ => shown.trim_start_matches('#').to_ascii_uppercase(),
-                    },
-                };
-                let r = crate::widgets::text_field_ex(ui, id, &mut h, "", 64.0, true, Some(6)).accessible_name(tl!("Color"));
-                if let Some(c) = pasted {
-                    edit = Some((c, Keep::Nothing));
-                }
-                if r.gained_focus() {
-                    crate::field_tab::select_all(ui.ctx(), id, &h);
-                }
-                if r.has_focus() {
-                    ui.data_mut(|d| d.insert_temp(id, h.clone()));
-                } else {
-                    ui.data_mut(|d| d.remove::<String>(id));
-                }
-                if r.changed()
-                    && let Some(c) = parse_hex(&h)
-                {
-                    edit = Some((c, Keep::Nothing));
-                }
-            });
-        });
-        egui::Grid::new("cp-lab-cmyk").min_row_height(0.0).num_columns(4).spacing([4.0, 2.0]).show(ui, |ui| {
-            for (i, (v, range)) in [(lab[0], 0.0..=100.0), (lab[1], -128.0..=127.0), (lab[2], -128.0..=127.0)].into_iter().enumerate() {
-                let (key, label) = LAB_MODES[i];
-                if radio(ui, mode == key, label) {
-                    new_mode = Some(key);
-                }
-                ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim));
-                let mut x = v.round();
-                if widgets::value_field(ui, &mut x, range, "", VALUE_W).accessible_name(tl!(&label)).changed() {
-                    let mut l = lab;
-                    l[i] = x;
-                    edit = Some((photocraft_color::convert::lab_to_srgb(l).map(|c| c.clamp(0.0, 1.0)), Keep::Lab(l)));
-                }
-                ui.label("");
-                ui.end_row();
-            }
-            ui.allocate_exact_size(vec2(0.0, 3.0), Sense::hover());
-            ui.end_row();
-            for (i, label) in ["C:", "M:", "Y:", "K:"].into_iter().enumerate() {
-                ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
-                ui.label(egui::RichText::new(tl!(&label)).color(t.text_dim));
-                let mut x = (cmyk[i] * 100.0).round();
-                if widgets::value_field(ui, &mut x, 0.0..=100.0, "", VALUE_W).accessible_name(tl!(&label)).changed() {
-                    let mut k = cmyk;
-                    k[i] = x / 100.0;
-                    edit = Some((photocraft_color::convert::cmyk_to_rgb(k).map(|c| c.clamp(0.0, 1.0)), Keep::Cmyk(k)));
-                }
-                ui.label(egui::RichText::new("%").color(t.text_faint));
-                ui.end_row();
-            }
-        });
-    });
-    if let Some(m) = new_mode {
-        f.insert("__mode".into(), json!(m));
-    }
-    if let Some((c, keep)) = edit {
-        set_rgb(f, c, keep);
-    }
-}
-
-fn take_hex_paste(ui: &egui::Ui) -> Option<[f32; 3]> {
-    ui.input_mut(|i| {
-        let mut found = None;
-        i.events.retain(|e| match e {
-            egui::Event::Paste(s) => match parse_hex(s) {
-                Some(c) => {
-                    found = Some(c);
-                    false
-                }
-                None => true,
-            },
-            _ => true,
-        });
-        found
-    })
 }
 
 /// Add to Swatches was clicked: add the picked colour to the Swatches panel.
