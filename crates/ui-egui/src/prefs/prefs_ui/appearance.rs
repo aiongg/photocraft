@@ -267,23 +267,16 @@ pub(super) fn sync_tooltips(app: &PhotocraftApp, ctx: &egui::Context) {
 }
 
 /// Interface › Enable Animations: off, egui's fades and slides take no time and scroll areas jump
-/// straight to their target (#3273). The selection already asks for reduced motion; this
-/// re-checks every frame because a theme change rebuilds the style, and covers the scroll glide,
-/// which the library's reduced-motion style leaves on. On, the library's motion stands. Both the
-/// dark and light styles are set, so a system appearance switch keeps it.
+/// straight to their target (#3273). The selection already asks for reduced motion, which also
+/// turns the scroll glide off; this re-checks the fade time every frame because a theme change
+/// rebuilds the style. On, the library's motion stands. Both the dark and light styles are set,
+/// so a system appearance switch keeps it.
 pub(super) fn sync_animations(app: &PhotocraftApp, ctx: &egui::Context) {
     if app.session.prefs().interface.enable_animations {
         return;
     }
-    let none = egui::style::ScrollAnimation::none();
-    if [egui::Theme::Dark, egui::Theme::Light].iter().any(|t| {
-        let s = ctx.style_of(*t);
-        s.animation_time != 0.0 || s.scroll_animation != none
-    }) {
-        ctx.all_styles_mut(|s| {
-            s.animation_time = 0.0;
-            s.scroll_animation = egui::style::ScrollAnimation::none();
-        });
+    if [egui::Theme::Dark, egui::Theme::Light].iter().any(|t| ctx.style_of(*t).animation_time != 0.0) {
+        ctx.all_styles_mut(|s| s.animation_time = 0.0);
     }
 }
 
