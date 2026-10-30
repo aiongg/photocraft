@@ -4,7 +4,7 @@
 //! The row itself is a craft-ui `ListRow` ([`layer_row`](super::layer_row)); its trailing items
 //! drop out and its label is cut by the library.
 
-use craft_ui::list::{RenameEnd, RowEvent};
+use craft_ui::list::{ListRow, RenameEnd, RowEvent};
 use egui::{Align2, FontId, Galley, Painter, Rect, pos2};
 use photocraft_doc::{Adjustment, Layer, LayerContent};
 use serde_json::{Value, json};
@@ -265,6 +265,18 @@ pub fn start_rename(ctx: &egui::Context, layer: u64, name: &str) -> Option<(Stri
     }
     store(ctx, Some(Rename { layer, original: name.to_string(), text: name.to_string(), focused: false, pass: ctx.cumulative_pass_nr() }));
     previous.and_then(|r| r.commit_action())
+}
+
+/// [`start_rename`] from a panel pass: the text typed into the rename it replaces is taken from
+/// its row and committed with it (#314).
+pub fn start_rename_in(ui: &egui::Ui, layer: u64, name: &str) -> Option<(String, Value)> {
+    if let Some(mut previous) = rename(ui.ctx()).filter(|r| r.layer != layer) {
+        if let Some(text) = ListRow::<u64>::take_rename_draft(ui, &previous.layer) {
+            previous.text = text;
+            store(ui.ctx(), Some(previous));
+        }
+    }
+    start_rename(ui.ctx(), layer, name)
 }
 
 /// End the rename in progress: commit it (its command is returned) or cancel it.

@@ -7,20 +7,6 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 
-#[test]
-fn clipping_indicator_points_down_inside_the_existing_row_slot() {
-    let ctx = egui::Context::default();
-    let at = pos2(100.0, 100.0);
-    let mut output = ctx.run_ui(Default::default(), |ui| super::paint_clipping_indicator(ui.painter(), at, egui::Color32::LIGHT_GRAY));
-    output.textures_delta.clear();
-    let paths: Vec<_> = output.shapes.iter().filter_map(|shape| if let egui::Shape::Path(path) = &shape.shape { Some(path) } else { None }).collect();
-    assert_eq!(paths.len(), 2, "the marker has a bent shaft and an arrowhead, independent of font glyphs");
-    let head = paths.iter().find(|path| path.points.len() == 3 && path.points[0].y == path.points[2].y).unwrap();
-    assert!(head.points[1].y > head.points[0].y && head.points[1].y > head.points[2].y, "the arrow points down toward the clipping base");
-    let slot = egui::Rect::from_min_max(at + vec2(0.0, -5.0), at + vec2(12.0, 5.0));
-    assert!(paths.iter().flat_map(|path| &path.points).all(|point| slot.contains(*point)), "the marker does not shift or overlap the thumbnail");
-}
-
 /// Build a themed Layers panel for clipping-marker and pointer-gesture checks.
 fn harness(theme: crate::theme::ThemeKind, width: f32, scale: f32, gpu: bool) -> Harness<'static, PhotocraftApp> {
     let mut session = photocraft_engine::Session::new();

@@ -3,6 +3,7 @@
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
 use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
+use craft_ui::theme::ToEgui as _;
 use photocraft_doc::{LabelColor, Layer, LayerContent};
 use serde_json::{Value, json};
 
@@ -293,15 +294,15 @@ fn common_color(app: &crate::PhotocraftApp, l: &Layer, on_set: bool) -> Option<L
 /// The label-colour rows: the current colour checked, each colour tinting its row.
 pub(crate) fn color_rows(app: &crate::PhotocraftApp, ctx: &egui::Context, l: &Layer, on_set: bool) -> Vec<MenuEntry<Choice>> {
     let current = common_color(app, l, on_set);
-    let t = crate::theme::Tokens::get(ctx);
+    let lib = craft_ui::theme::current(ctx);
     let mut rows = Vec::new();
     for color in LabelColor::ALL {
         if color == LabelColor::Red {
             rows.push(MenuEntry::Separator);
         }
         let mut item = MenuItem::new(color_name(color), Choice::Color(color)).check(current == Some(color));
-        if let Some((swatch, _)) = t.layer_label_colors(color) {
-            item = item.tint(swatch);
+        if let Some(label) = super::layer_row::label_of(color) {
+            item = item.tint(lib.component.list.label(label).swatch.to_egui());
         }
         rows.push(item.into());
     }
