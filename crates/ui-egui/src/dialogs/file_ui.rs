@@ -217,14 +217,14 @@ mod web_preview;
 fn dropdown_str(ui: &mut egui::Ui, id: &str, name: &str, f: &mut Map<String, Value>, key: &str, opts: &[(&str, &str)], w: f32) {
     let mut v = s(f, key, opts.first().map_or("", |o| o.0));
     let o: Vec<(String, &str)> = opts.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-    if crate::widgets::dropdown(ui, id, name, &mut v, &o, w) {
+    if craft_ui::controls::Select::new(id, name, &mut v).rows(o.len(), |i| o[i].0.clone(), |i| tl!(o[i].1)).show(ui).response.changed() {
         f.insert(key.into(), json!(v));
     }
 }
 
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, d: bool) {
     let mut v = b(f, key, d);
-    crate::widgets::checkbox(ui, &mut v, label);
+    craft_ui::controls::Checkbox::bool(tl!(label), &mut v).show(ui).response;
     f.insert(key.into(), json!(v));
 }
 

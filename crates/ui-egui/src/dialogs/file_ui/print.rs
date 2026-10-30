@@ -212,7 +212,7 @@ fn print_paper_controls(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.horizontal(|ui| {
         let mut papers: Vec<_> = photocraft_engine::print_cmds::PAPERS.iter().map(|p| (p.0.to_string(), p.0)).collect();
         papers.push(("custom".to_string(), tl!("Custom")));
-        if crate::widgets::dropdown(ui, "print-paper", tl!("Paper"), &mut selected, &papers, 110.0) {
+        if craft_ui::controls::Select::new("print-paper", tl!("Paper"), &mut selected).rows(papers.len(), |i| papers[i].0.clone(), |i| tl!(papers[i].1)).show(ui).response.changed() {
             if selected == "custom" {
                 let (w, h) = print_paper_size(f.get("__customPaper").or(previous.as_ref()));
                 f.insert("paper".into(), json!([w, h]));
@@ -499,7 +499,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                     let mut pr = s(f, "printer", "");
                     let opts = printer_options(f.get("__systemPrinters"), &pr);
                     let o: Vec<(String, &str)> = opts.iter().map(|(k, l)| (k.clone(), l.as_str())).collect();
-                    if crate::widgets::dropdown(ui, "print-printer", tl!("Printer"), &mut pr, &o, 240.0) {
+                    if craft_ui::controls::Select::new("print-printer", tl!("Printer"), &mut pr).rows(o.len(), |i| o[i].0.clone(), |i| tl!(o[i].1)).show(ui).response.changed() {
                         f.insert("printer".into(), json!(pr));
                     }
                 });

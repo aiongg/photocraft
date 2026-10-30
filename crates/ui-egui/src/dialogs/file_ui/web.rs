@@ -309,7 +309,7 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 let mut preset = s(f, "__preset", "");
                 let mut opts: Vec<(String, &str)> = vec![("".into(), "[Unnamed]")];
                 opts.extend(web_cmds::PRESETS.iter().map(|p| (p.to_string(), *p)));
-                if crate::widgets::dropdown(ui, "web-preset", tl!("Preset"), &mut preset, &opts, 230.0) && !preset.is_empty() {
+                if craft_ui::controls::Select::new("web-preset", tl!("Preset"), &mut preset).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() && !preset.is_empty() {
                     if let Some(Value::Object(m)) = web_cmds::preset_settings(&preset).map(|st| st.to_params()) {
                         f.extend(m);
                     }
@@ -482,7 +482,7 @@ fn web_size(ui: &mut egui::Ui, f: &mut Map<String, Value>, doc: &photocraft_doc:
         write(f, size.width, size.height);
     }
     let mut linked = lock;
-    if crate::widgets::checkbox(ui, &mut linked, tl!("Constrain proportions")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Constrain proportions"), &mut linked).show(ui).response.changed() {
         f.insert("__constrain".into(), json!(linked));
         // Linked again, the height follows the width in the document's proportions.
         if linked && let Ok(size) = resize_from_side(w0, h0, w, h, true, true) {
