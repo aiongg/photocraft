@@ -35,7 +35,9 @@ pub fn open(app: &mut PhotocraftApp, ctx: &egui::Context, url: &str) -> Value {
 
 /// The prominent "Join us on Discord" button.
 pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32) -> egui::Response {
-    let r = crate::widgets::primary_button(ui, tl!("Join us on Discord"), min_width).on_hover_text(DISCORD);
+    let r = ui
+        .add(craft_ui::controls::Button::new(tl!("Join us on Discord")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(min_width))
+        .on_hover_text(DISCORD);
     if r.clicked() {
         open(app, ui.ctx(), DISCORD);
     }
@@ -59,7 +61,7 @@ pub fn link_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if i > 0 {
                 ui.label(egui::RichText::new(sep).font(font.clone()).color(t.color.text.faint.to_egui()));
             }
-            if ui.link(egui::RichText::new(*label).font(font.clone()).color(t.color.accent.solid.to_egui())).on_hover_text(*url).clicked() {
+            if ui.add(craft_ui::controls::Link::new(*label)).on_hover_text(*url).clicked() {
                 clicked = Some(url);
             }
         }

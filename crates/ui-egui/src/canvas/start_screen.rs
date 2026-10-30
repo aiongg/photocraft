@@ -1,5 +1,6 @@
 use super::tabs::{open_on_double_click, paint_dots};
 use super::{PhotocraftApp, Rect, Sense};
+use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
 use craft_ui::theme::ToEgui;
 
 /// The Home screen's card is this wide when the canvas has room, and as wide as the canvas when it doesn't.
@@ -51,13 +52,21 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.horizontal(|ui| {
                     ui.add_space(((card.width() - 2.0 * button_width - HOME_BUTTON_GAP) / 2.0).max(0.0));
                     ui.spacing_mut().item_spacing.x = HOME_BUTTON_GAP;
-                    new_clicked = ui.add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width)).clicked();
-                    open_clicked = ui.add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked();
+                    new_clicked = ui
+                        .add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width))
+                        .clicked();
+                    open_clicked = ui
+                        .add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width))
+                        .clicked();
                 });
             } else {
-                new_clicked = ui.add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width)).clicked();
+                new_clicked = ui
+                    .add(craft_ui::controls::Button::new(tl!(&new_label)).variant(craft_ui::controls::ButtonVariant::Primary).min_width(button_width))
+                    .clicked();
                 ui.add_space(HOME_BUTTON_GAP);
-                open_clicked = ui.add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width)).clicked();
+                open_clicked = ui
+                    .add(craft_ui::controls::Button::new(tl!(&open_label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(button_width))
+                    .clicked();
             }
             if new_clicked {
                 let fields = app.new_document_fields();
@@ -94,6 +103,13 @@ pub(super) fn start_screen_drop_hint(app: &PhotocraftApp) -> std::borrow::Cow<'s
     } else {
         tl!("Drop an image or PSD anywhere to open it.").into()
     }
+}
+
+/// What the Home screen's recent-file menu runs.
+#[derive(Clone, Copy)]
+enum RecentCommand {
+    Remove,
+    Clear,
 }
 
 /// Recent files listed on the Home screen.
@@ -142,11 +158,11 @@ fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
         let resp = resp.on_hover_text(path).on_hover_cursor(egui::CursorIcon::PointingHand);
         if hovered {
-            let x = ui.interact(close, resp.id.with("remove"), Sense::click());
             let label = crate::i18n::fmt(tl!("Remove {name} from Recent"), &[("name", &name)]);
-            x.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
-            let color = crate::icons::button_chrome(ui, close, false, x.hovered());
-            crate::icons::paint(ui, close, "x", 12.0, color);
+            let x = craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Close, label)
+                .size(craft_ui::controls::ControlSize::Sm)
+                .id_salt(("home-recent-remove", path))
+                .show_at(ui, close);
             if x.on_hover_text(tl!("Remove from Recent")).clicked() {
                 remove = Some(path.clone());
             }
@@ -154,16 +170,13 @@ fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
         if resp.clicked() && remove.is_none() {
             open = Some(path.clone());
         }
-        resp.context_menu(|ui| {
-            if ui.button(tl!("Remove from Recent")).clicked() {
-                remove = Some(path.clone());
-                ui.close();
-            }
-            if ui.button(tl!("Clear Recent Files")).clicked() {
-                clear = true;
-                ui.close();
-            }
-        });
+        let entries: Vec<MenuEntry<RecentCommand>> =
+            vec![MenuItem::new(tl!("Remove from Recent"), RecentCommand::Remove).into(), MenuItem::new(tl!("Clear Recent Files"), RecentCommand::Clear).into()];
+        match ContextMenu::new(&entries).show(ui, &resp).chosen {
+            Some(RecentCommand::Remove) => remove = Some(path.clone()),
+            Some(RecentCommand::Clear) => clear = true,
+            None => {}
+        }
     }
     if clear {
         app.clear_recent();

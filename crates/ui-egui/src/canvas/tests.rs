@@ -940,7 +940,7 @@ fn document_tab_close_button_sits_on_the_platform_side() {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 40.0)).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
-                    tabs(app, ui);
+                    tabs(app, ui, None);
                 }
             },
             (app, false),
@@ -974,7 +974,7 @@ fn middle_clicking_a_tab_closes_that_document() {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 40.0)).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
-                    tabs(app, ui);
+                    tabs(app, ui, None);
                 }
             },
             (app, false),
@@ -1003,7 +1003,7 @@ fn middle_clicking_an_edited_tab_prompts_instead_of_discarding() {
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 40.0)).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
-                tabs(app, ui);
+                tabs(app, ui, None);
             }
         },
         (app, false),
@@ -1050,7 +1050,7 @@ fn large_tabs_preference_increases_tab_strip_height() {
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 60.0)).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
-                tabs(app, ui);
+                tabs(app, ui, None);
             }
         },
         (app, false),
@@ -1110,7 +1110,7 @@ fn dragging_a_tab_reorders_the_documents() {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 40.0)).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
-                    tabs(app, ui);
+                    tabs(app, ui, None);
                 }
             },
             (app, false),
@@ -1151,7 +1151,7 @@ fn dragging_a_tab_off_the_strip_floats_it_in_a_window() {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 300.0)).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
-                    tabs(app, ui);
+                    tabs(app, ui, None);
                 }
             },
             (app, false),
