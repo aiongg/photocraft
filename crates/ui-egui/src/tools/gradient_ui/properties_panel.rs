@@ -1,14 +1,13 @@
 //! Compact live-gradient Properties controls, sharing the editor's stop interaction.
 
-use super::{Color32, Fill, GradientStyle, Layer, LayerId, PhotocraftApp, Rect, Sense, Sink, StrokeKind, cmds, fill_of, json, stops_editor_for, vec2};
-use crate::{icons, props_layout};
+use super::{Fill, GradientStyle, Layer, LayerId, PhotocraftApp, Sink, cmds, fill_of, json, stops_editor_for, vec2};
+use crate::props_layout;
 use craft_ui::composites::PropertyRow;
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, NumberField};
+use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField};
 use craft_ui::edit::EditEvent;
+use craft_ui::icons::Icon;
 use craft_ui::localized::{LocaleNumbers, Unit};
 use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
 
 const STYLES: [(GradientStyle, &str); 5] = [
     (GradientStyle::Linear, "Linear Gradient"),
@@ -52,7 +51,7 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
             );
             ui.spacing_mut().item_spacing.x = 3.0;
             for (value, name) in STYLES {
-                if style_button(ui, value, value == style, name).clicked() {
+                if ui.add(IconButton::new(style_icon(value), tl!(name)).size(ControlSize::Md).selected(value == style)).clicked() {
                     let _ = app.run(cmds::SET, json!({"layer": layer.id.0, "style": cmds::style_name(value)}));
                 }
             }
@@ -124,45 +123,15 @@ fn numeric_row(ui: &mut egui::Ui, id: &str, name: &str, current: f32, range: std
     .inner
 }
 
-/// Small procedural previews: no proprietary icon assets, colours follow the theme.
-fn style_button(ui: &mut egui::Ui, style: GradientStyle, selected: bool, name: &str) -> egui::Response {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (rect, response) = ui.allocate_exact_size(vec2(25.0, 25.0), Sense::click());
-    icons::button_chrome(ui, rect, selected, response.hovered());
-    let preview = rect.shrink(5.0);
-    // One mesh avoids antialiased seams between the small preview's cells.
-    let mut mesh = egui::Mesh::default();
-    const N: usize = 16;
-    for y in 0..N {
-        for x in 0..N {
-            let (u, v) = ((x as f32 + 0.5) / N as f32, (y as f32 + 0.5) / N as f32);
-            let (dx, dy) = ((u - 0.5) * 2.0, (v - 0.5) * 2.0);
-            let amount = match style {
-                GradientStyle::Linear => u,
-                GradientStyle::Radial => dx.hypot(dy).min(1.0),
-                GradientStyle::Angle => (dy.atan2(dx) / std::f32::consts::TAU + 1.0).fract(),
-                GradientStyle::Reflected => dx.abs(),
-                GradientStyle::Diamond => (dx.abs() + dy.abs()).min(1.0),
-            };
-            let channel = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * amount) as u8;
-            let color = Color32::from_rgb(
-                channel(t.color.surface.sunken.to_egui().r(), t.color.text.normal.to_egui().r()),
-                channel(t.color.surface.sunken.to_egui().g(), t.color.text.normal.to_egui().g()),
-                channel(t.color.surface.sunken.to_egui().b(), t.color.text.normal.to_egui().b()),
-            );
-            let min = preview.min + vec2(x as f32, y as f32) * preview.size() / N as f32;
-            mesh.add_colored_rect(Rect::from_min_size(min, preview.size() / N as f32), color);
-        }
+/// The library glyph of a gradient style.
+pub(crate) fn style_icon(style: GradientStyle) -> Icon {
+    match style {
+        GradientStyle::Linear => Icon::GradientLinear,
+        GradientStyle::Radial => Icon::GradientRadial,
+        GradientStyle::Angle => Icon::GradientAngle,
+        GradientStyle::Reflected => Icon::GradientReflected,
+        GradientStyle::Diamond => Icon::GradientDiamond,
     }
-    ui.painter().add(egui::Shape::mesh(mesh));
-    ui.painter().rect_stroke(
-        preview,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui()),
-        StrokeKind::Outside,
-    );
-    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), selected, tl!(name)));
-    response.on_hover_text(tl!(name))
 }
 
 #[cfg(test)]

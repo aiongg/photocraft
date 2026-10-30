@@ -34,6 +34,7 @@ use crate::widgets;
 #[cfg(test)]
 mod editor_tests;
 mod properties_panel;
+pub(crate) use properties_panel::style_icon;
 pub(crate) mod stops_bar;
 
 use stops_bar::BarAction;

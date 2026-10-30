@@ -9,6 +9,7 @@ use craft_theme::Srgba;
 use craft_ui::composites::ColorPicker;
 use craft_ui::composites::ColorPickerLayout;
 use craft_ui::composites::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
+use craft_ui::controls::{ControlSize, IconButton};
 use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::ToEgui;
 use photocraft_doc::{Fill, GradientStyle};
@@ -126,14 +127,14 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        for (s, icon, tip) in [
-            (GradientStyle::Linear, "gradient", tl!("Linear Gradient")),
-            (GradientStyle::Radial, "circle", tl!("Radial Gradient")),
-            (GradientStyle::Angle, "rotate-cw", tl!("Angle Gradient")),
-            (GradientStyle::Reflected, "arrow-left-right", tl!("Reflected Gradient")),
-            (GradientStyle::Diamond, "diamond", tl!("Diamond Gradient")),
+        for (s, tip) in [
+            (GradientStyle::Linear, tl!("Linear Gradient")),
+            (GradientStyle::Radial, tl!("Radial Gradient")),
+            (GradientStyle::Angle, tl!("Angle Gradient")),
+            (GradientStyle::Reflected, tl!("Reflected Gradient")),
+            (GradientStyle::Diamond, tl!("Diamond Gradient")),
         ] {
-            if crate::icons::button(ui, icon, 22.0, *style == s, tip).clicked()
+            if ui.add(IconButton::new(crate::gradient_ui::style_icon(s), tip).size(ControlSize::Sm).selected(*style == s)).clicked()
                 && *style != s
                 && let Fill::Gradient { style, .. } = edited(&mut out, fill)
             {
