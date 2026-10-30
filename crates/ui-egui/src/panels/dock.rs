@@ -3,8 +3,7 @@ use super::info::info_panel;
 use super::layers::{channels, layers};
 use super::navigator::navigator;
 use super::properties::{adjustments_grid, properties_body};
-use super::{PhotocraftApp, Stroke, Tokens, icons, pos2};
-use craft_ui::theme::StrokeExt;
+use super::{PhotocraftApp, Tokens};
 
 // ----------------------------------------------------------------------------- dock
 
@@ -13,7 +12,7 @@ use craft_ui::theme::StrokeExt;
 pub fn dock_area(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     if app.ui.panels.rail && !t.pro {
-        rail(app, ui, &t);
+        rail(app, ui);
     }
     egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| crate::panel_docking::show(app, ui));
     crate::dock::persist(app, ui.ctx());
@@ -25,48 +24,45 @@ pub(crate) fn canvas_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let backdrop = if app.ui.view.hides_chrome() { egui::Color32::BLACK } else { crate::prefs_ui::pasteboard_color(app).unwrap_or(t.canvas) };
     if app.ui.panels.rail && t.pro {
-        rail(app, ui, &t);
+        rail(app, ui);
     }
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(backdrop)).show(ui, |ui| crate::canvas::document_area(app, ui));
 }
 
 /// Narrow icon rail, unless an embedding app hides it: shows, expands or collapses panel groups.
-fn rail(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
+fn rail(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    use crate::dock::Group;
+    use craft_ui::icons::Icon;
+    use craft_ui::patterns::{PanelRail, PanelRailItem, PanelRailRequest};
+    let t = Tokens::get(ui.ctx());
     let customized = app.ui.docking.is_some();
     let p = app.ui.panels.clone();
-    let (rw, rb) = if t.pro { (36.0, 28.0) } else { (44.0, 32.0) };
-    crate::direction::end_panel("rail")
-        .resizable(false)
-        .exact_size(rw)
-        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(4, 8)))
-        .show(ui, |ui| {
-            // The separator is on the canvas side.
-            let r = ui.max_rect();
-            let x = if crate::direction::is_rtl() { r.right() + 6.0 } else { r.left() - 6.0 };
-            ui.painter().line_segment([pos2(x, r.top() - 8.0), pos2(x, r.bottom() + 8.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
-            ui.spacing_mut().item_spacing.y = 4.0;
-            use crate::dock::Group;
-            let entries: [(&str, &str, Group); 6] = [
-                ("sliders-horizontal", tl!("Properties"), Group::Properties),
-                ("navigation", tl!("Navigator"), Group::Navigator),
-                ("palette", tl!("Color & Swatches"), Group::Color),
-                ("layers", tl!("Layers"), Group::Layers),
-                ("clock", tl!("History"), Group::History),
-                ("brush", tl!("Brushes"), Group::Brushes),
-            ];
-            for (icon, name, g) in entries {
-                // Studio floats Properties outside the dock.
-                let docked = t.pro || g != Group::Properties;
-                let on = if customized { crate::panel_docking::rail_on(app, g) } else { g.shown(&p) && !(docked && app.ui.dock.is_collapsed(g)) };
-                if icons::rail_button(ui, icon, rb, on, name).clicked() {
-                    if customized {
-                        crate::panel_docking::rail_click(app, g);
-                    } else {
-                        crate::dock::rail_click(app, g, docked);
-                    }
-                }
-            }
-        });
+    let entries = [
+        (Icon::Adjustments, tl!("Properties"), Group::Properties),
+        (Icon::Navigation, tl!("Navigator"), Group::Navigator),
+        (Icon::Palette, tl!("Color & Swatches"), Group::Color),
+        (Icon::Layers, tl!("Layers"), Group::Layers),
+        (Icon::Clock, tl!("History"), Group::History),
+        (Icon::Brush, tl!("Brushes"), Group::Brushes),
+    ];
+    let items: Vec<PanelRailItem<Group>> = entries.iter().map(|&(icon, name, g)| PanelRailItem::new(g, icon, name)).collect();
+    // Studio floats Properties outside the dock.
+    let open: Vec<Group> = entries
+        .iter()
+        .map(|e| e.2)
+        .filter(|&g| {
+            let docked = t.pro || g != Group::Properties;
+            if customized { crate::panel_docking::rail_on(app, g) } else { g.shown(&p) && !(docked && app.ui.dock.is_collapsed(g)) }
+        })
+        .collect();
+    let out = PanelRail::new("rail").label(tl!("Panels")).show(ui, &items, &open, |_| {});
+    if let Some(PanelRailRequest::Open(g) | PanelRailRequest::Close(g)) = out.request {
+        if customized {
+            crate::panel_docking::rail_click(app, g);
+        } else {
+            crate::dock::rail_click(app, g, t.pro || g != Group::Properties);
+        }
+    }
 }
 
 /// The dock's narrowest width (points). It is the right dock, on the left in a right-to-left UI.

@@ -774,7 +774,6 @@ pub fn apply_workspace(app: &mut PhotocraftApp) {
     app.ui.docking = None;
     app.ui.docking_kept = None;
     app.ui.docking_returns.clear();
-    app.ui.docking_collapsed.clear();
     app.ui.dock_tabs = Default::default();
     let p = &mut app.ui.panels;
     let (nav, color, layers, history, props) = match app.ui.workspace.as_str() {
