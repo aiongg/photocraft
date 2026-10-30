@@ -161,12 +161,6 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
 /// The zoom levels the − / + buttons step through, like the Filter Gallery's.
 const ZOOM_STEPS: [f32; 7] = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
 
-/// The vertical space the preview window takes below the parameters: the image, the zoom row and
-/// their spacing. `0` when the dialog has no preview (so the caller reserves nothing).
-pub(crate) fn reserved_height(f: &Map<String, Value>) -> f32 {
-    if shows(f) { PREVIEW_H + 32.0 } else { 0.0 }
-}
-
 /// Whether the dialog with fields `f` gets the preview window: Filter menu dialogs with a Preview
 /// checkbox, as in Photoshop. Image › Rotation › Arbitrary and the adjustment dialogs keep only
 /// the on-canvas preview, and Select and Mask has its own view.
@@ -403,10 +397,8 @@ mod tests {
     fn only_filter_dialogs_get_the_preview_window() {
         let fields = |cmd: &str| json!({"__preview": true, "__command": cmd}).as_object().cloned().unwrap();
         assert!(shows(&fields("filter.blur.gaussianBlur")));
-        assert!(reserved_height(&fields("filter.blur.gaussianBlur")) > 0.0);
         // Photoshop's Rotate Canvas and adjustment dialogs have no preview window.
         assert!(!shows(&fields("image.rotation.arbitrary")));
-        assert_eq!(reserved_height(&fields("image.rotation.arbitrary")), 0.0);
         assert!(!shows(&fields("adjust.levels")));
         // No Preview checkbox or no command: no window.
         assert!(!shows(json!({"__command": "filter.blur.gaussianBlur"}).as_object().unwrap()));

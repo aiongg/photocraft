@@ -124,11 +124,12 @@ pub(super) fn settings_height(available: f32, item_spacing: f32, button_height: 
 
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
-pub fn width(fields: &Map<String, Value>, available: f32) -> Option<f32> {
+pub fn width(fields: &Map<String, Value>, available: f32) -> Option<craft_ui::dialog::Width> {
+    use craft_ui::dialog::Width;
     match fields.get("__prefsui").and_then(Value::as_str)? {
-        "prefs" => Some(available.max(380.0)),
-        "shortcuts" => Some(720.0),
-        _ => Some(460.0),
+        "prefs" => Some(Width::Fixed(available.max(380.0))),
+        "shortcuts" => Some(Width::Range { min: 460.0, max: 720.0 }),
+        _ => Some(Width::Fixed(460.0)),
     }
 }
 

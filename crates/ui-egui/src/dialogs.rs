@@ -11,10 +11,11 @@
 //! - its width class in `width_of`, or its sizes in `resize_of`.
 
 use serde_json::{Value, json};
+use std::cell::{Cell, RefCell};
 
 use crate::PhotocraftApp;
 use crate::state::{Dialog, DialogKind};
-use craft_ui::dialog::{Alert, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
+use craft_ui::dialog::{Alert, Body, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
 
 /// A dialog body sets this field to the key of the text field whose Browse… button was clicked;
 /// [`show`] takes it out again and opens the matching file or folder dialog.
@@ -76,10 +77,6 @@ pub(crate) fn area_id(id: u64) -> egui::Id {
 pub(crate) fn rects(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Vec<egui::Rect> {
     h.state().ui.dialogs.iter().filter_map(|d| h.ctx.memory(|m| m.area_rect(area_id(d.id)))).collect()
 }
-
-/// Height of a dialog's title, rule, button row and frame margins (points), around a filter body
-/// that scrolls above its preview window (the library's scrolling body has no region under it).
-const DIALOG_CHROME: f32 = 150.0;
 
 /// Draw a dialog body that opens on its first number, selected, as Photoshop's value dialogs do:
 /// typing replaces it and Enter applies it (#1757). Once per dialog `id`, on the first laid-out
@@ -182,8 +179,8 @@ fn width_of(d: &Dialog) -> craft_ui::dialog::Width {
         Width::Fixed(800.0)
     } else if about_tabs {
         Width::Fixed(700.0)
-    } else if let Some(w) = crate::prefs_ui::width(f, 0.0) {
-        Width::Fixed(w)
+    } else if let Some(width) = crate::prefs_ui::width(f, 0.0) {
+        width
     } else if f.contains_key("__compact") {
         // A dialog of a few short fields (Fit Image) is narrower (#4673).
         Width::Compact
@@ -253,7 +250,7 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::smart_filter_dialog::owns(fields) => crate::smart_filter_dialog::body(app, ui, fields),
         _ if crate::adjust_dialog::owns(fields) => crate::adjust_dialog::body(app, ui, fields),
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
-        _ if fields.contains_key("__filter") => filter_body(app, ui, d, fields, id),
+        _ if fields.contains_key("__filter") => filter_body(app, ui, fields, id),
         _ if crate::new_guide_ui::owns(fields) => crate::new_guide_ui::body(ui, fields),
         _ if fields.contains_key("__form") => crate::view_cmds::form_body(ui, fields),
         _ => {}
@@ -306,33 +303,33 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
     outcome
 }
 
-/// A filter-style dialog: scrolling parameters with the in-dialog preview window under them.
-fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &mut Fields, id: egui::Id) {
+/// A filter-style dialog's parameters. The library scrolls them (`Body::Scroll`) above the
+/// in-dialog preview window, which [`filter_below`] draws.
+fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, id: egui::Id) {
     // Color Settings: the monitor profile in use can change while it is open.
     if fields.get("__command").and_then(Value::as_str) == Some("edit.colorSettings") {
         fields.insert("__note".into(), Value::String(crate::monitor_status::note(app)));
     }
-    // Long parameter lists (Flame, Lighting Effects) scroll, so the title and the
-    // OK / Cancel buttons stay inside a small window. The preview window below the
-    // parameters reserves its own space (#3769).
-    let room = (ui.ctx().content_rect().height() - DIALOG_CHROME - crate::filter_preview_ui::reserved_height(fields)).max(120.0);
     let body = |ui: &mut egui::Ui, fields: &mut serde_json::Map<String, Value>| {
-        egui::ScrollArea::vertical().id_salt(id.with("body")).max_height(room).show(ui, |ui| {
-            if crate::bitmap_dialog::owns(fields) {
-                crate::bitmap_dialog::body(app, ui, fields);
-            } else {
-                crate::filter_dialog::body(ui, fields);
-            }
-        });
-        // The in-dialog preview window sits under the scrolling parameters (#3769),
-        // so it never shifts them.
-        crate::filter_preview_ui::window(app, d.id, ui, fields);
+        if crate::bitmap_dialog::owns(fields) {
+            crate::bitmap_dialog::body(app, ui, fields);
+        } else {
+            crate::filter_dialog::body(ui, fields);
+        }
     };
     // Select and Mask leaves the keyboard to its view keys (F, X, O, V…).
     if crate::select_mask_view::owns(fields) {
         body(ui, fields);
     } else {
         first_field_focused(ui, id, |ui| body(ui, fields));
+    }
+}
+
+/// The in-dialog preview window under a filter dialog's scrolling parameters (#3769), so it never
+/// shifts them.
+fn filter_below(app: &PhotocraftApp, d: &Dialog, ui: &mut egui::Ui, fields: &mut Fields) {
+    if d.kind == DialogKind::Command && fields.contains_key("__filter") {
+        crate::filter_preview_ui::window(app, d.id, ui, fields);
     }
 }
 
@@ -353,10 +350,26 @@ fn ok_label(d: &Dialog) -> &'static str {
     }
 }
 
+/// Whether OK and Apply take input, from the dialog's current fields (`(ok, apply)`). Dialogs that
+/// need an input first (a preset name, a selection) grey OK out. The dialog body refreshes it each
+/// pass, and the footer reads it after the body ([`Footer::ok_enabled_with`]).
+fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool) {
+    if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
+        (true, crate::prefs_ui::preferences_changed(app, fields))
+    } else if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
+        (crate::mask_trash_prompt::can_apply(fields), true)
+    } else if crate::rasterize_prompt::is_filter(fields) {
+        (true, true)
+    } else {
+        (crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields), true)
+    }
+}
+
 /// The button area of a dialog: OK and Cancel, with Apply, an Alternate or Alt-Reset where the
 /// dialog has them. `None` for the dialogs that draw their own buttons (Guide Layout, Brush Preset
-/// and the Color Picker: a column at the body's side that validates Enter itself).
-fn footer_for(app: &PhotocraftApp, d: &Dialog) -> Footer<'static> {
+/// and the Color Picker: a column at the body's side that validates Enter itself). OK and Apply
+/// are enabled as `(ok, apply)` says once the body has run.
+fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>) -> Footer<'a> {
     let fields = &d.fields;
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
@@ -367,19 +380,18 @@ fn footer_for(app: &PhotocraftApp, d: &Dialog) -> Footer<'static> {
     let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
     footer = footer.labels(dialog_labels());
     if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
-        return footer.ok(ok_label(d)).apply(tl!("Apply")).apply_enabled(crate::prefs_ui::preferences_changed(app, fields));
+        return footer.ok(ok_label(d)).apply(tl!("Apply")).apply_enabled_with(move || enabled.get().1);
     }
     if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
         // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
-        return footer.ok(tl!("Apply")).ok_enabled(crate::mask_trash_prompt::can_apply(fields)).alternate(tl!("Delete"));
+        return footer.ok(tl!("Apply")).ok_enabled_with(move || enabled.get().0).alternate(tl!("Delete"));
     }
     if crate::rasterize_prompt::is_filter(fields) {
         // Photoshop: Convert to Smart Object / Rasterize / Cancel (#4303).
         footer = footer.ok(tl!("Rasterize"));
         return if crate::rasterize_prompt::offers_smart_object(fields) { footer.alternate(tl!("Convert to Smart Object")) } else { footer };
     }
-    // Dialogs that need an input first (a preset name, a selection) grey OK out.
-    footer = footer.ok(ok_label(d)).ok_enabled(crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields));
+    footer = footer.ok(ok_label(d)).ok_enabled_with(move || enabled.get().0);
     // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open). Dialogs opt in via
     // `dialog_alt_reset::supported` (per marker).
     if crate::dialog_alt_reset::supported(fields) {
@@ -438,11 +450,12 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let mut fields = Settings(d.fields.clone());
         let color_picker = crate::color_picker_ui::owns(&fields);
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
+        let enabled = Cell::new(enabled_for(app, &d, &fields));
         let tab = if interactive && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
-            .footer(footer_for(app, &d))
+            .footer(footer_for(&d, &enabled))
             .history(d.kind == DialogKind::Command)
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
@@ -456,23 +469,37 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             None => dialog.width(width_of(&d)),
         };
 
-        let body_outcome = std::cell::Cell::new(None::<bool>);
-        let private = std::cell::RefCell::new(Fields::new());
-        let response = dialog.show(ctx, &mut chrome, &mut fields, |ui, fields| {
-            crate::field_tab::begin(ui.ctx());
-            if let Some(done) = dialog_body(app, ui, &d, fields, id, interactive) {
-                body_outcome.set(Some(done));
-            }
-            crate::field_tab::end(ui.ctx(), tab);
-            if let Some(Value::String(key)) = fields.remove(BROWSE_FIELD) {
-                browse_field(app, d.id, fields, &key);
-            }
-            // The Color Table dialog loads and saves `.act` files, as in Photoshop.
-            if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
-                crate::color_table_ui::buttons(app, ui, d.id, fields);
-            }
-            *private.borrow_mut() = fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
-        });
+        if d.kind == DialogKind::Command && fields.contains_key("__filter") {
+            dialog = dialog.body(Body::Scroll);
+        }
+        let body_outcome = Cell::new(None::<bool>);
+        let private = RefCell::new(Fields::new());
+        // The body and the region under it both need the app; they run one after the other.
+        let app_cell = RefCell::new(&mut *app);
+        let response = dialog.show_with_below(
+            ctx,
+            &mut chrome,
+            &mut fields,
+            |ui, fields| {
+                let mut app = app_cell.borrow_mut();
+                crate::field_tab::begin(ui.ctx());
+                if let Some(done) = dialog_body(&mut app, ui, &d, fields, id, interactive) {
+                    body_outcome.set(Some(done));
+                }
+                crate::field_tab::end(ui.ctx(), tab);
+                if let Some(Value::String(key)) = fields.remove(BROWSE_FIELD) {
+                    browse_field(&mut app, d.id, fields, &key);
+                }
+                // The Color Table dialog loads and saves `.act` files, as in Photoshop.
+                if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
+                    crate::color_table_ui::buttons(&mut app, ui, d.id, fields);
+                }
+                enabled.set(enabled_for(&app, &d, fields));
+                *private.borrow_mut() = fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
+            },
+            |ui, fields| filter_below(&app_cell.borrow(), &d, ui, fields),
+        );
+        drop(app_cell);
         shown.push(response.rect);
 
         // ⌘Z / ⇧⌘Z stepped the settings back: the private keys are not part of the history.
@@ -908,7 +935,6 @@ pub mod palette;
 pub(crate) mod pattern_fill_ui;
 pub mod rasterize_prompt;
 pub mod replace_prompt;
-pub(super) mod rgb_histogram;
 pub mod screen_picker;
 pub mod select_mask_ui;
 pub mod shape_dialog;
