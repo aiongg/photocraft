@@ -5,18 +5,20 @@
 //! the Gradient Editor's grammar ([`apply_stop`]); the tab returns the edited gradient and the
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
-use craft_ui::theme::StrokeExt;
+use craft_theme::Srgba;
+use craft_ui::composites::ColorPicker;
+use craft_ui::composites::ColorPickerLayout;
+use craft_ui::composites::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
+use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::ToEgui;
-use egui::{Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use photocraft_compose::gradient_fill as gf;
 use photocraft_doc::{Fill, GradientStyle};
 use photocraft_engine::gradient_fill_cmds::apply_stop;
 use photocraft_engine::presets::Group;
 use photocraft_engine::presets::gradients::GradientPreset;
 use serde_json::{Value, json};
 
-use crate::shape_paint_ui::{picker_color, picker_rgba, rgba_of, rgba32};
-use crate::theme::Tokens;
+use crate::gradient_ui::stops_bar::{self, BarAction};
+use crate::shape_paint_ui::rgba_of;
 
 /// Width of the tab's rows (the strip, the swatch grids).
 const WIDTH: f32 = 228.0;
@@ -83,59 +85,42 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     let Fill::Gradient { angle, scale, style, reverse, align, .. } = fill else { return None };
     let t = craft_ui::theme::current(ui.ctx());
     let mut out: Option<Fill> = None;
-    let mut picked = false;
-    egui::ScrollArea::vertical().id_salt(id.with("gradient-presets")).max_height(120.0).show(ui, |ui| {
-        ui.set_width(WIDTH);
-        let group_label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(11.0));
-        if !choices.recent.is_empty() {
-            group_label(ui, tl!("Recent"));
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = vec2(3.0, 3.0);
-                for (i, recent) in choices.recent.iter().enumerate() {
-                    let (r, resp) = ui.allocate_exact_size(vec2(32.0, 18.0), Sense::click());
-                    paint_fill_ramp(ui, r, recent, resp.hovered());
-                    let name = format!("{} {}", tl!("Recent"), i + 1);
-                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
-                    if resp.clicked() {
-                        take_stops(edited(&mut out, fill), recent);
-                        picked = true;
-                    }
-                }
-            });
+    // The library palette: the recent gradients, then the preset library, as the bar shows them.
+    let recent: Vec<GradientStops> = choices.recent.iter().map(stops_bar::stops_of).collect();
+    let groups: Vec<GradientGroup> = choices
+        .presets
+        .iter()
+        .map(|g| {
+            GradientGroup::new(g.name.clone(), g.items.iter().map(|p| GradientItem::new(p.name.clone(), preset_stops(p, choices.fg, choices.bg))).collect())
+        })
+        .collect();
+    let picked = ui
+        .scope(|ui| {
+            ui.set_width(WIDTH);
+            GradientPalette::new(id.with("gradient-presets"), tl!("Gradient presets"), &groups).recent(&recent, tl!("Recent")).max_height(120.0).show(ui)
+        })
+        .inner;
+    match picked.event.as_ref().and_then(|e| e.value()) {
+        Some(GradientRef::Recent(i)) => {
+            if let Some(from) = choices.recent.get(*i) {
+                take_stops(edited(&mut out, fill), from);
+            }
         }
-        for group in choices.presets {
-            // Group and preset names are the library's data, shown as they are.
-            group_label(ui, &group.name);
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = vec2(3.0, 3.0);
-                for preset in &group.items {
-                    let (r, resp) = ui.allocate_exact_size(vec2(32.0, 18.0), Sense::click());
-                    crate::preset_panels::paint_gradient(ui, r, &preset.resolve(choices.fg, choices.bg));
-                    let border = if resp.hovered() { t.color.text.muted.to_egui() } else { t.color.line.control_edge.to_egui() };
-                    ui.painter().rect_stroke(
-                        r,
-                        craft_ui::theme::scale::Radius::R0.px(),
-                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border),
-                        StrokeKind::Outside,
-                    );
-                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &preset.name));
-                    if resp.on_hover_text(&preset.name).clicked() {
-                        take_preset(edited(&mut out, fill), preset, choices.fg, choices.bg);
-                        picked = true;
-                    }
-                }
-            });
+        Some(GradientRef::Item { group, item }) => {
+            if let Some(preset) = choices.presets.get(*group).and_then(|g| g.items.get(*item)) {
+                take_preset(edited(&mut out, fill), preset, choices.fg, choices.bg);
+            }
         }
-    });
-    if picked {
-        // New stops: start from the first colour stop, its colour row showing.
-        ui.data_mut(|d| d.insert_temp(selection_key(id), Marker::Color(0)));
+        None => {}
+    }
+    if out.is_some() {
+        // New stops: any gesture draft, picker and selection belonged to the old ones.
+        stops_bar::clear_draft(ui, bar_key(id));
+        ui.data_mut(|d| d.remove::<usize>(picker_key(id)));
+        GradientEditor::select(ui.ctx(), GradientEditor::id_in(ui, bar_key(id)), Some(StopRef::Color(0)));
     }
     ui.add_space(craft_ui::theme::scale::Space::S6.px());
-    if let Some(f) = stops_strip(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
-        out = Some(f);
-    }
-    if let Some(f) = stop_fields(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
+    if let Some(f) = stops_editor(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
         out = Some(f);
     }
     ui.add_space(t.space.gap.stack);
@@ -175,13 +160,13 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     });
     ui.horizontal(|ui| {
         let mut rev = *reverse;
-        if crate::widgets::checkbox(ui, &mut rev, tl!("Reverse")).changed()
+        if craft_ui::controls::Checkbox::bool(tl!("Reverse"), &mut rev).show(ui).response.changed()
             && let Fill::Gradient { reverse, .. } = edited(&mut out, fill)
         {
             *reverse = rev;
         }
         let mut al = *align;
-        if crate::widgets::checkbox(ui, &mut al, tl!("Align with layer")).changed()
+        if craft_ui::controls::Checkbox::bool(tl!("Align with layer"), &mut al).show(ui).response.changed()
             && let Fill::Gradient { align, .. } = edited(&mut out, fill)
         {
             *align = al;
@@ -195,352 +180,87 @@ fn edited<'a>(out: &'a mut Option<Fill>, fill: &Fill) -> &'a mut Fill {
     out.get_or_insert_with(|| fill.clone())
 }
 
-/// A gradient's ramp in `r` (un-reversed, as the stops strip shows it), outlined.
-fn paint_fill_ramp(ui: &egui::Ui, r: Rect, fill: &Fill, hovered: bool) {
-    let t = craft_ui::theme::current(ui.ctx());
-    if let Some(ramp) = gf::Ramp::new(&unreversed(fill)) {
-        crate::gradient_ui::paint_ramp(ui.painter(), r, |u| ramp.sample(u));
-    }
-    let border = if hovered { t.color.text.muted.to_egui() } else { t.color.line.control_edge.to_egui() };
-    ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), border), StrokeKind::Outside);
+/// The preset's stops as the bar shows them, the tool colours resolved.
+fn preset_stops(preset: &GradientPreset, fg: [f32; 4], bg: [f32; 4]) -> GradientStops {
+    let mut fill = Fill::gradient(Vec::new(), 0.0, 1.0, GradientStyle::Linear, false);
+    take_preset(&mut fill, preset, fg, bg);
+    stops_bar::stops_of(&fill)
 }
 
-fn unreversed(fill: &Fill) -> Fill {
-    let mut f = fill.clone();
-    if let Fill::Gradient { reverse, .. } = &mut f {
-        *reverse = false;
-    }
-    f
+fn bar_key(id: egui::Id) -> egui::Id {
+    id.with("stops-bar")
 }
 
-/// A marker of the stops strip.
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Marker {
-    Color(usize),
-    Opacity(usize),
-    /// The midpoint of the segment after colour stop `i`.
-    Mid(usize),
+/// Where swatch `id` keeps the colour stop whose inline picker is open.
+fn picker_key(id: egui::Id) -> egui::Id {
+    id.with("stop-picker-open")
 }
 
-/// A drag in progress: the marker and the gradient as it was when the drag began. Each frame
-/// re-applies the move to that gradient, so a stop dragged past another stays the one dragged.
-#[derive(Clone)]
-struct Drag {
-    marker: Marker,
-    start: Fill,
-}
-
-/// Colour stops, opacity stops and midpoints.
-type Stops = (Vec<(f32, photocraft_doc::Color)>, Vec<(f32, f32)>, Vec<f32>);
-
-/// The colour stops (sorted), opacity stops (sorted; two opaque ones when the gradient has none,
-/// as [`apply_stop`] counts them) and midpoints of `fill`.
-fn sorted_stops(fill: &Fill) -> Stops {
-    let Fill::Gradient { stops, opacity_stops, midpoints, .. } = fill else { return (Vec::new(), Vec::new(), Vec::new()) };
-    let mut cs = stops.clone();
-    cs.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let mut os = if opacity_stops.is_empty() { vec![(0.0, 1.0), (1.0, 1.0)] } else { opacity_stops.clone() };
-    os.sort_by(|a, b| a.0.total_cmp(&b.0));
-    (cs, os, midpoints.clone())
-}
-
-/// Where a stop moved to `location` lands once the stops are sorted again: the selection follows it.
-fn index_after_move(locations: &[f32], moved: usize, location: f32) -> usize {
-    locations.iter().enumerate().filter(|(i, l)| *i != moved && (**l < location || (**l == location && *i < moved))).count()
+/// Where swatch `id` keeps the gradient a bar gesture started from.
+fn gesture_key(id: egui::Id) -> egui::Id {
+    id.with("stops-gesture")
 }
 
 fn apply(fill: &Fill, edit: &Value, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
     apply_stop(fill, edit, fg, bg).ok()
 }
 
-/// Where swatch `id` keeps its selected marker.
-fn selection_key(id: egui::Id) -> egui::Id {
-    id.with("stops-selected")
-}
-
-/// Where swatch `id` keeps whether the selected colour stop's inline picker is open.
-fn picker_key(id: egui::Id) -> egui::Id {
-    id.with("stop-picker-open")
-}
-
-/// The selected marker, when it still names a stop of `fill`; else the first colour stop. The
-/// marker is an index, so a preset with fewer stops, a deleted stop or another shape would
-/// otherwise leave it pointing past the stops (and the stop's fields would vanish).
-fn selection(ui: &egui::Ui, id: egui::Id, fill: &Fill) -> Marker {
-    let (cs, os, _) = sorted_stops(fill);
-    let valid = |m: &Marker| match *m {
-        Marker::Color(i) => i < cs.len(),
-        Marker::Opacity(i) => i < os.len(),
-        Marker::Mid(i) => i.saturating_add(1) < cs.len(),
-    };
-    ui.data(|d| d.get_temp::<Marker>(selection_key(id))).filter(valid).unwrap_or(Marker::Color(0))
-}
-
-/// The stops strip: the ramp with opacity stops above and colour stops below (Photoshop's).
-fn stops_strip(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
-    let t = craft_ui::theme::current(ui.ctx());
-    let (outer, resp) = ui.allocate_exact_size(vec2(WIDTH, 58.0), Sense::click_and_drag());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Gradient stops")));
-    let top = outer.top() + 16.0;
-    let bar = Rect::from_min_max(pos2(outer.left() + 8.0, top), pos2(outer.right() - 8.0, top + 24.0));
-    let x_of = |loc: f32| bar.left() + loc.clamp(0.0, 1.0) * bar.width();
-    let loc_of = |x: f32| ((x - bar.left()) / bar.width().max(1.0)).clamp(0.0, 1.0);
-    if let Some(ramp) = gf::Ramp::new(&unreversed(fill)) {
-        crate::gradient_ui::paint_ramp(ui.painter(), bar, |u| ramp.sample(u));
-    }
-    ui.painter().rect_stroke(
-        bar,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
-        StrokeKind::Outside,
-    );
-    let (cs, os, mids) = sorted_stops(fill);
-    let (drag_key, selection_key) = (id.with("stops-drag"), selection_key(id));
-    let drag: Option<Drag> = ui.data(|d| d.get_temp(drag_key));
-    let selected: Option<Marker> = Some(drag.as_ref().map_or_else(|| selection(ui, id, fill), |d| d.marker));
-    let p = ui.painter();
-    let outline = |sel: bool| if sel { t.color.accent.solid.to_egui() } else { t.color.text.muted.to_egui() };
-    for (i, (loc, c)) in cs.iter().enumerate() {
-        let x = x_of(*loc);
-        let sel = selected == Some(Marker::Color(i));
-        let body = Rect::from_center_size(pos2(x, bar.bottom() + 10.0), vec2(10.0, 10.0));
-        p.add(egui::Shape::convex_polygon(vec![pos2(x, bar.bottom() + 1.0), pos2(x + 5.0, body.top()), pos2(x - 5.0, body.top())], outline(sel), Stroke::NONE));
-        let [r, g, b, _] = rgba_of(c);
-        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), rgba32([r, g, b, 1.0]));
-        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline(sel)), StrokeKind::Outside);
-    }
-    let mid_x = |i: usize| -> Option<f32> {
-        let (a, b) = (cs.get(i)?.0, cs.get(i + 1)?.0);
-        (b - a > 1e-3).then(|| x_of(a + (b - a) * mids.get(i).copied().unwrap_or(0.5)))
-    };
-    for i in 0..cs.len().saturating_sub(1) {
-        if let Some(x) = mid_x(i) {
-            let sel = selected == Some(Marker::Mid(i));
-            crate::gradient_ui::diamond(
-                p,
-                pos2(x, bar.bottom() + 6.0),
-                3.0,
-                if sel { t.color.accent.solid.to_egui() } else { t.color.text.faint.to_egui() },
-                t.color.text.faint.to_egui(),
-            );
-        }
-    }
-    for (i, (loc, a)) in os.iter().enumerate() {
-        let x = x_of(*loc);
-        let sel = selected == Some(Marker::Opacity(i));
-        let body = Rect::from_center_size(pos2(x, bar.top() - 10.0), vec2(10.0, 10.0));
-        p.add(egui::Shape::convex_polygon(
-            vec![pos2(x, bar.top() - 1.0), pos2(x + 5.0, body.bottom()), pos2(x - 5.0, body.bottom())],
-            outline(sel),
-            Stroke::NONE,
-        ));
-        p.rect_filled(body, craft_ui::theme::scale::Radius::R2.px(), egui::Color32::from_gray((a.clamp(0.0, 1.0) * 255.0) as u8));
-        p.rect_stroke(body, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline(sel)), StrokeKind::Outside);
-    }
-    let hit = |pos: Pos2| -> Option<Marker> {
-        if pos.y > bar.bottom() {
-            if pos.y >= bar.bottom() + 3.0
-                && let Some(i) = cs.iter().position(|(l, _)| (x_of(*l) - pos.x).abs() <= 6.0)
-            {
-                return Some(Marker::Color(i));
-            }
-            return (0..cs.len().saturating_sub(1)).find(|i| mid_x(*i).is_some_and(|x| (x - pos.x).abs() <= 4.0)).map(Marker::Mid);
-        }
-        if pos.y < bar.top() {
-            return os.iter().position(|(l, _)| (x_of(*l) - pos.x).abs() <= 6.0).map(Marker::Opacity);
-        }
-        None
-    };
+/// The stops bar, its fields row and the open colour stop's inline picker. The tab previews each
+/// gesture step on the shape, so the bar's commands address the gradient the gesture started from.
+fn stops_editor(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
+    let gesture = gesture_key(id);
+    let start = |ui: &egui::Ui| ui.data(|d| d.get_temp::<Fill>(gesture));
     let mut out = None;
-    if resp.drag_started()
-        && let Some(pos) = ui.input(|i| i.pointer.press_origin())
-        && let Some(marker) = hit(pos)
-    {
-        ui.data_mut(|d| {
-            d.insert_temp(drag_key, Drag { marker, start: fill.clone() });
-            d.insert_temp(selection_key, marker);
-        });
-    }
-    if let Some(drag) = ui.data(|d| d.get_temp::<Drag>(drag_key)) {
-        let (start_cs, start_os, _) = sorted_stops(&drag.start);
-        let pos = resp.interact_pointer_pos();
-        if let Some(pos) = pos {
-            // Dragged well off the strip, a stop is deleted (while at least two remain), as in Photoshop.
-            let off = pos.y > bar.bottom() + 28.0 || pos.y < bar.top() - 26.0;
-            let loc = loc_of(pos.x);
-            let edit = match drag.marker {
-                Marker::Color(i) if off && start_cs.len() > 2 => json!({"action": "delete", "index": i}),
-                Marker::Color(i) => json!({"action": "move", "index": i, "location": loc}),
-                Marker::Opacity(i) if off && start_os.len() > 2 => json!({"action": "delete", "kind": "opacity", "index": i}),
-                Marker::Opacity(i) => json!({"action": "move", "kind": "opacity", "index": i, "location": loc}),
-                Marker::Mid(i) => {
-                    let (a, b) = (start_cs.get(i).map_or(0.0, |s| s.0), start_cs.get(i + 1).map_or(1.0, |s| s.0));
-                    json!({"action": "midpoint", "index": i, "location": ((loc - a) / (b - a).max(1e-4)).clamp(0.05, 0.95)})
+    match stops_bar::show(ui, bar_key(id), fill, true, true) {
+        Some(BarAction::Preview(p)) => {
+            let base = start(ui).unwrap_or_else(|| fill.clone());
+            ui.data_mut(|d| d.insert_temp(gesture, base.clone()));
+            out = apply(&base, &p, fg, bg);
+        }
+        Some(BarAction::Commit(p)) => {
+            let base = start(ui).unwrap_or_else(|| fill.clone());
+            ui.data_mut(|d| d.remove::<Fill>(gesture));
+            out = apply(&base, &p, fg, bg);
+        }
+        Some(BarAction::Clear) => {
+            let base = start(ui);
+            ui.data_mut(|d| d.remove::<Fill>(gesture));
+            out = base;
+        }
+        Some(BarAction::Color(i)) => {
+            ui.data_mut(|d| {
+                if d.get_temp::<usize>(picker_key(id)) == Some(i) {
+                    d.remove::<usize>(picker_key(id));
+                } else {
+                    d.insert_temp(picker_key(id), i);
                 }
-            };
-            out = apply(&drag.start, &edit, fg, bg);
-            if resp.drag_stopped() {
-                let moved = edit.get("location").and_then(Value::as_f64).map(|l| l as f32);
-                let selection = match (drag.marker, edit.get("action").and_then(Value::as_str), moved) {
-                    (Marker::Color(i), Some("move"), Some(l)) => Some(Marker::Color(index_after_move(&start_cs.iter().map(|s| s.0).collect::<Vec<_>>(), i, l))),
-                    (Marker::Opacity(i), Some("move"), Some(l)) => {
-                        Some(Marker::Opacity(index_after_move(&start_os.iter().map(|s| s.0).collect::<Vec<_>>(), i, l)))
-                    }
-                    (Marker::Mid(i), ..) => Some(Marker::Mid(i)),
-                    _ => None,
-                };
-                ui.data_mut(|d| match selection {
-                    Some(m) => {
-                        d.insert_temp(selection_key, m);
-                    }
-                    None => d.remove::<Marker>(selection_key),
-                });
-            }
+            });
         }
-        if resp.drag_stopped() || pos.is_none() {
-            ui.data_mut(|d| d.remove::<Drag>(drag_key));
-        }
-        return out;
+        None => {}
     }
-    // Double-clicking a colour stop opens its colour, as Photoshop's opens the Color Picker. egui
-    // counts a click within 0.6 s of the one before last as a triple click (a preset picked just
-    // before), which is a double click on the stop all the same.
-    if (resp.double_clicked() || resp.triple_clicked())
-        && let Some(pos) = resp.interact_pointer_pos()
-        && let Some(marker @ Marker::Color(_)) = hit(pos)
+    let shown = out.as_ref().unwrap_or(fill);
+    if let Some(i) = ui.data(|d| d.get_temp::<usize>(picker_key(id)))
+        && let Some(edit) = stop_picker(ui, shown, id, i)
+        && let Some(f) = apply(shown, &edit, fg, bg)
     {
-        ui.data_mut(|d| {
-            d.insert_temp(selection_key, marker);
-            d.insert_temp(picker_key(id), true);
-        });
-        return None;
-    }
-    if resp.clicked()
-        && let Some(pos) = resp.interact_pointer_pos()
-    {
-        if let Some(marker) = hit(pos) {
-            ui.data_mut(|d| d.insert_temp(selection_key, marker));
-            return None;
-        }
-        // A click on the ramp adds a stop there: an opacity stop above its middle, a colour stop below.
-        let loc = loc_of(pos.x);
-        let opacity = pos.y < bar.center().y;
-        let (edit, marker) = if opacity {
-            (json!({"action": "add", "kind": "opacity", "location": loc}), Marker::Opacity(os.iter().filter(|s| s.0 <= loc).count()))
-        } else {
-            (json!({"action": "add", "location": loc}), Marker::Color(cs.iter().filter(|s| s.0 <= loc).count()))
-        };
-        out = apply(fill, &edit, fg, bg);
-        if out.is_some() {
-            ui.data_mut(|d| d.insert_temp(selection_key, marker));
-        }
+        out = Some(f);
     }
     out
 }
 
-/// The selected stop's fields under the strip: a colour stop's colour (an inline picker opened
-/// from its swatch), an opacity stop's opacity, a midpoint's position; Location and Delete.
-fn stop_fields(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, fg: [f32; 4], bg: [f32; 4]) -> Option<Fill> {
-    let t = craft_ui::theme::current(ui.ctx());
-    let selection_key = selection_key(id);
-    let selected = selection(ui, id, fill);
-    let (cs, os, mids) = sorted_stops(fill);
-    let label = |ui: &mut egui::Ui, s: &str| ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
-    let mut edit: Option<Value> = None;
-    let mut reselect: Option<Marker> = None;
-    let (locations, index): (Vec<f32>, usize) = match selected {
-        Marker::Color(i) => (cs.iter().map(|s| s.0).collect(), i),
-        Marker::Opacity(i) => (os.iter().map(|s| s.0).collect(), i),
-        Marker::Mid(i) => (Vec::new(), i),
-    };
-    let picker_key = picker_key(id);
-    let mut picker_open = ui.data(|d| d.get_temp::<bool>(picker_key)).unwrap_or(false);
-    ui.horizontal(|ui| match selected {
-        Marker::Color(i) => {
-            let Some((_, c)) = cs.get(i) else { return };
-            label(ui, tl!("Color"));
-            let (r, resp) = ui.allocate_exact_size(vec2(40.0, 20.0), Sense::click());
-            let [cr, cg, cb, _] = rgba_of(c);
-            ui.painter().rect_filled(r.shrink(1.0), t.shape.radius.control, rgba32([cr, cg, cb, 1.0]));
-            ui.painter().rect_stroke(
-                r,
-                t.shape.radius.control,
-                craft_ui::theme::scale::Stroke::W1
-                    .egui(ui.ctx(), if picker_open { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }),
-                StrokeKind::Inside,
-            );
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, true, tl!("Color")));
-            if resp.on_hover_text(tl!("Color")).clicked() {
-                picker_open = !picker_open;
-            }
-        }
-        Marker::Opacity(i) => {
-            let Some((_, a)) = os.get(i) else { return };
-            label(ui, tl!("Opacity"));
-            let mut v = a * 100.0;
-            if crate::widgets::value_field(ui, &mut v, 0.0..=100.0, "%", 52.0).changed() {
-                edit = Some(json!({"action": "opacity", "kind": "opacity", "index": i, "opacity": v}));
-            }
-        }
-        Marker::Mid(i) => {
-            if cs.get(i.saturating_add(1)).is_none() {
-                return;
-            }
-            label(ui, tl!("Location"));
-            let mut v = mids.get(i).copied().unwrap_or(0.5) * 100.0;
-            if crate::widgets::value_field(ui, &mut v, 5.0..=95.0, "%", 52.0).changed() {
-                edit = Some(json!({"action": "midpoint", "index": i, "location": v / 100.0}));
-            }
-        }
-    });
-    if let Some(loc) = locations.get(index).copied() {
-        let kind = if matches!(selected, Marker::Opacity(_)) { "opacity" } else { "color" };
-        ui.horizontal(|ui| {
-            label(ui, tl!("Location"));
-            let mut v = loc * 100.0;
-            if crate::widgets::value_field(ui, &mut v, 0.0..=100.0, "%", 52.0).changed() {
-                let to = v / 100.0;
-                edit = Some(json!({"action": "move", "kind": kind, "index": index, "location": to}));
-                reselect = Some(match selected {
-                    Marker::Opacity(_) => Marker::Opacity(index_after_move(&locations, index, to)),
-                    _ => Marker::Color(index_after_move(&locations, index, to)),
-                });
-            }
-            // A gradient keeps at least two stops of each kind.
-            if locations.len() > 2 && crate::widgets::secondary_button(ui, tl!("Delete"), 0.0).clicked() {
-                edit = Some(json!({"action": "delete", "kind": kind, "index": index}));
-                reselect = Some(match selected {
-                    Marker::Opacity(_) => Marker::Opacity(index.saturating_sub(1)),
-                    _ => Marker::Color(index.saturating_sub(1)),
-                });
-            }
-        });
-    }
-    if let (Marker::Color(i), true) = (selected, picker_open)
-        && let Some((_, c)) = cs.get(i)
-    {
-        // The stop's colour keeps its own alpha; transparency belongs to the opacity stops.
-        let rgba = rgba_of(c);
-        let cache = id.with(("stop-hsva", i));
-        let mut hsva = ui
-            .data(|d| d.get_temp::<([f32; 4], egui::ecolor::Hsva)>(cache))
-            .filter(|(previous, _)| *previous == rgba)
-            .map_or_else(|| picker_color(rgba), |(_, h)| h);
-        if egui::color_picker::color_picker_hsva_2d(ui, &mut hsva, egui::color_picker::Alpha::Opaque) {
-            let [r, g, b, _] = picker_rgba(hsva);
-            if [r, g, b].iter().zip(rgba).any(|(a, b)| (a - b).abs() > 0.000001) {
-                let color = [r, g, b, rgba[3]];
-                edit = Some(json!({"action": "color", "index": i, "color": color}));
-                ui.data_mut(|d| d.insert_temp(cache, (color, hsva)));
-            }
-        } else {
-            ui.data_mut(|d| d.insert_temp(cache, (rgba, hsva)));
-        }
-    }
-    ui.data_mut(|d| d.insert_temp(picker_key, picker_open));
-    let out = apply(fill, &edit?, fg, bg)?;
-    if let Some(m) = reselect {
-        ui.data_mut(|d| d.insert_temp(selection_key, m));
-    }
-    Some(out)
+/// The inline picker of colour stop `i` (sorted order). The stop's colour keeps its own alpha;
+/// transparency belongs to the opacity stops.
+fn stop_picker(ui: &mut egui::Ui, fill: &Fill, id: egui::Id, i: usize) -> Option<Value> {
+    let Fill::Gradient { stops, .. } = fill else { return None };
+    let mut sorted = stops.clone();
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let rgba = rgba_of(&sorted.get(i)?.1);
+    let numbers = LocaleNumbers::of(ui);
+    let response = ColorPicker::new(id.with(("stop-picker", i)), tl!("Color"), Srgba::new(rgba[0], rgba[1], rgba[2], 1.0), &numbers)
+        .layout(ColorPickerLayout::Compact)
+        .text(|key| tl!(key).to_string())
+        .show(ui);
+    let picked = response.edit.event.as_ref().and_then(|e| e.value())?;
+    let c = picked.color;
+    ([c.r, c.g, c.b].iter().zip(rgba).any(|(a, b)| (a - b).abs() > 0.000001)).then(|| json!({"action": "color", "index": i, "color": [c.r, c.g, c.b, rgba[3]]}))
 }

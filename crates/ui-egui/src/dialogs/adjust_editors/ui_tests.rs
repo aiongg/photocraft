@@ -499,9 +499,22 @@ fn map_stops(a: &Adjustment) -> Vec<(f32, [u8; 3])> {
     }
 }
 
-fn map_handle(h: &Harness<'_, PhotocraftApp>, at: f32) -> Pos2 {
-    let strip = h.get_by_label("Gradient stops").rect();
-    Pos2::new(strip.left() + 8.0 + at * (strip.width() - 16.0), strip.top() + 36.0)
+/// Where the Gradient Map bar puts locations: the x of the stops at 0 and 1 and the markers' y,
+/// read from the first and last colour markers before anything moves.
+struct MapBar {
+    x0: f32,
+    x1: f32,
+    y: f32,
+}
+
+fn map_bar(h: &Harness<'_, PhotocraftApp>) -> MapBar {
+    let mut markers: Vec<Rect> = h.get_all_by_label_contains("Color stop").map(|m| m.rect()).collect();
+    markers.sort_by(|a, b| a.center().x.total_cmp(&b.center().x));
+    MapBar { x0: markers[0].center().x, x1: markers[markers.len() - 1].center().x, y: markers[0].center().y }
+}
+
+fn map_handle(bar: &MapBar, at: f32) -> Pos2 {
+    Pos2::new(bar.x0 + at * (bar.x1 - bar.x0), bar.y)
 }
 
 #[test]
@@ -518,25 +531,25 @@ fn gradient_map_handle_drag_previews_and_commits_once_after_crossing_stops() {
             )
             .unwrap();
         h.run_steps(3);
+        let bar = map_bar(&h);
         let before = layer(&h).1;
         let steps = h.state().session.active().unwrap().history.past_len();
-        let start = map_handle(&h, 0.25);
+        let start = map_handle(&bar, 0.25);
         h.hover_at(start);
         h.run_steps(1);
         h.drag_at(start);
         h.run_steps(1);
         for location in [0.4, 0.5, 0.6, 0.75] {
-            let to = map_handle(&h, location);
+            let to = map_handle(&bar, location);
             h.hover_at(to);
             h.run_steps(1);
             assert!(h.state().live_adjust.is_some(), "{depth}: live preview");
             assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "{depth}: dragging records no history");
         }
-        let end = map_handle(&h, 0.8);
+        let end = map_handle(&bar, 0.8);
         h.drop_at(end);
         h.run_steps(3);
         assert_eq!(map_stops(&layer(&h).1), vec![(0.0, [0, 0, 0]), (0.5, [0, 255, 0]), (0.8, [255, 0, 0]), (1.0, [255, 255, 255])]);
-        assert_eq!(h.ctx.data(|d| d.get_temp::<usize>(crate::adjust_editors::layer_mem(id).with("gm-stop-selection"))), Some(2));
         assert!(h.state().live_adjust.is_none());
         assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 1);
         let after = layer(&h).1;
@@ -552,29 +565,26 @@ fn gradient_map_handle_drag_previews_and_commits_once_after_crossing_stops() {
 #[test]
 fn gradient_map_strip_adds_selects_and_removes_stops_without_deleting_the_last_pair() {
     let mut h = app_harness("gradientMap", "rgb", 8);
-    let (id, original) = layer(&h);
+    let (_, original) = layer(&h);
     let steps = h.state().session.active().unwrap().history.past_len();
-    let middle = map_handle(&h, 0.5);
-    click(&mut h, middle);
+    let bar = map_bar(&h);
+    let ramp = |at: f32| map_handle(&bar, at) - vec2(0.0, 16.0);
+    click(&mut h, ramp(0.5));
     let added = map_stops(&layer(&h).1);
     assert_eq!(added.len(), 3);
     assert!((added[1].0 - 0.5).abs() < 0.001);
     assert_eq!(added[1].1, [128, 128, 128]);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 1);
-    let first = map_handle(&h, 0.0);
-    click(&mut h, first);
-    assert_eq!(h.ctx.data(|d| d.get_temp::<usize>(crate::adjust_editors::layer_mem(id).with("gm-stop-selection"))), Some(0));
+    click(&mut h, map_handle(&bar, 0.0));
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 1, "selection is view state");
-    click(&mut h, middle);
-    let remove = h.get_by_label("Remove stop").rect().center();
-    click(&mut h, remove);
+    click(&mut h, map_handle(&bar, 0.5));
+    let delete = h.get_by_label("Delete").rect().center();
+    click(&mut h, delete);
     assert_eq!(layer(&h).1, original);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 2);
-    let first = map_handle(&h, 0.0);
-    click(&mut h, first);
-    let remove = h.get_by_label("Remove stop").rect().center();
-    click(&mut h, remove);
-    assert_eq!(layer(&h).1, original, "keep two stops");
+    click(&mut h, map_handle(&bar, 0.0));
+    assert!(h.query_by_label("Delete").is_none_or(|d| d.accesskit_node().is_disabled()), "keep two stops");
+    assert_eq!(layer(&h).1, original);
 }
 
 #[test]
@@ -582,14 +592,15 @@ fn gradient_map_drag_clamps_at_the_endpoints_and_reverse_keeps_stop_coordinates(
     let mut h = app_harness("gradientMap", "rgb", 8);
     let reverse = label_rect(&h, "Reverse").unwrap().center();
     click(&mut h, reverse);
-    let first = map_handle(&h, 0.0);
-    let target = map_handle(&h, 0.3);
+    let bar = map_bar(&h);
+    let first = map_handle(&bar, 0.0);
+    let target = map_handle(&bar, 0.3);
     drag(&mut h, first, target);
     assert!((map_stops(&layer(&h).1)[0].0 - 0.3).abs() < 0.001);
-    let target = map_handle(&h, 0.3);
+    let target = map_handle(&bar, 0.3);
     drag(&mut h, target, first - vec2(60.0, 0.0));
     assert_eq!(map_stops(&layer(&h).1)[0].0, 0.0);
-    let last = map_handle(&h, 1.0);
+    let last = map_handle(&bar, 1.0);
     let beyond = last + vec2(60.0, 0.0);
     let before = layer(&h).1;
     let steps = h.state().session.active().unwrap().history.past_len();
