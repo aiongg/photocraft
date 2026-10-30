@@ -167,14 +167,12 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
             }
             ui.add_enabled_ui(!block, |ui| {
                 percent_field(ui, tl!("Opacity"), &mut b.opacity, 0.0..=100.0, 62.0);
-                if icons::button(ui, "circle-dot", 24.0, b.pressure_opacity, tl!("Always use pressure for opacity")).clicked() {
-                    b.pressure_opacity = !b.pressure_opacity;
-                }
+                ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Target, tl!("Always use pressure for opacity")).size(craft_ui::controls::ControlSize::Md).toggle(&mut b.pressure_opacity));
             });
             // A Pencil- or Block-mode Eraser is always full flow, without build-up (Photoshop).
             ui.add_enabled_ui(!block && !crate::eraser_ui::pencil_mode(app, app.ui.tool), |ui| {
                 percent_field(ui, tl!("Flow"), &mut b.flow, 1.0..=100.0, 62.0);
-                let airbrush = icons::button(ui, "sparkles", 24.0, b.build_up, tl!("Enable airbrush-style build-up effects"));
+                let airbrush = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Sparkles, tl!("Enable airbrush-style build-up effects")).size(craft_ui::controls::ControlSize::Md).selected(b.build_up));
                 if crate::brush_picker::named(airbrush, "Enable airbrush-style build-up effects").clicked() {
                     b.build_up = !b.build_up;
                 }
@@ -183,9 +181,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
             smoothing_field(ui, b, 58.0);
             smoothing_options(ui, b);
             widgets::vline(ui, 22.0);
-            if icons::button(ui, "circle-dot", 24.0, b.pressure_size, tl!("Always use pressure for size")).clicked() {
-                b.pressure_size = !b.pressure_size;
-            }
+            ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Target, tl!("Always use pressure for size")).size(craft_ui::controls::ControlSize::Md).toggle(&mut b.pressure_size));
         }
         // Pencil: Photoshop's options (no hardness or flow: the pencil is always hard).
         Tool::Pencil => {
@@ -204,7 +200,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
             opt_label(ui, tl!("Smoothing"));
             smoothing_field(ui, b, if t.pro { 58.0 } else { 66.0 });
             widgets::vline(ui, 22.0);
-            widgets::checkbox(ui, &mut app.ui.tool_options.pencil_auto_erase, tl!("Auto Erase"));
+            craft_ui::controls::Checkbox::bool(tl!("Auto Erase"), &mut app.ui.tool_options.pencil_auto_erase).show(ui).response;
         }
         Tool::Brush | Tool::Eraser => {
             brush_preset_chip(ui, b, &mut app.ui);
@@ -232,8 +228,8 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
             opt_label(ui, tl!("Smoothing"));
             smoothing_field(ui, b, 66.0);
             widgets::vline(ui, 22.0);
-            widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
-            widgets::toggle(ui, &mut b.pressure_opacity, tl!("Pressure for Opacity"));
+            craft_ui::controls::Switch::new(tl!("Pressure for Size"), &mut b.pressure_size).show(ui).response;
+            craft_ui::controls::Switch::new(tl!("Pressure for Opacity"), &mut b.pressure_opacity).show(ui).response;
         }
         Tool::MixerBrush => {
             brush_preset_chip(ui, b, &mut app.ui);
@@ -256,7 +252,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
                 percent_field(ui, label, value, 0.0..=100.0, 62.0);
             }
             widgets::vline(ui, 22.0);
-            widgets::checkbox(ui, &mut b.mixer.sample_all_layers, tl!("Sample All Layers"));
+            craft_ui::controls::Checkbox::bool(tl!("Sample All Layers"), &mut b.mixer.sample_all_layers).show(ui).response;
         }
         _ => {}
     }
@@ -285,13 +281,13 @@ fn marquee_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     opt_label(ui, tl!("Feather"));
     widgets::value_field(ui, &mut o.feather, 0.0..=1000.0, "px", 62.0);
     // Photoshop greys Anti-alias for the Rectangular Marquee (its edges are always hard).
-    ui.add_enabled_ui(app.ui.tool == Tool::EllipseMarquee, |ui| widgets::checkbox(ui, &mut o.anti_alias, tl!("Anti-alias")));
+    ui.add_enabled_ui(app.ui.tool == Tool::EllipseMarquee, |ui| craft_ui::controls::Checkbox::bool(tl!("Anti-alias"), &mut o.anti_alias).show(ui).response);
     widgets::vline(ui, 22.0);
     // A single row or column has no style or size: Photoshop greys them.
     let sized = matches!(app.ui.tool, Tool::RectMarquee | Tool::EllipseMarquee);
     ui.add_enabled_ui(sized, |ui| opt_label(ui, tl!("Style")));
     let styles = [("normal".to_string(), tl!("Normal")), ("fixedRatio".to_string(), tl!("Fixed Ratio")), ("fixedSize".to_string(), tl!("Fixed Size"))];
-    if ui.add_enabled_ui(sized, |ui| widgets::dropdown(ui, "marquee-style", tl!("Style"), &mut o.marquee_style, &styles, 96.0)).inner {
+    if ui.add_enabled_ui(sized, |ui| craft_ui::controls::Select::new("marquee-style", tl!("Style"), &mut o.marquee_style).rows(styles.len(), |i| styles[i].0.clone(), |i| tl!(styles[i].1)).show(ui).response.changed()).inner {
         (o.marquee_width, o.marquee_height) = if o.marquee_style == "fixedSize" { (64.0, 64.0) } else { (1.0, 1.0) };
     }
     let fixed = sized && o.marquee_style != "normal";
@@ -306,7 +302,7 @@ fn marquee_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         } else {
             widgets::value_field(ui, &mut o.marquee_width, crate::tool_memory::style_range(&o.marquee_style), "", 62.0);
         }
-        if icons::button(ui, "arrow-left-right", 22.0, false, tl!("Swaps height and width")).clicked() {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width")).size(craft_ui::controls::ControlSize::Sm)).clicked() {
             std::mem::swap(&mut o.marquee_width, &mut o.marquee_height);
         }
         opt_label(ui, tl!("Height"));
@@ -329,7 +325,7 @@ fn lasso_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     widgets::vline(ui, 22.0);
     opt_label(ui, tl!("Feather"));
     widgets::value_field(ui, &mut app.ui.tool_options.feather, 0.0..=1000.0, "px", 62.0);
-    widgets::checkbox(ui, &mut app.ui.tool_options.anti_alias, tl!("Anti-alias"));
+    craft_ui::controls::Checkbox::bool(tl!("Anti-alias"), &mut app.ui.tool_options.anti_alias).show(ui).response;
     widgets::vline(ui, 22.0);
     if app.ui.tool == Tool::MagneticLasso {
         let o = &mut app.ui.tool_options;
@@ -341,9 +337,7 @@ fn lasso_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             .on_hover_text(tl!("Higher values follow only edges that contrast sharply with their surroundings"));
         opt_label(ui, tl!("Frequency"));
         widgets::value_field(ui, &mut o.magnetic_frequency, 0.0..=100.0, "", 50.0).on_hover_text(tl!("How often fastening points are placed by themselves"));
-        if icons::button(ui, "circle-dot", 24.0, o.magnetic_pressure, tl!("Use tablet pressure to change pen width")).clicked() {
-            o.magnetic_pressure = !o.magnetic_pressure;
-        }
+        ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Target, tl!("Use tablet pressure to change pen width")).size(craft_ui::controls::ControlSize::Md).toggle(&mut o.magnetic_pressure));
         widgets::vline(ui, 22.0);
     }
     select_and_mask_button(app, ui);
@@ -377,11 +371,11 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
             widgets::vline(ui, 22.0);
             opt_label(ui, tl!("Tolerance"));
             widgets::value_field(ui, &mut app.ui.tool_options.tolerance, 0.0..=255.0, "", 58.0);
-            widgets::checkbox(ui, &mut app.ui.tool_options.anti_alias, tl!("Anti-alias"));
-            widgets::checkbox(ui, &mut app.ui.tool_options.contiguous, tl!("Contiguous"));
-            widgets::checkbox(ui, &mut app.ui.tool_options.sample_all.magic_wand, tl!("Sample All Layers"));
+            craft_ui::controls::Checkbox::bool(tl!("Anti-alias"), &mut app.ui.tool_options.anti_alias).show(ui).response;
+            craft_ui::controls::Checkbox::bool(tl!("Contiguous"), &mut app.ui.tool_options.contiguous).show(ui).response;
+            craft_ui::controls::Checkbox::bool(tl!("Sample All Layers"), &mut app.ui.tool_options.sample_all.magic_wand).show(ui).response;
             widgets::vline(ui, 22.0);
-            if widgets::secondary_button(ui, tl!("Select Subject"), 0.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Select Subject")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
                 let r = app.run("select.subject", json!({}));
                 crate::retouch_ui::report_smart_result(app, r, tl!("No subject found — try Object Selection or the Lasso"));
             }
@@ -390,7 +384,7 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
         Tool::PaintBucket => {
             opt_label(ui, tl!("Fill"));
             let mut src = u8::from(app.ui.tool_options.bucket_fill_pattern);
-            if widgets::dropdown(ui, "bucket-src", tl!("Source"), &mut src, &[(0u8, tl!("Foreground")), (1, tl!("Pattern"))], 100.0) {
+            if craft_ui::controls::Select::new("bucket-src", tl!("Source"), &mut src).fit(true).option(0u8, tl!("Foreground")).option(1, tl!("Pattern")).show(ui).response.changed() {
                 app.ui.tool_options.bucket_fill_pattern = src == 1;
             }
             opt_label(ui, tl!("Mode"));
@@ -408,14 +402,14 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
             widgets::value_field(ui, &mut app.ui.tool_options.fill_opacity, 1.0..=100.0, "%", 62.0);
             opt_label(ui, tl!("Tolerance"));
             widgets::value_field(ui, &mut app.ui.tool_options.tolerance, 0.0..=255.0, "", 58.0);
-            widgets::checkbox(ui, &mut app.ui.tool_options.anti_alias, tl!("Anti-alias"));
-            widgets::checkbox(ui, &mut app.ui.tool_options.contiguous, tl!("Contiguous"));
-            widgets::checkbox(ui, &mut app.ui.tool_options.sample_all.paint_bucket, tl!("All Layers"));
+            craft_ui::controls::Checkbox::bool(tl!("Anti-alias"), &mut app.ui.tool_options.anti_alias).show(ui).response;
+            craft_ui::controls::Checkbox::bool(tl!("Contiguous"), &mut app.ui.tool_options.contiguous).show(ui).response;
+            craft_ui::controls::Checkbox::bool(tl!("All Layers"), &mut app.ui.tool_options.sample_all.paint_bucket).show(ui).response;
         }
         Tool::Gradient => {
             // Live "Gradient" (a Gradient Fill layer) or "Classic gradient" (pixels).
             let mut classic = app.ui.tool_options.gradient_classic;
-            if widgets::dropdown(ui, "gradient-mode", tl!("Mode"), &mut classic, &[(false, "Gradient"), (true, "Classic gradient")], 118.0) {
+            if craft_ui::controls::Select::new("gradient-mode", tl!("Mode"), &mut classic).fit(true).option(false, tl!("Gradient")).option(true, tl!("Classic gradient")).show(ui).response.changed() {
                 app.ui.tool_options.gradient_classic = classic;
             }
             // Live "Gradient" (a Gradient Fill layer) or "Classic gradient" (pixels):
@@ -456,8 +450,8 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 let drag = if r.dragged() { ui.data(|d| d.get_temp::<u64>(drag_key)) } else { None };
                 crate::gradient_ui::opacity_changed(app, drag);
             }
-            widgets::checkbox(ui, &mut app.ui.tool_options.gradient_reverse, tl!("Reverse"));
-            widgets::checkbox(ui, &mut app.ui.tool_options.gradient_dither, tl!("Dither"));
+            craft_ui::controls::Checkbox::bool(tl!("Reverse"), &mut app.ui.tool_options.gradient_reverse).show(ui).response;
+            craft_ui::controls::Checkbox::bool(tl!("Dither"), &mut app.ui.tool_options.gradient_dither).show(ui).response;
             // Live mode: the options also change a selected gradient fill layer.
             crate::gradient_ui::options_changed(app, &before);
         }
@@ -477,7 +471,7 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 let (mut rw, mut rh) = crate::crop_size::custom_ratio_fields(o, doc_size);
                 let decimals = crate::crop_size::RATIO_DECIMALS;
                 let fw = widgets::value_field_prec(ui, &mut rw, 0.0..=99_999.0, "", 54.0, decimals);
-                let swap = icons::button(ui, "arrow-left-right", 22.0, false, tl!("Swaps height and width")).clicked();
+                let swap = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width")).size(craft_ui::controls::ControlSize::Sm)).clicked();
                 let fh = widgets::value_field_prec(ui, &mut rh, 0.0..=99_999.0, "", 54.0, decimals);
                 let (cw, ch) = (fw.changed(), fh.changed());
                 if swap {
@@ -499,24 +493,17 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 }
             }
             widgets::vline(ui, 22.0);
-            if widgets::secondary_button(ui, tl!("Clear"), 0.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Clear")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
                 crate::crop_size::clear_ratio(o);
             }
             crate::crop_straighten::options_button(&mut app.crop.straighten, ui);
             crate::crop_overlay::options_button(o, ui);
             let pick_shield_color = crate::crop_shield::options_button(&mut o.crop_shield, ui);
-            widgets::checkbox(ui, &mut o.crop_delete, tl!("Delete Cropped Pixels"));
+            craft_ui::controls::Checkbox::bool(tl!("Delete Cropped Pixels"), &mut o.crop_delete).show(ui).response;
             // Fill: what a turned or extending crop puts where the image doesn't reach
             // (#3823). Generative Expand is not offered.
             ui.label(tl!("Fill:"));
-            widgets::dropdown(
-                ui,
-                "crop-fill",
-                tl!("Fill:"),
-                &mut o.crop_content_aware,
-                &[(false, tl!("Background (Default)")), (true, tl!("Content-Aware Fill"))],
-                150.0,
-            );
+            craft_ui::controls::Select::new("crop-fill", tl!("Fill:"), &mut o.crop_content_aware).fit(true).option(false, tl!("Background (Default)")).option(true, tl!("Content-Aware Fill")).show(ui).response.changed();
             if crate::crop_ui::preset_ratio(app) != before_ratio {
                 match ratio_base {
                     Some(base) => crate::crop_ui::apply_ratio_from(app, base),
@@ -527,18 +514,12 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 crate::crop_shield::pick_custom_color(app);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(
-                    ui,
-                    "check",
-                    26.0,
-                    false,
-                    &crate::i18n::fmt(tl!("Commit current crop operation  ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))]),
-                )
+                if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Check, &crate::i18n::fmt(tl!("Commit current crop operation  ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])).size(craft_ui::controls::ControlSize::Md))
                 .clicked()
                 {
                     crate::canvas::commit_crop(app);
                 }
-                if icons::button(ui, "ban", 26.0, false, tl!("Cancel current crop operation  (Esc)")).clicked() {
+                if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Ban, tl!("Cancel current crop operation  (Esc)")).size(craft_ui::controls::ControlSize::Md)).clicked() {
                     crate::crop_ui::cancel(app);
                 }
             });
@@ -583,17 +564,10 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
     match app.ui.tool {
         Tool::Move => {
             let o = &mut app.ui.tool_options;
-            widgets::checkbox(ui, &mut o.move_auto_select, tl!("Auto-Select:"));
-            widgets::dropdown(
-                ui,
-                "move-target",
-                tl!("Auto-Select:"),
-                &mut o.move_target,
-                &[("layer".to_string(), tl!("Layer")), ("group".to_string(), tl!("Group"))],
-                76.0,
-            );
+            craft_ui::controls::Checkbox::bool(tl!("Auto-Select:"), &mut o.move_auto_select).show(ui).response;
+            craft_ui::controls::Select::new("move-target", tl!("Auto-Select:"), &mut o.move_target).fit(true).option("layer".to_string(), tl!("Layer")).option("group".to_string(), tl!("Group")).show(ui).response.changed();
             widgets::vline(ui, 22.0);
-            widgets::checkbox(ui, &mut o.move_show_transform, tl!("Show Transform Controls"));
+            craft_ui::controls::Checkbox::bool(tl!("Show Transform Controls"), &mut o.move_show_transform).show(ui).response;
             widgets::vline(ui, 22.0);
             crate::align_bar::options(app, ui);
         }
@@ -602,10 +576,10 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
             // Resize Windows to Fit is Preferences › Zoom Resizes Windows itself, as in
             // Photoshop: one setting, shown in both places (zoom_window_fit.rs).
             let mut fit = app.session.prefs().general.zoom_resizes_windows;
-            if widgets::checkbox(ui, &mut fit, tl!("Resize Windows to Fit")).changed() {
+            if craft_ui::controls::Checkbox::bool(tl!("Resize Windows to Fit"), &mut fit).show(ui).response.changed() {
                 app.session.prefs.edit(|p| p.general.zoom_resizes_windows = fit);
             }
-            widgets::checkbox(ui, &mut app.ui.tool_options.zoom_scrubby, tl!("Scrubby Zoom"));
+            craft_ui::controls::Checkbox::bool(tl!("Scrubby Zoom"), &mut app.ui.tool_options.zoom_scrubby).show(ui).response;
             hint(
                 ui,
                 &crate::i18n::fmt(
@@ -613,14 +587,14 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
                     &[("key", &crate::shortcuts::pretty("Alt"))],
                 ),
             );
-            if widgets::secondary_button(ui, tl!("Fit Screen"), 0.0).clicked()
+            if ui.add(craft_ui::controls::Button::new(tl!("Fit Screen")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                 && let Some(i) = app.session.active_index()
             {
                 app.ui.views[i].fit_pending = true;
                 app.ui.views[i].request_zoom_animation(app.session.prefs().general.animated_zoom);
                 app.ui.views[i].zoom_anchor = None;
             }
-            if widgets::secondary_button(ui, "100%", 0.0).clicked()
+            if ui.add(craft_ui::controls::Button::new(tl!("100%")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                 && let Some(i) = app.session.active_index()
             {
                 app.ui.views[i].zoom = 1.0;
@@ -640,7 +614,7 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
                 {
                     v.rotation = crate::rotate_view::wrap_deg(angle);
                 }
-                if widgets::secondary_button(ui, tl!("Reset View"), 0.0).clicked()
+                if ui.add(craft_ui::controls::Button::new(tl!("Reset View")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                     && let Some(v) = app.ui.views.get_mut(i)
                 {
                     v.rotation = 0.0;
@@ -649,7 +623,7 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
         }
         Tool::Hand => {
             hint(ui, tl!("Drag to pan  ·  hold Space with any tool"));
-            if widgets::secondary_button(ui, "100%", 0.0).clicked()
+            if ui.add(craft_ui::controls::Button::new(tl!("100%")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                 && let Some(i) = app.session.active_index()
             {
                 app.ui.views[i].zoom = 1.0;
@@ -658,7 +632,7 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
                 app.ui.views[i].fit_pending = false;
                 app.ui.views[i].fill_pending = false;
             }
-            if widgets::secondary_button(ui, tl!("Fit Screen"), 0.0).clicked()
+            if ui.add(craft_ui::controls::Button::new(tl!("Fit Screen")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                 && let Some(i) = app.session.active_index()
             {
                 app.ui.views[i].fit_pending = true;
@@ -666,7 +640,7 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
                 app.ui.views[i].zoom_anchor = None;
                 app.ui.views[i].fill_pending = false;
             }
-            if widgets::secondary_button(ui, tl!("Fill Screen"), 0.0).clicked()
+            if ui.add(craft_ui::controls::Button::new(tl!("Fill Screen")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked()
                 && let Some(i) = app.session.active_index()
             {
                 app.ui.views[i].fill_pending = true;
