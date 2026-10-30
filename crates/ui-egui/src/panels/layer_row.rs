@@ -101,7 +101,7 @@ fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -
         // The Smart Filters row's filter mask thumbnail carries the brackets.
         return None;
     }
-    let slot = |kind: MaskKind| masks.iter().position(|m| m.0 == kind).map(|i| if i == 0 { Target::Library(ThumbTarget::Second) } else { Target::Extra });
+    let slot = |kind: MaskKind| masks.iter().position(|m| m.0 == kind).map(|i| if i == 0 { Target::Library(ThumbTarget::Extra(0)) } else { Target::Extra });
     if app.ui.vector_mask_target
         && let Some(target) = slot(MaskKind::Vector)
     {
@@ -308,7 +308,7 @@ pub(super) fn layer_row(
     if has_thumbs {
         lr = lr.thumb(thumb_size, |_, r| cells.first.set(Some(r)));
         if let Some(&(kind, _, linked)) = masks.first() {
-            lr = lr.second_thumb(|_, r| cells.second.set(Some(r))).thumb_link(linked, link_name(kind, linked, &l.name));
+            lr = lr.extra_thumb(|_, r| cells.second.set(Some(r))).thumb_link(linked, link_name(kind, linked, &l.name));
         }
         if let Some(Target::Library(which)) = target {
             lr = lr.thumb_target(which);
