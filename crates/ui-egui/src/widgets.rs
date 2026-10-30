@@ -14,6 +14,7 @@ pub use type_ahead::list_open as dropdown_list_open;
 
 mod buttons;
 mod color;
+mod dialog_fields;
 mod dropdown;
 pub mod field_tab;
 pub mod field_wheel;
@@ -46,6 +47,7 @@ pub use dropdown::{dropdown, dropdown_hovered, dropdown_literal, dropdown_wheel_
 pub(crate) use fields::compact_wrapping_value_field;
 #[cfg(test)]
 use fields::{FieldOpts, NUMERIC_INPUT_LIMIT, value_field_in};
+pub use dialog_fields::{NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, text as dialog_text};
 pub use fields::{
     POPUP_ARROW_W, PopupFieldResponse, VALUE_FIELD_H, compact_value_field, elided_label, elided_label_sensed, popup_value_field, value_field, value_field_named,
 };

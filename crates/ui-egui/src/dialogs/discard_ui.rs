@@ -297,7 +297,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     for (role, label, key, _) in &buttons {
         prompt = prompt.answer(*role, tl!(*label), Some(*key));
     }
-    let answer = prompt.show(ctx).and_then(|role| buttons.iter().find(|b| b.0 == role).map(|b| b.3));
+    let shown = prompt.show(ctx);
+    crate::dialogs::push_modal_rect(ctx, ("discard", doc));
+    let answer = shown.and_then(|role| buttons.iter().find(|b| b.0 == role).map(|b| b.3));
     if let Some(answer) = answer {
         apply(app, ctx, doc, answer);
     }

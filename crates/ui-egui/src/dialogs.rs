@@ -72,6 +72,15 @@ pub(crate) fn area_id(id: u64) -> egui::Id {
     craft_ui::dialog::dialog_id(id)
 }
 
+/// Tells the title bar where the library dialog `key` (the key it was built with: `Dialog::new`,
+/// `Alert::new`, `Prompt::new`) is, so a drag of the bar's free gap does not cross it. Call it
+/// after the dialog is shown, on every pass it is open.
+pub(crate) fn push_modal_rect(ctx: &egui::Context, key: impl std::hash::Hash + std::fmt::Debug) {
+    if let Some(rect) = ctx.memory(|m| m.area_rect(craft_ui::dialog::dialog_id(key))) {
+        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
+    }
+}
+
 /// Where the open dialogs are on screen.
 #[cfg(test)]
 pub(crate) fn rects(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Vec<egui::Rect> {
@@ -455,7 +464,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let title = display_title(&d);
         if d.kind == DialogKind::Error {
             let message = d.fields.get("message").and_then(Value::as_str).unwrap_or("Error");
-            if Alert::new(d.id, title, message).ok_label(tl!("OK")).stack(&stack).show(ctx) {
+            let closed = Alert::new(d.id, title, message).ok_label(tl!("OK")).stack(&stack).show(ctx);
+            push_modal_rect(ctx, d.id);
+            if closed {
                 let _ = cancel(app, d.id);
             }
             continue;

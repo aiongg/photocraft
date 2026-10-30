@@ -3,8 +3,9 @@
 //! the panel's New Group button. OK runs `layer.new.group` / `layer.new.groupFromLayers` with the
 //! options as one history step; explicit params from Actions, CLI and MCP run the engine directly.
 
+use craft_ui::composites::FormGrid;
 use craft_ui::theme::StrokeExt;
-use egui::{Align2, Sense, pos2, vec2};
+use egui::{Sense, vec2};
 use photocraft_color::BlendMode;
 use photocraft_doc::LabelColor;
 use serde_json::{Map, Value, json};
@@ -57,12 +58,6 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     app.run(&command, params(f))
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = Tokens::get(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(64.0, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 6.0, r.center().y), Align2::RIGHT_CENTER, text, egui::FontId::proportional(12.0), t.text_dim);
-}
-
 /// The label colour's swatch beside its menu: a crossed box for No Color, as in the layer menu.
 fn swatch(ui: &mut egui::Ui, color: LabelColor) {
     let t = Tokens::get(ui.ctx());
@@ -80,46 +75,47 @@ fn swatch(ui: &mut egui::Ui, color: LabelColor) {
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    ui.spacing_mut().item_spacing.y = 8.0;
-    ui.horizontal(|ui| {
-        label(ui, tl!("Name:"));
-        let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
-        let r = ui.add(egui::TextEdit::singleline(&mut name).desired_width(252.0));
-        if r.changed() {
-            f.insert("name".into(), json!(name));
-        }
-        crate::field_tab::register(ui.ctx(), r.id);
-        // Photoshop opens the dialog with the name selected, so typing replaces it.
-        if !f.contains_key("__focused") {
-            f.insert("__focused".into(), json!(true));
-            crate::field_tab::focus(ui.ctx(), r.id);
-        }
-        if r.gained_focus() {
-            crate::field_tab::select_all(ui.ctx(), r.id, &name);
-        }
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("Color:"));
-        let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or(LabelColor::None);
-        let options: Vec<(LabelColor, &str)> = LabelColor::ALL.iter().map(|c| (*c, crate::layer_menu_ui::color_name(*c))).collect();
-        if craft_ui::controls::Select::new("new-group-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
-            f.insert("color".into(), json!(color.id()));
-        }
-        swatch(ui, color);
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("Mode:"));
-        let mut mode = f.get("mode").and_then(Value::as_str).and_then(photocraft_engine::commands::blend_from_str).unwrap_or(BlendMode::PassThrough);
-        let options = crate::panels::blend_options(true, mode);
-        if craft_ui::controls::Select::new("new-group-mode", tl!("Mode"), &mut mode).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
-            f.insert("mode".into(), json!(crate::dialog_blend_ui::mode_key(mode)));
-        }
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
-        ui.label(egui::RichText::new(tl!("Opacity:")).size(12.0).color(Tokens::get(ui.ctx()).text_dim));
-        let mut opacity = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
-        if crate::widgets::value_field(ui, &mut opacity, 0.0..=100.0, "%", 64.0).changed() {
-            f.insert("opacity".into(), json!(opacity.round()));
-        }
+    use craft_ui::controls::Select;
+    FormGrid::new("new-group").show(ui, |form| {
+        form.row(tl!("Name:"), |ui, _| {
+            let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
+            let edit = crate::widgets::dialog_text(ui, "new-group-name", tl!("Name:"), &mut name);
+            if edit.changed {
+                f.insert("name".into(), json!(name));
+            }
+            edit.response
+        });
+        form.row(tl!("Color:"), |ui, _| {
+            ui.horizontal(|ui| {
+                let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or(LabelColor::None);
+                let options: Vec<(LabelColor, &str)> = LabelColor::ALL.iter().map(|c| (*c, crate::layer_menu_ui::color_name(*c))).collect();
+                let edit = Select::new("new-group-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
+                if edit.response.changed() {
+                    f.insert("color".into(), json!(color.id()));
+                }
+                swatch(ui, color);
+                edit
+            })
+            .inner
+        });
+        form.row(tl!("Mode:"), |ui, _| {
+            ui.horizontal(|ui| {
+                let mut mode = f.get("mode").and_then(Value::as_str).and_then(photocraft_engine::commands::blend_from_str).unwrap_or(BlendMode::PassThrough);
+                let options = crate::panels::blend_options(true, mode);
+                let edit = Select::new("new-group-mode", tl!("Mode"), &mut mode).rows(options.len(), |i| options[i].0, |i| tl!(options[i].1)).show(ui);
+                if edit.response.changed() {
+                    f.insert("mode".into(), json!(crate::dialog_blend_ui::mode_key(mode)));
+                }
+                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                ui.label(tl!("Opacity:"));
+                let mut opacity = f.get("opacity").and_then(Value::as_f64).unwrap_or(100.0) as f32;
+                if crate::widgets::dialog_number(ui, "new-group-opacity", tl!("Opacity:"), &mut opacity, 0.0..=100.0, "{n}%", 0) {
+                    f.insert("opacity".into(), json!(opacity.round()));
+                }
+                edit
+            })
+            .inner
+        });
     });
 }
 
