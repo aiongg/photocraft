@@ -715,7 +715,7 @@ fn size_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>, src_w: f64, src_h:
         write_size(f, size, "pixels");
     }
     let mut linked = lock;
-    if crate::widgets::checkbox(ui, &mut linked, tl!("Constrain proportions")).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!("Constrain proportions"), &mut linked).show(ui).response.changed() {
         f.insert("lockAspect".into(), json!(linked));
         if linked && let Ok(size) = resize_from_side(src_w, src_h, n(f, "width", src_w.max(1.0)), n(f, "height", src_h.max(1.0)), true, true) {
             write_size(f, size, "pixels");
@@ -731,7 +731,7 @@ fn resample_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         ui.label(egui::RichText::new(tl!("Resample")).color(t.color.text.muted.to_egui()));
         let mut method = resample_method(f, None).unwrap_or(DEFAULT_RESAMPLE).to_string();
         let opts: Vec<(String, &str)> = RESAMPLE.iter().map(|(k, label)| ((*k).to_string(), resample_label(label))).collect();
-        if crate::widgets::dropdown(ui, "export-resample", tl!("Resample"), &mut method, &opts, 130.0) {
+        if craft_ui::controls::Select::new("export-resample", tl!("Resample"), &mut method).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
             f.insert("resample".into(), json!(method));
         }
     });
@@ -810,14 +810,14 @@ fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String,
             for name in &names {
                 opts.push((name.clone(), name.as_str()));
             }
-            if crate::widgets::dropdown(ui, "export-preset", tl!("Preset"), &mut selected, &opts, 130.0) {
+            if craft_ui::controls::Select::new("export-preset", tl!("Preset"), &mut selected).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                 f.insert("__preset".into(), json!(selected));
                 if let Some(preset) = app.session.presets.export_presets.iter().find(|p| p.name == s(f, "__preset")).cloned() {
                     apply_preset(f, &preset.settings, src_w, src_h);
                 }
             }
         });
-        if !s(f, "__preset").is_empty() && crate::widgets::secondary_button(ui, tl!("Delete"), 84.0).clicked() {
+        if !s(f, "__preset").is_empty() && ui.add(craft_ui::controls::Button::new(tl!("Delete")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked() {
             let name = s(f, "__preset");
             match app.run("file.export.presets.delete", json!({"name": name})) {
                 Ok(_) => {
@@ -831,7 +831,7 @@ fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String,
         }
     }
     if f.get("__savingPreset").and_then(Value::as_bool) != Some(true) {
-        if crate::widgets::secondary_button(ui, tl!("Save Preset…"), 160.0).clicked() {
+        if ui.add(craft_ui::controls::Button::new(tl!("Save Preset…")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(160.0)).clicked() {
             f.insert("__savingPreset".into(), json!(true));
             f.remove("__presetError");
         }
@@ -842,7 +842,7 @@ fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String,
         ui.add(egui::TextEdit::singleline(&mut name).id_salt("export-preset-name").desired_width(160.0).char_limit(255)).labelled_by(label.id);
         f.insert("__presetName".into(), json!(name));
         ui.horizontal(|ui| {
-            if crate::widgets::secondary_button(ui, tl!("Save"), 70.0).clicked() || enter {
+            if ui.add(craft_ui::controls::Button::new(tl!("Save")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(70.0)).clicked() || enter {
                 match app.run("file.export.presets.save", json!({"name": name, "settings": preset_settings(f)})) {
                     Ok(v) => {
                         if let Some(saved) = v.get("preset").and_then(|p| p.get("name")).and_then(Value::as_str) {
@@ -857,7 +857,7 @@ fn preset_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String,
                     }
                 }
             }
-            if crate::widgets::secondary_button(ui, tl!("Cancel"), 70.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(70.0)).clicked() {
                 f.remove("__savingPreset");
                 f.remove("__presetError");
             }
@@ -880,14 +880,14 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 ui.label(egui::RichText::new(tl!("Format")).color(t.color.text.muted.to_egui()));
                 let mut fmt = s_fmt(f);
                 let opts: Vec<(String, &str)> = FORMATS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-                if crate::widgets::dropdown(ui, "export-format", tl!("Format"), &mut fmt, &opts, 130.0) {
+                if craft_ui::controls::Select::new("export-format", tl!("Format"), &mut fmt).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                     set_format_defaults(f, &fmt, &app.session.prefs().export);
                 }
             });
             let fmt = s_fmt(f);
             if fmt == "webp" {
                 let mut ll = lossless(f);
-                crate::widgets::checkbox(ui, &mut ll, tl!("Lossless"));
+                craft_ui::controls::Checkbox::bool(tl!("Lossless"), &mut ll).show(ui).response;
                 f.insert("lossless".into(), json!(ll));
             }
             if fmt == "jpg" || (fmt == "webp" && !lossless(f)) {
@@ -901,21 +901,21 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     let mut bits = s(f, "tgaBits");
                     let opts: Vec<(String, &str)> =
                         vec![("auto".into(), tl!("Auto")), ("24".into(), tl!("24 bits/pixel")), ("32".into(), tl!("32 bits/pixel"))];
-                    if crate::widgets::dropdown(ui, "export-tga-bits", tl!("Depth"), &mut bits, &opts, 130.0) {
+                    if craft_ui::controls::Select::new("export-tga-bits", tl!("Depth"), &mut bits).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                         f.insert("tgaBits".into(), json!(bits));
                     }
                 });
             }
             if fmt != "jpg" {
                 let mut tr = f.get("transparency").and_then(Value::as_bool).unwrap_or(true);
-                crate::widgets::checkbox(ui, &mut tr, tl!("Transparency"));
+                craft_ui::controls::Checkbox::bool(tl!("Transparency"), &mut tr).show(ui).response;
                 f.insert("transparency".into(), json!(tr));
             }
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(tl!("Metadata")).color(t.color.text.muted.to_egui()));
                 let mut m = s(f, "metadata");
                 let opts: Vec<(String, &str)> = vec![("none".into(), tl!("None")), ("exif".into(), tl!("EXIF")), ("all".into(), tl!("All"))];
-                if crate::widgets::dropdown(ui, "export-metadata", tl!("Metadata"), &mut m, &opts, 130.0) {
+                if craft_ui::controls::Select::new("export-metadata", tl!("Metadata"), &mut m).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                     f.insert("metadata".into(), json!(m));
                 }
             });
@@ -926,12 +926,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     profile = "document".into();
                 }
                 let opts: Vec<(String, &str)> = vec![("document".into(), tl!("Document Profile")), ("srgb".into(), tl!("Convert to sRGB"))];
-                if crate::widgets::dropdown(ui, "export-profile", tl!("Color Profile"), &mut profile, &opts, 130.0) {
+                if craft_ui::controls::Select::new("export-profile", tl!("Color Profile"), &mut profile).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed() {
                     f.insert("profile".into(), json!(profile));
                 }
             });
             let mut embed = f.get("embedProfile").and_then(Value::as_bool).unwrap_or(true);
-            crate::widgets::checkbox(ui, &mut embed, tl!("Embed Color Profile"));
+            craft_ui::controls::Checkbox::bool(tl!("Embed Color Profile"), &mut embed).show(ui).response;
             f.insert("embedProfile".into(), json!(embed));
             ui.add_space(craft_ui::theme::scale::Space::S8.px());
             ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));

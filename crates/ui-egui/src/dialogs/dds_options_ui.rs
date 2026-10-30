@@ -75,17 +75,17 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         ui.add_space(craft_ui::theme::scale::Space::S4.px());
         crate::widgets::hairline(ui);
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        crate::widgets::section_label(ui, tl!("Compression"));
+        craft_ui::composites::SectionLabel::new(tl!("Compression")).show(ui);
         for c in DdsCompression::ALL {
             ui.radio_value(&mut options.compression, c, label(c));
         }
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        crate::widgets::checkbox(ui, &mut options.mipmaps, tl!("Generate Mipmaps"));
+        craft_ui::controls::Checkbox::bool(tl!("Generate Mipmaps"), &mut options.mipmaps).show(ui).response;
         ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 10.0;
-            ok = crate::widgets::primary_button(ui, tl!("OK"), 84.0).clicked();
-            cancel = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
+            ok = ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(84.0)).clicked();
+            cancel = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked();
         });
     });
     cancel |= modal.should_close();
