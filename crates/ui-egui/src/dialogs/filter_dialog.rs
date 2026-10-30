@@ -808,6 +808,24 @@ fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 /// Dialog body for filter commands.
+/// Whether the dialog's first parameter is an angle dial. The dial's field is a library control, so
+/// the dialog host focuses it (`InitialFocus::FirstField`); PhotoCraft's own first-field focus
+/// would reach the next number instead.
+pub fn opens_on_angle_dial(f: &Map<String, Value>) -> bool {
+    if crate::select_mask_view::owns(f) {
+        return false;
+    }
+    let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default();
+    let spec = match f.get("__spec").and_then(Value::as_str) {
+        Some(s) => s.to_string(),
+        None => match photocraft_engine::commands::find(cmd) {
+            Some(c) => c.params.to_string(),
+            None => return false,
+        },
+    };
+    parse_spec(&spec).first().is_some_and(|p| matches!(p.kind, Kind::Range { .. }) && uses_angle_dial(cmd, &p.key))
+}
+
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let t = craft_ui::theme::current(ui.ctx());
     let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default().to_string();

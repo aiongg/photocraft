@@ -1,12 +1,11 @@
 //! Photoshop-style guide layout dialog. Its preview is a pure guide overlay, never an edit.
 
-use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 use egui::Color32;
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 
-use craft_ui::composites::{FormGrid, LabelAlign};
+use craft_ui::composites::{FormGrid, GroupBox, LabelAlign};
 use craft_ui::controls::Select;
 
 use crate::{PhotocraftApp, widgets};
@@ -187,6 +186,17 @@ pub fn preview(app: &PhotocraftApp, doc: &Document) -> Option<(Guides, Color32)>
     Some((guides, color))
 }
 
+/// Whether the Preview check is on.
+pub fn preview_on(f: &Map<String, Value>) -> bool {
+    on(f, "__preview", true)
+}
+
+/// The Preview check under the footer's Cancel button; `Some(on)` when the user toggled it.
+pub fn preview_check(ui: &mut egui::Ui, on: bool) -> Option<bool> {
+    let mut value = on;
+    craft_ui::controls::Checkbox::bool(tl!("Preview"), &mut value).show(ui).response.changed().then_some(value)
+}
+
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, fallback: bool) -> bool {
     let mut value = on(f, key, fallback);
     if craft_ui::controls::Checkbox::bool(tl!(label), &mut value).show(ui).response.changed() {
@@ -220,35 +230,26 @@ fn optional(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, name: &str
     edit.response.on_hover_text(tl!("Leave empty for automatic size"))
 }
 
-fn group<R>(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let t = craft_ui::theme::current(ui.ctx());
-    egui::Frame::new()
-        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
-        .inner_margin(8)
-        .show(ui, |ui| ui.vertical(content).inner)
-        .inner
-}
-
 fn axis(ui: &mut egui::Ui, f: &mut Map<String, Value>, rows: bool) {
     let (toggle, count, size, gap, title, size_label) = if rows {
         ("__rowsEnabled", "rows", "height", "rowGutter", tl!("Rows"), tl!("Height"))
     } else {
         ("__columnsEnabled", "columns", "width", "gutter", tl!("Columns"), tl!("Width"))
     };
-    group(ui, |ui| {
-        let enabled = check(ui, f, toggle, title, positive(f, count));
-        if enabled && f.get(count).and_then(Value::as_f64) == Some(0.0) {
-            f.insert(count.into(), json!(1));
-        }
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
-        ui.add_enabled_ui(enabled, |ui| {
-            FormGrid::new(count).label_align(LabelAlign::Start).show(ui, |form| {
-                form.row(tl!("Number"), |ui, _| number(ui, f, count, "Number", true));
-                form.row(size_label, |ui, _| optional(ui, f, size, size_label));
-                form.row(tl!("Spacing"), |ui, _| number(ui, f, gap, "Spacing", false));
-            });
+    let mut enabled = on(f, toggle, positive(f, count));
+    GroupBox::new(title).checkbox(&mut enabled).fill(false).id_salt(count).show(ui, |ui| {
+        FormGrid::new(count).label_align(LabelAlign::Start).show(ui, |form| {
+            form.row(tl!("Number"), |ui, _| number(ui, f, count, "Number", true));
+            form.row(size_label, |ui, _| optional(ui, f, size, size_label));
+            form.row(tl!("Spacing"), |ui, _| number(ui, f, gap, "Spacing", false));
         });
     });
+    if enabled != on(f, toggle, positive(f, count)) {
+        f.insert(toggle.into(), json!(enabled));
+    }
+    if enabled && f.get(count).and_then(Value::as_f64) == Some(0.0) {
+        f.insert(count.into(), json!(1));
+    }
 }
 
 fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
@@ -305,24 +306,21 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         }
     });
     ui.add_space(craft_ui::theme::scale::Space::S12.px());
-    group(ui, |ui| {
-        ui.label(tl!("Color"));
+    GroupBox::new(tl!("Color")).show(ui, |ui| {
         FormGrid::new("guide-color-row").label_align(LabelAlign::Start).show(ui, |form| {
             form.row(tl!("Color:"), |ui, _| {
-                ui.horizontal(|ui| {
-                    let mut color = f.get("color").and_then(Value::as_str).unwrap_or("#4affff").to_string();
-                    let colors = color_options(&color);
-                    let edit = Select::new("guide-color", tl!("Color"), &mut color).rows(colors.len(), |i| colors[i].0.clone(), |i| tl!(colors[i].1)).show(ui);
-                    if edit.response.changed() {
-                        f.insert("color".into(), json!(color));
-                    }
-                    let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
-                    if widgets::color_swatch_button(ui, shown, tl!("Guide color")).clicked() {
-                        crate::color_picker_ui::request(f, tl!("Guide color"));
-                    }
-                    edit
-                })
-                .inner
+                let mut color = f.get("color").and_then(Value::as_str).unwrap_or("#4affff").to_string();
+                let colors = color_options(&color);
+                let edit = Select::new("guide-color", tl!("Color"), &mut color).rows(colors.len(), |i| colors[i].0.clone(), |i| tl!(colors[i].1)).show(ui);
+                if edit.response.changed() {
+                    f.insert("color".into(), json!(color));
+                }
+                let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
+                let swatch = widgets::color_swatch_button(ui, shown, tl!("Guide color"));
+                if swatch.clicked() {
+                    crate::color_picker_ui::request(f, tl!("Guide color"));
+                }
+                (edit, swatch)
             });
         });
     });
@@ -333,25 +331,25 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         axis(ui, f, true);
     });
     ui.add_space(craft_ui::theme::scale::Space::S12.px());
-    group(ui, |ui| {
-        let enabled = check(ui, f, "__marginEnabled", tl!("Margin"), true);
-        let mut margins = f.get("margin").and_then(Value::as_array).cloned().unwrap_or_else(|| vec![json!(0); 4]);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
-        ui.add_enabled_ui(enabled, |ui| {
-            ui.horizontal(|ui| {
-                for (value, label) in margins.iter_mut().zip([tl!("Top:"), tl!("Left:"), tl!("Bottom:"), tl!("Right:")]) {
-                    ui.vertical(|ui| {
-                        ui.label(label);
-                        let mut n = value.as_f64().unwrap_or(0.0) as f32;
-                        if widgets::dialog_number(ui, ("guide-layout-margin", label), label, &mut n, 0.0..=300_000.0, "{n} px", 2) {
-                            *value = json!(n);
-                        }
-                    });
-                }
-            });
+    let mut enabled = on(f, "__marginEnabled", true);
+    let mut margins = f.get("margin").and_then(Value::as_array).cloned().unwrap_or_else(|| vec![json!(0); 4]);
+    GroupBox::new(tl!("Margin")).checkbox(&mut enabled).show(ui, |ui| {
+        ui.horizontal(|ui| {
+            for (value, label) in margins.iter_mut().zip([tl!("Top:"), tl!("Left:"), tl!("Bottom:"), tl!("Right:")]) {
+                ui.vertical(|ui| {
+                    ui.label(label);
+                    let mut n = value.as_f64().unwrap_or(0.0) as f32;
+                    if widgets::dialog_number(ui, ("guide-layout-margin", label), label, &mut n, 0.0..=300_000.0, "{n} px", 2) {
+                        *value = json!(n);
+                    }
+                });
+            }
         });
-        f.insert("margin".into(), Value::Array(margins));
     });
+    if enabled != on(f, "__marginEnabled", true) {
+        f.insert("__marginEnabled".into(), json!(enabled));
+    }
+    f.insert("margin".into(), Value::Array(margins));
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     check(ui, f, "centerColumns", tl!("Center Columns"), false);
     check(ui, f, "clearExisting", tl!("Clear Existing Guides"), false);
@@ -369,9 +367,6 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let before = (params(f), on(f, "__preview", true), f.get("color").cloned());
     main_fields(app, ui, f);
-    // The side footer has no slot for a check box, so Preview sits under the options.
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    check(ui, f, "__preview", tl!("Preview"), true);
     match calculate(app, f) {
         Ok(guides) => {
             f.insert("__previewGuides".into(), json!(guides));

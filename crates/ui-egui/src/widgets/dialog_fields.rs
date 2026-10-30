@@ -66,18 +66,6 @@ pub struct TextEdit {
     pub response: egui::Response,
 }
 
-/// [`text`] for a dialog that opens on its name: the first time the field has the focus (the host
-/// focuses the first field), its text is selected so typing replaces it, as Photoshop does. `fields`
-/// holds the private `__named` marker that says it happened.
-pub fn text_opening(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, value: &mut String, fields: &mut serde_json::Map<String, serde_json::Value>) -> TextEdit {
-    let edit = text(ui, id_salt, label, value);
-    if !fields.contains_key("__named") && !ui.is_sizing_pass() && edit.response.has_focus() {
-        super::field_tab::select_all(ui.ctx(), edit.response.id, value);
-        fields.insert("__named".into(), serde_json::Value::Bool(true));
-    }
-    edit
-}
-
 /// The response a `FormGrid` row returns for a control that keeps its own accessible name (a
 /// colour swatch named "Fill color"): the row would otherwise replace the name with its visible
 /// label. This is a nodeless stand-in at the control's position, so the row has nothing to name.

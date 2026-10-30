@@ -344,8 +344,9 @@ fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, 
             crate::filter_dialog::body(ui, fields);
         }
     };
-    // Select and Mask leaves the keyboard to its view keys (F, X, O, V…).
-    if crate::select_mask_view::owns(fields) {
+    // Select and Mask leaves the keyboard to its view keys (F, X, O, V…); a dialog that opens on
+    // an angle dial gets its focus from the host.
+    if crate::select_mask_view::owns(fields) || crate::filter_dialog::opens_on_angle_dial(fields) {
         body(ui, fields);
     } else {
         first_field_focused(ui, id, |ui| body(ui, fields));
@@ -418,7 +419,12 @@ fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool)
 /// dialog has them. `None` for the dialogs that draw their own buttons (Guide Layout, Brush Preset
 /// and the Color Picker: a column at the body's side that validates Enter itself). OK and Apply
 /// are enabled as `(ok, apply)` says once the body has run.
-fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>, table: &'a Cell<Option<crate::color_table_ui::Action>>) -> Footer<'a> {
+fn footer_for<'a>(
+    d: &Dialog,
+    enabled: &'a Cell<(bool, bool)>,
+    table: &'a Cell<Option<crate::color_table_ui::Action>>,
+    preview: &'a Cell<Option<bool>>,
+) -> Footer<'a> {
     let fields = &d.fields;
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
@@ -427,8 +433,14 @@ fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>, table: &'a Cell<O
         return Footer::none();
     }
     if crate::guide_layout_ui::owns(fields) {
-        // OK and Cancel at the body's side, as in Photoshop.
-        return Footer::side().labels(dialog_labels()).ok(tl!("OK")).cancel(tl!("Cancel")).ok_enabled_with(move || enabled.get().0);
+        // OK and Cancel at the body's side, Preview under Cancel, as in Photoshop.
+        let shown = crate::guide_layout_ui::preview_on(fields);
+        return Footer::side()
+            .labels(dialog_labels())
+            .ok(tl!("OK"))
+            .cancel(tl!("Cancel"))
+            .ok_enabled_with(move || enabled.get().0)
+            .below(move |ui| preview.set(crate::guide_layout_ui::preview_check(ui, shown)));
     }
     let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
     footer = footer.labels(dialog_labels());
@@ -511,16 +523,21 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
         let enabled = Cell::new(enabled_for(app, &d, &fields));
         let table = Cell::new(None);
+        let preview = Cell::new(None);
         let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(&fields) { crate::field_tab::take_step(ctx) } else { 0 };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
-            .footer(footer_for(&d, &enabled, &table))
+            .footer(footer_for(&d, &enabled, &table, &preview))
             .history(d.kind == DialogKind::Command)
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(if opens_on_first_field(&fields) { InitialFocus::FirstField } else { InitialFocus::None });
+            .initial_focus(if opens_on_first_field(&fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
+                InitialFocus::FirstField
+            } else {
+                InitialFocus::None
+            });
         if let Some(offset) = crate::blur_pins::first_place(&d.fields, ctx) {
             dialog = dialog.first_place(move |_| Some(offset));
         }
@@ -561,6 +578,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         );
         drop(app_cell);
         shown.push(response.rect);
+        if let Some(on) = preview.take() {
+            fields.insert("__preview".into(), json!(on));
+            ctx.request_repaint();
+        }
         if let Some(action) = table.take() {
             crate::color_table_ui::run(app, d.id, &fields, action);
         }
