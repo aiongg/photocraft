@@ -56,7 +56,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String, Val
         ui.label(egui::RichText::new(tl!("Destination")).font(crate::theme::semibold(13.0)));
         ui.end_row();
         ui.label(tl!("Document"));
-        crate::widgets::dropdown(ui, "duplicate-layer-document", tl!("Document"), &mut destination, &options, 260.0);
+        craft_ui::controls::Select::new("duplicate-layer-document", tl!("Document"), &mut destination).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed();
         ui.end_row();
         // Photoshop's document-`Name` is only there when the destination is a new document.
         if destination == "new" {

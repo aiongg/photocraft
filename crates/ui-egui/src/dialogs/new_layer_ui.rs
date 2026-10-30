@@ -91,7 +91,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.horizontal(|ui| {
         ui.add_space(label_width + ui.spacing().item_spacing.x);
         let mut clip = flag(f, "clipToPrevious");
-        if crate::widgets::checkbox(ui, &mut clip, tl!("Use Previous Layer to Create Clipping Mask")).changed() {
+        if craft_ui::controls::Checkbox::bool(tl!("Use Previous Layer to Create Clipping Mask"), &mut clip).show(ui).response.changed() {
             f.insert("clipToPrevious".into(), json!(clip));
         }
     });
@@ -99,7 +99,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         row_label(ui, tl!("Color:"));
         let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or_default();
         let options: Vec<(LabelColor, &str)> = LabelColor::ALL.into_iter().map(|c| (c, crate::layer_menu_ui::color_name(c))).collect();
-        if crate::widgets::dropdown(ui, "new-layer-color", tl!("Color"), &mut color, &options, 140.0) {
+        if craft_ui::controls::Select::new("new-layer-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
             f.insert("color".into(), json!(color.id()));
         }
     });
@@ -107,7 +107,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.horizontal(|ui| {
         row_label(ui, tl!("Mode:"));
         let options: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
-        if crate::widgets::dropdown(ui, "new-layer-mode", tl!("Mode"), &mut m, &options, 140.0) {
+        if craft_ui::controls::Select::new("new-layer-mode", tl!("Mode"), &mut m).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
             f.insert("mode".into(), json!(m.label()));
         }
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
@@ -121,7 +121,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         ui.add_space(label_width + ui.spacing().item_spacing.x);
         let available = neutral_color(m).is_some();
         let mut fill = available && flag(f, "fillNeutral");
-        let changed = ui.add_enabled_ui(available, |ui| crate::widgets::checkbox(ui, &mut fill, &neutral_label(m)).changed()).inner;
+        let changed = ui.add_enabled_ui(available, |ui| craft_ui::controls::Checkbox::bool(tl!(&neutral_label(m)), &mut fill).show(ui).response.changed()).inner;
         if changed {
             f.insert("fillNeutral".into(), json!(fill));
         }

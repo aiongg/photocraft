@@ -186,7 +186,7 @@ pub fn preview(app: &PhotocraftApp, doc: &Document) -> Option<(Guides, Color32)>
 
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, fallback: bool) -> bool {
     let mut value = on(f, key, fallback);
-    if widgets::checkbox(ui, &mut value, label).changed() {
+    if craft_ui::controls::Checkbox::bool(tl!(label), &mut value).show(ui).response.changed() {
         f.insert(key.into(), json!(value));
     }
     value
@@ -275,14 +275,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
     egui::Grid::new("guide-header").spacing([8.0, 6.0]).show(ui, |ui| {
         ui.label(tl!("Preset:"));
         let mut preset = f.get("__preset").and_then(Value::as_str).unwrap_or("custom").to_string();
-        if widgets::dropdown(
-            ui,
-            "guide-preset",
-            tl!("Preset:"),
-            &mut preset,
-            &[("custom".into(), "Custom"), ("five".into(), "5 Columns, 3 Rows"), ("eight".into(), "8 Columns"), ("twelve".into(), "12 Columns")],
-            222.0,
-        ) {
+        if craft_ui::controls::Select::new("guide-preset", tl!("Preset:"), &mut preset).fit(true).option("custom".into(), tl!("Custom")).option("five".into(), tl!("5 Columns, 3 Rows")).option("eight".into(), tl!("8 Columns")).option("twelve".into(), tl!("12 Columns")).show(ui).response.changed() {
             f.insert("__preset".into(), json!(preset));
             match preset.as_str() {
                 "five" | "eight" | "twelve" => {
@@ -317,7 +310,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         if !photocraft_engine::guide_layout::selected_artboards(&app.session).is_empty() {
             options.push(("selectedArtboards".into(), "Selected Artboards"));
         }
-        if widgets::dropdown(ui, "guide-target", tl!("Target"), &mut target, &options, 222.0) {
+        if craft_ui::controls::Select::new("guide-target", tl!("Target"), &mut target).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
             f.insert("target".into(), json!(target));
         }
         ui.end_row();
@@ -329,7 +322,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
             ui.label(tl!("Color:"));
             let mut color = f.get("color").and_then(Value::as_str).unwrap_or("#4affff").to_string();
             let colors = color_options(&color);
-            if widgets::dropdown(ui, "guide-color", tl!("Color"), &mut color, &colors, 174.0) {
+            if craft_ui::controls::Select::new("guide-color", tl!("Color"), &mut color).rows(colors.len(), |i| colors[i].0.clone(), |i| tl!(colors[i].1)).show(ui).response.changed() {
                 f.insert("color".into(), json!(color));
             }
             let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
@@ -388,11 +381,11 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
         ui.add_space(craft_ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             let valid = validate(app, f).is_ok();
-            if ui.add_enabled_ui(valid, |ui| widgets::primary_button(ui, tl!("OK"), 96.0)).inner.clicked() {
+            if ui.add_enabled_ui(valid, |ui| ui.add(craft_ui::controls::Button::new(tl!("OK")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(96.0))).inner.clicked() {
                 outcome = Some(true);
             }
             ui.add_space(craft_ui::theme::scale::Space::S4.px());
-            if widgets::secondary_button(ui, tl!("Cancel"), 96.0).clicked() {
+            if ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(96.0)).clicked() {
                 outcome = Some(false);
             }
             ui.add_space(craft_ui::theme::scale::Space::S6.px());

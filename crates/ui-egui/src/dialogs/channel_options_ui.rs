@@ -116,7 +116,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             }
         });
     }
-    crate::widgets::section_label(ui, tl!("Color Indicates:"));
+    craft_ui::composites::SectionLabel::new(tl!("Color Indicates:")).show(ui);
     crate::widgets::hairline(ui);
     let mut indicates = f.get("indicates").and_then(Value::as_str).unwrap_or("masked").to_string();
     let before = indicates.clone();
@@ -133,7 +133,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
     let spot = indicates == "spot";
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    crate::widgets::section_label(ui, tl!("Color"));
+    craft_ui::composites::SectionLabel::new(tl!("Color")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, "");
@@ -234,7 +234,7 @@ pub fn new_spot_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             f.insert("name".into(), json!(name));
         }
     });
-    crate::widgets::section_label(ui, tl!("Ink Characteristics"));
+    craft_ui::composites::SectionLabel::new(tl!("Ink Characteristics")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Color:"));

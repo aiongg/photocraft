@@ -102,7 +102,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         label(ui, tl!("Color:"));
         let mut color = f.get("color").and_then(Value::as_str).and_then(LabelColor::from_id).unwrap_or(LabelColor::None);
         let options: Vec<(LabelColor, &str)> = LabelColor::ALL.iter().map(|c| (*c, crate::layer_menu_ui::color_name(*c))).collect();
-        if crate::widgets::dropdown(ui, "new-group-color", tl!("Color"), &mut color, &options, 130.0) {
+        if craft_ui::controls::Select::new("new-group-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
             f.insert("color".into(), json!(color.id()));
         }
         swatch(ui, color);
@@ -111,7 +111,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         label(ui, tl!("Mode:"));
         let mut mode = f.get("mode").and_then(Value::as_str).and_then(photocraft_engine::commands::blend_from_str).unwrap_or(BlendMode::PassThrough);
         let options = crate::panels::blend_options(true, mode);
-        if crate::widgets::dropdown(ui, "new-group-mode", tl!("Mode"), &mut mode, &options, 130.0) {
+        if craft_ui::controls::Select::new("new-group-mode", tl!("Mode"), &mut mode).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed() {
             f.insert("mode".into(), json!(crate::dialog_blend_ui::mode_key(mode)));
         }
         ui.add_space(craft_ui::theme::scale::Space::S6.px());

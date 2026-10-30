@@ -171,7 +171,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             // Custom… first, then Photoshop's colours.
             let options: Vec<(String, &str)> =
                 std::iter::once(CUSTOM).chain(GUIDE_COLORS.iter().map(|(n, ..)| *n)).map(|n| (n.to_string(), color_label(n))).collect();
-            crate::widgets::dropdown(ui, "new-guide-color", tl!("Color"), &mut color, &options, 140.0);
+            craft_ui::controls::Select::new("new-guide-color", tl!("Color"), &mut color).rows(options.len(), |i| options[i].0.clone(), |i| tl!(options[i].1)).show(ui).response.changed();
             if color == CUSTOM {
                 let hex = custom_color(f);
                 let rgb = photocraft_engine::prefs::parse_hex(&hex).unwrap_or([0x4a, 0xff, 0xff]);
