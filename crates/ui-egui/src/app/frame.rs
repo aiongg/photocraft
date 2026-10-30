@@ -29,6 +29,9 @@ impl PhotocraftApp {
         // cursor block needs it before the frame renders. `None` (Wayland/web) keeps `false`.
         self.caps_lock = self.services.caps_lock.as_mut().is_some_and(|f| f());
         tool_cursor::set_wayland(ctx, self.services.is_wayland);
+        if let Some(restore) = self.services.window_restore.as_mut() {
+            restore(ctx);
+        }
         if !self.styled {
             Self::setup_context(ctx, self.ui.theme);
             self.styled = true;
@@ -271,6 +274,9 @@ impl PhotocraftApp {
         let tabbed_in = !chrome && self.ui.panels.full_screen_chrome;
         if (chrome || tabbed_in) && self.ui.panels.menu_bar {
             panels::title_bar(self, ui);
+        } else if self.custom_titlebar && !self.ui.panels.menu_bar {
+            // The undecorated window keeps its edge resizing without the bar.
+            titlebar::edge_zones_without_bar(self, ui);
         }
         if (chrome && self.ui.panels.options_bar) || tabbed_in {
             panels::options_bar(self, ui);
@@ -319,10 +325,21 @@ impl PhotocraftApp {
         gpu_status::show_fallback(self, &ctx);
         kys_import::show_offer(self, &ctx);
         if self.titlebar_modal_drag(chrome) {
-            titlebar::modal_drag_overlay(&ctx);
+            let rects = craft_ui::title_bar::ModalRects::take(&ctx, ctx.viewport_id());
+            craft_ui::title_bar::TitleBar::modal_drag_overlay(&ctx, ctx.viewport_id(), &rects);
         }
-        if self.custom_titlebar {
-            titlebar::resize_zones(ui);
+        // TitleBar sets the window's `movable` flag from where the pointer is. Without the bar the
+        // transparent strip is no title bar, and AppKit would still drag the window from it.
+        #[cfg(target_os = "macos")]
+        if self.integrated_titlebar {
+            if self.ui.panels.menu_bar {
+                craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
+            } else if let Some(set_movable) = self.services.set_movable.as_ref()
+                && self.titlebar_movable != Some(false)
+            {
+                set_movable(false);
+                self.titlebar_movable = Some(false);
+            }
         }
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);

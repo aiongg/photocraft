@@ -1397,6 +1397,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-platform"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=51c1d1e6903c34e2429825edb5e86f85743ff04c#51c1d1e6903c34e2429825edb5e86f85743ff04c"
+dependencies = [
+ "async-channel",
+ "async-io",
+ "async-process",
+ "egui",
+ "futures-lite",
+ "web-sys",
+ "zbus",
+]
+
+[[package]]
 name = "craft-print"
 version = "0.1.0"
 source = "git+https://github.com/aiongg/craft-libs?rev=51c1d1e6903c34e2429825edb5e86f85743ff04c#51c1d1e6903c34e2429825edb5e86f85743ff04c"
@@ -1408,6 +1422,17 @@ dependencies = [
  "tempfile",
  "winprint",
  "winsafe",
+]
+
+[[package]]
+name = "craft-settings"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=51c1d1e6903c34e2429825edb5e86f85743ff04c#51c1d1e6903c34e2429825edb5e86f85743ff04c"
+dependencies = [
+ "craft-atomic",
+ "dirs",
+ "serde",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1441,6 +1466,7 @@ dependencies = [
  "craft-i18n",
  "craft-theme",
  "craft-ui-macros",
+ "craft-window",
  "egui",
  "epaint",
  "js-sys",
@@ -1492,6 +1518,24 @@ dependencies = [
  "winreg",
  "winsafe",
  "zip",
+]
+
+[[package]]
+name = "craft-window"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=51c1d1e6903c34e2429825edb5e86f85743ff04c#51c1d1e6903c34e2429825edb5e86f85743ff04c"
+dependencies = [
+ "craft-atomic",
+ "craft-settings",
+ "eframe",
+ "egui",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "serde",
+ "serde_json",
+ "wayland-client",
+ "winit",
 ]
 
 [[package]]
@@ -5042,7 +5086,9 @@ dependencies = [
  "chrono",
  "clap",
  "core-graphics2",
+ "craft-platform",
  "craft-update",
+ "craft-window",
  "dispatch2",
  "eframe",
  "egui",
@@ -5473,6 +5519,7 @@ dependencies = [
  "craft-theme-store",
  "craft-ui",
  "craft-update",
+ "craft-window",
  "eframe",
  "egui",
  "egui_extras",
@@ -7734,8 +7781,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1340ea94a5856333492c9064b02c778b191dd2c853778d9609debdcdfea3a614"
 dependencies = [
  "indexmap",
+ "serde_core",
+ "serde_spanned",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

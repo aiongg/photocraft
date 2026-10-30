@@ -268,9 +268,9 @@ The desktop app stores them in `preferences.json` in the platform config directo
 `Recovery` folder (on Windows to `%LOCALAPPDATA%\Photocraft\Recovery`, out of the roaming
 profile, and on Linux to `$XDG_STATE_HOME/photocraft/Recovery`, by default
 `~/.local/state/photocraft/Recovery`, out of the config folder; autosaves left by earlier
-versions move there at startup), and the window size and
-position, the dock width and floating-panel geometry
-to `ui.ron` beside it (a file holding values that would crash startup is discarded). In portable mode (a `portable.txt` or `PhotoCraft.portable` file beside the
+versions move there at startup), the window size, position and state
+to `window.json` beside it, and the dock width and floating-panel geometry
+to `ui.ron` (a file holding values that would crash startup is discarded). In portable mode (a `portable.txt` or `PhotoCraft.portable` file beside the
 executable, as in the Windows portable zip) that directory is `PhotoCraftData` next to the
 executable instead. The web build keeps them in `localStorage`. A save writes only the values
 this instance changed since it last loaded or saved them over what storage holds now, so a second
