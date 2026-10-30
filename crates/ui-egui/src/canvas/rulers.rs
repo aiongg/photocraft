@@ -76,6 +76,17 @@ fn unit_menu_items(current: Unit, units: &[Unit]) -> Vec<(String, &'static str, 
     units.iter().map(|&u| (tl!(unit_label(u)).to_string(), u.name(), u == current)).collect()
 }
 
+/// The rows of a number field's unit menu: every unit, with `current` marked. A pick is an index
+/// into the units; [`unit_name_at`] names it.
+pub(crate) fn unit_entries(current: Unit) -> Vec<craft_ui::menu::MenuEntry<usize>> {
+    UNITS.iter().enumerate().map(|(i, &u)| craft_ui::menu::MenuItem::new(tl!(unit_label(u)), i).radio(u == current).into()).collect()
+}
+
+/// The name of the unit at `index` of [`unit_entries`].
+pub(crate) fn unit_name_at(index: usize) -> &'static str {
+    UNITS[index].name()
+}
+
 /// The length units menu that right-clicking a ruler (or Free Transform's W and H fields) opens;
 /// the chosen unit's name is returned (`None` if the menu is dismissed without a pick).
 pub(crate) fn unit_menu(ui: &mut egui::Ui, current: Unit) -> Option<&'static str> {

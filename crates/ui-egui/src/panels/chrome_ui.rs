@@ -247,11 +247,9 @@ pub fn home_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let on = app.ui.chrome.shows_home(n, auto);
     // With no documents and auto-show on, Home can't be dismissed (there's nothing behind it).
     let can_toggle = n > 0 || !auto;
-    if ui
-        .add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Home, tl!("Home")).size(craft_ui::controls::ControlSize::Md).selected(on && can_toggle))
-        .clicked()
-        && can_toggle
-    {
+    let mut shown = on && can_toggle;
+    ui.add_enabled_ui(can_toggle, |ui| craft_ui::patterns::OptionsBar::home(ui, &mut shown, tl!("Home")));
+    if can_toggle && shown != on {
         app.ui.chrome.home = if on { None } else { Some(n) };
     }
 }

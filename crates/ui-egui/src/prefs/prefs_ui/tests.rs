@@ -917,7 +917,10 @@ fn scale_preferences_and_monitor_changes_apply_live() {
 
 #[test]
 fn intermediate_ui_scale_choices_can_be_applied_from_preferences() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, store) = app_with_store();
     app.run("prefs.set", json!({"path": "interface.uiScale", "value": "100"})).unwrap();
     open_preferences(&mut app, "interface");
@@ -928,7 +931,8 @@ fn intermediate_ui_scale_choices_can_be_applied_from_preferences() {
     h.run_steps(4);
     let mut current = "100%";
     for (label, value) in [("105%", "105"), ("110%", "110"), ("115%", "115"), ("120%", "120")] {
-        h.get_by_value(current).click();
+        // The options bar's number fields can show the same percentage; the scale is the select.
+        h.get_all_by_role(egui::accesskit::Role::ComboBox).find(|n| n.accesskit_node().value().as_deref() == Some(current)).expect("the scale select").click();
         h.run_steps(2);
         h.get_by_label(label).click();
         h.run_steps(2);

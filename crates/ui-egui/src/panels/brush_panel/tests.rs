@@ -432,7 +432,7 @@ fn clone_stamp_opacity_and_flow_are_journaled_per_gesture() {
     let mut h = options_bar_harness(crate::state::Tool::CloneStamp);
     for (label, field) in [("Opacity", "opacity"), ("Flow", "flow")] {
         let n = h.state().session.journal.len();
-        let rect = caption_rect(&h, label);
+        let rect = caption_rect(&h, &format!("{label}:"));
         let start = egui::pos2(rect.right() + 40.0, rect.center().y);
         h.hover_at(start);
         h.run();
@@ -472,7 +472,7 @@ fn options_bar_edits_are_one_set_brush_per_gesture() {
     h.run_steps(3);
     assert_eq!(h.state().session.journal.len(), n, "showing the bar issues nothing");
     // Drag the Opacity field left: many frames, one journal entry.
-    let label = caption_rect(&h, "Opacity");
+    let label = caption_rect(&h, "Opacity:");
     let start = egui::pos2(label.right() + 40.0, label.center().y);
     h.hover_at(start);
     h.run();
@@ -491,10 +491,10 @@ fn options_bar_edits_are_one_set_brush_per_gesture() {
     let (id, p) = j.last().unwrap();
     assert_eq!(id, "tools.setBrush");
     assert_eq!(p["brush"]["opacity"].as_f64().map(|v| v as f32), Some(opacity));
-    // A click is its own gesture: the Pressure for Size switch sits left of its label.
-    let label = h.get_by_label("Pressure for Size").rect();
+    // A click is its own gesture: the Pressure for Size toggle.
+    let button = h.get_by_label("Always use pressure for size").rect();
     let was = h.state().session.tools.brush.pressure_size;
-    let at = egui::pos2(label.left() - 18.0, label.center().y);
+    let at = button.center();
     h.hover_at(at);
     h.run();
     h.drag_at(at);
@@ -518,13 +518,13 @@ fn brush_mode_dropdown_shows_outside_the_pro_themes() {
     use egui_kittest::kittest::{NodeT, Queryable};
     let mut h = options_bar_harness(crate::state::Tool::Brush);
     let n = h.state().session.journal.len();
-    assert!(h.query_by_label("Mode").is_some(), "the Brush's Mode label");
+    assert!(h.query_by_label("Mode:").is_some(), "the Brush's Mode label");
     h.get_all_by_role(egui::accesskit::Role::ComboBox)
         .find(|c| c.accesskit_node().value().as_deref() == Some("Normal"))
         .expect("the Brush's Mode dropdown")
         .click();
     h.run();
-    h.key_press(egui::Key::ArrowDown);
+    h.get_by_label("Dissolve").click();
     h.run_steps(3);
     assert_eq!(h.state().session.tools.brush.mode, photocraft_doc::BlendMode::Dissolve);
     let j = &h.state().session.journal;
@@ -1016,7 +1016,7 @@ fn editing_the_options_bar_amount_reenables_smoothing() {
     h.state_mut().run("tools.setBrush", json!({"brush": {"smoothing": {"enabled": false, "amount": 0.4}}})).unwrap();
     h.run_steps(3);
     let n = h.state().session.journal.len();
-    let label = caption_rect(&h, "Smoothing");
+    let label = caption_rect(&h, "Smoothing:");
     let at = egui::pos2(label.right() + 25.0, label.center().y);
     h.hover_at(at);
     h.run_steps(2);

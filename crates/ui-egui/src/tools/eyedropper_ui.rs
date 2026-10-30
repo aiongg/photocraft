@@ -6,9 +6,9 @@
 //! eyedropper, the dialog eyedroppers and the Info panel, as in Photoshop.
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
-use crate::widgets;
-use craft_ui::theme::ToEgui;
+use crate::panels::select_cell;
+use craft_ui::controls::{Checkbox, ControlSize};
+use craft_ui::patterns::OptionsBar;
 
 /// The Sample Size menu: each size with its label, in Photoshop's order.
 pub fn size_options() -> [(u32, &'static str); 7] {
@@ -34,27 +34,16 @@ pub fn layer_options() -> [(String, &'static str); 5] {
     ]
 }
 
-fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.label(egui::RichText::new(text).color(t.color.text.muted.to_egui()).size(12.0));
-}
-
 /// The options bar for the Eyedropper tool.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let o = &mut app.ui.tool_options;
-    opt(ui, tl!("Sample Size:"));
-    widgets::dropdown(ui, "eyedropper-size", tl!("Size"), &mut o.eyedropper_size, &size_options(), 130.0);
-    opt(ui, tl!("Sample:"));
-    widgets::dropdown(ui, "eyedropper-sample", tl!("Source"), &mut o.eyedropper_sample, &layer_options(), 190.0);
-    widgets::checkbox(ui, &mut o.eyedropper_ring, tl!("Show Sampling Ring"));
-    widgets::vline(ui, 22.0);
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.label(
-        egui::RichText::new(crate::i18n::fmt(
-            tl!("Click to sample the foreground colour  ·  {key}-click for background"),
-            &[("key", &crate::shortcuts::pretty("Alt"))],
-        ))
-        .color(t.color.text.faint.to_egui()),
+    select_cell(ui, Some("Sample Size"), "eyedropper-size", "Size", &mut o.eyedropper_size, &size_options(), false);
+    select_cell(ui, Some("Sample"), "eyedropper-sample", "Source", &mut o.eyedropper_sample, &layer_options(), false);
+    Checkbox::bool(tl!("Show Sampling Ring"), &mut o.eyedropper_ring).size(ControlSize::Sm).show(ui).response;
+    OptionsBar::divider(ui);
+    OptionsBar::hint(
+        ui,
+        &crate::i18n::fmt(tl!("Click to sample the foreground colour  ·  {key}-click for background"), &[("key", &crate::shortcuts::pretty("Alt"))]),
     );
 }
 

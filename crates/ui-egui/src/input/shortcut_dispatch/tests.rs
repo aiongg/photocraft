@@ -221,6 +221,12 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
         }
         // Tool letters from the tools panel tooltips ("Brush Tool  (B)").
         if !matches!(focus, Focus::Text) {
+            // A tool's options bar draws slowly the first time (its icons are rasterized); a tap
+            // that outlasts the spring-load hold time would switch back, so draw each once first.
+            for t in Tool::ALL {
+                h.state_mut().ui.tool = t;
+                h.run_steps(1);
+            }
             for t in Tool::ALL.into_iter().filter(|t| t.key() != '\0') {
                 h.state_mut().ui.tool = if t.key() == 'H' { Tool::Move } else { Tool::Hand };
                 press(&mut h, &t.key().to_string());
