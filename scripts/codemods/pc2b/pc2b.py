@@ -284,6 +284,34 @@ class Scan:
         self.lines = 0
 
 
+# PhotoCraft keeps a flat `Tokens` (theme/library.rs, `Tokens::from_library`) next to the library's
+# `UiTokens`. These fields exist only on the flat struct, or differ from the library token in some
+# theme (dark `danger`/`warning` use the solid colour, `accent_text` on Pro dark and Classic, the
+# Studio layouts clear `tab_strip`/`row_selected`), so a file that reads one keeps its flat
+# `Tokens` bindings and none of its token reads or `Tokens::get` calls are rewritten.
+FLAT_FIELDS = ("pro", "bevel", "kind", "round_chips", "canvas_dot", "histogram_level", "danger", "warning", "accent_text", "tab_strip", "row_selected")
+FLAT_METHODS = ("histogram_color", "histogram_fill", "layer_label_colors", "layer_label_icon", "scope_hue", "histogram_background", "field_selection", "knob_outline", "dark")
+# Files found flat by compile feedback: the flat value is handed on (a `&Tokens` parameter, a
+# struct field) or shadowed.
+FLAT_FILES = set()
+
+
+def is_flat_file(rel, m: str):
+    if str(rel) in FLAT_FILES:
+        return True
+    rr = "|".join(RECEIVERS)
+    if re.search(rf"\b(?:{rr})\.(?:{'|'.join(FLAT_FIELDS)})\b(?!\s*\()", m):
+        return True
+    if re.search(rf"\b(?:{rr})\.(?:{'|'.join(FLAT_METHODS)})\s*\(", m):
+        return True
+    if re.search(r"\b\w+\s*:\s*&?\s*(?:mut\s+)?(?:[\w]+::)*Tokens\b", m) or re.search(r"Tokens::(?:for_kind|from_library)\b|\bTokens\s*\{", m):
+        return True
+    # the whole value is handed on: it must stay the type the callee takes
+    if re.search(rf"&\s*(?:{rr})\b(?![\w.(])|[(,]\s*(?:{rr})\s*[,)]", m):
+        return True
+    return False
+
+
 def receiver_evidence(m: str):
     """Names bound to a PhotoCraft `Tokens` value in this file."""
     names = set()
@@ -362,8 +390,12 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
                 break
         return prev, next_
 
+    flat = is_flat_file(rel, m_code)
+
     def tokens_var(i):
-        """The name bound to a Tokens value in the enclosing fn before offset i, else None."""
+        """The name bound to a library tokens value in the enclosing fn before offset i, else None."""
+        if flat:
+            return None
         k = bisect.bisect_right(fn_starts, i) - 1
         if k < 0:
             return None
@@ -409,7 +441,7 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         scan.rewritten_detail[pat][label] += 1
 
     # ---- 1. token reads
-    evidence = receiver_evidence(m_code)
+    evidence = set() if flat else receiver_evidence(m_code)
     rx = re.compile(r"(?<![\w])(\.?\s*)\b(" + "|".join(RECEIVERS) + r")\.(" + "|".join(ALL_FIELDS) + r")\b(?!\s*\()")
     for mm in rx.finditer(m_code):
         # a field path (`self.theme.card`) has a '.' directly before the receiver
@@ -432,6 +464,9 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         if field in AMBIGUOUS_FIELDS:
             leave("token", f"`{field}`: {AMBIGUOUS_FIELDS[field]}", a)
             continue
+        if flat and recv in receiver_evidence(m_code):
+            leave("token", "file keeps the flat `Tokens` (reads a flat-only field, takes `Tokens` as a parameter or builds one)", a)
+            continue
         if recv not in evidence:
             leave("token", f"receiver `{recv}` not bound to `Tokens` in this file", a)
             continue
@@ -446,14 +481,27 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
     # ---- 2. Tokens::get
     for mm in re.finditer(r"(?<![\w])((?:\w+::)*)Tokens::get\s*\(", m_code):
         record_found("tokens_get")
+        if flat:
+            leave("tokens_get", "file keeps the flat `Tokens`", mm.start())
+            continue
         spans, close = parse_args(m_code, mm.end() - 1)
         if spans is None or len(spans) != 1:
             leave("tokens_get", "arguments not parsed", mm.start())
             continue
         arg = m_code[spans[0][0]:spans[0][1]].strip()
+        chain = re.match(r"\s*\.(\w+)\b(?!\s*\()", m_code[close + 1:close + 40])
+        field = chain.group(1) if chain else None
+        if field and (field in AMBIGUOUS_FIELDS or field in FLAT_FIELDS or field not in COLOR_FIELDS and field not in RADIUS_FIELDS):
+            leave("tokens_get", f"`.{field}` read on the flat `Tokens`", mm.start())
+            continue
+        end, suffix = close + 1, ""
+        if field in RADIUS_FIELDS:
+            end, suffix = close + 1 + chain.end(), f".shape.radius.{RADIUS_FIELDS[field]}"
+        elif field:
+            end, suffix = close + 1 + chain.end(), f".{COLOR_FIELDS[field]}.to_egui()"
         am = re.fullmatch(r"&?\s*(\w+)\.ctx\(\)", arg)
         if am and re.fullmatch(r"(?:\w*_)?ui(?:_\w+)?|ui\d*", am.group(1)):
-            rewrite("tokens_get", mm.start(), close + 1, f"{mm.group(1)}Tokens::of({am.group(1)})", "Tokens::get(ui.ctx()) -> Tokens::of(ui)")
+            rewrite("tokens_get", mm.start(), end, f"craft_ui::theme::current({am.group(1)}.ctx()){suffix}", "Tokens::get(ui.ctx()) -> craft_ui::theme::current(ui.ctx())")
             continue
         # DS-43 B11: any other Context goes through `craft_ui::theme::current(&Context)`
         if re.fullmatch(r"&?\s*(?:self\.)?\w+\.ctx\(\)", arg):
@@ -467,7 +515,7 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
         else:
             leave("tokens_get", f"argument `{arg[:30]}` is not a Context expression", mm.start())
             continue
-        rewrite("tokens_get", mm.start(), close + 1, f"craft_ui::theme::current({ctx})", "Tokens::get(<ctx>) -> craft_ui::theme::current(<ctx>)")
+        rewrite("tokens_get", mm.start(), end, f"craft_ui::theme::current({ctx}){suffix}", "Tokens::get(<ctx>) -> craft_ui::theme::current(<ctx>)")
 
     # ---- 3. add_space
     for mm in re.finditer(r"\badd_space\s*\(", m_code):
@@ -533,6 +581,10 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
                 leave("stroke", "colour argument not parsed", mm.start())
                 continue
             ctx = ctx_expr(mm.start())
+            ls = m_code.rfind("\n", 0, mm.start()) + 1
+            if ctx == "ui.ctx()" and re.match(r"\s*v\.", m_code[ls:mm.start()]):
+                leave("stroke", "assigned through `v`, a `&mut` borrow of `ui` (`ui.ctx()` cannot be read)", mm.start())
+                continue
             if ctx is None:
                 leave("stroke", "no `ui`, `ctx` or `painter` in the enclosing fn to take pixels_per_point from", mm.start())
                 continue
@@ -582,12 +634,10 @@ def scan_file(path: Path, rel: Path, scan: Scan, scale: str):
     return text
 
 
-IMPORT = "use craft_ui::theme::ToEgui;"
-
-
-def add_import(text: str) -> str:
-    if re.search(r"\bToEgui\b", text):
+def add_import(text: str, name="ToEgui") -> str:
+    if re.search(rf"\b{name}\b", text):
         return text
+    IMPORT = f"use craft_ui::theme::{name};"
     m = mask(text)
     mm = re.search(r"^use\s", m, re.M)
     if not mm:
@@ -692,7 +742,7 @@ Checked against craft-libs `{libs}` (the header line says whether every emitted 
 - Rounded rewrites (DS-43 B8/B9) change the pixel value: Space 3 and 5 to S4, 7 and 9 to S8, 10 and 14 to S12, 18 to S16, 22 and 26 to S24, 46 to S32; Radius 1 to R2. `--exact-only` turns them off. A rounded value that gets a role token is counted as role and shifted only, not as rounded.
 - Role tokens (`t.space.gap.section`, `.stack`, `.inline`; Compact 12/6/4, Comfortable 16/8/6) replace the S-step when the neighbouring statements show the role: `add_space` of 8 to 24 next to a separator, heading, hairline, group or header line is `section`; `add_space` of 4, 6 or 8 between two sibling rows is `stack`; `item_spacing.x = 4|6` is `inline` and `item_spacing.y = 4|6|8` is `stack`. A role is emitted only when a `Tokens` value (`t`) is bound earlier in the same fn; otherwise the S-step is emitted. Other `item_spacing` assignments (0, 1, 2, 3, 10, constants) are local resets, left.
 - `Stroke::new(<w>, <colour>)` becomes `scale::Stroke::W1.egui(<ctx>, <colour>)`; `<ctx>` is `ui.ctx()`, `ctx`/`&ctx` or `painter.ctx()`, taken from the enclosing fn's parameters.
-- `Tokens::get(<ui>.ctx())` becomes `Tokens::of(<ui>)`; any other Context becomes `craft_ui::theme::current(<ctx>)`. After a rewrite `t` is a `UiTokens`, so every read in the file must be rewritten too; a file with a left read will not compile until it is done by hand.
+- `Tokens::get(<ctx>)` becomes `craft_ui::theme::current(<ctx>)`; a direct field read on the call is rewritten with it. A file that reads a flat-only field, hands `t` to another fn or takes `Tokens` as a parameter keeps the flat `Tokens` (`FLAT_FIELDS`, `is_flat_file`). After a rewrite `t` is a `UiTokens`, so every read in the file must be rewritten too; a file with a left read will not compile until it is done by hand.
 - Receiver check is per file: `t`, `tokens`, `theme`, `tk` is rewritten only when the file binds that name to a `Tokens`. A second, unrelated `t` in the same file would be rewritten too; review the diff.
 - Rewritten colour reads add `use craft_ui::theme::ToEgui;` after the file's first `use` statement.
 """
@@ -741,6 +791,8 @@ def main():
             new = apply_edits(texts[p], edits)
             if any("to_egui()" in e[2] for e in edits):
                 new = add_import(new)
+            if any(".egui(" in e[2] for e in edits):
+                new = add_import(new, "StrokeExt")
             p.write_text(new)
 
     if args.report:
