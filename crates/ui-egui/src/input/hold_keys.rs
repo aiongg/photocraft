@@ -171,12 +171,14 @@ fn held(i: &InputState, sc: &KeyboardShortcut) -> bool {
 }
 
 /// The temporary tool whose key is held now, the most specific binding first (⌘Space before
-/// Space). Never while a text field has the keyboard, or while editing type on the canvas
-/// (Space must insert a space, not grab the Hand tool).
+/// Space). Never while editing type on the canvas (Space must insert a space, not grab the Hand
+/// tool). While a dialog's text field has the keyboard only the bound ⌘/Ctrl/⌥ keys count (⌘Space
+/// zooms), since they type nothing.
 pub fn held_tool(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Temporary> {
-    if ctx.text_edit_focused() || app.ui.text_edit.is_some() {
+    if app.ui.text_edit.is_some() {
         return None;
     }
+    let in_field = ctx.text_edit_focused();
     let count = |sc: &KeyboardShortcut| {
         let m = sc.modifiers;
         m.alt as u8 + m.shift as u8 + (m.command || m.mac_cmd) as u8 + (m.ctrl && !m.command) as u8
@@ -189,14 +191,15 @@ pub fn held_tool(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Temporary> 
         for t in Temporary::BOUND {
             if let Some(sc) = binding(app, t)
                 && held(i, &sc)
+                && (!in_field || sc.modifiers.command || sc.modifiers.mac_cmd || sc.modifiers.ctrl || sc.modifiers.alt)
                 && best.is_none_or(|(n, ..)| count(&sc) > n)
             {
                 best = Some((count(&sc), t, sc));
             }
         }
-        cmd_move = cmd_move_held(app, i);
+        cmd_move = !in_field && cmd_move_held(app, i);
         alt = i.modifiers.alt;
-        hand = hand_zoom(app, i);
+        hand = if in_field { None } else { hand_zoom(app, i) };
     });
     // ⌥ turns a held Zoom In around, as it does the Zoom tool: ⌘⌥Space zooms out (and wins the
     // tie with ⌥Space), unless ⌥ is part of the Zoom In key itself.

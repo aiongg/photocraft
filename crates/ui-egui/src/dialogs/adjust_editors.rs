@@ -278,14 +278,21 @@ impl<'a> Row<'a> {
 
     pub(crate) fn show(self, ui: &mut egui::Ui, x: &mut f32) -> Edit {
         let numbers = LocaleNumbers::of(ui);
-        // The control's gesture holds the exact value it reports, and a host value that differs
-        // from it ends the gesture. The host keeps rounded values, so the control shows the
-        // gesture's value until the gesture ends.
         let before = ui.make_persistent_id((self.label, "before"));
-        let draft = before.with("draft");
-        let shown = ui.data(|d| d.get_temp::<f64>(draft)).unwrap_or(f64::from(*x));
+        // The host stores f32, the row reports f64 on its step: show the reported value while the
+        // stored one is its f32 rounding, so the gesture sees the value it reported.
+        let exact = before.with("exact");
+        let shown = ui.data(|d| d.get_temp::<f64>(exact)).filter(|v| *v as f32 == *x).unwrap_or(f64::from(*x));
         let mut row = SliderRow::new(self.label, self.label, shown, f64::from(*self.range.start())..=f64::from(*self.range.end()), &numbers)
             .unit(Unit::new(&format!("{{n}}{}", self.unit)));
+        // Every value the row reports is on the step, so the host stores it as reported.
+        let range = f64::from(*self.range.end() - *self.range.start());
+        let step = match self.decimals {
+            Some(d) => 10f64.powi(-(d.min(6) as i32)),
+            None if range <= 10.0 => 0.01,
+            None => 1.0,
+        };
+        row = row.step(step);
         if let Some(d) = self.decimals {
             row = row.decimals(d);
         }
@@ -300,14 +307,8 @@ impl<'a> Row<'a> {
         }
         let mut e = Edit::default();
         for event in row.show(ui).edits() {
-            match &event {
-                EditEvent::Update { value, .. } => {
-                    ui.data_mut(|d| d.insert_temp(draft, *value));
-                }
-                EditEvent::Commit { .. } | EditEvent::Set { .. } | EditEvent::Cancel { .. } => {
-                    ui.data_mut(|d| d.remove::<f64>(draft));
-                }
-                _ => {}
+            if let EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. } = &event {
+                ui.data_mut(|d| d.insert_temp(exact, *value));
             }
             e.add(apply_event(ui, before, Some(event), x, |v| *v as f32));
         }
@@ -315,29 +316,11 @@ impl<'a> Row<'a> {
     }
 }
 
-/// A colour swatch button opening the library's picker popup; returns the edit. The popup shows
-/// the colour as the gesture has it until the gesture ends, since the host keeps 8-bit hex.
+/// A colour swatch button opening the library's picker popup; returns the edit.
 fn color_button(ui: &mut egui::Ui, salt: &str, label: &str, c: &mut [f32; 3]) -> Edit {
     let numbers = LocaleNumbers::of(ui);
-    let before = ui.make_persistent_id((salt, "before"));
-    let draft = before.with("draft");
-    let shown = ui.data(|d| d.get_temp::<[f32; 3]>(draft)).unwrap_or(*c);
-    let r = ColorPopover::new(salt, label, Srgba::rgb(shown[0], shown[1], shown[2]), &numbers).show(ui);
-    let mut e = Edit::default();
-    if let Some(event) = r.edit.event {
-        match &event {
-            EditEvent::Update { value, .. } => {
-                let c = [value.color.r, value.color.g, value.color.b];
-                ui.data_mut(|d| d.insert_temp(draft, c));
-            }
-            EditEvent::Commit { .. } | EditEvent::Set { .. } | EditEvent::Cancel { .. } => {
-                ui.data_mut(|d| d.remove::<[f32; 3]>(draft));
-            }
-            _ => {}
-        }
-        e = apply_event(ui, before, Some(event), c, |p| [p.color.r, p.color.g, p.color.b]);
-    }
-    e
+    let r = ColorPopover::new(salt, label, Srgba::rgb(c[0], c[1], c[2]), &numbers).show(ui);
+    apply_event(ui, ui.make_persistent_id((salt, "before")), r.edit.event, c, |p| [p.color.r, p.color.g, p.color.b])
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {

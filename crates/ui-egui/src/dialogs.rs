@@ -569,7 +569,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(if opens_on_first_field(d.kind, &fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
+            .initial_focus(if library_fields(d.kind, &fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
                 InitialFocus::FirstField
             } else {
                 InitialFocus::None

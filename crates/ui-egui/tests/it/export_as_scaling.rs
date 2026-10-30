@@ -94,7 +94,10 @@ fn export_as_scales_a_narrow_image_without_editing_the_source() {
         // name identifies the actual field.
         h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Scale").click();
         h.run_steps(2);
-        // Clicking a numeric field selects its current value; type through egui's text input.
+        // The dialog opens on its first field, so the click may land on a field that already has
+        // the focus: select its text explicitly, then type through egui's text input.
+        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+        h.run_steps(1);
         h.event(egui::Event::Text("50".into()));
         h.run_steps(3);
         // Click away to commit the field without Enter confirming the dialog.
