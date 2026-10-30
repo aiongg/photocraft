@@ -237,13 +237,13 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
         _ if crate::tool_reset::owns(fields) => crate::tool_reset::body(ui),
         _ if crate::crop_presets::owns(fields) => crate::crop_presets::body(app, ui, fields),
         _ if crate::variables_ui::owns(fields) => crate::variables_ui::body(app, ui, fields),
-        _ => return command_body_more(app, ui, d, fields, id),
+        _ => return command_body_more(app, ui, d, fields, id, interactive),
     }
     outcome
 }
 
 /// The rest of the command dialogs: files, colour, export, sizing, filters and forms.
-fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &mut Fields, id: egui::Id) -> Option<bool> {
+fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &mut Fields, id: egui::Id, interactive: bool) -> Option<bool> {
     let mut outcome: Option<bool> = None;
     match d.kind {
         _ if crate::file_ui::owns(fields) => crate::file_ui::body(app, ui, fields, d.id),
@@ -255,7 +255,7 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
             }
         }
         _ if crate::color_range_ui::owns(fields) => crate::color_range_ui::body(app, ui, fields),
-        _ if crate::prefs_ui::owns(fields) => crate::prefs_ui::body(app, ui, fields),
+        _ if crate::prefs_ui::owns(fields) => outcome = crate::prefs_ui::body(app, ui, fields, interactive),
         _ if fields.contains_key("__export") => crate::export_dialog::body(app, ui, fields),
         // Image Size and Canvas Size open on Width, selected (#2329).
         _ if fields.contains_key("__sizing") => crate::sizing::body(ui, fields),
@@ -407,10 +407,8 @@ fn ok_label(d: &Dialog) -> &'static str {
 /// Whether OK and Apply take input, from the dialog's current fields (`(ok, apply)`). Dialogs that
 /// need an input first (a preset name, a selection) grey OK out. The dialog body refreshes it each
 /// pass, and the footer reads it after the body ([`Footer::ok_enabled_with`]).
-fn enabled_for(app: &PhotocraftApp, d: &Dialog, fields: &Fields) -> (bool, bool) {
-    if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
-        (true, crate::prefs_ui::preferences_changed(app, fields))
-    } else if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
+fn enabled_for(app: &PhotocraftApp, fields: &Fields) -> (bool, bool) {
+    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
         (crate::mask_trash_prompt::can_apply(fields), true)
     } else if crate::rasterize_prompt::is_filter(fields) {
         (true, true)
@@ -435,7 +433,11 @@ fn footer_for<'a>(
     if matches!(d.kind, DialogKind::About | DialogKind::Error) {
         return Footer::standard().ok(tl!("OK")).without_cancel();
     }
-    if crate::brush_preset_dialog::owns(fields) || crate::color_picker_ui::owns(fields) {
+    // Preferences draws its own OK, Cancel and Apply (the library's Preferences body).
+    if crate::brush_preset_dialog::owns(fields)
+        || crate::color_picker_ui::owns(fields)
+        || (d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields))
+    {
         return Footer::none();
     }
     if crate::guide_layout_ui::owns(fields) {
@@ -450,9 +452,6 @@ fn footer_for<'a>(
     }
     let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
     footer = footer.labels(dialog_labels());
-    if d.kind == DialogKind::Command && crate::prefs_ui::is_preferences(fields) {
-        return footer.ok(ok_label(d)).apply(tl!("Apply")).apply_enabled_with(move || enabled.get().1);
-    }
     if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
         // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
         return footer.ok(tl!("Apply")).ok_enabled_with(move || enabled.get().0).alternate(tl!("Delete"));
@@ -557,10 +556,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let mut fields = Settings(d.fields.clone());
         let color_picker = crate::color_picker_ui::owns(&fields);
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
-        let enabled = Cell::new(enabled_for(app, &d, &fields));
+        let enabled = Cell::new(enabled_for(app, &fields));
         let table = Cell::new(None);
         let preview = Cell::new(None);
-        let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(d.kind, &fields) { crate::field_tab::take_step(ctx) } else { 0 };
+        let tab = if interactive && !egui::Popup::is_any_open(ctx) && !library_fields(d.kind, &fields) && !crate::prefs_ui::is_preferences(&fields) {
+            crate::field_tab::take_step(ctx)
+        } else {
+            0
+        };
         let mut dialog = HostDialog::new(d.id, title)
             .stack(&stack)
             .place_key(PlaceKey(place_id(&d)))
@@ -607,7 +610,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 if d.kind == DialogKind::Command && crate::color_table_ui::owns(fields) {
                     crate::color_table_ui::body_done(fields);
                 }
-                enabled.set(enabled_for(&app, &d, fields));
+                enabled.set(enabled_for(&app, fields));
                 *private.borrow_mut() = fields.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
             },
             |ui, fields| filter_below(&app_cell.borrow(), &d, ui, fields),
@@ -648,9 +651,6 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // A colour swatch (Edit › Fill, Edit › Stroke) opens the Color Picker over the dialog.
         if done.is_none() {
             crate::color_picker_ui::open_requested(app, d.id);
-        }
-        if response.outcome == Some(Outcome::Apply) && done.is_none() {
-            let _ = crate::prefs_ui::apply(app, d.id);
         }
         match done {
             Some(true) => {
