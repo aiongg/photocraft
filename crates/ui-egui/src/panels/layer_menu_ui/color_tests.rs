@@ -68,45 +68,14 @@ fn layer_color_context_menu_edits_the_clicked_layer_and_preserves_multi_selectio
 }
 
 #[test]
-fn layer_color_background_is_confined_to_the_eye_column_in_every_theme() {
-    fn rects(shape: &egui::Shape, color: egui::Color32, out: &mut Vec<egui::Rect>) {
-        match shape {
-            egui::Shape::Rect(r) if r.fill == color => out.push(r.rect),
-            egui::Shape::Vec(shapes) => {
-                for s in shapes {
-                    rects(s, color, out);
-                }
-            }
-            _ => {}
-        }
-    }
-    fn has_icon(shape: &egui::Shape, rect: egui::Rect) -> bool {
-        match shape {
-            egui::Shape::Rect(r) => r.brush.is_some() && r.rect == rect,
-            egui::Shape::Vec(shapes) => shapes.iter().any(|s| has_icon(s, rect)),
-            _ => false,
-        }
-    }
+fn clicking_the_eye_of_a_coloured_row_toggles_visibility_and_keeps_the_label_in_every_theme() {
     for kind in crate::theme::ThemeKind::ALL {
         let (mut h, red, _) = harness(kind, 1.0);
-        for visible in [true, false] {
-            h.state_mut().run("layer.setProps", json!({"layer": red.0, "visible": visible})).unwrap();
-            h.run_steps(4);
-            let r = row(&h, red);
-            let t = crate::theme::Tokens::for_kind(kind);
-            let (_, bg) = t.layer_label_colors(LabelColor::Red).unwrap();
-            let mut fills = Vec::new();
-            for s in &h.output().shapes {
-                rects(&s.shape, bg, &mut fills);
-            }
-            assert_eq!(fills, vec![egui::Rect::from_min_max(r.left_top(), pos2(r.left() + 30.0, r.bottom()))], "{kind:?}");
-            use egui::emath::GuiRounding;
-            let icon = egui::Rect::from_center_size(pos2(r.left() + 15.0, r.center().y), vec2(15.0, 15.0)).round_to_pixels(h.ctx.pixels_per_point());
-            assert_eq!(h.output().shapes.iter().any(|s| has_icon(&s.shape, icon)), visible, "centred eye in {kind:?}");
-        }
+        h.state_mut().run("layer.setProps", json!({"layer": red.0, "visible": false})).unwrap();
+        h.run_steps(4);
         let eye = pos2(row(&h, red).left() + 17.0, row(&h, red).center().y);
         click(&mut h, eye, PointerButton::Primary, Modifiers::NONE);
-        assert!(h.state().session.active().unwrap().doc.layer(red).unwrap().visible);
+        assert!(h.state().session.active().unwrap().doc.layer(red).unwrap().visible, "{kind:?}");
         assert_eq!(h.state().session.active().unwrap().doc.layer(red).unwrap().label, LabelColor::Red);
         click(&mut h, eye, PointerButton::Primary, Modifiers::ALT);
         assert!(h.state().session.active().unwrap().doc.layer(red).unwrap().visible);

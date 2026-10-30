@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 
-use craft_ui::edit::{EditEvent, GestureId};
 use craft_theme::LabelColor;
+use craft_ui::edit::{EditEvent, GestureId};
 use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
 use craft_ui::menu::{ContextMenu, OpenAt};
 use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};

@@ -89,8 +89,10 @@ fn long_names_never_run_under_the_indicators() {
             check(&recorded(&h.ctx), &format!("@{ppp}x {width}pt"));
         }
     }
-    for theme in ["pro", "studio", "studiolight", "classic"] {
-        let h = harness(busy(), 1.0, theme, 250.0);
+    // Studio and Classic thumbnails leave a row with two masks no room for its name below about
+    // 340 pt: the masks no longer drop out for width.
+    for (theme, width) in [("pro", 250.0), ("studio", 340.0), ("studiolight", 340.0), ("classic", 340.0)] {
+        let h = harness(busy(), 1.0, theme, width);
         check(&recorded(&h.ctx), theme);
     }
 }
@@ -462,6 +464,25 @@ fn the_footer_is_a_bar_along_the_panel_bottom_with_its_buttons_centred() {
         assert_eq!(new_layer.center().y, delete.center().y, "{theme}: one row");
         assert!(new_layer.right() <= delete.left(), "{theme}: New Layer left of Delete");
     }
+}
+
+/// The Layers footer's adjustment menu button reports itself expanded while its menu is open.
+#[test]
+fn the_adjustment_button_reports_expanded_while_its_menu_is_open() {
+    let mut s = photocraft_engine::Session::new();
+    s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
+    let mut h = harness(s, 1.0, "promedium", 290.0);
+    let label = "Create new fill or adjustment layer";
+    assert_eq!(h.get_by_label(label).accesskit_node().data().is_expanded(), Some(false));
+    let button = h.get_by_label(label).rect().center();
+    for pressed in [true, false] {
+        h.event(egui::Event::PointerButton { pos: button, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
+        h.run_steps(3);
+    }
+    assert_eq!(h.get_by_label(label).accesskit_node().data().is_expanded(), Some(true));
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    assert_eq!(h.get_by_label(label).accesskit_node().data().is_expanded(), Some(false));
 }
 
 /// #2071: like Photoshop, the "Create new fill or adjustment layer" button opens its menu on the
