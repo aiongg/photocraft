@@ -89,7 +89,7 @@ fn inactive_blend_rows(ui: &mut egui::Ui, pro: bool) {
                     }
                 });
             } else {
-                icons::button(ui, "lock-open", 22.0, false, tl!("Lock layer"));
+                ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::LockOpen, tl!("Lock layer")).size(craft_ui::controls::ControlSize::Sm));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let mut f = 100.0;
@@ -368,7 +368,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
         ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
     }
-    widgets::panel_footer(ui, |ui| {
+    craft_ui::composites::PanelFooter::show(ui, |ui| {
         let active_layer = active.and_then(|id| doc.layer(id));
         let (delete, label) = if app.ui.vector_mask_target && active_layer.is_some_and(|l| l.vector_mask.is_some()) {
             ("layer.vectorMask.delete", "Delete Vector Mask")
@@ -377,7 +377,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         } else {
             ("layer.delete", "Delete layer")
         };
-        let trash = icons::button(ui, "trash", 26.0, false, tl!(label));
+        let trash = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Trash, tl!(label)).size(craft_ui::controls::ControlSize::Md));
         // A selected smart filter row is what Delete removes, as in Photoshop (#4751).
         let picked_filter = crate::smart_ui::selected(&ctx, &doc, active);
         if trash.clicked()
@@ -408,7 +408,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // A click follows the selected thumbnail; name that action for screen readers even
         // though dropping a whole layer row onto the same button always deletes the layer.
         trash.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
-        let new_layer = icons::button(ui, "square-plus", 26.0, false, &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"));
+        let new_layer = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::NewLayer, &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer")).size(craft_ui::controls::ControlSize::Md));
         if new_layer.clicked() {
             // A click makes the layer above the selection; ⌥-click asks first (the New Layer
             // dialog) and ⌘/Ctrl-click adds it below, as in Photoshop.
@@ -423,7 +423,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             actions.push(("layer.new.layer".into(), params));
         }
         actions.extend(footer_drop(ui, &new_layer, footer_drag, "layer.duplicate"));
-        let group = icons::button(ui, "folder", 26.0, false, tl!("Create a new group"));
+        let group = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Folder, tl!("Create a new group")).size(craft_ui::controls::ControlSize::Md));
         if group.clicked() {
             // Like Photoshop CC 2014 and later, a click with two or more layers selected puts them
             // in the new group (Layer › Group Layers); with one layer or none it adds an empty
@@ -470,7 +470,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         } else {
             crate::i18n::fmt(tl!("Add a mask  (from the selection; {key} inverts)"), &[("key", &crate::shortcuts::pretty("Alt"))])
         };
-        let mask_btn = ui.add_enabled_ui(mask_cmd.is_some(), |ui| icons::button(ui, "layer-mask", 26.0, false, &mask_tip)).inner;
+        let mask_btn = ui.add_enabled_ui(mask_cmd.is_some(), |ui| ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::LayerMask, &mask_tip).size(craft_ui::controls::ControlSize::Md))).inner;
         mask_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &mask_tip));
         if mask_btn.clicked()
             && let Some(cmd) = mask_cmd
@@ -497,7 +497,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
         // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
         let can_link = app.session.is_enabled("layer.linkLayers");
-        if ui.add_enabled_ui(can_link, |ui| icons::button(ui, "link-2", 26.0, false, tl!("Link layers"))).inner.clicked() {
+        if ui.add_enabled_ui(can_link, |ui| ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Link, tl!("Link layers")).size(craft_ui::controls::ControlSize::Md))).inner.clicked() {
             actions.push(("layer.linkLayers".into(), json!({})));
         }
     });

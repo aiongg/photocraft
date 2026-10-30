@@ -262,22 +262,22 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let has = !doc.layer_comps.is_empty();
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        if crate::icons::button(ui, "chevrons-left", 24.0, false, tl!("Apply previous selected layer comp")).clicked() && has {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::ChevronsLeft, tl!("Apply previous selected layer comp")).size(craft_ui::controls::ControlSize::Md)).clicked() && has {
             action = Some(("layerComp.previous", json!({})));
         }
-        if crate::icons::button(ui, "chevrons-right", 24.0, false, tl!("Apply next selected layer comp")).clicked() && has {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::ChevronsRight, tl!("Apply next selected layer comp")).size(craft_ui::controls::ControlSize::Md)).clicked() && has {
             action = Some(("layerComp.next", json!({})));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if crate::icons::button(ui, "trash", 24.0, false, tl!("Delete layer comp")).clicked()
+            if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Trash, tl!("Delete layer comp")).size(craft_ui::controls::ControlSize::Md)).clicked()
                 && let Some(id) = selected
             {
                 action = Some(("layerComp.delete", json!({"comp": id})));
             }
-            if crate::icons::button(ui, "file-plus", 24.0, false, tl!("Create new layer comp")).clicked() {
+            if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::NewFile, tl!("Create new layer comp")).size(craft_ui::controls::ControlSize::Md)).clicked() {
                 action = Some(("layerComp.new", json!({})));
             }
-            if crate::icons::button(ui, "rotate-cw", 24.0, false, tl!("Update layer comp (visibility, position and appearance)")).clicked()
+            if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::RotateCw, tl!("Update layer comp (visibility, position and appearance)")).size(craft_ui::controls::ControlSize::Md)).clicked()
                 && let Some(id) = selected
             {
                 action = Some(("layerComp.update", json!({"comp": id})));
