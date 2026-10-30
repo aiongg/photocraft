@@ -365,15 +365,15 @@ fn context_menu(response: &egui::Response, has_selection: bool, view: &mut Camer
 }
 
 fn context(ui: &mut egui::Ui, has_selection: bool, view: &mut CameraRawScopeState) {
-    widgets::checkbox(ui, &mut view.lab, tl!("Show Lab Color Readouts"));
-    widgets::checkbox(ui, &mut view.vectorscope, tl!("Show Vectorscope"));
+    craft_ui::controls::Checkbox::bool(tl!("Show Lab Color Readouts"), &mut view.lab).show(ui);
+    craft_ui::controls::Checkbox::bool(tl!("Show Vectorscope"), &mut view.vectorscope).show(ui);
     if view.vectorscope {
         if has_selection {
-            widgets::checkbox(ui, &mut view.selected_region, tl!("Show Selected Region"));
+            craft_ui::controls::Checkbox::bool(tl!("Show Selected Region"), &mut view.selected_region).show(ui);
         }
-        widgets::checkbox(ui, &mut view.red_right, tl!("Show Red at 3 o'clock"));
+        craft_ui::controls::Checkbox::bool(tl!("Show Red at 3 o'clock"), &mut view.red_right).show(ui);
         let mut skin = !view.hide_skin_line;
-        widgets::checkbox(ui, &mut skin, tl!("Show Skin Tone Indicator"));
+        craft_ui::controls::Checkbox::bool(tl!("Show Skin Tone Indicator"), &mut skin).show(ui);
         view.hide_skin_line = !skin;
     }
 }
