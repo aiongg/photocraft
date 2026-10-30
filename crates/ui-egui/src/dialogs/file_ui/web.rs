@@ -236,7 +236,8 @@ fn web_playback(ui: &mut egui::Ui, f: &mut Map<String, Value>, doc: &photocraft_
         (frame, last) = advance_preview(frame, timeline.duration, timeline.fps, last, now);
     }
     ui.horizontal(|ui| {
-        if ui.add(IconButton::new(if playing { Icon::Pause } else { Icon::Play }, if playing { tl!("Pause") } else { tl!("Play") }).selected(playing)).clicked() {
+        if ui.add(IconButton::new(if playing { Icon::Pause } else { Icon::Play }, if playing { tl!("Pause") } else { tl!("Play") }).selected(playing)).clicked()
+        {
             playing = !playing;
             last = now;
         }

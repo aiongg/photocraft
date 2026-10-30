@@ -1,5 +1,5 @@
 use super::shortcuts::shortcut_items;
-use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Tokens, Value, json, prefs};
+use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Value, json, prefs};
 use craft_ui::theme::ToEgui;
 
 // ------------------------------------------------------------------ menu routing
@@ -113,14 +113,7 @@ pub fn apply(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 
 /// The size Preferences opens at: room for the widest section and about 30 settings rows. The
 /// dialog's resize grip changes it, and its contents follow (#7420).
-pub const PREFERENCES_SIZE: egui::Vec2 = egui::vec2(1040.0, 800.0);
-
-/// The height of the settings area (section list and fields) when `available` is left below the
-/// search field: everything but the dialog's button row (`item_spacing` + 8 pt + the buttons) and
-/// a little slack, never less than a few rows.
-pub(super) fn settings_height(available: f32, item_spacing: f32, button_height: f32) -> f32 {
-    (available - (item_spacing + 8.0 + button_height + 4.0)).max(160.0)
-}
+pub const PREFERENCES_SIZE: egui::Vec2 = craft_ui::preferences::DEFAULT_SIZE;
 
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
@@ -322,6 +315,9 @@ pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value, String> {
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
         "prefs" => {
+            if f.get(super::APPLIED).and_then(Value::as_bool) == Some(true) {
+                return Ok(Value::Null);
+            }
             let values = f.get("values").cloned().unwrap_or(Value::Null);
             app.run("prefs.set", json!({"path": "", "value": values}))
         }

@@ -1,49 +1,62 @@
+/// Whether the page of `section` has a setting the window shows.
+fn has_visible_fields(values: &Value, section: &str) -> bool {
+    super::window::pages(values, &Value::Null, None).iter().any(|p| p.id == section && p.has_content())
+}
+
+/// The Preferences dialog of `section`, drawn by the dialog host.
+fn prefs_harness(section: &str) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    open_preferences(&mut app, section);
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(1600.0, 1000.0)).build_ui_state(
+        |ui, app| {
+            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("semibold".into()))) {
+                crate::dialogs::show(app, ui.ctx());
+            }
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, Default::default());
+    h.run_steps(5);
+    h
+}
+
+/// The draft in the open Preferences dialog.
+fn draft(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Value {
+    h.state().ui.dialogs.iter().find(|d| is_preferences(&d.fields)).and_then(|d| d.fields.get("values")).cloned().unwrap_or(Value::Null)
+}
+
 #[test]
 fn memory_usage_has_a_dedicated_explanation_and_keeps_its_value() {
-    use egui_kittest::{Harness, kittest::Queryable};
-    let values = json!({"memoryUsageMb":50000}).as_object().unwrap().clone();
-    assert!(!field_visible("performance", &values, "memoryUsageMb", ""));
-    let mut h = Harness::builder()
-        .with_size(vec2(680.0, 350.0))
-        .build_ui_state(|ui, values| section_fields(ui, "performance", values, &["memoryUsageMb".into()], crate::i18n::Lang::EN, None, ""), values);
-    h.run_steps(2);
-    h.get_by_label("Memory Usage");
+    use egui_kittest::kittest::Queryable;
+    let values = prefs::Preferences::default().to_json();
+    assert!(!field_visible("performance", values["performance"].as_object().unwrap(), "memoryUsageMb", ""));
+    let h = prefs_harness("performance");
+    assert!(h.query_all_by_label("Memory Usage").next().is_some());
     h.get_by_label("Per-document RAM limit (MB)");
-    h.get_by_label("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.");
-    h.get_by_label("Applies immediately when saved. Memory is not reserved in advance.");
-    assert_eq!(h.state()["memoryUsageMb"], 50000);
+    let help = "Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.";
+    assert!(h.query_all_by_label_contains(help).next().is_some(), "the limit's explanation");
+    assert!(h.query_all_by_label_contains("Applies immediately when saved. Memory is not reserved in advance.").next().is_some());
+    assert_eq!(draft(&h)["performance"]["memoryUsageMb"], values["performance"]["memoryUsageMb"]);
 }
 
 #[test]
 fn the_generator_checkbox_reads_enable_generator() {
     // #9392: the reference application's Plug-ins page says "Enable Generator", not "Generator enabled".
-    use egui_kittest::{Harness, kittest::Queryable};
-    let values = serde_json::to_value(photocraft_engine::prefs::PlugIns::default()).unwrap().as_object().unwrap().clone();
-    let keys: Vec<String> = values.keys().cloned().collect();
-    let mut h = Harness::builder()
-        .with_size(vec2(680.0, 350.0))
-        .build_ui_state(move |ui, values| section_fields(ui, "plugIns", values, &keys, crate::i18n::Lang::EN, None, ""), values);
-    h.run_steps(2);
+    use egui_kittest::kittest::Queryable;
+    let mut h = prefs_harness("plugIns");
     assert!(h.query_by_label("Generator enabled").is_none());
+    let before = draft(&h)["plugIns"]["generatorEnabled"].clone();
     h.get_by_label("Enable Generator").click();
-    h.run_steps(2);
-    assert_eq!(h.state()["generatorEnabled"], true);
+    h.run_steps(3);
+    assert_ne!(draft(&h)["plugIns"]["generatorEnabled"], before);
 }
 
 #[test]
 fn graphics_dropdowns_are_named_for_their_settings() {
     use egui::accesskit::Role;
-    use egui_kittest::Harness;
     use egui_kittest::kittest::{NodeT, Queryable};
 
-    let obj = json!({"gpuBackend": "auto", "gpuAdapter": ""}).as_object().unwrap().clone();
-    let mut h = Harness::builder()
-        .with_size(vec2(700.0, 500.0))
-        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ALL[0]))
-        .build_ui_state(|ui, obj| gpu_status_rows(ui, None, None, obj), obj);
-    h.run_steps(2);
-    h.get_by_label("Advanced").click();
-    h.run_steps(2);
+    let h = prefs_harness("performance");
     let labels: Vec<String> = h.query_all_by_role(Role::ComboBox).filter_map(|n| n.accesskit_node().label()).collect();
     assert!(labels.iter().any(|label| label == "GPU Backend"), "{labels:?}");
     if cfg!(target_os = "linux") {
@@ -132,14 +145,18 @@ fn rendering_mode_display_respects_explicit_mode_and_legacy_disable() {
 
 #[test]
 fn preferences_search_matches_editable_fields_across_sections() {
-    let values = prefs::Preferences::default().to_json();
-    let contains = |needle: &str, section: &str| preference_sections(&values, needle).iter().any(|(id, _)| *id == section);
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let id = open_preferences(&mut app, "general");
+    let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
+    let host = super::window::Host::new(&mut app, &mut fields, None);
+    let specs = craft_ui::preferences::PreferencesHost::pages(&host);
+    let contains = |needle: &str, section: &str| craft_ui::preferences::list_pages(&specs, needle).iter().any(|l| specs[l.index].id == section);
     assert!(contains("UI Scale", "interface"));
     assert!(contains("placeholder", "type"));
     assert!(contains("performance", "performance"));
     assert!(contains("interface.uiScale", "interface"));
-    assert!(preference_sections(&values, "this setting does not exist").is_empty());
-    assert_eq!(preference_sections(&values, "").len(), SECTIONS.len());
+    assert!(craft_ui::preferences::list_pages(&specs, "this setting does not exist").is_empty());
+    assert_eq!(craft_ui::preferences::list_pages(&specs, "").len(), SECTIONS.len());
 }
 
 #[test]
@@ -155,19 +172,6 @@ fn preferences_dialog_width_follows_its_resizable_area() {
     assert_eq!(super::width(shortcuts.as_object().unwrap(), 3000.0), Some(Width::Range { min: 460.0, max: 720.0 }));
 }
 
-#[test]
-fn preferences_settings_fill_the_dialog_down_to_the_buttons() {
-    // The settings area plus the button row (spacing, 8 pt gap, buttons) stays inside what the
-    // resizable area gives it, at any size: the area grows to fit its content, so asking for
-    // more would make the dialog grow every frame. The area follows the dialog's size (#7420).
-    for available in [300.0, 600.0, 1400.0] {
-        let h = super::settings_height(available, 4.0, 30.0);
-        assert!(h + 4.0 + 8.0 + 30.0 <= available, "{available}");
-        assert!(h + 4.0 + 8.0 + 30.0 + 8.0 >= available, "{available}");
-    }
-    assert_eq!(super::settings_height(1400.0, 4.0, 30.0) - super::settings_height(600.0, 4.0, 30.0), 800.0);
-    assert_eq!(super::settings_height(50.0, 4.0, 30.0), 160.0);
-}
 use super::*;
 use std::sync::{Arc, Mutex};
 
@@ -1685,51 +1689,43 @@ fn system_title_bar_explains_next_launch_and_preserves_apply_and_cancel() {
 /// #7939: switching Rendering Mode waits for the next launch, and says so next to the setting.
 #[test]
 fn rendering_mode_explains_next_launch() {
-    use egui_kittest::{Harness, kittest::Queryable};
-    let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
-    let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""),
-        obj,
-    );
-    h.run_steps(4);
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = prefs_harness("performance");
     assert!(h.query_all_by_label("Rendering Mode").next().is_some(), "the Rendering Mode setting");
-    assert!(h.query_all_by_label("Applies at next launch.").next().is_some(), "its next-launch notice");
+    assert!(h.query_all_by_label_contains("Applies at next launch.").next().is_some(), "its next-launch notice");
     // A search that leaves Rendering Mode out leaves its notice out too.
-    let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
-    let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, "history"),
-        obj,
-    );
+    h.get_by_role(Role::SearchInput).click();
+    h.get_by_role(Role::SearchInput).type_text("history");
     h.run_steps(4);
-    assert!(h.query_by_label("Applies at next launch.").is_none());
+    assert!(h.query_all_by_label("Rendering Mode").next().is_none());
+    assert!(h.query_all_by_label_contains("Applies at next launch.").next().is_none());
 }
 
 /// #4097: Allow Agent Control and Control Port are read when the app starts, and say so.
 #[test]
 fn integrations_explain_next_launch() {
-    use egui_kittest::{Harness, kittest::Queryable};
-    let obj = json!({"allowAgentControl": true, "controlPort": 0}).as_object().unwrap().clone();
-    let mut h = Harness::new_ui_state(
-        |ui, obj: &mut Map<String, Value>| section_fields(ui, "integrations", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""),
-        obj,
-    );
-    h.run_steps(4);
+    use egui_kittest::kittest::Queryable;
+    let h = prefs_harness("integrations");
     h.get_by_label("Allow agent control");
     assert_eq!(h.query_all_by_label("Applies at next launch.").count(), 2, "one notice under each row");
 }
 
 #[test]
 fn next_launch_notice_does_not_mark_unrelated_interface_preferences() {
-    use egui_kittest::{Harness, kittest::Queryable};
-    let obj = json!({"showTooltips": true}).as_object().unwrap().clone();
-    let mut h =
-        Harness::new_ui_state(|ui, obj: &mut Map<String, Value>| section_fields(ui, "interface", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""), obj);
-    h.run_steps(4);
-    assert!(h.query_by_label("Applies at next launch.").is_none());
+    use egui_kittest::kittest::Queryable;
+    let mut h = prefs_harness("interface");
+    // Only System Title Bar (Windows and Linux) is read at launch.
+    let notices = h.query_all_by_label("Applies at next launch.").count();
+    assert_eq!(notices, usize::from(cfg!(all(not(target_arch = "wasm32"), not(target_os = "macos")))));
+    let before = draft(&h)["interface"]["showTooltips"].clone();
+    // The checkbox is below the fold of the page's scroll area.
+    h.get_by_label("Show tooltips").scroll_to_me();
+    h.run_steps(3);
     h.get_by_label("Show tooltips").click();
     h.run_steps(4);
-    assert_eq!(h.state()["showTooltips"], false);
-    assert!(h.query_by_label("Applies at next launch.").is_none());
+    assert_ne!(draft(&h)["interface"]["showTooltips"], before);
+    assert_eq!(h.query_all_by_label("Applies at next launch.").count(), notices);
 }
 
 #[test]

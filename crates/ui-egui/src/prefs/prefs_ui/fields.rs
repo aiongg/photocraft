@@ -1,30 +1,23 @@
-use super::appearance::{AppearanceRows, appearance_rows, system_theme};
-use super::dialogs::{mismatch_body, presets_body, presets_io_body, settings_height};
-use super::graphics::{gpu_memory_lines, gpu_status_rows, memory_usage_row, read_at_launch, rendering_mode_row};
+use super::appearance::{AppearanceRows, appearance_rows};
+use super::dialogs::{mismatch_body, presets_body, presets_io_body};
+use super::graphics::read_at_launch;
 use super::shortcuts::shortcuts_body;
-use super::{Color32, Map, PhotocraftApp, RichText, SECTIONS, Sense, Tokens, Value, json, prefs, vec2};
+use super::{Color32, Map, PhotocraftApp, RichText, Tokens, Value, json, prefs};
 use craft_ui::theme::StrokeExt;
 
 // ------------------------------------------------------------------ bodies
 
 /// Render one of our dialogs' bodies.
-pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
+pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, interactive: bool) -> Option<bool> {
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
-        "prefs" => {
-            let mut info = app.perf.gpu_info.lines();
-            info.extend(gpu_memory_lines(app));
-            f.insert("__gpuInfo".into(), json!(info));
-            f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
-            let system = system_theme(app, ui.ctx());
-            super::appearance::offer_themes(ui.ctx(), super::appearance::theme_choices(app));
-            prefs_body(ui, f, system);
-        }
+        "prefs" => return super::window::show(app, ui, f, interactive),
         "shortcuts" => shortcuts_body(app, ui, f),
         "presets" => presets_body(app, ui, f),
         "presetsIO" => presets_io_body(ui, f),
         "mismatch" => mismatch_body(ui, f),
         _ => {}
     }
+    None
 }
 
 /// The label a preference key shows in the dialog: a few keys have their own wording, the rest
@@ -146,140 +139,6 @@ pub(super) fn preference_matches(section: &str, key: &str, query: &str) -> bool 
     format!("{section}.{key}").to_lowercase().contains(query) || label.to_lowercase().contains(query) || tl!(&label).to_lowercase().contains(query)
 }
 
-pub(super) fn preference_sections(values: &Value, search: &str) -> Vec<(&'static str, &'static str)> {
-    let query = search.trim().to_lowercase();
-    SECTIONS
-        .iter()
-        .copied()
-        .filter(|(id, title)| {
-            query.is_empty()
-                || title.to_lowercase().contains(&query)
-                || tl!(title).to_lowercase().contains(&query)
-                || values
-                    .get(*id)
-                    .and_then(Value::as_object)
-                    .is_some_and(|fields| fields.keys().any(|key| !prefs::is_hidden(&format!("{id}.{key}")) && preference_matches(id, key, &query)))
-        })
-        .collect()
-}
-
-/// Preferences: section list on the left, the section's settings on the right.
-fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui::Theme>) {
-    let t = Tokens::get(ui.ctx());
-    let mut section = f.get("section").and_then(Value::as_str).unwrap_or("general").to_string();
-    let mut values = f.get("values").cloned().unwrap_or(Value::Null);
-    // The dialog follows the language being edited, so a change shows before OK.
-    let lang = crate::i18n::Lang::from_pref(values.pointer("/interface/language").and_then(Value::as_str).unwrap_or("auto"));
-    let mut search = f.get("__search").and_then(Value::as_str).unwrap_or("").to_string();
-    crate::widgets::text_field(ui, ui.scope_id().with("prefs-search"), &mut search, tl!("Search settings…"), ui.available_width(), false);
-    let found = preference_sections(&values, &search);
-    if !found.iter().any(|(id, _)| *id == section)
-        && let Some((first, _)) = found.first()
-    {
-        section = (*first).to_string();
-    }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
-    ui.horizontal_top(|ui| {
-        // Section list.
-        ui.vertical(|ui| {
-            ui.set_width(170.0);
-            if found.is_empty() {
-                ui.label(RichText::new(tl!("No matching settings")).color(t.text_dim));
-            }
-            for &(id, title) in &found {
-                let sel = section == id;
-                let empty = !has_visible_fields(&values, id);
-                let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 22.0), Sense::click());
-                if sel {
-                    ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
-                } else if resp.hovered() {
-                    ui.painter().rect_filled(rect, t.radius_sm, t.hover);
-                }
-                let color = if sel {
-                    t.text
-                } else if empty {
-                    t.text_faint
-                } else {
-                    t.text_dim
-                };
-                // Translated section names can be longer than the column: elide them (the full
-                // name is the tooltip) instead of drawing over the settings.
-                let mut job = egui::text::LayoutJob::simple_singleline(tl!(title).to_string(), crate::theme::medium(12.5), color);
-                job.wrap = egui::text::TextWrapping::truncate_at_width(rect.width() - 12.0);
-                let galley = ui.painter().layout_job(job);
-                let elided = galley.elided;
-                ui.painter().galley(rect.left_center() + vec2(8.0, -galley.size().y / 2.0), galley, color);
-                let resp = if elided { resp.on_hover_text(tl!(title)) } else { resp };
-                if resp.clicked() {
-                    section = id.to_string();
-                }
-            }
-        });
-        // The settings fill the dialog's resizable area down to the button row (#7420). Sizing them
-        // from the window instead left a resized dialog with empty space and the buttons mid-way.
-        // The area grows to fit its content, so this must never ask for more than it was given.
-        let content_height = settings_height(ui.available_height(), ui.spacing().item_spacing.y, crate::widgets::button_height(ui.ctx()));
-        crate::widgets::vline(ui, content_height);
-        ui.vertical(|ui| {
-            ui.set_width((ui.available_width() - 12.0).max(340.0));
-            let title = SECTIONS.iter().find(|(id, _)| *id == section).map_or("General", |(_, t)| *t);
-            ui.label(RichText::new(tl!(&title)).font(crate::theme::semibold(14.0)).color(t.text));
-            let show_all = search.trim().is_empty()
-                || title.to_lowercase().contains(&search.trim().to_lowercase())
-                || tl!(&title).to_lowercase().contains(&search.trim().to_lowercase());
-            let filter = if show_all { "" } else { search.trim() };
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
-            egui::ScrollArea::vertical().max_height(content_height - 30.0).id_salt("prefs-scroll").show(ui, |ui| {
-                let order: Vec<String> =
-                    f.get("__order").and_then(|o| o.get(&section)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-                if !has_visible_fields(&values, &section) {
-                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                    ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
-                } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
-                    section_fields(ui, &section, obj, &order, lang, system, filter);
-                    if section == "fileHandling" {
-                        ui.label(
-                            RichText::new(tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized."))
-                                .color(t.text_faint),
-                        );
-                    }
-                    if section == "performance" {
-                        gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
-                    }
-                    ui.add_space(craft_ui::theme::scale::Space::S8.px());
-                }
-                if search.trim().is_empty()
-                    && has_visible_fields(&values, &section)
-                    && ui.add(craft_ui::controls::Button::new(tl!("Reset Section")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(110.0)).clicked()
-                    && let Some(mut def) = prefs::Preferences::default().get(&section)
-                {
-                    // The favourite fonts are the user's library, not a Type setting: kept, as
-                    // `prefs.reset {"path": "type"}` keeps them.
-                    if section == "type"
-                        && let Some(favorites) = values.get(&section).and_then(|v| v.get("favoriteFonts")).cloned()
-                        && let Some(def) = def.as_object_mut()
-                    {
-                        def.insert("favoriteFonts".into(), favorites);
-                    }
-                    values[&section] = def;
-                }
-            });
-        });
-    });
-    f.insert("section".into(), json!(section));
-    f.insert("__search".into(), json!(search));
-    f.insert("values".into(), values);
-    // A colour swatch was clicked: open the Color Picker on that value (#2144).
-    if let Some((path, name)) = ctx_take_pick(ui) {
-        crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(&name));
-    }
-}
-
-/// Does `section` have any setting the dialog shows (see [`prefs::HIDDEN_UNTIL_IMPLEMENTED`])?
-pub(super) fn has_visible_fields(values: &Value, section: &str) -> bool {
-    values.get(section).and_then(Value::as_object).is_some_and(|o| o.keys().any(|k| !prefs::is_hidden(&format!("{section}.{k}"))))
-}
-
 /// JPEG and WebP have independent settings; unrelated format controls stay out of view.
 pub(super) fn export_field_visible(obj: &Map<String, Value>, key: &str) -> bool {
     let format = obj.get("quickExportFormat").and_then(Value::as_str).unwrap_or("png");
@@ -353,7 +212,7 @@ fn interface_groups(ui: &mut egui::Ui, obj: &mut Map<String, Value>, keys: &[Str
 const PICK_ID: &str = "prefs-pick-color";
 
 /// The colour swatch clicked this frame, if any: (preference path, label).
-fn ctx_take_pick(ui: &egui::Ui) -> Option<(String, String)> {
+pub(super) fn ctx_take_pick(ui: &egui::Ui) -> Option<(String, String)> {
     ui.ctx().data_mut(|d| d.remove_temp::<(String, String)>(egui::Id::unique(PICK_ID)))
 }
 
@@ -376,32 +235,19 @@ pub(super) fn field_visible(section: &str, obj: &Map<String, Value>, k: &str, qu
         && obj.get(k).is_some_and(|v| !matches!(v, Value::Null | Value::Object(_)))
 }
 
-/// Generic editor for a section's fields: checkboxes, dropdowns for choices, colour swatches,
-/// number fields with the preference's range, text fields.
-pub(super) fn section_fields(
+/// Preferences › Interface: its grouped rows (the page the library's row model does not
+/// cover). A search (`query`, lowercased) hides the rows that don't match.
+pub(super) fn interface_page(
     ui: &mut egui::Ui,
-    section: &str,
     obj: &mut Map<String, Value>,
     order: &[String],
     lang: crate::i18n::Lang,
     system: Option<egui::Theme>,
-    search: &str,
+    query: &str,
 ) {
-    let query = search.to_lowercase();
     let mut keys: Vec<String> = order.iter().filter(|k| obj.contains_key(*k)).cloned().collect();
     keys.extend(obj.keys().filter(|k| !order.contains(k)).cloned());
-    if section == "interface" {
-        interface_groups(ui, obj, &keys, lang, system, &query);
-        return;
-    }
-    if section == "performance" && (query.is_empty() || preference_matches(section, "renderingMode", &query)) {
-        rendering_mode_row(ui, obj);
-    }
-    if section == "performance" && (query.is_empty() || preference_matches(section, "memoryUsageMb", &query)) {
-        memory_usage_row(ui, obj);
-    }
-    keys.retain(|k| field_visible(section, obj, k, &query));
-    egui::Grid::new(("prefs-grid", section)).num_columns(2).spacing([14.0, 7.0]).show(ui, |ui| field_rows(ui, section, obj, keys, lang));
+    interface_groups(ui, obj, &keys, lang, system, query);
 }
 
 /// One grid row per setting in `keys` (already filtered by `field_visible`).
@@ -431,7 +277,11 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let mut pairs: Vec<(String, &str)> = vec![("auto".into(), tl!("Auto"))];
                 pairs.extend(crate::i18n::Lang::for_picker().into_iter().map(|l| (l.code().to_string(), l.name())));
                 let mut cur = s.clone();
-                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
+                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur)
+                    .rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1))
+                    .show(ui)
+                    .response
+                    .changed();
                 obj.insert(k, json!(cur));
             }
             Value::String(s) if prefs::choices(&path).is_some() => {
@@ -440,7 +290,11 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let labels: Vec<String> = opts.iter().map(|o| choice_label(o)).collect();
                 let pairs: Vec<(String, &str)> = opts.iter().map(|o| o.to_string()).zip(labels.iter().map(String::as_str)).collect();
                 let mut cur = s.clone();
-                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
+                craft_ui::controls::Select::new(&format!("pref-{path}"), tl!(&label), &mut cur)
+                    .rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1))
+                    .show(ui)
+                    .response
+                    .changed();
                 obj.insert(k, json!(cur));
             }
             Value::String(s) if prefs::is_color(&path) => {
@@ -482,31 +336,6 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                         .labelled_by(value_label.id);
                     obj.insert(k, json!(x));
                 }
-            }
-            Value::Array(_) if path == "tools.pressureCurve" => {
-                ui.label(RichText::new(tl!(&label)).color(t.text_dim));
-                if let Some(next) = crate::pressure_curve_ui::editor(ui, &v) {
-                    obj.insert(k, next);
-                }
-            }
-            Value::Array(items) if k == "disks" => {
-                ui.label(RichText::new(tl!("Scratch disks")).color(t.text_dim));
-                let mut items = items.clone();
-                ui.vertical(|ui| {
-                    for d in &mut items {
-                        ui.horizontal(|ui| {
-                            let mut on = d.get("enabled").and_then(Value::as_bool).unwrap_or(false);
-                            let mut path = d.get("path").and_then(Value::as_str).unwrap_or("").to_string();
-                            craft_ui::controls::Checkbox::bool(tl!("Enabled"), &mut on).show(ui).response;
-                            ui.add(egui::TextEdit::singleline(&mut path).desired_width(240.0)).accessible_name(tl!("Path"));
-                            *d = json!({"enabled": on, "path": path});
-                        });
-                    }
-                    if ui.small_button(tl!("Add disk")).clicked() {
-                        items.push(json!({"enabled": true, "path": ""}));
-                    }
-                });
-                obj.insert(k, Value::Array(items));
             }
             Value::Array(items) => {
                 ui.label(RichText::new(tl!(&label)).color(t.text_dim));
