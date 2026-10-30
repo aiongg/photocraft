@@ -323,6 +323,9 @@ pub type RightButtonDownFn = Box<dyn Fn() -> bool + Send + Sync>;
 /// I/O dependencies.
 #[derive(Default)]
 pub struct Services {
+    /// Where the Craft suite keeps its themes and selection (`SuiteDir::resolve(false)` on the
+    /// desktop). `None` keeps them in memory: tests, headless runs and the web.
+    pub suite_dir: Option<craft_theme_store::SuiteDir>,
     /// User-initiated desktop/browser pixel sampling.
     pub screen_pick: Option<screen_picker::Service>,
     /// Decode a file's bytes into a document (PSD, PNG, JPEG, …).

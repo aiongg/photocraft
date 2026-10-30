@@ -15,6 +15,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.insert("__gpuInfo".into(), json!(info));
             f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
             let system = system_theme(app, ui.ctx());
+            super::appearance::offer_themes(ui.ctx(), super::appearance::theme_choices(app));
             prefs_body(ui, f, system);
         }
         "shortcuts" => shortcuts_body(app, ui, f),
@@ -360,7 +361,7 @@ fn ctx_take_pick(ui: &egui::Ui) -> Option<(String, String)> {
 /// by their own widgets; their stored values pass through untouched.
 pub(super) fn field_visible(section: &str, obj: &Map<String, Value>, k: &str, query: &str) -> bool {
     let path = format!("{section}.{k}");
-    let drawn_elsewhere = (section == "interface" && matches!(k, "theme" | "appearanceMode" | "darkTheme" | "lightTheme" | "favoriteThemes"))
+    let drawn_elsewhere = (section == "interface" && matches!(k, "theme" | "appearanceMode" | "darkTheme" | "lightTheme" | "favoriteThemes" | "themeLight" | "themeDark" | "size" | "appearanceImported" | "lastSuite"))
         // View › Rulers (⌘R) sets it, as in Photoshop.
         || path == "unitsAndRulers.showRulers"
         || (section == "performance" && matches!(k, "useGpu" | "gpuBackend" | "gpuAdapter" | "renderingMode" | "memoryUsageMb"))

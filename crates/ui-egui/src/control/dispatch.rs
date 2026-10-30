@@ -213,6 +213,8 @@ struct UiSet {
     panels: PanelSet,
     view: ViewSet,
     theme: Option<crate::theme::ThemeKind>,
+    /// A library theme id (`craft.studio`) for the current appearance.
+    library_theme: Option<String>,
     brush: BrushSet,
     legacy_update: Option<crate::panel_docking::LegacyUpdate>,
 }
@@ -223,12 +225,12 @@ impl UiSet {
         let crop = CropSet::parse(app, p)?;
         let panels = PanelSet::parse(app, p)?;
         let view = ViewSet::parse(app, p)?;
-        let theme = theme_param(p)?;
+        let (theme, library_theme) = theme_param(p)?;
         let brush = BrushSet::parse(app, p)?;
         let bridge_pro = matches!(theme.unwrap_or(app.ui.theme), crate::theme::ThemeKind::Pro | crate::theme::ThemeKind::ProMedium);
         let legacy_update =
             crate::panel_docking::prepare_legacy_update(app, p, panels.panels.as_ref(), panels.dock_tabs.as_ref(), panels.dock.as_ref(), bridge_pro)?;
-        Ok(Self { tools, crop, panels, view, theme, brush, legacy_update })
+        Ok(Self { tools, crop, panels, view, theme, library_theme, brush, legacy_update })
     }
 
     /// Apply (nothing but the final `brushSize` command can fail).
@@ -238,6 +240,10 @@ impl UiSet {
         self.panels.apply_options(app);
         if let Some(k) = self.theme {
             app.set_theme(ctx, k);
+        }
+        if let Some(id) = &self.library_theme {
+            let dark = app.ui.theme.is_dark();
+            crate::prefs_ui::pick_theme(app, ctx, id, dark);
         }
         self.panels.apply_dock(app);
         if let Some(update) = self.legacy_update {
@@ -250,12 +256,18 @@ impl UiSet {
     }
 }
 
-fn theme_param(p: &Value) -> std::result::Result<Option<crate::theme::ThemeKind>, String> {
-    let Some(name) = str_param(p, "theme") else { return Ok(None) };
-    crate::theme::ThemeKind::from_name(name).map(Some).ok_or_else(|| {
-        let names: Vec<_> = crate::theme::ThemeKind::ALL.iter().map(|k| k.id()).collect();
-        format!("unknown theme `{name}` ({})", names.join(", "))
-    })
+/// `ui.set {theme}`: a legacy name or alias (`proMedium`, `dark`, `gnome`, …) or a library id
+/// (`craft.studio`) for the appearance on screen.
+fn theme_param(p: &Value) -> std::result::Result<(Option<crate::theme::ThemeKind>, Option<String>), String> {
+    let Some(name) = str_param(p, "theme") else { return Ok((None, None)) };
+    if let Some(kind) = crate::theme::ThemeKind::from_name(name) {
+        return Ok((Some(kind), None));
+    }
+    if name.starts_with("craft.") && photocraft_engine::prefs::appearance::is_theme_id(name) {
+        return Ok((None, Some(name.to_string())));
+    }
+    let names: Vec<_> = crate::theme::ThemeKind::ALL.iter().map(|k| k.id()).collect();
+    Err(format!("unknown theme `{name}` ({}, or a library id such as `craft.studio`)", names.join(", ")))
 }
 
 // -- tools: stroke, tool, gradient, eyedropper, Content-Aware Move, tile grid, layer filter --

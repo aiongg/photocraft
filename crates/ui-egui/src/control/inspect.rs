@@ -78,6 +78,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "dialogs": dialogs,
         "windows": app.ui.windows,
         "theme": app.ui.theme,
+        "appearance": appearance(app),
         "status": app.ui.status,
         "statusError": app.ui.status_error,
         "notices": app.ui.notices,
@@ -139,4 +140,19 @@ pub fn save_screenshot_rgba(app: &mut PhotocraftApp, w: usize, h: usize, rgba: &
         Ok(()) => json!({"ok": true, "result": {"path": path, "width": w, "height": h}}),
         Err(e) => json!({"ok": false, "error": e}),
     }
+}
+
+/// The look on screen in the Craft theme model: the library theme, the variant's mode, the Size,
+/// and the legacy theme id (`ui.set {theme}`) it corresponds to.
+fn appearance(app: &PhotocraftApp) -> Value {
+    let rt = &app.prefs_rt.suite;
+    let sel = rt.selection();
+    json!({
+        "theme": rt.shown_id(),
+        "legacyTheme": app.ui.theme.id(),
+        "mode": if app.ui.theme.is_dark() { "dark" } else { "light" },
+        "modeSetting": sel.map(|s| format!("{:?}", s.mode).to_lowercase()),
+        "size": sel.map(|s| format!("{:?}", s.size).to_lowercase()),
+        "textSize": sel.map(|s| format!("{:?}", s.text_size).to_lowercase()),
+    })
 }

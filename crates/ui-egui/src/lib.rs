@@ -244,6 +244,7 @@ pub use services::{
     FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenUrlFn, OsEventsFn, PhotoshopShortcutsFn, QuitFn, RecoverFn, Recoverable, RightButtonDownFn,
     SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, WindowFrameFn, WriteFn,
 };
+pub use craft_theme_store::SuiteDir;
 pub use text::bidi_text;
 pub use text::cjk_fonts;
 pub use text::direction;

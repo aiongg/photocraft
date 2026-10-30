@@ -493,11 +493,17 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     h.run_steps(2);
     h.get_by_label("Apply").click();
     h.run_steps(2);
-    assert_eq!(h.state().session.prefs().interface.favorite_themes, vec![SavedTheme::Classic]);
+    assert_eq!(h.state().session.prefs().interface.favorite_themes, vec!["craft.classic".to_string()]);
     assert!(h.query_by_label("Remove from favorites: Classic").is_some());
-    let (light, dark) = favorite_theme_groups(&[SavedTheme::Studio, SavedTheme::Classic, SavedTheme::Adwaita]);
-    assert_eq!(light, vec![ThemeKind::Classic, ThemeKind::Adwaita]);
-    assert_eq!(dark, vec![ThemeKind::Studio]);
+    let choices: Vec<_> = craft_theme::builtins()
+        .iter()
+        .map(|def| appearance::ThemeChoice { id: def.id.as_str().into(), name: def.name.clone(), variants: def.variants, def: def.clone() })
+        .collect();
+    let favorites = ["craft.studio", "craft.classic", "craft.adwaita"].map(String::from);
+    let (light, dark) = favorite_theme_groups(&favorites, &choices);
+    let ids = |v: Vec<appearance::ThemeChoice>| v.into_iter().map(|c| c.id).collect::<Vec<_>>();
+    assert_eq!(ids(light), ["craft.studio", "craft.classic", "craft.adwaita"], "Classic is light only");
+    assert_eq!(ids(dark), ["craft.studio", "craft.adwaita"]);
 }
 
 /// The favourite star badge overhangs its swatch; showing it on hover must not move the swatches
@@ -540,11 +546,9 @@ fn preferences_interface_shows_language_without_scrolling() {
     assert!(dark.bottom() < language.top(), "Presentation {language:?} follows the theme swatches {dark:?}");
     assert!(language.bottom() < ok.top() - 20.0, "Language {language:?} must show above the buttons {ok:?} without scrolling");
     // Every theme in the option lists gets a swatch, Breeze included.
-    for (id, _) in LIGHT_THEME_OPTIONS.iter().chain(DARK_THEME_OPTIONS) {
-        let label = choice_label(id);
-        assert!(h.query_by_label(&label).is_some(), "missing theme swatch {label}");
+    for def in craft_theme::builtins() {
+        assert!(h.query_all_by_label(&def.name).next().is_some(), "missing theme swatch {}", def.name);
     }
-    assert!(h.query_by_label("Breeze light").is_some() && h.query_by_label("Breeze dark").is_some());
 }
 
 #[test]

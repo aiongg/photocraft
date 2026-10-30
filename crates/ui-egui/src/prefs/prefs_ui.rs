@@ -25,6 +25,8 @@ use crate::theme::{ThemeKind, Tokens};
 /// Shell runtime state for preferences, autosave and snapping (not serialised).
 #[derive(Default)]
 pub struct Runtime {
+    /// The Craft suite's theme store and the selection last resolved.
+    pub(crate) suite: appearance::SuiteRt,
     loaded: bool,
     /// Preferences revision last written to storage (or loaded from it).
     saved_rev: u64,
@@ -70,8 +72,9 @@ mod shortcuts;
 mod startup;
 
 #[cfg(test)]
-use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
-pub(crate) use appearance::{appearance_context_menu, cycle_appearance, step_brightness, sync_appearance};
+use appearance::{display_scale, favorite_theme_groups, selected_theme};
+pub use appearance::SuiteRt;
+pub(crate) use appearance::{appearance_context_menu, cycle_appearance, pick_theme, step_brightness, sync_appearance};
 pub use appearance::{canvas_style, pasteboard_color};
 pub use dialogs::{
     PREFERENCES_SIZE, apply, confirm, invoke, is_preferences, open_mismatch, open_preferences, open_shortcuts, owns, preferences_changed, width,

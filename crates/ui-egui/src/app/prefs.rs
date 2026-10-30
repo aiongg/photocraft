@@ -27,21 +27,32 @@ impl PhotocraftApp {
         if let Err(e) = self.run("prefs.set", serde_json::json!({"path": "interface.theme", "value": kind.id()})) {
             self.ui.status = e;
         } else {
-            self.apply_theme(ctx, kind);
+            crate::prefs_ui::sync_appearance(self, ctx);
         }
     }
 
     pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, kind: theme::ThemeKind) {
+        self.note_theme_change(kind);
+        theme::apply(ctx, kind);
+        self.checker = None;
+    }
+
+    /// Shows the resolved library base on screen as `kind`.
+    pub(crate) fn apply_theme_base(&mut self, ctx: &egui::Context, base: &craft_ui::theme::Base, kind: theme::ThemeKind) {
+        self.note_theme_change(kind);
+        theme::install_base(ctx, base, kind);
+        self.checker = None;
+    }
+
+    fn note_theme_change(&mut self, kind: theme::ThemeKind) {
         // Color and Swatches trade indices between Pro and Studio layouts.
-        if let Some(selected) = dock::Group::Color.tabs(theme::Tokens::for_kind(self.ui.theme).pro).get(self.ui.dock_tabs.color)
-            && let Some(tab) = dock::Group::Color.tabs(theme::Tokens::for_kind(kind).pro).iter().position(|name| name == selected)
+        if let Some(selected) = dock::Group::Color.tabs(self.ui.theme.is_pro()).get(self.ui.dock_tabs.color)
+            && let Some(tab) = dock::Group::Color.tabs(kind.is_pro()).iter().position(|name| name == selected)
         {
             self.ui.dock_tabs.color = tab;
         }
         self.ui.theme = kind;
         panel_docking::sync_visibility(self);
-        theme::apply(ctx, kind);
-        self.checker = None;
     }
 }
 
@@ -61,7 +72,7 @@ impl PhotocraftApp {
         ctx.add_plugin(text_field_menu::TextFieldMenu);
         // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; PhotoCraft zooms the canvas instead
         // (shortcuts.rs), like Photoshop.
-        ctx.options_mut(|o| o.zoom_with_keyboard = false);
+        craft_ui::interface_scale::InterfaceScale::disable_keyboard_zoom(ctx);
         // ⌘/Ctrl + wheel scrolls sideways, as in Photoshop; only a pinch zooms (wheel_nav.rs).
         wheel_nav::configure(ctx);
     }
