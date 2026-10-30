@@ -50,7 +50,7 @@ pub(crate) fn stops_of(fill: &Fill) -> GradientStops {
 }
 
 /// The engine edit that turns `old` (from [`stops_of`]) into `new`, or `None` when they agree or
-/// the change is one the engine has no edit for (an opacity midpoint).
+/// the change is one the engine has no edit for.
 pub(crate) fn command(old: &GradientStops, new: &GradientStops) -> Option<Value> {
     row_command(old, new, StopRow::Color).or_else(|| row_command(old, new, StopRow::Opacity))
 }
@@ -103,6 +103,7 @@ fn row_command(old: &GradientStops, new: &GradientStops, row: StopRow) -> Option
                 StopRow::Opacity => json!({"action": "opacity", "kind": "opacity", "index": index, "opacity": percent(stop.2.r)}),
             });
         }
+        // The opacity row shows no midpoints: the engine's opacity stops carry none.
         if row == StopRow::Color && was.3 != stop.3 {
             return Some(json!({"action": "midpoint", "index": index, "location": stop.3}));
         }
@@ -174,6 +175,7 @@ pub(crate) fn edit_stops(ui: &mut Ui, key: egui::Id, base: &GradientStops, optio
     let response = GradientEditor::new(key, tl!("Gradient stops"), shown, &numbers)
         .rows(options.rows)
         .midpoints(options.midpoints)
+        .opacity_midpoints(false)
         .stops(options.stops.0, options.stops.1)
         .color_popover(options.color_popover)
         .labels(labels())
