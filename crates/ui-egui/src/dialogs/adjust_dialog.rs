@@ -151,10 +151,9 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
             selected = Some(i);
         }
     }
-    if let Some(i) = selected
-        && let Some(editor) = ctx.data(|d| d.get_temp::<egui::Id>(dialog_mem("curves").with("curves-editor")))
-    {
-        craft_ui::composites::CurveEditor::select(ctx, editor, Some(i));
+    if let Some(i) = selected {
+        // The Curves editor selects it on its next pass.
+        ctx.data_mut(|d| d.insert_temp(dialog_mem("curves").with("curves-select"), i));
     }
     if changed
         && let Some(dialog) = app.ui.dialog_mut(id)

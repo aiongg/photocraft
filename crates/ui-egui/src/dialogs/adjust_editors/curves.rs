@@ -177,10 +177,26 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
     let pencil = v.get("pencil").and_then(Value::as_bool).unwrap_or(false);
     let mut e = Edit::default();
     ui.horizontal(|ui| {
-        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Spline, tl!("Edit points to modify the curve")).size(craft_ui::controls::ControlSize::Md).selected(!pencil)).clicked() && pencil {
+        if ui
+            .add(
+                craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Spline, tl!("Edit points to modify the curve"))
+                    .size(craft_ui::controls::ControlSize::Md)
+                    .selected(!pencil),
+            )
+            .clicked()
+            && pencil
+        {
             e.add(Edit::discrete(set_pencil(v, false, gray)));
         }
-        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Pencil, tl!("Draw to modify the curve")).size(craft_ui::controls::ControlSize::Md).selected(pencil)).clicked() && !pencil {
+        if ui
+            .add(
+                craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Pencil, tl!("Draw to modify the curve"))
+                    .size(craft_ui::controls::ControlSize::Md)
+                    .selected(pencil),
+            )
+            .clicked()
+            && !pencil
+        {
             e.add(Edit::discrete(set_pencil(v, true, gray)));
         }
         let label = crate::i18n::tr_ctx(crate::i18n::current(), "curves", "Smooth");
@@ -198,7 +214,6 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
     });
     e
 }
-
 
 /// The curve the params hold for `key`: the pencil's drawing or the points.
 fn read_shape(v: &Value, key: &str, pencil: bool) -> Curve {
@@ -221,7 +236,8 @@ fn write_shape(v: &mut Value, key: &str, space: ToneSpace, curve: &Curve) {
 
 /// The photocraft curve through `points`: one output level per input level.
 fn sample_levels(points: &[[f32; 2]]) -> Vec<f32> {
-    let cp: Vec<photocraft_doc::adjust::CurvePoint> = points.iter().map(|q| photocraft_doc::adjust::CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect();
+    let cp: Vec<photocraft_doc::adjust::CurvePoint> =
+        points.iter().map(|q| photocraft_doc::adjust::CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect();
     photocraft_compose::adjust::curve_samples::<CURVE_SAMPLES>(&cp).into_iter().map(|y| y * 255.0).collect()
 }
 
@@ -264,7 +280,12 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     };
     let numbers = LocaleNumbers::of(ui);
     let sampler: &craft_ui::composites::Sampler = &sample_levels;
-    let mut editor = CurveEditor::new(cx.mem.with("curves-editor-salt"), tl!("Curve"), &curve, &numbers)
+    let salt = cx.mem.with("curves-editor-salt");
+    // A point the host added on the image (⌘/Ctrl-click) is the selected one.
+    if let Some(i) = ui.data_mut(|d| d.remove_temp::<usize>(cx.mem.with("curves-select"))) {
+        CurveEditor::select(ui.ctx(), CurveEditor::id_in(ui, salt), Some(i));
+    }
+    let mut editor = CurveEditor::new(salt, tl!("Curve"), &curve, &numbers)
         .channels(&channels)
         .channel(if isolated.is_some() { 0 } else { ch })
         .sampler(sampler)
@@ -281,9 +302,12 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let style = CurveEditor::style(&craft_ui::theme::current(ui.ctx()));
     ui.data_mut(|d| {
         d.insert_temp(cx.mem.with("curves-graph"), shown.response.rect.shrink(style.pad));
-        d.insert_temp(cx.mem.with("curves-editor"), shown.response.id);
     });
 
+    if shown.response.has_focus() && !pencil {
+        // The graph deletes its selected point with Delete and Backspace.
+        crate::shortcut_dispatch::claim_delete_keys(ui.ctx(), shown.response.id);
+    }
     let before_id = cx.mem.with("curves-before");
     match shown.event {
         Some(EditEvent::Begin { .. }) => {

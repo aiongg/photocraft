@@ -624,8 +624,7 @@ fn command_click_on_the_image_adds_a_point_on_the_composite_curve() {
     assert_eq!(points, vec![base[0], [86.0, output], base[1], base[2]]);
     let (before, after) = (curve_levels(&base), curve_levels(&points));
     assert!(before.iter().zip(&after).all(|(a, b)| (a - b).abs() <= 0.5), "the curve keeps its shape:\n{before:?}\n{after:?}");
-    let st: crate::state::CurvesEditorState = ctx.data(|d| d.get_temp(dialog_mem("curves").with("curves"))).unwrap();
-    assert_eq!((st.channel, st.gesture.selected), (0, Some(1)), "the new point is selected");
+    assert_eq!(selected_point(&ctx), Some(1), "the new point is selected");
     for key in ["red", "green", "blue"] {
         assert_eq!(channel_points(&app, key), vec![[0.0, 0.0], [255.0, 255.0]], "{key} untouched");
     }
@@ -664,8 +663,12 @@ fn command_click_adds_the_point_on_the_channel_shown_in_the_dialog() {
         assert_eq!(channel_points(&app, key), vec![[0.0, 0.0], [255.0, 255.0]], "{key} untouched");
     }
     assert_eq!(channel_points(&app, "points"), composite);
-    let st: crate::state::CurvesEditorState = ctx.data(|d| d.get_temp(dialog_mem("curves").with("curves"))).unwrap();
-    assert_eq!((st.channel, st.gesture.selected), (1, Some(1)));
+    assert_eq!(selected_point(&ctx), Some(1));
+}
+
+/// The point the Curves editor selects on its next pass.
+fn selected_point(ctx: &egui::Context) -> Option<usize> {
+    ctx.data(|d| d.get_temp::<usize>(dialog_mem("curves").with("curves-select")))
 }
 
 /// #7325: a plain click, a full curve and an armed eyedropper add nothing.

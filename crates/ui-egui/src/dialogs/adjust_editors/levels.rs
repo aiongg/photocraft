@@ -74,7 +74,8 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         e = Edit { changed: true, commit: true, ..Default::default() };
     }
     let color = channel_color(chan.key);
-    let levels = Levels { in_black: f64::from(l[0]), gamma: f64::from(l[1]), in_white: f64::from(l[2]), out_black: f64::from(l[3]), out_white: f64::from(l[4]) };
+    let levels =
+        Levels { in_black: f64::from(l[0]), gamma: f64::from(l[1]), in_white: f64::from(l[2]), out_black: f64::from(l[3]), out_white: f64::from(l[4]) };
     let histogram = cx.hist.as_ref().and_then(|h| h.ch.get(ch)).map(|bins| HistogramData::tone(bins.as_slice(), color));
     let numbers = LocaleNumbers::of(ui);
     let labels = LevelsLabels {
@@ -91,7 +92,8 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     if let Some(h) = &histogram {
         editor = editor.histogram(h);
     }
-    let write = |v: &mut Value, n: &Levels| write_levels(v, chan.key, &[n.in_black as f32, n.gamma as f32, n.in_white as f32, n.out_black as f32, n.out_white as f32]);
+    let write =
+        |v: &mut Value, n: &Levels| write_levels(v, chan.key, &[n.in_black as f32, n.gamma as f32, n.in_white as f32, n.out_black as f32, n.out_white as f32]);
     let before_id = cx.mem.with("levels-before");
     match editor.show(ui).event {
         Some(EditEvent::Begin { .. }) => {
