@@ -12,11 +12,13 @@
 
 use craft_platform::appearance::EguiService;
 #[cfg(target_os = "linux")]
+use craft_ui::title_bar::{CaptionIconCache, caption_icon_theme};
+#[cfg(target_os = "linux")]
 use craft_window::Layout;
 #[cfg(target_os = "linux")]
 use craft_window::policy::{CaptionFamily, DesktopKind, Frame, LayoutWatch};
 #[cfg(target_os = "linux")]
-use photocraft_ui_egui::{CaptionIcon, CaptionIcons, CaptionStyle, Captions};
+use photocraft_ui_egui::{CaptionStyle, Captions};
 
 /// The family and, when the layout is overridden, the fixed layout.
 #[cfg(target_os = "linux")]
@@ -26,56 +28,13 @@ fn overrides(found: CaptionFamily, var: &dyn Fn(&str) -> Option<String>) -> (Cap
 }
 
 /// The icon theme the glyphs come from: `PHOTOCRAFT_CAPTION_ICONS` (`none` draws PhotoCraft's own),
-/// the portal's answer, the desktop's setting, or Adwaita.
+/// else the portal's answer, the desktop's setting, or Adwaita.
 #[cfg(target_os = "linux")]
 fn icon_theme_name(portal: Option<&str>, desktop: Option<&str>, var: &dyn Fn(&str) -> Option<String>) -> Option<String> {
     match var("PHOTOCRAFT_CAPTION_ICONS") {
         Some(name) if name.trim().eq_ignore_ascii_case("none") => None,
         Some(name) => Some(name.trim().to_string()),
-        None => Some(portal.or(desktop).unwrap_or("Adwaita").to_string()),
-    }
-}
-
-/// The caption glyphs of icon theme `theme` (`window-*-symbolic.svg`), read now and rendered at
-/// whatever size the bar asks for. `None` when the theme (with its parents) has none of them.
-#[cfg(target_os = "linux")]
-fn load_icons(theme: &str) -> Option<CaptionIcons> {
-    use crate::icon_theme::{IconTheme, base_dirs, rasterize_mask, read_small};
-    let found = IconTheme::load(theme, &base_dirs(&|k: &str| std::env::var(k).ok()))?;
-    let svg = |name: &str| found.find_svg(name).and_then(|p| read_small(&p)).map(std::sync::Arc::<[u8]>::from);
-    let files = [svg("window-minimize-symbolic"), svg("window-maximize-symbolic"), svg("window-restore-symbolic"), svg("window-close-symbolic")];
-    if files.iter().all(Option::is_none) {
-        return None;
-    }
-    let render = move |icon: CaptionIcon, px: u32| {
-        let i = match icon {
-            CaptionIcon::Minimize => 0,
-            CaptionIcon::Maximize => 1,
-            CaptionIcon::Restore => 2,
-            CaptionIcon::Close => 3,
-        };
-        files.get(i)?.as_deref().and_then(|svg| rasterize_mask(svg, px))
-    };
-    Some(CaptionIcons { theme: theme.to_string(), render: std::sync::Arc::new(render) })
-}
-
-/// [`load_icons`] for the last theme asked for, kept, so a repeated publish of the same theme (the portal re-sends its setting) doesn't reread its files.
-#[cfg(target_os = "linux")]
-#[derive(Default)]
-struct IconCache(std::sync::Mutex<Option<(String, Option<CaptionIcons>)>>);
-
-#[cfg(target_os = "linux")]
-impl IconCache {
-    fn get(&self, theme: &str) -> Option<CaptionIcons> {
-        let mut last = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some((name, icons)) = last.as_ref()
-            && name == theme
-        {
-            return icons.clone();
-        }
-        let icons = load_icons(theme);
-        *last = Some((theme.to_string(), icons.clone()));
-        icons
+        None => Some(caption_icon_theme(portal, desktop)),
     }
 }
 
@@ -91,7 +50,7 @@ pub fn service(decision: &craft_window::policy::Decision, appearance: Option<Egu
         let (family, fixed) = overrides(captions.family, &var);
         let gnome = decision.desktop.kind == DesktopKind::Gnome;
         let desktop_icons = decision.desktop.icon_theme.clone();
-        let cache = IconCache::default();
+        let cache = CaptionIconCache::default();
         let layouts = Mutex::new((LayoutWatch::new(decision), None::<bool>));
         Some(Box::new(move |ctx| {
             let mut guard = layouts.lock().unwrap_or_else(PoisonError::into_inner);
@@ -104,7 +63,7 @@ pub fn service(decision: &craft_window::policy::Decision, appearance: Option<Egu
             *was_focused = focused;
             let layout = fixed.clone().unwrap_or_else(|| watch.layout().clone());
             let portal = appearance.as_ref().filter(|_| gnome).and_then(EguiService::icon_theme);
-            let icons = icon_theme_name(portal.as_deref(), desktop_icons.as_deref(), &|k: &str| std::env::var(k).ok()).and_then(|t| cache.get(&t));
+            let icons = icon_theme_name(portal.as_deref(), desktop_icons.as_deref(), &|k: &str| std::env::var(k).ok()).and_then(|t| cache.get(&t, ctx));
             CaptionStyle { captions: Captions { family, layout }, icons }
         }))
     }

@@ -57,7 +57,7 @@ pub(crate) fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, style: &Captio
 /// is hidden.
 pub(crate) fn edge_zones_without_bar(app: &PhotocraftApp, ui: &mut egui::Ui) {
     let style = style(app, ui.ctx());
-    craft_ui::title_bar::resize_zones_only(ui, &Frame::Integrated(style.captions), false);
+    craft_ui::title_bar::resize_zones_only(ui, &Frame::Integrated(style.captions), false, &[]);
 }
 
 /// The caption buttons' tooltips and accessibility labels.

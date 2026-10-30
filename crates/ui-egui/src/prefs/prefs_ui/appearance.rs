@@ -59,7 +59,7 @@ pub(crate) fn app_choice(i: &prefs::Interface, suite: &Selection) -> AppChoice {
         prefs::AppSize::Compact => Some(Size::Compact),
         prefs::AppSize::Comfortable => Some(Size::Comfortable),
     };
-    AppChoice { theme, mode: Some(mode), size }
+    AppChoice::new(theme, Some(mode), size)
 }
 
 /// The selection shown: the suite's choice with PhotoCraft's own on top, reduced motion where

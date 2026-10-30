@@ -42,7 +42,6 @@ mod file_dialog_probe;
 mod gpu_startup;
 #[cfg(target_os = "linux")]
 #[cfg(target_os = "linux")]
-mod icon_theme;
 mod launch_args;
 #[cfg(target_os = "macos")]
 mod mac_menu;
