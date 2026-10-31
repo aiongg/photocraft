@@ -11,7 +11,7 @@ use craft::ui::composites::{Curve, CurveEditor, CurvePreview};
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::StrokeExt;
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{RichText, Sense, Stroke, StrokeKind, vec2};
 use photocraft_doc::Contour;
 use photocraft_doc::adjust::CurvePoint;
 use photocraft_engine::layer_style::{CONTOURS, contour_from_param, contour_param, contour_to_shc, contours_from_shc};
@@ -326,7 +326,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
     let mem = egui::Id::unique(("contour-editor", effect.as_str(), key.as_str()));
-    let (mut pts, mut corners) = levels_of(&c);
+    let (pts, corners) = levels_of(&c);
     let mut close: Option<bool> = None;
     let mut load = false;
     let mut save = false;
