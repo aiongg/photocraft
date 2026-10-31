@@ -156,9 +156,11 @@ fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) ->
         groups.push(Group { title: Some(tl!("Memory Usage").to_string()), rows: vec![row] });
     }
     groups.push(group(generic));
-    let mut graphics = Row::new(GRAPHICS_KEY, "Graphics", Kind::Custom);
+    // An empty label: the info lines take the whole row under the group's title.
+    let mut graphics = Row::new(GRAPHICS_KEY, "", Kind::Custom);
+    graphics.label = String::new();
     graphics.keywords = "performance GPU graphics adapter backend".into();
-    groups.push(group(vec![graphics]));
+    groups.push(Group { title: Some(tl!("Graphics").to_string()), rows: vec![graphics] });
     let mut advanced = vec![Row::new(
         "performance.gpuBackend",
         "GPU Backend",
