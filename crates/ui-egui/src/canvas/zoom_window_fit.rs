@@ -145,7 +145,7 @@ pub fn follow(
         ppp: ctx.pixels_per_point(),
         aspect: app.ui.view.display_aspect(),
         chrome: rect.size() - crate::rulers::content_rect(app, rect).size(),
-        bars: if app.ui.view.shows_scrollbars() { crate::scrollbars::THICKNESS } else { 0.0 },
+        bars: if app.ui.view.shows_scrollbars() { crate::scrollbars::thickness(ctx) } else { 0.0 },
         flip: app.ui.view.flip_horizontal,
         monitor: ctx.input(|i| i.viewport().monitor_size),
     };
@@ -282,7 +282,7 @@ mod tests {
         app.run("prefs.set", json!({"path": "general.zoomResizesWindows", "value": true})).unwrap();
         // The scrollbars are drawn over the canvas: the window makes room for them.
         assert!(app.ui.view.shows_scrollbars());
-        let bars = Vec2::splat(crate::scrollbars::THICKNESS);
+        let bars = Vec2::splat(crate::scrollbars::thickness(&egui::Context::default()));
         assert_eq!(frame(&app, ViewportClass::Immediate, &at(1.0)), Some(vec2(400.0, 300.0) + bars));
         // Drawn inside the main window, a resize command would resize the main window: skipped.
         assert_eq!(frame(&app, ViewportClass::EmbeddedWindow, &at(2.0)), None);
@@ -365,7 +365,7 @@ mod tests {
         // A Zoom tool click near the top-left corner doubles the zoom about that spot.
         let mut zoomed = View { center: [60.0, 40.0], ..view([400, 300], 2.0) };
         assert!(follow(&app, &ctx, ViewportClass::Immediate, viewport, &window, &mut zoomed, rect).is_some());
-        let half_bar = crate::scrollbars::THICKNESS / 2.0 / 2.0;
+        let half_bar = crate::scrollbars::thickness(&ctx) / 2.0 / 2.0;
         assert_eq!(zoomed.center, [200.0 + half_bar, 150.0 + half_bar], "the whole image, centred");
         assert_eq!(zoomed.zoom, 2.0);
     }

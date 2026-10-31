@@ -71,15 +71,6 @@ impl ViewXform {
         self
     }
 
-    fn sincos(self) -> (f32, f32) {
-        if self.rotation.abs() < 1e-8 {
-            (1.0, 0.0)
-        } else {
-            let r = self.rotation.to_radians();
-            (r.cos(), r.sin())
-        }
-    }
-
     /// The same view for the library's canvas kit (`craft_ui::canvas`), whose document points are
     /// `kurbo` points: it maps every point and vector as [`Self::to_screen`] and [`Self::map_vec`].
     pub fn canvas_view(&self) -> craft_ui::canvas::CanvasView {
@@ -94,69 +85,41 @@ impl ViewXform {
         v
     }
 
-    /// Document pixel width over height on screen: [`Self::aspect`], or 1 when it is unusable.
-    fn sx(self) -> f32 {
-        if self.aspect.is_finite() && self.aspect > 0.0 { self.aspect } else { 1.0 }
-    }
-
     /// Screen points per document pixel along the document's x axis.
     pub fn zoom_x(&self) -> f32 {
-        self.zoom * self.sx()
+        self.canvas_view().zoom_x() as f32
     }
 
     /// Unflip, unrotate and unstretch a screen-space vector (no zoom). Hand pan and zoom-about
     /// use this.
     pub fn unmap_vec(self, d: Vec2) -> Vec2 {
-        let d = if self.flip { vec2(-d.x, d.y) } else { d };
-        let (c, s) = self.sincos();
-        vec2((d.x * c + d.y * s) / self.sx(), -d.x * s + d.y * c)
+        let v = craft_ui::canvas::CanvasView { zoom: 1.0, ..self.canvas_view() }.unmap_vec(d);
+        vec2(v.x as f32, v.y as f32)
     }
 
     /// A document-space vector on screen: stretched, rotated, flipped and zoomed as the view
     /// draws it (the inverse of [`Self::unmap_vec`], with the zoom).
     pub fn map_vec(self, d: Vec2) -> Vec2 {
-        let (c, s) = self.sincos();
-        let dx = d.x * self.sx();
-        let v = vec2(dx * c - d.y * s, dx * s + d.y * c) * self.zoom;
-        if self.flip { vec2(-v.x, v.y) } else { v }
+        self.canvas_view().map_vec(craft_ui::canvas::kurbo::Vec2::new(f64::from(d.x), f64::from(d.y)))
     }
 
     pub fn to_screen(&self, x: f32, y: f32) -> Pos2 {
-        let (c, s) = self.sincos();
-        let dx = (x - self.center[0]) * self.sx();
-        let dy = y - self.center[1];
-        let rx = dx * c - dy * s;
-        let ry = dx * s + dy * c;
-        let sx = if self.flip { -1.0 } else { 1.0 };
-        self.rect.center() + vec2(rx * self.zoom * sx, ry * self.zoom)
+        self.canvas_view().to_screen(craft_ui::canvas::kurbo::Point::new(f64::from(x), f64::from(y)))
     }
     pub fn to_doc(&self, p: Pos2) -> [f64; 2] {
-        let d = (p - self.rect.center()) / self.zoom;
-        let u = self.unmap_vec(d);
-        [(u.x + self.center[0]) as f64, (u.y + self.center[1]) as f64]
+        let d = self.canvas_view().to_doc(p);
+        [d.x, d.y]
     }
     /// On-screen bounds of the image, including camera rotation and pixel aspect correction.
     pub fn image_bounds(self, size: [u32; 2]) -> Rect {
-        let (c, s) = self.sincos();
-        let w = size[0] as f32 * self.sx() * self.zoom;
-        let h = size[1] as f32 * self.zoom;
-        let center = self.to_screen(size[0] as f32 / 2.0, size[1] as f32 / 2.0);
-        Rect::from_center_size(center, vec2(c.abs() * w + s.abs() * h, s.abs() * w + c.abs() * h))
+        self.quad_bounds(craft_ui::canvas::kurbo::Rect::new(0.0, 0.0, f64::from(size[0]), f64::from(size[1])))
     }
     pub fn doc_rect(&self, r: DRect) -> Rect {
-        let pts = [
-            self.to_screen(r.x0 as f32, r.y0 as f32),
-            self.to_screen(r.x1 as f32, r.y0 as f32),
-            self.to_screen(r.x1 as f32, r.y1 as f32),
-            self.to_screen(r.x0 as f32, r.y1 as f32),
-        ];
-        let mut min = pts[0];
-        let mut max = pts[0];
-        for p in pts {
-            min = min.min(p);
-            max = max.max(p);
-        }
-        Rect::from_min_max(min, max)
+        self.quad_bounds(craft_ui::canvas::kurbo::Rect::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1)))
+    }
+    fn quad_bounds(&self, r: craft_ui::canvas::kurbo::Rect) -> Rect {
+        let pts = self.canvas_view().quad(r);
+        pts.iter().skip(1).fold(Rect::from_min_max(pts[0], pts[0]), |acc, &p| acc.union(Rect::from_min_max(p, p)))
     }
 }
 
