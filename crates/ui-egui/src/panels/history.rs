@@ -1,5 +1,5 @@
 use super::layer_drag::dropped_on;
-use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, Value, empty, icons, json, pos2, vec2, widgets};
+use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, Tool, Value, empty, icons, json, pos2, vec2, widgets};
 use craft_ui::theme::StrokeExt;
 
 pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
