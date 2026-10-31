@@ -148,7 +148,7 @@ fn preferences_search_matches_editable_fields_across_sections() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let id = open_preferences(&mut app, "general");
     let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
-    let host = super::window::Host::new(&mut app, &mut fields, None);
+    let host = super::window::Host::new(&mut app, &mut fields, None, &craft_ui::interface_scale::InterfaceScaleLabels::default());
     let specs = craft_ui::preferences::PreferencesHost::pages(&host);
     let contains = |needle: &str, section: &str| craft_ui::preferences::list_pages(&specs, needle).iter().any(|l| specs[l.index].id == section);
     assert!(contains("UI Scale", "interface"));
