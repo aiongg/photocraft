@@ -79,23 +79,16 @@ pub fn flip(app: &mut PhotocraftApp, vertical: bool, index: usize, at: [f64; 2])
     }
 }
 
-/// Delete or Backspace with no modifiers while a guide is selected deletes the guide, before Edit ›
+/// Delete or Backspace with no modifiers while a guide is selected belongs to the guides
+/// (`rulers::show_guides`), which remove it: true leaves the key unconsumed for them, before Edit ›
 /// Clear can reach the pixels, as in Photoshop.
-pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
+pub fn keys(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
     use crate::shortcut_dispatch::Focus;
     // Text fields and widgets that delete with these keys themselves keep them (#1534).
     if selected(app).is_none() || app.ui.text_edit.is_some() || matches!(Focus::of(ctx), Focus::Text | Focus::DeletingWidget) {
         return false;
     }
-    let mods = ctx.input(|i| i.modifiers);
-    if !mods.is_none() || !ctx.input_mut(|i| i.consume_key(mods, egui::Key::Delete) || i.consume_key(mods, egui::Key::Backspace)) {
-        return false;
-    }
-    if let Err(e) = delete_selected(app) {
-        app.ui.status = e;
-        app.ui.status_error = true;
-    }
-    true
+    ctx.input(|i| i.modifiers.is_none() && (i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace)))
 }
 
 #[cfg(test)]

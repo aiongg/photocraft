@@ -12,7 +12,7 @@ use craft::ui::canvas::{CanvasGrid, Guide, GuideLine, GuideNames, Guides, Orient
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::{Labels as _, LocaleNumbers};
 use craft::ui::menu::{ContextMenu, OpenAt};
-use egui::{Color32, Pos2, Rect, vec2};
+use egui::{Color32, Rect, vec2};
 use photocraft_doc::Document;
 use photocraft_engine::prefs::{GuidesGridAndSlices, Unit};
 use serde_json::json;
@@ -96,45 +96,18 @@ pub(crate) fn unit_menu_of(ui: &mut egui::Ui, current: Unit, units: &[Unit]) -> 
     })
 }
 
-/// A guide being dragged: from a ruler (new) or an existing one (index).
+/// A guide being dragged, mirrored from the guides' edit events for the Info panel and the tools
+/// that stand aside while a guide moves: from a ruler (new) or an existing one (index).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GuideDrag {
     pub vertical: bool,
     pub index: Option<usize>,
     pub pos: f64,
-    /// Where the pointer went down, on the guide's axis: released there, an existing guide is
-    /// clicked (selected), not moved.
-    pub press: f64,
-    /// Whether the pointer was over a ruler when the guide was let go (#6286): a guide released
-    /// there is removed, whatever its own axis reads.
-    pub over_ruler: bool,
-}
-
-impl GuideDrag {
-    /// An existing guide taken at document point `p`.
-    pub fn existing(vertical: bool, index: usize, p: [f64; 2]) -> Self {
-        let at = if vertical { p[0] } else { p[1] };
-        Self { vertical, index: Some(index), pos: at, press: at, over_ruler: false }
-    }
 }
 
 /// Canvas area left after the rulers.
 pub fn content_rect(app: &PhotocraftApp, rect: Rect) -> Rect {
     if app.ui.extras.rulers { Rect::from_min_max(rect.min + vec2(RULER, RULER), rect.max) } else { rect }
-}
-
-/// Whether the screen point `p` is over a ruler, inside the full canvas rect `full`. A guide let go
-/// there is removed, as in Photoshop, and either ruler removes it (#6286): the top ruler measures
-/// document x and the left one y, so the ruler the guide was not dragged out of can lie over a
-/// coordinate that is still inside the document on the guide's own axis.
-pub(crate) fn dropped_on_a_ruler(app: &PhotocraftApp, full: Rect, p: Pos2) -> bool {
-    if !app.ui.extras.rulers {
-        return false;
-    }
-    // The rulers take the strips [`content_rect`] trims off the canvas rect, and nothing else: a
-    // canvas point on the boundary is canvas.
-    let content = content_rect(app, full);
-    full.contains(p) && (p.x < content.min.x || p.y < content.min.y)
 }
 
 /// Grid spacing in document pixels. Percentages use each axis's own extent.
@@ -161,17 +134,6 @@ pub fn draw_grid(app: &PhotocraftApp, ui: &egui::Ui, xf: &ViewXform, doc: &Docum
         .color(Some(pref_color(&g.grid_color, Color32::from_gray(140))))
         .line(line)
         .show(ui, &xf.canvas_view());
-}
-
-/// The cursor over a guide: the arrow across it as the view shows it. A vertical guide moves left
-/// and right in the document; a rotated view turns that, as it turns the guide (#3277).
-pub fn guide_cursor(xf: &ViewXform, vertical: bool) -> egui::CursorIcon {
-    crate::tool_cursor::resize(if vertical { [1.0, 0.0] } else { [0.0, 1.0] }, xf)
-}
-
-/// The library's key for guide `index` of an orientation: guides are named by place in the document.
-fn guide_key(vertical: bool, index: usize) -> u64 {
-    (index as u64) << 1 | u64::from(vertical)
 }
 
 /// The ruler unit of each axis (x, y) for `doc` from Preferences › Units & Rulers.
@@ -203,146 +165,182 @@ fn guides_salt(idx: usize) -> (&'static str, usize) {
     ("pc-guides", idx)
 }
 
+/// What the guides took of a pass.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct GuidesTaken {
+    /// The guides own the current press: the tool input leaves it alone.
+    pub claimed: bool,
+    /// A guide right-clicked (vertical?, index): the guide menu opens on it.
+    pub context: Option<(bool, usize)>,
+    /// The guides set the cursor (hover or drag): the tool cursors stand aside.
+    pub cursor: bool,
+}
+
+/// The library's names for the guides shown: by orientation and place, so they survive a delete
+/// before them (the selection names a guide the same way). Guides at one place are told apart by
+/// their order. Each is (key, vertical, index).
+fn guide_keys(guides: &photocraft_doc::Guides) -> Vec<(u64, bool, usize)> {
+    use std::hash::{Hash, Hasher};
+    let mut keys: Vec<(u64, bool, usize)> = Vec::new();
+    for (vertical, positions) in [(true, &guides.vertical), (false, &guides.horizontal)] {
+        for (index, position) in positions.iter().enumerate() {
+            let same = positions[..index].iter().filter(|p| p.to_bits() == position.to_bits()).count();
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            (vertical, position.to_bits(), same).hash(&mut hasher);
+            keys.push((hasher.finish(), vertical, index));
+        }
+    }
+    keys
+}
+
+/// Whether guides take the pointer and keys with `tool` and `mods`: the Move tool, or ⌘ with a
+/// selection tool or a tool on which ⌘ is the Move tool (#2690, #6288); shown, unlocked, and not
+/// under a Free Transform box.
+pub(crate) fn guides_take_pointer(app: &PhotocraftApp, tool: crate::state::Tool, mods: egui::Modifiers) -> bool {
+    let visible = app.ui.extras.guides && app.ui.view.shows(app.ui.view.show.canvas_guides) && !app.ui.extras.lock_guides;
+    visible && app.ui.transform.is_none() && (tool == crate::state::Tool::Move || crate::canvas::command_takes_guides(app, tool, mods))
+}
+
 /// The guides of `doc` (or the New Guide Layout preview) over the canvas, and the drags out of the
-/// rulers (their id is [`guides_id`]). The Move tool's own guide drags are moved by the
-/// tool input, so the guides here only draw; a guide being moved shows where it is.
-pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::Response, xf: &ViewXform, doc: &Document, idx: usize) {
-    let drag = app.guide_drag;
+/// rulers (their id is [`guides_id`]). `interactive` lets the pointer and keys take them
+/// ([`guides_take_pointer`]); the drag of an existing guide, its click (select, ⌥ turns it), a
+/// press elsewhere (deselects), Delete, the arrow keys, the readout and the cursor are the
+/// library's. Shown before the tool input, which skips a press the guides claimed.
+#[allow(clippy::too_many_arguments)]
+pub fn show_guides(
+    app: &mut PhotocraftApp,
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    response: &egui::Response,
+    xf: &ViewXform,
+    doc: &Document,
+    idx: usize,
+    interactive: bool,
+    mods: egui::Modifiers,
+) -> GuidesTaken {
     let g = &app.session.prefs().guides_grid_and_slices;
     let preview = crate::guide_layout_ui::preview(app, doc);
     let source = preview.as_ref().map(|(guides, _)| guides).unwrap_or(&doc.guides);
     let (base, style) =
         (preview.as_ref().map(|(_, color)| *color).unwrap_or_else(|| pref_color(&g.guide_color, Color32::from_rgb(74, 255, 255))), g.guide_style);
+    let keys = guide_keys(source);
     let mut list = Vec::new();
     if (app.ui.extras.guides && app.ui.view.shows(app.ui.view.show.canvas_guides)) || preview.is_some() {
-        for (vertical, positions) in [(true, &source.vertical), (false, &source.horizontal)] {
-            for (i, &position) in positions.iter().enumerate() {
-                // A guide the Move tool is carrying is drawn where the pointer has it.
-                let position = match drag {
-                    Some(d) if d.vertical == vertical && d.index == Some(i) => d.pos,
-                    _ => position,
-                };
-                let mut guide = Guide::new(guide_key(vertical, i), if vertical { Orientation::Vertical } else { Orientation::Horizontal }, position);
-                // A guide given a colour in New Guide keeps it; the rest use the preference colour
-                // (or, while New Guide Layout previews, the colour it will set).
-                guide.color = Some(source.color(vertical, positions[i]).map_or(base, |[r, g, b]| Color32::from_rgb(r, g, b)));
-                guide.line = line_style(style);
-                list.push(guide);
-            }
+        for &(key, vertical, i) in &keys {
+            let positions = if vertical { &source.vertical } else { &source.horizontal };
+            let mut guide = Guide::new(key, if vertical { Orientation::Vertical } else { Orientation::Horizontal }, positions[i]);
+            // A guide given a colour in New Guide keeps it; the rest use the preference colour
+            // (or, while New Guide Layout previews, the colour it will set).
+            guide.color = Some(source.color(vertical, positions[i]).map_or(base, |[r, g, b]| Color32::from_rgb(r, g, b)));
+            guide.line = line_style(style);
+            list.push(guide);
         }
     }
-    let selected = crate::guide_select::selected(app).map(|(vertical, i)| guide_key(vertical, i));
+    let interactive = interactive && preview.is_none() && app.session.active_index() == Some(idx);
+    let key_of = |vertical: bool, index: usize| keys.iter().find(|k| k.1 == vertical && k.2 == index).map(|k| k.0);
+    let selected = crate::guide_select::selected(app).and_then(|(vertical, i)| key_of(vertical, i));
     let [ux, uy] = ruler_units(app, ui, doc);
     let view = xf.canvas_view();
     let origin = Point::new(doc.ruler_origin[0], doc.ruler_origin[1]);
+    let cursor_before = ctx.output(|o| o.cursor_icon);
     let cell = RefCell::new(&mut *app);
     let out = Guides::new(guides_salt(idx), &list, &ux, &uy, GuideNames::of(ui))
         .selected(selected)
+        .interactive(interactive)
+        .modifiers(mods)
         .bounds(DocRect::new(0.0, 0.0, f64::from(doc.size.width), f64::from(doc.size.height)))
         .zero(origin)
+        .readout("X:", "Y:")
         .snap(|orientation, position, _| crate::snap_ui::snap_guide(&mut cell.borrow_mut(), orientation == Orientation::Vertical, position))
         .show(ui, response, &view);
     drop(cell);
-    // A drag out of a ruler: mirrored into `guide_drag` for the Info panel, the readout and the
-    // tools that stand aside while a guide moves, and applied on its release.
+    let find = |key: u64| keys.iter().find(|k| k.0 == key).map(|k| (k.1, k.2));
+    let name = |vertical: bool| if vertical { "vertical" } else { "horizontal" };
+    let mut deleted = None;
     match out.event {
+        // A drag out of a ruler is a new guide, added on its release (a drag released in the pass
+        // it begins arrives as one `Set`).
         Some((None, EditEvent::Begin { value: Some(value), .. } | EditEvent::Update { value, .. })) => {
             if let Some(pos) = value.position {
-                let vertical = value.orientation == Orientation::Vertical;
-                app.guide_drag = Some(GuideDrag { vertical, index: None, pos, press: pos, over_ruler: false });
+                app.guide_drag = Some(GuideDrag { vertical: value.orientation == Orientation::Vertical, index: None, pos });
             }
         }
-        // A drag released in the pass it begins arrives as one `Set`.
         Some((None, EditEvent::Commit { value, .. } | EditEvent::Set { value, .. })) => {
             app.guide_drag = None;
             if let Some(pos) = value.position {
                 let vertical = value.orientation == Orientation::Vertical;
-                let orientation = if vertical { "vertical" } else { "horizontal" };
-                let _ = app.run("view.newGuide", json!({"orientation": orientation, "position": (pos * 1000.0).round() / 1000.0}));
+                let _ = app.run("view.newGuide", json!({"orientation": name(vertical), "position": (pos * 1000.0).round() / 1000.0}));
                 app.ui.extras.guides = true;
             }
         }
-        Some((None, EditEvent::Cancel { .. })) => app.guide_drag = None,
-        _ => {}
-    }
-}
-
-/// The position readout of a guide being dragged: `X:` for a vertical guide, `Y:` for a horizontal
-/// one, measured from the ruler zero point in the ruler unit. Pixels keep one decimal, as
-/// Photoshop's "X: 103.2 px".
-pub fn guide_drag_readout(app: &PhotocraftApp, d: GuideDrag) -> Option<(&'static str, String)> {
-    let doc = &app.session.active()?.doc;
-    let ur = &app.session.prefs().units_and_rulers;
-    let axis = usize::from(!d.vertical);
-    let px = d.pos - doc.ruler_origin.get(axis).copied().unwrap_or(0.0);
-    let extent = if d.vertical { doc.size.width } else { doc.size.height } as f64;
-    let value = match ur.rulers {
-        Unit::Pixels => photocraft_engine::prefs::fmt_decimals(px, 1),
-        _ => ur.format(px, f64::from(doc.resolution_dpi), extent),
-    };
-    Some((if d.vertical { "X:" } else { "Y:" }, format!("{value} {}", ur.rulers.suffix())))
-}
-
-/// Draw [`guide_drag_readout`] beside the pointer while a guide is dragged.
-pub fn draw_guide_drag_readout(app: &PhotocraftApp, ctx: &egui::Context) {
-    let (Some(d), Some(at)) = (app.guide_drag, ctx.pointer_latest_pos()) else { return };
-    if let Some((label, value)) = guide_drag_readout(app, d) {
-        crate::canvas::draw_value_readout(app, ctx, "guide-drag-readout", at, [label], [value]);
-    }
-}
-
-/// Existing guide under a document point (within 4 screen px).
-pub fn guide_at(app: &PhotocraftApp, x: f64, y: f64) -> Option<(bool, usize)> {
-    // Hidden canvas guides are not interactive: the Move tool must reach the layer below.
-    // Keep hit testing consistent with the visibility gate in canvas::draw.
-    if !app.ui.extras.guides || !app.ui.view.shows(app.ui.view.show.canvas_guides) || app.ui.extras.lock_guides {
-        return None;
-    }
-    let doc = &app.session.active()?.doc;
-    let tol = 4.0 / app.point_zoom().max(0.01) as f64;
-    for (i, g) in doc.guides.vertical.iter().enumerate() {
-        if (*g - x).abs() <= tol {
-            return Some((true, i));
+        // A guide taken on the canvas: moved to where it is let go, or deleted (let go on a ruler
+        // or off the canvas, or Delete); one history step each.
+        Some((Some(key), event)) => {
+            if let Some((vertical, index)) = find(key) {
+                match event {
+                    EditEvent::Begin { value: Some(value), .. } | EditEvent::Update { value, .. } => {
+                        if let Some(pos) = value.position {
+                            app.guide_drag = Some(GuideDrag { vertical, index: Some(index), pos });
+                        }
+                    }
+                    EditEvent::Commit { value, changed, .. } => {
+                        app.guide_drag = None;
+                        match value.position {
+                            Some(pos) if changed => {
+                                let _ = app
+                                    .run("view.moveGuide", json!({"orientation": name(vertical), "index": index, "position": (pos * 1000.0).round() / 1000.0}));
+                            }
+                            Some(_) => {}
+                            None => deleted = app.run("view.deleteGuide", crate::guide_select::delete_params(vertical, index)).ok().map(|_| (vertical, index)),
+                        }
+                    }
+                    EditEvent::Set { value, .. } => match value.position {
+                        Some(pos) => {
+                            let _ =
+                                app.run("view.moveGuide", json!({"orientation": name(vertical), "index": index, "position": (pos * 1000.0).round() / 1000.0}));
+                        }
+                        None => deleted = app.run("view.deleteGuide", crate::guide_select::delete_params(vertical, index)).ok().map(|_| (vertical, index)),
+                    },
+                    _ => app.guide_drag = None,
+                }
+            }
         }
+        Some((None, _)) => app.guide_drag = None,
+        None => {}
     }
-    for (i, g) in doc.guides.horizontal.iter().enumerate() {
-        if (*g - y).abs() <= tol {
-            return Some((false, i));
+    // The guides' selection, by the names of the guides as they were: a guide after a deleted one
+    // has moved up an index.
+    match out.select {
+        Some(None) => crate::guide_select::clear(app),
+        Some(Some(key)) => {
+            if let Some((vertical, index)) = find(key) {
+                let index = match deleted {
+                    Some((v, i)) if v == vertical && i < index => index - 1,
+                    _ => index,
+                };
+                crate::guide_select::select(app, vertical, index);
+            }
         }
+        None => {}
     }
-    None
-}
-
-/// Finish a guide drag: create, move, or delete (dropped outside the canvas or on a ruler). An
-/// existing guide released where it was pressed is a click: it's selected and stays put, as in
-/// Photoshop; a moved one stays selected.
-pub fn finish_drag(app: &mut PhotocraftApp, d: GuideDrag) {
-    let Some(size) = app.session.active().map(|s| s.doc.size) else { return };
-    // A drop on a ruler removes the guide even when the drag held its own axis, which otherwise
-    // reads as a click: dragged sideways onto the left ruler, a horizontal guide never moves in y.
-    if let Some(i) = d.index
-        && !d.over_ruler
-        && (d.pos - d.press).abs() * f64::from(app.point_zoom().max(0.01)) < 0.5
+    // ⌥-click on a guide turns it, through the point clicked, as in Photoshop.
+    if let Some((key, clicked_with, at)) = out.clicked
+        && clicked_with.alt
+        && !clicked_with.shift
+        && !clicked_with.command
+        && let Some((vertical, index)) = find(key)
     {
-        crate::guide_select::select(app, d.vertical, i);
-        return;
+        crate::guide_select::flip(app, vertical, index, [at.x, at.y]);
     }
-    let extent = if d.vertical { size.width } else { size.height } as f64;
-    let orientation = if d.vertical { "vertical" } else { "horizontal" };
-    let inside = !d.over_ruler && d.pos >= 0.0 && d.pos <= extent;
-    let pos = (d.pos * 1000.0).round() / 1000.0;
-    let _ = match (d.index, inside) {
-        (None, true) => app.run("view.newGuide", json!({"orientation": orientation, "position": pos})),
-        (Some(i), true) => app
-            .run("view.moveGuide", json!({"orientation": orientation, "index": i, "position": pos}))
-            .inspect(|_| crate::guide_select::select(app, d.vertical, i)),
-        (Some(i), false) => app.run("view.deleteGuide", json!({"orientation": orientation, "index": i})),
-        (None, false) => Ok(serde_json::Value::Null),
-    };
-    if d.index.is_none() && inside {
-        app.ui.extras.guides = true;
+    // Double-clicking a guide opens Preferences › Guides, Grid & Slices, as in Photoshop.
+    if out.double_clicked.is_some()
+        && let Err(e) = crate::menus::invoke(app, ctx, "edit.preferences.guidesGridAndSlices", json!({}))
+    {
+        app.ui.status = e;
     }
+    GuidesTaken { claimed: out.claimed, context: out.context.and_then(find), cursor: ctx.output(|o| o.cursor_icon) != cursor_before }
 }
+
 /// The rulers of `doc`'s view in `full` (the canvas rect before [`content_rect`]), counting from
 /// its zero point. The active view's rulers take the pointer: a drag out of them is a new guide
 /// (`guides`, the id [`draw_guides`] returned), one out of the corner moves the zero point (Shift

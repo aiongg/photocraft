@@ -115,7 +115,7 @@ pub use textures::{MAX_TEXTURE, ensure_texture};
 use textures::{clamp_texture_side, preview_bounds, texture_factor};
 use textures::{ensure_gpu, redraw_focus, visible_doc_rect};
 pub use tool_input::{ToolEvent, selection_drag_kind, tool_event};
-pub(crate) use tool_input::{command_guide_at, command_moves_layer, event_tool};
+pub(crate) use tool_input::{command_moves_layer, command_takes_guides, event_tool};
 pub(crate) use transform_controls::{LAYER_EDGES, layer_edges_rect};
 use transform_controls::{begin_transform_controls_at, draw_transform_controls, transform_controls_cursor, transform_controls_rect, transform_controls_turn};
 #[cfg(test)]
@@ -764,7 +764,6 @@ struct CanvasToolInput<'a> {
     response: &'a egui::Response,
     xf: &'a ViewXform,
     rect: Rect,
-    full: Rect,
     tool: Tool,
     idx: usize,
     primary: bool,
@@ -774,6 +773,8 @@ struct CanvasToolInput<'a> {
     under_dialog: bool,
     zoom_out: &'a dyn Fn(bool) -> bool,
     display_zoom: f32,
+    /// The guide a right-click took (vertical?, index): the guide menu.
+    guide_context: Option<(bool, usize)>,
 }
 
 fn handle_primary_canvas_input(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, input: &CanvasToolInput<'_>) {
@@ -856,7 +857,10 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
     let guide_menu = response.secondary_clicked()
         && !lasso_retracted
         && !transforming
-        && response.interact_pointer_pos().is_some_and(|p| crate::canvas_tool_menu::open_guide(app, tool, mods, [p.x, p.y], xf.to_doc(p)));
+        && input
+            .guide_context
+            .zip(response.interact_pointer_pos())
+            .is_some_and(|((vertical, index), p)| crate::canvas_tool_menu::open_guide(app, tool, vertical, index, [p.x, p.y]));
     // Right-click with the Move tool, or ⌘/Ctrl+right-click: the layers under the pointer.
     if response.secondary_clicked()
         && !lasso_retracted
@@ -957,7 +961,6 @@ fn handle_canvas_tool_stroke(
     let response = input.response;
     let xf = input.xf;
     let rect = input.rect;
-    let full = input.full;
     let tool = input.tool;
     // A drag is only recognised once the pointer has moved past egui's click distance: the
     // gesture starts where the button went down, not where it is now (#123).
@@ -1070,15 +1073,6 @@ fn handle_canvas_tool_stroke(
             buttons.clicked = false;
         }
         let at = response.interact_pointer_pos();
-        // #6286: a guide let go over a ruler is removed, whichever ruler it is. Tested here in
-        // screen space, where the rulers are: on the guide's own axis the release can still be
-        // inside the document, which is what `finish_drag` sees.
-        if app.guide_drag.is_some() {
-            let on_ruler = at.is_some_and(|p| crate::rulers::dropped_on_a_ruler(app, full, p));
-            if let Some(g) = app.guide_drag.as_mut() {
-                g.over_ruler = on_ruler;
-            }
-        }
         let p = at.map(|p| xf.to_doc(p)).or_else(|| app.drag.as_ref().and_then(|d| d.points.last().map(|q| [q[0], q[1]])));
         if let Some(d) = p {
             tap_at_peak_pressure(app);
@@ -1152,12 +1146,6 @@ fn handle_canvas_tool_clicks(
             Tool::MagneticLasso if response.double_clicked() || response.triple_clicked() => crate::magnetic_lasso_ui::close(app, mods.alt),
             // The first click placed (or grabbed) the point; the second toggles it.
             Tool::CurvaturePen if response.double_clicked() => crate::vector_ui::curvature_toggle(app, d[0], d[1]),
-            // Double-clicking a guide opens Preferences › Guides, Grid & Slices, as in Photoshop.
-            Tool::Move if response.double_clicked() && crate::rulers::guide_at(app, d[0], d[1]).is_some() => {
-                if let Err(e) = crate::menus::invoke(app, ctx, "edit.preferences.guidesGridAndSlices", json!({})) {
-                    app.ui.status = e;
-                }
-            }
             _ => {
                 if tool == Tool::Move && app.ui.transform.is_none() {
                     begin_transform_controls_at(app, ctx, xf, p);
@@ -1238,6 +1226,45 @@ struct CanvasOverlayInput<'a> {
     edge_rect: Rect,
     panning: bool,
     zoom_out: &'a dyn Fn(bool) -> bool,
+    /// The guides set the cursor this frame.
+    guide_cursor: bool,
+}
+
+/// The rulers (every tile), then on the primary one the transform and warp previews, the grid and
+/// the guides, in the order they stack: the previews are image content, under the grid and guides,
+/// which stay visible across a layer being transformed (#5086). The guides always run, hidden or
+/// not: a guide dragged out of a ruler is run by them (the rulers hand it over in this pass).
+#[allow(clippy::too_many_arguments)]
+fn show_rulers_and_guides(
+    app: &mut PhotocraftApp,
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    response: &egui::Response,
+    full: Rect,
+    xf: &ViewXform,
+    doc: &Document,
+    idx: usize,
+    primary: bool,
+    tool: Tool,
+    under_dialog: bool,
+) -> crate::rulers::GuidesTaken {
+    if app.ui.extras.rulers {
+        let guides = primary.then(|| crate::rulers::guides_id(ui, idx));
+        crate::rulers::show_rulers(app, ui, response, full, xf, doc, idx, guides);
+    }
+    if !primary {
+        return Default::default();
+    }
+    let painter = ui.painter_at(xf.rect);
+    crate::transform_tool::draw_content(app, &painter, xf);
+    // So are Puppet Warp's, Perspective Warp's and Vanishing Point's warped pixels (#7781).
+    crate::distort_ui::draw_content(app, &painter, xf);
+    if app.ui.extras.grid && app.ui.view.extras {
+        crate::rulers::draw_grid(app, ui, xf, doc);
+    }
+    let mods = crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers));
+    let interactive = !under_dialog && crate::rulers::guides_take_pointer(app, tool, mods);
+    crate::rulers::show_guides(app, ui, ctx, response, xf, doc, idx, interactive, mods)
 }
 
 fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, input: &CanvasOverlayInput<'_>) {
@@ -1250,16 +1277,6 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     let border = input.border;
     let beyond = input.beyond;
     let edge_rect = input.edge_rect;
-    // The transform preview is image content: it goes under the grid and guides, which
-    // stay visible across a layer being transformed (#5086); the box is drawn later.
-    crate::transform_tool::draw_content(app, painter, xf);
-    // So are Puppet Warp's, Perspective Warp's and Vanishing Point's warped pixels (#7781).
-    crate::distort_ui::draw_content(app, painter, xf);
-    if app.ui.extras.grid && app.ui.view.extras {
-        crate::rulers::draw_grid(app, ui, xf, doc);
-    }
-    // Always shown, hidden guides or not: a guide dragged out of a ruler is run by them.
-    crate::rulers::draw_guides(app, ui, response, xf, doc, idx);
     // The pending crop frame shows on its own document only, not on the other tiles (#1918).
     let foreign_crop = if app.session.active_index() == Some(idx) { None } else { app.ui.crop_rect.take() };
     draw_drag_preview(app, painter, xf);
@@ -1322,20 +1339,13 @@ fn draw_canvas_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &C
     let tool = input.tool;
     let panning = input.panning;
     // Tool cursors (Photoshop-style).
-    let guide_hover = response.hover_pos().and_then(|p| {
-        let d = xf.to_doc(p);
-        if tool == Tool::Move {
-            return crate::rulers::guide_at(app, d[0], d[1]);
-        }
-        command_guide_at(app, tool, d, crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers)))
-    });
     if panning {
         // The fist set with the pan above stays (#2196).
     } else if crate::tool_cursor::pointer_elsewhere(ctx, &crate::panel_docking::native_viewports(app, ctx)) {
         // The pointer is over a floating panel's own window; this window's last position of
         // it is stale, so no tool cursor or brush outline is painted at it.
-    } else if let Some((vertical, _)) = guide_hover {
-        ui.ctx().set_cursor_icon(crate::rulers::guide_cursor(xf, vertical));
+    } else if input.guide_cursor {
+        // The guides set it (`rulers::show_guides`).
     } else if let Some((p, mods, c)) = response.hover_pos().and_then(|p| {
         let mods = crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers));
         let c = crate::transform_tool::cursor(app, xf, xf.to_doc(p), mods)?;
@@ -1663,11 +1673,6 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
         app.perf.span("scrollbars", crate::gpu_canvas::now_ms() - t0);
         app.hover_doc = response.hover_pos().map(|p| xf.to_doc(p));
     }
-    // After the ruler drags above, so the readout shows where the guide is now, and not after a
-    // release ended the drag.
-    if app.session.active_index() == Some(idx) {
-        crate::rulers::draw_guide_drag_readout(app, ctx);
-    }
     crate::rotate_view::overlay(app, ctx, painter, &xf, view, response);
     if primary {
         // Tool input can change the stored camera while navigation edits the local view.
@@ -1908,6 +1913,13 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         _ => alt || sticky_alt,
     };
 
+    // The rulers, the grid and the guides, before the tool input: a press the guides claim never
+    // reaches the tool. Under a crop that moves the image the canvas is painted after the tool
+    // input, so they follow it.
+    let mut guides = None;
+    if painted.is_some() {
+        guides = Some(show_rulers_and_guides(app, ui, &ctx, &response, full, &xf, &doc, idx, primary, tool, under_dialog));
+    }
     if under_dialog {
         handle_dialog_canvas_input(
             app,
@@ -1958,13 +1970,12 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         ctx.set_cursor_icon(crate::tool_cursor::hand(&ctx, true));
     } else if primary && !stroke_dismissal && temporary.is_none() && !middle && crate::layer_picker::armed(app).is_some() {
         layer_picker_eyedropper(app, ui, &ctx, &response, &xf);
-    } else if primary && !stroke_dismissal {
+    } else if primary && !stroke_dismissal && !guides.is_some_and(|g| g.claimed) {
         let input = CanvasToolInput {
             ctx: &ctx,
             response: &response,
             xf: &xf,
             rect,
-            full,
             tool,
             idx,
             primary,
@@ -1974,6 +1985,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             under_dialog,
             zoom_out: &zoom_out,
             display_zoom: display_view.zoom,
+            guide_context: guides.and_then(|g| g.context),
         };
         handle_primary_canvas_input(app, ui, &mut view, &input);
     }
@@ -1997,16 +2009,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         xf
     };
     let (beyond, layer_edges, edge_rect) = painted.unwrap_or_else(|| paint_canvas(app, ui, &display_view, xf, &paint_input));
-    // Before the guides, so a ruler drag reaches them in the same pass.
-    if app.ui.extras.rulers {
-        let before = app.guide_drag;
-        let guides = primary.then(|| crate::rulers::guides_id(ui, idx));
-        crate::rulers::show_rulers(app, ui, &response, full, &xf, &doc, idx, guides);
-        // A guide dragged out of a ruler moved after this frame drew it: draw it again where it is.
-        if app.guide_drag != before {
-            ctx.request_repaint();
-        }
-    }
+    let guides = guides.unwrap_or_else(|| show_rulers_and_guides(app, ui, &ctx, &response, full, &xf, &doc, idx, primary, tool, under_dialog));
     // A Hand drag (the tool, Space or the middle button) keeps every overlay on screen, as in
     // Photoshop: the Pen path being drawn, paths, guides, grid, transform box (#6592). Only the
     // tool cursors below give way to the fist.
@@ -2026,6 +2029,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             edge_rect,
             panning,
             zoom_out: &zoom_out,
+            guide_cursor: guides.cursor,
         };
         paint_primary_overlays(app, ui, &mut view, &input);
     }
