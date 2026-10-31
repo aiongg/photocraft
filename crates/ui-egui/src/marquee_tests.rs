@@ -358,7 +358,7 @@ fn show_transformation_values_off_hides_the_free_transform_readout() {
         let at = screen(&h, 130.0, 120.0);
         h.event(egui::Event::PointerMoved(at));
         h.run_steps(2);
-        assert_eq!(h.query_by_label("ΔX:").is_some(), shown, "shown: {shown}");
+        assert_eq!(h.query_by_label_contains("ΔX:").is_some(), shown, "shown: {shown}");
     }
 }
 

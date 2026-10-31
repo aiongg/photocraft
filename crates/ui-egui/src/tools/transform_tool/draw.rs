@@ -4,78 +4,33 @@ use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
 use super::warp::{on_section_edge, quick_split_kind, single_patch};
 use super::{
-    BezierMesh, Color32, DocId, HANDLE_PX, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, Stroke, TransformPreview, TransformSession, ViewXform, Warp,
-    WarpDrag, WarpStyle, corners, pos2, vec2,
+    BezierMesh, Color32, DocId, HANDLE_PX, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag,
+    WarpStyle, corners, pos2, vec2,
 };
-use craft_ui::theme::StrokeExt;
+use craft_ui::canvas::kurbo::Vec2;
+use craft_ui::canvas::{PointerInk, Readout as LibReadout, TransformBox, WarpGrid, distort_cursor, skew_cursor, turn_cursor};
+use craft_ui::primitives::{Handle, HandleShape};
 
-/// The distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
+/// The library's distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
 /// pointer over a handle. The canvas calls it from its cursor branch, so nothing is drawn where a
 /// guide, a pan or a zoom set the cursor instead.
 pub(crate) fn draw_handle_cursor(app: &PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, at: Pos2, mods: egui::Modifiers) {
     let Some(t) = &app.ui.transform else { return };
     let h = handle_at(app, t, xf.to_doc(at), super::handle_tolerance(app));
-    let scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
+    let view = xf.canvas_view();
+    let doc = |a: [f64; 2], b: [f64; 2]| Vec2::new(a[0] - b[0], a[1] - b[1]);
     match (h, handle_indicator(app, t, h, mods)) {
         (Hit::Corner(i), Some(HandleIndicator::Distort)) => {
             if let Some(q) = t.quad.get(i) {
-                draw_distort_cursor(ctx, at, scr(*q) - scr(t.pivot));
+                distort_cursor(ctx, at, &view, doc(*q, t.pivot), PointerInk::Painted);
             }
         }
         (Hit::Edge(i), Some(HandleIndicator::Skew)) => {
             if let (Some(a), Some(b)) = (t.quad.get(i), t.quad.get((i + 1) % 4)) {
-                draw_skew_cursor(ctx, at, scr(*b) - scr(*a));
+                skew_cursor(ctx, at, &view, doc(*b, *a), PointerInk::Painted);
             }
         }
         _ => {}
-    }
-}
-
-/// Draws the Free Distort cursor at `at`: a high-contrast vector pointer pointing toward
-/// or outward through the corner, with shadow outline for contrast on any canvas background.
-fn draw_distort_cursor(ctx: &egui::Context, at: Pos2, toward: egui::Vec2) {
-    let len = toward.length();
-    let u = if len.is_finite() && len > 1e-6 { toward / len } else { vec2(-1.0, -1.0).normalized() };
-    let perp = vec2(-u.y, u.x);
-    let tokens = crate::theme::Tokens::get(ctx);
-    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("transform-distort-cursor")));
-
-    // An arrowhead dart pointing along `u` with tip at `at`.
-    let tip = at;
-    const LENGTH: f32 = 16.0;
-    const HALF_WIDTH: f32 = 7.0;
-    let base = tip - u * LENGTH;
-    let left = base + perp * HALF_WIDTH;
-    let right = base - perp * HALF_WIDTH;
-    let notch = tip - u * (LENGTH * 0.65);
-
-    // Convex decomposition: two triangles meeting along [tip, notch].
-    painter.add(egui::Shape::convex_polygon(vec![tip, left, notch], accent_text, Stroke::NONE));
-    painter.add(egui::Shape::convex_polygon(vec![tip, notch, right], accent_text, Stroke::NONE));
-    painter.add(egui::Shape::closed_line(vec![tip, left, notch, right], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, tokens.shadow)));
-}
-
-/// Draws the Skew cursor at `at`: opposing parallel arrows aligned with the edge tangent `tangent`.
-fn draw_skew_cursor(ctx: &egui::Context, at: Pos2, tangent: egui::Vec2) {
-    let len = tangent.length();
-    let u = if len.is_finite() && len > 1e-6 { tangent / len } else { vec2(1.0, 0.0) };
-    let perp = vec2(-u.y, u.x);
-    let tokens = crate::theme::Tokens::get(ctx);
-    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("transform-skew-cursor")));
-
-    for (offset, dir) in [(4.0f32, 1.0f32), (-4.0f32, -1.0f32)] {
-        let center = at + perp * offset;
-        let p_start = center - u * (dir * 9.0);
-        let p_end = center + u * (dir * 9.0);
-        painter.line_segment([p_start, p_end], Stroke::new(3.5, tokens.shadow));
-        painter.line_segment([p_start, p_end], craft_ui::theme::scale::Stroke::W1_5.egui(ctx, accent_text));
-
-        let tip = p_end + u * (dir * 3.5);
-        let wing1 = p_end - u * (dir * 2.5) + perp * 3.5;
-        let wing2 = p_end - u * (dir * 2.5) - perp * 3.5;
-        painter.add(egui::Shape::convex_polygon(vec![tip, wing1, wing2], accent_text, craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow)));
     }
 }
 
@@ -200,25 +155,16 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             accent,
         );
     }
+    let tokens = craft_ui::theme::current(painter.ctx());
+    let style = TransformBox::style(&tokens);
+    let ppp = painter.ctx().pixels_per_point();
     let pts: Vec<Pos2> = t.quad.iter().map(|q| scr(*q)).collect();
-    painter.add(egui::Shape::closed_line(pts.clone(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent)));
+    painter.add(egui::Shape::closed_line(pts.clone(), style.line));
     let mids: Vec<Pos2> = (0..4).map(|i| pts[i].lerp(pts[(i + 1) % 4], 0.5)).collect();
     for p in pts.iter().chain(mids.iter()) {
-        let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
-        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-        painter.rect_stroke(
-            r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
-            egui::StrokeKind::Inside,
-        );
+        painter.extend(Handle::shapes_with(&style.handle, HandleShape::Square, *p, ppp));
     }
-    // Reference point (Photoshop's crosshair circle).
-    let c = scr(t.pivot);
-    painter.circle_stroke(c, 5.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
-    painter.circle_stroke(c, 5.0, Stroke::new(0.5, Color32::BLACK));
-    painter.line_segment([c - vec2(8.0, 0.0), c + vec2(8.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
-    painter.line_segment([c - vec2(0.0, 8.0), c + vec2(0.0, 8.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+    paint_pivot(painter, scr(t.pivot), &style);
     if let Some(at) = painter.ctx().pointer_hover_pos().filter(|p| xf.rect.contains(*p)) {
         let p = xf.to_doc(at);
         let tol = HANDLE_PX / f64::from(xf.zoom.max(0.01));
@@ -226,12 +172,23 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             // Through the view, so the arc bends round the corner as it shows under a turned or
             // flipped view.
             let toward = xf.to_screen((p[0] + k[0] * 16.0) as f32, (p[1] + k[1] * 16.0) as f32) - at;
-            crate::crop_ui::draw_turn_cursor(painter.ctx(), at, toward);
+            turn_cursor(painter.ctx(), at, toward);
         }
         // Preferences › Tools › Show Transformation Values off hides it, as in Photoshop (#204).
         if let Some(r) = live_readout(app).filter(|_| app.session.prefs().tools.show_transformation_values) {
             draw_live_readout(app, painter.ctx(), at, r);
         }
+    }
+}
+
+/// The reference point: a circle and a cross, in the library box's look (`TransformBox` paints
+/// the same, privately).
+pub(crate) fn paint_pivot(painter: &egui::Painter, c: Pos2, style: &craft_ui::canvas::TransformStyle) {
+    let (r, arm) = (style.pivot_radius, style.pivot_arm);
+    for stroke in [style.pivot_halo, style.pivot] {
+        painter.circle_stroke(c, r, stroke);
+        painter.line_segment([c - vec2(arm, 0.0), c + vec2(arm, 0.0)], stroke);
+        painter.line_segment([c - vec2(0.0, arm), c + vec2(0.0, arm)], stroke);
     }
 }
 
@@ -364,14 +321,14 @@ fn parallelogram(q: &[[f64; 2]; 4]) -> bool {
     (0..2).all(|k| ((q[0][k] + q[2][k]) - (q[1][k] + q[3][k])).abs() <= scale * 1e-9)
 }
 
-/// [`live_readout`] as the rounded label beside the pointer (the marquee's and Crop's readout).
+/// [`live_readout`] as the library readout beside the pointer.
 fn draw_live_readout(app: &PhotocraftApp, ctx: &egui::Context, at: Pos2, r: Readout) {
-    let id = "transform-readout";
-    match r {
-        Readout::Angle(a) => crate::canvas::draw_readout(ctx, id, at, ["Angle:"], [format!("{:.1}°", fixed(a, 1))]),
-        Readout::Scale { percent, px } => crate::canvas::draw_readout(ctx, id, at, ["W:", "H:"], scale_values(app, percent, px)),
-        Readout::Offset([dx, dy]) => crate::canvas::draw_readout(ctx, id, at, ["ΔX:", "ΔY:"], [dx, dy].map(|v| format!("{:.0} px", fixed(v, 0)))),
-    }
+    let rows: Vec<(&str, String)> = match r {
+        Readout::Angle(a) => vec![("Angle:", format!("{:.1}°", fixed(a, 1)))],
+        Readout::Scale { percent, px } => ["W:", "H:"].into_iter().zip(scale_values(app, percent, px)).collect(),
+        Readout::Offset([dx, dy]) => ["ΔX:", "ΔY:"].into_iter().zip([dx, dy].map(|v| format!("{:.0} px", fixed(v, 0)))).collect(),
+    };
+    rows.into_iter().fold(LibReadout::new("transform-readout"), |r, (label, value)| r.row(tl!(label), value)).show(ctx, at);
 }
 
 /// `v` rounded to `places` decimals, so a hair below zero never reads "-0".
@@ -449,10 +406,6 @@ fn clip_to_canvas(mut mesh: egui::Mesh, size: [f32; 2], to_screen: impl Fn(Pos2)
 /// boundaries are solid. A single patch (Grid › Default) also draws its rule-of-thirds guides;
 /// 3×3, 4×4 and 5×5 are just those even cells, with an anchor at every intersection. `guide` is
 /// the split line following the pointer.
-/// How near the pointer (screen px) a handle's anchor or the handle itself must be for the
-/// handle to show. Everything else stays out of the way: only anchors are always drawn.
-const HANDLE_REVEAL_PX: f32 = 56.0;
-
 /// The anchor a handle belongs to, as `(i, j)` in the control grid (an anchor is its own).
 pub(super) fn handle_anchor(i: usize, j: usize) -> (usize, usize) {
     if i.is_multiple_of(3) {
@@ -467,17 +420,17 @@ pub(super) fn handle_anchor(i: usize, j: usize) -> (usize, usize) {
     }
 }
 
-/// Anchors always, small and quiet. A handle and its arm show only while the pointer is close to
-/// them or they are being dragged, so a dense grid does not bury the picture in dots.
-fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 2]) -> Pos2, pv: &TransformPreview, line: Stroke) {
+/// Anchors always. A handle and its arm show only while the pointer is within the library's
+/// reveal distance of them or they are being dragged, so a dense grid does not bury the picture in dots.
+fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 2]) -> Pos2, pv: &TransformPreview, style: &craft_ui::canvas::WarpStyle) {
     let (nx, ny) = (m.nx(), m.ny());
     let hover = painter.ctx().input(|i| i.pointer.hover_pos());
+    let ppp = painter.ctx().pixels_per_point();
     let dragged = match &pv.warp_drag {
         Some(WarpDrag::Point { index, .. }) => Some(handle_anchor(index % nx, index / nx)),
         _ => None,
     };
-    let near = |p: Pos2| hover.is_some_and(|h| h.distance(p) <= HANDLE_REVEAL_PX);
-    let faint = Stroke::new(0.75, line.color.gamma_multiply(0.8));
+    let near = |p: Pos2| hover.is_some_and(|h| h.distance(p) <= style.reveal);
     for j in 0..ny {
         for i in 0..nx {
             if !on_section_edge(i, j) {
@@ -485,9 +438,7 @@ fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 
             }
             let p = scr(m.point(i, j));
             if i.is_multiple_of(3) && j.is_multiple_of(3) {
-                let r = egui::Rect::from_center_size(p, vec2(5.0, 5.0));
-                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-                painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), faint, egui::StrokeKind::Inside);
+                painter.extend(Handle::shapes_with(&style.anchor, HandleShape::Square, p, ppp));
                 continue;
             }
             let (ai, aj) = handle_anchor(i, j);
@@ -495,9 +446,8 @@ fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 
             if !(near(p) || near(a) || dragged == Some((ai, aj))) {
                 continue;
             }
-            painter.line_segment([a, p], faint);
-            painter.circle_filled(p, 2.75, Color32::WHITE);
-            painter.circle_stroke(p, 2.75, faint);
+            painter.line_segment([a, p], style.arm);
+            painter.extend(Handle::shapes_with(&style.control, HandleShape::Round, p, ppp));
         }
     }
 }
@@ -549,8 +499,8 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
             accent,
         );
     }
-    let line = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent);
-    let thin = Stroke::new(0.75, accent.gamma_multiply(0.7));
+    let style = WarpGrid::style(&craft_ui::theme::current(painter.ctx()));
+    let (line, thin) = (style.line, style.minor);
     let curve = |fixed_u: Option<f64>, fixed_v: Option<f64>| -> Vec<Pos2> {
         (0..=40)
             .map(|k| {
@@ -586,12 +536,10 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
         painter.add(egui::Shape::line(curve(None, Some(win[1])), line));
     }
     if w.style == WarpStyle::Custom {
-        draw_warp_points(painter, &m, scr, pv, line);
+        draw_warp_points(painter, &m, scr, pv, &style);
     }
     if let Some((tool, p)) = guide {
         let (s, t) = m.param_at(p);
-        let under = Stroke::new(3.0, Color32::BLACK);
-        let over = Stroke::new(1.25, Color32::WHITE);
         let mut strokes = Vec::new();
         if matches!(tool, SplitTool::Vertical | SplitTool::Cross) {
             strokes.push(curve(Some(s), None));
@@ -600,8 +548,7 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
             strokes.push(curve(None, Some(t)));
         }
         for pts in strokes {
-            painter.add(egui::Shape::line(pts.clone(), under));
-            painter.add(egui::Shape::line(pts, over));
+            painter.add(egui::Shape::line(pts, style.split));
         }
     }
 }

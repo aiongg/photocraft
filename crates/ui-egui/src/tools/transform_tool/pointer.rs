@@ -6,6 +6,7 @@ use super::{
     CursorIcon, HANDLE_PX, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, WarpStyle,
     handle_tolerance,
 };
+use craft_ui::canvas::{kurbo::Vec2, resize_cursor};
 
 /// Which part of the box a document point hits.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -311,7 +312,7 @@ pub fn cursor(app: &PhotocraftApp, xf: &ViewXform, p: [f64; 2], mods: egui::Modi
         [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
     };
     // A handle resizes the box away from the opposite handle.
-    let resize = |from: [f64; 2], to: [f64; 2]| crate::tool_cursor::resize([to[0] - from[0], to[1] - from[1]], xf);
+    let resize = |from: [f64; 2], to: [f64; 2]| resize_cursor(&xf.canvas_view(), Vec2::new(to[0] - from[0], to[1] - from[1]));
     Some(match h {
         Hit::Corner(_) | Hit::Edge(_) if indicator.is_some() => CursorIcon::None,
         Hit::Corner(i) => crate::tool_cursor::corner_resize(&t.quad, i, xf),

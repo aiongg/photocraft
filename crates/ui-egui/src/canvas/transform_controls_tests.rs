@@ -357,3 +357,22 @@ fn transform_control_hit_keeps_move_interior_free_and_has_rotation_band() {
     assert!(!transform_controls_hit(r, r.center()));
     assert!(!transform_controls_hit(r, pos2(60.0, 4.0)));
 }
+
+/// The library kit draws cursors and overlays through `canvas_view`, so it must place every point
+/// and vector where the canvas does, under a turned, mirrored, stretched view.
+#[test]
+fn canvas_view_maps_points_and_vectors_as_the_view_xform_does() {
+    let xf = ViewXform {
+        rect: Rect::from_min_size(pos2(30.0, 20.0), vec2(640.0, 480.0)),
+        zoom: 1.75,
+        center: [120.0, 80.0],
+        flip: true,
+        rotation: 33.0,
+        aspect: 1.2,
+    };
+    let view = xf.canvas_view();
+    let p = view.to_screen(craft_ui::canvas::kurbo::Point::new(250.0, -40.0));
+    assert!((p - xf.to_screen(250.0, -40.0)).length() < 1e-2);
+    let v = view.map_vec(craft_ui::canvas::kurbo::Vec2::new(3.0, -7.0));
+    assert!((v - xf.map_vec(vec2(3.0, -7.0))).length() < 1e-3);
+}

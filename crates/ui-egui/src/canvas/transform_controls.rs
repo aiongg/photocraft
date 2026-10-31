@@ -1,7 +1,6 @@
 use super::selection::floating_outline;
 use super::view_xform::ViewXform;
-use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Stroke, Tool, Vec2, pos2, vec2};
-use craft_ui::theme::StrokeExt;
+use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Tool, Vec2, pos2, vec2};
 use craft_ui::theme::ToEgui;
 
 /// View › Show › Layer Edges: the colour of the active layer's outline.
@@ -133,15 +132,11 @@ pub(super) fn draw_transform_controls(app: &mut PhotocraftApp, painter: &egui::P
             crate::vector_ui::draw_outline(painter, &sh.path, &to_scr, accent);
         }
     }
-    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent), egui::StrokeKind::Middle);
+    let tokens = craft_ui::theme::current(painter.ctx());
+    let style = craft_ui::canvas::TransformBox::style(&tokens);
+    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), style.line, egui::StrokeKind::Middle);
+    let ppp = painter.ctx().pixels_per_point();
     for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
-        let h = Rect::from_center_size(p, vec2(7.0, 7.0));
-        painter.rect_filled(h, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-        painter.rect_stroke(
-            h,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
-            egui::StrokeKind::Inside,
-        );
+        painter.extend(craft_ui::primitives::Handle::shapes_with(&style.handle, craft_ui::primitives::HandleShape::Square, p, ppp));
     }
 }
