@@ -2021,3 +2021,13 @@ fn reset_section_on_type_keeps_the_favourite_fonts() {
     assert_eq!(prefs.favorite_fonts, ["Bebas Neue"], "the favourites are kept");
     assert_eq!(stored(&store)["type"]["favoriteFonts"], json!(["Bebas Neue"]));
 }
+
+#[test]
+fn preferences_opens_with_no_field_focused_and_no_popup_open() {
+    // Upstream opens every page with nothing focused; a focused Cache tile size field or an open UI scale list is a regression.
+    for page in ["interface", "performance"] {
+        let h = prefs_harness(page);
+        h.ctx.memory(|m| assert!(m.focused().is_none(), "{page}: a field has focus: {:?}", m.focused()));
+        assert!(!egui::Popup::is_any_open(&h.ctx), "{page}: a popup is open");
+    }
+}
