@@ -86,7 +86,6 @@ impl PhotocraftApp {
             input_waiters: Vec::new(),
             live_adjust: None,
             frame: 0,
-            notices_hovered: false,
             styled: false,
             integrated_titlebar: false,
             custom_titlebar: false,
