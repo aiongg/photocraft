@@ -207,8 +207,11 @@ pub(super) fn pages(values: &Value, order: &Value, gpu_app: Option<&PhotocraftAp
             let order: Vec<String> = order.get(id).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
             let mut keys: Vec<&String> = order.iter().filter(|k| obj.contains_key(*k)).collect();
             keys.extend(obj.keys().filter(|k| !order.contains(k)));
-            let rows: Vec<Row> =
-                keys.into_iter().filter(|k| field_visible(id, obj, k, "")).filter_map(|k| setting_row(&format!("{id}.{k}"), k, &obj[k.as_str()], &scale)).collect();
+            let rows: Vec<Row> = keys
+                .into_iter()
+                .filter(|k| field_visible(id, obj, k, ""))
+                .filter_map(|k| setting_row(&format!("{id}.{k}"), k, &obj[k.as_str()], &scale))
+                .collect();
             let footnote =
                 (id == "fileHandling").then(|| tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized.").to_string());
             let groups = match id {
@@ -239,13 +242,8 @@ fn interface_groups(obj: &Map<String, Value>, rows: Vec<Row>) -> Vec<Group> {
         let options = options.iter().map(|(id, label)| (id.to_string(), tl!(*label).to_string())).collect();
         Row::new(path, human, Kind::Choice { value: text(key, default), options })
     };
-    let mode = choice(
-        "interface.appearanceMode",
-        "Appearance Mode",
-        "appearanceMode",
-        "dark",
-        [("auto", "Sync with system"), ("dark", "Dark"), ("light", "Light")],
-    );
+    let mode =
+        choice("interface.appearanceMode", "Appearance Mode", "appearanceMode", "dark", [("auto", "Sync with system"), ("dark", "Dark"), ("light", "Light")]);
     let size = choice("interface.size", "Size", "size", "suite", [("suite", "Suite default"), ("compact", "Compact"), ("comfortable", "Comfortable")]);
     let theme = |path: &str, human: &str| {
         let mut row = Row::new(path, human, Kind::Custom);
@@ -311,7 +309,12 @@ pub(super) struct Host<'a> {
 
 impl<'a> Host<'a> {
     /// The window's host over the dialog's `fields`.
-    pub(super) fn new(app: &'a mut PhotocraftApp, fields: &'a mut Map<String, Value>, system: Option<egui::Theme>, scale_labels: &InterfaceScaleLabels) -> Self {
+    pub(super) fn new(
+        app: &'a mut PhotocraftApp,
+        fields: &'a mut Map<String, Value>,
+        system: Option<egui::Theme>,
+        scale_labels: &InterfaceScaleLabels,
+    ) -> Self {
         let lang = crate::i18n::Lang::from_pref(fields.get("values").and_then(|v| v.pointer("/interface/language")).and_then(Value::as_str).unwrap_or("auto"));
         let values = fields.get("values").cloned().unwrap_or(Value::Null);
         let order = fields.get("__order").cloned().unwrap_or(Value::Null);

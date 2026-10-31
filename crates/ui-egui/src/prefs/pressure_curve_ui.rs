@@ -3,8 +3,8 @@
 //! Brush Settings uses the same editor for each dynamic's own curve ([`edit_points`]).
 //! The graph is the library's `CurveEditor`; the presets sit beside it.
 
-use craft_ui::controls::{Button, ButtonVariant, ControlSize};
 use craft_ui::composites::{Curve, CurveEditor, CurveLabels};
+use craft_ui::controls::{Button, ButtonVariant, ControlSize};
 use craft_ui::edit::EditEvent;
 use craft_ui::localized::LocaleNumbers;
 use photocraft_engine::prefs::PressureCurve;
