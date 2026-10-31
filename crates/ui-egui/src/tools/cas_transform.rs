@@ -209,7 +209,7 @@ pub fn fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) 
         let label = ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
         crate::widgets::scrub_option_label(ui, &label);
     };
-    crate::transform_tool::position_size_fields(app, ui, t);
+    crate::transform_tool::bar_fields(app, ui, t, craft::draw::ui::BarGroups { angle: false, skew: false, interpolation: false, ..Default::default() });
     crate::widgets::vline(ui, 22.0);
     let mut next = o.clone();
     lbl(ui, tl!("Amount:"));

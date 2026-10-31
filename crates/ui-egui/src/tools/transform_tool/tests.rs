@@ -322,36 +322,10 @@ fn type_into_bar_field_with(setup: impl FnOnce(&mut PhotocraftApp), n: usize, te
     h.state().ui.transform.clone().unwrap()
 }
 
-/// The values the W and H fields show (the 3rd and 4th numeric fields).
+/// The values the W and H fields show, with their unit (the 3rd and 4th numeric fields).
 fn shown_size(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> Vec<String> {
     use egui_kittest::kittest::{NodeT, Queryable};
     h.get_all_by_role(egui::accesskit::Role::SpinButton).skip(2).take(2).map(|n| n.accesskit_node().value().unwrap_or_default().to_string()).collect()
-}
-
-#[test]
-fn size_fields_convert_between_percent_and_lengths() {
-    use crate::layer_props_ui::LenUnit;
-    use photocraft_engine::prefs::Unit;
-    // A 300 px side at 300 ppi is one inch at 100 %.
-    let at = |unit| LenUnit { unit, dpi: 300.0, ppi: 72.0 };
-    for (unit, at_100) in [
-        (Unit::Percent, 100.0),
-        (Unit::Pixels, 300.0),
-        (Unit::Inches, 1.0),
-        (Unit::Centimeters, 2.54),
-        (Unit::Millimeters, 25.4),
-        (Unit::Points, 72.0),
-        (Unit::Picas, 6.0),
-    ] {
-        let u = at(unit);
-        let shown = size_shown(&u, 100.0, 300.0);
-        assert!((f64::from(shown) - at_100).abs() < 1e-3, "{unit:?}: {shown}");
-        assert!((size_shown(&u, 150.0, 300.0) - shown * 1.5).abs() < 1e-3, "{unit:?} scales with the box");
-        assert!((size_pct(&u, shown * 2.0, 300.0) - 200.0).abs() < 1e-3, "{unit:?}: twice the length is 200 %");
-        assert!((size_pct(&u, -shown, 300.0) + 100.0).abs() < 1e-3, "{unit:?}: a negative length flips");
-    }
-    // A degenerate side never divides by zero.
-    assert!(size_pct(&at(Unit::Inches), 1.0, 0.0).is_finite());
 }
 
 #[test]
@@ -360,7 +334,7 @@ fn w_and_h_take_lengths_in_the_unit_picked_for_them() {
     // The test box is 100 × 50 px; with no document open, lengths convert at 72 ppi.
     let cm = |app: &mut PhotocraftApp| set_size_unit(app, Unit::Centimeters.name());
     let h = bar_harness(cm);
-    assert_eq!(shown_size(&h), ["3.53", "1.76"], "the box's size in cm, not 100 %");
+    assert_eq!(shown_size(&h), ["3.53 cm", "1.76 cm"], "the box's size in cm, not 100 %");
     // 7.06 cm is twice the width; linked, the height follows.
     let t = type_into_bar_field_with(cm, 2, "7.06");
     let (sx, sy, _, _) = readout(&t);
@@ -369,7 +343,7 @@ fn w_and_h_take_lengths_in_the_unit_picked_for_them() {
     let t = type_into_bar_field_with(|app| set_size_unit(app, Unit::Pixels.name()), 2, "250");
     assert!((t.quad[1][0] - t.quad[0][0] - 250.0).abs() < 0.01, "{:?}", t.quad);
     // Percent is still the default.
-    assert_eq!(shown_size(&bar_harness(|_| {})), ["100", "100"]);
+    assert_eq!(shown_size(&bar_harness(|_| {})), ["100%", "100%"]);
 }
 
 /// Opens a document at `dpi` so the W/H fields convert typed lengths at its resolution.
@@ -461,7 +435,7 @@ fn w_and_h_reject_or_clamp_hostile_typed_lengths() {
 
 #[test]
 fn right_clicking_w_or_h_picks_their_unit_and_remembers_it() {
-    use egui_kittest::kittest::Queryable;
+    use egui_kittest::kittest::{NodeT, Queryable};
     let mut h = bar_harness(|_| {});
     h.get_all_by_role(egui::accesskit::Role::SpinButton).nth(2).unwrap().click_secondary();
     h.run_steps(2);
@@ -469,14 +443,18 @@ fn right_clicking_w_or_h_picks_their_unit_and_remembers_it() {
     h.run_steps(3);
     assert_eq!(size_unit(h.state()).unit, photocraft_engine::prefs::Unit::Inches);
     assert_eq!(h.state().session.prefs().dialogs[SIZE_UNIT_KEY]["sizeUnit"], "inches");
-    assert_eq!(shown_size(&h), ["1.389", "0.694"], "100 × 50 px at 72 ppi");
+    assert_eq!(shown_size(&h), ["1.389 in", "0.694 in"], "100 × 50 px at 72 ppi");
     // H opens the same menu, with the current unit checked.
     h.get_all_by_role(egui::accesskit::Role::SpinButton).nth(3).unwrap().click_secondary();
     h.run_steps(2);
-    assert!(h.query_by_label("✓ Inches").is_some(), "the current unit is checked");
+    let inches = {
+        use egui_kittest::kittest::NodeT;
+        h.get_by_label("Inches")
+    };
+    assert_eq!(inches.accesskit_node().toggled(), Some(egui::accesskit::Toggled::True), "the current unit is checked");
     h.get_by_label("Percent").click();
     h.run_steps(3);
-    assert_eq!(shown_size(&h), ["100", "100"]);
+    assert_eq!(shown_size(&h), ["100%", "100%"]);
     // A hand-edited or stale preference falls back to Percent instead of failing.
     h.state_mut().session.prefs.edit(|p| {
         p.dialogs.insert(SIZE_UNIT_KEY.into(), json!({"sizeUnit": "furlongs"}));
@@ -657,15 +635,10 @@ fn transform_fields_reach_large_documents() {
 /// allocated: the 100 × 50 px test box tops out at 300000 % wide.
 #[test]
 fn typed_scales_stay_within_the_largest_document() {
-    assert_eq!(scale_limit_pct(20.0), SCALE_LIMIT_PCT);
-    assert_eq!(scale_limit_pct(3000.0), 10_000.0);
-    assert_eq!(scale_limit_pct(1e9), 100.0);
-    assert_eq!(scale_limit_pct(0.0), SCALE_LIMIT_PCT);
-    assert_eq!(scale_limit_pct(f64::NAN), SCALE_LIMIT_PCT);
     let t = type_into_bar_field(2, "99999999");
     let (sx, sy, _, _) = readout(&t);
-    let side = t.rect[2] - t.rect[0];
-    assert!(sx <= f64::from(scale_limit_pct(side)) + 0.5 && sy <= f64::from(scale_limit_pct(t.rect[3] - t.rect[1])) + 0.5, "{sx} {sy}");
+    let limit = |side: f64| (f64::from(POSITION_LIMIT_PX) / side * 100.0).clamp(100.0, 1_000_000.0);
+    assert!(sx <= limit(t.rect[2] - t.rect[0]) + 0.5 && sy <= limit(t.rect[3] - t.rect[1]) + 0.5, "{sx} {sy}");
 }
 
 fn drag(s: &mut TransformSession, from: [f64; 2], to: [f64; 2], mods: egui::Modifiers) {
@@ -3032,19 +3005,11 @@ fn warp_on_type_takes_a_style_and_keeps_the_type_editable() {
     assert_eq!(past(&app), before + 2);
 }
 
-#[test]
-fn anchor_grid_point_on_quad_and_carry_pivot() {
-    let quad = [[0.0, 0.0], [100.0, 0.0], [100.0, 50.0], [0.0, 50.0]];
-    assert_eq!(point_on_quad(quad, 0), [0.0, 0.0]);
-    assert_eq!(point_on_quad(quad, 1), [50.0, 0.0]);
-    assert_eq!(point_on_quad(quad, 2), [100.0, 0.0]);
-    assert_eq!(point_on_quad(quad, 3), [0.0, 25.0]);
-    assert_eq!(point_on_quad(quad, 4), [50.0, 25.0]);
-    assert_eq!(point_on_quad(quad, 5), [100.0, 25.0]);
-    assert_eq!(point_on_quad(quad, 6), [0.0, 50.0]);
-    assert_eq!(point_on_quad(quad, 7), [50.0, 50.0]);
-    assert_eq!(point_on_quad(quad, 8), [100.0, 50.0]);
+/// Reach of the position fields: the largest document side.
+const POSITION_LIMIT_PX: f32 = 300_000.0;
 
+#[test]
+fn the_reference_point_keeps_its_place_in_the_box_as_it_doubles() {
     // The reference point keeps its place in the box as the box doubles.
     for (pivot, doubled) in [([100.0, 0.0], [200.0, 0.0]), ([50.0, 25.0], [100.0, 50.0])] {
         let mut s = session();
@@ -3052,12 +3017,6 @@ fn anchor_grid_point_on_quad_and_carry_pivot() {
         drag(&mut s, [100.0, 50.0], [200.0, 100.0], egui::Modifiers::NONE);
         assert_eq!(s.pivot, doubled);
     }
-
-    for anchor in 0..9 {
-        assert_eq!(matching_anchor(quad, point_on_quad(quad, anchor)), Some(anchor));
-    }
-    assert_eq!(matching_anchor(quad, [12.3, 45.6]), None);
-    assert_eq!(matching_anchor(quad, [50.0, 30.0]), None);
 }
 
 #[test]
@@ -3280,7 +3239,7 @@ fn w_and_h_edits_on_a_skewed_box_match_upstream() {
 
 /// A distorted box scales through its homography and keeps its perspective, as upstream does.
 #[test]
-#[ignore = "waits on craft-ui row 112: typing draft survives host write-back"]
+#[ignore = "waits on craft-ui: typed W/H steps each scale the box left by the step before, and scaling a perspective box does not compose"]
 fn w_and_h_edits_on_a_distorted_box_match_upstream() {
     assert_size_edits_match_upstream("distorted", [[0.0, 0.0], [100.0, 10.0], [90.0, 60.0], [-5.0, 50.0]]);
 }

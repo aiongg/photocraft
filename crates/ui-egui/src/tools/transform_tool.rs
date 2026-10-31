@@ -52,17 +52,14 @@ pub use draw::{draw_content, draw_overlay};
 pub(crate) use draw::{draw_handle_cursor, paint_box};
 #[cfg(test)]
 use draw::{front_vertices, handle_anchor};
-pub(crate) use options_bar::position_size_fields;
+pub(crate) use options_bar::bar_fields;
 #[cfg(test)]
-use options_bar::{
-    POSITION_LIMIT_PX, SCALE_LIMIT_PCT, SIZE_UNIT_KEY, matching_anchor, readout, rotate_about_pivot, scale_about_pivot, scale_limit_pct, set_size_unit,
-    size_pct, size_shown, size_unit, warp_grid_id,
-};
+use options_bar::{SIZE_UNIT_KEY, readout, rotate_about_pivot, scale_about_pivot, set_size_unit, size_unit, warp_grid_id};
 pub use options_bar::{options_bar, reset_warp};
 pub(crate) use pointer::{Gesture, Held, Hit, apply_drag, corner_bisector, hit, point_view, reach, rotate_cursor_dir};
 pub use pointer::{cursor, pointer};
 #[cfg(test)]
-use pointer::{near_rotate_corner, point_on_quad, rotation_degrees};
+use pointer::{near_rotate_corner, rotation_degrees};
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};
 #[cfg(test)]

@@ -2,7 +2,7 @@ use super::begin::moving_layers;
 use super::commit::{commit, committing, moves_type};
 use super::drag_modes::handle_indicator;
 use super::warp::{warp_cursor, warp_pointer};
-use super::{CursorIcon, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, handle_tolerance};
+use super::{CursorIcon, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, handle_tolerance};
 use craft::draw::ui::{BoxPress, BoxRelease, TransformBox, TransformNames, TransformStyle};
 use craft::ui::canvas::quad::{BoxAllow, BoxPart, BoxRules, BoxState, ScaleRule, TransformMode as BoxMode};
 use craft::ui::canvas::{CanvasView, kurbo::Point, kurbo::Vec2, resize_cursor};
@@ -236,43 +236,6 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
     }
     crate::snap_ui::retain_transform_lines(app, mods);
     true
-}
-
-fn anchor_uv(anchor: usize) -> (f64, f64) {
-    match anchor {
-        0 => (0.0, 0.0),
-        1 => (0.5, 0.0),
-        2 => (1.0, 0.0),
-        3 => (0.0, 0.5),
-        4 => (0.5, 0.5),
-        5 => (1.0, 0.5),
-        6 => (0.0, 1.0),
-        7 => (0.5, 1.0),
-        8 => (1.0, 1.0),
-        _ => (0.5, 0.5),
-    }
-}
-
-pub(super) fn point_on_quad(quad: [[f64; 2]; 4], anchor: usize) -> [f64; 2] {
-    let (u, v) = anchor_uv(anchor);
-    if let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], quad) {
-        let (x, y) = h.apply(u, v);
-        if x.is_finite() && y.is_finite() {
-            return [x, y];
-        }
-    }
-    match anchor {
-        0 => quad[0],
-        1 => [(quad[0][0] + quad[1][0]) / 2.0, (quad[0][1] + quad[1][1]) / 2.0],
-        2 => quad[1],
-        3 => [(quad[0][0] + quad[3][0]) / 2.0, (quad[0][1] + quad[3][1]) / 2.0],
-        4 => [(quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4.0, (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4.0],
-        5 => [(quad[1][0] + quad[2][0]) / 2.0, (quad[1][1] + quad[2][1]) / 2.0],
-        6 => quad[3],
-        7 => [(quad[2][0] + quad[3][0]) / 2.0, (quad[2][1] + quad[3][1]) / 2.0],
-        8 => quad[2],
-        _ => [(quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4.0, (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4.0],
-    }
 }
 
 /// True just outside a corner: rotate handle feedback lives here, not over the entire

@@ -1,16 +1,16 @@
 use super::begin::{enter_warp, leave_warp, warps_type};
 use super::commit::{cancel, commit};
-use super::pointer::{apply_state, box_state, point_on_quad};
+use super::pointer::{apply_state, box_state};
 use super::warp::edit_session_warp;
 use super::{BezierMesh, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
-use craft::ui::canvas::ReferencePoint;
-use craft::ui::canvas::quad::{Anchor9, BoxState, Parts as BoxParts, SKEW_LIMIT};
+use craft::draw::ui::{BarGroups, FieldLabel, SizeUnit, TransformField, TransformFieldLabels, TransformFields, TransformRow};
+use craft::ui::canvas::quad::SKEW_LIMIT;
+use craft::ui::canvas::{RulerUnits, Ticks};
 use craft::ui::controls::{ControlSize, IconButton, NumberField};
 use craft::ui::edit::EditEvent;
 use craft::ui::icons::Icon;
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::patterns::{CellWidth, OptionsBar};
-use std::ops::RangeInclusive;
 
 /// How much the box enlarges its pixels: the longest edge relative to the original (picks the
 /// preview's texture level and filter).
@@ -34,42 +34,11 @@ pub(super) fn readout(t: &TransformSession) -> (f64, f64, f64, f64) {
     (p.w * 100.0, p.h * 100.0, p.angle, p.skew_h)
 }
 
-/// Sets the box's H and V skew (degrees), keeping its scale, angle and reference point: the
-/// options bar's skew fields.
-fn skew_about_pivot(app: &mut PhotocraftApp, skew_h: f64, skew_v: f64) {
-    let Some(s) = app.ui.transform.as_mut() else { return };
-    let (state, rect) = (box_state(s), start_rect(s));
-    let skew_v = skew_v.clamp(-SKEW_LIMIT, SKEW_LIMIT);
-    let to = BoxParts { skew_h, skew_v, ..state.parts(rect, s.skew_v) };
-    let next = state.with_parts(rect, s.skew_v, to);
-    if next.quad.iter().all(|p| p.is_finite()) {
-        apply_state(s, &next);
-        s.skew_v = skew_v;
-    }
-}
-
 /// Width of the mode, cancel and commit cluster kept on the right of the options bar.
 const ACTIONS_W: f32 = 140.0;
 
 /// Width of the action buttons when they follow the Warp fields (one more than the box bar: Reset).
 const WARP_ACTIONS_W: f32 = 176.0;
-
-/// Reach of the reference point X/Y fields: the largest document side (`image.canvasSize`'s limit).
-pub(super) const POSITION_LIMIT_PX: f32 = 300_000.0;
-
-/// Reach of the W/H fields. The engine takes any scale; this lets a 30 px layer span the largest
-/// document (#1267).
-pub(super) const SCALE_LIMIT_PCT: f32 = 1_000_000.0;
-
-/// The W or H field's limit for a box side of `side` px: as far as the result stays within the
-/// largest document side, so a typed scale can't ask for an image too large to allocate.
-pub(super) fn scale_limit_pct(side: f64) -> f32 {
-    let side = side.abs();
-    if !side.is_finite() || side < 1e-6 {
-        return SCALE_LIMIT_PCT;
-    }
-    ((f64::from(POSITION_LIMIT_PX) / side * 100.0) as f32).clamp(100.0, SCALE_LIMIT_PCT)
-}
 
 /// Where Free Transform remembers the unit of its W and H fields, picked by right-clicking either
 /// of them as in Photoshop (Percent until another is picked).
@@ -90,18 +59,6 @@ pub(super) fn set_size_unit(app: &mut PhotocraftApp, name: &str) {
         }
         entry["sizeUnit"] = json!(name);
     });
-}
-
-/// A W or H value shown in `u`: the box side `side` px wide at the original size, scaled by `pct`.
-/// Percent stays the scale itself (100 % is the original size), lengths are the side's length.
-pub(super) fn size_shown(u: &crate::layer_props_ui::LenUnit, pct: f64, side: f64) -> f32 {
-    u.shown(pct / 100.0 * side, side)
-}
-
-/// The scale (%) a W or H value typed in `u` asks for, for a box side `side` px wide originally.
-pub(super) fn size_pct(u: &crate::layer_props_ui::LenUnit, v: f32, side: f64) -> f64 {
-    let side = side.abs().max(1e-9);
-    u.px(v, side) / side * 100.0
 }
 
 /// Options bar while transforming: the fields (reference point X/Y, W/H %, angle, interpolation,
@@ -132,94 +89,130 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
-    let (_, _, angle, skew_h) = readout(t);
-    position_size_fields(app, ui, t);
-    OptionsBar::divider(ui);
-    let degrees = Unit::new("{n}°");
-    let turn = Cell {
-        id: "transform-angle",
-        caption: None,
-        name: tl!("Rotate"),
-        range: -180.0..=180.0,
-        unit: degrees.clone(),
-        width: CellWidth::Sm,
-        decimals: 0..=2,
-        icon: Some(Icon::RotateCw),
+    bar_fields(app, ui, t, BarGroups::ALL);
+}
+
+/// The Free Transform fields of the options bar (the groups of `groups`; Content-Aware Scale
+/// shows the reference point, X/Y and W/H): the library's [`TransformFields`] over the session's
+/// box. W and H show the unit picked from their right-click menu, and every field takes the units
+/// a number may carry when typed (`40px`, `2in`, `50%`, #6284) and arithmetic.
+pub(crate) fn bar_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession, groups: BarGroups) {
+    let u = size_unit(app);
+    let (state, rect) = (box_state(t), start_rect(t));
+    let numbers = LocaleNumbers::of(ui).as_ref().clone().ungrouped();
+    let mut pixels = RulerUnits::pixels(numbers.clone());
+    pixels.decimals = 2;
+    // Percent is a length unit too, scaled per axis so 100 is the box's original side: a typed
+    // length converts to a percentage that keeps two decimals (the library's own percent size
+    // rounds to one, which would move "5cm" by up to 0.05 % of the side).
+    let per_doc =
+        |side: f64| if u.unit == photocraft_engine::prefs::Unit::Percent { 100.0 / side.abs().max(1e-9) } else { u.unit.from_px(1.0, u.dpi, 1.0, u.ppi) };
+    let (unit, decimals) = if u.unit == photocraft_engine::prefs::Unit::Percent {
+        (Unit::new("{n}%"), 2)
+    } else {
+        (Unit::new(&format!("{{n}} {}", u.unit.suffix())), u.unit.decimals())
     };
-    if let Some(a) = number_cell(ui, &turn, angle as f32) {
-        rotate_about_pivot(app, (f64::from(a) - angle).to_radians());
-    }
-    // Photoshop's H and V skew fields: the box's sides lean by H, its top and bottom by V.
-    let (mut h, mut v) = (skew_h as f32, t.skew_v as f32);
-    let lim = -SKEW_LIMIT as f32..=SKEW_LIMIT as f32;
-    let skew = |id, caption, name| Cell {
-        id,
-        caption: Some(caption),
-        name,
-        range: lim.clone(),
-        unit: degrees.clone(),
-        width: CellWidth::Sm,
-        decimals: 0..=2,
-        icon: None,
+    let side_units =
+        |side: f64| RulerUnits { per_doc: per_doc(side), ticks: Ticks::Decimal { whole: false }, numbers: numbers.clone(), unit: unit.clone(), decimals };
+    let size = SizeUnit::Length { x: side_units(t.rect[2] - t.rect[0]), y: side_units(t.rect[3] - t.rect[1]) };
+    let labels = TransformFieldLabels {
+        x: FieldLabel::new(tl!("X"), tl!("X")),
+        y: FieldLabel::new(tl!("Y"), tl!("Y")),
+        w: FieldLabel::new(tl!("W"), tl!("Width")),
+        h: FieldLabel::new(tl!("H"), tl!("Height")),
+        link: tl!("Maintain aspect ratio").to_string(),
+        angle: FieldLabel::new("", tl!("Rotate")),
+        skew_h: FieldLabel::new(tl!("H"), tl!("Set horizontal skew")),
+        skew_v: FieldLabel::new(tl!("V"), tl!("Set vertical skew")),
+        percent: Unit::new("{n}%"),
+        degrees: Unit::new("{n}°"),
     };
-    let mut skewed = false;
-    if let Some(x) = number_cell(ui, &skew("transform-skew-h", "H:", tl!("Set horizontal skew")), h) {
-        (h, skewed) = (x, true);
-    }
-    if let Some(x) = number_cell(ui, &skew("transform-skew-v", "V:", tl!("Set vertical skew")), v) {
-        (v, skewed) = (x, true);
-    }
-    if skewed {
-        skew_about_pivot(app, f64::from(h), f64::from(v));
-    }
-    OptionsBar::divider(ui);
+    // A typed length converts at the document's resolution; W and H also take a percentage of the
+    // box's original side.
+    let (side_w, side_h) = (t.rect[2] - t.rect[0], t.rect[3] - t.rect[1]);
+    let parser = |field: TransformField, text: &str, _: craft::draw::ui::ParseContext| {
+        use photocraft_engine::prefs::Unit as Len;
+        let (unit, suffix, extent) = match field {
+            TransformField::X | TransformField::Y => (Some(Len::Pixels), "px", None),
+            TransformField::W => (Some(u.unit), u.unit.suffix(), Some(side_w)),
+            TransformField::H => (Some(u.unit), u.unit.suffix(), Some(side_h)),
+            _ => (None, "°", None),
+        };
+        let text: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+        crate::numeric_expression::parse_with_units(&text, Some(crate::numeric_expression::Units { unit, suffix, dpi: u.dpi, ppi: u.ppi, extent }))
+    };
+    let entries = crate::rulers::unit_entries(u.unit);
+    let mut picked = None;
+    let mut linked = !app.ui.transform_unlinked;
     let mut interp = t.interpolation.clone();
-    let opts = [("bicubic".to_string(), "Bicubic"), ("bilinear".to_string(), "Bilinear"), ("nearest".to_string(), "Nearest Neighbor")];
-    if crate::panels::select_cell(ui, Some("Interpolation:"), "transform-interp", "Interpolation", &mut interp, &opts, false)
+    let opts = [
+        ("bicubic".to_string(), "Bicubic".to_string()),
+        ("bilinear".to_string(), "Bilinear".to_string()),
+        ("nearest".to_string(), "Nearest Neighbor".to_string()),
+    ];
+    let edit = TransformFields::new("transform-fields", &state, rect, labels)
+        .units(&pixels, &pixels)
+        .size_unit(size)
+        .linked(&mut linked)
+        .skew_v(t.skew_v)
+        .size_menu(&entries, &mut picked)
+        .interpolation(tl!("Interpolation"), &mut interp, &opts)
+        .parser(parser)
+        .groups(groups)
+        .show_bar(ui);
+    if let Some(i) = picked {
+        set_size_unit(app, crate::rulers::unit_name_at(i));
+    }
+    app.ui.transform_unlinked = !linked;
+    if interp != t.interpolation
         && let Some(s) = app.ui.transform.as_mut()
     {
         s.interpolation = interp;
     }
+    // A cancelled gesture puts the box back as it was when the gesture began.
+    let start = egui::Id::NULL.with("transform-bar-start");
+    match edit.event {
+        Some(EditEvent::Begin { value, .. }) => {
+            ui.data_mut(|d| d.insert_temp(start, (t.quad, t.pivot, t.skew_v)));
+            if let Some(row) = value {
+                apply_row(app, &row);
+            }
+        }
+        Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => apply_row(app, &value),
+        Some(EditEvent::Commit { value, changed: true, .. }) => apply_row(app, &value),
+        Some(EditEvent::Cancel { .. }) => {
+            if let (Some((quad, pivot, skew_v)), Some(s)) = (ui.data(|d| d.get_temp::<([[f64; 2]; 4], [f64; 2], f64)>(start)), app.ui.transform.as_mut()) {
+                (s.quad, s.pivot, s.skew_v) = (quad, pivot, skew_v);
+            }
+        }
+        _ => {}
+    }
 }
 
-/// One number cell of the strip: its caption (or a scrub icon), accessible name and limits.
-struct Cell<'a> {
-    id: &'a str,
-    caption: Option<&'a str>,
-    name: &'a str,
-    range: RangeInclusive<f32>,
-    unit: Unit,
-    width: CellWidth,
-    decimals: RangeInclusive<usize>,
-    /// Scrubs the field instead of a caption.
-    icon: Option<Icon>,
+/// The box and V skew a field edit gave, applied to the session.
+fn apply_row(app: &mut PhotocraftApp, row: &TransformRow) {
+    let Some(s) = app.ui.transform.as_mut() else { return };
+    if row.state.quad.iter().all(|p| p.is_finite()) && row.state.pivot.is_finite() {
+        apply_state(s, &row.state);
+        s.skew_v = row.skew_v.clamp(-SKEW_LIMIT, SKEW_LIMIT);
+    }
 }
 
-/// A caption and its number field. Returns the value this frame's edit gave: a typed, scrubbed or
-/// stepped value, or the value a cancelled gesture began with.
-fn number_cell(ui: &mut egui::Ui, cell: &Cell<'_>, value: f32) -> Option<f32> {
-    let icon = cell.icon;
-    let numbers = LocaleNumbers::of(ui);
-    let start = egui::Id::NULL.with(("transform-cell-start", cell.id));
-    let show = |ui: &mut egui::Ui, caption: Option<&egui::Response>| {
-        let mut field = NumberField::new(cell.id, cell.name, f64::from(value), &numbers)
-            .range(cell.range.clone())
-            .decimals(cell.decimals.clone())
-            .unit(cell.unit.clone())
+/// A caption and a percentage field of the Warp bar. Returns the value this frame's edit gave: a
+/// typed, scrubbed or stepped value, or the value a cancelled gesture began with.
+fn warp_cell(ui: &mut egui::Ui, id: &str, caption: &str, name: &str, value: f32) -> Option<f32> {
+    let numbers = LocaleNumbers::of(ui).as_ref().clone().ungrouped();
+    let start = egui::Id::NULL.with(("transform-cell-start", id));
+    let edit = OptionsBar::cell(ui, caption, CellWidth::Md, |ui, caption| {
+        NumberField::new(id, name, f64::from(value), &numbers)
+            .range(-100.0..=100.0)
+            .decimals(0..=1)
+            .unit(Unit::new("{n}%"))
             .or_parse(|text| crate::numeric_expression::parse(&text.split_whitespace().collect::<String>()))
-            .size(ControlSize::Sm);
-        if let Some(c) = caption {
-            field = field.scrub_by(c);
-        }
-        if let Some(icon) = icon {
-            field = field.scrub_icon(icon);
-        }
-        field.show(ui)
-    };
-    let edit = match cell.caption {
-        Some(caption) => OptionsBar::cell(ui, &format!("{}", tl!(caption)), cell.width, |ui, c| show(ui, Some(c))),
-        None => OptionsBar::cell(ui, "", cell.width, |ui, _| show(ui, None)),
-    };
+            .size(ControlSize::Sm)
+            .scrub_by(caption)
+            .show(ui)
+    });
     match edit.event {
         Some(EditEvent::Begin { value: first, .. }) => {
             ui.data_mut(|d| d.insert_temp(start, value));
@@ -229,101 +222,6 @@ fn number_cell(ui: &mut egui::Ui, cell: &Cell<'_>, value: f32) -> Option<f32> {
         Some(EditEvent::Commit { value, changed: true, .. }) => Some(value as f32),
         Some(EditEvent::Cancel { .. }) => ui.data(|d| d.get_temp::<f32>(start)),
         _ => None,
-    }
-}
-
-pub(super) fn matching_anchor(quad: [[f64; 2]; 4], pivot: [f64; 2]) -> Option<usize> {
-    (0..9).find(|&i| {
-        let p = point_on_quad(quad, i);
-        (p[0] - pivot[0]).abs() <= 0.05 && (p[1] - pivot[1]).abs() <= 0.05
-    })
-}
-
-/// The reference point's X/Y and the W/H scale fields (with the aspect link) of the options bar.
-pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
-    let (sx, sy, _, _) = readout(t);
-    let mut pivot = t.pivot;
-    let picked = matching_anchor(t.quad, t.pivot).map(|i| Anchor9::ALL[i]);
-    let pick = ReferencePoint::new("transform-reference-point", picked).label(tl!("Reference point location")).show(ui);
-    if let Some(EditEvent::Set { value: Some(anchor), .. }) = pick.event {
-        pivot = point_on_quad(t.quad, anchor as usize);
-        if let Some(s) = app.ui.transform.as_mut() {
-            s.pivot = pivot;
-        }
-    }
-    let px_unit = Unit::new("{n} px");
-    let position = |id, caption, name| Cell {
-        id,
-        caption: Some(caption),
-        name,
-        range: -POSITION_LIMIT_PX..=POSITION_LIMIT_PX,
-        unit: px_unit.clone(),
-        width: CellWidth::Md,
-        decimals: 0..=2,
-        icon: None,
-    };
-    let (mut px, mut py) = (pivot[0] as f32, pivot[1] as f32);
-    let (mut moved, edited_x) = (false, number_cell(ui, &position("transform-x", "X:", "X"), px));
-    if let Some(x) = edited_x {
-        (px, moved) = (x, true);
-    }
-    if let Some(y) = number_cell(ui, &position("transform-y", "Y:", "Y"), py) {
-        (py, moved) = (y, true);
-    }
-    if moved && let Some(s) = app.ui.transform.as_mut() {
-        let (dx, dy) = (px as f64 - s.pivot[0], py as f64 - s.pivot[1]);
-        s.quad = s.quad.map(|q| [q[0] + dx, q[1] + dy]);
-        s.pivot = [px as f64, py as f64];
-    }
-    OptionsBar::divider(ui);
-    // W and H in the unit picked from their right-click menu: the scale in percent, or the box's
-    // length (Photoshop's units, at the document's resolution).
-    let u = size_unit(app);
-    let (side_w, side_h) = (t.rect[2] - t.rect[0], t.rect[3] - t.rect[1]);
-    let (wlim, hlim) = (scale_limit_pct(side_w), scale_limit_pct(side_h));
-    let (wlim_u, hlim_u) = (size_shown(&u, f64::from(wlim), side_w), size_shown(&u, f64::from(hlim), side_h));
-    let (mut w, mut h) = (size_shown(&u, sx, side_w), size_shown(&u, sy, side_h));
-    let (suffix, places) = (u.unit.suffix(), u.unit.decimals() as u32);
-    // Lengths need more room than a percentage ("2116.67 mm").
-    let size_w = if u.unit == photocraft_engine::prefs::Unit::Percent { 66.0 } else { 84.0 };
-    // Whatever their unit, W and H take any other typed in (`500 px` or `2 in` in percent, `50%`
-    // in a length), converted at the document's resolution against the box's original side (#6284).
-    let units = crate::widgets::FieldUnits { unit: u.unit, dpi: u.dpi, ppi: u.ppi };
-    crate::panels::opt_label(ui, "W");
-    let rw = crate::widgets::value_field_extent(ui, &mut w, -wlim_u..=wlim_u, suffix, size_w, places, units, side_w).accessible_name(tl!("Width"));
-    let link = !app.ui.transform_unlinked;
-    let mut linked = link;
-    ui.add(IconButton::new(if link { Icon::Link } else { Icon::Unlink }, tl!("Maintain aspect ratio")).size(ControlSize::Sm).toggle(&mut linked));
-    app.ui.transform_unlinked = !linked;
-    crate::panels::opt_label(ui, "H");
-    let rh = crate::widgets::value_field_extent(ui, &mut h, -hlim_u..=hlim_u, suffix, size_w, places, units, side_h).accessible_name(tl!("Height"));
-    for r in [&rw, &rh] {
-        r.context_menu(|ui| {
-            if let Some(name) = crate::rulers::unit_menu(ui, u.unit) {
-                set_size_unit(app, name);
-            }
-        });
-    }
-    let (w, h) = (size_pct(&u, w, side_w), size_pct(&u, h, side_h));
-    if rw.changed() || rh.changed() {
-        let (state, rect) = (box_state(t), start_rect(t));
-        let (now_w, now_h) = state.signed_scale(rect, t.skew_v);
-        let (now_w, now_h) = (now_w * 100.0, now_h * 100.0);
-        let (w, h) = if link {
-            let (axis, typed, side) = if rw.changed() { (0, w, now_w) } else { (1, h, now_h) };
-            // Linked, the other side follows: keep both within their own limit.
-            let k = typed / if side.abs() < 1e-9 { 1e-9f64.copysign(side) } else { side };
-            let cap = (f64::from(wlim) / now_w.abs().max(1e-9)).min(f64::from(hlim) / now_h.abs().max(1e-9));
-            BoxState::linked_scale((now_w, now_h), axis, side * k.signum() * k.abs().min(cap))
-        } else {
-            (w, h)
-        };
-        let next = state.with_signed_scale(rect, t.skew_v, w / 100.0, h / 100.0);
-        if let Some(s) = app.ui.transform.as_mut()
-            && next.quad.iter().all(|p| p.is_finite())
-        {
-            apply_state(s, &next);
-        }
     }
 }
 
@@ -359,17 +257,7 @@ fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
         }
         let fields: [(&str, &str, f64); 3] = [("warp-bend", "Bend:", w.bend), ("warp-h", "H:", w.h_distort), ("warp-v", "V:", w.v_distort)];
         for (k, (id, label, v)) in fields.iter().enumerate() {
-            let cell = Cell {
-                id,
-                caption: Some(label),
-                name: tl!(label),
-                range: -100.0..=100.0,
-                unit: Unit::new("{n}%"),
-                width: CellWidth::Md,
-                decimals: 0..=1,
-                icon: None,
-            };
-            if let Some(f) = number_cell(ui, &cell, *v as f32)
+            if let Some(f) = warp_cell(ui, id, label, tl!(label), *v as f32)
                 && let Some(Some(cur)) = app.ui.transform.as_mut().map(|t| t.warp.as_mut())
             {
                 match k {
