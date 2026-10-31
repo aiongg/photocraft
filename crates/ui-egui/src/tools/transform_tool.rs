@@ -15,6 +15,7 @@ use egui::{Color32, CursorIcon, Pos2, Stroke, pos2, vec2};
 use photocraft_algo::transform::Homography;
 use photocraft_doc::{DocId, Document, LayerContent, LayerId};
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome};
+use craft_ui::canvas::{WarpPress, WarpSplitPress};
 use photocraft_geom::warp::{BezierMesh, Warp, WarpStyle};
 use serde_json::json;
 
@@ -39,10 +40,10 @@ pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_placed, begin_selection
 pub(crate) use commit::{SAVE_FOR_WEB, committing, nudge};
 pub use commit::{cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event, track_steps};
 #[cfg(test)]
-use drag_modes::{HandleIndicator, handle_indicator, keep_convex, turns};
-pub(crate) use drag_modes::{apply_drag, corner_distorts, legacy_mods};
+use drag_modes::{HandleIndicator, handle_indicator};
+pub(crate) use drag_modes::{corner_distorts, legacy_mods};
 #[cfg(test)]
-pub(crate) use drag_modes::{apply_mode_drag, unlinked_mods};
+pub(crate) use drag_modes::unlinked_mods;
 pub(crate) use draw::draw_handle_cursor;
 #[cfg(test)]
 use draw::scale_values;
@@ -59,9 +60,9 @@ use options_bar::{
     set_size_unit, size_pct, size_shown, size_unit, warp_grid_id,
 };
 pub use options_bar::{options_bar, reset_warp};
-pub(crate) use pointer::{Gesture, Hit, hit, rotate_cursor_dir};
+pub(crate) use pointer::{Gesture, Hit, hit, point_view, reach, rotate_cursor_dir};
 #[cfg(test)]
-use pointer::{accepts_outside_click, carry_pivot, near_rotate_corner, point_on_quad, rotation_degrees};
+use pointer::{carry_pivot, near_rotate_corner, point_on_quad, rotation_degrees};
 pub use pointer::{cursor, pointer};
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};
@@ -69,7 +70,7 @@ use preview::{Above, composite_image, show_only};
 use preview::{covering, preview_image};
 pub use warp::{edit_session_warp, split};
 #[cfg(test)]
-use warp::{on_section_edge, single_patch, split_cursor, surface_at, warp_hit, warp_pointer};
+use warp::{on_section_edge, single_patch, surface_at, warp_pointer};
 
 /// Which Split button is armed. The guide follows the pointer and the split is added on release.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -100,9 +101,9 @@ impl SplitTool {
 /// What a Warp-mode press grabbed. `pts0` is the mesh's control grid at the press.
 enum WarpDrag {
     /// An anchor or handle: it follows the pointer (an anchor takes its handles along).
-    Point { index: usize, start: [f64; 2], pts0: Vec<[f64; 2]> },
+    Point { press: WarpPress, pts0: Vec<[f64; 2]> },
     /// Anywhere else on the grid: the surface under the pointer follows it.
-    Surface { s: f64, t: f64, start: [f64; 2], pts0: Vec<[f64; 2]> },
+    Surface { press: WarpPress, pts0: Vec<[f64; 2]> },
 }
 
 /// Preview state that isn't serialisable: the document without the transformed pixels, and
@@ -125,8 +126,9 @@ pub struct TransformPreview {
     /// Document point the split guide is following (a drag, or the hover while placing).
     split_pointer: Option<[f64; 2]>,
     split_placing: bool,
-    /// Option-click places a split without a button armed.
-    split_quick: bool,
+    /// The split press under way ([`WarpGrid::split_press`]); a quick one (⌥ or ⌘ without a
+    /// button armed) is told by the press itself.
+    split_press: Option<WarpSplitPress>,
     steps: Steps,
     /// The tool the session began with: picking another one applies the transform.
     tool: Tool,
@@ -237,13 +239,10 @@ pub const LOCKED: &str = "Could not complete the Free Transform command because 
 /// Why Edit › Transform's modes and Warp refuse while Content-Aware Scale's box is open.
 pub const CAS_ONLY_SCALES: &str = "Content-Aware Scale only scales: commit or cancel it first";
 
-/// Grab radius of the box's handles, in screen points. Generous, so a corner is easy to catch;
-/// just beyond it, outside the box, a drag rotates.
-pub const HANDLE_PX: f64 = 12.0;
-
-/// [`HANDLE_PX`] in document pixels at the current zoom.
+/// The library's grab radius for the box's handles (`transform.hit`) in document pixels at the
+/// current zoom.
 pub fn handle_tolerance(app: &PhotocraftApp) -> f64 {
-    HANDLE_PX / app.point_zoom().max(0.01) as f64
+    f64::from(pointer::reach().hit) / f64::from(app.point_zoom().max(0.01))
 }
 
 /// The box as one undo step restores it.

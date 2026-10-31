@@ -83,7 +83,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -180,7 +180,7 @@ fn begin_several(app: &mut PhotocraftApp, ctx: &egui::Context, doc: Arc<Document
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -308,7 +308,7 @@ pub(crate) fn begin_content_aware(
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -437,7 +437,7 @@ fn begin_lone(
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -489,7 +489,7 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: Some(path),
@@ -579,7 +579,7 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
         split_tool: None,
         split_pointer: None,
         split_placing: false,
-        split_quick: false,
+        split_press: None,
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -741,6 +741,6 @@ pub fn leave_warp(app: &mut PhotocraftApp) {
         pv.split_tool = None;
         pv.split_pointer = None;
         pv.split_placing = false;
-        pv.split_quick = false;
+        pv.split_press = None;
     }
 }
