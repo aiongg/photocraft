@@ -6,95 +6,16 @@
 //! Auto Center Preview (on by default, default mode only), see `crop_mode`.
 //!
 //! The state lives in `ToolOptions::crop_shield` ([`CropShield`]), which `ui.inspect` reports and
-//! `ui.set {cropShield: {...}}` patches. [`fill`] resolves it to the colour the canvas paints over
-//! the area outside the box.
+//! `ui.set {cropShield: {...}}` patches. The library's [`CropShield::fill`] resolves it to the
+//! colour the canvas paints over the area outside the box.
 
 use craft::ui::theme::ToEgui;
 use egui::{Color32, Key, Modifiers};
-use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
-/// Photoshop's default shield opacity, percent.
-pub const DEFAULT_OPACITY: f32 = 75.0;
-/// Auto Adjust Opacity: the share of the opacity the shield keeps while the box is dragged.
-pub const EDITING_FACTOR: f32 = 0.5;
-
-pub use craft::draw::ui::ShieldColor;
-
-/// The gear menu's options. Every field defaults on its own, so older settings load.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct CropShield {
-    /// Use Classic Mode (P): the box turns and moves over the image instead of the image turning
-    /// and moving behind an upright box (`crop_mode`). Off by default, as in Photoshop.
-    pub classic_mode: bool,
-    /// Auto Center Preview: in default mode, drawing or resizing the box re-pans the view so the
-    /// box sits in the middle of the canvas.
-    pub auto_center_preview: bool,
-    /// Show Cropped Area (H): off hides everything outside the box behind the canvas colour.
-    pub show_cropped_area: bool,
-    /// Enable Crop Shield: off shows the area outside the box undimmed.
-    pub enabled: bool,
-    pub color: ShieldColor,
-    /// sRGB, used when `color` is `Custom`.
-    pub custom_color: [u8; 3],
-    /// Percent, 0..=100 ([`CropShield::opacity`] clamps a stray value).
-    pub opacity: f32,
-    /// Auto Adjust Opacity: lighter while the box is dragged.
-    pub auto_adjust: bool,
-}
-
-impl Default for CropShield {
-    fn default() -> Self {
-        Self {
-            classic_mode: false,
-            auto_center_preview: true,
-            show_cropped_area: true,
-            enabled: true,
-            color: ShieldColor::MatchCanvas,
-            custom_color: [0, 0, 0],
-            opacity: DEFAULT_OPACITY,
-            auto_adjust: true,
-        }
-    }
-}
-
-impl CropShield {
-    /// Show Cropped Area as it acts: always on in Classic Mode, where Photoshop greys the option
-    /// out (the stored choice is kept for the default mode).
-    pub fn shows_cropped_area(&self) -> bool {
-        self.classic_mode || self.show_cropped_area
-    }
-
-    /// The opacity as a fraction in 0..=1: a non-finite value (a hand-edited settings file) is
-    /// the default, an out-of-range one is clamped.
-    pub fn opacity(&self) -> f32 {
-        let o = if self.opacity.is_finite() { self.opacity } else { DEFAULT_OPACITY };
-        o.clamp(0.0, 100.0) / 100.0
-    }
-}
-
-/// What to paint over the area outside the crop box, `canvas` being the pasteboard colour and
-/// `editing` a crop drag in progress: the opaque canvas colour when Show Cropped Area is off, no
-/// shield when it is disabled (or fully transparent), otherwise its colour at its opacity.
-pub fn fill(s: &CropShield, canvas: Color32, editing: bool) -> Option<Color32> {
-    let [r, g, b, _] = canvas.to_srgba_unmultiplied();
-    if !s.shows_cropped_area() {
-        return Some(Color32::from_rgb(r, g, b));
-    }
-    if !s.enabled {
-        return None;
-    }
-    let [r, g, b] = match s.color {
-        ShieldColor::MatchCanvas => [r, g, b],
-        ShieldColor::Custom => s.custom_color,
-    };
-    let a = s.opacity() * if s.auto_adjust && editing { EDITING_FACTOR } else { 1.0 };
-    let a = (a * 255.0).round().clamp(0.0, 255.0) as u8;
-    (a > 0).then(|| Color32::from_rgba_unmultiplied(r, g, b, a))
-}
+pub use craft::draw::ui::{CropShield, ShieldColor};
 
 /// The pasteboard colour the shield matches: Preferences › Interface's, else black in Full Screen
 /// Mode (the backdrop there) and the theme's canvas otherwise.
@@ -103,9 +24,9 @@ pub fn canvas_color(app: &PhotocraftApp, ctx: &egui::Context) -> Color32 {
         .unwrap_or_else(|| if app.ui.view.hides_chrome() { Color32::BLACK } else { craft::ui::theme::current(ctx).color.surface.canvas.to_egui() })
 }
 
-/// The shield over the pending crop box now ([`fill`]).
+/// The shield over the pending crop box now ([`CropShield::fill`]).
 pub fn current(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Color32> {
-    fill(&app.ui.tool_options.crop_shield, canvas_color(app, ctx), app.crop.drag.is_some())
+    app.ui.tool_options.crop_shield.fill(canvas_color(app, ctx), app.crop.drag.is_some())
 }
 
 /// Show Cropped Area is off with the Crop tool showing a box: nothing outside it shows.
@@ -183,7 +104,7 @@ pub fn options_button(s: &mut CropShield, ui: &mut egui::Ui) -> bool {
                     }
                 });
                 if !s.opacity.is_finite() {
-                    s.opacity = DEFAULT_OPACITY;
+                    s.opacity = CropShield::default().opacity;
                 }
                 crate::widgets::slider_row(ui, tl!("Opacity:"), &mut s.opacity, 0.0..=100.0, "%", None);
                 crate::widgets::checkbox(ui, &mut s.auto_adjust, tl!("Auto Adjust Opacity"));
@@ -212,67 +133,6 @@ pub fn set_custom_color(app: &mut PhotocraftApp, hex: &str) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const CANVAS: Color32 = Color32::from_rgb(40, 40, 40);
-
-    #[test]
-    fn defaults_match_photoshop() {
-        let s = CropShield::default();
-        assert!(s.show_cropped_area && s.enabled && s.auto_adjust);
-        assert_eq!((s.color, s.opacity), (ShieldColor::MatchCanvas, 75.0));
-        assert_eq!(fill(&s, CANVAS, false), Some(Color32::from_rgba_unmultiplied(40, 40, 40, 191)));
-    }
-
-    #[test]
-    fn auto_adjust_lightens_the_shield_while_dragging() {
-        let mut s = CropShield::default();
-        let still = fill(&s, CANVAS, false).unwrap();
-        let dragging = fill(&s, CANVAS, true).unwrap();
-        assert!(dragging.a() < still.a(), "{dragging:?} {still:?}");
-        assert_eq!(dragging.to_srgba_unmultiplied()[3], 96);
-        s.auto_adjust = false;
-        assert_eq!(fill(&s, CANVAS, true), Some(still), "without Auto Adjust the opacity holds");
-    }
-
-    #[test]
-    fn a_disabled_shield_leaves_the_outside_undimmed() {
-        let s = CropShield { enabled: false, ..Default::default() };
-        assert_eq!(fill(&s, CANVAS, false), None);
-        assert_eq!(fill(&s, CANVAS, true), None);
-        let s = CropShield { opacity: 0.0, ..Default::default() };
-        assert_eq!(fill(&s, CANVAS, false), None, "0 % draws nothing");
-    }
-
-    #[test]
-    fn custom_colour_and_match_canvas() {
-        let s = CropShield { color: ShieldColor::Custom, custom_color: [200, 10, 30], opacity: 100.0, ..Default::default() };
-        assert_eq!(fill(&s, CANVAS, false), Some(Color32::from_rgb(200, 10, 30)));
-        let s = CropShield { opacity: 100.0, ..Default::default() };
-        assert_eq!(fill(&s, Color32::from_rgb(184, 184, 184), false), Some(Color32::from_rgb(184, 184, 184)));
-    }
-
-    #[test]
-    fn hidden_cropped_area_is_opaque_canvas_whatever_the_shield() {
-        for enabled in [true, false] {
-            let s =
-                CropShield { show_cropped_area: false, enabled, color: ShieldColor::Custom, custom_color: [255, 0, 0], opacity: 10.0, ..Default::default() };
-            assert_eq!(fill(&s, CANVAS, false), Some(CANVAS));
-            assert_eq!(fill(&s, CANVAS, true), Some(CANVAS));
-        }
-    }
-
-    #[test]
-    fn stray_opacities_are_clamped() {
-        for (o, want) in [(f32::NAN, 0.75), (f32::INFINITY, 0.75), (f32::NEG_INFINITY, 0.75), (-20.0, 0.0), (250.0, 1.0), (40.0, 0.4)] {
-            let s = CropShield { opacity: o, ..Default::default() };
-            assert!((s.opacity() - want).abs() < 1e-6, "{o}");
-            assert_eq!(fill(&s, CANVAS, false).map_or(0, |c| c.to_srgba_unmultiplied()[3]), (want * 255.0f32).round() as u8, "{o}");
-        }
-        // From JSON: out-of-range numbers load and are clamped when drawn.
-        let s: CropShield = serde_json::from_str(r#"{"opacity": 1e9}"#).unwrap();
-        assert_eq!(s.opacity(), 1.0);
-        assert!(serde_json::from_str::<CropShield>(r#"{"opacity": "high"}"#).is_err());
-    }
 
     #[test]
     fn older_settings_without_the_shield_get_the_defaults() {

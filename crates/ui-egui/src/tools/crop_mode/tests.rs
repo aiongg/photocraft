@@ -543,7 +543,7 @@ fn classic_mode_shows_the_cropped_area_and_h_does_nothing() {
     app.ui.tool_options.crop_shield.classic_mode = true;
     assert!(!crate::crop_shield::hides_outside(&app));
     let canvas = egui::Color32::from_rgb(40, 40, 40);
-    assert_ne!(crate::crop_shield::fill(&app.ui.tool_options.crop_shield, canvas, false), Some(canvas), "the shield, not the opaque canvas");
+    assert_ne!(app.ui.tool_options.crop_shield.fill(canvas, false), Some(canvas), "the shield, not the opaque canvas");
     key(&mut app, egui::Key::H, NONE);
     assert_eq!(app.ui.tool, Tool::Crop, "H is taken, not the Hand tool");
     assert!(!app.ui.tool_options.crop_shield.show_cropped_area, "and changes nothing");

@@ -15,7 +15,7 @@
 //! does nothing.
 
 use craft::draw::ui::CropBox;
-use craft::ui::canvas::kurbo::{Rect, Size};
+use craft::ui::canvas::kurbo::{Point, Rect, Size};
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
 use egui::{Modifiers, Pos2};
@@ -108,9 +108,7 @@ pub fn frame_angle(a: [f64; 2], b: [f64; 2], min_len: f64) -> Option<f64> {
     if !len.is_finite() || len < min_len.max(f64::MIN_POSITIVE) {
         return None;
     }
-    let rot = photocraft_engine::analysis_cmds::straighten_angle(&photocraft_doc::Ruler { start: a, end: b, protractor: None });
-    // ↵ turns the document back by the frame's angle; turning it by `rot` levels the line.
-    rot.is_finite().then(|| crate::crop_ui::normalized_angle(-rot) + 0.0)
+    CropBox::level_angle(Point::new(a[0], a[1]), Point::new(b[0], b[1]))
 }
 
 /// The line from `a` to `b` (document px, at `zoom` screen points per px) straightens the frame.
