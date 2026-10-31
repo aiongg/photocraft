@@ -1,7 +1,7 @@
 //! The Crop tool's Straighten (Photoshop's options-bar level button, #1919): draw a line along
 //! something that should be level (a horizon) or plumb (a wall), and the crop frame turns so that
-//! line ends up horizontal, or vertical when it is nearer vertical (the Ruler's Straighten
-//! convention, `analysis_cmds::straighten_angle`).
+//! line ends up horizontal, or vertical when it is nearer vertical (the library's
+//! `CropBox::level_angle`).
 //!
 //! - The options-bar button arms it for one line, then disarms (one-shot); clicking it again
 //!   disarms it without a line.
@@ -11,21 +11,14 @@
 //! While the line is drawn its angle shows beside the pointer. Straighten sets the frame's angle
 //! and fits the frame to the image ([`fitted`]); in Classic Mode the frame then shows turned over
 //! the image, in the default mode the image turns behind the upright box (`crop_mode`). It is only a pending frame edit:
-//! ↵ commits it and Esc cancels it as any crop. A line shorter than [`MIN_LINE_PX`] screen points
+//! ↵ commits it and Esc cancels it as any crop. A line shorter than the library's `crop.straighten_min`
 //! does nothing.
 
 use craft::draw::ui::CropBox;
-use craft::ui::canvas::kurbo::{Point, Rect, Size};
-use craft::ui::theme::StrokeExt;
-use craft::ui::theme::ToEgui;
-use egui::{Modifiers, Pos2};
+use craft::ui::canvas::kurbo::{Rect, Size};
 
 use crate::PhotocraftApp;
-use crate::canvas::ToolEvent;
 use crate::state::Tool;
-
-/// The shortest line (screen points) that straightens.
-pub const MIN_LINE_PX: f64 = 3.0;
 
 /// Straighten state (not serialized: it only lasts for a line or while a key is held).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -34,8 +27,6 @@ pub struct Straighten {
     pub armed: bool,
     /// ⌘ (Ctrl) is held: set by the canvas every frame.
     pub held: bool,
-    /// The line being drawn: start and end in document px.
-    pub line: Option<[[f64; 2]; 2]>,
 }
 
 /// ⌘ (Ctrl) is held over the canvas.
@@ -47,14 +38,17 @@ pub fn set_held(app: &mut PhotocraftApp, down: bool) {
 /// shows the straighten cursor instead of the frame's.
 pub fn mode(app: &PhotocraftApp) -> bool {
     let s = &app.crop.straighten;
-    app.ui.tool == Tool::Crop && app.crop.drag.is_none() && (s.armed || s.held || s.line.is_some())
+    app.ui.tool == Tool::Crop
+        && match app.crop.drag {
+            Some(d) => d.kind == crate::crop_ui::DragKind::Line,
+            None => s.armed || s.held,
+        }
 }
 
 impl Straighten {
     /// The options-bar button: arms (or disarms) Straighten for one line.
     pub fn toggle(&mut self) {
         self.armed = !self.armed;
-        self.line = None;
     }
 }
 
@@ -66,55 +60,11 @@ pub fn toggle(app: &mut PhotocraftApp) {
 /// Drops the armed button and any line (Esc, another tool).
 pub fn reset(app: &mut PhotocraftApp) {
     app.crop.straighten.armed = false;
-    app.crop.straighten.line = None;
 }
 
-/// Pointer input for Straighten, called by the Crop tool first (finite `p`, a document open).
-/// Returns true when the event drew a straighten line.
-pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool {
-    match ev {
-        ToolEvent::Down { x, y, .. } => {
-            // A line whose release went elsewhere (Space's Hand took it) never continues here.
-            app.crop.straighten.line = None;
-            let s = app.crop.straighten;
-            if app.crop.drag.is_some() || !(s.armed || mods.command) {
-                return false;
-            }
-            app.crop.straighten.line = Some([[x, y], [x, y]]);
-            app.crop.editing = app.ui.crop_rect.is_some();
-            true
-        }
-        ToolEvent::Move { x, y, .. } => {
-            let Some(l) = app.crop.straighten.line.as_mut() else { return false };
-            l[1] = [x, y];
-            true
-        }
-        ToolEvent::Up { x, y } => {
-            let Some([a, _]) = app.crop.straighten.line.take() else { return false };
-            // One line per click of the button.
-            app.crop.straighten.armed = false;
-            let zoom = f64::from(app.point_zoom());
-            apply(app, a, [x, y], zoom);
-            true
-        }
-    }
-}
-
-/// The frame's angle (degrees, clockwise on screen) that makes the line from `a` to `b` level, or
-/// plumb when it is nearer vertical; `None` for a line shorter than `min_len` or not finite.
-pub fn frame_angle(a: [f64; 2], b: [f64; 2], min_len: f64) -> Option<f64> {
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let len = dx.hypot(dy);
-    if !len.is_finite() || len < min_len.max(f64::MIN_POSITIVE) {
-        return None;
-    }
-    CropBox::level_angle(Point::new(a[0], a[1]), Point::new(b[0], b[1]))
-}
-
-/// The line from `a` to `b` (document px, at `zoom` screen points per px) straightens the frame.
-fn apply(app: &mut PhotocraftApp, a: [f64; 2], b: [f64; 2], zoom: f64) {
-    let min_len = if zoom.is_finite() && zoom > 0.0 { MIN_LINE_PX / zoom } else { MIN_LINE_PX };
-    let Some(deg) = frame_angle(a, b, min_len) else { return };
+/// A released line that levels the frame at `deg` degrees (the library's `CropRelease::Straighten`):
+/// the frame turns to it, as large as fits the canvas.
+pub(crate) fn apply(app: &mut PhotocraftApp, deg: f64) {
     let Some(size) = app.session.active().map(|st| (f64::from(st.doc.size.width), f64::from(st.doc.size.height))) else { return };
     // The frame keeps its proportions (an options-bar ratio is already the frame's); no frame
     // takes the canvas's.
@@ -131,21 +81,6 @@ fn apply(app: &mut PhotocraftApp, a: [f64; 2], b: [f64; 2], zoom: f64) {
     app.crop.editing = true;
 }
 
-/// The line being drawn and its angle beside the pointer. `to_screen` maps document px to the
-/// screen.
-pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, to_screen: impl Fn([f64; 2]) -> Pos2, hover: Option<Pos2>) {
-    let Some([a, b]) = app.crop.straighten.line.filter(|_| app.ui.tool == Tool::Crop) else { return };
-    let t = craft::ui::theme::current(painter.ctx());
-    let seg = [to_screen(a), to_screen(b)];
-    painter.line_segment(seg, egui::Stroke::new(3.0, t.color.surface.shadow.to_egui()));
-    painter.line_segment(seg, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.text.to_egui()));
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let deg = (-dy).atan2(dx).to_degrees();
-    if let Some(h) = hover.filter(|_| deg.is_finite() && (dx != 0.0 || dy != 0.0)) {
-        crate::canvas::draw_value_readout(app, painter.ctx(), "crop-straighten-readout", h, ["Angle:"], [crate::canvas::angle_readout(deg)]);
-    }
-}
-
 /// The options-bar Straighten button (Photoshop's level icon), lit while armed.
 pub fn options_button(s: &mut Straighten, ui: &mut egui::Ui) {
     if crate::icons::button(ui, "ruler", 24.0, s.armed, tl!("Straighten the image by drawing a line on it")).clicked() {
@@ -156,8 +91,9 @@ pub fn options_button(s: &mut Straighten, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canvas::tool_event;
-    use crate::crop_ui::{CropDrag, ensure_frame};
+    use crate::canvas::{ToolEvent, tool_event};
+    use crate::crop_ui::{DragKind, ensure_frame, test_drag};
+    use egui::Modifiers;
     use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 
     const NONE: Modifiers = Modifiers::NONE;
@@ -194,27 +130,6 @@ mod tests {
     /// Every corner of frame `r` turned `deg` lies inside the `w`×`h` canvas.
     fn inside(r: [f64; 4], deg: f64, w: f64, h: f64) -> bool {
         crate::crop_ui::corners(r, deg).iter().all(|p| p[0] >= -1e-6 && p[1] >= -1e-6 && p[0] <= w + 1e-6 && p[1] <= h + 1e-6)
-    }
-
-    #[test]
-    fn the_frame_turns_with_a_horizon_and_nearly_vertical_lines_turn_it_plumb() {
-        // A horizon falling 10° to the right: the frame turns 10° clockwise, so ↵ levels it.
-        let d = 10.0f64.to_radians();
-        assert!(near(frame_angle([0.0, 0.0], [100.0 * d.cos(), 100.0 * d.sin()], 1.0).unwrap(), 10.0));
-        // Rising to the right: counter-clockwise. Drawn right to left: the same line.
-        assert!(near(frame_angle([0.0, 50.0], [100.0, 40.0], 1.0).unwrap(), -(10.0f64 / 100.0).atan().to_degrees()));
-        assert!(near(frame_angle([100.0, 40.0], [0.0, 50.0], 1.0).unwrap(), -(10.0f64 / 100.0).atan().to_degrees()));
-        // A wall leaning 5° (nearer vertical) is made plumb, not level.
-        let a = frame_angle([50.0, 0.0], [50.0 + 100.0 * 5.0f64.to_radians().tan(), 100.0], 1.0).unwrap();
-        assert!(near(a, -5.0), "{a}");
-        // Level and plumb lines need no turn.
-        assert_eq!(frame_angle([0.0, 0.0], [40.0, 0.0], 1.0), Some(0.0));
-        assert_eq!(frame_angle([0.0, 0.0], [0.0, 40.0], 1.0), Some(0.0));
-        // Too short, zero-length or not finite: nothing.
-        assert_eq!(frame_angle([5.0, 5.0], [5.0, 5.0], 0.0), None);
-        assert_eq!(frame_angle([5.0, 5.0], [6.0, 6.0], 3.0), None);
-        assert_eq!(frame_angle([f64::NAN, 0.0], [10.0, 0.0], 1.0), None);
-        assert_eq!(frame_angle([0.0, 0.0], [f64::INFINITY, 1.0], 1.0), None);
     }
 
     /// A straighten is one box Undo step (#3145): Undo turns the frame back instead of undoing the
@@ -257,7 +172,7 @@ mod tests {
             let r = app.ui.crop_rect.unwrap();
             assert!(inside(r, want, 200.0, 100.0) && near((r[2] - r[0]) / (r[3] - r[1]), 2.0), "{r:?}");
             assert!(!app.crop.default_frame && app.crop.editing && crate::crop_ui::pending(&app));
-            assert!(!app.crop.straighten.armed && app.crop.straighten.line.is_none(), "one-shot");
+            assert!(!app.crop.straighten.armed, "one-shot");
             // The next drag is a normal crop gesture again: inside the frame it moves it.
             let before = app.ui.crop_rect.unwrap();
             drag(&mut app, &[[100.0, 50.0], [105.0, 50.0]], NONE);
@@ -320,11 +235,11 @@ mod tests {
         // A ⌘-drag whose release went to the temporary Hand (Space pressed mid-line).
         tool_event(&mut app, ToolEvent::Down { x: 0.0, y: 0.0, pressure: 1.0 }, CMD);
         tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 17.6, pressure: 1.0 }, CMD);
-        assert!(app.crop.straighten.line.is_some());
+        assert!(app.crop.drag.is_some_and(|d| d.kind == DragKind::Line));
         // The next plain drag inside the frame moves it, and ends.
         drag(&mut app, &[[50.0, 40.0], [60.0, 40.0]], NONE);
         assert_eq!((app.ui.crop_rect, app.ui.crop_angle), (Some([30.0, 20.0, 130.0, 70.0]), 0.0));
-        assert!(app.crop.drag.is_none() && app.crop.straighten.line.is_none());
+        assert!(app.crop.drag.is_none());
     }
 
     #[test]
@@ -337,7 +252,7 @@ mod tests {
         // A ⌘-drag outside the frame draws the line instead of turning the frame about the pointer.
         tool_event(&mut app, ToolEvent::Down { x: 250.0, y: 60.0, pressure: 1.0 }, CMD);
         tool_event(&mut app, ToolEvent::Move { x: 150.0, y: 0.0, pressure: 1.0 }, CMD);
-        assert!(app.crop.straighten.line.is_some() && app.crop.drag.is_none());
+        assert!(app.crop.drag.is_some_and(|d| d.kind == DragKind::Line));
         tool_event(&mut app, ToolEvent::Up { x: 0.0, y: 0.0 }, CMD);
         // From (250, 60) to (0, 0): nearer horizontal, rising to the left.
         let want = (60.0f64 / 250.0).atan().to_degrees();
@@ -348,7 +263,8 @@ mod tests {
         drag(&mut app, &[[300.0, 50.0], [300.0, 90.0]], NONE);
         assert!(app.crop.drag.is_none() && app.ui.crop_angle > want, "{}", app.ui.crop_angle);
         // And a ⌘-drag in the middle of a crop gesture doesn't hijack it.
-        app.crop.drag = Some(CropDrag::Move { start: [100.0, 50.0], rect: app.ui.crop_rect.unwrap() });
-        assert!(!pointer(&mut app, ToolEvent::Down { x: 100.0, y: 50.0, pressure: 1.0 }, CMD));
+        app.crop.drag = Some(test_drag());
+        crate::crop_ui::pointer(&mut app, ToolEvent::Down { x: 100.0, y: 50.0, pressure: 1.0 }, CMD);
+        assert!(app.crop.drag.is_some_and(|d| d.kind != DragKind::Line));
     }
 }

@@ -8,7 +8,7 @@
 //! state lives in `ToolOptions` (`crop_overlay`, `crop_overlay_show`, `crop_overlay_orientation`),
 //! which `ui.inspect` reports and `ui.set` drives by the types' serde names.
 
-use craft::draw::ui::{CropGuide, GuideShow, Polyline};
+use craft::draw::ui::{CropGuide, GuideShow};
 use egui::{Key, Modifiers};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -26,13 +26,10 @@ pub fn from_wire_id<T: DeserializeOwned>(id: &str) -> Option<T> {
     serde_json::from_value(serde_json::Value::String(id.to_owned())).ok()
 }
 
-/// The guides the pending crop box shows now: none when the options say not to.
-pub fn current_guides(app: &PhotocraftApp, w: f32, h: f32) -> Vec<Polyline> {
+/// The guide and orientation the pending crop box shows now: none when the options say not to.
+pub fn current_guide(app: &PhotocraftApp) -> Option<(CropGuide, u8)> {
     let o = &app.ui.tool_options;
-    if app.ui.tool != Tool::Crop || !o.crop_overlay_show.shows(app.crop.drag.is_some()) {
-        return Vec::new();
-    }
-    o.crop_overlay.guides(o.crop_overlay_orientation, w, h)
+    (app.ui.tool == Tool::Crop && o.crop_overlay_show.shows(app.crop.drag.is_some())).then_some((o.crop_overlay, o.crop_overlay_orientation))
 }
 
 /// O: the next overlay (the orientation starts over).
@@ -208,7 +205,7 @@ mod tests {
         assert_eq!((app.ui.tool, app.ui.tool_options.crop_overlay), (Tool::Dodge, CropGuide::Thirds));
         // A crop drag in progress leaves the overlay alone.
         let mut app = crop_app();
-        app.crop.drag = Some(crate::crop_ui::CropDrag::Move { start: [0.0, 0.0], rect: [0.0, 0.0, 10.0, 10.0] });
+        app.crop.drag = Some(crate::crop_ui::test_drag());
         let ctx = egui::Context::default();
         ctx.input_mut(|i| i.events.push(egui::Event::Key { key: Key::O, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }));
         assert!(!keys(&mut app, &ctx));
@@ -218,17 +215,17 @@ mod tests {
     #[test]
     fn the_overlay_shows_by_mode_and_gesture() {
         let mut app = crop_app();
-        assert!(current_guides(&app, 300.0, 200.0).is_empty(), "Auto: no guides without a drag");
-        app.crop.drag = Some(crate::crop_ui::CropDrag::Move { start: [0.0, 0.0], rect: [0.0, 0.0, 10.0, 10.0] });
-        assert_eq!(current_guides(&app, 300.0, 200.0).len(), 4, "Auto: the thirds while dragging");
+        assert_eq!(current_guide(&app), None, "Auto: no guide without a drag");
+        app.crop.drag = Some(crate::crop_ui::test_drag());
+        assert_eq!(current_guide(&app), Some((CropGuide::Thirds, 0)), "Auto: the thirds while dragging");
         app.ui.tool_options.crop_overlay_show = GuideShow::Never;
-        assert!(current_guides(&app, 300.0, 200.0).is_empty());
+        assert_eq!(current_guide(&app), None);
         app.crop.drag = None;
         app.ui.tool_options.crop_overlay_show = GuideShow::Always;
         app.ui.tool_options.crop_overlay = CropGuide::Triangle;
-        assert_eq!(current_guides(&app, 300.0, 200.0).len(), 3);
+        assert_eq!(current_guide(&app), Some((CropGuide::Triangle, 0)));
         app.ui.tool = Tool::Brush;
-        assert!(current_guides(&app, 300.0, 200.0).is_empty(), "a pending frame under another tool shows no guide");
+        assert_eq!(current_guide(&app), None, "a pending frame under another tool shows no guide");
     }
 
     #[test]

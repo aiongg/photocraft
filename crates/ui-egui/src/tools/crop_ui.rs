@@ -29,21 +29,21 @@
 //! shows the layers' pixels past its edges (kept by a crop with Delete Cropped Pixels off, or moved
 //! out), with transparency out to the frame, under the shield ([`shows_beyond_canvas`]).
 
+use std::sync::OnceLock;
+
+use craft::draw::ui::{CropBox, CropFrame, CropNames, CropPress, CropRelease, CropStyle};
+use craft::ui::canvas::quad::BoxPart;
+use craft::ui::canvas::{CanvasView, kurbo::Point, kurbo::Rect as KRect};
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
 use egui::{CursorIcon, Modifiers};
 
 use crate::PhotocraftApp;
-use crate::canvas::ToolEvent;
+use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::Tool;
 
-/// How far (screen points) from an edge the pointer still grabs it.
-const HANDLE_PX: f64 = 8.0;
-/// Smallest frame (document px) a gesture may leave behind.
-const MIN_FRAME: f64 = 1.0;
-
 /// Crop tool pointer state (not serialized: it only exists during a gesture).
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct CropState {
     pub drag: Option<CropDrag>,
     /// Space is held: drawing a new frame moves it instead of sizing it.
@@ -65,6 +65,9 @@ pub struct CropState {
     redo: Vec<CropStep>,
     /// The frame at the current gesture's press; pushed to `undo` on release when the box changed.
     press_step: Option<CropStep>,
+    /// What the last pointer position snapped to: the release has no snapping of its own (the
+    /// canvas ends it before the tools see the release), so it ends the drag where the last move did.
+    snap: Option<crate::snap_ui::CropSnap>,
 }
 
 /// One frame state of the crop box's own Undo/Redo.
@@ -75,32 +78,32 @@ struct CropStep {
     default_frame: bool,
 }
 
-/// A crop gesture in progress. Rects are `[x0, y0, x1, y1]` in document coordinates.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CropDrag {
-    /// Drawing a new frame from `anchor`; `prev` is the frame it replaces, restored when the new
-    /// one is too small (a click).
-    Draw { anchor: [f64; 2], cur: [f64; 2], last: [f64; 2], prev: Option<[f64; 4]> },
-    /// Moving the frame `rect` grabbed at `start`.
-    Move { start: [f64; 2], rect: [f64; 4] },
-    /// Dragging an edge or corner: `hx`/`hy` are -1 (left/top), 1 (right/bottom) or 0 (untouched).
-    /// `view` is the view at the press when Auto Center Preview keeps the box's centre in place
-    /// while it is resized (default mode, `crop_mode::live_resize`), else `None`.
-    Resize { hx: i8, hy: i8, start: [f64; 2], rect: [f64; 4], view: Option<crate::crop_mode::PressView> },
-    /// Turning the frame about `center`: the pointer's direction from it at the press (radians)
-    /// and the frame's angle then (degrees).
-    Rotate { center: [f64; 2], grab: f64, from: f64 },
-    /// Default mode, inside the box: the image moves under it, so the document point grabbed at
-    /// `start` stays under the pointer. `rect` is the frame and `view` the view at the press;
-    /// pointer points are read in that view (`crop_mode::to_press`).
-    MoveImage { start: [f64; 2], rect: [f64; 4], view: Option<crate::crop_mode::PressView> },
-    /// Default mode, outside the box: the image turns about the frame's `center` (which stays put
-    /// on screen). `grab` is the pointer's direction from it at the press (radians, in the press
-    /// `view`), `from` the frame's angle then (degrees).
-    TurnImage { center: [f64; 2], grab: f64, from: f64, view: Option<crate::crop_mode::PressView> },
+/// A crop gesture in progress: the library frame's press, and what the press picked.
+#[derive(Clone, Copy, Debug)]
+pub struct CropDrag {
+    pub press: CropPress,
+    pub kind: DragKind,
+    /// The view's camera at the press: `ui.pointer` points are read in it (`crop_mode::control_point`).
+    pub view: Option<crate::crop_mode::PressView>,
 }
 
-/// What the pointer is over, relative to a crop frame.
+/// What a press on the frame picked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DragKind {
+    /// A new frame: no frame yet, or inside the untouched default frame.
+    Draw,
+    /// Inside the frame: moves it (Classic Mode) or the image under it (default mode).
+    Move,
+    /// An edge or corner: `hx`/`hy` are -1 (left/top), 1 (right/bottom) or 0 (untouched).
+    Resize(i8, i8),
+    /// Outside the frame: turns it (Classic Mode) or the image (default mode).
+    Turn,
+    /// Straighten's line.
+    Line,
+}
+
+/// What the pointer is over, relative to a rect frame. The Artboard tool's handles use it; the
+/// Crop tool's own hit tests are the library's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hit {
     Handle(i8, i8),
@@ -169,12 +172,6 @@ pub fn turned_bounds(r: [f64; 4], deg: f64) -> [f64; 4] {
         .fold([f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY], |b, p| [b[0].min(p[0]), b[1].min(p[1]), b[2].max(p[0]), b[3].max(p[1])])
 }
 
-/// [`hit`] for frame `r` turned `deg` degrees about its centre: handles and inside are found in
-/// the frame's own axes.
-pub fn hit_turned(r: [f64; 4], deg: f64, p: [f64; 2], tol: f64) -> Hit {
-    if deg == 0.0 { hit(r, p, tol) } else { hit(r, turn(p, center(r), -deg), tol) }
-}
-
 /// An angle in degrees brought into (-180, 180]; 0 for anything not finite.
 pub fn normalized_angle(deg: f64) -> f64 {
     if !deg.is_finite() {
@@ -182,37 +179,6 @@ pub fn normalized_angle(deg: f64) -> f64 {
     }
     let a = deg.rem_euclid(360.0);
     if a > 180.0 { a - 360.0 } else { a }
-}
-
-/// The frame's angle after turning it from `from` degrees by the pointer's sweep about `c` from
-/// direction `grab` (radians) to `p`; ⇧ snaps it to 15° steps, as in Photoshop.
-pub fn turned_angle(c: [f64; 2], grab: f64, from: f64, p: [f64; 2], snap: bool) -> f64 {
-    let now = (p[1] - c[1]).atan2(p[0] - c[0]);
-    let a = from + (now - grab).to_degrees();
-    normalized_angle(if snap { (a / 15.0).round() * 15.0 } else { a })
-}
-
-/// [`resized`] for frame `r` turned `deg` degrees: the handle moves along the frame's own axes by
-/// the document-space drag `d`, and the edges opposite stay where they are on the page.
-pub fn resized_turned(r: [f64; 4], deg: f64, hx: i8, hy: i8, d: [f64; 2], ratio: Option<f64>, alt: bool) -> [f64; 4] {
-    if deg == 0.0 {
-        return resized(r, hx, hy, d, ratio, alt);
-    }
-    let c = center(r);
-    // In the frame's axes (about its old centre), then the new centre back on the page.
-    let n = resized(r, hx, hy, turn(d, [0.0, 0.0], -deg), ratio, alt);
-    let nc = turn(center(n), c, deg);
-    let (hw, hh) = ((n[2] - n[0]) / 2.0, (n[3] - n[1]) / 2.0);
-    [nc[0] - hw, nc[1] - hh, nc[0] + hw, nc[1] + hh]
-}
-
-/// `[x0, y0, x1, y1]` with x0 ≤ x1, y0 ≤ y1.
-fn normalized(a: [f64; 2], b: [f64; 2]) -> [f64; 4] {
-    [a[0].min(b[0]), a[1].min(b[1]), a[0].max(b[0]), a[1].max(b[1])]
-}
-
-fn size_ok(r: [f64; 4]) -> bool {
-    r[2] - r[0] >= MIN_FRAME && r[3] - r[1] >= MIN_FRAME
 }
 
 /// The options-bar ratio preset as width / height (W : H in W x H x Resolution mode).
@@ -286,54 +252,6 @@ fn fit_frame(app: &mut PhotocraftApp) {
             keyed(app, fitted);
         }
     }
-}
-
-/// A new frame drawn from `anchor` to `cur`: ⇧ square, ⌥ from the centre, `ratio` held.
-pub fn drawn(anchor: [f64; 2], cur: [f64; 2], ratio: Option<f64>, mods: Modifiers) -> [f64; 4] {
-    let e = match ratio {
-        Some(k) => crate::chrome_ui::marquee_end("fixedRatio", k, 1.0, false, anchor, cur),
-        None => crate::chrome_ui::marquee_end("", 0.0, 0.0, mods.shift, anchor, cur),
-    };
-    if mods.alt { normalized([2.0 * anchor[0] - e[0], 2.0 * anchor[1] - e[1]], e) } else { normalized(anchor, e) }
-}
-
-/// Frame `r` with handle (`hx`, `hy`) dragged by `d`. `alt` resizes about the centre; `ratio`
-/// (width / height) keeps the proportions.
-pub fn resized(r: [f64; 4], hx: i8, hy: i8, d: [f64; 2], ratio: Option<f64>, alt: bool) -> [f64; 4] {
-    // Per axis: the fixed point, the signed extent from it, and whether it is centred (the
-    // extent is then a half-extent).
-    let axis = |lo: f64, hi: f64, h: i8, d: f64| -> (f64, f64, bool) {
-        let c = (lo + hi) / 2.0;
-        match h {
-            1 if alt => (c, hi + d - c, true),
-            1 => (lo, hi + d - lo, false),
-            -1 if alt => (c, lo + d - c, true),
-            -1 => (hi, lo + d - hi, false),
-            _ => (c, (hi - lo) / 2.0, true),
-        }
-    };
-    let (fx, mut ex, cx) = axis(r[0], r[2], hx, d[0]);
-    let (fy, mut ey, cy) = axis(r[1], r[3], hy, d[1]);
-    if let Some(k) = ratio.filter(|k| k.is_finite() && *k > 0.0) {
-        let full = |e: f64, c: bool| e.abs() * if c { 2.0 } else { 1.0 };
-        let (w, h) = (full(ex, cx), full(ey, cy));
-        let (w, h) = match (hx != 0, hy != 0) {
-            // A corner: the larger relative extent wins.
-            (true, true) => {
-                let s = (w / k).max(h);
-                (s * k, s)
-            }
-            (true, false) => (w, w / k),
-            (false, true) => (h * k, h),
-            (false, false) => (w, h),
-        };
-        let back = |e: f64, len: f64, c: bool| if e < 0.0 { -1.0 } else { 1.0 } * if c { len / 2.0 } else { len };
-        ex = back(ex, w, cx);
-        ey = back(ey, h, cy);
-    }
-    let span = |f: f64, e: f64, c: bool| if c { (f - e, f + e) } else { (f, f + e) };
-    let ((ax, bx), (ay, by)) = (span(fx, ex, cx), span(fy, ey, cy));
-    normalized([ax, ay], [bx, by])
 }
 
 /// Space is held (set by the canvas each frame, or by `ui.pointer`'s `space` flag).
@@ -615,36 +533,40 @@ pub fn press(app: &mut PhotocraftApp) -> bool {
     new
 }
 
-pub(crate) fn tolerance(app: &PhotocraftApp) -> f64 {
-    HANDLE_PX / (app.point_zoom() as f64).max(0.01)
-}
-
 /// The pending frame's angle (degrees), 0 when it isn't a finite number.
 pub fn angle(app: &PhotocraftApp) -> f64 {
     normalized_angle(app.ui.crop_angle)
 }
 
+/// The part of the frame under document point `p` (None while Straighten is armed).
+fn part_at(app: &PhotocraftApp, p: [f64; 2]) -> Option<BoxPart> {
+    let b = crop_box(app)?;
+    let (view, at) = view_and_screen(app, p)?;
+    library_frame(app, &b, Modifiers::NONE, app.crop.straighten.armed).hit(&view, reach(), at)
+}
+
 /// A press at document point `p` would turn the frame (Crop tool, outside the frame and its
 /// handles) rather than draw, move or resize one.
 pub fn turns_at(app: &PhotocraftApp, p: [f64; 2]) -> bool {
-    app.ui.tool == Tool::Crop
-        && app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite())).is_some_and(|r| hit_turned(r, angle(app), p, tolerance(app)) == Hit::Outside)
+    app.ui.tool == Tool::Crop && part_at(app, p) == Some(BoxPart::Outside)
 }
 
 /// A double-click at document point `p` commits the crop (Photoshop: double-click inside the box,
 /// like ↵): Crop tool, a pending frame, and `p` inside it (not on a handle, not outside).
 pub fn commits_at(app: &PhotocraftApp, p: [f64; 2]) -> bool {
-    app.ui.tool == Tool::Crop
-        && app.crop.drag.is_none()
-        && app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite())).is_some_and(|r| hit_turned(r, angle(app), p, tolerance(app)) == Hit::Inside)
+    if app.ui.tool != Tool::Crop || app.crop.drag.is_some() {
+        return false;
+    }
+    let (Some(b), Some((view, at))) = (crop_box(app), view_and_screen(app, p)) else { return false };
+    library_frame(app, &b, Modifiers::NONE, false).double_click(&view, reach(), at)
 }
 
 /// The frame is being turned: the angle for the readout beside the pointer. Classic Mode shows
 /// the frame's turn; the default mode the image's (clockwise positive, as Photoshop 25.1 does).
 pub fn turning(app: &PhotocraftApp) -> Option<f64> {
     match app.crop.drag {
-        Some(CropDrag::Rotate { .. }) => Some(angle(app)),
-        Some(CropDrag::TurnImage { .. }) => Some(crate::crop_mode::image_turn(angle(app))),
+        Some(CropDrag { kind: DragKind::Turn, .. }) if crate::crop_mode::moves_image(app) => Some(crate::crop_mode::image_turn(angle(app))),
+        Some(CropDrag { kind: DragKind::Turn, .. }) => Some(angle(app)),
         _ => None,
     }
 }
@@ -661,8 +583,8 @@ pub fn frame_size(r: [f64; 4]) -> Option<[f64; 2]> {
 pub fn sizing(app: &PhotocraftApp) -> Option<[f64; 2]> {
     match app.crop.drag {
         // Until the pointer moves, the frame shown is still the previous one.
-        Some(CropDrag::Draw { anchor, cur, .. }) if anchor != cur => {}
-        Some(CropDrag::Resize { .. }) => {}
+        Some(CropDrag { kind: DragKind::Draw, press, .. }) if press.began() => {}
+        Some(CropDrag { kind: DragKind::Resize(..), .. }) => {}
         _ => return None,
     }
     frame_size(app.ui.crop_rect?)
@@ -760,6 +682,85 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::X)) && swap_orientation(app)
 }
 
+/// The library's frame for the pending box `state`: the options bar's ratio, the default-frame and
+/// mode flags, Straighten and the host's snapping.
+fn library_frame<'a>(app: &PhotocraftApp, state: &'a CropBox, mods: Modifiers, straighten: bool) -> CropFrame<'a> {
+    CropFrame::new("crop-tool", state, CropNames::default())
+        .ratio(preset_ratio(app))
+        .default_frame(app.crop.default_frame)
+        .straighten(straighten)
+        .image_mode(crate::crop_mode::moves_image(app))
+        .auto_center(app.ui.tool_options.crop_shield.auto_center_preview)
+        .modifiers(mods)
+}
+
+/// The library's sizes (`crop.*`): the same in every theme, so hit tests read them without a context.
+pub(crate) fn reach() -> &'static CropStyle {
+    static STYLE: OnceLock<CropStyle> = OnceLock::new();
+    STYLE.get_or_init(|| CropFrame::style(&craft::ui::theme::current(&egui::Context::default())))
+}
+
+/// The pending frame as the library's box (None when it isn't a finite frame).
+pub(crate) fn crop_box(app: &PhotocraftApp) -> Option<CropBox> {
+    let r = app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite()))?;
+    Some(CropBox { rect: KRect::new(r[0], r[1], r[2], r[3]), angle: angle(app) })
+}
+
+fn apply_box(app: &mut PhotocraftApp, b: &CropBox) {
+    app.ui.crop_rect = Some([b.rect.x0, b.rect.y0, b.rect.x1, b.rect.y1]);
+    app.ui.crop_angle = b.angle;
+}
+
+/// The handle (`hx`, `hy`) of a corner or edge part.
+pub(crate) fn part_handle(part: BoxPart) -> Option<(i8, i8)> {
+    match part {
+        BoxPart::Corner(i) => Some([(-1, -1), (1, -1), (1, 1), (-1, 1)][usize::from(i % 4)]),
+        BoxPart::Edge(i) => Some([(0, -1), (1, 0), (0, 1), (-1, 0)][usize::from(i % 4)]),
+        _ => None,
+    }
+}
+
+/// The active view as the library's: a plain view at the zoom when the document has none laid out
+/// yet (the control channel before the first frame).
+fn canvas_view(app: &PhotocraftApp) -> CanvasView {
+    ViewXform::active(app).map_or_else(
+        || CanvasView::new(egui::Rect::from_center_size(egui::Pos2::ZERO, egui::vec2(1e7, 1e7)), Point::ZERO, f64::from(app.point_zoom().max(0.01))),
+        |xf| xf.canvas_view(),
+    )
+}
+
+/// The active view as the library's, and a point of it in screen space.
+fn view_and_screen(app: &PhotocraftApp, p: [f64; 2]) -> Option<(CanvasView, egui::Pos2)> {
+    let view = canvas_view(app);
+    let at = view.to_screen(Point::new(p[0], p[1]));
+    (at.x.is_finite() && at.y.is_finite()).then_some((view, at))
+}
+
+/// Writes the library view's camera back to the active document's view when a drag moved it.
+fn follow_view(app: &mut PhotocraftApp, before: &CanvasView, view: &CanvasView) {
+    if (before.center, before.rotation) == (view.center, view.rotation) {
+        return;
+    }
+    let (center, rotation) = ([view.center.x as f32, view.center.y as f32], view.rotation as f32);
+    if let Some(v) = app.session.active_index().and_then(|i| app.ui.views.get_mut(i))
+        && center.iter().all(|c| c.is_finite())
+        && rotation.is_finite()
+    {
+        (v.center, v.rotation) = (center, rotation);
+    }
+}
+
+/// What a press at screen point `at` picks on `frame`.
+fn kind_at(app: &PhotocraftApp, frame: &CropFrame, view: &CanvasView, at: egui::Pos2) -> DragKind {
+    match frame.hit(view, reach(), at) {
+        None => DragKind::Line,
+        Some(BoxPart::Outside) => DragKind::Turn,
+        Some(BoxPart::Inside) if app.crop.default_frame => DragKind::Draw,
+        Some(BoxPart::Inside) => DragKind::Move,
+        Some(part) => part_handle(part).map_or(DragKind::Move, |(hx, hy)| DragKind::Resize(hx, hy)),
+    }
+}
+
 /// Pointer input for the Crop tool. Returns true when the event was its.
 pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool {
     if app.ui.tool != Tool::Crop {
@@ -769,112 +770,127 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
     let p = match ev {
         ToolEvent::Down { x, y, .. } | ToolEvent::Move { x, y, .. } | ToolEvent::Up { x, y } => [x, y],
     };
-    if app.session.active().is_none() || !p.iter().all(|v| v.is_finite()) || straighten(app, ev, mods, p) {
+    if app.session.active().is_none() || !p.iter().all(|v| v.is_finite()) {
         return true;
     }
-    if track(app, ev, p, mods) {
-        crate::crop_mode::sync_frame(app);
-    }
-    true
-}
-
-/// Press, drag and release of the frame. Returns true when the frame needs syncing to the view.
-fn track(app: &mut PhotocraftApp, ev: ToolEvent, p: [f64; 2], mods: Modifiers) -> bool {
     match ev {
-        ToolEvent::Down { .. } => begin_drag(app, p),
-        ToolEvent::Move { .. } => update(app, p, mods),
-        ToolEvent::Up { .. } => {
-            update(app, p, mods);
-            let Some(drag) = app.crop.drag.take() else { return false };
-            release(app, drag);
-        }
+        ToolEvent::Down { .. } => press_at(app, p, mods),
+        ToolEvent::Move { .. } => track_to(app, p, mods, false),
+        ToolEvent::Up { .. } => release_at(app, p, mods),
     }
     true
 }
 
-/// The Straighten line drag. Returns true when it took the event.
-fn straighten(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers, p: [f64; 2]) -> bool {
-    // Straighten button or ⌘: the drag draws a line to level the frame on.
-    if !crate::crop_straighten::pointer(app, ev, mods) {
-        return false;
-    }
+/// Starts the gesture a press at `p` picks: resize, move, turn, draw or a Straighten line.
+fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
+    // A Straighten line whose release went elsewhere (Space's Hand took it) never continues here.
+    let had_drag = app.crop.drag.take().is_some_and(|d| d.kind != DragKind::Line);
     claim(app);
-    // Default mode: the image turns so the line ends up level.
-    // The turn is one box Undo step, like any other frame gesture.
-    match ev {
-        ToolEvent::Down { .. } => {
-            app.crop.press_step = Some(step_of(app));
-            crate::crop_mode::sync(app, Some(p));
-        }
-        ToolEvent::Move { .. } => crate::crop_mode::sync_frame(app),
-        ToolEvent::Up { .. } => {
-            crate::crop_mode::sync_frame(app);
-            push_press_step(app);
-        }
-    }
-    true
-}
-
-/// Starts the drag a press at `p` selects: resize, move, turn or draw.
-fn begin_drag(app: &mut PhotocraftApp, p: [f64; 2]) {
-    claim(app);
-    app.crop.editing = true;
+    app.crop.editing = app.ui.crop_rect.is_some();
     app.crop.press_step = Some(step_of(app));
     // Default mode: the view stays upright for the frame, about the pressed point.
     crate::crop_mode::sync(app, Some(p));
-    let frame = app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite()));
-    let deg = angle(app);
-    app.crop.drag = Some(match frame.map(|r| (r, hit_turned(r, deg, p, tolerance(app)))) {
-        Some((rect, Hit::Handle(hx, hy))) => {
-            let view = if crate::crop_mode::live_center(app) { crate::crop_mode::press_view(app) } else { None };
-            CropDrag::Resize { hx, hy, start: p, rect, view }
-        }
-        Some((rect, Hit::Inside)) if !app.crop.default_frame => inside_drag(app, p, rect),
-        Some((rect, Hit::Outside)) => outside_drag(app, p, rect, deg),
-        _ => {
-            app.ui.crop_angle = 0.0;
-            CropDrag::Draw { anchor: p, cur: p, last: p, prev: app.ui.crop_rect }
-        }
+    let Some((view, at)) = view_and_screen(app, p) else { return };
+    // No frame yet: a drag draws one. The library draws inside its default frame, so the press is
+    // made on a stand-in that covers the pointer.
+    let stand_in = crop_box(app).is_none().then(|| {
+        let [x, y] = p;
+        CropBox::upright(KRect::new(x - 1e3, y - 1e3, x + 1e3, y + 1e3))
     });
+    let Some(b) = stand_in.or_else(|| crop_box(app)) else { return };
+    if stand_in.is_some() {
+        app.ui.crop_angle = 0.0;
+    }
+    // A ⌘-drag in the middle of a crop gesture doesn't hijack it.
+    let straight = !had_drag && (app.crop.straighten.armed || mods.command);
+    let frame = library_frame(app, &b, mods, straight).default_frame(stand_in.is_some() || app.crop.default_frame);
+    let kind = if stand_in.is_some() { DragKind::Draw } else { kind_at(app, &frame, &view, at) };
+    let Some(press) = frame.press(&view, reach(), at) else { return };
+    app.crop.editing = true;
+    app.crop.drag = Some(CropDrag { press, kind, view: crate::crop_mode::press_view(app) });
 }
 
-/// A press inside the frame: moves the image in default mode, else the frame.
-fn inside_drag(app: &PhotocraftApp, p: [f64; 2], rect: [f64; 4]) -> CropDrag {
-    // Default mode moves the image and keeps the box in place on screen, as in Photoshop.
+/// The frame follows the pointer at document point `p`.
+fn track_to(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, release: bool) {
+    let Some(mut drag) = app.crop.drag else { return };
+    let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
+    let before = view;
+    let now = crate::snap_ui::crop_snap(app);
+    if !release {
+        app.crop.snap = now.clone();
+    }
+    let snap = (drag.kind != DragKind::Line).then(|| now.or_else(|| app.crop.snap.clone().filter(|_| release))).flatten();
+    let lines = std::cell::RefCell::new(Vec::new());
+    let frame = library_frame(app, &b, mods, false);
+    let frame = match &snap {
+        Some(snap) => frame.snap(|part, state, _| {
+            let (d, found) = snap.vector(part, state);
+            *lines.borrow_mut() = found;
+            d
+        }),
+        None => frame,
+    };
+    let track = frame.track(&mut view, &mut drag.press, at, mods, app.crop.space);
+    drop(frame);
+    if let Some(next) = track.state {
+        apply_box(app, &next);
+    }
+    if snap.is_some() && !release {
+        app.prefs_rt.snap_lines = lines.into_inner();
+    }
     if crate::crop_mode::moves_image(app) {
-        CropDrag::MoveImage { start: p, rect, view: crate::crop_mode::press_view(app) }
-    } else {
-        CropDrag::Move { start: p, rect }
+        follow_view(app, &before, &view);
     }
+    app.crop.drag = Some(drag);
+    crate::crop_mode::sync_frame(app);
 }
 
-/// A press outside the frame: turns the image in default mode, else the frame.
-fn outside_drag(app: &PhotocraftApp, p: [f64; 2], rect: [f64; 4], deg: f64) -> CropDrag {
-    let c = center(rect);
-    let grab = (p[1] - c[1]).atan2(p[0] - c[0]);
+/// Ends the gesture: keeps a valid frame or restores the previous one, and records a box Undo step
+/// when it changed.
+fn release_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
+    track_to(app, p, mods, true);
+    let Some(drag) = app.crop.drag.take() else { return };
+    let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
+    let before = view;
+    let frame = library_frame(app, &b, mods, false);
+    let release = frame.release(&mut view, reach(), &drag.press, Some(at));
+    drop(frame);
     if crate::crop_mode::moves_image(app) {
-        CropDrag::TurnImage { center: c, grab, from: deg, view: crate::crop_mode::press_view(app) }
-    } else {
-        // Outside the frame a drag turns it, as in Photoshop (#1792).
-        CropDrag::Rotate { center: c, grab, from: deg }
+        follow_view(app, &before, &view);
     }
-}
-
-/// Ends `drag`: keeps a valid frame or restores the previous one, and records an undo step when it changed.
-fn release(app: &mut PhotocraftApp, drag: CropDrag) {
-    let ok = app.ui.crop_rect.is_some_and(size_ok);
-    // A click outside the untouched default frame (no turn) leaves it the default.
-    let changed = !matches!(drag, CropDrag::Rotate { from, .. } | CropDrag::TurnImage { from, .. } if from == angle(app))
-        && !matches!(drag, CropDrag::MoveImage { rect, .. } if app.ui.crop_rect == Some(rect));
-    if ok && changed {
-        app.crop.default_frame = false;
+    let start = app.crop.press_step;
+    match release {
+        CropRelease::Commit(done) => {
+            apply_box(app, &done);
+            let held = |s: CropStep| match drag.kind {
+                DragKind::Turn => done.angle == s.angle,
+                DragKind::Move if crate::crop_mode::moves_image(app) => app.ui.crop_rect == s.rect,
+                _ => false,
+            };
+            if !start.is_some_and(held) {
+                app.crop.default_frame = false;
+            }
+        }
+        CropRelease::Cancel => {
+            if let Some(s) = start {
+                (app.ui.crop_rect, app.ui.crop_angle) = (s.rect, s.angle);
+            }
+        }
+        CropRelease::Straighten(deg) => crate::crop_straighten::apply(app, deg),
+        CropRelease::Nothing => {
+            // A press that never moved: clicking on the frame is an edit of it, as before; the
+            // turn zones and a held-still image are not.
+            if !matches!(drag.kind, DragKind::Turn | DragKind::Line) && !(drag.kind == DragKind::Move && crate::crop_mode::moves_image(app)) {
+                app.crop.default_frame = false;
+            }
+        }
     }
-    if ok {
-        finish_frame(app, drag);
-    } else {
-        restore_frame(app, drag);
+    if drag.kind == DragKind::Line {
+        // One line per click of the button.
+        app.crop.straighten.armed = false;
     }
     push_press_step(app);
+    crate::crop_mode::sync_frame(app);
 }
 
 /// On release: the frame state at the press becomes a box Undo step when the gesture changed it.
@@ -887,106 +903,6 @@ fn push_press_step(app: &mut PhotocraftApp) {
     }
 }
 
-/// Puts back the frame a too-small drag started from.
-fn restore_frame(app: &mut PhotocraftApp, drag: CropDrag) {
-    match drag {
-        CropDrag::Draw { prev, .. } => app.ui.crop_rect = prev,
-        CropDrag::Move { rect, .. } | CropDrag::Resize { rect, view: None, .. } => app.ui.crop_rect = Some(rect),
-        // A collapsed live-centred resize restores the frame and the view.
-        CropDrag::Resize { rect, view: Some(view), .. } => crate::crop_mode::offset_image(app, rect, Some(view), [0.0, 0.0]),
-        _ => {}
-    }
-}
-
-/// Centres a newly drawn frame in default mode.
-fn finish_frame(app: &mut PhotocraftApp, drag: CropDrag) {
-    // Auto Center Preview moves a box drawn in default mode to the middle.
-    if let CropDrag::Draw { .. } = drag {
-        crate::crop_mode::sync_frame(app);
-        crate::crop_mode::auto_center(app);
-    }
-}
-
-/// The frame follows the pointer at `p`.
-fn update(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
-    if follow_view_drag(app, p, mods) {
-        return;
-    }
-    if let Some(rect) = dragged_frame(app, p, mods) {
-        app.ui.crop_rect = Some(rect);
-    }
-}
-
-/// Follows rotate, turn, move-image and live-centred resize drags. Returns false for the other drags.
-fn follow_view_drag(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) -> bool {
-    match app.crop.drag {
-        Some(CropDrag::Rotate { center, grab, from }) => app.ui.crop_angle = turned_angle(center, grab, from, p, mods.shift),
-        Some(CropDrag::TurnImage { center, grab, from, view }) => {
-            // The image turns with the pointer's sweep on screen, so the frame turns against it.
-            let at = crate::crop_mode::to_press(app, view, p);
-            let turned = from - ((at[1] - center[1]).atan2(at[0] - center[0]) - grab).to_degrees();
-            if turned.is_finite() {
-                app.ui.crop_angle = normalized_angle(if mods.shift { (turned / 15.0).round() * 15.0 } else { turned });
-                crate::crop_mode::sync_frame(app);
-            }
-        }
-        Some(CropDrag::MoveImage { start, rect, view }) => {
-            // The image follows the pointer, so the frame and view move the other way.
-            let at = crate::crop_mode::to_press(app, view, p);
-            crate::crop_mode::offset_image(app, rect, view, [at[0] - start[0], at[1] - start[1]]);
-        }
-        Some(CropDrag::Resize { hx, hy, start, rect, view: Some(view) }) => {
-            // Auto Center Preview keeps the box centred while the handle follows the pointer.
-            let at = crate::crop_mode::to_press(app, Some(view), p);
-            let ratio = resize_ratio(app, rect, mods);
-            let deg = angle(app);
-            crate::crop_mode::live_resize(app, crate::crop_mode::LiveResize { rect, deg, hx, hy, start, q: at, ratio, alt: mods.alt }, view);
-        }
-        _ => return false,
-    }
-    true
-}
-
-/// The frame a draw, move or resize drag gives at `p`, or None for the other drags.
-fn dragged_frame(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) -> Option<[f64; 4]> {
-    let ratio = preset_ratio(app);
-    let space = app.crop.space;
-    let deg = angle(app);
-    match app.crop.drag.as_mut()? {
-        CropDrag::Draw { anchor, cur, last, .. } => {
-            if space {
-                // Space: the frame being drawn follows the pointer, keeping its size.
-                let d = [p[0] - last[0], p[1] - last[1]];
-                *anchor = [anchor[0] + d[0], anchor[1] + d[1]];
-                *cur = [cur[0] + d[0], cur[1] + d[1]];
-            } else {
-                *cur = p;
-            }
-            *last = p;
-            (*anchor != *cur).then(|| drawn(*anchor, *cur, ratio, mods))
-        }
-        CropDrag::Move { start, rect } => {
-            let (dx, dy) = (p[0] - start[0], p[1] - start[1]);
-            Some([rect[0] + dx, rect[1] + dy, rect[2] + dx, rect[3] + dy])
-        }
-        CropDrag::Resize { hx, hy, start, rect, .. } => {
-            let keep = || {
-                let (w, h) = (rect[2] - rect[0], rect[3] - rect[1]);
-                (w > 0.0 && h > 0.0).then(|| w / h)
-            };
-            let ratio = ratio.or_else(|| if mods.shift { keep() } else { None });
-            Some(resized_turned(*rect, deg, *hx, *hy, [p[0] - start[0], p[1] - start[1]], ratio, mods.alt))
-        }
-        CropDrag::Rotate { .. } | CropDrag::TurnImage { .. } | CropDrag::MoveImage { .. } => None,
-    }
-}
-
-/// Geometry and snapping must use the same ratio so constrained handles stay aligned.
-pub(crate) fn resize_ratio(app: &PhotocraftApp, rect: [f64; 4], mods: Modifiers) -> Option<f64> {
-    let keep = (rect[2] - rect[0] > 0.0 && rect[3] - rect[1] > 0.0).then(|| (rect[2] - rect[0]) / (rect[3] - rect[1]));
-    preset_ratio(app).or(if mods.shift { keep } else { None })
-}
-
 /// Cursor over the canvas at document point `p`: resize arrows on the edges, move inside (the
 /// crosshair inside the untouched default frame, where a drag draws a new one).
 pub fn cursor(app: &PhotocraftApp, p: [f64; 2]) -> Option<CursorIcon> {
@@ -997,23 +913,41 @@ pub fn cursor(app: &PhotocraftApp, p: [f64; 2]) -> Option<CursorIcon> {
         return Some(CursorIcon::Crosshair);
     }
     let deg = angle(app);
-    let h = match app.crop.drag {
-        Some(CropDrag::Move { .. } | CropDrag::MoveImage { .. }) => Hit::Inside,
-        Some(CropDrag::Resize { hx, hy, .. }) => Hit::Handle(hx, hy),
-        Some(CropDrag::Draw { .. }) => return Some(CursorIcon::Crosshair),
-        Some(CropDrag::Rotate { .. } | CropDrag::TurnImage { .. }) => Hit::Outside,
-        None => hit_turned(app.ui.crop_rect?, deg, p, tolerance(app)),
+    let part = match app.crop.drag {
+        Some(CropDrag { kind: DragKind::Move, .. }) => BoxPart::Inside,
+        Some(CropDrag { kind: DragKind::Resize(hx, hy), .. }) => handle_part(hx, hy),
+        Some(CropDrag { kind: DragKind::Draw | DragKind::Line, .. }) => return Some(CursorIcon::Crosshair),
+        Some(CropDrag { kind: DragKind::Turn, .. }) => BoxPart::Outside,
+        None => part_at(app, p)?,
     };
-    Some(match h {
+    Some(match part {
         // The arrow as the handle faces on screen: the frame's turn plus the view's, mirrored when
         // the view is flipped.
-        Hit::Handle(hx, hy) => resize_icon(hx, hy, deg + f64::from(crate::crop_mode::view_rotation(app)), app.ui.view.flip_horizontal),
+        BoxPart::Corner(_) | BoxPart::Edge(_) => {
+            let (hx, hy) = part_handle(part)?;
+            resize_icon(hx, hy, deg + f64::from(crate::crop_mode::view_rotation(app)), app.ui.view.flip_horizontal)
+        }
         // Inside the untouched default frame a drag draws a new one (`pointer`), so nothing moves (#4461).
-        Hit::Inside if app.crop.default_frame => CursorIcon::Crosshair,
-        Hit::Inside => CursorIcon::Move,
+        BoxPart::Inside if app.crop.default_frame => CursorIcon::Crosshair,
+        BoxPart::Inside => CursorIcon::Move,
         // Photoshop's curved two-headed arrow (`draw_turn_cursor`, from `turn_cursor_dir`).
-        Hit::Outside => CursorIcon::None,
+        _ => CursorIcon::None,
     })
+}
+
+/// The part (`hx`, `hy`) names.
+fn handle_part(hx: i8, hy: i8) -> BoxPart {
+    match (hx.signum(), hy.signum()) {
+        (-1, -1) => BoxPart::Corner(0),
+        (1, -1) => BoxPart::Corner(1),
+        (1, 1) => BoxPart::Corner(2),
+        (-1, 1) => BoxPart::Corner(3),
+        (0, -1) => BoxPart::Edge(0),
+        (1, 0) => BoxPart::Edge(1),
+        (0, 1) => BoxPart::Edge(2),
+        (-1, 0) => BoxPart::Edge(3),
+        _ => BoxPart::Inside,
+    }
 }
 
 /// Where the turn cursor's arc bends at document point `p` (pointer outside the frame, or turning
@@ -1026,9 +960,8 @@ pub fn turn_cursor_dir(app: &PhotocraftApp, p: [f64; 2]) -> Option<[f64; 2]> {
     let r = app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite()))?;
     let deg = angle(app);
     let turning = match app.crop.drag {
-        Some(CropDrag::Rotate { .. } | CropDrag::TurnImage { .. }) => true,
-        Some(_) => false,
-        None => hit_turned(r, deg, p, tolerance(app)) == Hit::Outside,
+        Some(d) => d.kind == DragKind::Turn,
+        None => part_at(app, p) == Some(BoxPart::Outside),
     };
     if !(turning && p[0].is_finite() && p[1].is_finite()) {
         return None;
@@ -1085,6 +1018,15 @@ fn resize_icon(hx: i8, hy: i8, deg: f64, flip: bool) -> CursorIcon {
         2 => CursorIcon::ResizeVertical,
         _ => CursorIcon::ResizeNeSw,
     }
+}
+
+/// A press in progress for tests of the keys and overlays that a drag in progress leaves alone.
+#[cfg(test)]
+pub(crate) fn test_drag() -> CropDrag {
+    let view = CanvasView::new(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(100.0, 100.0)), Point::ZERO, 1.0);
+    let b = CropBox::upright(KRect::new(0.0, 0.0, 10.0, 10.0));
+    let press = CropFrame::new("test", &b, CropNames::default()).press(&view, reach(), egui::pos2(5.0, 5.0)).expect("a finite frame");
+    CropDrag { press, kind: DragKind::Move, view: None }
 }
 
 #[cfg(test)]

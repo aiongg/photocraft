@@ -147,7 +147,7 @@ fn image_drag(app: &mut PhotocraftApp, from: [f32; 2], d: [f32; 2], line: Option
     let mid = mid_of(screen_box(app));
     let p = xf(app).to_doc(a);
     tool_event(app, ToolEvent::Down { x: p[0], y: p[1], pressure: 1.0 }, NONE);
-    assert_eq!(app.prefs_rt.snap.as_ref().map(|s| &s.gesture), Some(&crate::snap_ui::Gesture::CropImage));
+    assert_eq!(app.prefs_rt.snap.as_ref().map(|s| &s.gesture), Some(&crate::snap_ui::Gesture::Crop));
     for t in [0.5, 1.0] {
         let p = xf(app).to_doc(a + (b - a) * t);
         tool_event(app, ToolEvent::Move { x: p[0], y: p[1], pressure: 1.0 }, NONE);
@@ -206,8 +206,8 @@ fn moving_the_image_centres_a_larger_box_on_a_layer() {
     sync(&mut app, None);
     let p = xf(&app).to_doc(mid_of(screen_box(&app)));
     tool_event(&mut app, ToolEvent::Down { x: p[0], y: p[1], pressure: 1.0 }, NONE);
-    assert!(matches!(app.crop.drag, Some(CropDrag::MoveImage { .. })));
-    assert!(app.prefs_rt.snap.is_none(), "a turned box doesn't snap");
+    assert!(app.crop.drag.is_some_and(|d| d.kind == crate::crop_ui::DragKind::Move));
+    assert!(app.prefs_rt.snap_lines.is_empty(), "a turned box doesn't snap");
     tool_event(&mut app, ToolEvent::Up { x: p[0], y: p[1] }, NONE);
 }
 
@@ -567,7 +567,7 @@ fn p_toggles_classic_mode_while_the_crop_tool_shows_a_box() {
     press(&mut app);
     assert!(!classic(&app));
     // Mid-drag P is left alone; without a box P is the Pen key.
-    app.crop.drag = Some(CropDrag::Move { start: [0.0, 0.0], rect: [0.0, 0.0, 10.0, 10.0] });
+    app.crop.drag = Some(crate::crop_ui::test_drag());
     let ctx = egui::Context::default();
     ctx.input_mut(|i| i.events.push(egui::Event::Key { key: egui::Key::P, physical_key: None, pressed: true, repeat: false, modifiers: NONE }));
     assert!(!crate::crop_shield::keys(&mut app, &ctx));
@@ -641,9 +641,6 @@ fn degenerate_input_never_panics() {
             crate::crop_ui::swap_orientation(&mut app);
             auto_center(&mut app);
             shift_image(&mut app, [f64::NAN, f64::INFINITY]);
-            let press = PressView { rotation: f32::NAN, center: [f32::INFINITY, 0.0] };
-            let g = LiveResize { rect: frame, deg: angle, hx: 1, hy: -1, start: [0.0, f64::NAN], q: [1e300, -1e300], ratio: Some(f64::NAN), alt: false };
-            live_resize(&mut app, g, press);
             assert!(app.ui.crop_rect.is_none_or(|r| r.iter().all(|v| v.is_finite()) || r == frame), "{frame:?} {angle}");
             let v = &app.ui.views[0];
             assert!(v.rotation.is_finite() && v.center.iter().all(|c| c.is_finite()), "{frame:?} {angle}: {v:?}");

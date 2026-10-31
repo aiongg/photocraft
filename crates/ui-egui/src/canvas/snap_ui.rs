@@ -6,6 +6,9 @@
 //! Ctrl is the corner-distortion modifier. Smart guides follow View › Show › Smart Guides and also snap the Move
 //! tool to other layers' edges and centres. The threshold is 8 screen pixels at the current zoom.
 
+use craft::draw::ui::CropBox;
+use craft::ui::canvas::kurbo::Vec2;
+use craft::ui::canvas::quad::BoxPart;
 use egui::Color32;
 use photocraft_doc::LayerId;
 use photocraft_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
@@ -36,9 +39,9 @@ pub enum Gesture {
     DrawMove { rect: [f64; 4] },
     /// A guide being moved with the Move tool.
     Guide,
-    /// Default crop mode, a drag inside an upright box: the image moves under it, so the frame
-    /// moves the other way over the document and its edges and centre snap ([`crop_image`]).
-    CropImage,
+    /// The Crop tool's drag: the library's frame asks [`CropSnap`] for the vector that snaps the
+    /// part it drags, so the pointer itself is left as it is.
+    Crop,
 }
 
 /// Snapping state of the drag in progress.
@@ -213,7 +216,6 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
     // outside the selection moves the layer as the Move tool does (#2681).
     let tool = crate::canvas::event_tool(app, mods);
     let moves_layer = crate::canvas::command_moves_layer(app, tool, p, mods);
-    let crop_tol = crate::crop_ui::tolerance(app);
     let gesture = if let Some(t) = &app.ui.transform {
         let corner = match crate::transform_tool::hit(t, p, crate::transform_tool::handle_tolerance(app)) {
             crate::transform_tool::Hit::Corner(index) => {
@@ -235,32 +237,8 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
     } else if tool == Tool::Move || moves_layer {
         let exclude = app.session.active().map(|s| s.selected_layers()).unwrap_or_default();
         moving_rect(app, tool).map(|rect| (Gesture::Move { rect }, exclude))
-    } else if tool == Tool::Crop
-        && (crate::crop_mode::classic(app) || app.crop.default_frame)
-        && let Some(rect) =
-            app.ui.crop_rect.filter(|r| crate::crop_ui::angle(app) == 0.0 && crate::crop_ui::hit(*r, p, crop_tol) == crate::crop_ui::Hit::Inside)
-    {
-        // Inside the untouched default frame draws a new crop (in both modes): snap its corner, not
-        // the old canvas-sized frame's bounds. An edited Classic Mode frame still moves and snaps
-        // its edges.
-        let gesture = if app.crop.default_frame { Gesture::Point } else { Gesture::Move { rect } };
-        Some((gesture, Vec::new()))
-    } else if tool == Tool::Crop
-        && crate::crop_mode::moves_image(app)
-        && !app.crop.default_frame
-        && crate::crop_ui::angle(app) == 0.0
-        && app.ui.crop_rect.is_some_and(|r| crate::crop_ui::hit(r, p, crop_tol) == crate::crop_ui::Hit::Inside)
-    {
-        // The default mode moves the image under an upright box: the frame's edges and centre
-        // snap, as an edited Classic Mode frame's do, so content can be centred in it (#8580).
-        Some((Gesture::CropImage, Vec::new()))
-    } else if tool == Tool::Crop
-        && (crate::crop_ui::turns_at(app, p)
-            || app.ui.crop_rect.is_some_and(|r| crate::crop_ui::hit_turned(r, crate::crop_ui::angle(app), p, crop_tol) == crate::crop_ui::Hit::Inside))
-    {
-        // Turning the frame, moving a turned one (its edges don't line up with anything), or in
-        // the default mode turning the image or moving it under a turned box: no snapping.
-        None
+    } else if tool == Tool::Crop {
+        Some((Gesture::Crop, Vec::new()))
     } else if let Some(cut) = crate::canvas::selection_drag_kind(app, tool, p, mods) {
         // A marquee or lasso inside the selection moves the outline (⌘: cuts its pixels into a
         // floating piece): its bounds snap, as the Move tool's do, not the pointer. A cut piece
@@ -292,7 +270,7 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
         // A moving selection never snaps back to where it started.
         targets = targets.filtered(|k| k != SnapKind::Selection);
     }
-    let smart = if snap_on(app) && matches!(gesture, Gesture::Move { .. } | Gesture::CropImage) && smart_on(app) {
+    let smart = if snap_on(app) && matches!(gesture, Gesture::Move { .. } | Gesture::Crop) && smart_on(app) {
         build(app, &exclude, true)
     } else {
         SnapTargets::default()
@@ -329,7 +307,7 @@ fn apply(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) -> [f64; 2
         return p;
     }
     let (out, lines) = match &snap.gesture {
-        Gesture::Point => crop_handle(app, p, mods, &snap.targets, tol).unwrap_or_else(|| snap.targets.snap_point(p, tol)),
+        Gesture::Point => snap.targets.snap_point(p, tol),
         Gesture::TransformCorner { point, .. } if corner_distorts(app, &snap.gesture, mods) => {
             let proposed = [point[0] + p[0] - snap.start[0], point[1] + p[1] - snap.start[1]];
             let (corner, lines) = snap.targets.snap_point(proposed, tol);
@@ -344,12 +322,8 @@ fn apply(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) -> [f64; 2
             let (adj, lines) = set.snap_rect(moved, tol);
             ([p[0] + adj[0], p[1] + adj[1]], lines)
         }
-        Gesture::CropImage => {
-            // Smart guides still snap when nothing in View › Snap To is within reach: the
-            // document's bounds alone keep `targets` from ever being empty.
-            let snapped = |set| crop_image(app, p, set, tol).filter(|(_, lines)| !lines.is_empty());
-            snapped(&snap.targets).or_else(|| snapped(&snap.smart)).unwrap_or((p, Vec::new()))
-        }
+        // The crop frame snaps itself through `crop_snap`; its lines stay as it last set them.
+        Gesture::Crop => (p, app.prefs_rt.snap_lines.clone()),
     };
     app.prefs_rt.snap_lines = lines;
     out
@@ -367,92 +341,66 @@ pub(crate) fn retain_transform_lines(app: &mut PhotocraftApp, mods: egui::Modifi
     app.prefs_rt.snap_lines.retain(|line| (if line.vertical { point[0] } else { point[1] } - line.pos).abs() < 1e-6);
 }
 
-/// Snap a crop handle being dragged: the handle itself (the frame's edge or corner), not the
-/// pointer, which grabbed it up to the grab radius away (#1919: snapping the pointer left a strip
-/// as wide as that offset between the frame and the edge it showed as snapped to). With Auto
-/// Center Preview the handle is found on the image, calculated from the original camera: snapping
-/// the pointer in the moving camera feeds the previous frame's pan back into the resize and makes
-/// a stationary pointer oscillate near the canvas edges.
-fn crop_handle(app: &PhotocraftApp, p: [f64; 2], mods: egui::Modifiers, targets: &SnapTargets, tol: f64) -> Option<([f64; 2], Vec<SnapLine>)> {
-    if app.ui.tool != Tool::Crop {
-        return None;
-    }
-    let crate::crop_ui::CropDrag::Resize { hx, hy, start, rect, view } = app.crop.drag? else { return None };
-    let deg = crate::crop_ui::angle(app);
-    let ratio = crate::crop_ui::resize_ratio(app, rect, mods);
-    let q = view.map_or(p, |view| crate::crop_mode::to_press(app, Some(view), p));
-    // The frame for the pointer at `q`, as `crop_ui` resizes it.
-    let frame_at = |q: [f64; 2]| match view {
-        Some(_) => crate::crop_mode::resized_frame(crate::crop_mode::LiveResize { rect, deg, hx, hy, start, q, ratio, alt: mods.alt }).map(|(f, _)| f),
-        None => Some(crate::crop_ui::resized_turned(rect, deg, hx, hy, [q[0] - start[0], q[1] - start[1]], ratio, mods.alt)),
-    };
-    let frame = frame_at(q)?;
-    let at = |r: [f64; 4]| {
-        let c = crate::crop_ui::center(r);
-        crate::crop_ui::turn([c[0] + f64::from(hx) * (r[2] - r[0]) / 2.0, c[1] + f64::from(hy) * (r[3] - r[1]) / 2.0], c, deg)
-    };
-    let handle = at(frame);
-    let (snapped, mut lines) = targets.snap_point(handle, tol);
-    let mut d = crate::crop_ui::turn([snapped[0] - handle[0], snapped[1] - handle[1]], [0.0, 0.0], -deg);
-    // An edge handle controls only its own axis, not the midpoint along the other one.
-    if hx == 0 {
-        d[0] = 0.0;
-    }
-    if hy == 0 {
-        d[1] = 0.0;
-    }
-    if deg == 0.0 {
-        lines.retain(|line| if line.vertical { hx != 0 } else { hy != 0 });
-    }
-    if lines.is_empty() {
-        return Some((p, lines));
-    }
-    // Auto Center Preview moves both screen edges. On the image the opposite edge stays put,
-    // so the grabbed edge travels twice as far as the pointer (once with Alt). Without it the
-    // handle follows the pointer.
-    let scale = if view.is_some() && !mods.alt { 2.0 } else { 1.0 };
-    // How much the frame's extent grows per unit of pointer travel: both sides with Auto Center
-    // Preview or Alt, else the grabbed one.
-    let grow = if view.is_some() || mods.alt { 2.0 } else { 1.0 };
-    let original = at(rect);
-    let travel = crate::crop_ui::turn([handle[0] - original[0], handle[1] - original[1]], [0.0, 0.0], -deg);
-    let mut local = [(travel[0] + d[0]) / scale, (travel[1] + d[1]) / scale];
-    if deg == 0.0
-        && hx != 0
-        && hy != 0
-        && let Some(k) = ratio
-    {
-        // A corner with a ratio has one degree of freedom. Put the other axis on the same
-        // ratio, rather than letting the raw pointer's unused axis override the snapped edge.
-        if lines.iter().any(|line| line.vertical) {
-            local[1] = f64::from(hy) * ((rect[2] - rect[0] + grow * f64::from(hx) * local[0]) / k - (rect[3] - rect[1])) / grow;
-        } else {
-            local[0] = f64::from(hx) * ((rect[3] - rect[1] + grow * f64::from(hy) * local[1]) * k - (rect[2] - rect[0])) / grow;
-        }
-    }
-    let d = crate::crop_ui::turn(local, [0.0, 0.0], deg);
-    let q = [start[0] + d[0], start[1] + d[1]];
-    if let Some(snapped_frame) = frame_at(q) {
-        let h = at(snapped_frame);
-        lines.retain(|line| (if line.vertical { h[0] } else { h[1] } - line.pos).abs() < 1e-3);
-    }
-    Some((view.map_or(q, |view| crate::crop_mode::from_press(app, view, q)), lines))
+/// What the Crop tool's drag snaps to, taken when it starts ([`crop_snap`]).
+#[derive(Clone, Debug)]
+pub(crate) struct CropSnap {
+    targets: SnapTargets,
+    smart: SnapTargets,
+    tol: f64,
 }
 
-/// Snap the image being moved under the crop box (default mode): the frame moves by the image's
-/// travel the other way over the document, so its edges and centre snap and the pointer moves by
-/// the frame's correction the other way too (#8580). As `crop_ui` reads this drag, the pointer is
-/// read in the camera at the press, since the view pans with the frame meanwhile.
-fn crop_image(app: &PhotocraftApp, p: [f64; 2], targets: &SnapTargets, tol: f64) -> Option<([f64; 2], Vec<SnapLine>)> {
-    let crate::crop_ui::CropDrag::MoveImage { start, rect, view } = app.crop.drag? else { return None };
-    let q = crate::crop_mode::to_press(app, view, p);
-    let d = [q[0] - start[0], q[1] - start[1]];
-    let (adj, lines) = targets.snap_rect([rect[0] - d[0], rect[1] - d[1], rect[2] - d[0], rect[3] - d[1]], tol);
-    if adj == [0.0, 0.0] {
-        return Some((p, lines));
+/// The snapping of the Crop drag in progress: None when View › Snap is off, Ctrl turned it off for
+/// this gesture, or the drag isn't a crop's.
+pub(crate) fn crop_snap(app: &PhotocraftApp) -> Option<CropSnap> {
+    let snap = app.prefs_rt.snap.as_ref().filter(|s| s.gesture == Gesture::Crop && !s.disabled)?;
+    snap_on(app).then(|| CropSnap { targets: snap.targets.clone(), smart: snap.smart.clone(), tol: tolerance(app) })
+}
+
+impl CropSnap {
+    /// The document vector that moves the part `part` of `frame` (what the pointer gives now) onto
+    /// its snap target, and the alignment lines it reaches. The frame's edges and centre snap when
+    /// it moves (or the image moves under it), so content can be centred in it (#8580); a handle or
+    /// the corner being drawn snaps itself, not the pointer, which grabbed it up to the grab radius
+    /// away (#1919). A turned frame doesn't snap as a whole: its edges line up with nothing.
+    pub(crate) fn vector(&self, part: BoxPart, frame: &CropBox) -> (Vec2, Vec<SnapLine>) {
+        let none = (Vec2::ZERO, Vec::new());
+        if part == BoxPart::Inside {
+            if frame.angle != 0.0 {
+                return none;
+            }
+            let r = frame.rect.abs();
+            let rect = [r.x0, r.y0, r.x1, r.y1];
+            // Smart guides still snap when nothing in View › Snap To is within reach: the
+            // document's bounds alone keep `targets` from ever being empty.
+            for set in [&self.targets, &self.smart] {
+                let (adj, lines) = set.snap_rect(rect, self.tol);
+                if !lines.is_empty() {
+                    return (Vec2::new(adj[0], adj[1]), lines);
+                }
+            }
+            return none;
+        }
+        let Some(handle) = frame.part_point(part) else { return none };
+        let (snapped, mut lines) = self.targets.snap_point([handle.x, handle.y], self.tol);
+        let deg = frame.angle;
+        let mut d = crate::crop_ui::turn([snapped[0] - handle.x, snapped[1] - handle.y], [0.0, 0.0], -deg);
+        // An edge handle controls only its own axis, not the midpoint along the other one.
+        let (hx, hy) = crate::crop_ui::part_handle(part).unwrap_or((0, 0));
+        if hx == 0 {
+            d[0] = 0.0;
+        }
+        if hy == 0 {
+            d[1] = 0.0;
+        }
+        if deg == 0.0 {
+            lines.retain(|line| if line.vertical { hx != 0 } else { hy != 0 });
+        }
+        if lines.is_empty() {
+            return none;
+        }
+        let d = crate::crop_ui::turn(d, [0.0, 0.0], deg);
+        (Vec2::new(d[0], d[1]), lines)
     }
-    let q = [q[0] - adj[0], q[1] - adj[1]];
-    Some((view.map_or(q, |view| crate::crop_mode::from_press(app, view, q)), lines))
 }
 
 /// The bounds `[x0, y0, x1, y1]` of what drag `d` draws so far, for the tools whose drag Space
@@ -496,15 +444,7 @@ pub fn filter_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifier
             begin(app, [x, y], mods);
             // Moves snap their delta, which is zero at the start: keep the press point.
             let p = match app.prefs_rt.snap.as_ref().map(|s| &s.gesture) {
-                Some(Gesture::Point)
-                    if !(app.ui.tool == Tool::Crop
-                        && app.ui.crop_rect.is_some_and(|r| {
-                            matches!(
-                                crate::crop_ui::hit_turned(r, crate::crop_ui::angle(app), [x, y], crate::crop_ui::tolerance(app)),
-                                crate::crop_ui::Hit::Handle(..)
-                            )
-                        })) =>
-                {
+                Some(Gesture::Point) => {
                     let q = apply(app, [x, y], mods);
                     pixel_round(app, q)
                 }

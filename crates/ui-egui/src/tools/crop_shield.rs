@@ -215,7 +215,7 @@ mod tests {
         assert!(app.ui.tool_options.crop_shield.show_cropped_area);
         // A crop drag in progress.
         let mut app = crop_app();
-        app.crop.drag = Some(crate::crop_ui::CropDrag::Move { start: [0.0, 0.0], rect: [0.0, 0.0, 10.0, 10.0] });
+        app.crop.drag = Some(crate::crop_ui::test_drag());
         let ctx = egui::Context::default();
         ctx.input_mut(|i| i.events.push(egui::Event::Key { key: Key::H, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }));
         assert!(!keys(&mut app, &ctx));
