@@ -209,8 +209,12 @@ fn color32(c: [f32; 3]) -> Color32 {
 fn apply_event<T, U: Clone + Send + Sync + 'static>(ui: &egui::Ui, id: egui::Id, event: Option<EditEvent<T>>, cur: &mut U, from: impl Fn(&T) -> U) -> Edit {
     let mut e = Edit::default();
     match event {
-        Some(EditEvent::Begin { .. }) => {
+        Some(EditEvent::Begin { value, .. }) => {
             ui.data_mut(|d| d.insert_temp(id, cur.clone()));
+            if let Some(value) = value {
+                *cur = from(&value);
+                e.changed = true;
+            }
         }
         Some(EditEvent::Update { value, .. }) => {
             *cur = from(&value);

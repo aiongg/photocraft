@@ -92,8 +92,11 @@ pub(crate) fn edit_points(ui: &mut egui::Ui, id: egui::Id, points: &mut Vec<[f32
             .show(ui);
         let before = id.with("before");
         match shown.event {
-            Some(EditEvent::Begin { .. }) => {
+            Some(EditEvent::Begin { value, .. }) => {
                 ui.data_mut(|d| d.insert_temp(before, points.clone()));
+                if let Some(value) = value {
+                    changed |= take(points, &value);
+                }
             }
             Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => changed |= take(points, &value),
             Some(EditEvent::Commit { value, changed: true, .. }) => changed |= take(points, &value),

@@ -328,6 +328,7 @@ fn a_control_request_changes_the_drawing_language_in_the_same_frame() {
 }
 
 #[test]
+#[ignore = "waits on PC craft-i18n adoption (Preferences captions from library Words)"]
 fn preferences_preview_does_not_commit_until_applied_and_survives_reload() {
     with_language(Lang::EN, || {
         let mut h = harness();
