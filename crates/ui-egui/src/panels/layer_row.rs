@@ -449,7 +449,7 @@ struct RowCtx<'a> {
 }
 
 /// The doc label colour as the library's; `None` leaves the row's own surface.
-pub(super) fn label_of(label: photocraft_doc::LabelColor) -> Option<LabelColor> {
+pub(crate) fn label_of(label: photocraft_doc::LabelColor) -> Option<LabelColor> {
     use photocraft_doc::LabelColor as D;
     Some(match label {
         D::None => return None,

@@ -58,30 +58,12 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     app.run(&command, params(f))
 }
 
-fn label_of(color: LabelColor) -> Option<craft_theme::LabelColor> {
-    use craft_theme::LabelColor as L;
-    Some(match color {
-        LabelColor::None => return None,
-        LabelColor::Red => L::Red,
-        LabelColor::Orange => L::Orange,
-        LabelColor::Yellow => L::Yellow,
-        LabelColor::Green => L::Green,
-        LabelColor::Seafoam => L::Seafoam,
-        LabelColor::Blue => L::Blue,
-        LabelColor::Indigo => L::Indigo,
-        LabelColor::Magenta => L::Magenta,
-        LabelColor::Fuchsia => L::Fuchsia,
-        LabelColor::Violet => L::Violet,
-        LabelColor::Gray => L::Gray,
-    })
-}
-
 /// The label colour's swatch beside its menu: a crossed box for No Color, as in the layer menu.
 fn swatch(ui: &mut egui::Ui, color: LabelColor) {
     let t = Tokens::get(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
     let p = ui.painter();
-    if let Some(label) = label_of(color) {
+    if let Some(label) = crate::panels::label_of(color) {
         let fill = craft_ui::theme::current(ui.ctx()).component.list.label(label).swatch.to_egui();
         p.rect_filled(r, t.radius_sm, fill);
     } else {

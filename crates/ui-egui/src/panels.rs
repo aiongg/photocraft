@@ -70,6 +70,7 @@ pub(crate) use color::{color_field, color_field_fill_id, field_chips, field_hsva
 pub(crate) use color::{hsva_color32, hsva_srgb, srgb_bytes};
 #[cfg(test)]
 pub(crate) use dock::DOCK_MIN_WIDTH;
+pub(crate) use layer_row::label_of;
 pub(crate) use dock::{canvas_panel, dock_body, dock_width_id, dock_width_range};
 pub use dock::{dock_area, request_dock_width};
 #[cfg(test)]
