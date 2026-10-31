@@ -446,12 +446,18 @@ pub fn mono(size: f32) -> FontId {
     FontId::monospace(size)
 }
 
+/// PhotoCraft's size overrides: every Sm control is 24 points tall in Compact too, as its number
+/// fields, buttons and dropdowns have always been.
+pub(crate) fn app_sizes() -> craft::theme::AppSizes {
+    craft::theme::AppSizes { compact: [("size.control.sm".to_owned(), craft::theme::SizeValue::Number(24.0))].into(), ..Default::default() }
+}
+
 /// Shows `kind` as a built-in library theme at its own Size, without a theme store. Tests, the
 /// web start-up and the snapshot tools use this; the app installs the user's selection with
 /// [`install_base`].
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     let sel = selection_for(kind);
-    let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
+    let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: app_sizes() };
     let base =
         craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft::theme::builtins().iter().find(|t| t.id == *id).cloned());
     install_base(ctx, &base, kind);

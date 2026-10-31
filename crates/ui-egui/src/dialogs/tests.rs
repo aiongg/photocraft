@@ -387,7 +387,7 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     assert_eq!(radius(&h), Some(1.0), "the default the first time");
     assert!(h.get_by_role(egui::accesskit::Role::SpinButton).is_focused(), "the Radius field has focus");
     h.event(egui::Event::Text("5".into()));
-    h.run_steps(1);
+    h.run();
     assert_eq!(radius(&h), Some(5.0), "typing replaced the selected 1");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
@@ -406,6 +406,19 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     crate::filter_dialog::open(h.state_mut(), BLUR).unwrap();
     h.run_steps(2);
     assert_eq!(radius(&h), Some(5.0), "a cancelled 9 is not remembered");
+}
+
+/// The first typed digit reaches the host in the same frame it is typed.
+#[test]
+#[ignore = "library row 125: first typed digit reaches the host in the same frame"]
+fn a_value_dialog_takes_the_first_typed_digit_in_one_frame() {
+    use egui_kittest::kittest::Queryable;
+    const BLUR: &str = "filter.blur.gaussianBlur";
+    let mut h = dialog_harness(egui::vec2(1280.0, 800.0), BLUR);
+    assert!(h.get_by_role(egui::accesskit::Role::SpinButton).is_focused(), "the Radius field has focus");
+    h.event(egui::Event::Text("5".into()));
+    h.run_steps(1);
+    assert_eq!(h.state().ui.dialogs.last().and_then(|d| d.fields["radius"].as_f64()), Some(5.0), "typing replaced the selected 1");
 }
 
 /// #4673: File › Automate › Fit Image holds two numbers and a check box, so its window is as

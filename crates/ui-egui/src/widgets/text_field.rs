@@ -1,6 +1,5 @@
-use super::panel::surface;
-use super::{Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, theme, vec2};
-use craft::ui::theme::StrokeExt;
+use super::{Rect, Response, Sense, Tokens, Ui, Vec2, theme, vec2};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 
 /// The most characters a [`text_field`] holds unless its caller sets a limit: far beyond any
 /// search, name or hex value, yet a pasted multi-gigabyte string is cut at the field instead of
@@ -77,10 +76,7 @@ fn text_field_in(
 ) -> (Response, Rect) {
     let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(vec2(width.max(16.0), TEXT_FIELD_H), Sense::hover());
-    surface(ui, rect, t.field, false);
-    if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
-    }
+    craft::ui::primitives::Surface::paint(ui.painter(), rect, craft::ui::primitives::SurfaceKind::Sunken, &LibTokens::of(ui));
     let font = if mono { theme::mono(12.0) } else { egui::FontId::proportional(12.5) };
     let mut inner = rect.shrink2(TEXT_FIELD_PAD);
     inner.max.x = (inner.max.x - trailing).max(inner.min.x + 1.0);
@@ -117,20 +113,4 @@ fn text_field_in(
         *text = b;
     }
     (response, rect)
-}
-
-pub(super) fn first_field_id() -> egui::Id {
-    egui::Id::unique("pc-focus-first-field")
-}
-
-/// While `on`, the next number field drawn takes the keyboard focus with its text selected (a
-/// dialog opening on its first value, as in Photoshop). Turn it off once the body is laid out.
-pub fn focus_first_field(ctx: &egui::Context, on: bool) {
-    ctx.data_mut(|d| {
-        if on {
-            d.insert_temp(first_field_id(), true);
-        } else {
-            d.remove::<bool>(first_field_id());
-        }
-    });
 }

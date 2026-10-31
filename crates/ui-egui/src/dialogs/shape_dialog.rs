@@ -180,17 +180,19 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
             let to_unit = |px: f64| unit.from_px(px, dpi, extent, ppi) as f32;
             let mut v = to_unit(px);
             let places = unit.decimals() as u32;
-            let resp = crate::widgets::value_field_prec(ui, &mut v, to_unit(1.0)..=to_unit(MAX_PX), unit.suffix(), 110.0, places).accessible_name(text);
+            // Right-click: the length units for this field (the sizes stay in pixels). The ruler
+            // menu's entries run in `LENGTH_UNITS` order, with Percent last.
+            let entries: Vec<_> = crate::rulers::unit_entries(unit).into_iter().take(crate::rulers::LENGTH_UNITS.len()).collect();
+            let mut picked = None;
+            let resp = crate::widgets::value_field_prec_menu(ui, &mut v, to_unit(1.0)..=to_unit(MAX_PX), unit.suffix(), 110.0, places, &entries, &mut picked)
+                .accessible_name(text);
+            if let Some(i) = picked {
+                f.insert(unit_key.into(), json!(crate::rulers::unit_name_at(i)));
+            }
             if resp.changed() {
                 let px = unit.to_px(f64::from(v), dpi, extent, ppi).clamp(1.0, MAX_PX);
                 f.insert(key.into(), json!((px * 1000.0).round() / 1000.0));
             }
-            // Right-click: the length units for this field (the sizes stay in pixels).
-            resp.context_menu(|ui| {
-                if let Some(name) = crate::rulers::unit_menu_of(ui, unit, &crate::rulers::LENGTH_UNITS) {
-                    f.insert(unit_key.into(), json!(name));
-                }
-            });
         });
     }
     match kind.as_str() {
