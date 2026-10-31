@@ -307,9 +307,7 @@ fn choice<T: Copy + PartialEq>(ui: &mut egui::Ui, label: &str, value: &mut T, ch
 }
 
 fn number(ui: &mut egui::Ui, name: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str) -> bool {
-    let response = crate::widgets::value_field(ui, value, range, unit, 74.0);
-    response.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(*value), tl!(name)));
-    response.changed()
+    crate::widgets::dialog_number(ui, name, tl!(name), value, range, unit, 2)
 }
 
 #[derive(Clone)]

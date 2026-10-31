@@ -235,7 +235,7 @@ pub(crate) fn select_cell<T: PartialEq + Clone + Send + Sync + 'static>(
 }
 
 /// A checkbox in the bar.
-fn check(ui: &mut egui::Ui, label: &str, value: &mut bool) -> Response {
+pub(crate) fn check(ui: &mut egui::Ui, label: &str, value: &mut bool) -> Response {
     Checkbox::bool(tl!(label), value).size(ControlSize::Sm).show(ui).response
 }
 

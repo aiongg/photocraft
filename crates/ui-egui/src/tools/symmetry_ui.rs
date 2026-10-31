@@ -7,6 +7,7 @@ use crate::{
     theme::Tokens,
     widgets,
 };
+use craft_ui::patterns::OptionsBar;
 use craft_ui::theme::StrokeExt;
 use egui::{Atom, Key, Stroke, vec2};
 use photocraft_doc::Document;
@@ -91,8 +92,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
     if app.ui.symmetry_transform.is_none() {
         return false;
     }
-    ui.label(egui::RichText::new(tl!("Transform Symmetry")).color(Tokens::get(ui.ctx()).text_dim));
-    widgets::vline(ui, 22.0);
+    OptionsBar::hint(ui, tl!("Transform Symmetry"));
+    OptionsBar::divider(ui);
     let tip = crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))]);
     let commit_btn = icons::button(ui, "check", 26.0, false, &tip);
     commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Commit transform"));

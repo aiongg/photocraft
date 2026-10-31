@@ -1,13 +1,13 @@
 //! UI for the Eraser group's colour-aware tools: Magic Eraser (click → `paint.magicEraser`) and
 //! Background Eraser (stroke → `paint.backgroundEraser`), with their options bars.
 
-use craft_ui::theme::ToEgui;
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
-use crate::theme::Tokens;
-use crate::{icons, widgets};
+use crate::icons;
+use crate::panels::{Field, check, number_cell, select_cell};
 
 fn report(app: &mut PhotocraftApp, r: Result<Value, String>) {
     if let Err(e) = r {
@@ -80,15 +80,8 @@ pub fn block_size(app: &PhotocraftApp) -> f32 {
 
 /// The Eraser's Mode dropdown (Brush / Pencil / Block). Returns whether it changed.
 pub fn mode_dropdown(ui: &mut egui::Ui, mode: &mut String) -> bool {
-    opt(ui, tl!("Mode:"));
     let modes = [("brush".to_string(), tl!("Brush")), ("pencil".to_string(), tl!("Pencil")), ("block".to_string(), tl!("Block"))];
-    widgets::dropdown(ui, "eraser-mode", tl!("Mode"), mode, &modes, 96.0)
-}
-
-fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
-    crate::widgets::scrub_option_label(ui, &label);
+    select_cell(ui, Some("Mode"), "eraser-mode", "Mode", mode, &modes, false)
 }
 
 /// Options bar for the Magic Eraser and Background Eraser. Returns false for other tools.
@@ -96,14 +89,12 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     let o = &mut app.ui.tool_options;
     match tool {
         Tool::MagicEraser => {
-            opt(ui, tl!("Tolerance:"));
-            widgets::value_field(ui, &mut o.tolerance, 0.0..=255.0, "", 58.0);
-            widgets::checkbox(ui, &mut o.anti_alias, tl!("Anti-alias"));
-            widgets::checkbox(ui, &mut o.contiguous, tl!("Contiguous"));
-            widgets::checkbox(ui, &mut o.sample_all.magic_eraser, tl!("Sample All Layers"));
-            widgets::vline(ui, 22.0);
-            opt(ui, tl!("Opacity:"));
-            widgets::value_field(ui, &mut o.magic_eraser_opacity, 1.0..=100.0, "%", 62.0);
+            number_cell(ui, &Field::new("Tolerance", 0.0..=255.0, "", CellWidth::Sm), &mut o.tolerance);
+            check(ui, "Anti-alias", &mut o.anti_alias);
+            check(ui, "Contiguous", &mut o.contiguous);
+            check(ui, "Sample All Layers", &mut o.sample_all.magic_eraser);
+            OptionsBar::divider(ui);
+            number_cell(ui, &Field::new("Opacity", 1.0..=100.0, "%", CellWidth::Md), &mut o.magic_eraser_opacity);
         }
         Tool::BackgroundEraser => {
             // Sampling: Continuous / Once / Background Swatch, as icon toggles (Photoshop).
@@ -118,17 +109,15 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 }
             }
             ui.spacing_mut().item_spacing.x = 8.0;
-            widgets::vline(ui, 22.0);
-            opt(ui, tl!("Limits:"));
+            OptionsBar::divider(ui);
             let limits = [
                 ("discontiguous".to_string(), tl!("Discontiguous")),
                 ("contiguous".to_string(), tl!("Contiguous")),
                 ("findEdges".to_string(), tl!("Find Edges")),
             ];
-            widgets::dropdown(ui, "bg-eraser-limits", tl!("Limits:"), &mut o.bg_limits, &limits, 110.0);
-            opt(ui, tl!("Tolerance:"));
-            widgets::value_field(ui, &mut o.bg_tolerance, 0.0..=100.0, "%", 62.0);
-            widgets::checkbox(ui, &mut o.bg_protect_fg, tl!("Protect Foreground Color"));
+            select_cell(ui, Some("Limits"), "bg-eraser-limits", "Limits:", &mut o.bg_limits, &limits, false);
+            number_cell(ui, &Field::new("Tolerance", 0.0..=100.0, "%", CellWidth::Md), &mut o.bg_tolerance);
+            check(ui, "Protect Foreground Color", &mut o.bg_protect_fg);
         }
         _ => return false,
     }

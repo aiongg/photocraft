@@ -4,6 +4,7 @@
 //! (`slice.new`, `slice.set`, `slice.promote`, `slice.divide`, `slice.delete`); this module only
 //! turns pointer gestures into them.
 
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use craft_ui::theme::StrokeExt;
 use egui::{Color32, Rect, Stroke, vec2};
 use photocraft_doc::slices::{self, ResolvedSlice};
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
+use crate::panels::{Field, check, number_cell, select_cell};
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{DialogKind, Tool};
 
@@ -437,32 +439,23 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     if tool == Tool::Slice {
         // Style, Width and Height, as the marquee's (#8360).
         let o = &mut app.ui.tool_options;
-        crate::panels::opt_label(ui, tl!("Style"));
-        let styles = [("normal".to_string(), tl!("Normal")), ("fixedRatio".to_string(), tl!("Fixed Ratio")), ("fixedSize".to_string(), tl!("Fixed Size"))];
-        if crate::widgets::dropdown(ui, "slice-style", tl!("Style"), &mut o.slice_style, &styles, 96.0) {
+        let styles = [("normal".to_string(), "Normal"), ("fixedRatio".to_string(), "Fixed Ratio"), ("fixedSize".to_string(), "Fixed Size")];
+        if select_cell(ui, Some("Style"), "slice-style", "Style", &mut o.slice_style, &styles, false) {
             (o.slice_width, o.slice_height) = if o.slice_style == "fixedSize" { (64.0, 64.0) } else { (1.0, 1.0) };
         }
         let fixed_size = o.slice_style == "fixedSize";
         let range = crate::tool_memory::style_range(&o.slice_style);
         // Fixed Size shows whole pixels, the size the slice gets (`new_rect` rounds the same way),
         // however the value was typed, stepped or scrubbed.
-        let field = |ui: &mut egui::Ui, v: &mut f32| {
-            if fixed_size {
-                crate::widgets::value_field_prec(ui, v, range.clone(), "px", 62.0, 0)
-            } else {
-                crate::widgets::value_field(ui, v, range.clone(), "", 62.0)
-            }
-        };
-        ui.add_enabled_ui(o.slice_style != "normal", |ui| {
-            crate::panels::opt_label(ui, tl!("Width"));
-            field(ui, &mut o.slice_width);
+        let (suffix, decimals) = if fixed_size { ("px", 0..=0) } else { ("", 0..=3) };
+        OptionsBar::group(ui, o.slice_style != "normal", |ui| {
+            number_cell(ui, &Field::new("Width", range.clone(), suffix, CellWidth::Md).decimals(decimals.clone()), &mut o.slice_width);
             if crate::icons::button(ui, "arrow-left-right", 22.0, false, tl!("Swaps height and width")).clicked() {
                 std::mem::swap(&mut o.slice_width, &mut o.slice_height);
             }
-            crate::panels::opt_label(ui, tl!("Height"));
-            field(ui, &mut o.slice_height);
+            number_cell(ui, &Field::new("Height", range.clone(), suffix, CellWidth::Md).decimals(decimals), &mut o.slice_height);
         });
-        crate::widgets::vline(ui, 22.0);
+        OptionsBar::divider(ui);
         if ui.add_enabled_ui(has_doc && !locked, |ui| crate::widgets::secondary_button(ui, tl!("Slices From Guides"), 0.0)).inner.clicked() {
             let _ = app.run("slice.fromGuides", json!({}));
         }
@@ -482,9 +475,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         {
             app.ui.slices.selected = None;
         }
-        crate::widgets::vline(ui, 22.0);
-        crate::widgets::checkbox(ui, &mut app.ui.slices.hide_auto, tl!("Hide Auto Slices"));
-        crate::widgets::vline(ui, 22.0);
+        OptionsBar::divider(ui);
+        check(ui, "Hide Auto Slices", &mut app.ui.slices.hide_auto);
+        OptionsBar::divider(ui);
         if ui.add_enabled_ui(sel && !locked, |ui| crate::widgets::secondary_button(ui, tl!("Slice Options…"), 0.0)).inner.clicked() {
             let _ = open_options(app);
         }

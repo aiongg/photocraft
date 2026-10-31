@@ -98,7 +98,7 @@ pub(crate) use navigator::{last_navigator_controls, last_navigator_preview};
 #[cfg(test)]
 use options_bar::LAYER_PCT_W;
 pub use options_bar::options_bar;
-pub(crate) use options_bar::{FIXED_SIZE_MAX_PX, opt_label, select_cell};
+pub(crate) use options_bar::{CellEdit, FIXED_SIZE_MAX_PX, Field, check, number_cell, opt_label, select_cell};
 pub use panel_state::{migrate_panel_state, panel_state_id, remember_panel_state};
 pub use properties::properties_window;
 #[cfg(test)]

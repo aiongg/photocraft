@@ -3,6 +3,7 @@
 //! selection tools (Quick Selection, Object Selection): gesture → engine command, options bars,
 //! and the clone-source marker.
 
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use craft_ui::theme::ToEgui;
 use egui::{Color32, Stroke, vec2};
 use serde_json::{Value, json};
@@ -10,7 +11,7 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::canvas::ViewXform;
 use crate::state::Tool;
-use crate::theme::Tokens;
+use crate::panels::{Field, check, number_cell, select_cell};
 
 /// The tool a stroke uses with ⌥ held: Dodge and Burn swap, as do Blur and Sharpen.
 pub(crate) fn alt_flipped(tool: Tool, alt: bool) -> Tool {
@@ -485,16 +486,8 @@ pub fn draw_source_marker(app: &PhotocraftApp, painter: &egui::Painter, xf: &Vie
     }
 }
 
-fn opt(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let label = ui.label(egui::RichText::new(tl!(&text)).color(t.color.text.muted.to_egui()).size(12.0));
-    // The caption scrubs and names the field or dropdown drawn right after it.
-    crate::widgets::scrub_option_label(ui, &label);
-}
-
 fn pct(ui: &mut egui::Ui, label: &str, v: &mut f32) {
-    opt(ui, label);
-    crate::widgets::value_field(ui, v, 1.0..=100.0, "%", 58.0);
+    number_cell(ui, &Field::new(label, 1.0..=100.0, "%", CellWidth::Md), v);
 }
 
 /// Options bar for the retouching and smart-selection tools. Returns false for other tools.
@@ -507,22 +500,23 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     let o = &mut app.ui.tool_options;
     match tool {
         Tool::SpotHealing => {
-            opt(ui, tl!("Type:"));
-            for (k, l) in [("contentAware", tl!("Content-Aware")), ("createTexture", tl!("Create Texture")), ("proximityMatch", tl!("Proximity Match"))] {
-                let mut on = o.spot_type == k;
-                if crate::widgets::checkbox(ui, &mut on, l).clicked() {
-                    o.spot_type = k.into();
+            OptionsBar::cell(ui, tl!("Type:"), CellWidth::Content, |ui, _| {
+                for (k, l) in [("contentAware", tl!("Content-Aware")), ("createTexture", tl!("Create Texture")), ("proximityMatch", tl!("Proximity Match"))] {
+                    let mut on = o.spot_type == k;
+                    if check(ui, l, &mut on).clicked() {
+                        o.spot_type = k.into();
+                    }
                 }
-            }
-            crate::widgets::vline(ui, 22.0);
-            crate::widgets::checkbox(ui, &mut o.sample_all.spot_healing, tl!("Sample All Layers"));
+            });
+            OptionsBar::divider(ui);
+            check(ui, "Sample All Layers", &mut o.sample_all.spot_healing);
         }
         Tool::Remove => {
             // Photoshop's options bar: Sample All Layers, Create a new layer, Remove after each
             // stroke; with strokes waiting, ✓ applies them and ⊘ drops them.
-            crate::widgets::checkbox(ui, &mut o.sample_all.remove, tl!("Sample All Layers"));
-            crate::widgets::checkbox(ui, &mut o.remove_new_layer, tl!("Create a new layer"));
-            crate::widgets::checkbox(ui, &mut o.remove_after_each_stroke, tl!("Remove after each stroke"));
+            check(ui, "Sample All Layers", &mut o.sample_all.remove);
+            check(ui, "Create a new layer", &mut o.remove_new_layer);
+            check(ui, "Remove after each stroke", &mut o.remove_after_each_stroke);
             if !app.remove_pending.is_empty() {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if crate::widgets::primary_button(ui, "✓", 32.0)
@@ -539,39 +533,33 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         Tool::Patch => {
             // Photoshop's options bar: Patch: Normal (Source / Destination) or Content-Aware
             // (Structure, Color, Sample All Layers).
-            opt(ui, tl!("Patch:"));
             let kinds = [("normal".to_string(), tl!("Normal")), ("contentAware".to_string(), tl!("Content-Aware"))];
             let mut kind = if o.patch_content_aware { "contentAware" } else { "normal" }.to_string();
-            crate::widgets::dropdown(ui, "patch-kind", tl!("Type"), &mut kind, &kinds, 120.0);
+            select_cell(ui, Some("Patch:"), "patch-kind", tl!("Type"), &mut kind, &kinds, false);
             o.patch_content_aware = kind == "contentAware";
             if o.patch_content_aware {
-                opt(ui, tl!("Structure:"));
-                crate::widgets::value_field(ui, &mut o.patch_structure, 1.0..=7.0, "", 40.0);
-                opt(ui, tl!("Color:"));
-                crate::widgets::value_field(ui, &mut o.patch_color, 0.0..=10.0, "", 40.0);
-                crate::widgets::checkbox(ui, &mut o.sample_all.patch, tl!("Sample All Layers"));
+                number_cell(ui, &Field::new("Structure:", 1.0..=7.0, "", CellWidth::Sm), &mut o.patch_structure);
+                number_cell(ui, &Field::new("Color:", 0.0..=10.0, "", CellWidth::Sm), &mut o.patch_color);
+                check(ui, "Sample All Layers", &mut o.sample_all.patch);
             } else {
                 for (k, l) in [("source", tl!("Source")), ("destination", tl!("Destination"))] {
                     let mut on = o.patch_mode == k;
-                    if crate::widgets::checkbox(ui, &mut on, l).clicked() {
+                    if check(ui, l, &mut on).clicked() {
                         o.patch_mode = k.into();
                     }
                 }
             }
-            crate::widgets::vline(ui, 22.0);
-            opt(ui, tl!("Lasso around an area, then drag the selection"));
+            OptionsBar::divider(ui);
+            OptionsBar::hint(ui, tl!("Lasso around an area, then drag the selection"));
         }
         Tool::ContentAwareMove => {
-            opt(ui, tl!("Mode:"));
             let modes = [("move".to_string(), tl!("Move")), ("extend".to_string(), tl!("Extend"))];
-            crate::widgets::dropdown(ui, "cam-mode", tl!("Mode"), &mut o.cam_mode, &modes, 90.0);
-            opt(ui, tl!("Structure:"));
-            crate::widgets::value_field(ui, &mut o.cam_structure, 1.0..=7.0, "", 40.0);
-            opt(ui, tl!("Color:"));
-            crate::widgets::value_field(ui, &mut o.cam_color, 0.0..=10.0, "", 40.0);
-            crate::widgets::checkbox(ui, &mut o.sample_all.content_aware_move, tl!("Sample All Layers"));
-            crate::widgets::checkbox(ui, &mut o.cam_transform_on_drop, tl!("Transform On Drop"));
-            crate::widgets::vline(ui, 22.0);
+            select_cell(ui, Some("Mode:"), "cam-mode", tl!("Mode"), &mut o.cam_mode, &modes, false);
+            number_cell(ui, &Field::new("Structure:", 1.0..=7.0, "", CellWidth::Sm), &mut o.cam_structure);
+            number_cell(ui, &Field::new("Color:", 0.0..=10.0, "", CellWidth::Sm), &mut o.cam_color);
+            check(ui, "Sample All Layers", &mut o.sample_all.content_aware_move);
+            check(ui, "Transform On Drop", &mut o.cam_transform_on_drop);
+            OptionsBar::divider(ui);
             if crate::cam_transform::active(app) {
                 // The box on the dropped patch: ✓ computes the move, ⊘ drops it (as ↩ / Esc).
                 let tip = crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))]);
@@ -586,62 +574,58 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                     crate::cam_transform::cancel(app);
                 }
             } else {
-                opt(ui, tl!("Lasso around an area, then drag the selection"));
+                OptionsBar::hint(ui, tl!("Lasso around an area, then drag the selection"));
             }
         }
         Tool::PatternStamp => {
             pattern_stamp_options(app, ui);
         }
         Tool::Healing | Tool::CloneStamp => {
-            crate::widgets::checkbox(ui, &mut o.clone_aligned, tl!("Aligned"));
-            opt(ui, tl!("Sample:"));
+            check(ui, "Aligned", &mut o.clone_aligned);
             let opts = [
                 ("current".to_string(), tl!("Current Layer")),
                 ("currentAndBelow".to_string(), tl!("Current & Below")),
                 ("all".to_string(), tl!("All Layers")),
             ];
-            crate::widgets::dropdown(ui, "clone-sample", tl!("Source"), &mut o.clone_sample, &opts, 130.0);
+            select_cell(ui, Some("Sample:"), "clone-sample", tl!("Source"), &mut o.clone_sample, &opts, false);
             if app.ui.clone_source.is_none() {
-                crate::widgets::vline(ui, 22.0);
-                opt(ui, &crate::i18n::fmt(tl!("{key}-click to set the source"), &[("key", &crate::shortcuts::pretty("Alt"))]));
+                OptionsBar::divider(ui);
+                OptionsBar::hint(ui, &crate::i18n::fmt(tl!("{key}-click to set the source"), &[("key", &crate::shortcuts::pretty("Alt"))]));
             }
         }
         Tool::Dodge | Tool::Burn => {
-            opt(ui, tl!("Range:"));
             let opts = [("shadows".to_string(), tl!("Shadows")), ("midtones".to_string(), tl!("Midtones")), ("highlights".to_string(), tl!("Highlights"))];
-            crate::widgets::dropdown(ui, "tone-range", tl!("Range"), &mut o.tone_range, &opts, 100.0);
-            pct(ui, tl!("Exposure:"), &mut o.exposure);
-            crate::widgets::checkbox(ui, &mut o.protect_tones, tl!("Protect Tones"));
+            select_cell(ui, Some("Range:"), "tone-range", tl!("Range"), &mut o.tone_range, &opts, false);
+            pct(ui, "Exposure", &mut o.exposure);
+            check(ui, "Protect Tones", &mut o.protect_tones);
         }
         Tool::Sponge => {
-            opt(ui, tl!("Mode:"));
             let opts = [("desaturate".to_string(), tl!("Desaturate")), ("saturate".to_string(), tl!("Saturate"))];
-            crate::widgets::dropdown(ui, "sponge-mode", tl!("Mode"), &mut o.sponge_mode, &opts, 110.0);
-            crate::widgets::checkbox(ui, &mut o.vibrance, tl!("Vibrance"));
+            select_cell(ui, Some("Mode:"), "sponge-mode", tl!("Mode"), &mut o.sponge_mode, &opts, false);
+            check(ui, "Vibrance", &mut o.vibrance);
         }
         Tool::Blur | Tool::Sharpen | Tool::Smudge => {
-            pct(ui, tl!("Strength:"), &mut o.strength);
+            pct(ui, "Strength", &mut o.strength);
             if let Some(all) = o.sample_all.slot(tool) {
-                crate::widgets::checkbox(ui, all, tl!("Sample All Layers"));
+                check(ui, "Sample All Layers", all);
             }
             if tool == Tool::Sharpen {
-                crate::widgets::checkbox(ui, &mut o.protect_detail, tl!("Protect Detail"));
+                check(ui, "Protect Detail", &mut o.protect_detail);
             }
             if tool == Tool::Smudge {
-                crate::widgets::checkbox(ui, &mut o.finger_painting, tl!("Finger Painting"));
+                check(ui, "Finger Painting", &mut o.finger_painting);
             }
         }
         Tool::ColorReplacement => {
             // Photoshop's options bar: Mode, Sampling (three icon toggles), Limits, Tolerance, Anti-alias.
-            opt(ui, tl!("Mode:"));
             let modes = [
                 ("hue".to_string(), tl!("Hue")),
                 ("saturation".to_string(), tl!("Saturation")),
                 ("color".to_string(), tl!("Color")),
                 ("luminosity".to_string(), tl!("Luminosity")),
             ];
-            crate::widgets::dropdown(ui, "color-replacement-mode", tl!("Mode"), &mut o.cr_mode, &modes, 100.0);
-            crate::widgets::vline(ui, 22.0);
+            select_cell(ui, Some("Mode:"), "color-replacement-mode", tl!("Mode"), &mut o.cr_mode, &modes, false);
+            OptionsBar::divider(ui);
             ui.spacing_mut().item_spacing.x = 2.0;
             for (k, icon, tip) in [
                 ("continuous", "pipette", "Sampling: Continuous"),
@@ -653,21 +637,20 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 }
             }
             ui.spacing_mut().item_spacing.x = 8.0;
-            crate::widgets::vline(ui, 22.0);
-            opt(ui, tl!("Limits:"));
+            OptionsBar::divider(ui);
             let limits = [
                 ("discontiguous".to_string(), tl!("Discontiguous")),
                 ("contiguous".to_string(), tl!("Contiguous")),
                 ("findEdges".to_string(), tl!("Find Edges")),
             ];
-            crate::widgets::dropdown(ui, "color-replacement-limits", tl!("Limits:"), &mut o.cr_limits, &limits, 110.0);
-            opt(ui, tl!("Tolerance:"));
-            crate::widgets::value_field(ui, &mut o.cr_tolerance, 0.0..=100.0, "%", 62.0);
-            crate::widgets::checkbox(ui, &mut o.cr_anti_alias, tl!("Anti-alias"));
+            select_cell(ui, Some("Limits:"), "color-replacement-limits", tl!("Limits:"), &mut o.cr_limits, &limits, false);
+            number_cell(ui, &Field::new("Tolerance:", 0.0..=100.0, "%", CellWidth::Md), &mut o.cr_tolerance);
+            check(ui, "Anti-alias", &mut o.cr_anti_alias);
         }
-        Tool::HistoryBrush => opt(ui, tl!("Paints from the History panel's source state")),
+        Tool::HistoryBrush => {
+            OptionsBar::hint(ui, tl!("Paints from the History panel's source state"));
+        }
         Tool::ArtHistoryBrush => {
-            opt(ui, tl!("Style"));
             let styles = [
                 ("tightShort".to_string(), tl!("Tight Short")),
                 ("tightMedium".to_string(), tl!("Tight Medium")),
@@ -678,41 +661,37 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 ("tightCurl".to_string(), tl!("Tight Curl")),
                 ("looseCurl".to_string(), tl!("Loose Curl")),
             ];
-            crate::widgets::dropdown(ui, "art-history-style", tl!("Style"), &mut o.art_history_style, &styles, 130.0);
-            opt(ui, tl!("Area"));
-            crate::widgets::value_field(ui, &mut o.art_history_area, 0.0..=100.0, "", 50.0);
-            opt(ui, tl!("Tolerance"));
-            crate::widgets::value_field(ui, &mut o.art_history_tolerance, 0.0..=100.0, "", 50.0);
-            crate::widgets::vline(ui, 22.0);
-            opt(ui, tl!("Stylized dabs from a history state"));
+            select_cell(ui, Some("Style"), "art-history-style", tl!("Style"), &mut o.art_history_style, &styles, false);
+            number_cell(ui, &Field::new("Area", 0.0..=100.0, "", CellWidth::Sm), &mut o.art_history_area);
+            number_cell(ui, &Field::new("Tolerance", 0.0..=100.0, "", CellWidth::Sm), &mut o.art_history_tolerance);
+            OptionsBar::divider(ui);
+            OptionsBar::hint(ui, tl!("Stylized dabs from a history state"));
         }
         Tool::QuickSelection => {
-            crate::widgets::checkbox(ui, &mut o.sample_all.quick_selection, tl!("Sample All Layers"));
-            crate::widgets::checkbox(ui, &mut o.enhance_edge, tl!("Enhance Edge"));
-            opt(ui, &crate::i18n::fmt(tl!("{key} to subtract"), &[("key", &crate::shortcuts::pretty("Alt"))]));
-            crate::widgets::vline(ui, 22.0);
+            check(ui, "Sample All Layers", &mut o.sample_all.quick_selection);
+            check(ui, "Enhance Edge", &mut o.enhance_edge);
+            OptionsBar::hint(ui, &crate::i18n::fmt(tl!("{key} to subtract"), &[("key", &crate::shortcuts::pretty("Alt"))]));
+            OptionsBar::divider(ui);
             if crate::widgets::secondary_button(ui, tl!("Select Subject"), 0.0).clicked() {
                 let r = app.run("select.subject", json!({}));
                 report_smart_result(app, r, tl!("No subject found — try Object Selection or the Lasso"));
             }
         }
         Tool::ObjectSelection => {
-            crate::widgets::checkbox(ui, &mut o.object_finder, tl!("Object Finder"));
-            crate::widgets::checkbox(ui, &mut o.sample_all.object_selection, tl!("Sample All Layers"));
-            opt(ui, tl!("Drag a rectangle around the object"));
-            crate::widgets::vline(ui, 22.0);
+            check(ui, "Object Finder", &mut o.object_finder);
+            check(ui, "Sample All Layers", &mut o.sample_all.object_selection);
+            OptionsBar::hint(ui, tl!("Drag a rectangle around the object"));
+            OptionsBar::divider(ui);
             if crate::widgets::secondary_button(ui, tl!("Select Subject"), 0.0).clicked() {
                 let r = app.run("select.subject", json!({}));
                 report_smart_result(app, r, tl!("No subject found — try a rectangle around the object"));
             }
         }
         Tool::RedEye => {
-            opt(ui, tl!("Pupil Size"));
-            crate::widgets::value_field(ui, &mut o.red_eye_pupil_size, 1.0..=100.0, "", 50.0);
-            opt(ui, tl!("Darken Amount"));
-            crate::widgets::value_field(ui, &mut o.red_eye_darken, 0.0..=100.0, "", 50.0);
-            crate::widgets::vline(ui, 22.0);
-            opt(ui, tl!("Click a red pupil to neutralize it"));
+            number_cell(ui, &Field::new("Pupil Size", 1.0..=100.0, "", CellWidth::Sm), &mut o.red_eye_pupil_size);
+            number_cell(ui, &Field::new("Darken Amount", 0.0..=100.0, "", CellWidth::Sm), &mut o.red_eye_darken);
+            OptionsBar::divider(ui);
+            OptionsBar::hint(ui, tl!("Click a red pupil to neutralize it"));
         }
         _ => {}
     }
@@ -723,21 +702,18 @@ fn pattern_stamp_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let opts: Vec<(String, String)> = app.session.patterns.items.iter().map(|p| (p.id.clone(), p.display_name().to_string())).collect();
     let mut pat = photocraft_engine::presets::patterns::current(&app.session).or(app.session.patterns.items.first()).map(|p| p.id.clone()).unwrap_or_default();
     let o = &mut app.ui.tool_options;
-    crate::widgets::checkbox(ui, &mut o.pattern_stamp_aligned, tl!("Aligned"));
-    crate::widgets::checkbox(ui, &mut o.pattern_stamp_impressionist, tl!("Impressionist"));
-    crate::widgets::vline(ui, 22.0);
-    opt(ui, tl!("Pattern"));
+    check(ui, "Aligned", &mut o.pattern_stamp_aligned);
+    check(ui, "Impressionist", &mut o.pattern_stamp_impressionist);
+    OptionsBar::divider(ui);
     let opts_ref: Vec<(String, &str)> = opts.iter().map(|(id, n)| (id.clone(), n.as_str())).collect();
     let picked = if opts_ref.is_empty() {
-        ui.label(egui::RichText::new(tl!("No patterns")).color(craft_ui::theme::current(ui.ctx()).color.text.faint.to_egui()));
+        OptionsBar::hint(ui, tl!("No patterns"));
         false
     } else {
-        crate::widgets::dropdown(ui, "pattern-stamp-pat", tl!("Pattern"), &mut pat, &opts_ref, 140.0)
+        select_cell(ui, Some("Pattern"), "pattern-stamp-pat", tl!("Pattern"), &mut pat, &opts_ref, false)
     };
-    opt(ui, tl!("Scale"));
-    crate::widgets::value_field(ui, &mut o.pattern_stamp_scale, 1.0..=1000.0, "%", 58.0);
-    opt(ui, tl!("Angle:"));
-    crate::widgets::value_field(ui, &mut o.pattern_stamp_angle, -180.0..=180.0, "°", 58.0);
+    number_cell(ui, &Field::new("Scale", 1.0..=1000.0, "%", CellWidth::Md), &mut o.pattern_stamp_scale);
+    number_cell(ui, &Field::new("Angle:", -180.0..=180.0, "°", CellWidth::Md), &mut o.pattern_stamp_angle);
     if picked {
         let _ = app.run("pattern.presets.select", json!({"pattern": pat}));
     }
