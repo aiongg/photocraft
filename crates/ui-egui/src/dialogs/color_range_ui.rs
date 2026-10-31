@@ -383,24 +383,6 @@ fn preview(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Map<String, Value>)
     app.color_range.as_ref()?.mask.as_ref().map(|t| (t.id(), [w, h], k))
 }
 
-/// Photoshop-style radio button.
-fn radio(ui: &mut egui::Ui, on: bool, label: &str) -> egui::Response {
-    let t = Tokens::get(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 5.0;
-        let (r, resp) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::click());
-        ui.painter().circle_stroke(r.center(), 5.5, Stroke::new(1.2, if on { t.accent } else { t.text_faint }));
-        if on {
-            ui.painter().circle_filled(r.center(), 3.0, t.accent);
-        }
-        let l = ui
-            .add(egui::Label::new(egui::RichText::new(tl!(&label)).color(t.text_dim)).selectable(false).sense(Sense::click()))
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
-        resp.union(l)
-    })
-    .inner
-}
-
 /// Eyedropper button: the pipette icon with a +/− badge; labelled for accessibility.
 fn eyedropper(ui: &mut egui::Ui, badge: &str, selected: bool, label: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
@@ -564,15 +546,15 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
     });
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let view = s(f, "__view", "selection").to_string();
+    let mut shown = view;
+    let mut set = craft_ui::controls::RadioSet::new("color-range-view", tl!("Preview"), &mut shown).item("selection".to_string()).item("image".to_string()).begin(ui);
     ui.horizontal(|ui| {
-        if radio(ui, view == "selection", "Selection").clicked() {
-            f.insert("__view".into(), json!("selection"));
-        }
+        set.radio(ui, 0, tl!("Selection"));
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        if radio(ui, view == "image", "Image").clicked() {
-            f.insert("__view".into(), json!("image"));
-        }
+        set.radio(ui, 1, tl!("Image"));
     });
+    set.end(ui);
+    f.insert("__view".into(), json!(shown));
     ui.add_space(craft_ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!("Selection Preview:")).color(t.text_dim));
