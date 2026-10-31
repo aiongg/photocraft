@@ -305,7 +305,6 @@ pub use tools::warp_preview;
 pub use tools::zoom_tool;
 pub use widgets::field_tab;
 use widgets::numeric_expression;
-pub use widgets::point_curve;
 pub use widgets::press_menu;
 use widgets::rgb_histogram;
 use widgets::tab_strip;

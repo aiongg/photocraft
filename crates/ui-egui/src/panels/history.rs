@@ -1,5 +1,6 @@
 use super::layer_drag::dropped_on;
 use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, Tool, Value, icons, json, pos2, vec2, widgets};
+use craft::ui::composites::PanelFooter;
 use craft::ui::theme::StrokeExt;
 
 pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
@@ -27,7 +28,8 @@ pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut set_source: Option<usize> = None;
     let all = entries.iter().map(|e| (e.clone(), false)).chain(redo.iter().map(|e| (e.clone(), true)));
     // The dock gives History a fixed height: the rows scroll above the footer.
-    let footer = if t.pro { widgets::footer_height(ui) + ui.spacing().item_spacing.y } else { 0.0 };
+    let footer_style = PanelFooter::style(&craft::ui::theme::current(&ctx), ui.pixels_per_point());
+    let footer = if t.pro { PanelFooter::reserved_height(&footer_style) + ui.spacing().item_spacing.y } else { 0.0 };
     let max_h = (ui.available_height() - footer).max(40.0);
     // Follow the current state when the history moves (a new step, Undo, a state row) or another
     // document comes up (`spot`), scrolling only if its row is hidden (#5909). Other changes (a
@@ -127,7 +129,7 @@ pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         };
         let can_delete = can_click || can_drop;
         let can_new = app.session.is_enabled("history.newDocument");
-        widgets::panel_footer(ui, |ui| {
+        PanelFooter::show(ui, |ui| {
             let trash = ui.add_enabled_ui(can_delete, |ui| icons::button(ui, "trash", 26.0, false, tl!("Delete current state"))).inner;
             if trash.clicked() {
                 footer_cmd = Some(match selected_snap {

@@ -15,14 +15,12 @@
 //!   with the Crop tool, [`keys`]) fills them with the active document's size in px and its
 //!   resolution; Clear empties them; ⇄ and X swap W and H.
 
-use craft::ui::theme::StrokeExt;
-use egui::{Modifiers, Stroke, StrokeKind, vec2};
+use egui::{Modifiers, vec2};
 use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::{Tool, ToolOptions};
-use crate::theme::Tokens;
 
 /// `crop_ratio` key of the W x H x Resolution mode.
 pub const WHR: &str = "whr";
@@ -286,14 +284,10 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 /// A text field for a length or the resolution: what is typed is kept while it has focus and
 /// normalised into `value` (by `normalize(typed, previous)`) when it loses it. Returns true then.
 fn text_field(ui: &mut egui::Ui, id: &str, value: &mut String, hint: &str, width: f32, normalize: fn(&str, &str) -> String) -> bool {
-    let t = Tokens::get(ui.ctx());
     let id = ui.scope_id().with(id);
     let mut buf = ui.data(|d| d.get_temp::<String>(id)).unwrap_or_else(|| value.clone());
     let (rect, _) = ui.allocate_exact_size(vec2(width, 24.0), egui::Sense::hover());
-    crate::widgets::surface(ui, rect, t.field, false);
-    if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
-    }
+    craft::ui::primitives::Surface::paint(ui.painter(), rect, craft::ui::primitives::SurfaceKind::Sunken, &craft::ui::theme::current(ui.ctx()));
     let inner = rect.shrink2(vec2(4.0, 2.0));
     let r = ui.put(
         inner,

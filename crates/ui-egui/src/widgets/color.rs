@@ -1,6 +1,7 @@
 use super::dropdown::swatch_popup;
-use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui, Vec2, pos2};
+use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui};
 use craft::theme::Srgba;
+use craft::ui::controls::{ControlSize, Swatch, checkerboard};
 use craft::ui::theme::StrokeExt;
 
 /// Camera Raw-style continuous RGB ribbons on craft-ui's [`Histogram`]. Raw bins remain exact;
@@ -36,56 +37,17 @@ pub fn hue_stops() -> Vec<Color32> {
     (0..=12).map(|i| hue_color(i as f32 * 30.0)).collect()
 }
 
-/// Paint a small checkerboard (transparency) in `rect`.
+/// Paint a small checkerboard (transparency) in `rect`, in the swatch checker colours.
 pub fn checker(painter: &egui::Painter, rect: Rect, cell: f32) {
-    painter.rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(250));
-    let nx = (rect.width() / cell).ceil() as i32;
-    let ny = (rect.height() / cell).ceil() as i32;
-    for j in 0..ny {
-        for i in 0..nx {
-            if (i + j) % 2 == 1 {
-                let r = Rect::from_min_size(Pos2::new(rect.left() + i as f32 * cell, rect.top() + j as f32 * cell), Vec2::splat(cell)).intersect(rect);
-                painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(214));
-            }
-        }
-    }
+    checker_rounded(painter, rect, cell, CornerRadius::ZERO);
 }
 
-/// A transparency checkerboard of `cell`-point squares clipped to `rect` with `radius` corners,
-/// for rounded swatches (#3208): [`checker`] paints square cells, which showed past a rounded
-/// fill's corners. This one is a repeating two-by-two tile textured onto the rounded rect.
+/// A transparency checkerboard of `cell`-point squares in `rect` with `radius` corners, for
+/// rounded swatches (#3208): the cells at a corner take its radius, so none shows past it.
 pub fn checker_rounded(painter: &egui::Painter, rect: Rect, cell: f32, radius: impl Into<CornerRadius>) {
-    let tile = checker_tile(painter.ctx());
-    painter.add(egui::epaint::RectShape::filled(rect, radius, Color32::WHITE).with_texture(tile.id(), checker_uv(rect, cell)));
-}
-
-/// The texture range that tiles `rect` with `cell`-point squares: the tile holds two cells a side.
-pub(super) fn checker_uv(rect: Rect, cell: f32) -> Rect {
     let cell = if cell.is_finite() && cell > 0.0 { cell } else { 4.0 };
-    Rect::from_min_max(Pos2::ZERO, pos2(rect.width() / (2.0 * cell), rect.height() / (2.0 * cell)))
-}
-
-pub(super) fn checker_tile_id() -> egui::Id {
-    egui::Id::unique("transparency-checker-tile")
-}
-
-/// The checker's two-by-two tile (light, dark / dark, light), loaded once per context and shared
-/// by every rounded checker; it repeats and never blurs.
-fn checker_tile(ctx: &egui::Context) -> egui::TextureHandle {
-    if let Some(tile) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(checker_tile_id())) {
-        return tile;
-    }
-    let (light, dark) = (Color32::from_gray(250), Color32::from_gray(214));
-    let image = egui::ColorImage::new([2, 2], vec![light, dark, dark, light]);
-    let options = egui::TextureOptions {
-        magnification: egui::TextureFilter::Nearest,
-        minification: egui::TextureFilter::Nearest,
-        wrap_mode: egui::TextureWrapMode::Repeat,
-        mipmap_mode: None,
-    };
-    let tile = ctx.load_texture("transparency-checker-tile", image, options);
-    ctx.data_mut(|d| d.insert_temp(checker_tile_id(), tile.clone()));
-    tile
+    let style = Swatch::style(&craft::ui::theme::current(painter.ctx()), ControlSize::Md);
+    painter.extend(checkerboard(rect, radius.into(), style.checker, cell));
 }
 
 pub(crate) fn color_swatch(ui: &mut Ui, color: Color32) -> Response {

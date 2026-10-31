@@ -53,13 +53,6 @@ fn tool_move(app: &mut PhotocraftApp, x: f64, y: f64, pressure: f32, mods: egui:
 }
 
 fn preflight_tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> Option<(bool, egui::Modifiers)> {
-    // A press anywhere but on a guide deselects the selected guide (`guide_select`).
-    if let ToolEvent::Down { x, y, .. } = ev
-        && app.ui.selected_guide.is_some()
-        && crate::rulers::guide_at(app, x, y).is_none()
-    {
-        crate::guide_select::clear(app);
-    }
     if crate::symmetry_ui::pointer(app, ev, crate::workspace_ui::sticky_mods(app, mods)) {
         return None;
     }
@@ -187,14 +180,6 @@ fn filter_event_before_tool(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::
     if crate::gradient_ui::pointer(app, ev, mods) {
         return None;
     }
-    // ⌘ over a guide takes the guide (#2690, #6288); the guide drag below moves it.
-    if let ToolEvent::Down { x, y, .. } = raw
-        && let Some((vertical, i)) = command_guide_at(app, app.active_tool(), [x, y], mods)
-    {
-        app.guide_drag = Some(crate::rulers::GuideDrag::existing(vertical, i, [x, y]));
-        crate::snap_ui::begin_guide(app, [x, y]);
-        return None;
-    }
     if crate::lasso_ui::pointer(app, ev, mods) {
         return None;
     }
@@ -208,15 +193,6 @@ fn filter_event_before_tool(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::
 fn handle_move_pointer(app: &mut PhotocraftApp, ev: ToolEvent, tool: Tool, mods: egui::Modifiers) -> bool {
     match ev {
         ToolEvent::Down { x, y, pressure } if tool == Tool::Move => {
-            if let Some((vertical, i)) = crate::rulers::guide_at(app, x, y) {
-                // ⌥-click turns the guide, through the point clicked, as in Photoshop.
-                if mods.alt && !mods.shift && !mods.command {
-                    crate::guide_select::flip(app, vertical, i, [x, y]);
-                    return true;
-                }
-                app.guide_drag = Some(crate::rulers::GuideDrag::existing(vertical, i, [x, y]));
-                return true;
-            }
             // Auto-Select (or ⌘-click while it is off) picks the layer under the pointer first
             // (not when the selected pixels move: those are the active layer's).
             if !crate::move_ui::moves_selected_pixels_with(app, tool) && app.ui.tool_options.move_auto_select != mods.command {
@@ -268,20 +244,6 @@ fn handle_move_pointer(app: &mut PhotocraftApp, ev: ToolEvent, tool: Tool, mods:
                     d.sel_move = Some(true);
                     app.drag = Some(d);
                 }
-                return true;
-            }
-        }
-        ToolEvent::Move { x, y, .. } => {
-            if let Some(d) = app.guide_drag.as_mut().filter(|d| d.index.is_some()) {
-                d.pos = if d.vertical { x } else { y };
-                return true;
-            }
-        }
-        ToolEvent::Up { x, y } => {
-            if let Some(mut d) = app.guide_drag.filter(|d| d.index.is_some()) {
-                app.guide_drag = None;
-                d.pos = if d.vertical { x } else { y };
-                crate::rulers::finish_drag(app, d);
                 return true;
             }
         }
@@ -630,14 +592,14 @@ pub(crate) fn command_moves_layer(app: &PhotocraftApp, tool: Tool, p: [f64; 2], 
     selection_tool && mods.command && !mods.shift && !floating && app.ui.polygon.is_empty() && !inside_selection(app, p)
 }
 
-/// The guide a ⌘ press with `tool` at `p` drags (vertical?, index), as the Move tool's press
-/// would (#2690): ⌘ is the Move tool, and a guide under the pointer comes before the layer or the
+/// Whether a ⌘ press with `tool` takes a guide under the pointer, as the Move tool's press would
+/// (#2690): ⌘ is the Move tool, and a guide under the pointer comes before the layer or the
 /// selected pixels. The selection tools, and every tool on which ⌘ is the Move tool
-/// (`hold_keys::cmd_moves`, #6288); the canvas shows the guide cursor where this finds a guide.
-/// Not while a polygon or lasso outline, a stroke, Free Transform or type editing is under way.
-pub(crate) fn command_guide_at(app: &PhotocraftApp, tool: Tool, p: [f64; 2], mods: egui::Modifiers) -> Option<(bool, usize)> {
+/// (`hold_keys::cmd_moves`, #6288). Not while a polygon or lasso outline, a stroke, Free Transform
+/// or type editing is under way.
+pub(crate) fn command_takes_guides(app: &PhotocraftApp, tool: Tool, mods: egui::Modifiers) -> bool {
     let selection_tool = matches!(tool, Tool::RectMarquee | Tool::EllipseMarquee | Tool::Lasso | Tool::PolygonLasso | Tool::MagicWand);
     let moves = selection_tool || crate::hold_keys::cmd_moves(tool);
     let idle = app.ui.polygon.is_empty() && !crate::lasso_ui::active(app) && app.ui.transform.is_none() && app.ui.text_edit.is_none() && app.drag.is_none();
-    (moves && mods.command && idle).then(|| crate::rulers::guide_at(app, p[0], p[1])).flatten()
+    moves && mods.command && idle
 }

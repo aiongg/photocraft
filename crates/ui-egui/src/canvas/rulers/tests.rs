@@ -1,4 +1,4 @@
-use egui::pos2;
+use egui::{Pos2, pos2};
 
 use super::*;
 
@@ -7,7 +7,9 @@ fn draw_rulers(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: Rect, xf: &View
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     let response = ui.interact(xf.rect, egui::Id::new("test-canvas"), egui::Sense::click_and_drag());
     show_rulers(app, ui, &response, full, xf, &doc, 0, Some(guides_id(ui, 0)));
-    draw_guides(app, ui, &response, xf, &doc, 0);
+    let ctx = ui.ctx().clone();
+    let mods = ui.input(|i| i.modifiers);
+    show_guides(app, ui, &ctx, &response, xf, &doc, 0, false, mods);
 }
 
 #[test]
@@ -144,43 +146,38 @@ fn info_panel_shows_guide_drag_position_outside_canvas() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
     app.hover_doc = None;
-    app.guide_drag = Some(GuideDrag { vertical: true, index: None, pos: 42.0, press: 42.0, over_ruler: false });
+    app.guide_drag = Some(GuideDrag { vertical: true, index: None, pos: 42.0 });
     let mut h = egui_kittest::Harness::builder()
         .with_size(vec2(260.0, 240.0))
         .build_ui_state(|ui, app| crate::panels::dock_body(app, ui, crate::dock::Group::Navigator, 2), app);
     h.run_steps(2);
     assert!(h.query_by_label("42").is_some(), "vertical guide: X readout");
-    h.state_mut().guide_drag = Some(GuideDrag { vertical: false, index: None, pos: 17.0, press: 17.0, over_ruler: false });
+    h.state_mut().guide_drag = Some(GuideDrag { vertical: false, index: None, pos: 17.0 });
     h.run_steps(2);
     assert!(h.query_by_label("17").is_some(), "horizontal guide: Y readout");
 }
 
 /// A dragged guide shows its position beside the pointer: X for a vertical guide, Y for a
-/// horizontal one, from the zero point, in the ruler unit (pixels to one decimal).
+/// horizontal one, from the zero point, in the ruler unit.
 #[test]
-fn guide_drag_shows_its_position_beside_the_pointer() {
+fn guide_drag_shows_its_position_from_the_zero_point_in_the_ruler_unit() {
     use egui_kittest::kittest::Queryable;
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
-    let v = GuideDrag { vertical: true, index: Some(0), pos: 103.24, press: 50.0, over_ruler: false };
-    assert_eq!(guide_drag_readout(&app, v), Some(("X:", "103.2 px".to_owned())));
-    let h = GuideDrag { vertical: false, index: None, pos: 40.0, press: 40.0, over_ruler: false };
-    assert_eq!(guide_drag_readout(&app, h), Some(("Y:", "40 px".to_owned())));
-    app.run("view.setRulerOrigin", json!({"x": 3.0, "y": 10.0})).unwrap();
-    assert_eq!(guide_drag_readout(&app, h), Some(("Y:", "30 px".to_owned())), "from the zero point");
-    app.run("view.resetRulerOrigin", json!({})).unwrap();
-    app.run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
-    assert_eq!(guide_drag_readout(&app, GuideDrag { vertical: true, index: None, pos: 103.0, press: 0.0, over_ruler: false }).map(|r| r.0), Some("X:"));
-    app.run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "pixels"})).unwrap();
-
-    app.guide_drag = Some(v);
-    let mut h = egui_kittest::Harness::builder().with_size(vec2(300.0, 200.0)).build_ui_state(|ui, app| draw_guide_drag_readout(app, ui.ctx()), app);
-    h.event(egui::Event::PointerMoved(pos2(50.0, 50.0)));
+    let mut h = canvas_harness(false);
+    h.state_mut().run("view.setRulerOrigin", json!({"x": 3.0, "y": 10.0})).unwrap();
     h.run_steps(2);
-    assert!(h.query_by_label("X: 103.2 px").is_some());
-    h.state_mut().guide_drag = None;
+    let press = canvas_at(&h, 200.0, 100.0);
+    h.event(egui::Event::PointerMoved(press));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: press, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+    h.run_steps(1);
+    h.event(egui::Event::PointerMoved(canvas_at(&h, 200.0, 140.0)));
     h.run_steps(2);
-    assert!(h.query_by_label_contains("X:").is_none(), "no readout once the drag ends");
+    assert!(h.query_by_label_contains("Y:").is_some(), "the readout shows beside the pointer");
+    assert!(h.query_by_label_contains("130").is_some(), "from the zero point: 140 - 10");
+    h.state_mut().run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
+    h.event(egui::Event::PointerMoved(canvas_at(&h, 200.0, 150.0)));
+    h.run_steps(2);
+    assert!(h.query_all_by_label_contains("%").next().is_some(), "in the ruler unit");
 }
 
 type AppHarness = egui_kittest::Harness<'static, PhotocraftApp>;
@@ -285,42 +282,43 @@ fn percentage_grid_spacing_uses_both_canvas_dimensions() {
 }
 
 #[test]
-fn hidden_guides_are_not_hit_tested() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.session.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
-    app.sync_views();
-    app.session.execute("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
-    app.session.execute("view.newGuide", json!({"orientation": "horizontal", "position": 25})).unwrap();
-    let positions = app.session.active().unwrap().doc.guides.clone();
-
-    // Visible, unlocked guides remain interactive in either orientation.
-    assert_eq!(guide_at(&app, 50.0, 10.0), Some((true, 0)));
-    assert_eq!(guide_at(&app, 10.0, 25.0), Some((false, 0)));
-
-    // All ways to hide the canvas guides must also disable hit testing.
-    app.ui.extras.guides = false;
-    assert_eq!(guide_at(&app, 50.0, 10.0), None);
-    assert_eq!(guide_at(&app, 10.0, 25.0), None);
-    app.ui.extras.guides = true;
-
-    app.ui.view.show.canvas_guides = false;
-    assert_eq!(guide_at(&app, 50.0, 10.0), None);
-    assert_eq!(guide_at(&app, 10.0, 25.0), None);
-    app.ui.view.show.canvas_guides = true;
-
-    app.ui.view.extras = false;
-    assert_eq!(guide_at(&app, 50.0, 10.0), None);
-    assert_eq!(guide_at(&app, 10.0, 25.0), None);
-    app.ui.view.extras = true;
-
-    // Hiding/showing must not change the stored guide positions.
-    assert_eq!(app.session.active().unwrap().doc.guides, positions);
-    assert_eq!(guide_at(&app, 50.0, 10.0), Some((true, 0)));
-    assert_eq!(guide_at(&app, 10.0, 25.0), Some((false, 0)));
-
-    app.ui.extras.lock_guides = true;
-    assert_eq!(guide_at(&app, 50.0, 10.0), None);
-    assert_eq!(guide_at(&app, 10.0, 25.0), None);
+fn hidden_or_locked_guides_take_neither_pointer_nor_keys() {
+    let mut h = canvas_harness(false);
+    let drag = |h: &mut AppHarness| {
+        let press = canvas_at(h, 200.0, 100.0);
+        h.event(egui::Event::PointerMoved(press));
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: press, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+        h.run_steps(1);
+        h.event(egui::Event::PointerMoved(canvas_at(h, 200.0, 130.0)));
+        h.run_steps(2);
+        let took = h.state().guide_drag.is_some();
+        h.event(egui::Event::PointerButton {
+            pos: canvas_at(h, 200.0, 130.0),
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+        h.run_steps(2);
+        took
+    };
+    let hide: [(&str, fn(&mut PhotocraftApp, bool)); 4] = [
+        ("Show Guides off", |a, on| a.ui.extras.guides = on),
+        ("View › Show › Guides off", |a, on| a.ui.view.show.canvas_guides = on),
+        ("View › Extras off", |a, on| a.ui.view.extras = on),
+        ("Lock Guides", |a, on| a.ui.extras.lock_guides = !on),
+    ];
+    for (name, set) in hide {
+        set(h.state_mut(), false);
+        h.run_steps(2);
+        assert!(!drag(&mut h), "{name}: the pointer reaches the layer below");
+        set(h.state_mut(), true);
+        h.run_steps(2);
+        let positions = h.state().session.active().unwrap().doc.guides.horizontal.clone();
+        assert_eq!(positions, vec![100.0], "{name}: hiding changes no guide");
+    }
+    assert!(drag(&mut h), "shown and unlocked: the Move tool takes the guide");
+    assert_eq!(h.state().session.active().unwrap().doc.guides.horizontal, vec![130.0]);
 }
 
 #[test]
@@ -375,29 +373,72 @@ fn rulers_open_as_last_set_after_a_restart() {
     }
 }
 
+/// Screen point of document point `(x, y)` in a harness whose view is at 100 %.
+fn at(h: &AppHarness, x: f32, y: f32) -> Pos2 {
+    canvas_at(h, x, y)
+}
+
+/// Drag the primary button through `path` (screen points), holding `modifiers`.
+fn drag_path(h: &mut AppHarness, path: &[Pos2], modifiers: egui::Modifiers) {
+    let button = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers };
+    h.event_modifiers(egui::Event::PointerMoved(path[0]), modifiers);
+    h.run_steps(1);
+    h.event_modifiers(button(path[0], true), modifiers);
+    h.run_steps(1);
+    for &p in &path[1..] {
+        h.event_modifiers(egui::Event::PointerMoved(p), modifiers);
+        h.run_steps(2);
+    }
+    let last = *path.last().unwrap();
+    h.event_modifiers(button(last, false), modifiers);
+    h.run_steps(2);
+}
+
+fn guides_of(h: &AppHarness) -> (Vec<f64>, Vec<f64>) {
+    let g = &h.state().session.active().unwrap().doc.guides;
+    (g.vertical.clone(), g.horizontal.clone())
+}
+
+/// One history step per drag: a guide is made out of a ruler, moved with the Move tool, deleted
+/// off the document, and locked guides stay put.
 #[test]
 fn guide_drags_create_move_and_delete() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.session.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
-    app.sync_views();
-    finish_drag(&mut app, GuideDrag { vertical: true, index: None, pos: 50.0, press: 50.0, over_ruler: false });
-    finish_drag(&mut app, GuideDrag { vertical: false, index: None, pos: 500.0, press: 500.0, over_ruler: false }); // off canvas: ignored
-    assert_eq!(app.session.active().unwrap().doc.guides.vertical, vec![50.0]);
-    assert!(app.session.active().unwrap().doc.guides.horizontal.is_empty());
-    assert_eq!(guide_at(&app, 51.0, 10.0), Some((true, 0)));
-    finish_drag(&mut app, GuideDrag { vertical: true, index: Some(0), pos: 120.0, press: 50.0, over_ruler: false });
-    assert_eq!(app.session.active().unwrap().doc.guides.vertical, vec![120.0]);
-    finish_drag(&mut app, GuideDrag { vertical: true, index: Some(0), pos: -30.0, press: 120.0, over_ruler: false });
-    assert!(app.session.active().unwrap().doc.guides.vertical.is_empty());
-    app.ui.extras.lock_guides = true;
-    assert_eq!(guide_at(&app, 0.0, 0.0), None);
+    let mut h = tool_canvas_harness(crate::state::Tool::Move);
+    let canvas = h.state().last_canvas_rect;
+    let steps = |h: &AppHarness| h.state().session.active().unwrap().history.past_len();
+    let left = canvas.min.x + RULER / 2.0;
+    let before = steps(&h);
+    let (a, b) = (pos2(left, at(&h, 0.0, 100.0).y), at(&h, 50.0, 100.0));
+    drag_path(&mut h, &[a, b], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h), (vec![50.0], vec![]));
+    assert_eq!(steps(&h), before + 1, "one history step");
+    // Off the document (x = 500 > 400): no guide.
+    let (a, b) = (pos2(left, at(&h, 0.0, 100.0).y), at(&h, 500.0, 100.0));
+    drag_path(&mut h, &[a, b], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h), (vec![50.0], vec![]), "a drag let go off the document makes no guide");
+    // Move it with the Move tool.
+    let before = steps(&h);
+    let (a, b, c) = (at(&h, 50.0, 100.0), at(&h, 80.0, 100.0), at(&h, 120.0, 100.0));
+    drag_path(&mut h, &[a, b, c], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h), (vec![120.0], vec![]));
+    assert_eq!(steps(&h), before + 1, "one history step for the whole drag");
+    // Let go off the document: deleted.
+    let (a, b) = (at(&h, 120.0, 100.0), at(&h, 450.0, 100.0));
+    drag_path(&mut h, &[a, b], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h), (vec![], vec![]));
+    // Locked guides don't move.
+    h.state_mut().run("view.newGuide", json!({"orientation": "vertical", "position": 60})).unwrap();
+    h.state_mut().ui.extras.lock_guides = true;
+    h.run_steps(2);
+    let (a, b) = (at(&h, 60.0, 100.0), at(&h, 90.0, 100.0));
+    drag_path(&mut h, &[a, b], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h), (vec![60.0], vec![]));
 }
 
 /// ⌘ is the Move tool with any tool, so a ⌘-drag over a guide moves the guide, never the layer
 /// (#2690); with Lock Guides a ⌘-drag with a marquee moves the layer as before.
 #[test]
 fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
-    use crate::canvas::{ToolEvent, tool_event};
     use crate::state::Tool;
     for (tool, locked) in [
         (Tool::Brush, false),
@@ -410,44 +451,31 @@ fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
         (Tool::MagicWand, false),
         (Tool::RectMarquee, true),
     ] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.run("file.new", json!({"width": 80, "height": 60, "background": "transparent"})).unwrap();
-        app.sync_views();
-        app.ui.tool = tool;
-        app.ui.extras.lock_guides = locked;
-        let layer = app.session.active().unwrap().active_layer.unwrap();
-        app.session
+        let mut h = tool_canvas_harness_with(tool, json!({"width": 400, "height": 300, "background": "transparent"}));
+        h.state_mut().ui.extras.lock_guides = locked;
+        let layer = h.state().session.active().unwrap().active_layer.unwrap();
+        h.state_mut()
+            .session
             .edit("paint", |doc, _| {
                 doc.layer_mut(layer).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(10, 10, 30, 30), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
-        app.run("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
-        let cmd = egui::Modifiers::COMMAND;
-        tool_event(&mut app, ToolEvent::Down { x: 50.0, y: 40.0, pressure: 1.0 }, cmd);
-        tool_event(&mut app, ToolEvent::Move { x: 65.0, y: 40.0, pressure: 1.0 }, cmd);
-        tool_event(&mut app, ToolEvent::Up { x: 65.0, y: 40.0 }, cmd);
-        let doc = &app.session.active().unwrap().doc;
+        h.state_mut().run("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
+        h.run_steps(2);
+        let v = &mut h.state_mut().ui.views[0];
+        (v.zoom, v.center, v.fit_pending) = (1.0, [200.0, 150.0], false);
+        h.run_steps(2);
+        let (a, b) = (at(&h, 50.0, 40.0), at(&h, 65.0, 40.0));
+        let mid = at(&h, 57.0, 40.0);
+        drag_path(&mut h, &[a, mid, b], egui::Modifiers::COMMAND);
+        let doc = &h.state().session.active().unwrap().doc;
         let moved = doc.layer(layer).unwrap().surface().unwrap().rgba(12, 12)[3] == 0.0;
         if locked {
             assert_eq!((doc.guides.vertical.clone(), moved), (vec![50.0], true), "{tool:?}, guides locked: the layer moves");
         } else {
             assert_eq!((doc.guides.vertical.clone(), moved), (vec![65.0], false), "{tool:?}: the guide moves, the layer stays");
         }
-    }
-}
-
-/// The cursor over a guide turns with the view as the guide does: on a view turned 90°, a
-/// vertical guide shows as a horizontal line and moves up and down.
-#[test]
-fn guide_cursors_turn_with_a_rotated_view() {
-    use egui::CursorIcon::{ResizeHorizontal as H, ResizeNeSw as NeSw, ResizeNwSe as NwSe, ResizeVertical as V};
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
-    let level = ViewXform { rect, zoom: 1.0, center: [400.0, 300.0], flip: false, rotation: 0.0, aspect: 1.0 };
-    // View rotation, flip → the cursor over a vertical guide, over a horizontal guide.
-    for (rotation, flip, want) in [(0.0, false, [H, V]), (90.0, false, [V, H]), (45.0, false, [NwSe, NeSw]), (0.0, true, [H, V])] {
-        let xf = ViewXform { rotation, flip, ..level };
-        assert_eq!([guide_cursor(&xf, true), guide_cursor(&xf, false)], want, "view turned {rotation}°, flip {flip}");
     }
 }
 
@@ -517,55 +545,41 @@ fn a_guide_dropped_on_either_ruler_is_removed() {
 /// two are told apart by where the pointer is, not by the position it reads.
 #[test]
 fn a_guide_let_go_on_a_ruler_is_removed_not_moved() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
-    app.sync_views();
-    let horizontal = |app: &PhotocraftApp| app.session.active().unwrap().doc.guides.horizontal.clone();
-    for drag in [
-        GuideDrag { vertical: false, index: Some(0), pos: 50.0, press: 10.0, over_ruler: true },
-        // Dragged sideways onto the left ruler, a horizontal guide holds its y, which on its own
-        // reads as a click: the ruler still removes it.
-        GuideDrag { vertical: false, index: Some(0), pos: 50.0, press: 50.0, over_ruler: true },
-    ] {
-        app.run("view.newGuide", json!({"orientation": "horizontal", "position": 50})).unwrap();
-        finish_drag(&mut app, drag);
-        assert!(horizontal(&app).is_empty(), "let go on a ruler: removed, {drag:?}");
+    let mut h = tool_canvas_harness(crate::state::Tool::Move);
+    let canvas = h.state().last_canvas_rect;
+    h.state_mut().run("view.newGuide", json!({"orientation": "horizontal", "position": 150})).unwrap();
+    h.run_steps(2);
+    let on = |h: &AppHarness| at(h, 200.0, 150.0);
+    // Dragged sideways onto the left ruler, a horizontal guide holds its y, which on its own
+    // reads as a click: the ruler still removes it. So does the top ruler.
+    for ruler in [pos2(canvas.min.x + RULER / 2.0, on(&h).y), pos2(on(&h).x, canvas.min.y + RULER / 2.0)] {
+        let p = on(&h);
+        let side = pos2(p.x - 12.0, p.y);
+        drag_path(&mut h, &[p, side, ruler], egui::Modifiers::NONE);
+        assert_eq!(guides_of(&h).1, Vec::<f64>::new(), "let go on a ruler: removed");
+        h.state_mut().run("view.newGuide", json!({"orientation": "horizontal", "position": 150})).unwrap();
+        h.run_steps(2);
     }
-    app.run("view.newGuide", json!({"orientation": "horizontal", "position": 50})).unwrap();
-    finish_drag(&mut app, GuideDrag { vertical: false, index: Some(0), pos: 80.0, press: 10.0, over_ruler: false });
-    assert_eq!(horizontal(&app), vec![80.0], "let go on the canvas: moved");
-    // Clicked where it was pressed, on the canvas: selected and kept, as before.
-    finish_drag(&mut app, GuideDrag { vertical: false, index: Some(0), pos: 80.0, press: 80.0, over_ruler: false });
-    assert_eq!(horizontal(&app), vec![80.0], "clicked on the canvas: kept");
-    assert!(app.ui.selected_guide.is_some(), "clicked on the canvas: selected");
-}
-
-/// The ruler bands are the strips the rulers take off the canvas rect, and only while the rulers
-/// are shown: with them hidden the whole canvas rect is canvas (#6286).
-#[test]
-fn only_the_ruler_bands_count_as_a_ruler() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let full = Rect::from_min_size(pos2(16.0, 42.0), vec2(968.0, 642.0));
-    let content = Rect::from_min_size(pos2(32.0, 58.0), vec2(952.0, 626.0));
-    app.ui.extras.rulers = true;
-    assert!(dropped_on_a_ruler(&app, full, pos2(full.min.x + RULER / 2.0, 371.0)), "the left ruler");
-    assert!(dropped_on_a_ruler(&app, full, pos2(508.0, full.min.y + RULER / 2.0)), "the top ruler");
-    assert!(dropped_on_a_ruler(&app, full, full.min), "the ruler corner");
-    assert!(!dropped_on_a_ruler(&app, full, pos2(508.0, 371.0)), "the canvas");
-    assert!(!dropped_on_a_ruler(&app, full, content.min), "the canvas' own top-left corner");
-    assert!(!dropped_on_a_ruler(&app, full, pos2(content.min.x + 0.5, 371.0)), "the first canvas column");
-    assert!(!dropped_on_a_ruler(&app, full, pos2(508.0, content.min.y + 0.5)), "the first canvas row");
-    assert!(!dropped_on_a_ruler(&app, full, pos2(full.min.x - 1.0, 371.0)), "outside the canvas rect");
-    app.ui.extras.rulers = false;
-    for p in [pos2(full.min.x + RULER / 2.0, 371.0), pos2(508.0, full.min.y + RULER / 2.0), full.min] {
-        assert!(!dropped_on_a_ruler(&app, full, p), "rulers hidden: no band at {p:?}");
-    }
+    let p = on(&h);
+    let (q, r) = (at(&h, 200.0, 170.0), at(&h, 200.0, 180.0));
+    drag_path(&mut h, &[p, q, r], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h).1, vec![180.0], "let go on the canvas: moved");
+    // Clicked where it was pressed, on the canvas: selected and kept.
+    let p = at(&h, 200.0, 180.0);
+    drag_path(&mut h, &[p], egui::Modifiers::NONE);
+    assert_eq!(guides_of(&h).1, vec![180.0], "clicked on the canvas: kept");
+    assert!(h.state().ui.selected_guide.is_some(), "clicked on the canvas: selected");
 }
 
 /// The canvas the guides live on, rulers on, at 100 %.
 fn tool_canvas_harness(tool: crate::state::Tool) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    tool_canvas_harness_with(tool, json!({"width": 400, "height": 300}))
+}
+
+/// [`tool_canvas_harness`] on the document `file.new` makes from `new`.
+fn tool_canvas_harness_with(tool: crate::state::Tool, new: serde_json::Value) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
+    app.run("file.new", new).unwrap();
     app.sync_views();
     app.ui.extras.rulers = true;
     app.ui.extras.snap = false;
@@ -625,10 +639,10 @@ fn a_guide_dragged_onto_a_ruler_is_deleted_through_the_canvas() {
         h.run_steps(1);
         h.event(egui::Event::PointerButton { pos: on_the_guide, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
         h.run_steps(1);
-        // Past egui's click distance, so the drag starts at the press, on the guide.
+        // Along the guide, which its axis does not count as a move.
         h.event(egui::Event::PointerMoved(dragged));
         h.run_steps(2);
-        assert!(h.state().guide_drag.is_some(), "the Move tool takes the guide");
+        assert!(h.state().guide_drag.is_none(), "along the guide it is still a click");
         h.event(egui::Event::PointerMoved(onto_the_left_ruler));
         h.run_steps(1);
         h.event(egui::Event::PointerButton {
@@ -690,4 +704,16 @@ fn shift_dragged_guides_land_on_ruler_ticks() {
     h.run_steps(2);
     let guides = h.state().session.active().unwrap().doc.guides.vertical.clone();
     assert!(guides.len() == 1 && (guides[0] - 38.4).abs() < 1e-9, "{guides:?}");
+}
+
+/// The guide readout prints the ruler unit and at most one decimal for pixels: `X: 103.2 px`.
+#[test]
+fn ruler_units_format_the_readout_with_the_unit_and_one_decimal() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", serde_json::json!({"width": 200, "height": 100})).unwrap();
+    let doc = &app.session.active().unwrap().doc;
+    let [x, _] = ruler_units_with(&app, LocaleNumbers::from_tag("en"), doc);
+    let decimals = 0..=x.decimals.max(1);
+    assert_eq!(x.format(103.2, 0.0, decimals.clone()), "103.2 px");
+    assert_eq!(x.format(103.0, 0.0, decimals), "103 px");
 }

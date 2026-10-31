@@ -141,7 +141,7 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
         let at = (input / 255.0 * lut.len().saturating_sub(1) as f32).round() as usize;
         let Some(output) = lut.get(at).map(|o| (o * 255.0).round()) else { continue };
         let before = pts.len();
-        let Some(i) = crate::point_curve::insert(&mut pts, [input, output]) else { continue };
+        let Some(i) = craft::ui::composites::CurveRules { levels: 255.0, max_points: 16 }.insert(&mut pts, [input, output]) else { continue };
         if pts.len() > before {
             // Whole levels, as the editor writes a point clicked on the graph.
             values[field] = json!(pts.iter().map(|q| [q[0].round(), q[1].round()]).collect::<Vec<_>>());
