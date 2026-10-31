@@ -2,13 +2,19 @@
 //! (W/H/X/Y of the layer content, editable), Align and Distribute, the kind's sections and Quick Actions. Edits dispatch
 //! `edit.transform`, `layer.translate`, `layer.align.*` and selection commands.
 
+use craft_ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
+use craft_ui::controls::{Button, ButtonVariant, ControlSize, IconButton, NumberField};
+use craft_ui::edit::{EditEvent, EditResponse};
+use craft_ui::icons::Icon;
+use craft_ui::localized::{LocaleNumbers, Unit};
 use craft_ui::theme::ToEgui;
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::{Value, json};
 
-use crate::props_layout::{LABEL_GAP, LABEL_W, quick_actions_ui, section, stacked_label};
-use crate::theme::{ROW_GAP, Tokens};
+use super::options_bar::reader;
+use crate::props_layout::{quick_actions_ui, section};
+use crate::theme::ROW_GAP;
 use crate::{PhotocraftApp, widgets};
 
 /// `edit.transform` params that scale the content box `b` = [x0, y0, x1, y1] to `w` x `h`, keeping
@@ -47,26 +53,49 @@ fn edit_tolerance(layer: &Layer, u: LenUnit, extent: f64) -> f32 {
     }
 }
 
-/// A number field that reports a value once committed (drag released, Enter, focus lost). `label` is its own
-/// label and the one stacked with it in the same column ("W" over "X"), which share a centre.
-/// `len` is the unit shown and its 100% extent (for percent); `name` is the field's accessible name.
-// The explicit accessible name accompanies the existing numeric-field parameters.
-#[expect(clippy::too_many_arguments)]
-fn field(ui: &mut egui::Ui, id: &str, label: (&str, &str), name: &str, current: f32, width: f32, len: (LenUnit, f64), tol: f32) -> Option<f32> {
+/// A number field of the Transform section. `len` is the unit shown and its 100% extent (for
+/// percent); `name` is the field's accessible name; `key` holds the value of a gesture under way.
+fn number(ui: &mut egui::Ui, id: &str, key: egui::Id, name: &str, current: f32, len: (LenUnit, f64)) -> EditResponse<f64> {
     let (u, extent) = len;
-    stacked_label(ui, tl!(label.0), &[tl!(label.0), tl!(label.1)], LABEL_W, 2.0);
-    let key = ui.make_persistent_id(("layer-props-field", id));
-    let mut v = ui.data(|d| d.get_temp::<f32>(key)).unwrap_or_else(|| u.shown(f64::from(current), extent));
-    let resp = widgets::value_field(ui, &mut v, -300_000.0..=300_000.0, u.unit.suffix(), width).accessible_name(tl!(name));
-    if resp.dragged() || resp.has_focus() {
-        ui.data_mut(|d| d.insert_temp(key, v));
-        return None;
-    }
-    ui.data_mut(|d| d.remove::<f32>(key));
-    if !(resp.drag_stopped() || resp.lost_focus() || resp.changed()) {
-        return None;
-    }
-    let px = u.px(v, extent) as f32;
+    let numbers = LocaleNumbers::of(ui);
+    let shown = ui.data(|d| d.get_temp::<f32>(key)).unwrap_or_else(|| u.shown(f64::from(current), extent));
+    // The field compares what it is given with what it sent, so a stored f32 must not come back as 53.000004.
+    let shown = (f64::from(shown) * 1e4).round() / 1e4;
+    let suffix = u.unit.suffix();
+    let template = if suffix == "%" { "{n}%".to_owned() } else { format!("{{n}} {suffix}") };
+    let units = widgets::FieldUnits { unit: u.unit, dpi: u.dpi, ppi: u.ppi };
+    let salt = format!("layer-props-{id}");
+    NumberField::new(salt.as_str(), tl!(name), shown, &numbers)
+        .range(-300_000.0..=300_000.0)
+        .decimals(0..=u.unit.decimals())
+        .unit(Unit::new(&template))
+        .or_parse(reader(suffix, Some(units)))
+        .size(ControlSize::Md)
+        .show(ui)
+}
+
+/// The value a field commits (drag released, Enter, focus lost), in document px: scrubbing and
+/// typing show their value until the gesture ends, then one edit is reported. `tol` is the
+/// smallest change, in px, that counts as an edit.
+fn committed(ui: &egui::Ui, key: egui::Id, edit: &EditResponse<f64>, current: f32, len: (LenUnit, f64), tol: f32) -> Option<f32> {
+    let (u, extent) = len;
+    let value = match edit.event {
+        Some(EditEvent::Update { value, .. }) => {
+            ui.data_mut(|d| d.insert_temp(key, value as f32));
+            return None;
+        }
+        Some(EditEvent::Commit { value, changed, .. }) => {
+            ui.data_mut(|d| d.remove::<f32>(key));
+            changed.then_some(value)?
+        }
+        Some(EditEvent::Set { value, .. }) => value,
+        Some(EditEvent::Cancel { .. }) => {
+            ui.data_mut(|d| d.remove::<f32>(key));
+            return None;
+        }
+        _ => return None,
+    };
+    let px = u.px(value as f32, extent) as f32;
     ((px - current).abs() >= tol).then_some(px)
 }
 
@@ -145,9 +174,6 @@ fn frame(layer: &Layer, px: photocraft_geom::Rect) -> [f64; 4] {
     path.map_or([f64::from(px.x0), f64::from(px.y0), f64::from(px.x1), f64::from(px.y1)], |c| [c.0, c.1, c.2, c.3])
 }
 
-/// Width of the link toggle between the W and H fields (the X/Y row leaves the same gap).
-const LINK_W: f32 = 20.0;
-
 /// Pro Properties body for a non-adjustment layer: Transform, Align and Distribute, the kind's own
 /// sections (Character/Paragraph/Type Options for type, Appearance/Shape for shapes), then Quick
 /// Actions, all with the same collapsible headers (#155).
@@ -161,31 +187,44 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
         if section(ui, "transform", tl!("Transform")) {
             let link_key = egui::Id::unique("layer-props-link");
             let linked = ui.data(|d| d.get_temp::<bool>(link_key)).unwrap_or(true);
-            // Two label+field columns with the link toggle between them, filling the panel.
-            let w = ((ui.available_width() - 2.0 * (LABEL_W + LABEL_GAP) - LINK_W - 2.0 * LABEL_GAP) / 2.0).max(36.0);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = LABEL_GAP;
-                if let Some(v) = field(ui, "w", ("W", "X"), "Width", (bb[2] - bb[0]) as f32, w, (u, dw), tw) {
-                    run.extend(transform_params(layer.id.0, bb, Some(v), None, linked, tw).map(|p| ("edit.transform".to_string(), p)));
-                }
-                if crate::icons::button(ui, if linked { "link" } else { "unlink" }, LINK_W, linked, tl!("Link width and height")).clicked() {
-                    ui.data_mut(|d| d.insert_temp(link_key, !linked));
-                }
-                if let Some(v) = field(ui, "h", ("H", "Y"), "Height", (bb[3] - bb[1]) as f32, w, (u, dh), th) {
-                    run.extend(transform_params(layer.id.0, bb, None, Some(v), linked, th).map(|p| ("edit.transform".to_string(), p)));
-                }
-            });
-            ui.add_space(ROW_GAP);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = LABEL_GAP;
-                if let Some(v) = field(ui, "x", ("X", "W"), "X", bb[0] as f32, w, (u, dw), 0.5) {
-                    run.push(("layer.translate".into(), json!({"layer": layer.id.0, "dx": (v - bb[0] as f32).round() as i32, "dy": 0})));
-                }
-                ui.add_space(LINK_W + LABEL_GAP);
-                if let Some(v) = field(ui, "y", ("Y", "H"), "Y", bb[1] as f32, w, (u, dh), 0.5) {
-                    run.push(("layer.translate".into(), json!({"layer": layer.id.0, "dx": 0, "dy": (v - bb[1] as f32).round() as i32})));
-                }
-            });
+            let keys = ["w", "h", "x", "y"].map(|id| ui.make_persistent_id(("layer-props-field", id)));
+            let (width, height) = ((bb[2] - bb[0]) as f32, (bb[3] - bb[1]) as f32);
+            // W over X and H over Y; the link toggle sits between the W and H fields, and the X/Y row
+            // leaves its slot empty so the columns line up.
+            let (size, position) = PropertyGroup::new("layer-props-transform")
+                .show(ui, |ui| {
+                    let size = PropertyRow::pair(PropertyLabel::glyph(tl!("W")), PropertyLabel::glyph(tl!("H")))
+                        .show_linked(
+                            ui,
+                            |ui, _| number(ui, "w", keys[0], "Width", width, (u, dw)),
+                            |ui| {
+                                let icon = if linked { Icon::Link } else { Icon::Unlink };
+                                if ui.add(IconButton::new(icon, tl!("Link width and height")).size(ControlSize::Sm).selected(linked)).clicked() {
+                                    ui.data_mut(|d| d.insert_temp(link_key, !linked));
+                                }
+                            },
+                            |ui, _| number(ui, "h", keys[1], "Height", height, (u, dh)),
+                        )
+                        .inner;
+                    let position = PropertyRow::pair(PropertyLabel::glyph(tl!("X")), PropertyLabel::glyph(tl!("Y")))
+                        .reserve_link_slot()
+                        .show(ui, |ui, _| number(ui, "x", keys[2], "X", bb[0] as f32, (u, dw)), |ui, _| number(ui, "y", keys[3], "Y", bb[1] as f32, (u, dh)))
+                        .inner;
+                    (size, position)
+                })
+                .inner;
+            if let Some(v) = committed(ui, keys[0], &size.0, width, (u, dw), tw) {
+                run.extend(transform_params(layer.id.0, bb, Some(v), None, linked, tw).map(|p| ("edit.transform".to_string(), p)));
+            }
+            if let Some(v) = committed(ui, keys[1], &size.2, height, (u, dh), th) {
+                run.extend(transform_params(layer.id.0, bb, None, Some(v), linked, th).map(|p| ("edit.transform".to_string(), p)));
+            }
+            if let Some(v) = committed(ui, keys[2], &position.0, bb[0] as f32, (u, dw), 0.5) {
+                run.push(("layer.translate".into(), json!({"layer": layer.id.0, "dx": (v - bb[0] as f32).round() as i32, "dy": 0})));
+            }
+            if let Some(v) = committed(ui, keys[3], &position.1, bb[1] as f32, (u, dh), 0.5) {
+                run.push(("layer.translate".into(), json!({"layer": layer.id.0, "dx": 0, "dy": (v - bb[1] as f32).round() as i32})));
+            }
             ui.add_space(ROW_GAP);
         }
     }
@@ -256,7 +295,7 @@ fn align_and_distribute(app: &PhotocraftApp, ui: &mut egui::Ui, run: &mut Vec<(S
     ui.horizontal_wrapped(|ui| {
         for (kind, text) in [("horizontally", tl!("Horizontally")), ("vertically", tl!("Vertically"))] {
             let id = format!("layer.distribute.{kind}");
-            if ui.add_enabled(app.session.is_enabled(&id), egui::Button::new(text)).clicked() {
+            if ui.add(Button::new(text).variant(ButtonVariant::Secondary).size(ControlSize::Sm).enabled(app.session.is_enabled(&id))).clicked() {
                 run.push((id, json!({})));
             }
         }
@@ -312,12 +351,13 @@ mod tests {
         }
     }
 
-    /// #7314: in the Transform section W sits over X and H over Y, and each pair shares a centre.
+    /// Typing a width into the Transform section's field resizes the layer once, keeping the
+    /// aspect ratio while W and H are linked.
     #[test]
-    fn transform_labels_are_centred_on_each_other() {
+    fn typing_a_width_resizes_the_layer() {
+        use egui_kittest::kittest::Queryable;
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.run("file.new", json!({"width": 200, "height": 120})).unwrap();
-        app.run("layer.new.layer", json!({})).unwrap();
+        app.run("file.new", json!({"width": 200, "height": 120, "background": "transparent"})).unwrap();
         app.run("select.rect", json!({"x": 10, "y": 10, "width": 100, "height": 60})).unwrap();
         app.run("edit.fill", json!({"contents": "color", "color": "#336699"})).unwrap();
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).build_ui_state(
@@ -333,17 +373,16 @@ mod tests {
             app,
         );
         h.run_steps(3);
-        let centres: Vec<(String, f32)> = h
-            .output()
-            .shapes
-            .iter()
-            .filter_map(|s| if let egui::Shape::Text(t) = &s.shape { Some(t) } else { None })
-            .filter(|t| t.galley.text().chars().count() == 1)
-            .map(|t| (t.galley.text().to_string(), t.pos.x + t.galley.size().x * 0.5))
-            .collect();
-        let at = |l: &str| centres.iter().find(|(s, _)| s == l).map(|(_, x)| *x).unwrap_or_else(|| panic!("no {l} label in {centres:?}"));
-        assert!((at("W") - at("X")).abs() < 0.01, "W and X: {centres:?}");
-        assert!((at("H") - at("Y")).abs() < 0.01, "H and Y: {centres:?}");
+        h.get_by_label("Width").click();
+        h.run_steps(2);
+        h.get_by_label("Width").focus();
+        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+        h.get_by_label("Width").type_text("50");
+        h.key_press(egui::Key::Enter);
+        h.run_steps(4);
+        let st = h.state().session.active().unwrap();
+        let b = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds();
+        assert_eq!((b.width(), b.height()), (50, 30));
     }
 
     #[test]

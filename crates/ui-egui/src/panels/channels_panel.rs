@@ -406,7 +406,6 @@ fn reorder_drop(ui: &egui::Ui, drag: &RowDrag, alphas: &[(Row, Rect)], actions: 
     }
 }
 
-
 pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(st) = app.session.active() else {
         ui.weak(tl!("No document"));
@@ -556,7 +555,6 @@ fn drop_action(row: Row, name: &str, mask_layer: Option<u64>, on: Footer) -> Opt
         (Footer::Load, _) => Some(("select.loadSelection".into(), json!({ "channel": row.reference() }))),
     }
 }
-
 
 fn thumbs_id() -> egui::Id {
     egui::Id::unique("channel-thumb-rects")
