@@ -129,7 +129,7 @@ fn refine_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             for &(label, id) in row {
                 // Greyed when its command can't run, by the same rule as the menu item.
                 let enabled = crate::menus::is_enabled(app, id);
-                if ui.add_enabled_ui(enabled, |ui| widgets::secondary_button(ui, label, w).clicked()).inner {
+                if ui.add_enabled_ui(enabled, |ui| ui.add(craft_ui::controls::Button::new(tl!(label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(w)).clicked()).inner {
                     let params = if id == INVERT { json!({"target": "mask"}) } else { json!({}) };
                     if let Err(error) = crate::menus::invoke(app, ui.ctx(), id, params) {
                         app.ui.status = error;
