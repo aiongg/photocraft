@@ -431,3 +431,40 @@ fn fit_image_is_as_narrow_as_its_content() {
         assert!(window.contains_rect(node.rect()), "{label} inside the window");
     }
 }
+
+/// A harness with File › New's dialog open in a window of `size`.
+fn new_document_harness(size: egui::Vec2) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    let fields = h.state_mut().new_document_fields();
+    h.state_mut().ui.open_dialog(DialogKind::NewDocument, fields);
+    h.run_steps(4);
+    h
+}
+
+/// Upstream opens New Document with the Name field focused and its text selected, so typing
+/// replaces "Untitled-1" and Tab goes on to Width.
+#[test]
+fn new_document_opens_with_the_name_focused_and_selected() {
+    use egui_kittest::kittest::Queryable;
+    let h = new_document_harness(egui::vec2(1440.0, 900.0));
+    let name = h.get_by_label("Name");
+    assert!(name.is_focused(), "the Name field has focus");
+    let focused = h.ctx.memory(|m| m.focused()).expect("a focused widget");
+    let range = egui::text_edit::TextEditState::load(&h.ctx, focused).and_then(|s| s.cursor.char_range()).expect("a cursor");
+    let [from, to] = range.sorted_cursors();
+    assert_eq!((from.index.0, to.index.0), (0, "Untitled-1".chars().count()), "the whole name is selected");
+}
+
+/// Upstream's New Document is a fixed 800 pt of content (`Width::Fixed(800.0)`), plus the dialog's
+/// padding on each side and the frame's few points, whatever the window size.
+#[test]
+fn new_document_is_800_points_of_content_wide() {
+    let h = new_document_harness(egui::vec2(1440.0, 900.0));
+    let id = h.state().ui.dialogs.last().unwrap().id;
+    let rect = h.ctx.memory(|m| m.area_rect(area_id(id))).expect("the dialog's area");
+    let pad = craft::ui::theme::current(&h.ctx).component.dialog.pad;
+    let chrome = rect.width() - 800.0 - 2.0 * pad;
+    assert!((0.0..=16.0).contains(&chrome), "the dialog is {} wide", rect.width());
+}

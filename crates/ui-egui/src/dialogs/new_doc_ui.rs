@@ -9,7 +9,6 @@ use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButt
 use craft::ui::icons::Icon;
 use craft::ui::list::ListRow;
 use craft::ui::primitives::{Content, Interactive, SurfaceKind, Text};
-use craft::ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
 use craft::ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 use egui::accesskit::Role;
 use egui::{Align2, Rect, Stroke, StrokeKind, pos2, vec2};
@@ -574,21 +573,38 @@ fn preset_card(ui: &mut egui::Ui, index: usize, c: &Card, units: &UnitsAndRulers
     (resp, size)
 }
 
-/// The category tabs; a click on one stores it in `__category`.
+/// The category tabs; a click on one stores it in `__category`. Plain labels with the selected
+/// one underlined, as in Photoshop. The library's text tab strip has no selected-tab indicator
+/// and its tabs are smaller (craft-libs 77830c0, `crates/ui/src/tab_strip/tab.rs:412`, `TabKind::Text`
+/// draws no indicator), so the strip stays PhotoCraft's own.
 fn category_tabs(ui: &mut egui::Ui, f: &mut Map<String, Value>, cat: &str) {
-    let tabs: Vec<Tab<&'static str>> =
-        CATEGORIES.iter().map(|c| c.0).chain(["Saved"]).map(|name| Tab::new(name, if name == "Saved" { tl!("Saved") } else { tl!(name) })).collect();
-    let selected = tabs.iter().map(|t| *t.key()).find(|k| *k == cat);
-    let mut strip = TabStrip::new("new-document-categories", tl!("Categories"), TabKind::Text);
-    if let Some(key) = &selected {
-        strip = strip.selected(key);
-    }
-    let out = strip.show(ui, &tabs);
-    for event in out.events {
-        if let TabEvent::Activate(name) = event {
-            f.insert("__category".into(), json!(name));
+    let t = crate::theme::Tokens::get(ui.ctx());
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 18.0;
+        for name in CATEGORIES.iter().map(|c| c.0).chain(["Saved"]) {
+            let on = cat == name;
+            let label = if name == "Saved" { tl!("Saved") } else { tl!(name) };
+            let r = ui
+                .add(
+                    egui::Label::new(egui::RichText::new(label).size(13.0).color(if on { t.text } else { t.text_dim }))
+                        .selectable(false)
+                        .sense(egui::Sense::click()),
+                )
+                .on_hover_cursor(egui::CursorIcon::Default);
+            if on {
+                ui.painter().line_segment(
+                    [r.rect.left_bottom() + vec2(0.0, 3.0), r.rect.right_bottom() + vec2(0.0, 3.0)],
+                    craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.text),
+                );
+            }
+            if r.clicked() {
+                f.insert("__category".into(), json!(name));
+            }
         }
-    }
+    });
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
+    widgets::hairline(ui);
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
 }
 
 /// The left column: the preset cards of the category, or the saved presets.
