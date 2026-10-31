@@ -234,20 +234,14 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         let lang = crate::i18n::current();
         (path.iter().map(|p| crate::i18n::tr(lang, p).to_string()).collect(), crate::i18n::tr_id(lang, id, label).to_string())
     };
-    let eff = |overrides: &BTreeMap<String, String>, id: &str, def: &Option<String>| -> Option<String> {
-        match overrides.get(id) {
-            Some(s) if s.is_empty() => None,
-            Some(s) => Some(s.clone()),
-            None => def.clone(),
-        }
+    // The keys as the dialog stands, read from the shortcut catalog with the dialog's edits as
+    // its overrides (`eff` for the main key, `eff_alts` for the further keys).
+    let item_ids: Vec<String> = items.iter().map(|i| i.0.clone()).collect();
+    let eff = |overrides: &BTreeMap<String, String>, alts: &BTreeMap<String, Vec<String>>, id: &str| -> Option<String> {
+        crate::shortcut_keymap::draft(&item_ids, overrides, alts).main(id).and_then(|k| prefs::normalize_shortcut(&k))
     };
-    // A command's further keys as the dialog stands: its edited list, else its defaults.
-    let eff_alts = |alts: &BTreeMap<String, Vec<String>>, id: &str, main: Option<&str>| -> Vec<String> {
-        let mut p = prefs::Preferences::default();
-        if let Some(list) = alts.get(id) {
-            p.alternate_shortcuts.insert(id.to_string(), list.clone());
-        }
-        p.alternates(id, main)
+    let eff_alts = |overrides: &BTreeMap<String, String>, alts: &BTreeMap<String, Vec<String>>, id: &str| -> Vec<String> {
+        crate::shortcut_keymap::draft(&item_ids, overrides, alts).alternates(id).iter().filter_map(|k| prefs::normalize_shortcut(k)).collect()
     };
     let mut capture_mods = capture_mods_field(f.get("captureMods"));
     // Key capture for the selected command: its main key, or (Add Shortcut) one more key.
@@ -277,11 +271,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             } else if let Some(sc) = shortcut_text(key, m) {
                 let clash_ids: Vec<&str> = items
                     .iter()
-                    .filter(|(id, _, _, def)| {
-                        let cur = eff(&overrides, id, def);
+                    .filter(|(id, ..)| {
                         *id != selected
-                            && (cur.as_deref().and_then(prefs::normalize_shortcut) == Some(sc.clone())
-                                || eff_alts(&alt_overrides, id, cur.as_deref()).contains(&sc))
+                            && (eff(&overrides, &alt_overrides, id).as_deref() == Some(sc.as_str()) || eff_alts(&overrides, &alt_overrides, id).contains(&sc))
                     })
                     .map(|(id, ..)| id.as_str())
                     .collect();
@@ -308,10 +300,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     conflict = None;
                 }
                 if capture_alt {
-                    let def = items.iter().find(|i| i.0 == selected).and_then(|i| i.3.clone());
-                    let cur = eff(&overrides, &selected, &def);
-                    let mut keys = eff_alts(&alt_overrides, &selected, cur.as_deref());
-                    if cur.as_deref().and_then(prefs::normalize_shortcut) != Some(sc.clone()) && !keys.contains(&sc) && keys.len() < prefs::MAX_ALTERNATES {
+                    let cur = eff(&overrides, &alt_overrides, &selected);
+                    let mut keys = eff_alts(&overrides, &alt_overrides, &selected);
+                    if cur.as_deref() != Some(sc.as_str()) && !keys.contains(&sc) && keys.len() < prefs::MAX_ALTERNATES {
                         keys.push(sc.clone());
                     }
                     alt_overrides.insert(selected.clone(), keys);
@@ -338,8 +329,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 if tab == 1 && crate::tool_shortcuts::tool(id).is_some() {
                     continue;
                 }
-                let cur = eff(&overrides, id, def);
-                let alts = eff_alts(&alt_overrides, id, cur.as_deref());
+                let cur = eff(&overrides, &alt_overrides, id);
+                let alts = eff_alts(&overrides, &alt_overrides, id);
                 let (shown_path, shown_label) = shown(id, label, path);
                 // Match what is shown and the English name (commands are documented in English).
                 let hay =
@@ -500,12 +491,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             if ui.add(button(tl!("Accept and Go to Conflict"))).on_hover_text(tl!("Take the shortcut from the other command and select it")).clicked() {
                 let holders: Vec<String> = serde_json::from_value(c["holders"].clone()).unwrap_or_else(|_| vec![with.to_string()]);
                 for holder in &holders {
-                    let def = items.iter().find(|i| i.0 == *holder).and_then(|i| i.3.clone());
-                    let cur = eff(&overrides, holder, &def);
-                    if cur.as_deref().and_then(prefs::normalize_shortcut).as_deref() == Some(key) {
+                    if eff(&overrides, &alt_overrides, holder).as_deref() == Some(key) {
                         overrides.insert(holder.clone(), String::new());
                     }
-                    let keys = eff_alts(&alt_overrides, holder, eff(&overrides, holder, &def).as_deref());
+                    let keys = eff_alts(&overrides, &alt_overrides, holder);
                     if keys.iter().any(|k| k == key) {
                         alt_overrides.insert(holder.clone(), keys.into_iter().filter(|k| k != key).collect());
                     }
@@ -559,19 +548,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
 
 /// A command's keys as the dialog stands, main key first: the edited main key (or its default)
 /// and its further keys.
-fn dialog_keys(overrides: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>, id: &str, default: Option<&str>) -> Vec<String> {
-    let main = match overrides.get(id) {
-        Some(s) if s.is_empty() => None,
-        Some(s) => Some(s.as_str()),
-        None => default,
-    };
-    let mut p = prefs::Preferences::default();
-    if let Some(list) = alternates.get(id) {
-        p.alternate_shortcuts.insert(id.to_string(), list.clone());
-    }
-    let mut keys: Vec<String> = main.and_then(prefs::normalize_shortcut).into_iter().collect();
-    keys.extend(p.alternates(id, main));
-    keys
+fn dialog_keys(item_ids: &[String], overrides: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>, id: &str) -> Vec<String> {
+    let km = crate::shortcut_keymap::draft(item_ids, overrides, alternates);
+    km.main(id).into_iter().chain(km.alternates(id)).filter_map(|k| prefs::normalize_shortcut(&k)).collect()
 }
 
 /// Edit › Keyboard Shortcuts › Set, as in Photoshop: choose a saved set (its bindings replace
@@ -590,6 +569,7 @@ fn set_row(
     warning: &mut bool,
 ) {
     use photocraft_engine::shortcut_sets::{self, ShortcutSet};
+    let item_ids: Vec<String> = items.iter().map(|i| i.0.clone()).collect();
     let mut sets: BTreeMap<String, ShortcutSet> = f.get("sets").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
     let mut active = f.get("activeSet").and_then(Value::as_str).unwrap_or("").to_string();
     if !active.is_empty() && !sets.contains_key(&active) {
@@ -680,21 +660,21 @@ fn set_row(
         let result = if export {
             let entries: Vec<photocraft_engine::kys::Entry> = items
                 .iter()
-                .map(|(id, label, _, def)| photocraft_engine::kys::Entry {
+                .map(|(id, label, _, _)| photocraft_engine::kys::Entry {
                     id: id.clone(),
                     label: label.clone(),
                     tool: id.starts_with("tools.select."),
-                    keys: dialog_keys(overrides, alternates, id, def.as_deref()),
+                    keys: dialog_keys(&item_ids, overrides, alternates, id),
                 })
                 .collect();
             let text = photocraft_engine::kys::write(&set_label, &entries);
             save_text(app, &format!("{set_label}.kys"), text)
         } else {
             let mut sections: Vec<shortcut_sets::Section> = Vec::new();
-            for (id, label, path, def) in items {
+            for (id, label, path, _) in items {
                 let section = path.first().cloned().unwrap_or_else(|| tl!("Other").to_string());
                 let name = path.iter().skip(1).chain(std::iter::once(label)).cloned().collect::<Vec<_>>().join(" › ");
-                let row = (name, dialog_keys(overrides, alternates, id, def.as_deref()));
+                let row = (name, dialog_keys(&item_ids, overrides, alternates, id));
                 match sections.iter_mut().find(|(s, _)| *s == section) {
                     Some((_, rows)) => rows.push(row),
                     None => sections.push((section, vec![row])),

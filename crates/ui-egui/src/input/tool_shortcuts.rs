@@ -26,7 +26,7 @@ pub(crate) fn shortcut(app: &PhotocraftApp, tool: Tool) -> Option<String> {
 }
 
 pub(crate) fn uses_default(app: &PhotocraftApp, tool: Tool) -> bool {
-    !app.session.prefs().shortcuts.contains_key(&id(tool))
+    !app.keymap().main_overridden(&id(tool))
 }
 
 #[cfg(test)]

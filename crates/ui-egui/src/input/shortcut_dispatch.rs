@@ -47,65 +47,20 @@ pub fn take_log(ctx: &egui::Context) -> Vec<(String, Outcome)> {
 /// (`tools.defaultColors` / `tools.swapColors`) and the fill keys are commands like any other, so
 /// their overrides apply. Held temporary tools (Space…) are not here: see [`crate::hold_keys`].
 pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
-    let prefs = app.session.prefs();
-    let action_ids: Vec<String> = app.session.actions.list.iter().map(|a| crate::actions::shortcut_id(&a.name)).collect();
-    let actions = action_ids.iter().map(|id| (id.as_str(), prefs.shortcut(id, None).map(str::to_string)));
-    // The Keyboard Shortcuts dialog lists Photoshop's Window › <panel> item (`window.panel.*`)
-    // in place of the shell command it runs (`window.toggle.*`, see `menus::panel_alias`), so an
-    // edit to that row reassigns or removes the shell command's default too (#1272).
-    let aliased = |id: &str, sc: Option<&str>| {
-        !prefs.shortcuts.contains_key(id)
-            && prefs.shortcuts.keys().any(|k| {
-                crate::menus::panel_alias(k) == Some(id) && crate::menu_catalog::CATALOG.iter().any(|c| c.3 == k.as_str() && c.2.is_some() && c.2 == sc)
-            })
-    };
-    let ui = crate::menus::UI_COMMANDS.iter().map(|(id, _, _, sc)| (*id, if aliased(id, *sc) { None } else { prefs.shortcut(id, *sc).map(str::to_string) }));
-    let engine = photocraft_engine::command_specs().iter().map(|c| (c.id, prefs.shortcut(c.id, c.shortcut).map(str::to_string)));
-    let own: std::collections::HashSet<&str> = crate::menus::UI_COMMANDS
-        .iter()
-        .map(|c| c.0)
-        .chain(photocraft_engine::command_specs().iter().filter(|c| c.shortcut.is_some() || prefs.shortcuts.contains_key(c.id)).map(|c| c.id))
-        .collect();
-    let catalog = crate::menu_catalog::CATALOG
-        .iter()
-        .filter(|(_, _, sc, id)| sc.is_some() && !own.contains(id) && crate::menus::is_live(id))
-        .map(|&(_, _, sc, id)| (id, prefs.shortcut(id, sc).map(str::to_string)));
-    let overrides = prefs
-        .shortcuts
-        .iter()
-        .filter(|(id, sc)| {
-            !sc.is_empty()
-                && !id.starts_with(crate::actions::SHORTCUT_PREFIX)
-                && photocraft_engine::commands::find(id).is_none()
-                && !crate::menus::UI_COMMANDS.iter().any(|c| c.0 == id.as_str())
-                && !crate::hold_keys::is_temporary(id)
-        })
-        .map(|(id, sc)| (id.as_str(), Some(sc.clone())));
+    let keymap = app.keymap();
+    let km = &*keymap;
+    // Mains in catalog order, then every command's alternates, the user's ahead of the defaults.
     // A key the user assigned in Edit › Keyboard Shortcuts belongs to that command, ahead of any
     // default that still names it (#1272): OK clears the old owner's row, but that row can be
     // another id for the same item, or a default the dialog doesn't list.
-    let mut candidates: Vec<(&str, Option<String>, bool)> = actions
-        .chain(ui)
-        .chain(engine)
-        .chain(catalog)
-        .chain(overrides)
-        .map(|(id, sc)| {
-            let user = sc.is_some() && prefs.shortcuts.get(id) == sc.as_ref();
-            (id, sc, user)
-        })
-        .collect();
-    // Each command's alternates after every main key, the user's ahead of the defaults.
-    let alternate_ids: std::collections::BTreeSet<&str> =
-        photocraft_engine::prefs::ALTERNATE_SHORTCUTS.iter().map(|(id, _)| *id).chain(prefs.alternate_shortcuts.keys().map(String::as_str)).collect();
-    for id in alternate_ids {
-        let main = prefs.shortcut(id, crate::shortcuts::default_shortcut(id).as_deref()).map(str::to_string);
-        let user = prefs.alternate_shortcuts.contains_key(id);
-        candidates.extend(prefs.alternates(id, main.as_deref()).into_iter().map(|k| (id, Some(k), user)));
-    }
+    let ids: Vec<&str> = km.ids().filter(|id| km.fires(id)).collect();
+    let mains = ids.iter().filter_map(|id| Some((*id, km.main(id)?, km.main_overridden(id))));
+    let alternates = ids.iter().flat_map(|id| km.alternates(id).into_iter().map(move |k| (*id, k, km.alternates_overridden(id))));
+    let mut candidates: Vec<(&str, String, bool)> = mains.chain(alternates).collect();
     candidates.sort_by_key(|(_, _, user)| !user);
     let mut all: Vec<(String, KeyboardShortcut)> = Vec::new();
     for (id, sc, _) in candidates {
-        let Some(sc) = sc.as_deref().and_then(parse) else { continue };
+        let Some(sc) = parse(&sc) else { continue };
         if !all.iter().any(|(_, b)| *b == sc) {
             all.push((id.to_string(), sc));
         }

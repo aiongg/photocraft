@@ -9,6 +9,7 @@ pub(super) mod opacity_keys;
 pub(super) mod page_keys;
 pub(super) mod scrub_wrap;
 pub mod shortcut_dispatch;
+pub mod shortcut_keymap;
 pub mod shortcuts;
 pub(super) mod single_line_drag;
 pub mod spring_tools;

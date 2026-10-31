@@ -57,12 +57,12 @@ fn entries(app: &PhotocraftApp, lang: crate::i18n::Lang) -> Vec<PaletteEntry<Str
         })
         .collect();
     for tool in crate::state::Tool::ALL {
-        out.push(
-            PaletteEntry::new(format!("tool:{tool:?}"), tl!(tool.label()))
-                .english(tool.label())
-                .kind(crate::i18n::tr(lang, "Tool"))
-                .shortcut(Kbd::keys(&[tool.key().to_string()])),
-        );
+        let mut e = PaletteEntry::new(format!("tool:{tool:?}"), tl!(tool.label())).english(tool.label()).kind(crate::i18n::tr(lang, "Tool"));
+        // The tool's key in the shortcut catalog: the user's assignment, else its letter.
+        if let Some(k) = crate::tool_shortcuts::shortcut(app, tool).as_deref().and_then(crate::shortcuts::parse) {
+            e = e.shortcut(Kbd::new(&k));
+        }
+        out.push(e);
     }
     out
 }

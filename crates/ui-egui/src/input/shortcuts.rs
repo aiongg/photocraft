@@ -53,29 +53,23 @@ pub fn tip_label(app: &PhotocraftApp, label: &str, command: &str) -> String {
     shortcut_label(app, command).map_or_else(|| label.to_string(), |sc| format!("{label}  ({sc})"))
 }
 
-/// The shortcut in effect for a command: the user's override, else `default`.
+/// The shortcut in effect for a command, from the shortcut catalog ([`crate::shortcut_keymap`]):
+/// the user's assignment, else the default. `default` stands in for a command the catalog does
+/// not list.
 pub fn effective_shortcut(app: &PhotocraftApp, id: &str, default: Option<&str>) -> Option<String> {
-    app.session.prefs().shortcut(id, default).map(str::to_string)
+    let km = app.keymap();
+    if km.knows(id) { km.main(id) } else { app.session.prefs().shortcut(id, default).map(str::to_string) }
 }
 
 /// A command's further keys in effect besides its main one (#3665): the user's, else
 /// Photoshop's (F3 for Copy, Shift+F7 for Inverse…). Menus show only the main key.
 pub fn effective_alternates(app: &PhotocraftApp, id: &str) -> Vec<String> {
-    let main = effective_shortcut(app, id, default_shortcut(id).as_deref());
-    app.session.prefs().alternates(id, main.as_deref())
+    app.keymap().alternates(id)
 }
 
 /// Default (unmodified) shortcut of a command id.
 pub fn default_shortcut(id: &str) -> Option<String> {
-    crate::menus::UI_COMMANDS
-        .iter()
-        .find(|c| c.0 == id)
-        .and_then(|c| c.3)
-        .or_else(|| photocraft_engine::commands::find(id).and_then(|c| c.shortcut))
-        .or_else(|| crate::menu_catalog::CATALOG.iter().find(|c| c.3 == id).and_then(|c| c.2))
-        .or_else(|| photocraft_engine::prefs::TEMPORARY_TOOLS.iter().find(|t| t.0 == id).map(|t| t.2))
-        .map(str::to_string)
-        .or_else(|| crate::tool_shortcuts::tool(id).and_then(crate::tool_shortcuts::default))
+    crate::shortcut_keymap::default_main(id)
 }
 
 /// Does a key press match a shortcut, the way Photoshop matches them? The library's rules
@@ -145,10 +139,9 @@ fn nav_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 /// pressed this frame, with the key press consumed. A view with its own zoom, like Liquify's
 /// preview, steps it with the same keys (#7210).
 pub(crate) fn nav_shortcut(app: &PhotocraftApp, ctx: &egui::Context) -> Option<&'static str> {
+    let km = app.keymap();
     NAV_COMMANDS.into_iter().find(|id| {
-        let main = crate::menus::UI_COMMANDS.iter().find(|c| c.0 == *id).and_then(|c| app.session.prefs().shortcut(id, c.3));
-        let keys: Vec<KeyboardShortcut> =
-            main.into_iter().map(str::to_string).chain(app.session.prefs().alternates(id, main)).filter_map(|k| parse(&k)).collect();
+        let keys: Vec<KeyboardShortcut> = km.main(id).into_iter().chain(km.alternates(id)).filter_map(|k| parse(&k)).collect();
         keys.iter().any(|sc| consume(ctx, sc))
     })
 }

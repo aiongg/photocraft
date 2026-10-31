@@ -154,8 +154,7 @@ pub fn binding(app: &PhotocraftApp, t: Temporary) -> Option<KeyboardShortcut> {
 
 /// [`binding`] by id.
 fn binding_of(app: &PhotocraftApp, id: &str) -> Option<KeyboardShortcut> {
-    let def = photocraft_engine::prefs::TEMPORARY_TOOLS.iter().find(|x| x.0 == id).map(|x| x.2);
-    parse(app.session.prefs().shortcut(id, def)?)
+    parse(&app.keymap().main(id)?)
 }
 
 /// Is `sc` held: its key down with at least its modifiers (more may be held, so ⇧ still squares

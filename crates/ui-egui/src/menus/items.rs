@@ -216,9 +216,10 @@ pub fn menu_items(app: &PhotocraftApp) -> Vec<MenuItem> {
     // Edit › Keyboard Shortcuts overrides, Edit › Menus hidden items and colours.
     let prefs = app.session.prefs();
     if !prefs.shortcuts.is_empty() {
+        let km = app.keymap();
         for it in &mut items {
-            if prefs.shortcuts.contains_key(&it.id) {
-                it.shortcut = prefs.shortcut(&it.id, None).map(str::to_string);
+            if km.main_overridden(&it.id) {
+                it.shortcut = km.main(&it.id);
             }
         }
     }
