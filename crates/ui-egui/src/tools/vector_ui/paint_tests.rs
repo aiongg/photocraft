@@ -637,7 +637,7 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, pos: Pos2) {
 
 /// The fields row's Color well.
 fn color_well(h: &Harness<'_, PhotocraftApp>) -> Rect {
-    h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Color well").rect()
+    h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell).expect("the Color well").rect()
 }
 
 /// A point of the open inline picker's saturation / brightness field, off its centre.
@@ -748,7 +748,7 @@ fn gradient_tab_keeps_the_stop_colour_after_a_preset_with_fewer_stops() {
     h.run_steps(3);
     assert_eq!(gradient_stops(&tool_stroke_gradient(&h)).0.len(), 2);
     assert!(h.query_by_label("Location").is_some(), "the selected stop's rows stay after a preset with fewer stops");
-    assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::Button), "the Color well stays");
+    assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell), "the Color well stays");
     // Double-click the right colour stop: its picker opens, and a click in it recolours only that stop.
     let stop = pos2(x_at(1.0), bar_bottom + 10.0);
     h.hover_at(stop);

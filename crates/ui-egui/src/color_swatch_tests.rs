@@ -77,7 +77,7 @@ fn preferences_colours_open_the_color_picker() {
     let values = |h: &Harness<'_, PhotocraftApp>| h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap().fields["values"]["guidesGridAndSlices"].clone();
     let before = values(&h);
     // The library's Preferences rows name their swatch by the setting.
-    h.get_by_role_and_label(Role::Button, "Guide color").click();
+    h.get_by_role_and_label(Role::ColorWell, "Guide color").click();
     answer(&mut h, "the first Preferences colour");
     let after = values(&h);
     let changed: Vec<&str> = after.as_object().unwrap().iter().filter(|(k, v)| before.get(k.as_str()) != Some(v)).map(|(k, _)| k.as_str()).collect();

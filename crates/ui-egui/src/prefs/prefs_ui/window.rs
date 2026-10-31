@@ -328,7 +328,7 @@ impl PreferencesHost for Host<'_> {
                         GroupSpec::new(g.title.as_deref(), rows)
                     })
                     .collect();
-                let mut page = PageSpec { id: p.id, title: &p.title, groups, footnote: None, custom: false };
+                let mut page = PageSpec { id: p.id, title: &p.title, groups, footnote: None, custom: false, keywords: "" };
                 page.footnote = p.footnote.as_deref();
                 page
             })

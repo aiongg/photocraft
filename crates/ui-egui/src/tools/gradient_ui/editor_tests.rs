@@ -70,13 +70,13 @@ fn top_opacity_and_bottom_color_select_their_own_fields_in_both_editor_modes() {
         let before = sink_fill(sink, h.state()).unwrap();
         assert!(h.query_by_label("Color stops").is_none(), "editor has one combined strip");
         assert!(h.query_by_label("Opacity stops").is_none());
-        assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::Button));
+        assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell));
         select(&mut h, 1, true);
         assert!(h.get_by_label("Opacity stop 2 of 3").accesskit_node().is_selected() == Some(true));
         assert!(h.query_by_label("Color").is_none(), "opacity selection hides color controls");
         select(&mut h, 1, false);
         assert!(h.get_by_label("Color stop 2 of 3").accesskit_node().is_selected() == Some(true));
-        assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::Button));
+        assert!(h.get_all_by_label("Color").any(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell));
         assert_eq!(sink_fill(sink, h.state()).unwrap(), before, "selecting stops never edits the gradient");
     }
 }
@@ -117,7 +117,7 @@ fn editor_location_follows_reordered_color_and_opens_existing_picker() {
         type_number(&mut h, 0, "70", true);
         assert!(h.get_by_label("Color stop 2 of 3").accesskit_node().is_selected() == Some(true));
         assert!(matches!(sink_fill(sink, h.state()).unwrap(), Fill::Gradient { stops, .. } if (stops[1].0 - 0.7).abs() < 1e-5));
-        h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).unwrap().click();
+        h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell).unwrap().click();
         h.run_steps(3);
         assert!(!h.state().ui.dialogs.is_empty());
     }

@@ -249,7 +249,7 @@ mod tests {
         click_at(&mut h, rect.center());
         assert_eq!(fill(h.state()), before);
         assert_eq!(h.state().session.active().unwrap().history.past_len(), count);
-        h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).unwrap().click();
+        h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell).unwrap().click();
         h.run_steps(2);
         assert!(!h.state().ui.dialogs.is_empty());
     }
