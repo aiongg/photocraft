@@ -3236,3 +3236,53 @@ fn applying_the_box_hides_no_pointer() {
     assert_eq!(cursor(&app, &xf, [32.0, 32.0], cmd()), Some(CursorIcon::ResizeNwSe));
     assert_eq!(cursor(&app, &xf, [96.0, 32.0], cmd()), Some(CursorIcon::ResizeVertical));
 }
+
+/// Upstream PhotoCraft's W/H edit, ported as it was before the box maths moved to the library:
+/// `Parts::of` for the W and H scales (%), then `scale_about_pivot` through the box's homography.
+/// The expected corners of the tests below come from this function.
+fn upstream_size_edit(quad: [[f64; 2]; 4], rect: [f64; 4], pivot: [f64; 2], axis: usize, typed_pct: f64) -> [[f64; 2]; 4] {
+    let (w0, h0) = (rect[2] - rect[0], rect[3] - rect[1]);
+    let c0 = [(quad[1][0] - quad[0][0]) / w0, (quad[1][1] - quad[0][1]) / w0];
+    let c1 = [(quad[3][0] - quad[0][0]) / h0, (quad[3][1] - quad[0][1]) / h0];
+    // skew_v is 0: the X edge's direction is the angle, and sx its length; sy is the Y edge
+    // measured across the turned frame.
+    let angle = c0[1].atan2(c0[0]);
+    let sx = c0[0].hypot(c0[1]);
+    let sy = -c1[0] * angle.sin() + c1[1] * angle.cos();
+    let (sx, sy) = (sx * 100.0, sy * 100.0);
+    let k = typed_pct / if axis == 0 { sx } else { sy };
+    let h = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], quad).unwrap();
+    let inv = h.inverse().unwrap();
+    let (pu, pv) = inv.apply(pivot[0], pivot[1]);
+    let m = |u: f64, v: f64| {
+        let (x, y) = h.apply(pu + (u - pu) * k, pv + (v - pv) * k);
+        [x, y]
+    };
+    [m(0.0, 0.0), m(1.0, 0.0), m(1.0, 1.0), m(0.0, 1.0)]
+}
+
+/// W and H typed (linked) on `quad` give upstream PhotoCraft's corners.
+fn assert_size_edits_match_upstream(name: &str, quad: [[f64; 2]; 4]) {
+    for (field, axis, typed) in [(2, 0, 50.0), (3, 1, 150.0)] {
+        let t = type_into_bar_field_with(move |app| app.ui.transform.as_mut().unwrap().quad = quad, field, &typed.to_string());
+        let want = upstream_size_edit(quad, t.rect, t.pivot, axis, typed);
+        for (i, (got, want)) in t.quad.iter().zip(&want).enumerate() {
+            assert!((got[0] - want[0]).abs() < 1e-3 && (got[1] - want[1]).abs() < 1e-3, "{name} field {field} corner {i}: {got:?} vs upstream {want:?}");
+        }
+    }
+}
+
+#[test]
+fn w_and_h_edits_on_a_skewed_box_match_upstream() {
+    let d = 50.0 * 20f64.to_radians().tan();
+    assert_size_edits_match_upstream("skewed", [[0.0, 0.0], [100.0, 0.0], [100.0 - d, 50.0], [-d, 50.0]]);
+}
+
+/// The library's `BoxState` scales a distorted box as a parallelogram (affine part only);
+/// upstream scaled through the box's homography and kept the perspective. W 50 % on this box:
+/// corner 0 is (29.193, 14.722) here and (25.300, 12.650) upstream.
+#[test]
+#[ignore = "BoxState scales a distorted box affinely; upstream kept its perspective (numbers in the doc comment)"]
+fn w_and_h_edits_on_a_distorted_box_match_upstream() {
+    assert_size_edits_match_upstream("distorted", [[0.0, 0.0], [100.0, 10.0], [90.0, 60.0], [-5.0, 50.0]]);
+}
