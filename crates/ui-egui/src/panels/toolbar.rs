@@ -1,6 +1,6 @@
 use super::{Color32, PhotocraftApp, Tool, icons, json};
-use craft::theme::Srgba;
 use craft::color::ui::{PairWell, SwatchPair, Well};
+use craft::theme::Srgba;
 use craft::ui::controls::IconButton;
 use craft::ui::icons::Icon;
 use craft::ui::localized::LocaleNumbers;

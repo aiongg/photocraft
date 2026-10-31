@@ -1,7 +1,7 @@
 use super::basic::{sliders, track_stops};
 use super::{Color32, Edit, EditorCx, HUE_RANGES, HueRange, Rect, Row, Value, apply_event, color32, flag, hue_color, json, num, nums, pos2, vec2, widgets};
-use craft::theme::{Srgba, TypeRole};
 use craft::draw::ui::gradient::GradientRamp;
+use craft::theme::{Srgba, TypeRole};
 use craft::ui::controls::{Thumb, ThumbRow};
 use craft::ui::primitives::{Content, Text};
 use craft::ui::theme::{ToEgui, Tokens as LibTokens, TokensOf as _};

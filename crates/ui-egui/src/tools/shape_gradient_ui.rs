@@ -5,10 +5,10 @@
 //! the Gradient Editor's grammar ([`apply_stop`]); the tab returns the edited gradient and the
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
-use craft::theme::Srgba;
 use craft::color::ui::ColorPicker;
 use craft::color::ui::ColorPickerLayout;
 use craft::draw::ui::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
+use craft::theme::Srgba;
 use craft::ui::controls::{ControlSize, IconButton};
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::ToEgui;

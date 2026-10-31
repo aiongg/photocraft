@@ -124,8 +124,9 @@ impl Tokens {
     pub fn for_kind(kind: ThemeKind) -> Tokens {
         let sel = selection_for(kind);
         let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
-        let base =
-            craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft::theme::builtins().iter().find(|t| t.id == *id).cloned());
+        let base = craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| {
+            craft::theme::builtins().iter().find(|t| t.id == *id).cloned()
+        });
         let shown = base.shown(kind.mode());
         Tokens::from_library(kind, &shown.resolved.tokens, shown.appearance)
     }

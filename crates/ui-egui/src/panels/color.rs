@@ -1,6 +1,6 @@
 use super::{PhotocraftApp, Rect, RichText, Sense, Tokens, theme, vec2, widgets};
-use craft::theme::{ColorModel, HsbModel, ModelValues, Rgba, Srgba, kept_or_converted};
 use craft::color::ui::{AreaMode, ColorArea, ColorStrip, HexField, PairWell, SwatchPair, Well};
+use craft::theme::{ColorModel, HsbModel, ModelValues, Rgba, Srgba, kept_or_converted};
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::TokensOf as _;
 use egui::UiBuilder;

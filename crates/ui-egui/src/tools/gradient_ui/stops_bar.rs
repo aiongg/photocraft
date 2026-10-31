@@ -5,8 +5,8 @@
 //! index (the tag travels with a stop through moves and reorders) and [`command`] reads the edit
 //! back from the tags.
 
-use craft::theme::Srgba;
 use craft::draw::ui::gradient::{ColorStop, GradientEditor, GradientLabels, GradientStops, OpacityStop, StopRow, StopRows};
+use craft::theme::Srgba;
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::LocaleNumbers;
 use egui::Ui;

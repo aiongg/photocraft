@@ -1,7 +1,7 @@
 use super::curves::{ToneChannel, channel_color, channel_picker, tone_channels};
 use super::{Edit, EditorCx, Value, json, round, space_of};
-use craft::ui::composites::{HistogramData};
 use craft::imaging::ui::{Levels, LevelsEditor, LevelsLabels};
+use craft::ui::composites::HistogramData;
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::LocaleNumbers;
 

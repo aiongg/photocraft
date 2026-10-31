@@ -26,7 +26,8 @@ commands:
   wasm            cargo check --target wasm32-unknown-unknown for the wasm-safe crates (one call, plus
                   one per optional web feature)
   test            workspace tests (cargo nextest when installed, else cargo test), then doctests
-  ci              the CI gate: fmt --check, clippy -D warnings, layers, scorecard --check, tests
+  egui-fork       check that Cargo.lock takes every egui package from craft::egui_fork
+  ci              the CI gate: fmt --check, egui-fork, clippy -D warnings, layers, scorecard --check, tests
                   (nextest --profile ci), panic_hunt, doctests and wasm, with --locked --features heif
                   (stops at first failure), then the i18n-coverage report
   corpus [--all | --pngsuite | --psd | --psd-tools | --pixls | --atn | --photoshop | --gimp] [--local] [--update-manifest]
@@ -60,6 +61,7 @@ fn main() -> ExitCode {
         Some("layers") => cmd_layers(),
         Some("wasm") => cmd_wasm(),
         Some("test") => cmd_test().and_then(|()| cmd_doctest()),
+        Some("egui-fork") => cmd_egui_fork(),
         Some("ci") => cmd_ci(),
         Some("corpus") => corpus::cmd(&rest),
         Some("test-corpus") => corpus::test_cmd(&rest),
@@ -255,6 +257,12 @@ fn cmd_parity() -> Result<(), String> {
     run(c, "cargo run -p photocraft-ui-egui --example parity")
 }
 
+/// Every egui package in Cargo.lock comes from the fork the craft libraries are built with.
+fn cmd_egui_fork() -> Result<(), String> {
+    let lock = std::fs::read_to_string(root().join("Cargo.lock")).map_err(|e| format!("Cargo.lock: {e}"))?;
+    craft::egui_fork::check_lockfile(&lock)
+}
+
 fn cmd_ci() -> Result<(), String> {
     type Step = (&'static str, Box<dyn Fn() -> Result<(), String>>);
     let steps: Vec<Step> = vec![
@@ -274,6 +282,7 @@ fn cmd_ci() -> Result<(), String> {
                 run(c, "cargo clippy --workspace --locked --features heif --all-targets --keep-going -- -D warnings")
             }),
         ),
+        ("egui fork", Box::new(cmd_egui_fork)),
         ("layers", Box::new(cmd_layers)),
         ("scorecard", Box::new(|| scorecard::run(&root(), &["--check"]))),
         ("test", Box::new(|| cmd_gate_tests(false))),

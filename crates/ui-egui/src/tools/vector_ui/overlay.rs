@@ -134,8 +134,8 @@ pub(crate) fn path_key(r: crate::direct_select::PathRef) -> u64 {
 
 /// `p` for the library's path overlay under `key`, drawn in `color`.
 fn edit_path(key: u64, p: &Path, color: Color32) -> craft::draw::ui::EditPath {
-    use craft::ui::canvas::kurbo::Point;
     use craft::draw::ui::{EditPath, EditSubpath, Knot};
+    use craft::ui::canvas::kurbo::Point;
     let at = |q: photocraft_geom::Point| Point::new(q.x, q.y);
     let subpaths = p
         .subpaths

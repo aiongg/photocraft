@@ -1,9 +1,9 @@
 use super::selection::floating_outline;
 use super::view_xform::ViewXform;
 use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Tool, Vec2, pos2, vec2};
-use craft::ui::canvas::quad::{BoxPart, BoxState};
-use craft::ui::canvas::{kurbo::Point};
 use craft::draw::ui::{RotateZone, TransformBox, TransformNames};
+use craft::ui::canvas::kurbo::Point;
+use craft::ui::canvas::quad::{BoxPart, BoxState};
 use craft::ui::theme::ToEgui;
 
 /// View › Show › Layer Edges: the colour of the active layer's outline.

@@ -187,7 +187,11 @@ fn undocking_a_panel_opens_its_own_window_and_the_studio_card_stays_in_the_main_
     let viewport = desktop.window_of("info").expect("Info floats in its own OS window");
     let window = lay(desktop.h.state()).floating.iter().find(|window| window.contains(&"info".to_owned())).unwrap().clone();
     assert!(
-        craft::ui::docking::DockArea::<String>::floating_layer(area_id(), &window).is_none_or(|layer| desktop.h.ctx.memory(|m| m.area_rect(layer.id)).is_none()),
+        craft::ui::docking::DockArea::<String>::floating_layer(area_id(), &window).is_none_or(|layer| desktop
+            .h
+            .ctx
+            .memory(|m| m.area_rect(layer.id))
+            .is_none()),
         "and not in the main window"
     );
     // Undock Panel's window opens over its place in the main window.

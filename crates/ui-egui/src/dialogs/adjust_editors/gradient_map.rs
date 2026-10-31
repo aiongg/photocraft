@@ -1,7 +1,7 @@
 use super::{Edit, EditorCx, GradientPreset, Group, PhotocraftApp, Value, adjust_params, flag, json, label, rgb_of, round, vec2};
 use crate::gradient_ui::stops_bar::{self, BarOptions, StopsEvent};
-use craft::theme::Srgba;
 use craft::draw::ui::gradient::{ColorStop, GradientRamp, GradientStops, StopRows};
+use craft::theme::Srgba;
 use craft::ui::controls::Select;
 use craft::ui::edit::EditEvent;
 use craft::ui::menu::{MenuEntry, MenuItem};

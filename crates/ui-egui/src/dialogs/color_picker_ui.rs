@@ -5,8 +5,8 @@
 //! While it is the top dialog the image is its eyedropper, as in Photoshop: the pointer over the
 //! canvas is a pipette, and a click or drag there samples into the new colour ([`sample_at`]).
 
-use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft::color::ui::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
+use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft::ui::controls::{Button, ButtonVariant};
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::scale::Space;

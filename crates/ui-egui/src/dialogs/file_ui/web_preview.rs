@@ -97,10 +97,8 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         (format!("Index {i}: {}", web_cmds::rgb_hex([r, g, b])), craft::theme::Srgba::rgb(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0))
     });
     let selected = f.get("__selectedColor").and_then(Value::as_u64).map(|i| i as usize);
-    let shown = craft::color::ui::SwatchPalette::table("web-color-table", tl!("Color Table").trim_end_matches('…'), swatches)
-        .selected(selected)
-        .columns(16)
-        .show(ui);
+    let shown =
+        craft::color::ui::SwatchPalette::table("web-color-table", tl!("Color Table").trim_end_matches('…'), swatches).selected(selected).columns(16).show(ui);
     if let Some(i) = shown.selected {
         f.insert("__selectedColor".into(), json!(i));
     }

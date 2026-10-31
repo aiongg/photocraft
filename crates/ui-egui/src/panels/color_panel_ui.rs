@@ -9,8 +9,8 @@
 use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
-use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft::color::ui::{ColorRamp, ColorWarning, ColorWarningChip, ColorWheel};
+use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
 use egui::{Color32, Rect, Sense, StrokeKind, UiBuilder, pos2, vec2};
 use serde_json::json;
