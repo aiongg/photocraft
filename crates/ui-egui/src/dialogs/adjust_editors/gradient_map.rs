@@ -144,7 +144,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
             changed = true;
             e.add(Edit::discrete(true));
         }
-        Some(StopsEvent::Cancel { base }) => {
+        Some(StopsEvent::Cancel { base, external: false }) => {
             stops = stops_of_bar(&base);
             changed = true;
             e.changed = true;

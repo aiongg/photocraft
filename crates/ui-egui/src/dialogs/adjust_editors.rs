@@ -9,7 +9,7 @@
 use craft::color::ui::ColorPopover;
 use craft::theme::{Srgba, TypeRole};
 use craft::ui::composites::SliderRow;
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::primitives::{Content, Text};
 use std::sync::Arc;
@@ -231,7 +231,7 @@ fn apply_event<T, U: Clone + Send + Sync + 'static>(ui: &egui::Ui, id: egui::Id,
             *cur = from(&value);
             e = Edit::discrete(true);
         }
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
             if let Some(before) = ui.data(|d| d.get_temp::<U>(id)) {
                 *cur = before;
                 e.changed = true;
@@ -330,6 +330,32 @@ fn label(ui: &mut egui::Ui, text: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use craft::ui::edit::{CancelReason, GestureId};
+
+    /// A value the host changes mid-gesture stays after an External cancel; any other cancel
+    /// restores the value the gesture began with.
+    #[test]
+    fn external_cancel_keeps_the_host_value() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("apply_event_cancel");
+        let run = |reason| {
+            let mut cur = 1.0_f32;
+            let mut result = (Edit::default(), cur);
+            let mut out = ctx.run_ui(Default::default(), |ui| {
+                let gesture = GestureId::next();
+                apply_event(ui, id, Some(EditEvent::<f64>::begin(gesture)), &mut cur, |v| *v as f32);
+                cur = 5.0; // the host sets the value elsewhere
+                let e = apply_event(ui, id, Some(EditEvent::<f64>::cancel(gesture, reason)), &mut cur, |v| *v as f32);
+                result = (e, cur);
+            });
+            out.textures_delta.clear();
+            result
+        };
+        let (e, value) = run(CancelReason::External);
+        assert_eq!((value, e.changed), (5.0, false));
+        let (e, value) = run(CancelReason::Escape);
+        assert_eq!((value, e.changed), (1.0, true));
+    }
 
     #[test]
     fn saturation_track_follows_the_hue() {

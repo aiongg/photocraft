@@ -2,7 +2,7 @@ use super::curves::{ToneChannel, channel_color, channel_picker, tone_channels};
 use super::{Edit, EditorCx, Value, json, round, space_of};
 use craft::imaging::ui::{Levels, LevelsEditor, LevelsLabels};
 use craft::ui::composites::HistogramData;
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 
 // ---------------------------------------------------------------------------------------------
@@ -120,7 +120,7 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
             e.changed = true;
             e.commit = true;
         }
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
             if let Some(before) = ui.data(|d| d.get_temp::<Lv>(before_id)) {
                 write_levels(v, chan.key, &before);
                 e.changed = true;

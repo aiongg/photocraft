@@ -8,7 +8,7 @@
 //!   the param Cancel restores.
 
 use craft::ui::composites::{Curve, CurveEditor, CurvePreview};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::StrokeExt;
 use egui::{RichText, Sense, Stroke, StrokeKind, vec2};
@@ -380,7 +380,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. }) => {
                         set_curve(f, &value);
                     }
-                    Some(EditEvent::Cancel { .. }) => {
+                    Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
                         if let Some(original) = ui.data(|d| d.get_temp::<Contour>(before)) {
                             set_param(f, &effect, &key, contour_param(&original));
                         }
