@@ -103,6 +103,13 @@ fn color_picker_dialog_hex_field_is_in_tab_order_and_confirms_typed_color() {
         h.event(egui::Event::Text(ch.to_string()));
         h.run_steps(1);
     }
+    // Tab leaves the hex field for the next control, and Shift+Tab comes back to it.
+    h.key_press(egui::Key::Tab);
+    h.run_steps(2);
+    assert!(!h.get_by_role(Role::TextInput).is_focused(), "Tab moves on from the hex field");
+    h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+    h.run_steps(2);
+    assert!(h.get_by_role(Role::TextInput).is_focused(), "Shift+Tab returns to the hex field");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(hex([h.state().session.tools.foreground[0], h.state().session.tools.foreground[1], h.state().session.tools.foreground[2]]), "#ff8800");

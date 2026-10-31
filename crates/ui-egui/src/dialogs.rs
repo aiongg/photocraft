@@ -374,6 +374,7 @@ fn library_fields(kind: DialogKind, fields: &Fields) -> bool {
         || crate::pattern_fill_ui::owns(fields)
         || crate::stroke_ui::owns(fields)
         || crate::adjust_dialog::owns(fields)
+        || crate::color_picker_ui::owns(fields)
         || fields.contains_key("__export")
 }
 
@@ -572,11 +573,15 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             .close_label(CLOSE_BOX.then(|| tl!("Close").to_string()))
             .roomy(color_picker)
             // The dialogs that take the keyboard themselves open with their focus where they put it.
-            .initial_focus(if library_fields(d.kind, &fields) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
-                InitialFocus::FirstField
-            } else {
-                InitialFocus::None
-            });
+            // The Color Picker focuses its hex field itself (`ColorPicker::focus_hex`); the first
+            // field in the order is a different one.
+            .initial_focus(
+                if (library_fields(d.kind, &fields) && !color_picker) || (is_filter_route(&fields) && crate::filter_dialog::opens_on_angle_dial(&fields)) {
+                    InitialFocus::FirstField
+                } else {
+                    InitialFocus::None
+                },
+            );
         if let Some(offset) = crate::blur_pins::first_place(&d.fields, ctx) {
             dialog = dialog.first_place(move |_| Some(offset));
         }

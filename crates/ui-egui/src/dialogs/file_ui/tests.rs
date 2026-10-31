@@ -528,16 +528,25 @@ fn web_preview_grows_with_resize_and_accepts_zoom_and_pan() {
     h.run_steps(3);
     assert_ne!(h.state().ui.dialogs[0].fields["__center"], json!([0.5, 0.5]));
     assert_eq!(h.state().session.active().unwrap().revision, revision);
-    // Enter while editing a swatch must not export and close the parent dialog.
+    // Opening a table entry shows the Color Picker over the dialog; Enter in the picker confirms
+    // its colour into that entry and must not export and close the parent dialog.
     h.state_mut().ui.dialogs[0].fields.insert("format".into(), json!("gif"));
     h.run_steps(4);
     use egui_kittest::kittest::Queryable;
-    h.get_by_role(egui::accesskit::Role::ColorWell).click();
-    h.run_steps(3);
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    h.get_all_by_role(egui::accesskit::Role::ListBoxOption).next().unwrap().focus();
+    h.run_steps(2);
     h.key_press(egui::Key::Enter);
-    h.run_steps(3);
+    h.run_steps(4);
+    assert_eq!(h.state().ui.dialogs.len(), 2);
+    assert!(crate::color_picker_ui::owns(&h.state().ui.dialogs[1].fields));
+    for ch in "12ab34".chars() {
+        h.event(egui::Event::Text(ch.to_string()));
+        h.run_steps(1);
+    }
+    h.key_press(egui::Key::Enter);
+    h.run_steps(4);
     assert_eq!(h.state().ui.dialogs.len(), 1);
+    assert_eq!(h.state().ui.dialogs[0].fields["colorTableEdits"]["0"], "#12ab34");
 }
 
 #[test]
