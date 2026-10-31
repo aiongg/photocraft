@@ -1,10 +1,10 @@
 use super::begin::{enter_warp, leave_warp, warps_type};
 use super::commit::{cancel, commit};
-use super::pointer::point_on_quad;
+use super::pointer::{apply_state, box_state, point_on_quad};
 use super::warp::edit_session_warp;
 use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
 use craft_ui::canvas::ReferencePoint;
-use craft_ui::canvas::quad::Anchor9;
+use craft_ui::canvas::quad::{Anchor9, Parts as BoxParts, SKEW_LIMIT};
 use craft_ui::controls::{ControlSize, IconButton, NumberField};
 use craft_ui::edit::EditEvent;
 use craft_ui::icons::Icon;
@@ -22,116 +22,35 @@ pub(super) fn quad_scale(t: &TransformSession) -> f32 {
     if s.is_finite() { s as f32 } else { 1.0 }
 }
 
-/// W and H (%), the angle (°) and the horizontal skew (°) the options bar shows for the box.
-/// A mirrored box reads as a negative W or H, whichever keeps the angle nearer 0 (Photoshop:
-/// Flip Horizontal is W -100 % at 0°, Flip Vertical H -100 % at 0°). Both are the same box:
-/// negating W and H and turning by a half turn cancel out.
+/// The session's box before the transform, as the library's box maths takes it.
+fn start_rect(t: &TransformSession) -> craft_ui::canvas::kurbo::Rect {
+    craft_ui::canvas::kurbo::Rect::new(t.rect[0], t.rect[1], t.rect[2], t.rect[3])
+}
+
+/// W and H (%), the angle (°) and the horizontal skew (°) the options bar shows for the box
+/// ([`BoxState::parts`]: a mirrored box reads as a negative W or H).
 pub(super) fn readout(t: &TransformSession) -> (f64, f64, f64, f64) {
-    let p = Parts::of(t);
-    let wrap = |a: f64| {
-        let a = a.rem_euclid(std::f64::consts::TAU);
-        if a > std::f64::consts::PI { a - std::f64::consts::TAU } else { a }
-    };
-    let turned = wrap(p.angle + std::f64::consts::PI);
-    let (sx, sy, angle) = if p.sy < 0.0 && turned.abs() < wrap(p.angle).abs() { (-p.sx, -p.sy, turned) } else { (p.sx, p.sy, p.angle) };
-    (sx * 100.0, sy * 100.0, angle.to_degrees(), p.skew_h.to_degrees())
-}
-
-/// `v`, kept off zero with its sign: a divisor for a W or H scale that may be negative.
-fn nonzero(v: f64) -> f64 {
-    if v.abs() < 1e-9 { 1e-9f64.copysign(v) } else { v }
-}
-
-/// The box's affine part read as Photoshop's options bar does: the frame scaled (W, H), skewed
-/// (H, V) and then rotated about the reference point. Angles are radians; positive turns
-/// clockwise on screen, so a positive H skew leans the box's sides like the angle field would
-/// turn them, and a positive V skew its top and bottom.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Parts {
-    pub(super) sx: f64,
-    /// Negative when the box is flipped vertically relative to its rotation.
-    pub(super) sy: f64,
-    pub(super) angle: f64,
-    pub(super) skew_h: f64,
-    pub(super) skew_v: f64,
-}
-
-/// The skew fields' reach: a skew of ±90° would flatten the box.
-pub(super) const SKEW_LIMIT_DEG: f32 = 89.0;
-
-impl Parts {
-    /// The box's columns: where the frame's unit X and Y edges went (from the top-left corner).
-    fn columns(t: &TransformSession) -> Option<[[f64; 2]; 2]> {
-        let (w0, h0) = (t.rect[2] - t.rect[0], t.rect[3] - t.rect[1]);
-        if w0.abs() < 1e-9 || h0.abs() < 1e-9 {
-            return None;
-        }
-        let q = &t.quad;
-        let m = [[(q[1][0] - q[0][0]) / w0, (q[1][1] - q[0][1]) / w0], [(q[3][0] - q[0][0]) / h0, (q[3][1] - q[0][1]) / h0]];
-        m.iter().flatten().all(|v| v.is_finite()).then_some(m)
-    }
-
-    /// The box as scale, skew and rotation, keeping the session's typed V skew (any box can be
-    /// written with any V skew short of ±90°).
-    fn of(t: &TransformSession) -> Parts {
-        let skew_v = t.skew_v.to_radians();
-        let none = Parts { sx: 1.0, sy: 1.0, angle: 0.0, skew_h: 0.0, skew_v };
-        Parts::columns(t).map_or(none, |m| Parts::from_columns(m, skew_v))
-    }
-
-    pub(super) fn from_columns([c0, c1]: [[f64; 2]; 2], skew_v: f64) -> Parts {
-        // X edge = sx · R(angle) · (1, tan v): its direction is the angle plus v.
-        let angle = c0[1].atan2(c0[0]) - skew_v;
-        let sx = c0[0].hypot(c0[1]) * skew_v.cos();
-        // Y edge = sy · R(angle) · (−tan h, 1).
-        let (gx, gy) = unturn(c1, angle);
-        let skew_h = if gy.abs() < 1e-12 { 0.0 } else { (-gx / gy).atan() };
-        Parts { sx, sy: gy, angle, skew_h, skew_v }
-    }
-
-    pub(super) fn columns_of(self) -> [[f64; 2]; 2] {
-        let (sn, cs) = self.angle.sin_cos();
-        let rot = |x: f64, y: f64| [x * cs - y * sn, x * sn + y * cs];
-        let c0 = rot(self.sx, self.sx * self.skew_v.tan());
-        let c1 = rot(-self.sy * self.skew_h.tan(), self.sy);
-        [c0, c1]
-    }
-}
-
-/// `c` turned back by `angle` (radians).
-fn unturn(c: [f64; 2], angle: f64) -> (f64, f64) {
-    let (sn, cs) = angle.sin_cos();
-    (c[0] * cs + c[1] * sn, -c[0] * sn + c[1] * cs)
+    let p = box_state(t).parts(start_rect(t), t.skew_v);
+    (p.w * 100.0, p.h * 100.0, p.angle, p.skew_h)
 }
 
 /// Sets the box's H and V skew (degrees), keeping its scale, angle and reference point: the
 /// options bar's skew fields.
 fn skew_about_pivot(app: &mut PhotocraftApp, skew_h: f64, skew_v: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
-    let Some(m) = Parts::columns(s) else { return };
-    let limit = f64::from(SKEW_LIMIT_DEG);
-    let (skew_h, skew_v) = (skew_h.clamp(-limit, limit), skew_v.clamp(-limit, limit));
-    let from = Parts::from_columns(m, s.skew_v.to_radians());
-    let to = Parts { skew_h: skew_h.to_radians(), skew_v: skew_v.to_radians(), ..from }.columns_of();
-    // The map from the old box to the new one: to · m⁻¹.
-    let det = m[0][0] * m[1][1] - m[1][0] * m[0][1];
-    if det.abs() < 1e-12 {
-        return;
-    }
-    let inv = [[m[1][1] / det, -m[0][1] / det], [-m[1][0] / det, m[0][0] / det]];
-    let l = |x: f64, y: f64| {
-        let (u, v) = (inv[0][0] * x + inv[1][0] * y, inv[0][1] * x + inv[1][1] * y);
-        [to[0][0] * u + to[1][0] * v, to[0][1] * u + to[1][1] * v]
-    };
-    let c = s.pivot;
-    let quad = s.quad.map(|q| {
-        let d = l(q[0] - c[0], q[1] - c[1]);
-        [c[0] + d[0], c[1] + d[1]]
-    });
-    if quad.iter().flatten().all(|v| v.is_finite()) {
-        s.quad = quad;
+    let (state, rect) = (box_state(s), start_rect(s));
+    let skew_v = skew_v.clamp(-SKEW_LIMIT, SKEW_LIMIT);
+    let to = BoxParts { skew_h, skew_v, ..state.parts(rect, s.skew_v) };
+    let next = state.with_parts(rect, s.skew_v, to);
+    if next.quad.iter().all(|p| p.is_finite()) {
+        apply_state(s, &next);
         s.skew_v = skew_v;
     }
+}
+
+/// `v`, kept off zero with its sign: a divisor for a W or H scale that may be negative.
+fn nonzero(v: f64) -> f64 {
+    if v.abs() < 1e-9 { 1e-9f64.copysign(v) } else { v }
 }
 
 /// Width of the mode, cancel and commit cluster kept on the right of the options bar.
@@ -237,7 +156,7 @@ fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSes
     }
     // Photoshop's H and V skew fields: the box's sides lean by H, its top and bottom by V.
     let (mut h, mut v) = (skew_h as f32, t.skew_v as f32);
-    let lim = -SKEW_LIMIT_DEG..=SKEW_LIMIT_DEG;
+    let lim = -SKEW_LIMIT as f32..=SKEW_LIMIT as f32;
     let skew = |id, caption, name| Cell {
         id,
         caption: Some(caption),
@@ -615,7 +534,8 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
     }
 }
 
-/// Scale the box along its own axes about the reference point.
+/// Scale the box along its own axes about the reference point. A negative factor mirrors that
+/// side; both negative turn the box by a half turn.
 pub(super) fn scale_about_pivot(app: &mut PhotocraftApp, kx: f64, ky: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
     let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], s.quad) else { return };

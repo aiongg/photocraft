@@ -14,6 +14,8 @@
 //! ↵ commits it and Esc cancels it as any crop. A line shorter than [`MIN_LINE_PX`] screen points
 //! does nothing.
 
+use craft_ui::canvas::CropBox;
+use craft_ui::canvas::kurbo::{Rect, Size};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 use egui::{Modifiers, Pos2};
@@ -111,26 +113,6 @@ pub fn frame_angle(a: [f64; 2], b: [f64; 2], min_len: f64) -> Option<f64> {
     rot.is_finite().then(|| crate::crop_ui::normalized_angle(-rot) + 0.0)
 }
 
-/// The largest frame with the proportions of `w`×`h`, turned `deg` degrees, that stays inside a
-/// `cw`×`ch` canvas, centred on the canvas. `None` when a size is not a positive finite number.
-///
-/// Kept apart on purpose: whether Photoshop's Classic Mode fits the frame exactly this way after
-/// Straighten (keeping the frame's proportions, centred on the image) is not verified.
-pub fn fitted(w: f64, h: f64, cw: f64, ch: f64, deg: f64) -> Option<[f64; 4]> {
-    if ![w, h, cw, ch, deg].iter().all(|v| v.is_finite()) || w <= 0.0 || h <= 0.0 || cw <= 0.0 || ch <= 0.0 {
-        return None;
-    }
-    let (s, c) = deg.to_radians().sin_cos();
-    let (s, c) = (s.abs(), c.abs());
-    // The turned frame's bounds, scaled by `k`, must fit the canvas on both axes.
-    let k = (cw / (w * c + h * s)).min(ch / (w * s + h * c));
-    if !k.is_finite() || k <= 0.0 {
-        return None;
-    }
-    let (hw, hh, cx, cy) = (w * k / 2.0, h * k / 2.0, cw / 2.0, ch / 2.0);
-    Some([cx - hw, cy - hh, cx + hw, cy + hh])
-}
-
 /// The line from `a` to `b` (document px, at `zoom` screen points per px) straightens the frame.
 fn apply(app: &mut PhotocraftApp, a: [f64; 2], b: [f64; 2], zoom: f64) {
     let min_len = if zoom.is_finite() && zoom > 0.0 { MIN_LINE_PX / zoom } else { MIN_LINE_PX };
@@ -139,7 +121,9 @@ fn apply(app: &mut PhotocraftApp, a: [f64; 2], b: [f64; 2], zoom: f64) {
     // The frame keeps its proportions (an options-bar ratio is already the frame's); no frame
     // takes the canvas's.
     let (w, h) = app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite())).map_or(size, |r| (r[2] - r[0], r[3] - r[1]));
-    let Some(r) = fitted(w, h, size.0, size.1, deg) else { return };
+    // The library's fit: the largest frame of that shape that stays inside the canvas when turned by `deg`.
+    let Some(fit) = CropBox::upright(Rect::new(0.0, 0.0, w, h)).fitted(Size::new(size.0, size.1), deg) else { return };
+    let r = [fit.rect.x0, fit.rect.y0, fit.rect.x1, fit.rect.y1];
     if app.ui.crop_rect == Some(r) && crate::crop_ui::angle(app) == deg {
         return;
     }
@@ -259,31 +243,6 @@ mod tests {
         assert_eq!(angle_readout(179.97), "180.0°");
         assert_eq!(angle_readout(12.34), "12.3°");
         assert_eq!(angle_readout(-12.36), "-12.4°");
-    }
-
-    #[test]
-    fn the_fitted_frame_is_the_largest_of_its_proportions_inside_the_canvas() {
-        // Upright, the canvas's own proportions fill it.
-        assert_eq!(fitted(200.0, 100.0, 200.0, 100.0, 0.0), Some([0.0, 0.0, 200.0, 100.0]));
-        for deg in [-45.0, -10.0, 3.0, 10.0, 30.0, 45.0, 90.0] {
-            let r = fitted(200.0, 100.0, 200.0, 100.0, deg).unwrap();
-            assert!(inside(r, deg, 200.0, 100.0), "{deg}: {r:?}");
-            assert!(near((r[2] - r[0]) / (r[3] - r[1]), 2.0), "keeps 2:1 at {deg}");
-            assert!(near((r[0] + r[2]) / 2.0, 100.0) && near((r[1] + r[3]) / 2.0, 50.0), "centred at {deg}");
-            // As large as possible: 1% larger would leave the canvas.
-            let c = crate::crop_ui::center(r);
-            let g = [c[0] - (c[0] - r[0]) * 1.01, c[1] - (c[1] - r[1]) * 1.01, c[0] + (r[2] - c[0]) * 1.01, c[1] + (r[3] - c[1]) * 1.01];
-            assert!(!inside(g, deg, 200.0, 100.0), "{deg}: not the largest");
-        }
-        for bad in [
-            [0.0, 1.0, 1.0, 1.0, 0.0],
-            [1.0, -1.0, 1.0, 1.0, 0.0],
-            [1.0, 1.0, 0.0, 1.0, 0.0],
-            [1.0, 1.0, 1.0, 1.0, f64::NAN],
-            [f64::INFINITY, 1.0, 1.0, 1.0, 0.0],
-        ] {
-            assert_eq!(fitted(bad[0], bad[1], bad[2], bad[3], bad[4]), None, "{bad:?}");
-        }
     }
 
     #[test]

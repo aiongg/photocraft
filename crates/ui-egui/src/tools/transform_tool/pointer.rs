@@ -70,7 +70,7 @@ pub(super) fn box_state(t: &TransformSession) -> BoxState {
     BoxState { quad: t.quad.map(p), pivot: p(t.pivot) }
 }
 
-fn apply_state(t: &mut TransformSession, s: &BoxState) {
+pub(super) fn apply_state(t: &mut TransformSession, s: &BoxState) {
     t.quad = s.quad.map(|p| [p.x, p.y]);
     t.pivot = [s.pivot.x, s.pivot.y];
 }

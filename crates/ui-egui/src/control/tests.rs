@@ -849,13 +849,13 @@ fn ui_set_drives_the_crop_fill() {
 /// #1919: the Crop tool's overlay menu over the control channel, reported by `ui.inspect`.
 #[test]
 fn ui_set_drives_the_crop_overlay_options() {
-    use crate::crop_overlay::{CropOverlay, OverlayShow};
+    use craft_ui::canvas::{CropGuide, GuideShow};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     let good = call(&mut app, &ctx, "ui.set", json!({"tool": "crop", "cropOverlay": "goldenSpiral", "cropOverlayShow": "always", "cropOverlayOrientation": 2}));
     assert_eq!(good["ok"], true, "{good}");
     let o = &app.ui.tool_options;
-    assert_eq!((o.crop_overlay, o.crop_overlay_show, o.crop_overlay_orientation), (CropOverlay::GoldenSpiral, OverlayShow::Always, 2));
+    assert_eq!((o.crop_overlay, o.crop_overlay_show, o.crop_overlay_orientation), (CropGuide::GoldenSpiral, GuideShow::Always, 2));
     let seen = call(&mut app, &ctx, "ui.inspect", json!({}));
     let t = &seen["result"]["toolOptions"];
     assert_eq!(
@@ -874,7 +874,7 @@ fn ui_set_drives_the_crop_overlay_options() {
         let r = call(&mut app, &ctx, "ui.set", bad.clone());
         assert_eq!(r["ok"], false, "{bad}: {r}");
     }
-    assert_eq!(app.ui.tool_options.crop_overlay, CropOverlay::GoldenSpiral, "a rejected call applies none of its fields");
+    assert_eq!(app.ui.tool_options.crop_overlay, CropGuide::GoldenSpiral, "a rejected call applies none of its fields");
 }
 
 /// #1919: the Crop tool's gear menu (Show Cropped Area, crop shield) over the control channel.

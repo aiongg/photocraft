@@ -218,7 +218,7 @@ pub const CROP_COMMIT: &str = "crop.commit";
 /// order, and its Clear; the overlay and when it shows; then Cancel and Crop, the bar's ⊘ and ✓.
 /// Built from the bar's own lists, so the two cannot disagree. Empty for any other menu.
 pub fn crop_rows(menu: &CanvasToolMenu) -> Vec<Row<String>> {
-    use crate::crop_overlay::{CropOverlay, OverlayShow};
+    use craft_ui::canvas::{CropGuide, GuideShow};
     let Some(users) = menu.crop.as_ref() else { return Vec::new() };
     let ratio = |(k, l): &(String, &str)| Some((l.to_string(), format!("{CROP_RATIO}{k}")));
     let (before, after): (Vec<_>, Vec<_>) = crate::crop_size::dropdown_options().into_iter().partition(|(k, _)| k != crate::crop_size::FRONT);
@@ -230,9 +230,9 @@ pub fn crop_rows(menu: &CanvasToolMenu) -> Vec<Row<String>> {
     rows.push(Some(("New Crop Preset…".into(), CROP_NEW.into())));
     rows.push(Some(("Delete Crop Preset…".into(), CROP_DELETE.into())));
     rows.push(None);
-    rows.extend(CropOverlay::ALL.iter().map(|k| Some((k.label().to_string(), format!("{CROP_OVERLAY}{}", k.id())))));
+    rows.extend(CropGuide::ALL.iter().map(|k| Some((k.name().to_string(), format!("{CROP_OVERLAY}{}", crate::crop_overlay::wire_id(k))))));
     rows.push(None);
-    rows.extend(OverlayShow::ALL.iter().map(|k| Some((k.label().to_string(), format!("{CROP_SHOW}{}", k.id())))));
+    rows.extend(GuideShow::ALL.iter().map(|k| Some((k.name().to_string(), format!("{CROP_SHOW}{}", crate::crop_overlay::wire_id(k))))));
     rows.push(None);
     rows.push(Some(("Cancel".into(), CROP_CANCEL.into())));
     rows.push(Some(("Crop".into(), CROP_COMMIT.into())));
@@ -268,9 +268,9 @@ fn crop_checked(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bo
         return user.is_some() && crop_preset(menu, command) == user.as_ref();
     }
     if let Some(k) = command.strip_prefix(CROP_OVERLAY) {
-        return k == o.crop_overlay.id();
+        return k == crate::crop_overlay::wire_id(&o.crop_overlay);
     }
-    command.strip_prefix(CROP_SHOW).is_some_and(|k| k == o.crop_overlay_show.id())
+    command.strip_prefix(CROP_SHOW).is_some_and(|k| k == crate::crop_overlay::wire_id(&o.crop_overlay_show))
 }
 
 fn crop_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bool {
@@ -310,8 +310,8 @@ pub fn open_crop(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
 
 /// A crop row: each runs what its options-bar twin runs.
 fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
-    use crate::crop_overlay::{CropOverlay, OverlayShow};
     use crate::crop_presets::{Choice, apply_choice};
+    use craft_ui::canvas::{CropGuide, GuideShow};
     match command {
         CROP_CANCEL => crate::crop_ui::cancel(app),
         CROP_COMMIT => crate::canvas::commit_crop(app),
@@ -325,9 +325,9 @@ fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) ->
                 apply_choice(app, Choice::User(name.clone()));
             } else if command == CROP_CLEAR {
                 crate::crop_size::clear_ratio(&mut app.ui.tool_options);
-            } else if let Some(k) = command.strip_prefix(CROP_OVERLAY).and_then(CropOverlay::from_id) {
+            } else if let Some(k) = command.strip_prefix(CROP_OVERLAY).and_then(crate::crop_overlay::from_wire_id::<CropGuide>) {
                 crate::crop_overlay::set_overlay(&mut app.ui.tool_options, k);
-            } else if let Some(k) = command.strip_prefix(CROP_SHOW).and_then(OverlayShow::from_id) {
+            } else if let Some(k) = command.strip_prefix(CROP_SHOW).and_then(crate::crop_overlay::from_wire_id::<GuideShow>) {
                 app.ui.tool_options.crop_overlay_show = k;
             }
             // As the options bar does: a saved preset or Clear changes the ratio without refitting
