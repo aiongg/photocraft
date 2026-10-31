@@ -2,8 +2,8 @@
 //! selected. Canvas size and orientation, resolution, colour mode and bit depth, and the
 //! Rulers & Grids toggles. Every edit dispatches an engine or view command, so the panel stays thin.
 
-use craft_ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
 use craft_ui::composites::FieldControl as _;
+use craft_ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
 use craft_ui::controls::{ControlSize, IconButton, NumberField};
 use craft_ui::icons::Icon;
 use craft_ui::localized::{LocaleNumbers, Unit};
@@ -120,10 +120,13 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         |ui, _| number(ui, "doc-h", keys[1], "Height", h as f32, (lu, f64::from(h))),
                     )
                     .inner;
-                let dim = |ui: &mut egui::Ui, id: &str, name: &str| NumberField::new(id, tl!(name), 0.0, &numbers).unit(Unit::new("{n} px")).enabled(false).show(ui);
-                PropertyRow::pair(PropertyLabel::glyph(tl!("X")), PropertyLabel::glyph(tl!("Y")))
-                    .reserve_link_slot()
-                    .show(ui, |ui, _| dim(ui, "doc-props-x", "X"), |ui, _| dim(ui, "doc-props-y", "Y"));
+                let dim =
+                    |ui: &mut egui::Ui, id: &str, name: &str| NumberField::new(id, tl!(name), 0.0, &numbers).unit(Unit::new("{n} px")).enabled(false).show(ui);
+                PropertyRow::pair(PropertyLabel::glyph(tl!("X")), PropertyLabel::glyph(tl!("Y"))).reserve_link_slot().show(
+                    ui,
+                    |ui, _| dim(ui, "doc-props-x", "X"),
+                    |ui, _| dim(ui, "doc-props-y", "Y"),
+                );
                 size
             })
             .inner;
