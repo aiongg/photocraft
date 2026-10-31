@@ -175,30 +175,33 @@ fn sticky_command_shows_the_guide_cursor() {
     }
 }
 
-/// The one decision for "a ⌘ press here takes the guide" outside the Move tool: not without ⌘,
-/// not with a locked guide, not during a stroke, not for a tool that keeps ⌘.
+/// The one decision for "guides take the pointer" outside the Move tool: not without ⌘, not with
+/// locked or hidden guides, not during a stroke, not for a tool that keeps ⌘.
 #[test]
-fn command_guide_at_decides_for_every_tool_that_moves_guides() {
-    use crate::canvas::command_guide_at;
+fn guides_take_the_pointer_for_every_tool_that_moves_guides() {
+    use crate::rulers::guides_take_pointer;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
     app.run("view.newGuide", json!({"orientation": "vertical", "position": 200})).unwrap();
     let cmd = Modifiers::COMMAND;
     for tool in [Tool::Brush, Tool::Eraser, Tool::Gradient, Tool::PaintBucket, Tool::Eyedropper, Tool::Frame, Tool::Artboard, Tool::MagicWand] {
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], cmd), Some((true, 0)), "{tool:?}");
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], Modifiers::NONE), None, "{tool:?} without ⌘");
-        assert_eq!(command_guide_at(&app, tool, [120.0, 100.0], cmd), None, "{tool:?} off the guide");
+        assert!(guides_take_pointer(&app, tool, cmd), "{tool:?}");
+        assert!(!guides_take_pointer(&app, tool, Modifiers::NONE), "{tool:?} without ⌘");
     }
-    for tool in [Tool::Move, Tool::Pen, Tool::Hand, Tool::Zoom, Tool::Crop, Tool::Type, Tool::Rectangle, Tool::Slice, Tool::PathSelection] {
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], cmd), None, "{tool:?} keeps ⌘");
+    assert!(guides_take_pointer(&app, Tool::Move, Modifiers::NONE), "the Move tool needs no ⌘");
+    for tool in [Tool::Pen, Tool::Hand, Tool::Zoom, Tool::Crop, Tool::Type, Tool::Rectangle, Tool::Slice, Tool::PathSelection] {
+        assert!(!guides_take_pointer(&app, tool, cmd), "{tool:?} keeps ⌘");
     }
     app.ui.extras.lock_guides = true;
-    assert_eq!(command_guide_at(&app, Tool::Brush, [200.0, 100.0], cmd), None, "locked guides");
+    assert!(!guides_take_pointer(&app, Tool::Brush, cmd) && !guides_take_pointer(&app, Tool::Move, cmd), "locked guides");
     app.ui.extras.lock_guides = false;
+    app.ui.extras.guides = false;
+    assert!(!guides_take_pointer(&app, Tool::Move, cmd), "hidden guides");
+    app.ui.extras.guides = true;
     // A stroke under way keeps the pointer: ⌘ pressed mid-stroke does not take the guide.
     app.ui.tool = Tool::Brush;
     crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
     assert!(app.drag.is_some());
-    assert_eq!(command_guide_at(&app, Tool::Brush, [200.0, 100.0], cmd), None, "during a stroke");
+    assert!(!guides_take_pointer(&app, Tool::Brush, cmd), "during a stroke");
 }

@@ -720,15 +720,12 @@ pub fn open_pasteboard(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bo
     true
 }
 
-/// Right-click at document point `doc` on a guide that `tool` could drag (the Move tool, or ⌘ with
-/// a tool on which ⌘ moves guides, `canvas::command_guide_at`): select the guide and open the guide
-/// menu at screen point `pos`.
-pub fn open_guide(app: &mut PhotocraftApp, tool: Tool, mods: egui::Modifiers, pos: [f32; 2], doc: [f64; 2]) -> bool {
-    if !pos.iter().all(|v| v.is_finite()) || !doc.iter().all(|v| v.is_finite()) {
+/// Right-click on guide `index` (the guides took it, as they take presses: the Move tool, or ⌘ with
+/// a tool on which ⌘ moves guides): select the guide and open the guide menu at screen point `pos`.
+pub fn open_guide(app: &mut PhotocraftApp, tool: Tool, vertical: bool, index: usize, pos: [f32; 2]) -> bool {
+    if !pos.iter().all(|v| v.is_finite()) {
         return false;
     }
-    let hit = if tool == Tool::Move { crate::rulers::guide_at(app, doc[0], doc[1]) } else { crate::canvas::command_guide_at(app, tool, doc, mods) };
-    let Some((vertical, index)) = hit else { return false };
     crate::guide_select::select(app, vertical, index);
     app.ui.brush_picker = None;
     app.ui.layer_menu = None;
