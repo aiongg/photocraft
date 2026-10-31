@@ -410,7 +410,6 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
 
 /// The first typed digit reaches the host in the same frame it is typed.
 #[test]
-#[ignore = "library row 125: first typed digit reaches the host in the same frame"]
 fn a_value_dialog_takes_the_first_typed_digit_in_one_frame() {
     use egui_kittest::kittest::Queryable;
     const BLUR: &str = "filter.blur.gaussianBlur";

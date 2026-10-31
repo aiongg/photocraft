@@ -2,7 +2,7 @@ use super::scrub::take_scrub_label;
 use super::units::{FieldUnits, field_resolution_id, parse_num_in, unit_of_suffix};
 use super::{Response, Sense, Tokens, Ui, Vec2, vec2};
 use craft::ui::controls::{ControlSize, NumberField};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::menu::MenuEntry;
 use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
@@ -168,7 +168,8 @@ fn cap_numeric_events(ui: &Ui, id: Option<egui::Id>) {
 }
 
 /// Applies a field's `event` to `value`: updates and one-shot sets apply, a commit applies when it
-/// changed something, and a cancel puts back the value the gesture began with (kept in `start`).
+/// changed something, and a cancel puts back the value the gesture began with (kept in `start`),
+/// unless the host changed the value itself.
 /// True when `value` changed.
 fn apply(ui: &Ui, start: egui::Id, event: Option<&EditEvent<f64>>, value: &mut f32) -> bool {
     let set = |value: &mut f32, to: f64| {
@@ -181,7 +182,10 @@ fn apply(ui: &Ui, start: egui::Id, event: Option<&EditEvent<f64>>, value: &mut f
             first.is_some_and(|v| set(value, v))
         }
         Some(EditEvent::Update { value: v, .. } | EditEvent::Set { value: v, .. } | EditEvent::Commit { value: v, changed: true, .. }) => set(value, *v),
-        Some(EditEvent::Cancel { .. }) => ui.data(|d| d.get_temp::<f32>(start)).is_some_and(|before| set(value, f64::from(before))),
+        // An external change (the host set the value mid-run) stays: nothing to put back.
+        Some(EditEvent::Cancel { reason, .. }) if *reason != CancelReason::External => {
+            ui.data(|d| d.get_temp::<f32>(start)).is_some_and(|before| set(value, f64::from(before)))
+        }
         _ => false,
     }
 }

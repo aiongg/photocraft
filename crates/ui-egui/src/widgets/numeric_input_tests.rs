@@ -157,7 +157,6 @@ fn numeric_event_limit_counts_unicode_characters_and_rejects_without_truncating(
 }
 
 #[test]
-#[ignore = "library row 127 (128-char parse cap)"]
 fn numeric_parser_rejects_oversized_accumulated_text_before_normalizing() {
     let mut h = focused();
     select_all(&mut h);

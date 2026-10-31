@@ -1,7 +1,7 @@
 use super::{Color32, Pos2, Response, Ui, Vec2};
 use craft::ui::composites::SliderRow;
 use craft::ui::controls::{ControlSize, Slider};
-use craft::ui::edit::{EditEvent, EditResponse};
+use craft::ui::edit::{CancelReason, EditEvent, EditResponse};
 use craft::ui::localized::{LocaleNumbers, Unit};
 
 /// Thin-track slider with a round knob over `*value`, named `label` for screen readers and
@@ -59,7 +59,8 @@ fn apply_event(ui: &Ui, salt: egui::Id, event: Option<&EditEvent<f64>>, value: &
             *value = (*v as f32).clamp(min, max);
             true
         }
-        Some(EditEvent::Cancel { .. }) => match ui.data(|d| d.get_temp::<f32>(before)) {
+        // An external change (the host set the value mid-run) stays.
+        Some(EditEvent::Cancel { reason, .. }) if *reason != CancelReason::External => match ui.data(|d| d.get_temp::<f32>(before)) {
             Some(old) => {
                 *value = old;
                 true
