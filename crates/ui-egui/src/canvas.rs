@@ -1350,7 +1350,7 @@ fn draw_canvas_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &C
         let d = xf.to_doc(p);
         if let Some(k) = crate::transform_tool::rotate_cursor_dir(app, d) {
             let toward = xf.to_screen((d[0] + k[0] * 16.0) as f32, (d[1] + k[1] * 16.0) as f32) - p;
-            crate::crop_ui::draw_turn_cursor(ctx, p, toward);
+            craft_ui::canvas::turn_cursor(ctx, p, toward);
         } else if c == egui::CursorIcon::None {
             // Likewise the distort and skew pointers over a handle (#5405).
             crate::transform_tool::draw_handle_cursor(app, ctx, xf, p, mods);
@@ -1371,7 +1371,7 @@ fn draw_canvas_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &C
         // Give them their resize/rotate cursors before the first pointer press (#2871).
         ui.ctx().set_cursor_icon(c);
         if let Some(toward) = transform_controls_turn(r, p) {
-            crate::crop_ui::draw_turn_cursor(ctx, p, toward);
+            craft_ui::canvas::turn_cursor(ctx, p, toward);
         }
     } else if let Some(c) = response.hover_pos().filter(|_| tool.is_type()).and_then(|p| {
         let mods = crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers));

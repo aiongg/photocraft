@@ -80,6 +80,20 @@ impl ViewXform {
         }
     }
 
+    /// The same view for the library's canvas kit (`craft_ui::canvas`), whose document points are
+    /// `kurbo` points: it maps every point and vector as [`Self::to_screen`] and [`Self::map_vec`].
+    pub fn canvas_view(&self) -> craft_ui::canvas::CanvasView {
+        let mut v = craft_ui::canvas::CanvasView::new(
+            self.rect,
+            craft_ui::canvas::kurbo::Point::new(f64::from(self.center[0]), f64::from(self.center[1])),
+            f64::from(self.zoom),
+        );
+        v.rotation = f64::from(self.rotation);
+        v.flip_x = self.flip;
+        v.aspect = f64::from(self.aspect);
+        v
+    }
+
     /// Document pixel width over height on screen: [`Self::aspect`], or 1 when it is unusable.
     fn sx(self) -> f32 {
         if self.aspect.is_finite() && self.aspect > 0.0 { self.aspect } else { 1.0 }

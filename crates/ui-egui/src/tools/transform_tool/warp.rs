@@ -62,7 +62,7 @@ pub(super) fn split_cursor(m: &BezierMesh, tool: SplitTool, (s, t): (f64, f64), 
         SplitTool::Horizontal => (m.eval(s, (t - e).max(0.0)), m.eval(s, (t + e).min(1.0))),
         SplitTool::Cross => return CursorIcon::Crosshair,
     };
-    crate::tool_cursor::resize([b[0] - a[0], b[1] - a[1]], xf)
+    craft_ui::canvas::resize_cursor(&xf.canvas_view(), craft_ui::canvas::kurbo::Vec2::new(b[0] - a[0], b[1] - a[1]))
 }
 
 /// Armed split tool, or Option held: the guide tracks the pointer and the split lands on release.
