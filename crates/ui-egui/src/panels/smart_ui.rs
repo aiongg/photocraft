@@ -128,8 +128,12 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         let blend_label = crate::i18n::fmt(tl!("Blending Options ({filter})"), &[("filter", &name)]);
         let mask_cell = Cell::new(None);
         let blend_opened = Cell::new(false);
-        let mut row =
-            ListRow::new((l.id.0, index), name.as_str()).toggle(ToggleColumn::eye(tl!("Visibility {row}"), shown)).selected(selected).dimmed(!on).layer(true);
+        let mut row = ListRow::new((l.id.0, index), name.as_str())
+            .toggle(ToggleColumn::eye(tl!("Visibility {row}"), shown))
+            .selected(selected)
+            .dimmed(!on)
+            .layer(true)
+            .indented_toggles(true);
         if let Some(i) = index {
             row = row.drop_mark(mark_of(ui.ctx(), MarkAt::Filter(l.id, i)));
         }

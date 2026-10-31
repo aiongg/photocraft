@@ -353,7 +353,11 @@ pub(super) fn effect_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer,
     }
     for (i, (name, on, kind)) in rows.into_iter().enumerate() {
         let effect = i.checked_sub(1);
-        let mut row = ListRow::new(("fx", l.id.0, effect), name.as_str()).toggle(ToggleColumn::eye(tl!("Visibility {row}"), on)).dimmed(!on).layer(true);
+        let mut row = ListRow::new(("fx", l.id.0, effect), name.as_str())
+            .toggle(ToggleColumn::eye(tl!("Visibility {row}"), on))
+            .dimmed(!on)
+            .layer(true)
+            .indented_toggles(true);
         if effect.is_none() {
             row = row.icon(Icon::Sparkles);
         }

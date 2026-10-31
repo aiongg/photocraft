@@ -42,6 +42,16 @@ fn clear(ctx: &egui::Context) {
     ctx.data_mut(|d| d.remove::<Transfer>(key()));
 }
 
+/// Esc ends the transfer (like the row drag it came from): nothing drops, even if the button is
+/// released over another document later. True when it did.
+fn cancelled(ctx: &egui::Context) -> bool {
+    if get(ctx).is_some() && ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        clear(ctx);
+        return true;
+    }
+    false
+}
+
 /// Starts a transfer of `layers` from the active document.
 fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: Option<[f64; 2]>) -> bool {
     let Some(st) = app.session.active() else { return false };
@@ -80,6 +90,9 @@ pub fn pointer_if_armed(app: &PhotocraftApp, ctx: &egui::Context) -> Option<egui
 /// transfer (the source layers stay where they were), the tab's document is shown, and a release
 /// right here drops the layers into it.
 pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
+    if cancelled(ctx) {
+        return;
+    }
     if get(ctx).is_none() {
         let Some(grab) = move_drag(app) else { return };
         let Some(active) = app.session.active().and_then(|st| st.active_layer) else { return };
@@ -113,6 +126,9 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
 /// Every frame after the document area: a release over another document's canvas drops the
 /// layers there; while the button is held a ghost follows the pointer.
 pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if cancelled(ctx) {
+        return;
+    }
     let Some(t) = get(ctx) else { return };
     let (pos, released, down) = ctx.input(|i| (i.pointer.latest_pos(), i.pointer.any_released(), i.pointer.primary_down()));
     let target = pos.and_then(|p| target_at(app, p));

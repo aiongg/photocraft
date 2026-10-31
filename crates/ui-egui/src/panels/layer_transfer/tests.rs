@@ -38,6 +38,11 @@ fn tab(h: &Harness<'_, PhotocraftApp>, name: &str) -> Pos2 {
 /// Press at `path[0]`, move through the rest (a few frames at each) and release at the last
 /// point with `release` held.
 fn drag_along(h: &mut Harness<'_, PhotocraftApp>, path: &[Pos2], release: Modifiers) {
+    drag_along_with(h, path, release, false);
+}
+
+/// `drag_along`, with Esc pressed at the last point before the release when `escape` is set.
+fn drag_along_with(h: &mut Harness<'_, PhotocraftApp>, path: &[Pos2], release: Modifiers, escape: bool) {
     let first = path[0];
     h.event(egui::Event::PointerMoved(first));
     h.run_steps(1);
@@ -51,6 +56,10 @@ fn drag_along(h: &mut Harness<'_, PhotocraftApp>, path: &[Pos2], release: Modifi
         h.run_steps(2);
     }
     let last = path[path.len() - 1];
+    if escape {
+        h.key_press(egui::Key::Escape);
+        h.run_steps(2);
+    }
     h.event(egui::Event::ModifiersChanged(release));
     h.event(egui::Event::PointerButton { pos: last, button: PointerButton::Primary, pressed: false, modifiers: release });
     h.run_steps(3);
@@ -129,4 +138,14 @@ fn dropping_back_on_the_source_copies_nothing() {
     let docs = h.state().session.documents();
     assert_eq!((docs[0].doc.layers.len(), docs[1].doc.layers.len()), (2, 1));
     assert_eq!(h.state().session.active_index(), Some(0));
+}
+
+#[test]
+fn escape_ends_the_transfer_so_the_release_drops_nothing() {
+    let (mut h, _) = harness();
+    let row = h.get_by_role_and_label(Role::TreeItem, "paint").rect().center();
+    let over_tab = tab(&h, "dest-doc");
+    let drop = h.state().last_canvas_rect.center();
+    drag_along_with(&mut h, &[row, over_tab, drop], Modifiers::NONE, true);
+    assert_eq!(h.state().session.documents()[1].doc.layers.len(), 1, "nothing dropped in dest-doc");
 }
