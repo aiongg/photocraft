@@ -1,5 +1,6 @@
 use super::*;
 use egui::{Event, Modifiers, PointerButton, Pos2, vec2};
+use egui_kittest::kittest::NodeT as _;
 use egui_kittest::{Harness, kittest::Queryable};
 
 fn app() -> PhotocraftApp {
@@ -519,19 +520,12 @@ fn populated_canvas_keeps_a_real_opacity_edit_after_floating_and_redocking() {
     h.input_mut().max_texture_side = Some(8192);
     h.run_steps(5);
     let floating = floating_rect(&h, "properties");
-    let mut sliders: Vec<_> = h.ctx.viewport(|vp| {
-        vp.prev_pass
-            .widgets
-            .layers()
-            .flat_map(|(_, widgets)| widgets.iter())
-            .filter(|widget| {
-                widget.sense.senses_drag() && widget.rect.height() == 18.0 && floating.contains_rect(widget.rect) && widget.rect.left() > floating.left()
-            })
-            .map(|widget| widget.rect)
-            .collect()
-    });
-    sliders.sort_by(|a, b| a.top().total_cmp(&b.top()));
-    let at = sliders.first().expect("Properties opacity slider").center();
+    let at = h
+        .query_all_by_role(egui::accesskit::Role::Slider)
+        .find(|node| node.accesskit_node().label().as_deref() == Some("Opacity") && floating.contains_rect(node.rect()))
+        .expect("Properties opacity slider")
+        .rect()
+        .center();
     h.hover_at(at);
     h.run_steps(1);
     for pressed in [true, false] {
