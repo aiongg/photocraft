@@ -7,16 +7,14 @@
 
 use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
-use craft_ui::controls::{Button, ButtonVariant};
+use craft_ui::dialog::{ButtonRole, FooterButton};
 use craft_ui::localized::LocaleNumbers;
-use craft_ui::theme::scale::Space;
-use egui::{Color32, Rect, Stroke, UiBuilder, pos2, vec2};
+use egui::vec2;
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::DialogKind;
-use crate::widgets;
 
 /// Colour differences the CMYK round trip leaves inside the printable gamut (ΔE ≤ 0.4, black ≈ 1.4
 /// with black-point compensation) stay below this; out-of-gamut colours move far more.
@@ -33,7 +31,7 @@ pub fn out_of_gamut(rgb: [f32; 3]) -> Option<[f32; 3]> {
 
 /// The nearest web colour (channels in steps of 51), when `rgb` isn't one.
 pub fn not_web_safe(rgb: [f32; 3]) -> Option<[f32; 3]> {
-    let web = rgb.map(|v| (v.clamp(0.0, 1.0) * 5.0).round() / 5.0);
+    let web = web_safe(rgb);
     (hex(web) != hex(rgb)).then_some(web)
 }
 
@@ -284,10 +282,8 @@ fn web_safe(c: [f32; 3]) -> [f32; 3] {
 /// Room for both component columns, including units, without overflowing the title's width; with
 /// the frame and title the window fits Photoshop's (about 534 x 376 points).
 pub(crate) const CONTENT_WIDTH: f32 = 488.0;
-/// Side of the colour field (Photoshop's is about 256 points).
-/// Draw the picker and its top-right actions. `Some(true)` confirms, `Some(false)` cancels.
+/// Draw the picker and its side actions. `Some(true)` confirms, `Some(false)` cancels.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
-    ui.set_width(CONTENT_WIDTH);
     let now = current(f);
     let orig = f.get("__orig").and_then(Value::as_str).and_then(parse_hex).unwrap_or(now.rgb);
     let mut mode = area_mode(f.get("__mode").and_then(Value::as_str).unwrap_or("h"));
@@ -304,10 +300,14 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         .mode(&mut mode)
         .web_colors(&mut web)
         .compare(srgba(orig))
-        .focus_on_open(false)
         .eyedropper(tl!("Pick screen color"))
         .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
-        .text(word);
+        .text(word)
+        .side_actions([
+            FooterButton::new(ButtonRole::Default, tl!("OK")),
+            FooterButton::new(ButtonRole::Cancel, tl!("Cancel")),
+            FooterButton::new(ButtonRole::Apply, tl!("Add to Swatches")),
+        ]);
     // Photoshop's warnings beside the swatch, each over a chip of the nearest colour that passes
     // (a click takes it): out of gamut for printing on top, not a web colour below.
     if let Some(near) = out_of_gamut(now.rgb) {
@@ -317,12 +317,6 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         picker = picker.warning(ColorWarning::web_colors(tl!("Not a web colour: click for the nearest web colour"), srgba(near)));
     }
     let shown = picker.show(ui);
-    // The hex field takes the focus, its text selected, once the dialog is on show: the library
-    // asks on the first pass, which a window's hidden sizing pass spends.
-    if ui.is_visible() && !f.contains_key("__focused") {
-        f.insert("__focused".into(), json!(true));
-        ColorPicker::focus_hex(ui.ctx(), shown.edit.response.id);
-    }
     if shown.eyedropper_requested {
         crate::screen_picker::request(ui.ctx(), screen_id);
     }
@@ -338,32 +332,16 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
     if let Some(picked) = shown.edit.event.as_ref().and_then(|e| e.value()) {
         apply_picked(f, picked);
     }
-    actions(ui, f, shown.edit.response.rect.top())
-}
-
-/// OK, Cancel and Add to Swatches in a column at the picker's top-right corner, beside the
-/// compare swatch and above the channel fields, as Photoshop's are. `top` is the picker's top.
-fn actions(ui: &mut egui::Ui, f: &mut Map<String, Value>, top: f32) -> Option<bool> {
-    let mut outcome = None;
-    // As wide as the longest label, at the right edge like Photoshop's.
-    let width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
-    let right = ui.max_rect().right();
-    let rect = Rect::from_min_max(pos2(right - width, top), pos2(right, top + 120.0));
-    let mut column = ui.new_child(UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Max)));
-    let ui = &mut column;
-    if ui.add(Button::new(tl!("OK")).variant(ButtonVariant::Primary).min_width(width)).clicked() {
-        outcome = Some(true);
+    match shown.side_clicked.map(|c| c.role) {
+        Some(ButtonRole::Default) => Some(true),
+        Some(ButtonRole::Cancel) => Some(false),
+        // Handled by the dialog host, which has the app (`take_add_swatch`).
+        Some(_) => {
+            f.insert("__addSwatch".into(), json!(true));
+            None
+        }
+        None => None,
     }
-    ui.add_space(Space::S4.px());
-    if ui.add(Button::new(tl!("Cancel")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
-        outcome = Some(false);
-    }
-    ui.add_space(Space::S4.px());
-    // Handled by the dialog host, which has the app (`take_add_swatch`).
-    if ui.add(Button::new(tl!("Add to Swatches")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
-        f.insert("__addSwatch".into(), json!(true));
-    }
-    outcome
 }
 
 /// Stores what the picker reported: the colour, and the values of the model it was edited in
@@ -382,7 +360,7 @@ fn apply_picked(f: &mut Map<String, Value>, picked: &PickedColor) {
     }
 }
 
-fn srgba(c: [f32; 3]) -> Srgba {
+pub(crate) fn srgba(c: [f32; 3]) -> Srgba {
     Srgba::rgb(c[0], c[1], c[2])
 }
 
@@ -465,30 +443,6 @@ impl ColorModel for CmykModel {
     }
     fn default_on(&self) -> DefaultOn {
         DefaultOn { full: true, compact: false }
-    }
-}
-
-/// ⚠: a filled triangle with an exclamation mark cut out of it.
-pub(crate) fn warning_triangle(p: &egui::Painter, r: Rect, ink: Color32, cut: Color32) {
-    let tri = vec![pos2(r.center().x, r.top()), pos2(r.right(), r.bottom()), pos2(r.left(), r.bottom())];
-    p.add(egui::Shape::convex_polygon(tri, ink, Stroke::NONE));
-    let x = r.center().x;
-    p.line_segment([pos2(x, r.top() + 4.5), pos2(x, r.bottom() - 4.0)], Stroke::new(1.5, cut));
-    p.circle_filled(pos2(x, r.bottom() - 2.0), 0.9, cut);
-}
-
-/// A cube seen corner-on: a hexagon with three edges meeting in the middle.
-pub(crate) fn web_cube(p: &egui::Painter, r: Rect, ink: Color32) {
-    let (c, rad) = (r.center(), r.width() / 2.0);
-    let corner = |k: f32| {
-        let a = std::f32::consts::FRAC_PI_3 * k - std::f32::consts::FRAC_PI_2;
-        c + vec2(rad * a.cos(), rad * a.sin())
-    };
-    let hex: Vec<_> = (0..6).map(|k| corner(k as f32)).collect();
-    let stroke = Stroke::new(1.2, ink);
-    p.add(egui::Shape::closed_line(hex, stroke));
-    for k in [1.0, 3.0, 5.0] {
-        p.line_segment([c, corner(k)], stroke);
     }
 }
 

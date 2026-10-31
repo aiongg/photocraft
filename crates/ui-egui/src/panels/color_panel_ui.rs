@@ -10,11 +10,12 @@ use craft_ui::theme::StrokeExt;
 use std::f32::consts::TAU;
 use std::sync::Arc;
 
-use egui::{Color32, Mesh, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{Color32, Mesh, Pos2, Rect, Sense, Stroke, StrokeKind, UiBuilder, pos2, vec2};
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::color_picker_ui::{hex, not_web_safe, out_of_gamut};
+use crate::color_picker_ui::{hex, not_web_safe, out_of_gamut, srgba};
+use craft_ui::composites::{ColorWarning, ColorWarningChip};
 use crate::panels::{color_field_fill_id, field_chips, field_hsva, srgb_hsva};
 use crate::state::{ColorPanelMode, ColorRamp};
 use crate::theme::Tokens;
@@ -355,36 +356,25 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, mode: ColorPanelMode) {
 /// Photoshop's alerts under the chips: ⚠ when the colour can't print (click: the nearest CMYK
 /// colour) and, for Web Color sliders, the cube when it isn't a web colour (click: the nearest).
 pub(crate) fn alerts(app: &mut PhotocraftApp, ui: &mut egui::Ui, col: Rect, rgb: [f32; 3], web: bool) {
-    let t = Tokens::get(ui.ctx());
     let background = app.ui.color_panel.background;
-    let mut y = col.top() + CHIPS_W + 2.0;
-    let warnings = [
-        (out_of_gamut(rgb), "Out of gamut for printing: click for the nearest printable colour", false),
-        (if web { not_web_safe(rgb) } else { None }, "Not a web colour: click for the nearest web colour", true),
-    ];
-    for (slot, (near, tip, cube)) in warnings.into_iter().enumerate() {
-        let Some(near) = near else { continue };
-        let icon = Rect::from_min_size(pos2(col.left() + 1.0, y), vec2(14.0, 13.0));
-        let chip = Rect::from_min_size(pos2(col.left() + 18.0, y), vec2(13.0, 13.0));
-        if cube {
-            crate::color_picker_ui::web_cube(ui.painter(), icon.shrink(0.5), t.text_dim);
-        } else {
-            crate::color_picker_ui::warning_triangle(ui.painter(), icon, t.text_dim, t.card);
-        }
-        ui.painter().rect_filled(chip, craft_ui::theme::scale::Radius::R0.px(), rgb32(near));
-        ui.painter().rect_stroke(
-            chip,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim),
-            StrokeKind::Outside,
-        );
-        let resp = ui.interact(icon.union(chip), ui.scope_id().with(("color-panel-alert", slot)), Sense::click());
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tip));
-        if resp.on_hover_text(tl!(tip)).clicked() {
-            set_color(app, ui.ctx(), background, near);
-        }
-        y += 18.0;
+    let mut warnings = Vec::new();
+    if let Some(near) = out_of_gamut(rgb) {
+        warnings.push(ColorWarning::new(tl!("Out of gamut for printing: click for the nearest printable colour"), srgba(near)));
     }
+    if web && let Some(near) = not_web_safe(rgb) {
+        warnings.push(ColorWarning::web_colors(tl!("Not a web colour: click for the nearest web colour"), srgba(near)));
+    }
+    let area = Rect::from_min_max(pos2(col.left() + 1.0, col.top() + CHIPS_W + 2.0), col.max);
+    let row = UiBuilder::new().max_rect(area).layout(egui::Layout::left_to_right(egui::Align::Min));
+    ui.scope_builder(row, |ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (slot, warning) in warnings.into_iter().enumerate() {
+            if ColorWarningChip::new(("color-panel-alert", slot), warning.clone()).show(ui).clicked() {
+                let near = warning.nearest();
+                set_color(app, ui.ctx(), background, [near.r, near.g, near.b]);
+            }
+        }
+    });
 }
 
 /// The ramp's colour at (x, y) in 0..1 (y down). RGB Spectrum: hue across, white at the top
