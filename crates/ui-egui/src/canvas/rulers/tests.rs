@@ -2,12 +2,12 @@ use egui::pos2;
 
 use super::*;
 
-/// The rulers over a canvas, as the app lays them out: guides first, then the rulers they feed.
+/// The rulers over a canvas, as the app lays them out: the rulers first, then the guides they feed.
 fn draw_rulers(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: Rect, xf: &ViewXform) {
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     let response = ui.interact(xf.rect, egui::Id::new("test-canvas"), egui::Sense::click_and_drag());
-    let guides = draw_guides(app, ui, &response, xf, &doc, 0);
-    show_rulers(app, ui, &response, full, xf, &doc, 0, Some(guides));
+    show_rulers(app, ui, &response, full, xf, &doc, 0, Some(guides_id(ui, 0)));
+    draw_guides(app, ui, &response, xf, &doc, 0);
 }
 
 #[test]
@@ -249,7 +249,6 @@ fn moving_a_guide_on_the_canvas_shows_its_y() {
 /// after that frame's pointer move (the ruler handles the drag after the canvas is drawn), and
 /// the frame that drops it shows none.
 #[test]
-#[ignore = "PC draws the guides before the rulers (show_rulers needs the guides' id), so Guides::drag_from_ruler is handed over after the guides were shown and the Begin arrives a pass later; the readout then needs a third step"]
 fn ruler_drag_readout_is_current_every_frame() {
     use egui_kittest::kittest::Queryable;
     let mut h = canvas_harness(true);

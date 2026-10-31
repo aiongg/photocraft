@@ -1261,8 +1261,7 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
         crate::rulers::draw_grid(app, ui, xf, doc);
     }
     // Always shown, hidden guides or not: a guide dragged out of a ruler is run by them.
-    let guides_id = crate::rulers::draw_guides(app, ui, response, xf, doc, idx);
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new(("pc-guides-id", idx)), guides_id));
+    crate::rulers::draw_guides(app, ui, response, xf, doc, idx);
     // The pending crop frame shows on its own document only, not on the other tiles (#1918).
     let foreign_crop = if app.session.active_index() == Some(idx) { None } else { app.ui.crop_rect.take() };
     draw_drag_preview(app, painter, xf);
@@ -1666,15 +1665,6 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
         app.perf.span("scrollbars", crate::gpu_canvas::now_ms() - t0);
         app.hover_doc = response.hover_pos().map(|p| xf.to_doc(p));
     }
-    if app.ui.extras.rulers {
-        let before = app.guide_drag;
-        let guides = primary.then(|| ctx.data(|d| d.get_temp::<egui::Id>(egui::Id::new(("pc-guides-id", idx))))).flatten();
-        crate::rulers::show_rulers(app, ui, response, full, &xf, doc, idx, guides);
-        // A guide dragged out of a ruler moved after this frame drew it: draw it again where it is.
-        if app.guide_drag != before {
-            ctx.request_repaint();
-        }
-    }
     // After the ruler drags above, so the readout shows where the guide is now, and not after a
     // release ended the drag.
     if app.session.active_index() == Some(idx) {
@@ -2009,6 +1999,16 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         xf
     };
     let (beyond, layer_edges, edge_rect) = painted.unwrap_or_else(|| paint_canvas(app, ui, &display_view, xf, &paint_input));
+    // Before the guides, so a ruler drag reaches them in the same pass.
+    if app.ui.extras.rulers {
+        let before = app.guide_drag;
+        let guides = primary.then(|| crate::rulers::guides_id(ui, idx));
+        crate::rulers::show_rulers(app, ui, &response, full, &xf, &doc, idx, guides);
+        // A guide dragged out of a ruler moved after this frame drew it: draw it again where it is.
+        if app.guide_drag != before {
+            ctx.request_repaint();
+        }
+    }
     // A Hand drag (the tool, Space or the middle button) keeps every overlay on screen, as in
     // Photoshop: the Pen path being drawn, paths, guides, grid, transform box (#6592). Only the
     // tool cursors below give way to the fist.

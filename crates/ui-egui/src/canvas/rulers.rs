@@ -189,10 +189,19 @@ pub(crate) fn ruler_units(app: &PhotocraftApp, ui: &egui::Ui, doc: &Document) ->
     })
 }
 
+/// The id of the guides of document `idx`, which the rulers hand a drag to.
+pub fn guides_id(ui: &egui::Ui, idx: usize) -> egui::Id {
+    ui.make_persistent_id(egui::IdSalt::new(guides_salt(idx)))
+}
+
+fn guides_salt(idx: usize) -> (&'static str, usize) {
+    ("pc-guides", idx)
+}
+
 /// The guides of `doc` (or the New Guide Layout preview) over the canvas, and the drags out of the
-/// rulers: returns the guides' id for the rulers. The Move tool's own guide drags are moved by the
+/// rulers (their id is [`guides_id`]). The Move tool's own guide drags are moved by the
 /// tool input, so the guides here only draw; a guide being moved shows where it is.
-pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::Response, xf: &ViewXform, doc: &Document, idx: usize) -> egui::Id {
+pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::Response, xf: &ViewXform, doc: &Document, idx: usize) {
     let drag = app.guide_drag;
     let g = &app.session.prefs().guides_grid_and_slices;
     let preview = crate::guide_layout_ui::preview(app, doc);
@@ -222,7 +231,7 @@ pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::
     let view = xf.canvas_view();
     let origin = Point::new(doc.ruler_origin[0], doc.ruler_origin[1]);
     let cell = RefCell::new(&mut *app);
-    let out = Guides::new(("pc-guides", idx), &list, &ux, &uy, GuideNames::of(ui))
+    let out = Guides::new(guides_salt(idx), &list, &ux, &uy, GuideNames::of(ui))
         .selected(selected)
         .bounds(DocRect::new(0.0, 0.0, f64::from(doc.size.width), f64::from(doc.size.height)))
         .zero(origin)
@@ -251,7 +260,6 @@ pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::
         Some((None, EditEvent::Cancel { .. })) => app.guide_drag = None,
         _ => {}
     }
-    out.id
 }
 
 /// The position readout of a guide being dragged: `X:` for a vertical guide, `Y:` for a horizontal
