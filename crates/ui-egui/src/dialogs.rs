@@ -550,6 +550,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::i18n::current()
         };
         let _language = crate::i18n::language_scope(lang);
+        let _host_language = crate::i18n::host_language_scope(ctx, lang);
         let interactive = stack.is_top(dialog_id(d.id));
         let title = display_title(&d);
         if d.kind == DialogKind::Error {
