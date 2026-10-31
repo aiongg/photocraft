@@ -1840,3 +1840,28 @@ fn section_boxes_show_a_pressed_state() {
         assert!(looks.iter().skip(i + 1).all(|b| b != a), "{looks:?}");
     }
 }
+
+/// The shared check box (options bars, dialogs): pressing its label leaves it unchecked, and the
+/// release checks it, as AccessKit reports it.
+#[test]
+fn checkboxes_show_a_pressed_state_from_their_label() {
+    use egui::accesskit::Toggled;
+    use egui_kittest::kittest::Queryable;
+    let mut h = Harness::builder().with_size(vec2(300.0, 100.0)).build_ui_state(
+        |ui, on: &mut bool| {
+            widgets::checkbox(ui, on, "Sample All Layers");
+        },
+        false,
+    );
+    h.run();
+    let toggled = |h: &Harness<'_, bool>| h.get_by_label("Sample All Layers").accesskit_node().toggled();
+    assert_eq!(toggled(&h), Some(Toggled::False));
+    let label = h.get_by_label("Sample All Layers").rect();
+    h.drag_at(label.center());
+    h.run();
+    assert_eq!(toggled(&h), Some(Toggled::False), "pressing the label does not check the box yet");
+    h.drop_at(label.center());
+    h.run();
+    assert!(*h.state(), "the release checks it");
+    assert_eq!(toggled(&h), Some(Toggled::True));
+}

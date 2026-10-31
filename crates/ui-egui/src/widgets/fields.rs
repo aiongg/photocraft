@@ -352,7 +352,8 @@ pub fn popup_value_field(ui: &mut Ui, name: &str, value: &mut f32, range: std::o
     popup.show(|ui| {
         crate::press_menu::above_parent_ui(parent_layer, ui);
         ui.set_width(POPUP_SLIDER_W);
-        let s = super::slider_named(ui, &name, value, range, None);
+        let s = slider(ui, value, range, None);
+        s.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(*value), &name));
         let key = gesture(ui, s.drag_started());
         if s.changed() {
             out.changed = true;
