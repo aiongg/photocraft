@@ -468,4 +468,27 @@ mod tests {
         assert!(!app.gpu_active());
         assert_eq!(app.ui.notices.len(), 1, "the restart notice");
     }
+
+    #[test]
+    fn fallback_window_is_drawn_while_the_notice_is_set_and_keep_using_cpu_clears_both() {
+        use egui_kittest::kittest::Queryable as _;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).build_eframe(|cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+            app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+            queue_fallback_notice(&mut app, "test fault");
+            app
+        });
+        h.run_steps(4);
+        let title = tl!("Switched to CPU rendering");
+        assert!(h.state().ui.gpu_fallback_notice.is_some());
+        assert!(h.query_by_label(title).is_some(), "window drawn while the notice is set");
+        let at = h.get_by_role_and_label(egui::accesskit::Role::Button, tl!("Keep Using CPU")).rect().center();
+        h.event(egui::Event::PointerMoved(at));
+        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+        h.run();
+        assert!(h.state().ui.gpu_fallback_notice.is_none(), "Keep Using CPU clears the notice");
+        assert!(h.query_by_label(title).is_none(), "window gone with the notice");
+    }
 }
