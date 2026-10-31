@@ -107,25 +107,6 @@ pub(super) fn choice_label(v: &str) -> String {
     }
 }
 
-/// An editable `#rrggbb` field beside a colour swatch (#668): typing a valid value sets the
-/// colour; while it's being typed a partial value is kept, and it shows the colour otherwise.
-pub(super) fn hex_field(ui: &mut egui::Ui, key: &str, rgb: &mut [u8; 3]) {
-    let id = egui::Id::unique(("pref-hex", key));
-    let shown = format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]);
-    let mut text = ui.data(|d| d.get_temp::<String>(id)).unwrap_or_else(|| shown.clone());
-    let r = crate::widgets::text_field_ex(ui, id, &mut text, "", 72.0, true, Some(7)).accessible_name(tl!("Color"));
-    if r.changed()
-        && let Some(c) = prefs::parse_hex(&text)
-    {
-        *rgb = c;
-    }
-    if r.has_focus() {
-        ui.data_mut(|d| d.insert_temp(id, text));
-    } else {
-        ui.data_mut(|d| d.remove::<String>(id));
-    }
-}
-
 pub(super) fn color_of(s: &str) -> Color32 {
     prefs::parse_hex(s).map_or(Color32::GRAY, |c| Color32::from_rgb(c[0], c[1], c[2]))
 }

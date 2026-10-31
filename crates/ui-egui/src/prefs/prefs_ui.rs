@@ -13,8 +13,8 @@ use egui::{Color32, RichText, Sense, vec2};
 use photocraft_doc::DocId;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
 #[cfg(test)]
-use photocraft_engine::prefs::Theme;
-use photocraft_engine::prefs::{self, AppearanceMode, DarkTheme, LightTheme, SECTIONS, Theme as SavedTheme};
+use photocraft_engine::prefs::{DarkTheme, LightTheme, Theme};
+use photocraft_engine::prefs::{self, AppearanceMode, SECTIONS};
 use photocraft_engine::snap::{SnapLine, SnapOptions, SnapTargets};
 use serde_json::{Map, Value, json};
 
@@ -80,7 +80,7 @@ pub use appearance::SuiteRt;
 pub(crate) use appearance::{appearance_context_menu, cycle_appearance, pick_theme, step_brightness, sync_appearance};
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
-use appearance::{display_scale, favorite_theme_groups, selected_theme};
+use appearance::favorite_theme_groups;
 pub use dialogs::{
     PREFERENCES_SIZE, apply, confirm, invoke, is_preferences, open_mismatch, open_preferences, open_shortcuts, owns, preferences_changed, width,
 };
@@ -88,7 +88,7 @@ pub use dialogs::{
 use dialogs::{preference_values, presets_io_body};
 pub use fields::body;
 #[cfg(test)]
-use fields::{choice_label, export_field_visible, field_visible, hex_field, humanize, tools_field_visible};
+use fields::{choice_label, export_field_visible, field_visible, humanize, tools_field_visible};
 #[cfg(test)]
 use graphics::rendering_mode_value;
 use save::SaveRetry;

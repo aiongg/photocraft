@@ -375,7 +375,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                         cur.as_deref().map(crate::shortcuts::pretty).unwrap_or_default()
                     };
                     let changed = overrides.contains_key(id) || alt_overrides.contains_key(id);
-                    let r = ui.add(Button::new(tl!(&text)).variant(ButtonVariant::Secondary).size(ControlSize::Sm).min_width(120.0));
+                    let cell = Button::new(tl!(&text)).variant(ButtonVariant::Secondary).size(ControlSize::Sm).min_width(120.0);
+                    let r = if changed { accent_text(ui, |ui| ui.add(cell)) } else { ui.add(cell) };
                     // An unassigned shortcut shows no text: name it by the command it binds.
                     let r = if text.is_empty() { r.labelled_by(name_row.id) } else { r };
                     if r.clicked() {
@@ -717,4 +718,16 @@ fn save_text(app: &mut PhotocraftApp, suggested: &str, text: String) -> Result<V
 /// A command button of the Keyboard Shortcuts tab.
 fn button(label: &str) -> Button {
     Button::new(label).variant(ButtonVariant::Secondary).size(ControlSize::Sm)
+}
+
+/// Draws `add_contents` with secondary buttons whose label is the accent text colour: a changed
+/// shortcut stands out from the defaults.
+fn accent_text<R>(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let accent = craft_ui::theme::current(ui.ctx()).color.accent.text;
+    let pins = ["rest", "hover", "pressed", "disabled"]
+        .into_iter()
+        .filter_map(|state| craft_theme::ComponentField::from_path(&format!("button.secondary.text.{state}")))
+        .map(|field| (field, accent))
+        .collect::<craft_theme::Pins>();
+    craft_ui::theme::scope(ui, |o| o.colors = pins, add_contents)
 }
