@@ -240,7 +240,7 @@ fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSes
     lbl(ui, tl!("Interpolation:"));
     let mut interp = t.interpolation.clone();
     let opts = [("bicubic".to_string(), tl!("Bicubic")), ("bilinear".to_string(), tl!("Bilinear")), ("nearest".to_string(), tl!("Nearest Neighbor"))];
-    if crate::widgets::dropdown(ui, "transform-interp", tl!("Interpolation"), &mut interp, &opts, 130.0)
+    if craft_ui::controls::Select::new("transform-interp", tl!("Interpolation"), &mut interp).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
         && let Some(s) = app.ui.transform.as_mut()
     {
         s.interpolation = interp;
@@ -374,7 +374,7 @@ fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
     lbl(ui, tl!("Warp:"));
     let mut style = w.style;
     let opts: Vec<(WarpStyle, &str)> = WarpStyle::all().filter(|s| !(on_type && *s == WarpStyle::Custom)).map(|s| (s, s.label())).collect();
-    if crate::widgets::dropdown(ui, "warp-style", tl!("Warp"), &mut style, &opts, 120.0)
+    if craft_ui::controls::Select::new("warp-style", tl!("Warp"), &mut style).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
         && let Some(t) = app.ui.transform.as_mut()
     {
         let b = t.rect;
@@ -388,7 +388,7 @@ fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
     // Orientation and the bend fields are always there, and only act on a preset style.
     let preset = w.style.is_preset();
     ui.add_enabled_ui(preset, |ui| {
-        let orient = crate::icons::button(ui, "arrow-left-right", 26.0, w.vertical, tl!("Vertical"));
+        let orient = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Vertical")).size(craft_ui::controls::ControlSize::Md).selected(w.vertical));
         orient.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, preset, "Change warp orientation"));
         if orient.clicked()
             && let Some(Some(cur)) = app.ui.transform.as_mut().map(|t| t.warp.as_mut())
@@ -446,7 +446,7 @@ fn warp_mesh_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
         ("4".to_string(), tl!("4 x 4")),
         ("5".to_string(), tl!("5 x 5")),
     ];
-    if crate::widgets::dropdown(ui, "warp-grid", tl!("Grid"), &mut grid, &opts, 92.0)
+    if craft_ui::controls::Select::new("warp-grid", tl!("Grid"), &mut grid).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
         && let Some(n) = match grid.as_str() {
             "default" => Some(1),
             "3" => Some(3),
@@ -542,21 +542,21 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
     } else {
         crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
     };
-    let commit_btn = crate::icons::button(ui, "check", 26.0, false, &commit_tip);
+    let commit_btn = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Check, &commit_tip).size(craft_ui::controls::ControlSize::Md));
     let label = "Commit transform";
     commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
     if commit_btn.clicked() {
         commit(app);
     }
     let cancel_tip = if warping { tl!("Cancel warp (Esc)") } else { tl!("Cancel transform (Esc)") };
-    let cancel_btn = crate::icons::button(ui, "ban", 26.0, false, cancel_tip);
+    let cancel_btn = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Ban, cancel_tip).size(craft_ui::controls::ControlSize::Md));
     let label = "Cancel transform";
     cancel_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
     if cancel_btn.clicked() {
         cancel(app);
     }
     if warping {
-        let reset = crate::icons::button(ui, "undo-2", 26.0, false, tl!("Reset"));
+        let reset = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Undo, tl!("Reset")).size(craft_ui::controls::ControlSize::Md));
         reset.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Reset warp"));
         if reset.clicked() {
             reset_warp(app);
@@ -566,7 +566,7 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
         return;
     }
     crate::widgets::vline(ui, 22.0);
-    let mode = crate::icons::button(ui, "grid-3x3", 26.0, warping, tl!("Switch between free transform and warp modes"));
+    let mode = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Grid, tl!("Switch between free transform and warp modes")).size(craft_ui::controls::ControlSize::Md).selected(warping));
     mode.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Switch between free transform and warp modes"));
     if mode.clicked() {
         if warping {
