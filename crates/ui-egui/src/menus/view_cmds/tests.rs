@@ -245,10 +245,9 @@ fn batch_menu_requires_a_recorded_action() {
 fn engine_commands_open_their_dialogs() {
     let (mut app, ctx) = app_with(2);
     let d = menu(&mut app, &ctx, "file.automate.fitImage", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    let dlg = app.ui.dialog_mut(d).unwrap();
-    assert_eq!(dlg.fields["width"], 110);
-    dlg.fields.insert("width".into(), json!(55));
-    dlg.fields.insert("height".into(), json!(1000));
+    assert_eq!(app.ui.dialog_fields(d).unwrap()["width"], 110);
+    crate::dialogs::hosted::set_field(&mut app, d, "width", json!(55)).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, d, "height", json!(1000)).unwrap();
     crate::dialogs::confirm(&mut app, d).unwrap();
     assert_eq!(app.session.active().unwrap().doc.size.width, 55);
     let d = menu(&mut app, &ctx, "file.fileInfo", json!({})).unwrap()["dialog"].as_u64().unwrap();
@@ -283,7 +282,7 @@ fn apply_image_and_calculations_open_dialogs_without_editing() {
         let (mut app, ctx) = app_with(1);
         let revision = app.session.active().unwrap().revision;
         let dialog = menu(&mut app, &ctx, id, json!({})).unwrap()["dialog"].as_u64().unwrap_or_else(|| panic!("{id} did not open a dialog"));
-        let fields = &app.ui.dialog_mut(dialog).unwrap().fields;
+        let fields = app.ui.dialog_fields(dialog).unwrap();
         assert_eq!(fields["__command"], id, "{id} opened the wrong dialog");
         assert_eq!(app.session.active().unwrap().revision, revision, "{id} edited before confirmation");
     }
@@ -300,7 +299,7 @@ fn apply_image_dialog_offers_source_layer_scale_and_offset() {
     let background = app.session.active().unwrap().doc.walk()[0].2.name.clone();
     let open = |app: &mut PhotocraftApp| menu(app, &ctx, "image.applyImage", json!({})).unwrap()["dialog"].as_u64().unwrap();
     let d = open(&mut app);
-    let fields = &app.ui.dialog_mut(d).unwrap().fields;
+    let fields = app.ui.dialog_fields(d).unwrap();
     assert_eq!(fields["sourceLayer"], "merged");
     assert_eq!(fields["scale"], 1.0);
     assert_eq!(fields["offset"], 0);
@@ -309,7 +308,7 @@ fn apply_image_dialog_offers_source_layer_scale_and_offset() {
     assert_eq!(fields["__labels"]["Skin High"], "Skin High");
     // The frequency separation recipe: a layer subtracted from itself at Scale 2, Offset 128 is mid grey.
     for (k, v) in [("sourceLayer", json!("Skin High")), ("blending", json!("subtract")), ("scale", json!(2.0)), ("offset", json!(128))] {
-        app.ui.dialog_mut(d).unwrap().fields.insert(k.into(), v);
+        crate::dialogs::hosted::set_field(&mut app, d, k, v).unwrap();
     }
     crate::dialogs::confirm(&mut app, d).unwrap();
     let st = app.session.active().unwrap();
@@ -319,7 +318,7 @@ fn apply_image_dialog_offers_source_layer_scale_and_offset() {
     // The chosen layer is the source, not the merged image.
     let d = open(&mut app);
     for (k, v) in [("sourceLayer", json!(background)), ("blending", json!("subtract")), ("scale", json!(2.0)), ("offset", json!(128))] {
-        app.ui.dialog_mut(d).unwrap().fields.insert(k.into(), v);
+        crate::dialogs::hosted::set_field(&mut app, d, k, v).unwrap();
     }
     crate::dialogs::confirm(&mut app, d).unwrap();
     let st = app.session.active().unwrap();
@@ -375,17 +374,17 @@ fn lookup_export_dialog_uses_the_current_adjustment_selection() {
     let current = app.session.active().unwrap().active_layer.unwrap();
     let opened = front(&mut app, &ctx, "file.export.colorLookupTables", &json!({})).unwrap().unwrap();
     let id = opened["dialog"].as_u64().unwrap();
-    let dialog = &app.ui.dialogs.last().unwrap().fields;
+    let dialog = app.ui.dialog_fields(id).unwrap();
     assert_eq!(dialog["scope"], "selected");
     assert_eq!(dialog["size"], 33);
     assert_eq!(dialog["__choices"]["scope"], json!(["all", "selected"]));
-    app.ui.close_dialog(id);
+    crate::dialogs::cancel(&mut app, id).unwrap();
 
     app.run("layer.new.layer", json!({"name": "Unrelated pixels"})).unwrap();
     let opened = front(&mut app, &ctx, "file.export.colorLookupTables", &json!({})).unwrap().unwrap();
     let id = opened["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialogs.last().unwrap().fields["scope"], "all");
-    app.ui.close_dialog(id);
+    assert_eq!(app.ui.dialog_fields(id).unwrap()["scope"], "all");
+    crate::dialogs::cancel(&mut app, id).unwrap();
 
     app.run("layer.select", json!({"layer": current})).unwrap();
     let direct = app.run("file.export.colorLookupTables", json!({"size": 3, "scope": "selected"})).unwrap();
@@ -454,17 +453,17 @@ fn save_selection_opens_its_dialog_and_saves_on_confirm() {
     let dialog = menu(&mut app, &ctx, "select.saveSelection", json!({})).unwrap()["dialog"].as_u64().expect("Save Selection opens a dialog");
     assert_eq!(app.session.active().unwrap().revision, revision, "saved before confirmation");
     assert!(app.session.active().unwrap().doc.channels.is_empty());
-    let fields = &mut app.ui.dialog_mut(dialog).unwrap().fields;
+    let fields = app.ui.dialog_fields(dialog).unwrap();
     assert_eq!(fields["__command"], "select.saveSelection");
     assert_eq!(fields["channel"], "new");
     assert_eq!(fields["__choices"]["operation"], json!(["new", "replace", "add", "subtract", "intersect"]));
-    fields.insert("name".into(), json!("Keep"));
+    crate::dialogs::hosted::set_field(&mut app, dialog, "name", json!("Keep")).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     let names: Vec<_> = app.session.active().unwrap().doc.channels.iter().map(|c| c.name.clone()).collect();
     assert_eq!(names, ["Keep"]);
     // A second save lists the new channel as a destination.
     let dialog = menu(&mut app, &ctx, "select.saveSelection", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialog_mut(dialog).unwrap().fields["__choices"]["channel"], json!(["new", "Keep"]));
+    assert_eq!(app.ui.dialog_fields(dialog).unwrap()["__choices"]["channel"], json!(["new", "Keep"]));
 }
 
 #[test]
@@ -476,7 +475,7 @@ fn load_selection_opens_its_dialog_and_loads_on_confirm() {
     app.run("select.deselect", json!({})).unwrap();
     let dialog = menu(&mut app, &ctx, "select.loadSelection", json!({})).unwrap()["dialog"].as_u64().expect("Load Selection opens a dialog");
     assert!(app.session.active().unwrap().doc.selection.is_none(), "loaded before confirmation");
-    let fields = &app.ui.dialog_mut(dialog).unwrap().fields;
+    let fields = app.ui.dialog_fields(dialog).unwrap();
     assert_eq!(fields["__command"], "select.loadSelection");
     assert_eq!(fields["channel"], "Keep");
     assert_eq!(fields["invert"], false);
@@ -493,7 +492,7 @@ fn load_selection_opens_its_dialog_and_loads_on_confirm() {
 fn load_selection_without_alpha_channels_offers_the_composite() {
     let (mut app, ctx) = app_with(1);
     let dialog = menu(&mut app, &ctx, "select.loadSelection", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialog_mut(dialog).unwrap().fields["channel"], "RGB");
+    assert_eq!(app.ui.dialog_fields(dialog).unwrap()["channel"], "RGB");
     crate::dialogs::confirm(&mut app, dialog).unwrap();
 }
 
@@ -509,10 +508,10 @@ fn video_menu_commands_open_pickers_and_dialogs() {
     }
 
     let interpret = menu(&mut app, &ctx, "layer.videoLayers.interpretFootage", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    let fields = &app.ui.dialog_mut(interpret).unwrap().fields;
+    let fields = app.ui.dialog_fields(interpret).unwrap();
     assert_eq!(fields["__command"], "layer.videoLayers.interpretFootage");
     assert_eq!(fields["fps"], 30.0);
-    app.ui.close_dialog(interpret);
+    crate::dialogs::cancel(&mut app, interpret).unwrap();
 }
 
 /// One frame of the shortcut handler with a plain Esc press.

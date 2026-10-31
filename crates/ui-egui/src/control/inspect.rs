@@ -25,6 +25,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let screen = ctx.content_rect();
     let mut dialogs: Vec<Value> =
         app.ui.dialogs.iter().map(|d| json!({"id": d.id, "kind": d.kind, "title": crate::dialogs::title(d), "fields": d.fields})).collect();
+    dialogs.extend(app.ui.hosted.iter().filter_map(|h| Some(json!({"id": h.id, "kind": "Command", "title": h.title, "fields": app.ui.dialog_fields(h.id)?}))));
     if let Some((kind, fields)) = &app.ui.shell.dialog {
         dialogs.push(json!({"id": SHELL_DIALOG, "kind": kind, "title": crate::workspace_ui::title(kind), "fields": fields}));
     }

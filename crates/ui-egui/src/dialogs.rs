@@ -697,6 +697,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
     app.ui.host.show(ctx);
+    hosted::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
     for id in app.ui.host.stack().ids().filter(|id| !legacy.contains(id)) {
         if let Some(rect) = ctx.memory(|m| m.area_rect(id)) {
@@ -740,15 +741,17 @@ fn display_title(d: &Dialog) -> String {
         return crate::smart_filter_dialog::title(&d.fields);
     }
     match d.kind {
-        DialogKind::Command => {
-            let label = d.fields.get("__label").and_then(Value::as_str).unwrap_or("Command");
-            // Dialog labels are catalogued with their "…" ("Export As…"); some commands omit it.
-            let with_dots = format!("{}…", label.trim_end_matches('…'));
-            let shown = if crate::i18n::has(crate::i18n::current(), label) { tl!(label) } else { tl!(&with_dots) };
-            shown.trim_end_matches('…').to_string()
-        }
+        DialogKind::Command => display_label(d.fields.get("__label").and_then(Value::as_str).unwrap_or("Command")),
         _ => tl!(&title(d)).to_string(),
     }
+}
+
+/// A command dialog's title from its label, in the UI language.
+pub(crate) fn display_label(label: &str) -> String {
+    // Dialog labels are catalogued with their "…" ("Export As…"); some commands omit it.
+    let with_dots = format!("{}…", label.trim_end_matches('…'));
+    let shown = if crate::i18n::has(crate::i18n::current(), label) { tl!(label) } else { tl!(&with_dots) };
+    shown.trim_end_matches('…').to_string()
 }
 
 pub fn title(d: &Dialog) -> String {
@@ -962,6 +965,9 @@ fn confirm_command_more(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, Str
 }
 
 pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
+    if app.ui.hosted(id).is_some() {
+        return hosted::confirm(app, id);
+    }
     confirm_preflight(app, id)?;
     let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
     match d.kind {

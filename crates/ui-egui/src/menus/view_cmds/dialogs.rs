@@ -61,15 +61,89 @@ pub(super) fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: 
     let mut f = Map::new();
     f.insert("__command".into(), json!(command));
     f.insert("__label".into(), json!(label));
-    f.insert("__form".into(), json!(true));
     f.insert("__choices".into(), choices);
     if let Value::Object(m) = fields {
         f.extend(m);
     }
+    if !stays_legacy(command, &f) {
+        return open_hosted(app, command, label, f);
+    }
+    f.insert("__form".into(), json!(true));
     // Snapshot user-facing params at open so Alt+Reset can restore them.
     let orig: Map<String, Value> = f.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
     f.insert("__formOrig".into(), Value::Object(orig));
     app.ui.open_dialog(DialogKind::Command, f)
+}
+
+/// The forms the library's `CommandForm` cannot draw yet: a folder field's Browse… button, Batch's
+/// file naming and optional quality, File Info's Camera Data section.
+fn stays_legacy(command: &str, f: &Map<String, Value>) -> bool {
+    command == "file.automate.batch" || f.contains_key("__camera") || f.keys().any(|k| crate::dialogs::is_folder_field(k))
+}
+
+/// Opens `fields` as a `CommandForm`: a row per scalar field, in `form_keys` order. The labels are
+/// PhotoCraft's: `__labels` verbatim for data, `label_of` for everything else.
+fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<String, Value>) -> u64 {
+    use craft::ui::dialog::{DialogFields, FieldValue, Param, ParamKind, Width};
+    let choices = f.get("__choices").cloned().unwrap_or(Value::Null);
+    let labels = f.get("__labels").cloned().unwrap_or(Value::Null);
+    let label_for = |k: &str| labels.get(k).and_then(Value::as_str).map_or_else(|| label_of(k), str::to_string);
+    let (mut params, mut values, mut extra) = (Vec::new(), DialogFields::new(), Map::new());
+    for key in form_keys(&f) {
+        let kind = match &f[&key] {
+            Value::Bool(b) => Some((ParamKind::Bool { default: *b }, FieldValue::Bool(*b))),
+            Value::String(s) => Some(match choices.get(&key).and_then(Value::as_array) {
+                Some(opts) => {
+                    let options = opts.iter().filter_map(Value::as_str).map(|o| (o.to_string(), label_for(o))).collect();
+                    (ParamKind::Choice { options, default: Some(s.clone()) }, FieldValue::Text(s.clone()))
+                }
+                None => (ParamKind::Text { default: s.clone() }, FieldValue::Text(s.clone())),
+            }),
+            Value::Number(n) => Some(match n.as_i64() {
+                Some(i) => (ParamKind::Int { min: None, max: None, default: i }, FieldValue::Int(i)),
+                None => {
+                    let x = n.as_f64().unwrap_or(0.0);
+                    let (min, max, scale) = float_bounds(&key, x);
+                    (ParamKind::Range { min, max, default: x, scale }, FieldValue::Number(x))
+                }
+            }),
+            Value::Array(_) | Value::Object(_) | Value::Null => None,
+        };
+        match kind {
+            Some((kind, value)) => {
+                params.push(Param::new(key.clone(), label_for(&key), kind));
+                values.set(key, value);
+            }
+            None => {
+                extra.insert(key.clone(), f[&key].clone());
+            }
+        }
+    }
+    let private: Map<String, Value> = f.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
+    // A dialog of a few short fields (Fit Image) is narrower (#4673).
+    let width = if f.contains_key("__compact") { Width::Compact } else { Width::Standard };
+    crate::dialogs::hosted::open_form(app, command, label, params, values, extra, private, width)
+}
+
+/// The slider range of a fractional form field: the engine's documented range for the field,
+/// else a wide one. `CommandForm` has no plain number field, so these rows are sliders.
+fn float_bounds(key: &str, value: f64) -> (f64, f64, craft::ui::controls::SliderScale) {
+    use craft::ui::controls::SliderScale::{Linear, Log};
+    match key {
+        "fps" => (0.01, 1000.0, Log),
+        "radius" => (1.0, 500.0, Linear),
+        "strength" => (0.1, 4.0, Linear),
+        "gamma" => (0.1, 2.0, Linear),
+        "exposure" => (-5.0, 5.0, Linear),
+        "detail" => (-100.0, 300.0, Linear),
+        "saturation" => (-100.0, 100.0, Linear),
+        "opacity" => (0.0, 100.0, Linear),
+        "scale" => (1.0, 2.0, Linear),
+        _ => {
+            let reach = 1000.0 * value.abs().max(1.0);
+            (-reach, reach, Linear)
+        }
+    }
 }
 
 /// The Batch and Image Processor dialogs' "Include All Subfolders" checkbox reads as Photoshop's.

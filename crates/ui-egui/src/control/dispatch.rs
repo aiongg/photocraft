@@ -976,7 +976,9 @@ fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: 
 fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     let (Some(id), Some(field)) = (u64_param(p, "dialog"), str_param(p, "field")) else { return err("need `dialog` and `field`") };
     let value = p.get("value").cloned().unwrap_or(Value::Null);
-    let hosted = app.ui.hosted(id).is_some();
+    if app.ui.hosted(id).is_some() {
+        return wrap(crate::dialogs::hosted::set_field(app, id, field, value).map(|()| Value::Null));
+    }
     match app.ui.dialog_mut(id) {
         // A continuation belongs to the dialog that paused it, even when another
         // action has a valid token. Replacing it would resume or cancel that action.
@@ -987,7 +989,6 @@ fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
             d.fields.insert(field.to_string(), value);
             ok(Value::Null)
         }
-        None if hosted => err("a hosted dialog's fields are set by its family"),
         None => err(format!("no dialog {id}")),
     }
 }

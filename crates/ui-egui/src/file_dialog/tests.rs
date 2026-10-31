@@ -248,12 +248,12 @@ fn menu_open_exr_parts_asks_for_a_file_then_shows_the_parts_dialog() {
     answer(&open, Some(FileDialogAnswer::Paths(vec![path.clone()])));
     app.poll_file_dialog(&ctx, None);
     assert!(!app.ui.status_error, "{}", app.ui.status);
-    let dialog = app.ui.dialogs.iter().find(|d| d.fields.get("__command") == Some(&json!("file.openExrParts"))).expect("the parts dialog is open");
-    assert_eq!(dialog.fields["path"], json!(path));
-    let parts: Vec<&String> = dialog.fields.keys().filter(|k| k.starts_with("part/")).collect();
-    assert_eq!(parts.len(), 1, "{:?}", dialog.fields);
-    assert_eq!(dialog.fields[parts[0].as_str()], json!(true), "the first colour part is preselected");
-    let id = dialog.id;
+    let id = app.ui.hosted.iter().find(|h| h.key == "file.openExrParts").expect("the parts dialog is open").id;
+    let fields = app.ui.dialog_fields(id).unwrap();
+    assert_eq!(fields["path"], json!(path));
+    let parts: Vec<&String> = fields.keys().filter(|k| k.starts_with("part/")).collect();
+    assert_eq!(parts.len(), 1, "{fields:?}");
+    assert_eq!(fields[parts[0].as_str()], json!(true), "the first colour part is preselected");
     let documents = app.session.documents().len();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.documents().len(), documents + 1);

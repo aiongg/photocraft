@@ -432,9 +432,11 @@ fn fit_image_is_as_narrow_as_its_content() {
     let ctx = h.ctx.clone();
     let d = crate::menus::invoke(h.state_mut(), &ctx, "file.automate.fitImage", json!({})).unwrap()["dialog"].as_u64().unwrap();
     h.run_steps(4);
-    let window = h.ctx.memory(|m| m.area_rect(crate::dialogs::area_id(d))).expect("the Fit Image window");
+    assert!(h.state().ui.hosted(d).is_some());
+    let window = h.ctx.memory(|m| m.area_rect(craft::ui::dialog::dialog_id("file.automate.fitImage"))).expect("the Fit Image window");
     assert!(window.width() < 300.0, "Fit Image is {} points wide", window.width());
-    for label in ["Fit Image", "Width", "Height", "OK", "Cancel"] {
+    // The library form puts a colon after a row's label.
+    for label in ["Fit Image", "Width:", "Height:", "OK", "Cancel"] {
         // A caption and the field it names share the label; either sits inside the window.
         let node = h
             .query_all_by_label(label)

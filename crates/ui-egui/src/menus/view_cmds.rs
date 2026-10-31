@@ -209,12 +209,13 @@ mod form_reset_tests {
     #[test]
     fn alt_reset_restores_form_orig() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let id = form(&mut app, "test.form", "Test", json!({"radius": 5.0, "on": true}), json!({}));
+        // A folder field keeps the form on the legacy body (the library form has no Browse… button).
+        let id = form(&mut app, "test.form", "Test", json!({"dir": "/a", "on": true}), json!({}));
         let f = &mut app.ui.dialog_mut(id).unwrap().fields;
-        f.insert("radius".into(), json!(99.0));
+        f.insert("dir".into(), json!("/b"));
         f.insert("on".into(), json!(false));
         reset_form(f);
-        assert_eq!(f["radius"], json!(5.0));
+        assert_eq!(f["dir"], json!("/a"));
         assert_eq!(f["on"], json!(true));
         assert!(f.contains_key("__formOrig"));
     }
