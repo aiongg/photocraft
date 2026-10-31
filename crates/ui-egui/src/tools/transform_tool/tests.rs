@@ -183,7 +183,12 @@ fn warp_bar_buttons_follow_the_fields_on_a_wide_bar() {
     h.run_steps(4);
     assert!(h.state().ui.transform.as_ref().unwrap().warp.is_some());
     let commit = h.get_by_label("Commit transform").rect();
-    assert!(commit.right() < width / 2.0, "commit sits next to the fields, not at the far right: {commit:?}");
+    // Next to the fields, not at the far right: a still wider bar leaves it where it is.
+    assert!(commit.right() < width * 0.9, "commit sits next to the fields, not at the far right: {commit:?}");
+    h.set_size(vec2(width + 800.0, 48.0));
+    h.run_steps(4);
+    let wider = h.get_by_label("Commit transform").rect();
+    assert!((wider.right() - commit.right()).abs() < 1.0, "commit follows the fields, not the bar's edge: {commit:?} then {wider:?}");
     let reset = h.get_by_label("Reset warp").rect();
     assert!(reset.right() < commit.left() + 1.0, "reset is left of commit");
     h.get_by_label("Reset warp").click();
@@ -302,6 +307,14 @@ fn bar_harness(setup: impl FnOnce(&mut PhotocraftApp)) -> egui_kittest::Harness<
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    // Wide enough for every field at the active Size: the end of the last one, read from the layout.
+    h.set_size(vec2(3000.0, 360.0));
+    h.run_steps(6);
+    let end = {
+        use egui_kittest::kittest::Queryable;
+        h.get_by_label("Interpolation").rect().right()
+    };
+    h.set_size(vec2(end + 16.0, 360.0));
     h.run_steps(6);
     h
 }
