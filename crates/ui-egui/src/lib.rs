@@ -175,6 +175,7 @@ pub use dialogs::wide_angle_ui;
 use input::alt_grab;
 use input::blend_keys;
 use input::control_click;
+use input::dialog_keys;
 pub use input::hold_keys;
 use input::layout_keys;
 pub use input::nudge_bundle;

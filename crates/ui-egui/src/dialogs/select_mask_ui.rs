@@ -1374,7 +1374,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) {
 
 /// The workspace's keys (unless a text field has the keyboard): tools, brush size, views, undo.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    use egui::{Key, Modifiers};
+    use egui::Key;
     let Some(w) = app.distort.select_mask.as_mut() else { return };
     match craft_ui::dialog::take_step(ctx) {
         Some(craft_ui::dialog::Step::Redo) => {
@@ -1391,56 +1391,78 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         w.hide_view = false;
         return;
     }
-    let pressed = |k: Key, m: Modifiers| ctx.input_mut(|i| i.consume_key(m, k));
-    if pressed(Key::W, Modifiers::SHIFT) {
-        w.pick(if w.w_tool == SmTool::Quick { SmTool::Object } else { SmTool::Quick });
-    }
-    if pressed(Key::L, Modifiers::SHIFT) {
-        w.pick(if w.l_tool == SmTool::Lasso { SmTool::PolygonalLasso } else { SmTool::Lasso });
-    }
-    for (k, t) in
-        [(Key::W, w.w_tool), (Key::R, SmTool::RefineEdge), (Key::B, SmTool::Brush), (Key::L, w.l_tool), (Key::H, SmTool::Hand), (Key::Z, SmTool::Zoom)]
-    {
-        if pressed(k, Modifiers::NONE) {
-            w.pick(t);
-        }
-    }
-    if pressed(Key::OpenBracket, Modifiers::NONE) {
-        let s = w.size();
-        w.set_size((s * 0.9).min(s - 1.0));
-    }
-    if pressed(Key::CloseBracket, Modifiers::NONE) {
-        let s = w.size();
-        w.set_size((s * 1.1).max(s + 1.0));
-    }
-    if (pressed(Key::Backspace, Modifiers::NONE) || pressed(Key::Delete, Modifiers::NONE))
-        && let Some((_, pts)) = w.poly.as_mut()
-    {
-        pts.pop();
-        if pts.is_empty() {
-            w.poly = None;
-        }
-    }
-    // The views: their letters, F cycles, J Show Edge, P Show Original; holding X shows the image.
     let before = w.opts.clone();
-    if pressed(Key::F, Modifiers::NONE) {
-        w.opts.view = w.opts.view.next();
-    }
-    for m in Mode::ALL {
-        if pressed(m.key(), Modifiers::NONE) {
-            w.opts.view = m;
+    for command in dialog_keys().pressed(ctx) {
+        match command.as_str() {
+            "swapW" => w.pick(if w.w_tool == SmTool::Quick { SmTool::Object } else { SmTool::Quick }),
+            "swapL" => w.pick(if w.l_tool == SmTool::Lasso { SmTool::PolygonalLasso } else { SmTool::Lasso }),
+            "w" => w.pick(w.w_tool),
+            "refine" => w.pick(SmTool::RefineEdge),
+            "brush" => w.pick(SmTool::Brush),
+            "l" => w.pick(w.l_tool),
+            "hand" => w.pick(SmTool::Hand),
+            "zoom" => w.pick(SmTool::Zoom),
+            "smaller" => {
+                let s = w.size();
+                w.set_size((s * 0.9).min(s - 1.0));
+            }
+            "bigger" => {
+                let s = w.size();
+                w.set_size((s * 1.1).max(s + 1.0));
+            }
+            "back" | "delete" => {
+                if let Some((_, pts)) = w.poly.as_mut() {
+                    pts.pop();
+                    if pts.is_empty() {
+                        w.poly = None;
+                    }
+                }
+            }
+            // The views: their letters, F cycles, J Show Edge, P Show Original; holding X shows the image.
+            "nextView" => w.opts.view = w.opts.view.next(),
+            "edge" => w.opts.show_edge = !w.opts.show_edge,
+            "original" => w.opts.show_original = !w.opts.show_original,
+            view => {
+                if let Some(m) = Mode::ALL.into_iter().find(|m| view.strip_prefix("view.") == Some(m.id())) {
+                    w.opts.view = m;
+                }
+            }
         }
-    }
-    if pressed(Key::J, Modifiers::NONE) {
-        w.opts.show_edge = !w.opts.show_edge;
-    }
-    if pressed(Key::P, Modifiers::NONE) {
-        w.opts.show_original = !w.opts.show_original;
     }
     if w.opts != before {
         w.stale();
     }
     w.hide_view = ctx.input(|i| i.key_down(Key::X) && !i.modifiers.command && !i.modifiers.alt && !i.modifiers.ctrl);
+}
+
+/// The dialog's fixed keys. W, L and the view letters are listed in the order the dialog resolves them.
+fn dialog_keys() -> &'static crate::dialog_keys::DialogKeys {
+    static KEYS: std::sync::LazyLock<crate::dialog_keys::DialogKeys> = std::sync::LazyLock::new(|| {
+        let mut rows: Vec<(&str, String)> = vec![
+            ("swapW", "Shift+W".into()),
+            ("swapL", "Shift+L".into()),
+            ("w", "W".into()),
+            ("refine", "R".into()),
+            ("brush", "B".into()),
+            ("l", "L".into()),
+            ("hand", "H".into()),
+            ("zoom", "Z".into()),
+            ("smaller", "[".into()),
+            ("bigger", "]".into()),
+            ("back", "Backspace".into()),
+            ("delete", "Delete".into()),
+            ("nextView", "F".into()),
+            ("edge", "J".into()),
+            ("original", "P".into()),
+        ];
+        // The view letters; one that is also a tool letter above is left to the tool.
+        let ids: Vec<String> = Mode::ALL.iter().map(|m| format!("view.{}", m.id())).collect();
+        for (m, id) in Mode::ALL.into_iter().zip(&ids) {
+            rows.push((id.as_str(), crate::dialog_keys::key_text(m.key())));
+        }
+        crate::dialog_keys::DialogKeys::new("Select and Mask", &rows)
+    });
+    &KEYS
 }
 
 /// A view: screen px per document px and the document point at the centre of `area`.

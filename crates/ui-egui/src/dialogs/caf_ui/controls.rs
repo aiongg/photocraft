@@ -149,30 +149,40 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) {
 }
 
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let cmd_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
-    if ctx.input_mut(|i| i.consume_key(cmd_shift, egui::Key::Z)) {
-        redo(app);
-        return;
-    }
-    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z)) {
-        undo(app);
-        return;
+    static KEYS: std::sync::LazyLock<crate::dialog_keys::DialogKeys> = std::sync::LazyLock::new(|| {
+        crate::dialog_keys::DialogKeys::new(
+            "Content-Aware Fill",
+            &[
+                ("overlay", "Cmd+H".into()),
+                ("smaller", "[".into()),
+                ("bigger", "]".into()),
+                ("brush", "B".into()),
+                ("lasso", "L".into()),
+                ("hand", "H".into()),
+                ("zoom", "Z".into()),
+            ],
+        )
+    });
+    match craft_ui::dialog::take_step(ctx) {
+        Some(craft_ui::dialog::Step::Redo) => return redo(app),
+        Some(craft_ui::dialog::Step::Undo) => return undo(app),
+        None => {}
     }
     let Some(w) = app.distort.caf.as_mut() else { return };
-    // Ctrl+H hides the overlay (Hide Extras).
-    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::H)) {
-        w.opts.show_overlay = !w.opts.show_overlay;
-        w.overlay_dirty = true;
-    }
-    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::OpenBracket)) {
-        w.brush_size = (w.brush_size * 0.9).max(1.0).round();
-    }
-    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::CloseBracket)) {
-        w.brush_size = (w.brush_size * 1.1).min(5000.0).round().max(w.brush_size + 1.0);
-    }
-    for (k, t) in [(egui::Key::B, CafTool::Brush), (egui::Key::L, CafTool::Lasso), (egui::Key::H, CafTool::Hand), (egui::Key::Z, CafTool::Zoom)] {
-        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, k)) {
-            w.tool = t;
+    for command in KEYS.pressed(ctx) {
+        match command.as_str() {
+            // Ctrl+H hides the overlay (Hide Extras).
+            "overlay" => {
+                w.opts.show_overlay = !w.opts.show_overlay;
+                w.overlay_dirty = true;
+            }
+            "smaller" => w.brush_size = (w.brush_size * 0.9).max(1.0).round(),
+            "bigger" => w.brush_size = (w.brush_size * 1.1).min(5000.0).round().max(w.brush_size + 1.0),
+            "brush" => w.tool = CafTool::Brush,
+            "lasso" => w.tool = CafTool::Lasso,
+            "hand" => w.tool = CafTool::Hand,
+            "zoom" => w.tool = CafTool::Zoom,
+            _ => {}
         }
     }
 }
