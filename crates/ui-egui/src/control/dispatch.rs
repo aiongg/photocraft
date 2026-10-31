@@ -976,6 +976,7 @@ fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: 
 fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     let (Some(id), Some(field)) = (u64_param(p, "dialog"), str_param(p, "field")) else { return err("need `dialog` and `field`") };
     let value = p.get("value").cloned().unwrap_or(Value::Null);
+    let hosted = app.ui.hosted(id).is_some();
     match app.ui.dialog_mut(id) {
         // A continuation belongs to the dialog that paused it, even when another
         // action has a valid token. Replacing it would resume or cancel that action.
@@ -986,17 +987,18 @@ fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
             d.fields.insert(field.to_string(), value);
             ok(Value::Null)
         }
+        None if hosted => err("a hosted dialog's fields are set by its family"),
         None => err(format!("no dialog {id}")),
     }
 }
 
 fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u64) -> Outcome {
     let apply = req.method == "ui.dialog.apply";
-    let command = app.ui.dialogs.iter().find(|dialog| dialog.id == id).and_then(|dialog| {
+    let command = app.ui.dialog_fields(id).and_then(|fields| {
         if apply {
-            dialog.fields.get("values").map(|values| ("prefs.set".to_string(), json!({"path": "", "value": values})))
+            fields.get("values").map(|values| ("prefs.set".to_string(), json!({"path": "", "value": values})))
         } else {
-            dialog.fields.get("__command").and_then(Value::as_str).map(|command| (command.to_string(), Value::Object(dialog.fields.clone())))
+            fields.get("__command").and_then(Value::as_str).map(|command| (command.to_string(), Value::Object(fields.clone())))
         }
     });
     if let Some((command, params)) = command

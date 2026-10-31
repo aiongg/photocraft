@@ -15,7 +15,7 @@ use std::cell::{Cell, RefCell};
 
 use crate::PhotocraftApp;
 use crate::state::{Dialog, DialogKind};
-use craft::ui::dialog::{Alert, Body, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
+use craft::ui::dialog::{Alert, Body, Dialog as HostDialog, DialogLabels, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
 
 /// A dialog body sets this field to the key of the text field whose Browse… button was clicked;
 /// [`show`] takes it out again and opens the matching file or folder dialog.
@@ -538,10 +538,18 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     app.dialog_chrome.retain(|id, _| dialogs.iter().any(|d| d.id == *id));
     // The open dialogs in the order they were opened: only the last takes input, and it is drawn
     // above the others.
-    let mut stack = DialogStack::default();
-    for d in &dialogs {
-        stack.push(dialog_id(d.id), None);
+    // They share the stack with the hosted dialogs (`ui.host`), which the host pushes itself on
+    // open; a legacy dialog that closed since the last pass leaves it here.
+    let open_ids: Vec<u64> = dialogs.iter().map(|d| d.id).collect();
+    for gone in app.ui.legacy_stacked.iter().filter(|id| !open_ids.contains(id)) {
+        app.ui.host.stack_mut().remove(dialog_id(gone));
     }
+    for d in &dialogs {
+        app.ui.host.stack_mut().push(dialog_id(d.id), None);
+    }
+    app.ui.legacy_stacked = open_ids;
+    // The frame draws against a copy: the bodies hold `app` while they run.
+    let stack = app.ui.host.stack().clone();
     let mut shown = Vec::new();
     for d in dialogs {
         let lang = if crate::prefs_ui::is_preferences(&d.fields) {
@@ -686,6 +694,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     for rect in shown {
         craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
+    }
+    // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
+    app.ui.host.show(ctx);
+    let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
+    for id in app.ui.host.stack().ids().filter(|id| !legacy.contains(id)) {
+        if let Some(rect) = ctx.memory(|m| m.area_rect(id)) {
+            craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
+        }
     }
 }
 
@@ -969,7 +985,7 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 
 /// Cancel a dialog and its dependent Layer Style picker, without applying edits.
 pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    let closed = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
+    let Some(closed) = app.ui.close_dialog(id) else { return hosted::cancel(app, id) };
     crate::actions::stopped(app, &closed.fields);
     if crate::guide_layout_ui::owns(&closed.fields) {
         app.ui.dialogs.retain(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));
@@ -1057,6 +1073,7 @@ pub(super) mod filter_preview_worker;
 pub mod gallery_ui;
 pub mod guide_layout_ui;
 pub mod history_options_ui;
+pub mod hosted;
 pub mod jpeg_options_ui;
 pub mod layer_picker;
 pub mod layer_style;

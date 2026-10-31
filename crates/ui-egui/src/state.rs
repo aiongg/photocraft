@@ -375,6 +375,15 @@ pub struct UiState {
     /// Views per open document (index-aligned with the session's documents).
     pub views: Vec<View>,
     pub dialogs: Vec<Dialog>,
+    /// The library's dialog host, drawn against the same stack as `dialogs`.
+    #[serde(skip)]
+    pub host: crate::dialogs::hosted::HostCell,
+    /// The open hosted dialogs, by automation id.
+    #[serde(skip)]
+    pub hosted: Vec<crate::dialogs::hosted::Hosted>,
+    /// The legacy dialogs the shared stack holds, so `dialogs::show` can drop the ones that closed.
+    #[serde(skip)]
+    pub legacy_stacked: Vec<u64>,
     pub windows: Vec<DocWindow>,
     pub theme: crate::theme::ThemeKind,
     pub workspace: String,
@@ -543,6 +552,9 @@ impl Default for UiState {
             panels: Panels::default(),
             views: Vec::new(),
             dialogs: Vec::new(),
+            host: Default::default(),
+            hosted: Vec::new(),
+            legacy_stacked: Vec::new(),
             windows: Vec::new(),
             theme: crate::theme::ThemeKind::ProMedium,
             workspace: "Essentials".into(),
