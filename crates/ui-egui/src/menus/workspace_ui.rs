@@ -434,7 +434,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(11.0));
                     let mut v = f.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-                    if crate::widgets::slider(ui, &mut v, range.clone(), None).changed()
+                    if crate::widgets::slider(ui, tl!(&label), &mut v, range.clone(), None).changed()
                         | crate::widgets::value_field(ui, &mut v, range, "", 60.0).accessible_name(tl!(&label)).changed()
                     {
                         f.insert(key.into(), json!(v));

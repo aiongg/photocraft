@@ -885,7 +885,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                             });
                         });
                         let mut lv = v.clamp(min, max).ln();
-                        if crate::widgets::slider(ui, &mut lv, min.ln()..=max.ln(), None).changed() {
+                        if crate::widgets::slider(ui, &label(&p.key), &mut lv, min.ln()..=max.ln(), None).changed() {
                             v = lv.exp();
                         }
                         ui.add_space(craft::ui::theme::scale::Space::S4.px());
