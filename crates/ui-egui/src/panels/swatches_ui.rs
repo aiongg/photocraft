@@ -72,10 +72,11 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     st.sizes.entry(PANEL.to_string()).or_insert(DEFAULT_SIZE);
     let max_h = (ui.available_height() - 30.0).max(60.0);
     // Flat, touching squares, as in Photoshop's Swatches panel (#5103).
-    let events = browser(ui, &mut st, PANEL, &groups, Place { canvas, max_h, new_tip: tl!("Create new swatch"), flush: true }, &mut |ui, r: Rect, gi, ii| {
-        let c = table.get(gi).and_then(|g| g.get(ii)).copied().unwrap_or(Color32::GRAY);
-        ui.painter().rect_filled(r, CornerRadius::ZERO, c);
-    });
+    let events =
+        browser(ui, &mut st, PANEL, &groups, Place { canvas, max_h, new_tip: tl!("Create new swatch"), flush: true }, &mut |painter, r: Rect, gi, ii| {
+            let c = table.get(gi).and_then(|g| g.get(ii)).copied().unwrap_or(Color32::GRAY);
+            painter.rect_filled(r, CornerRadius::ZERO, c);
+        });
     app.ui.presets_ui = st;
     let mods = ui.input(|i| i.modifiers);
     for e in events {
@@ -519,12 +520,16 @@ mod tests {
     /// state (UI state is serde, so it saves and reloads with the rest of the panel state).
     #[test]
     fn dragging_a_group_header_reorders_and_persists() {
+        use egui_kittest::kittest::Queryable;
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut h = Harness::builder().with_size(vec2(300.0, 4000.0)).build_ui_state(|ui, app: &mut PhotocraftApp| panel(app, ui), app);
         h.run_steps(2);
-        let headers = crate::preset_panels::last_group_headers(&h.ctx, PANEL);
-        assert!(headers.len() >= 2, "the default library has folders: {headers:?}");
-        let names: Vec<String> = headers.iter().map(|(n, _)| n.clone()).collect();
+        let names: Vec<String> = h.state().session.presets.swatches.iter().map(|g| g.name.clone()).collect();
+        assert!(names.len() >= 2, "the default library has folders: {names:?}");
+        let headers: Vec<(String, egui::Rect)> = names
+            .iter()
+            .map(|n| (n.clone(), h.get_by(|node| node.role() == egui::accesskit::Role::TreeItem && node.label().as_deref() == Some(n.as_str())).rect()))
+            .collect();
         let (first, first_r) = &headers[0];
         let (last, last_r) = headers.last().unwrap();
         // Drag the last folder's header above the first; the insertion lands before it.
