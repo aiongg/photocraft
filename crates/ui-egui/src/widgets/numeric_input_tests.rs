@@ -3,7 +3,8 @@
 use egui::{Event, ImeEvent, Key, Modifiers, accesskit::Role};
 use egui_kittest::{Harness, kittest::Queryable};
 
-const LIMIT: usize = super::NUMERIC_INPUT_LIMIT;
+/// craft's `NumberField::max_chars` default.
+const LIMIT: usize = 128;
 type Fields = (f32, String);
 
 fn fields() -> Harness<'static, Fields> {

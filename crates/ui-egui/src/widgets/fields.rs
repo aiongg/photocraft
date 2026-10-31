@@ -93,10 +93,6 @@ pub(super) fn value_field_in(
     let (dpi, ppi) = ui.data(|d| d.get_temp::<(f64, f64)>(field_resolution_id())).unwrap_or((72.0, 72.0));
     let typed_suffix = suffix.trim().to_owned();
     let reader = move |text: &str| {
-        // Short events can accumulate: reject before the parser normalizes the text.
-        if text.chars().nth(NUMERIC_INPUT_LIMIT).is_some() {
-            return None;
-        }
         let units = match units {
             Some(u) => crate::numeric_expression::Units { unit: Some(u.unit), suffix: &typed_suffix, dpi: u.dpi, ppi: u.ppi, extent: None },
             None => crate::numeric_expression::Units { unit: unit_of_suffix(&typed_suffix), suffix: &typed_suffix, dpi, ppi, extent: None },
@@ -109,8 +105,6 @@ pub(super) fn value_field_in(
     let shown = (f64::from(*value) * 1e4).round() / 1e4;
     ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
         let caption = take_scrub_label(ui, ui.max_rect());
-        let last = ui.data(|d| d.get_temp::<egui::Id>(salt));
-        cap_numeric_events(ui, last);
         let mut field = NumberField::new(salt, "", shown, &numbers)
             .range(lo..=hi)
             .step(if fine { 0.01 } else { 1.0 })
@@ -130,7 +124,6 @@ pub(super) fn value_field_in(
         let mut response = edit.response.clone();
         // Typed text is a change of the field's text, not of the value: only `apply` reports one.
         response.flags.set(egui::response::Flags::CHANGED, false);
-        ui.data_mut(|d| d.insert_temp(salt, response.id));
         if apply(ui, response.id.with("gesture-start"), edit.event.as_ref(), value) {
             response.mark_changed();
         }
@@ -144,27 +137,6 @@ pub(super) fn value_field_in(
         response
     })
     .inner
-}
-
-/// The most characters one text, paste or input-method event may carry into a focused number
-/// field; longer ones are dropped before the field lays out text (the library's field has no
-/// such limit).
-pub(super) const NUMERIC_INPUT_LIMIT: usize = 128;
-
-fn cap_numeric_events(ui: &Ui, id: Option<egui::Id>) {
-    if !id.is_some_and(|id| ui.is_enabled() && ui.memory(|m| m.has_focus(id))) {
-        return;
-    }
-    ui.input_mut(|input| {
-        input.events.retain(|event| {
-            let text = match event {
-                egui::Event::Text(text) | egui::Event::Paste(text) | egui::Event::Ime(egui::ImeEvent::Commit(text)) => text,
-                egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) => text,
-                _ => return true,
-            };
-            text.chars().nth(NUMERIC_INPUT_LIMIT).is_none()
-        });
-    });
 }
 
 /// Applies a field's `event` to `value`: updates and one-shot sets apply, a commit applies when it

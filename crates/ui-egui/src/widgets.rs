@@ -36,8 +36,6 @@ pub use dialog_fields::{
     text_as as dialog_text_as,
 };
 pub use dropdown::{dropdown, dropdown_hovered, dropdown_list_open, dropdown_literal, dropdown_with_tooltips, menu_scroll, swatch_popup};
-#[cfg(test)]
-use fields::NUMERIC_INPUT_LIMIT;
 pub(crate) use fields::compact_wrapping_value_field;
 pub use fields::{POPUP_ARROW_W, PopupFieldResponse, compact_value_field, elided_label, elided_label_sensed, value_field};
 pub(crate) use panel::body_margin;

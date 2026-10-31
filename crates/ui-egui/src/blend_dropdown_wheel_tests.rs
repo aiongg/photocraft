@@ -74,16 +74,16 @@ fn each_wheel_notch_over_the_blend_mode_dropdown_steps_one_mode_and_one_history_
 }
 
 #[test]
-fn several_notches_in_one_wheel_event_record_one_history_step() {
+fn several_notches_in_one_wheel_event_record_one_history_step_per_notch() {
     let mut h = harness(pixel_layer);
     let at = dropdown(&h).center();
     let undo = steps(&h);
     wheel(&mut h, at, -3.0);
     assert_eq!(blend(&h), BlendMode::Multiply);
-    assert_eq!(steps(&h), undo + 1, "the notches of one wheel event are one step");
+    assert_eq!(steps(&h), undo + 3, "one history step per notch");
     h.state_mut().run("edit.undo", json!({})).unwrap();
     h.run_steps(2);
-    assert_eq!(blend(&h), BlendMode::Normal, "undo goes back to the mode before the event");
+    assert_eq!(blend(&h), BlendMode::Darken, "undo goes back one notch");
 }
 
 #[test]

@@ -50,10 +50,14 @@ fn apply_event(ui: &Ui, salt: egui::Id, event: Option<&EditEvent<f64>>, value: &
     let before = salt.with("pc-before");
     let (min, max) = (lo.min(hi), lo.max(hi));
     match event {
-        Some(EditEvent::Begin { .. }) => {
+        // A typing run's first change arrives on its Begin.
+        Some(EditEvent::Begin { value: first, .. }) => {
             let start = *value;
             ui.data_mut(|d| d.insert_temp(before, start));
-            false
+            first.is_some_and(|v| {
+                *value = (v as f32).clamp(min, max);
+                *value != start
+            })
         }
         Some(EditEvent::Update { value: v, .. } | EditEvent::Set { value: v, .. } | EditEvent::Commit { value: v, changed: true, .. }) => {
             *value = (*v as f32).clamp(min, max);

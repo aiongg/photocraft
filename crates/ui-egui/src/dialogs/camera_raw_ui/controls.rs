@@ -123,7 +123,8 @@ fn slider(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: 
                 *v = value as f32;
                 *dirty = true;
             }
-            EditEvent::Cancel { .. } => {
+            // An external change (the host set the value mid-run) stays.
+            EditEvent::Cancel { reason, .. } if reason != CancelReason::External => {
                 if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
                     *v = old;
                     *dirty = true;

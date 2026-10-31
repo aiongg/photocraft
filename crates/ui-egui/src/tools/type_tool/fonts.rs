@@ -217,7 +217,8 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
                     v = value as f32;
                     changed = true;
                 }
-                craft::ui::edit::EditEvent::Cancel { .. } => {
+                // An external change (the host set the value mid-run) stays.
+                craft::ui::edit::EditEvent::Cancel { reason, .. } if reason != craft::ui::edit::CancelReason::External => {
                     if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
                         v = old;
                         changed = true;
