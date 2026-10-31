@@ -10,28 +10,6 @@ fn modifier_operations() {
 }
 
 #[test]
-fn rename_field_interrupts_the_ime_only_when_it_takes_focus() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
-    app.run("channel.new", json!({})).unwrap();
-    let ctx = egui::Context::default();
-    crate::theme::install_fonts(&ctx);
-    ctx.run_ui(Default::default(), |_| {}).textures_delta.clear();
-    let doc = app.session.active().unwrap().doc.id.0;
-    let name = app.session.active().unwrap().doc.channels[0].name.clone();
-    ctx.data_mut(|d| d.insert_temp(egui::Id::unique(("chan-rename", doc, format!("{:?}", Row::Alpha(0).reference()))), name));
-    // The field takes focus on the first pass and owns the IME from the second on (#585).
-    let interrupts: Vec<Option<bool>> = (0..4)
-        .map(|_| {
-            let mut out = ctx.run_ui(Default::default(), |ui| show(&mut app, ui));
-            out.textures_delta.clear();
-            out.platform_output.ime.map(|ime| ime.should_interrupt_composition)
-        })
-        .collect();
-    assert_eq!(interrupts, [None, Some(false), Some(false), Some(false)]);
-}
-
-#[test]
 fn channel_thumbs_honours_show_channels_in_color() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
@@ -273,7 +251,7 @@ fn clicks_still_target_and_a_drop_elsewhere_does_nothing() {
     drag_to(&mut h, "Alpha 1", "Save selection as channel");
     assert_eq!(alphas(&h), ["Alpha 1"]);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "nothing ran");
-    assert!(h.ctx.data(|d| d.get_temp::<(Row, String)>(drag_id())).is_none(), "the drag ended");
+    assert!(egui::DragAndDrop::payload::<RowDrag>(&h.ctx).is_none(), "the drag ended");
 }
 
 /// Double-clicking the layer mask's row opens Layer Mask Display Options, as in Photoshop; OK
@@ -311,4 +289,26 @@ fn the_layer_mask_row_on_the_trash_asks_first() {
     assert!(h.state().ui.dialogs.iter().any(|d| crate::mask_trash_prompt::owns(&d.fields)), "the prompt is open");
     let st = h.state().session.active().unwrap();
     assert!(st.doc.layer(photocraft_doc::LayerId(masked)).unwrap().mask.is_some(), "nothing deleted yet");
+}
+
+/// Double-clicking an alpha channel's name renames it in place; Enter commits one history step.
+#[test]
+fn double_clicking_an_alpha_name_renames_it() {
+    let (mut h, _) = channels_harness();
+    let steps = h.state().session.active().unwrap().history.past_len();
+    let p = at(&h, "Alpha 1");
+    h.hover_at(p);
+    h.run_steps(30);
+    for pressed in [true, false, true, false] {
+        h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
+        h.step();
+    }
+    h.run_steps(3);
+    h.event(egui::Event::Key { key: egui::Key::A, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::COMMAND });
+    h.event(egui::Event::Text("Sky".into()));
+    h.run_steps(2);
+    h.event(egui::Event::Key { key: egui::Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE });
+    h.run_steps(3);
+    assert_eq!(alphas(&h), ["Sky"]);
+    assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 1);
 }

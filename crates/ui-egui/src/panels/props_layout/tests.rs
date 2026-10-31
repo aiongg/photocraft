@@ -182,14 +182,11 @@ fn type_controls_fill_the_panel_at_every_width_and_scale() {
                 .filter(|r| r.top() >= transform.bottom() && r.bottom() <= header.top())
                 .map(|r| r.right())
                 .fold(f32::MIN, f32::max);
-            // The size/leading row ends in the leading presets chevron at the panel's right edge,
-            // where Transform's field boxes end. The leading box ends where the chevron starts:
-            // its number stops one unit suffix ("pt", like Transform's "px") short of it.
+            // The size/leading row ends in the leading presets chevron at the panel's right edge.
+            // Transform's library number fields end flush with it, their unit inside the box.
             let chevron = h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Leading presets").rect();
-            let lead = h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Leading (set to the font size × auto-leading when Auto)").rect();
             assert!((chevron.right() - header.right()).abs() < 0.5, "{what}: Character controls end at {}, panel {}", chevron.right(), header.right());
-            let (t_suffix, lead_suffix) = (header.right() - t_right, chevron.left() - lead.right());
-            assert!((t_suffix - lead_suffix).abs() < 0.5, "{what}: Transform's suffix slot {t_suffix}, the leading field's {lead_suffix} (overlap or gap)");
+            assert!((header.right() - t_right).abs() < 0.5, "{what}: Transform's fields end at {t_right}, panel {}", header.right());
             // Quick Actions buttons span the panel too.
             let qa = h.get_by_label("Rasterize Type").rect();
             assert!(qa.right() >= header.right() - 2.0 && qa.right() <= header.right() + 1.0, "{what}: {qa:?}");
