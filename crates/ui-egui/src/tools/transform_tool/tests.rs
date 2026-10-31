@@ -3239,7 +3239,6 @@ fn w_and_h_edits_on_a_skewed_box_match_upstream() {
 
 /// A distorted box scales through its homography and keeps its perspective, as upstream does.
 #[test]
-#[ignore = "waits on craft-ui: typed W/H steps each scale the box left by the step before, and scaling a perspective box does not compose"]
 fn w_and_h_edits_on_a_distorted_box_match_upstream() {
     assert_size_edits_match_upstream("distorted", [[0.0, 0.0], [100.0, 10.0], [90.0, 60.0], [-5.0, 50.0]]);
 }
