@@ -6,8 +6,7 @@
 //! Ctrl is the corner-distortion modifier. Smart guides follow View › Show › Smart Guides and also snap the Move
 //! tool to other layers' edges and centres. The threshold is 8 screen pixels at the current zoom.
 
-use craft::ui::theme::StrokeExt;
-use egui::{Color32, Stroke, pos2};
+use egui::Color32;
 use photocraft_doc::LayerId;
 use photocraft_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
 
@@ -571,45 +570,31 @@ pub(crate) fn smart_color(app: &PhotocraftApp) -> Color32 {
 }
 
 /// Draw smart guides (and the moving bounds) for the drag in progress.
-pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
+pub fn draw(app: &PhotocraftApp, ui: &egui::Ui, xf: &ViewXform) {
+    use craft::ui::canvas::{SmartGuides, SmartLine, kurbo::Point};
     let Some(snap) = &app.prefs_rt.snap else { return };
-    let smart_color = smart_color(app);
+    let lines: Vec<SmartLine> = if smart_on(app) {
+        app.prefs_rt
+            .snap_lines
+            .iter()
+            .filter(|l| l.kind.is_smart())
+            .map(|l| {
+                let (a, b) = if l.vertical { ([l.pos, l.from], [l.pos, l.to]) } else { ([l.from, l.pos], [l.to, l.pos]) };
+                SmartLine { a: Point::new(a[0], a[1]), b: Point::new(b[0], b[1]), extension: false }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut guides = SmartGuides::new(&lines, &[]).color(smart_color(app));
     // The moved layers' bounds follow the Move tool (Free Transform draws its own box).
     if let (Gesture::Move { rect }, Some(d)) =
         (&snap.gesture, app.drag.as_ref().and_then(|d| d.points.last()).map(|p| [p[0] - snap.start[0], p[1] - snap.start[1]]))
     {
-        let r = egui::Rect::from_two_pos(
-            xf.to_screen((rect[0] + d[0]) as f32, (rect[1] + d[1]) as f32),
-            xf.to_screen((rect[2] + d[0]) as f32, (rect[3] + d[1]) as f32),
-        );
-        painter.rect_stroke(
-            r,
-            craft::ui::theme::scale::Radius::R0.px(),
-            craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent),
-            egui::StrokeKind::Middle,
-        );
+        let r = [rect[0] + d[0], rect[1] + d[1], rect[2] + d[0], rect[3] + d[1]];
+        guides = guides.bounds(craft::ui::canvas::kurbo::Rect::new(r[0], r[1], r[2], r[3]));
     }
-    if !smart_on(app) {
-        return;
-    }
-    for l in &app.prefs_rt.snap_lines {
-        if !l.kind.is_smart() {
-            continue;
-        }
-        draw_line(painter, xf, l, smart_color);
-    }
-}
-
-fn draw_line(painter: &egui::Painter, xf: &ViewXform, l: &SnapLine, color: Color32) {
-    let (a, b) = if l.vertical {
-        (xf.to_screen(l.pos as f32, l.from as f32), xf.to_screen(l.pos as f32, l.to as f32))
-    } else {
-        (xf.to_screen(l.from as f32, l.pos as f32), xf.to_screen(l.to as f32, l.pos as f32))
-    };
-    painter.line_segment(
-        [pos2(a.x.round() + 0.5, a.y.round() + 0.5), pos2(b.x.round() + 0.5, b.y.round() + 0.5)],
-        craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), color),
-    );
+    guides.show(ui, &xf.canvas_view());
 }
 
 #[cfg(test)]

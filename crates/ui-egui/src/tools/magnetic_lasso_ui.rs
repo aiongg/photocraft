@@ -422,7 +422,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, hover:
     let screen = |q: &[f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     let pts: Vec<Pos2> = m.path.iter().chain(m.live.iter().skip(1)).map(screen).collect();
     // Solid until the selection is made, as in Photoshop (#7495).
-    crate::tool_feedback::draw_solid_path(painter, &pts, false);
+    crate::tool_feedback::draw_solid_path(painter, &pts);
     for p in m.anchors.iter().filter_map(|&i| m.path.get(i)).map(screen) {
         let r = Rect::from_center_size(p, vec2(5.0, 5.0));
         painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);

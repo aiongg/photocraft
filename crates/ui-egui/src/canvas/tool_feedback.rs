@@ -7,7 +7,7 @@
 //! ants) so they read on light and dark pixels alike.
 
 use craft::ui::canvas::SelectionBadge;
-use egui::{Color32, Pos2, Shape, Stroke, pos2, vec2};
+use egui::{Color32, Pos2, pos2};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
@@ -134,49 +134,25 @@ pub fn badge(app: &PhotocraftApp, tool: Tool, m: egui::Modifiers) -> Option<Badg
 }
 
 impl Badge {
-    /// The library badge for the three selection modes; `Move` has none.
-    fn selection(self) -> Option<SelectionBadge> {
+    /// The library badge for this intent.
+    fn selection(self) -> SelectionBadge {
         match self {
-            Badge::Add => Some(SelectionBadge::Add),
-            Badge::Subtract => Some(SelectionBadge::Subtract),
-            Badge::Intersect => Some(SelectionBadge::Intersect),
-            Badge::Move => None,
+            Badge::Add => SelectionBadge::Add,
+            Badge::Subtract => SelectionBadge::Subtract,
+            Badge::Intersect => SelectionBadge::Intersect,
+            Badge::Move => SelectionBadge::Move,
         }
     }
-}
-
-/// The Move badge's glyph as line segments around `c` (half-size `h`): four arrows. The library's
-/// `SelectionBadge` has no such variant.
-fn move_glyph(c: Pos2, h: f32) -> Vec<[Pos2; 2]> {
-    let a = h * 0.45;
-    let mut v = vec![[c - vec2(h, 0.0), c + vec2(h, 0.0)], [c - vec2(0.0, h), c + vec2(0.0, h)]];
-    for d in [vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0)] {
-        let tip = c + d * h;
-        let side = vec2(-d.y, d.x) * a;
-        v.push([tip, tip - d * a + side]);
-        v.push([tip, tip - d * a - side]);
-    }
-    v
 }
 
 /// Draw the badge next to the cursor hotspot `p` (Photoshop puts it below-right of the
 /// crosshair; Quick Selection shows it inside the brush circle, at the centre).
 pub fn draw_badge(painter: &egui::Painter, p: Pos2, b: Badge, centred: bool) {
-    if let Some(badge) = b.selection() {
-        if centred {
-            craft::ui::canvas::selection_badge_at(painter.ctx(), p, badge);
-        } else {
-            craft::ui::canvas::selection_badge_beside_pointer(painter.ctx(), p, badge);
-        }
-        return;
-    }
-    // Right of the system arrow cursor: at 1x the arrow covers (11, 11), so the badge sat under it.
-    let c = if centred { p } else { p + vec2(30.0, 11.0) };
-    // White glyph with a dark halo: readable on any pixels.
-    for (w, col) in [(3.0, Color32::from_black_alpha(200)), (1.2, Color32::WHITE)] {
-        for seg in move_glyph(c, 3.5) {
-            painter.line_segment(seg, Stroke::new(w, col));
-        }
+    let badge = b.selection();
+    if centred {
+        craft::ui::canvas::selection_badge_at(painter.ctx(), p, badge);
+    } else {
+        craft::ui::canvas::selection_badge_beside_pointer(painter.ctx(), p, badge);
     }
 }
 
@@ -188,16 +164,9 @@ pub fn draw_ants(painter: &egui::Painter, points: &[Pos2], closed: bool) {
 
 /// A selection outline still being drawn (Lasso, Polygonal Lasso, Magnetic Lasso): a solid line,
 /// as Photoshop draws it until the selection is made (#7495). Marching ants are for selections
-/// that exist. A thin dark line on a soft light edge: Photoshop's look on light pixels, and still
-/// visible on dark ones.
-pub fn solid_path(points: &[Pos2], closed: bool) -> Vec<Shape> {
-    let make = |s: Stroke| if closed { Shape::closed_line(points.to_vec(), s) } else { Shape::line(points.to_vec(), s) };
-    vec![make(Stroke::new(3.0, Color32::from_white_alpha(140))), make(Stroke::new(1.0, Color32::BLACK))]
-}
-
-/// Draw [`solid_path`].
-pub fn draw_solid_path(painter: &egui::Painter, points: &[Pos2], closed: bool) {
-    painter.extend(solid_path(points, closed));
+/// that exist.
+pub fn draw_solid_path(painter: &egui::Painter, points: &[Pos2]) {
+    crate::ants::draw_look(painter, points, craft::ui::canvas::MarqueeLook::Drawing);
 }
 
 /// Polygon approximating the ellipse inscribed in `r` (enough vertices to look smooth).
@@ -214,28 +183,13 @@ pub fn ellipse_points(r: egui::Rect) -> Vec<Pos2> {
 
 /// A path preview in `color` with a contrasting dark halo, so a blue shape outline still shows
 /// on blue (or any) pixels: the shape tools' drag preview.
-pub fn contrast_path(points: Vec<Pos2>, closed: bool, color: Color32) -> Vec<Shape> {
-    let make = |pts: Vec<Pos2>, s: Stroke| if closed { Shape::closed_line(pts, s) } else { Shape::line(pts, s) };
-    vec![make(points.clone(), Stroke::new(3.0, Color32::from_black_alpha(150))), make(points, Stroke::new(1.0, color))]
+pub fn draw_contrast_path(painter: &egui::Painter, points: &[Pos2], color: Color32) {
+    crate::ants::draw_look(painter, points, craft::ui::canvas::MarqueeLook::Contrast(color));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn strokes(shapes: &[Shape]) -> Vec<Color32> {
-        shapes
-            .iter()
-            .filter_map(|s| match s {
-                Shape::LineSegment { stroke, .. } => Some(stroke.color),
-                Shape::Path(p) => match p.stroke.color {
-                    egui::epaint::ColorMode::Solid(c) => Some(c),
-                    _ => None,
-                },
-                _ => None,
-            })
-            .collect()
-    }
 
     #[test]
     fn badge_follows_modifiers_and_the_options_bar() {
@@ -272,26 +226,8 @@ mod tests {
         }
     }
 
-    /// #7495: an outline still being drawn is one unbroken line (no dashes, nothing marching),
-    /// black over a light edge.
     #[test]
-    fn solid_path_is_one_unbroken_dark_line_on_a_light_edge() {
-        let pts = [pos2(0.0, 0.0), pos2(40.0, 0.0), pos2(40.0, 30.0)];
-        for closed in [false, true] {
-            let shapes = solid_path(&pts, closed);
-            assert!(shapes.iter().all(|s| matches!(s, Shape::Path(p) if p.closed == closed && p.points.len() == 3)), "{shapes:?}");
-            assert_eq!(strokes(&shapes), vec![Color32::from_white_alpha(140), Color32::BLACK], "the dark line on top");
-        }
-    }
-
-    #[test]
-    fn shape_previews_contrast_and_ellipses_close() {
-        let pts = [pos2(0.0, 0.0), pos2(40.0, 0.0), pos2(40.0, 30.0)];
-        // Shape previews: the accent path over a dark halo.
-        let s = contrast_path(pts.to_vec(), true, Color32::from_rgb(0, 120, 255));
-        let cols = strokes(&s);
-        assert_eq!(cols.len(), 2);
-        assert!(cols[0].r() < 10 && cols[0].a() > 100 && cols[1] == Color32::from_rgb(0, 120, 255));
+    fn ellipses_close() {
         // Ellipses close smoothly.
         let e = ellipse_points(egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(100.0, 50.0)));
         assert!(e.len() >= 16 && e.iter().all(|p| p.x >= -0.01 && p.x <= 100.01 && p.y >= -0.01 && p.y <= 50.01));
