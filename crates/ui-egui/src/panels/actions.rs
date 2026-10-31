@@ -4,6 +4,7 @@
 //! `play` / `list` / `get` / `delete` / `move` / `rename`), so the panel, the CLI and MCP share them. This module
 //! keeps only which row is selected and which rows are expanded.
 
+use craft_ui::controls::{Checkbox, ControlSize};
 use craft_ui::theme::StrokeExt;
 use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
 use serde::{Deserialize, Serialize};
@@ -311,20 +312,6 @@ fn button_fill(color: &str, t: &Tokens) -> Color32 {
 
 fn button_label_color(color: &str, t: &Tokens) -> Color32 {
     if color.is_empty() { t.text } else { Color32::from_rgb(20, 20, 20) }
-}
-
-fn paint_check(ui: &egui::Ui, rect: Rect, on: bool, t: &Tokens) {
-    let b = Rect::from_center_size(rect.center(), vec2(11.0, 11.0));
-    ui.painter().rect_stroke(
-        b,
-        craft_ui::theme::scale::Radius::R2.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint),
-        egui::StrokeKind::Inside,
-    );
-    if on {
-        let pts = vec![pos2(b.left() + 2.5, b.center().y), pos2(b.left() + 4.5, b.bottom() - 3.0), pos2(b.right() - 2.5, b.top() + 2.5)];
-        ui.painter().add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)));
-    }
 }
 
 fn step_label(id: &str, params: &Value) -> String {
@@ -1231,13 +1218,14 @@ fn draw_step_label(app: &PhotocraftApp, ui: &egui::Ui, rect: Rect, response: &eg
 
 fn draw_step_controls(ui: &mut egui::Ui, rect: Rect, step: usize, label: &str, context: &StepRowsContext<'_>) -> (egui::Response, egui::Response) {
     let on = !context.disabled.contains(&step);
-    let check = ui.interact(
-        Rect::from_center_size(pos2(context.x0 + 30.0, rect.center().y), vec2(16.0, 16.0)),
-        ui.scope_id().with(("action-step-check", context.action, step)),
-        Sense::click(),
-    );
+    let slot = Rect::from_center_size(pos2(context.x0 + 30.0, rect.center().y), vec2(16.0, 16.0));
+    let mut shown = on;
+    let check = ui
+        .scope_builder(egui::UiBuilder::new().max_rect(slot), |ui| {
+            Checkbox::bool("", &mut shown).size(ControlSize::Sm).id_salt(("action-step-check", context.action, step)).show(ui).response
+        })
+        .inner;
     check.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, on, format!("{}: {label}", tl!("Include in playback"))));
-    paint_check(ui, check.rect, on, context.tokens);
     let with_dialog = context.dialogs.contains(&step);
     let dialog = ui.interact(
         Rect::from_center_size(pos2(context.x0 + 46.0, rect.center().y), vec2(16.0, 16.0)),
