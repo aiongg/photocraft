@@ -1,4 +1,5 @@
 //! Real dialog/controller acceptance: interactions never make a second document edit path.
+use egui::accesskit::Role;
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::ThemeKind};
@@ -466,9 +467,9 @@ fn curve_drag_moves_the_existing_point_without_creating_another() {
 
 fn open_curve(h: &mut Harness<'_, PhotocraftApp>) -> Rect {
     let lang = photocraft_ui_egui::i18n::current();
-    h.get_by_label(photocraft_ui_egui::i18n::tr_ctx(lang, "cameraRaw", "Light")).click();
+    h.get_by_role_and_label(Role::DisclosureTriangle, photocraft_ui_egui::i18n::tr_ctx(lang, "cameraRaw", "Light")).click();
     h.run_steps(16);
-    h.get_by_label(photocraft_ui_egui::i18n::tr(lang, "Curve")).click();
+    h.get_by_role_and_label(Role::DisclosureTriangle, photocraft_ui_egui::i18n::tr(lang, "Curve")).click();
     h.run_steps(16);
     rect(h, "curveRect")
 }
@@ -765,9 +766,9 @@ fn alt_drag_diagnostics_follow_light_tone_sliders_not_same_named_ones() {
     assert_eq!(during["overlayRevision"], during["previewRevision"], "Light tone sliders drive Alt diagnostics");
 
     let mut h = fixture(ThemeKind::Pro);
-    h.get_by_label(tr("Light")).click();
+    h.get_by_role_and_label(Role::DisclosureTriangle, tr("Light")).click();
     h.run_steps(12);
-    h.get_by_label(tr("Curve")).click();
+    h.get_by_role_and_label(Role::DisclosureTriangle, tr("Curve")).click();
     h.run_steps(12);
     // The Curve section's Highlights shares its label with the Light tone slider.
     let during = alt_drag_slider(&mut h, tr("Highlights"));

@@ -143,7 +143,8 @@ fn setting_row(path: &str, key: &str, v: &Value, scale: &[(String, String)]) -> 
 fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) -> Vec<Group> {
     let mut groups = Vec::new();
     {
-        let mode = Row::new("performance.renderingMode", "Rendering Mode", Kind::Choice { value: rendering_mode_value(obj), options: rendering_mode_options() });
+        let mode =
+            Row::new("performance.renderingMode", "Rendering Mode", Kind::Choice { value: rendering_mode_value(obj), options: rendering_mode_options() });
         let info = vec![
             (tl!("Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.").to_string(), false),
             (launch_note().to_string(), true),
