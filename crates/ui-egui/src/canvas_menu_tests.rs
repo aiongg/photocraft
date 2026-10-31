@@ -243,8 +243,8 @@ fn control_tap(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, popup: Popup) {
         }
         let canvas = ui.allocate_rect(egui::Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0)), egui::Sense::click_and_drag());
         match popup {
-            Popup::Tool => crate::canvas_tool_menu::show(h.state_mut(), ui, &canvas),
-            Popup::Layers => crate::layer_pick_ui::show(h.state_mut(), ui, &canvas),
+            Popup::Tool => drop(crate::canvas_tool_menu::show(h.state_mut(), ui, &canvas)),
+            Popup::Layers => drop(crate::layer_pick_ui::show(h.state_mut(), ui, &canvas)),
             Popup::Brush => crate::paint_mouse::show_picker(h.state_mut(), ui.ctx()),
         }
         stayed_open &= is_open(h, popup);
