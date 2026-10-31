@@ -60,11 +60,12 @@ fn clicking_a_state_jumps_there_with_one_command() {
 }
 
 /// The ghost label that follows a History row being dragged to the trash (the text painted at
-/// the pointer, `layer_transfer::ghost`), if one is drawn.
+/// the pointer, `layer_transfer::show_ghost`), if one is drawn.
 fn ghost_label(h: &Harness<'_, PhotocraftApp>, p: egui::Pos2) -> Option<String> {
-    let at = p + vec2(20.0, -6.0);
+    // Beside the pointer, to its reading end.
+    let near = egui::Rect::from_min_max(p + vec2(0.0, -24.0), p + vec2(60.0, 24.0));
     h.output().shapes.iter().find_map(|c| match &c.shape {
-        egui::Shape::Text(t) if (t.pos - at).length() < 1.0 => Some(t.galley.job.text.clone()),
+        egui::Shape::Text(t) if near.contains(t.pos) => Some(t.galley.job.text.clone()),
         _ => None,
     })
 }
