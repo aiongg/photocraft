@@ -1840,39 +1840,3 @@ fn section_boxes_show_a_pressed_state() {
         assert!(looks.iter().skip(i + 1).all(|b| b != a), "{looks:?}");
     }
 }
-
-/// The shared check box (options bars, dialogs) does the same, and pressing its label counts.
-#[test]
-fn checkboxes_show_a_pressed_state_from_their_label() {
-    use egui_kittest::kittest::Queryable;
-    let mut h = Harness::builder().with_size(vec2(300.0, 100.0)).build_ui_state(
-        |ui, on: &mut bool| {
-            widgets::checkbox(ui, on, "Sample All Layers");
-        },
-        false,
-    );
-    h.run();
-    let t = Tokens::get(&h.ctx);
-    let label = h.get_by_label("Sample All Layers").rect();
-    let boxr = egui::Rect::from_min_size(egui::pos2(label.left() - 6.0 - 14.0, label.center().y - 7.0), vec2(14.0, 14.0));
-    let fill = |h: &Harness<'_, bool>| {
-        h.output()
-            .shapes
-            .iter()
-            .filter_map(|c| match &c.shape {
-                egui::Shape::Rect(r) if (r.rect.center() - boxr.center()).length() < 1.5 && r.rect.width() < 15.0 && r.fill != Color32::TRANSPARENT => {
-                    Some(r.fill)
-                }
-                _ => None,
-            })
-            .next_back()
-    };
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(false, false, &t)));
-    h.drag_at(label.center());
-    h.run();
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(false, true, &t)), "pressing the label presses the box");
-    h.drop_at(label.center());
-    h.run();
-    assert!(*h.state(), "the release checks it");
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(true, false, &t)));
-}

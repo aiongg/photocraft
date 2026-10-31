@@ -31,10 +31,7 @@ pub mod text_field_menu;
 pub mod tone;
 mod units;
 
-pub use buttons::{
-    ButtonRole, DialogButton, button_width, check_box, check_box_fill, checkbox, dialog_buttons, primary_button,
-    secondary_button, toggle,
-};
+pub use buttons::{ButtonRole, DialogButton, button_width, check_box, check_box_fill, checkbox, dialog_buttons, primary_button, secondary_button, toggle};
 pub(crate) use color::color_swatch;
 pub use color::{checker, checker_rounded, color_edit_button_rgb, color_edit_button_srgb, color_swatch_button, hue_color, hue_stops, pick_pos, rgb_histogram};
 #[cfg(test)]
@@ -57,7 +54,7 @@ pub use panel::{
 pub use scrub::{scrub_label, scrub_option_icon, scrub_option_label};
 #[cfg(test)]
 use slider::DOUBLE_CLICK_S;
-pub use slider::{RowGestures, second_click, slider, slider_row, slider_row_prec, slider_row_with};
+pub use slider::{RowGestures, second_click, slider, slider_named, slider_row, slider_row_prec, slider_row_with};
 pub(crate) use slider::{count_notches, wheel_notches_of};
 pub use text_field::{
     INPUT_EVENT_LIMIT, TEXT_FIELD_H, TEXT_FIELD_LIMIT, cap_text_events, focus_first_field, text_field, text_field_ex, text_field_with_trailing,

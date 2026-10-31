@@ -1,15 +1,22 @@
 use super::{Color32, Pos2, Response, Ui, Vec2};
 use craft_ui::composites::SliderRow;
-use craft_ui::controls::Slider;
+use craft_ui::controls::{ControlSize, Slider};
 use craft_ui::edit::{EditEvent, EditResponse};
 use craft_ui::localized::{LocaleNumbers, Unit};
 
 /// Thin-track slider with a round knob over `*value`. `gradient` paints the track (e.g. hue
 /// spectrum). The response is changed on every update the user makes.
 pub fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {
+    slider_named(ui, tl!("Slider"), value, range, gradient)
+}
+
+/// [`slider`] named `label` for screen readers and automation.
+pub fn slider_named(ui: &mut Ui, label: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {
     let salt = ui.next_auto_id();
     let (lo, hi) = (*range.start(), *range.end());
-    let mut slider = Slider::new(salt, "", f64::from(*value), f64::from(lo)..=f64::from(hi)).width(ui.available_width().max(60.0));
+    let mut slider = Slider::new(salt, label, held(ui, salt).unwrap_or(f64::from(*value)), f64::from(lo)..=f64::from(hi))
+        .size(ControlSize::Sm)
+        .width(ui.available_width().max(60.0));
     if let Some(stops) = gradient.filter(|g| g.len() >= 2) {
         slider = slider.track_colors(stops.iter().copied());
     }
@@ -44,8 +51,23 @@ fn apply(ui: &Ui, salt: egui::Id, edit: &EditResponse<f64>, value: &mut f32, lo:
     apply_event(ui, salt, edit.event.as_ref(), value, lo, hi)
 }
 
+/// The value a gesture under way last reported. The library cancels a gesture whose value the
+/// host changed, and callers round, exponentiate or clamp what they store, so the control is
+/// given this value until the gesture ends.
+fn held(ui: &Ui, salt: egui::Id) -> Option<f64> {
+    ui.data(|d| d.get_temp::<f64>(salt.with("pc-held")))
+}
+
 fn apply_event(ui: &Ui, salt: egui::Id, event: Option<&EditEvent<f64>>, value: &mut f32, lo: f32, hi: f32) -> bool {
     let before = salt.with("pc-before");
+    let held_id = salt.with("pc-held");
+    match event {
+        Some(EditEvent::Update { value: v, .. }) => {
+            ui.data_mut(|d| d.insert_temp(held_id, *v));
+        }
+        Some(_) => drop(ui.data_mut(|d| d.remove_temp::<f64>(held_id))),
+        None => {}
+    }
     let (min, max) = (lo.min(hi), lo.max(hi));
     match event {
         Some(EditEvent::Begin { .. }) => {
@@ -186,7 +208,7 @@ pub fn slider_row_prec(
     // Rows repeat labels, so the row's own position names its gestures.
     let salt = ui.next_auto_id();
     let (lo, hi) = (*range.start(), *range.end());
-    let mut row = SliderRow::new(salt, tl!(label), f64::from(*value), f64::from(lo)..=f64::from(hi), &numbers)
+    let mut row = SliderRow::new(salt, tl!(label), held(ui, salt).unwrap_or(f64::from(*value)), f64::from(lo)..=f64::from(hi), &numbers)
         .wheel(g.wheel_step.is_some())
         // `RowGestures::wheel_step` is the slider's step per notch; the library's default is a hundredth of the range.
         .unit(if suffix.is_empty() { Unit::default() } else { Unit::new(&format!("{{n}}{suffix}")) });
@@ -208,8 +230,8 @@ pub fn slider_row_prec(
     let shown = row.show(ui);
     let mut r = shown.response.clone();
     let mut changed = false;
-    for (n, event) in [shown.field.event.as_ref(), shown.slider.event.as_ref()].into_iter().enumerate() {
-        changed |= apply_event(ui, salt.with(n), event, value, lo, hi);
+    for event in [shown.field.event.as_ref(), shown.slider.event.as_ref()] {
+        changed |= apply_event(ui, salt, event, value, lo, hi);
     }
     if changed {
         r.mark_changed();
