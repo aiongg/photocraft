@@ -1307,7 +1307,7 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     crate::distort_ui::draw_overlay(app, painter, xf);
     crate::perspective_crop_ui::draw_overlay(app, painter, xf);
     crate::retouch_ui::draw_source_marker(app, painter, xf);
-    crate::vector_ui::draw_overlay(app, painter, xf, doc);
+    crate::vector_ui::draw_overlay(app, ui, response, painter, xf, doc);
     crate::symmetry_ui::draw(app, painter, xf);
     crate::analysis_ui::draw_overlay(app, painter, xf);
     crate::gradient_ui::draw_overlay(app, painter, xf);

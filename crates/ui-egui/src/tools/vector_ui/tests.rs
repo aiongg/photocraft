@@ -211,6 +211,12 @@ fn saved_path_context_menu_offers_rename() {
     assert_eq!(rename(PathRow::Work), None, "the work path is saved, not renamed");
 }
 
+/// `draw_overlay` over a canvas response covering the view.
+fn overlay_in(app: &PhotocraftApp, ui: &mut egui::Ui, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
+    let canvas = ui.allocate_rect(xf.rect, egui::Sense::hover());
+    draw_overlay(app, ui, &canvas, painter, xf, doc);
+}
+
 /// How many shapes the path overlay paints for `app` this frame.
 fn overlay_shapes(app: &PhotocraftApp, ctx: &egui::Context) -> usize {
     let doc = app.session.active().unwrap().doc.clone();
@@ -218,7 +224,7 @@ fn overlay_shapes(app: &PhotocraftApp, ctx: &egui::Context) -> usize {
         let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0));
         let painter = ui.ctx().layer_painter(egui::LayerId::background()).with_clip_rect(rect);
         let xf = ViewXform { rect, zoom: 1.0, center: [100.0, 100.0], flip: false, rotation: 0.0, aspect: 1.0 };
-        draw_overlay(app, &painter, &xf, &doc);
+        overlay_in(app, ui, &painter, &xf, &doc);
     });
     out.textures_delta.clear();
     out.shapes.len()
@@ -665,7 +671,10 @@ fn an_unclosed_path_stays_with_its_document() {
             rotation: 0.0,
             aspect: 1.0,
         };
-        let mut out = ctx.run_ui(Default::default(), |ui| draw_overlay(app, ui.painter(), &xf, &doc));
+        let mut out = ctx.run_ui(Default::default(), |ui| {
+            let painter = ui.painter().clone();
+            overlay_in(app, ui, &painter, &xf, &doc)
+        });
         out.textures_delta.clear();
         out.shapes.len()
     };
@@ -706,7 +715,8 @@ fn pen_overlay_uses_the_view_document_even_during_direct_selection() {
     let shapes = |app: &PhotocraftApp, doc: &Document, modifiers| {
         let ctx = egui::Context::default();
         let mut output = ctx.run_ui(egui::RawInput { events: vec![egui::Event::ModifiersChanged(modifiers)], ..Default::default() }, |ui| {
-            draw_overlay(app, ui.painter(), &xf, doc)
+            let painter = ui.painter().clone();
+            overlay_in(app, ui, &painter, &xf, doc)
         });
         output.textures_delta.clear();
         output.shapes.len()

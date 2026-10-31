@@ -21,7 +21,7 @@
 //! step per drag, and the same commands drive it over MCP and the control channel. The Pen path
 //! being drawn is not in the document yet: its edits apply to it directly, without a command.
 
-use egui::{Color32, Modifiers, Pos2};
+use egui::{Modifiers, Pos2};
 use photocraft_doc::vector::Path;
 use photocraft_geom::Point;
 use photocraft_vector::edit::{self, Handle, Hit};
@@ -532,39 +532,38 @@ pub fn arrow_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     false
 }
 
-/// Paths with their anchors (selected ones filled), the shown handles, the drag's preview in
-/// place of its path, and the marquee. `paths` false (View › Show › Target Path off) leaves only
-/// the marquee.
-pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, to_scr: &dyn Fn([f64; 2]) -> Pos2, accent: Color32, paths: bool) {
+/// The paths the overlay shows with their anchors, the drag's preview in place of its path, and
+/// the selection (selected anchors filled, their handles shown). `paths` false (View › Show ›
+/// Target Path off) shows none.
+pub fn overlay_paths(app: &PhotocraftApp, mods: Modifiers, paths: bool) -> (Vec<(PathRef, Path)>, craft_ui::canvas::PathSelection) {
     let ds = &app.ui.direct_selection;
     // The idle Curvature Pen shows the anchors of the path it edits, not every shape's.
     let shown = if !paths {
         Vec::new()
-    } else if curvature_idle(app, painter.ctx().input(|i| i.modifiers)) {
+    } else if curvature_idle(app, mods) {
         active_paths(app)
     } else {
         candidates(app)
     };
-    for (r, path) in shown {
-        let path = match &ds.drag {
-            Some(Drag::Edit { target, preview: Some(p), .. }) if *target == r => p.clone(),
-            _ => path,
-        };
-        crate::vector_ui::draw_outline(painter, &path, to_scr, accent);
-        let ours = ds.target == Some(r);
-        for &(k, h) in if ours { shown_handles(ds, &path) } else { Vec::new() }.iter() {
-            if let Some(kn) = path.subpaths.get(k[0]).and_then(|s| s.knots.get(k[1])) {
-                let c = if h == Handle::In { kn.in_ctrl } else { kn.out_ctrl };
-                crate::vector_ui::draw_handle(painter, to_scr([kn.anchor.x, kn.anchor.y]), to_scr([c.x, c.y]), accent);
-            }
-        }
-        for (s, sp) in path.subpaths.iter().enumerate() {
-            for (k, kn) in sp.knots.iter().enumerate() {
-                crate::vector_ui::draw_anchor(painter, to_scr([kn.anchor.x, kn.anchor.y]), ours && ds.anchors.contains(&[s, k]), accent);
-            }
-        }
-    }
-    if let Some(Drag::Marquee { start, end, .. }) = &ds.drag {
+    let shown = shown
+        .into_iter()
+        .map(|(r, path)| match &ds.drag {
+            Some(Drag::Edit { target, preview: Some(p), .. }) if *target == r => (r, p.clone()),
+            _ => (r, path),
+        })
+        .collect();
+    use craft_ui::canvas::KnotRef;
+    let selection = craft_ui::canvas::PathSelection {
+        path: ds.target.map(crate::vector_ui::path_key),
+        anchors: ds.anchors.iter().map(|&[s, k]| KnotRef::new(s, k)).collect(),
+        segment: ds.segment.map(|[s, k]| KnotRef::new(s, k)),
+    };
+    (shown, selection)
+}
+
+/// The marquee being dragged, in marching ants.
+pub fn draw_marquee(app: &PhotocraftApp, painter: &egui::Painter, to_scr: &dyn Fn([f64; 2]) -> Pos2) {
+    if let Some(Drag::Marquee { start, end, .. }) = &app.ui.direct_selection.drag {
         let pts = [*start, [end[0], start[1]], *end, [start[0], end[1]]].map(to_scr);
         crate::tool_feedback::draw_ants(painter, &pts, true);
     }

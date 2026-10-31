@@ -175,7 +175,7 @@ fn guide_key(vertical: bool, index: usize) -> u64 {
 }
 
 /// The ruler unit of each axis (x, y) for `doc` from Preferences › Units & Rulers.
-fn ruler_units(app: &PhotocraftApp, ui: &egui::Ui, doc: &Document) -> [RulerUnits; 2] {
+pub(crate) fn ruler_units(app: &PhotocraftApp, ui: &egui::Ui, doc: &Document) -> [RulerUnits; 2] {
     let ur = &app.session.prefs().units_and_rulers;
     let (unit, ppi) = (ur.rulers, ur.point_size.per_inch());
     let dpi = f64::from(doc.resolution_dpi.max(1.0));
