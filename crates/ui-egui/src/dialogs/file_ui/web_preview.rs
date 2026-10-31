@@ -91,43 +91,37 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let Some(table) = settings.color_table else { return };
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     SectionLabel::new(tl!("Color Table…").trim_end_matches('…')).show(ui);
-    ui.scope(|ui| {
-        ui.spacing_mut().interact_size = egui::vec2(14.0, 14.0);
-        ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
-        egui::Grid::new("web-color-table").spacing(egui::vec2(1.0, 1.0)).show(ui, |ui| {
-            for (i, source) in table.iter().enumerate() {
-                let mut color = settings.color_table_edits.get(&i).copied().unwrap_or(*source);
-                let response = ui.push_id(i, |ui| crate::widgets::color_edit_button_srgb(ui, &mut color)).inner;
-                response.clone().on_hover_text(format!("Index {i}: {}", web_cmds::rgb_hex(color)));
-                if response.clicked() {
-                    f.insert("__selectedColor".into(), json!(i));
-                }
-                if f.get("__selectedColor").and_then(Value::as_u64) == Some(i as u64) {
-                    let t = craft_ui::theme::current(ui.ctx());
-                    ui.painter().rect_stroke(
-                        response.rect,
-                        t.shape.radius.control,
-                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
-                        egui::StrokeKind::Inside,
-                    );
-                }
-                if response.changed() {
-                    let edits = f.entry("colorTableEdits").or_insert_with(|| json!({}));
-                    if let Some(edits) = edits.as_object_mut() {
-                        edits.insert(i.to_string(), json!(web_cmds::rgb_hex(color)));
-                    }
-                }
-                if i % 16 == 15 {
-                    ui.end_row();
-                }
-            }
-            if f.get("__transparentIndex").and_then(Value::as_u64).is_some() {
-                let (rect, response) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
-                crate::widgets::checker(ui.painter(), rect, 4.0);
-                response.on_hover_text(tl!("Transparency"));
-            }
-        });
+    let edited = |i: usize| settings.color_table_edits.get(&i).copied().unwrap_or(table[i]);
+    let swatches = (0..table.len()).map(|i| {
+        let [r, g, b] = edited(i);
+        (format!("Index {i}: {}", web_cmds::rgb_hex([r, g, b])), craft_theme::Srgba::rgb(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0))
     });
+    let selected = f.get("__selectedColor").and_then(Value::as_u64).map(|i| i as usize);
+    let shown = craft_ui::composites::SwatchPalette::table("web-color-table", tl!("Color Table").trim_end_matches('…'), swatches)
+        .selected(selected)
+        .columns(16)
+        .show(ui);
+    if let Some(i) = shown.selected {
+        f.insert("__selectedColor".into(), json!(i));
+    }
+    if let Some(i) = shown.open {
+        // The table reports Enter without taking it, so the dialog would also answer it with OK.
+        ui.input_mut(|input| input.events.retain(|e| !matches!(e, egui::Event::Key { key: egui::Key::Enter, pressed: true, .. })));
+        f.insert("__selectedColor".into(), json!(i));
+        // The Color Picker dialog edits an existing field, so the entry's current colour is
+        // written to its edit first.
+        let edits = f.entry("colorTableEdits").or_insert_with(|| json!({}));
+        if let Some(edits) = edits.as_object_mut() {
+            edits.insert(i.to_string(), json!(web_cmds::rgb_hex(edited(i))));
+        }
+        let title = crate::color_picker_ui::title_for(&format!("{} {i}", tl!("Color Table").trim_end_matches('…')));
+        crate::color_picker_ui::request_field(f, &format!("/colorTableEdits/{i}"), &title);
+    }
+    if f.get("__transparentIndex").and_then(Value::as_u64).is_some() {
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+        crate::widgets::checker(ui.painter(), rect, 4.0);
+        response.on_hover_text(tl!("Transparency"));
+    }
     ui.horizontal(|ui| {
         ui.add(Text::new(format!("{}: {}", tl!("Colors"), table.len())).role(TypeRole::Caption).content(Content::Muted));
         if ui.add(Button::new(tl!("Reset")).variant(ButtonVariant::Secondary).size(ControlSize::Sm)).clicked() {
