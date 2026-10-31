@@ -3278,11 +3278,9 @@ fn w_and_h_edits_on_a_skewed_box_match_upstream() {
     assert_size_edits_match_upstream("skewed", [[0.0, 0.0], [100.0, 0.0], [100.0 - d, 50.0], [-d, 50.0]]);
 }
 
-/// The library's `BoxState` scales a distorted box as a parallelogram (affine part only);
-/// upstream scaled through the box's homography and kept the perspective. W 50 % on this box:
-/// corner 0 is (29.193, 14.722) here and (25.300, 12.650) upstream.
+/// A distorted box scales through its homography and keeps its perspective, as upstream does.
 #[test]
-#[ignore = "the field commits per keystroke; the homography scale reads back inexactly (5 -> 4.91 %), so the next digit lands on a different box than upstream's single edit"]
+#[ignore = "waits on craft-ui row 112: typing draft survives host write-back"]
 fn w_and_h_edits_on_a_distorted_box_match_upstream() {
     assert_size_edits_match_upstream("distorted", [[0.0, 0.0], [100.0, 10.0], [90.0, 60.0], [-5.0, 50.0]]);
 }
