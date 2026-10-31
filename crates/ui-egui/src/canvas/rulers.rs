@@ -232,7 +232,7 @@ pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::
     // A drag out of a ruler: mirrored into `guide_drag` for the Info panel, the readout and the
     // tools that stand aside while a guide moves, and applied on its release.
     match out.event {
-        Some((None, EditEvent::Update { value, .. })) => {
+        Some((None, EditEvent::Begin { value: Some(value), .. } | EditEvent::Update { value, .. })) => {
             if let Some(pos) = value.position {
                 let vertical = value.orientation == Orientation::Vertical;
                 app.guide_drag = Some(GuideDrag { vertical, index: None, pos, press: pos, over_ruler: false });

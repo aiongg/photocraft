@@ -10,7 +10,8 @@ use craft::ui::localized::{LocaleNumbers, Unit};
 pub fn slider(ui: &mut Ui, label: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {
     let salt = ui.next_auto_id();
     let (lo, hi) = (*range.start(), *range.end());
-    let mut slider = Slider::new(salt, label, f64::from(*value), f64::from(lo)..=f64::from(hi)).size(ControlSize::Md).width(ui.available_width().max(60.0));
+    let mut slider =
+        Slider::new(salt, label, f64::from(*value), f64::from(lo)..=f64::from(hi)).size(ControlSize::Md).fill(false).width(ui.available_width().max(60.0));
     if let Some(stops) = gradient.filter(|g| g.len() >= 2) {
         slider = slider.track_colors(stops.iter().copied());
     }
@@ -189,6 +190,8 @@ pub fn slider_row_prec(
     let (lo, hi) = (*range.start(), *range.end());
     let mut row = SliderRow::new(salt, tl!(label), f64::from(*value), f64::from(lo)..=f64::from(hi), &numbers)
         .size(ControlSize::Md)
+        .fill(false)
+        .field_width(74.0)
         .wheel(g.wheel_step.is_some())
         // `RowGestures::wheel_step` is the slider's step per notch; the library's default is a hundredth of the range.
         .unit(if suffix.is_empty() { Unit::default() } else { Unit::new(&format!("{{n}}{suffix}")) });

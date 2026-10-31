@@ -249,7 +249,6 @@ fn moving_a_guide_on_the_canvas_shows_its_y() {
 /// after that frame's pointer move (the ruler handles the drag after the canvas is drawn), and
 /// the frame that drops it shows none.
 #[test]
-#[ignore = "craft-ui Guides::track begins a ruler drag with Gesture::begin(), so Begin carries no position and the first Update comes a pass later; it needs begin_with_value()"]
 fn ruler_drag_readout_is_current_every_frame() {
     use egui_kittest::kittest::Queryable;
     let mut h = canvas_harness(true);
