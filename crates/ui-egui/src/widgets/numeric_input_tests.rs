@@ -156,6 +156,24 @@ fn numeric_event_limit_counts_unicode_characters_and_rejects_without_truncating(
 }
 
 #[test]
+#[ignore = "NumberField has no cap on parsed text length (S1 gap A, library row pending)"]
+fn numeric_parser_rejects_oversized_accumulated_text_before_normalizing() {
+    let mut h = focused();
+    select_all(&mut h);
+    // Each event is under the cap, but the resulting input is too long. Normalizing first
+    // would hide all the spaces and apply 2. DragValue still owns its editable text.
+    h.event(Event::Text(" ".repeat(LIMIT / 2)));
+    h.run();
+    h.event(Event::Text(format!("{}2", " ".repeat(LIMIT / 2))));
+    h.run();
+    assert_eq!(numeric_text(&h).chars().count(), LIMIT + 1);
+    assert_eq!(h.state().0, 100.0, "oversized plain input must not apply live");
+    h.key_press(Key::Enter);
+    h.run();
+    assert_eq!(h.state().0, 100.0, "oversized input must not apply on commit");
+}
+
+#[test]
 fn tab_and_paste_in_one_frame_filter_only_the_receiving_numeric_field() {
     let mut h = focused();
     let text = "x".repeat(16 * 1024);
