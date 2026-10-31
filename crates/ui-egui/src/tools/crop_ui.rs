@@ -720,18 +720,9 @@ pub(crate) fn part_handle(part: BoxPart) -> Option<(i8, i8)> {
     }
 }
 
-/// The active view as the library's: a plain view at the zoom when the document has none laid out
-/// yet (the control channel before the first frame).
-fn canvas_view(app: &PhotocraftApp) -> CanvasView {
-    ViewXform::active(app).map_or_else(
-        || CanvasView::new(egui::Rect::from_center_size(egui::Pos2::ZERO, egui::vec2(1e7, 1e7)), Point::ZERO, f64::from(app.point_zoom().max(0.01))),
-        |xf| xf.canvas_view(),
-    )
-}
-
 /// The active view as the library's, and a point of it in screen space.
 fn view_and_screen(app: &PhotocraftApp, p: [f64; 2]) -> Option<(CanvasView, egui::Pos2)> {
-    let view = canvas_view(app);
+    let view = ViewXform::library_view(app);
     let at = view.to_screen(Point::new(p[0], p[1]));
     (at.x.is_finite() && at.y.is_finite()).then_some((view, at))
 }
