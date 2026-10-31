@@ -14,6 +14,7 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{TransformSession, TypeTransform};
 use crate::transform_tool::{Gesture, Hit};
+use craft_ui::canvas::quad::{BoxRules, ScaleRule};
 
 const PREVIEW_BASE: u64 = 1 << 37;
 const ROTATE_PX: f64 = 28.0;
@@ -215,14 +216,17 @@ fn hit(app: &PhotocraftApp, t: &TransformSession, p: [f64; 2]) -> Option<Hit> {
     (h != Hit::Outside || near_border(t, p, ROTATE_PX / f64::from(app.point_zoom().max(0.01)))).then_some(h)
 }
 
-/// Type uses legacy scaling: Shift constrains; Ctrl/Cmd is the mode key, never corner Distort.
+/// Type uses legacy scaling (the library's `ScaleRule::Free`): Shift constrains; Ctrl/Cmd is the
+/// mode key, never corner Distort.
+fn gesture_rules() -> BoxRules {
+    BoxRules { scale: ScaleRule::Free, ..BoxRules::default() }
+}
+
+/// The keys of a drag on `h`: ⌘ is held for an edge (it skews) and dropped for any other part.
 fn gesture_mods(h: Hit, mut mods: Modifiers) -> Modifiers {
     mods.command = matches!(h, Hit::Edge(_));
     mods.ctrl = false;
     mods.mac_cmd = false;
-    if matches!(h, Hit::Corner(_)) {
-        mods.shift = !mods.shift;
-    }
     mods
 }
 
@@ -273,7 +277,7 @@ fn update(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
             _ => None,
         };
         let p = target.map_or(p, |q| [q[0] + p[0] - t.gesture.start[0], q[1] + p[1] - t.gesture.start[1]]);
-        crate::transform_tool::apply_drag(&mut t.frame, t.gesture, p, gesture_mods(t.gesture.hit, mods));
+        crate::transform_tool::apply_drag(&mut t.frame, t.gesture, p, gesture_mods(t.gesture.hit, mods), &gesture_rules());
     }
     if affine(t).is_none() {
         t.frame = before;

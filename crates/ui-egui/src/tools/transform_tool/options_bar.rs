@@ -580,8 +580,10 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
 fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, mode_switch: bool) {
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     // Cancel and Commit keep the library order at the end of the bar; Reset, the divider and the mode switch follow them.
+    let style = OptionsBar::style(&<craft_theme::Tokens as craft_ui::theme::TokensOf>::of(ui), false);
+    let pair = 2.0 * style.button + ui.spacing().item_spacing.x;
     let done = ui
-        .scope_builder(egui::UiBuilder::new().layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
+        .allocate_ui_with_layout(egui::vec2(pair, ui.available_height()), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             OptionsBar::commit_cancel(ui, tl!("Commit transform"), tl!("Cancel transform"))
         })
         .inner;

@@ -142,12 +142,11 @@ pub(crate) struct Gesture {
     pub(crate) pivot0: [f64; 2],
 }
 
-/// `g`'s drag of a box to document point `p` with `mods`, by the library's rules for Free
-/// Transform (no mode, the modifiers already adjusted by the caller).
-pub(crate) fn apply_drag(s: &mut TransformSession, g: Gesture, p: [f64; 2], mods: Modifiers) {
+/// `g`'s drag of a box to document point `p` with `mods` held, by the library's `rules`.
+pub(crate) fn apply_drag(s: &mut TransformSession, g: Gesture, p: [f64; 2], mods: Modifiers, rules: &BoxRules) {
     let point = |q: [f64; 2]| Point::new(q[0], q[1]);
     let start = BoxState { quad: g.quad0.map(point), pivot: point(g.pivot0) };
-    let next = craft_ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, &BoxRules::default());
+    let next = craft_ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, rules);
     apply_state(s, &next);
 }
 

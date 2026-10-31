@@ -39,11 +39,10 @@ pub(crate) use begin::moving_texel;
 pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_placed, begin_selection, begin_warp, enter_warp, leave_warp, warps_type};
 pub(crate) use commit::{SAVE_FOR_WEB, committing, nudge};
 pub use commit::{cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event, track_steps};
+pub(crate) use drag_modes::corner_distorts;
 #[cfg(test)]
-pub(crate) use drag_modes::unlinked_mods;
 #[cfg(test)]
 use drag_modes::{HandleIndicator, handle_indicator};
-pub(crate) use drag_modes::{corner_distorts, legacy_mods};
 #[cfg(test)]
 use draw::scale_values;
 #[cfg(test)]
