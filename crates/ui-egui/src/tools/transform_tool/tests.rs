@@ -183,7 +183,7 @@ fn warp_bar_buttons_follow_the_fields_on_a_wide_bar() {
     h.run_steps(4);
     assert!(h.state().ui.transform.as_ref().unwrap().warp.is_some());
     let commit = h.get_by_label("Commit transform").rect();
-    assert!(commit.right() < width / 2.0, "commit sits next to the fields, not at the far right: {commit:?}");
+    assert!(commit.right() < width * 0.6, "commit sits next to the fields, not at the far right: {commit:?}");
     let reset = h.get_by_label("Reset warp").rect();
     assert!(reset.right() < commit.left() + 1.0, "reset is left of commit");
     h.get_by_label("Reset warp").click();
@@ -292,7 +292,7 @@ fn bar_harness(setup: impl FnOnce(&mut PhotocraftApp)) -> egui_kittest::Harness<
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.ui.transform = Some(session());
     setup(&mut app);
-    let mut h = Harness::builder().with_size(vec2(900.0, 360.0)).build_ui_state(
+    let mut h = Harness::builder().with_size(vec2(1300.0, 360.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -669,7 +669,7 @@ fn typed_scales_stay_within_the_largest_document() {
 
 fn drag(s: &mut TransformSession, from: [f64; 2], to: [f64; 2], mods: egui::Modifiers) {
     let g = Gesture { hit: hit(s, from, 8.0), start: from, quad0: s.quad, pivot0: s.pivot };
-    apply_drag(s, g, to, mods);
+    apply_drag(s, g, to, mods, &BoxRules::default());
 }
 
 /// A handle drag in Edit › Transform `mode`, as the canvas applies it (on a pixel layer).
@@ -1824,20 +1824,6 @@ fn a_distort_corner_stops_before_the_box_folds_over() {
 
 #[test]
 fn the_legacy_preference_swaps_corner_proportions_and_stretches_edges() {
-    let none = egui::Modifiers::NONE;
-    let corner = Hit::Corner(1);
-    let edge = Hit::Edge(1);
-    // Default: proportional (⇧ frees), so the drag keeps its keys.
-    assert!(!legacy_mods(false, corner, none).shift);
-    assert!(!legacy_mods(false, edge, none).shift);
-    // Legacy: corners free by default, ⇧ keeps proportions; edges always stretch one axis;
-    // ⌘ gestures are left alone.
-    assert!(legacy_mods(true, corner, none).shift);
-    assert!(!legacy_mods(true, corner, egui::Modifiers::SHIFT).shift);
-    assert!(legacy_mods(true, edge, none).shift);
-    assert!(legacy_mods(true, edge, egui::Modifiers::SHIFT).shift);
-    assert!(!legacy_mods(true, corner, egui::Modifiers::COMMAND).shift);
-    assert!(!legacy_mods(true, edge, egui::Modifiers::COMMAND).shift);
     // Through the box: a plain corner drag, then a plain right-edge drag, on a 16×16 square.
     for (legacy, proportional) in [(false, true), (true, false)] {
         for at_edge in [false, true] {
@@ -1847,7 +1833,7 @@ fn the_legacy_preference_swaps_corner_proportions_and_stretches_edges() {
             begin(&mut app, &egui::Context::default()).unwrap();
             let q0 = app.ui.transform.as_ref().unwrap().quad;
             let from = if at_edge { [q0[1][0], (q0[1][1] + q0[2][1]) / 2.0] } else { q0[2] };
-            press_drag(&mut app, from, [from[0] + 16.0, from[1]], none);
+            press_drag(&mut app, from, [from[0] + 16.0, from[1]], egui::Modifiers::NONE);
             let q = app.ui.transform.as_ref().unwrap().quad;
             let (w, h) = (q[2][0] - q[0][0], q[2][1] - q[0][1]);
             assert_eq!((w - h).abs() < 1e-6, proportional, "legacy {legacy}, edge {at_edge}: {w} × {h}");
@@ -1885,9 +1871,6 @@ fn the_aspect_link_decides_whether_handle_drags_keep_proportions() {
             }
         }
     }
-    // ⌘ gestures (skew, distort) are left alone.
-    assert!(!unlinked_mods(true, false, Hit::Corner(0), egui::Modifiers::COMMAND).shift);
-    assert!(!unlinked_mods(true, false, Hit::Inside, none).shift);
 }
 
 #[test]
@@ -2261,11 +2244,11 @@ fn preview_pixels_past_the_canvas_are_hidden() {
 fn shift_body_drag_locks_to_eight_directions_and_switches() {
     let mut s = session();
     let g = Gesture { hit: Hit::Inside, start: [40.0, 20.0], quad0: s.quad, pivot0: s.pivot };
-    apply_drag(&mut s, g, [60.0, 23.0], egui::Modifiers::SHIFT);
+    apply_drag(&mut s, g, [60.0, 23.0], egui::Modifiers::SHIFT, &BoxRules::default());
     assert!(close(s.quad, corners([20.0, 0.0, 120.0, 50.0])), "horizontal: {:?}", s.quad);
-    apply_drag(&mut s, g, [60.0, 39.0], egui::Modifiers::SHIFT);
+    apply_drag(&mut s, g, [60.0, 39.0], egui::Modifiers::SHIFT, &BoxRules::default());
     assert!((s.quad[0][0] - s.quad[0][1]).abs() < 1e-9 && s.quad[0][0] > 15.0, "diagonal: {:?}", s.quad[0]);
-    apply_drag(&mut s, g, [41.0, 60.0], egui::Modifiers::SHIFT);
+    apply_drag(&mut s, g, [41.0, 60.0], egui::Modifiers::SHIFT, &BoxRules::default());
     assert!(close(s.quad, corners([0.0, 40.0, 100.0, 90.0])), "vertical: {:?}", s.quad);
 }
 

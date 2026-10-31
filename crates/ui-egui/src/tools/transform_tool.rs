@@ -39,18 +39,17 @@ pub(crate) use begin::moving_texel;
 pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_placed, begin_selection, begin_warp, enter_warp, leave_warp, warps_type};
 pub(crate) use commit::{SAVE_FOR_WEB, committing, nudge};
 pub use commit::{cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event, track_steps};
+pub(crate) use drag_modes::corner_distorts;
 #[cfg(test)]
-pub(crate) use drag_modes::unlinked_mods;
 #[cfg(test)]
 use drag_modes::{HandleIndicator, handle_indicator};
-pub(crate) use drag_modes::{corner_distorts, legacy_mods};
-pub(crate) use draw::draw_handle_cursor;
 #[cfg(test)]
 use draw::scale_values;
 #[cfg(test)]
 pub(crate) use draw::{Readout, live_readout, styled_frame};
 pub(crate) use draw::{carries_selection_of, draw_selection};
 pub use draw::{draw_content, draw_overlay};
+pub(crate) use draw::{draw_handle_cursor, paint_box};
 #[cfg(test)]
 use draw::{front_vertices, handle_anchor};
 pub(crate) use options_bar::position_size_fields;
@@ -60,7 +59,7 @@ use options_bar::{
     set_size_unit, size_pct, size_shown, size_unit, warp_grid_id,
 };
 pub use options_bar::{options_bar, reset_warp};
-pub(crate) use pointer::{Gesture, Held, Hit, apply_drag, hit, point_view, reach, rotate_cursor_dir};
+pub(crate) use pointer::{Gesture, Held, Hit, apply_drag, corner_bisector, hit, point_view, reach, rotate_cursor_dir};
 pub use pointer::{cursor, pointer};
 #[cfg(test)]
 use pointer::{near_rotate_corner, point_on_quad, rotation_degrees};
@@ -126,7 +125,7 @@ pub struct TransformPreview {
     /// Document point the split guide is following (a drag, or the hover while placing).
     split_pointer: Option<[f64; 2]>,
     split_placing: bool,
-    /// The split press under way ([`WarpGrid::split_press`]); a quick one (⌥ or ⌘ without a
+    /// The split press under way ([`WarpSplitPress`]); a quick one (⌥ or ⌘ without a
     /// button armed) is told by the press itself.
     split_press: Option<WarpSplitPress>,
     steps: Steps,

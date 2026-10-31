@@ -12,6 +12,7 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{CamTransform, Tool, TransformSession};
 use crate::transform_tool::{Gesture, Hit};
+use craft_ui::canvas::quad::{BoxRules, ScaleRule};
 
 /// Where the patch lands: the drag offset (px) and the scale (%, per axis) and clockwise rotation
 /// (degrees) about its centre, as `paint.contentAwareMove` takes them.
@@ -170,7 +171,8 @@ pub(crate) fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -
                 let before = (t.frame.quad, t.frame.pivot);
                 // Move, scale and rotate only: ⌘ would skew or distort, which the blend can't take.
                 let plain = Modifiers { command: false, ctrl: false, mac_cmd: false, ..mods };
-                crate::transform_tool::apply_drag(&mut t.frame, g, [x, y], crate::transform_tool::legacy_mods(legacy, g.hit, plain));
+                let rules = BoxRules { scale: if legacy { ScaleRule::Free } else { ScaleRule::Proportional }, ..BoxRules::default() };
+                crate::transform_tool::apply_drag(&mut t.frame, g, [x, y], plain, &rules);
                 if placement(t).is_none() {
                     (t.frame.quad, t.frame.pivot) = before;
                 }
@@ -198,7 +200,7 @@ pub(crate) fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform)
         });
         painter.ctx().request_repaint_after(std::time::Duration::from_millis(100));
     }
-    crate::type_transform::draw_box(painter, xf, &t.frame);
+    crate::transform_tool::paint_box(painter, xf, &t.frame);
 }
 
 /// The Free Transform box's cursors over the box's handles.
@@ -217,7 +219,7 @@ pub(crate) fn cursor(app: &PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, p
             crate::tool_cursor::resize([a[0] - b[0], a[1] - b[1]], xf)
         }
         Hit::Outside => {
-            crate::type_transform::rotation_cursor(ctx, p);
+            crate::type_transform::rotation_cursor(ctx, xf, &q, p);
             CursorIcon::None
         }
         Hit::Pivot => CursorIcon::Crosshair,
