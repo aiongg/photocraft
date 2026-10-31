@@ -3,8 +3,8 @@
 //! Dynamics, Transfer, Brush Pose, Build-up and Smoothing. Each edits a working copy of the brush;
 //! the panel turns the difference into one `tools.setBrush` call.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{self, BrushPreset, Control, Dynamic, MAX_BRUSH_SIZE, MaskMode, Pattern, PatternStyle, TipShape};
@@ -44,9 +44,9 @@ const PATTERNS: [(PatternStyle, &str); 4] =
 /// The library's labelled slider row over `*v`; returns whether it changed. A cancelled drag
 /// (Esc) restores the value the drag began with.
 fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str) -> bool {
-    use craft_ui::composites::SliderRow;
-    use craft_ui::edit::EditEvent;
-    use craft_ui::localized::{LocaleNumbers, Unit};
+    use craft::ui::composites::SliderRow;
+    use craft::ui::edit::EditEvent;
+    use craft::ui::localized::{LocaleNumbers, Unit};
     let numbers = LocaleNumbers::of(ui);
     // Rows repeat labels ("Minimum" under each dynamic), so the row's own position names it.
     let salt = ui.next_auto_id();
@@ -96,7 +96,7 @@ fn num(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclus
 }
 
 fn dim(ui: &mut egui::Ui, s: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.label(RichText::new(s).color(t.color.text.muted.to_egui()));
 }
 
@@ -138,7 +138,7 @@ fn control_row(ui: &mut egui::Ui, id: &str, d: &mut Dynamic, angle: bool) {
         }
     }
     ui.data_mut(|m| m.insert_temp(open_id, open));
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
 }
 
 /// A jitter slider, its Control row and (optionally) the Minimum slider: one Photoshop block.
@@ -148,7 +148,7 @@ fn dynamic(ui: &mut egui::Ui, id: &str, label: &str, d: &mut Dynamic, max: f32, 
     if let Some(m) = minimum {
         minimum_row(ui, m, d);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
 }
 
 /// Minimum belongs to the control. Off disables editing without discarding its saved value.
@@ -159,7 +159,7 @@ fn minimum_row(ui: &mut egui::Ui, label: &str, d: &mut Dynamic) {
 /// Size: a value field over a logarithmic slider (small sizes get most of the travel).
 /// `restore` adds Photoshop's "Restore original size" button (sampled tips).
 fn size_row(ui: &mut egui::Ui, label: &str, size: &mut f32, max: f32, restore: Option<f32>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!(label)).color(t.color.text.muted.to_egui()));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -178,7 +178,7 @@ fn size_row(ui: &mut egui::Ui, label: &str, size: &mut f32, max: f32, restore: O
     if widgets::slider(ui, &mut lv, 0.0..=max.ln(), None).changed() {
         *size = lv.exp().round().clamp(1.0, max);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
 }
 
 /// Which part of the angle/roundness widget a drag grabbed.
@@ -220,7 +220,7 @@ pub fn ellipse_drag(grab: EllipseGrab, rel: egui::Vec2, angle: f32, roundness: f
 
 /// Photoshop's angle/roundness widget: drag the arrow to rotate, the dots to squash.
 fn ellipse_widget(ui: &mut egui::Ui, angle: &mut f32, roundness: &mut f32) -> bool {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(84.0, 84.0), Sense::click_and_drag());
     let c = rect.center();
     let grab_id = resp.id.with("grab");
@@ -250,9 +250,9 @@ fn ellipse_widget(ui: &mut egui::Ui, angle: &mut f32, roundness: &mut f32) -> bo
     }
     let p = ui.painter();
     p.circle_filled(c, 40.0, t.color.surface.sunken.to_egui());
-    p.circle_stroke(c, 40.0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
-    p.line_segment([c - vec2(40.0, 0.0), c + vec2(40.0, 0.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
-    p.line_segment([c - vec2(0.0, 40.0), c + vec2(0.0, 40.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+    p.circle_stroke(c, 40.0, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()));
+    p.line_segment([c - vec2(40.0, 0.0), c + vec2(40.0, 0.0)], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
+    p.line_segment([c - vec2(0.0, 40.0), c + vec2(0.0, 40.0)], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()));
     let (s, co) = angle.to_radians().sin_cos();
     let major = vec2(co, -s);
     let minor = vec2(-s, -co);
@@ -266,16 +266,16 @@ fn ellipse_widget(ui: &mut egui::Ui, angle: &mut f32, roundness: &mut f32) -> bo
     p.add(egui::Shape::convex_polygon(
         pts,
         t.color.text.normal.to_egui().gamma_multiply(0.18),
-        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui()),
+        craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui()),
     ));
     // Arrow along the major axis.
     let tip = c + major * (ELLIPSE_R + 5.0);
-    p.line_segment([c, tip], craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
+    p.line_segment([c, tip], craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
     let back = tip - major * 7.0;
     p.add(egui::Shape::convex_polygon(vec![tip, back + minor * 4.0, back - minor * 4.0], t.color.accent.solid.to_egui(), Stroke::NONE));
     for h in roundness_handles(*angle, *roundness) {
         p.circle_filled(c + h, 4.0, Color32::WHITE);
-        p.circle_stroke(c + h, 4.0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()));
+        p.circle_stroke(c + h, 4.0, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()));
     }
     let _ = resp.on_hover_text(tl!("Drag the arrow to set the angle, the dots to set the roundness"));
     changed
@@ -296,7 +296,7 @@ pub fn thumb_scale(size: f32) -> f32 {
 /// preset (by identity: look-alike duplicates must stay distinct, so rows are keyed by index).
 /// Returns the clicked index.
 fn tip_grid(ui: &mut egui::Ui, id: &str, presets: &[BrushPreset], highlight: Option<usize>) -> Option<usize> {
-    use craft_ui::presets::{PresetBrowser, PresetEvent, PresetRow, PresetState, PresetView};
+    use craft::ui::presets::{PresetBrowser, PresetEvent, PresetRow, PresetState, PresetView};
     const CELL: f32 = 44.0;
     let rows: Vec<PresetRow<usize>> =
         presets.iter().enumerate().map(|(i, p)| PresetRow::item(i, p.name.as_str(), 0).caption(format!("{}", p.brush.size.round() as i64))).collect();
@@ -309,13 +309,13 @@ fn tip_grid(ui: &mut egui::Ui, id: &str, presets: &[BrushPreset], highlight: Opt
         .max_height(104.0)
         .show(ui, |painter, rect, info| {
             let Some(p) = presets.get(*info.key) else { return };
-            let t = craft_ui::theme::current(painter.ctx());
+            let t = craft::ui::theme::current(painter.ctx());
             let (tip, size, hard, angle, round, _) = preset_tip(p);
             let tex = brush_preview::tip_texture(painter.ctx(), &format!("{id}:{}", p.name), tip, (hard, angle, round), 34, t.color.text.normal.to_egui());
             let ir = egui::Rect::from_center_size(rect.center(), rect.size() * thumb_scale(size));
             painter.image(tex.id(), ir, egui::Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
         });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     out.events.iter().find_map(|e| match e {
         PresetEvent::Select { key, .. } => Some(*key),
         _ => None,
@@ -343,15 +343,15 @@ fn tip_shape(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset], 
     size_row(ui, tl!("Size"), &mut b.size, MAX_BRUSH_SIZE, orig);
     ui.horizontal(|ui| {
         widgets::checkbox(ui, &mut b.flip_x, tl!("Flip X"));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         widgets::checkbox(ui, &mut b.flip_y, tl!("Flip Y"));
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         ellipse_widget(ui, &mut b.angle, &mut b.roundness);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         ui.vertical(|ui| {
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.add_space(craft::ui::theme::scale::Space::S12.px());
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(vec2(72.0, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| dim(ui, tl!("Angle:")));
                 let mut a = b.angle;
@@ -359,7 +359,7 @@ fn tip_shape(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset], 
                     b.angle = a.round().clamp(-180.0, 180.0);
                 }
             });
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(vec2(72.0, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| dim(ui, tl!("Roundness:")));
                 let mut r = (b.roundness * 100.0).round();
@@ -369,13 +369,13 @@ fn tip_shape(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset], 
             });
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.add_enabled_ui(matches!(b.tip, TipShape::Round), |ui| {
         pct(ui, tl!("Hardness"), &mut b.hardness, 1.0);
     });
     // Unchecked, the pointer's speed sets the spacing (Photoshop).
     widgets::checkbox(ui, &mut b.spacing_enabled, tl!("Spacing")).on_hover_text(tl!("Off: the speed of the pointer sets the spacing"));
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     let on = b.spacing_enabled;
     ui.add_enabled_ui(on, |ui| signed_pct(ui, tl!("Spacing"), &mut b.spacing, 0.01, 10.0));
     None
@@ -389,15 +389,15 @@ fn shape_dynamics(ui: &mut egui::Ui, b: &mut BrushSettings) {
     // Tilt Scale applies with the size control on Pen Tilt (greyed out otherwise, like Photoshop).
     let tilt = sd.size.control == Control::PenTilt;
     ui.add_enabled_ui(tilt, |ui| pct(ui, tl!("Tilt Scale"), &mut sd.tilt_scale, 2.0));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     dynamic(ui, "brush-angle-ctl", tl!("Angle Jitter"), &mut sd.angle, 1.0, None, true);
     dynamic(ui, "brush-round-ctl", tl!("Roundness Jitter"), &mut sd.roundness, 1.0, Some(tl!("Minimum Roundness")), false);
     ui.horizontal(|ui| {
         widgets::checkbox(ui, &mut sd.flip_x_jitter, tl!("Flip X Jitter"));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         widgets::checkbox(ui, &mut sd.flip_y_jitter, tl!("Flip Y Jitter"));
     });
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     widgets::checkbox(ui, &mut sd.brush_projection, tl!("Brush Projection")).on_hover_text(tl!("Apply the pen's tilt and rotation to the tip shape"));
 }
 
@@ -405,9 +405,9 @@ fn scattering(ui: &mut egui::Ui, b: &mut BrushSettings) {
     let sc = &mut b.scattering;
     pct(ui, tl!("Scatter"), &mut sc.scatter.jitter, 10.0);
     widgets::checkbox(ui, &mut sc.both_axes, tl!("Both Axes"));
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     control_row(ui, "brush-scatter-ctl", &mut sc.scatter, false);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let mut c = sc.count as f32;
     if num(ui, tl!("Count"), &mut c, 1.0..=16.0, "") {
         sc.count = c as u32;
@@ -417,7 +417,7 @@ fn scattering(ui: &mut egui::Ui, b: &mut BrushSettings) {
 
 /// The pattern swatch: the (adjusted) texture as the stroke sees it.
 fn pattern_swatch(ui: &mut egui::Ui, tx: &paint::Texture) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let n = 56u32;
     let (rect, _) = ui.allocate_exact_size(vec2(n as f32, n as f32), Sense::hover());
     let sig = {
@@ -462,8 +462,8 @@ fn pattern_swatch(ui: &mut egui::Ui, tx: &paint::Texture) {
     ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
     ui.painter().rect_stroke(
         rect,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        craft::ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
         egui::StrokeKind::Inside,
     );
 }
@@ -472,7 +472,7 @@ fn texture(ui: &mut egui::Ui, b: &mut BrushSettings) {
     let tx = &mut b.texture;
     ui.horizontal(|ui| {
         pattern_swatch(ui, tx);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         ui.vertical(|ui| {
             let mut style = match &tx.pattern {
                 Pattern::Procedural { style, .. } => Some(*style),
@@ -491,11 +491,11 @@ fn texture(ui: &mut egui::Ui, b: &mut BrushSettings) {
                 };
                 tx.pattern = Pattern::Procedural { style: s, size, seed: 1 };
             }
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+            ui.add_space(craft::ui::theme::scale::Space::S4.px());
             widgets::checkbox(ui, &mut tx.invert, tl!("Invert"));
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if let Pattern::Procedural { size, .. } = &mut tx.pattern {
         let mut s = *size as f32;
         if num(ui, tl!("Pattern Size"), &mut s, 16.0..=1024.0, "px") {
@@ -513,12 +513,12 @@ fn texture(ui: &mut egui::Ui, b: &mut BrushSettings) {
         tx.contrast = if ct < 0.0 { ct / 50.0 } else { ct / 100.0 };
     }
     widgets::checkbox(ui, &mut tx.each_tip, tl!("Texture Each Tip"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         dim(ui, tl!("Mode:"));
         widgets::dropdown(ui, "brush-texture-mode", tl!("Mode"), &mut tx.mode, &MASK_MODES, 130.0);
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     pct(ui, tl!("Depth"), &mut tx.depth, 1.0);
     let each = tx.each_tip;
     ui.add_enabled_ui(each, |ui| {
@@ -533,10 +533,10 @@ fn dual_brush(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset])
     ui.horizontal(|ui| {
         dim(ui, tl!("Mode:"));
         widgets::dropdown(ui, "brush-dual-mode", tl!("Mode"), &mut d.mode, &MASK_MODES, 120.0);
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         widgets::checkbox(ui, &mut d.flip, tl!("Flip"));
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     // The dual tip is a sub-setting, not a selection: no persistent highlight (a look-alike match
     // would highlight an arbitrary duplicate).
     if let Some(p) = tip_grid(ui, "brush-dual-grid", presets, None).and_then(|i| presets.get(i)) {
@@ -553,7 +553,7 @@ fn dual_brush(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset])
     signed_pct(ui, tl!("Spacing"), &mut d.spacing, 0.01, 10.0);
     pct(ui, tl!("Scatter"), &mut d.scatter, 10.0);
     widgets::checkbox(ui, &mut d.both_axes, tl!("Both Axes"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut c = d.count as f32;
     if num(ui, tl!("Count"), &mut c, 1.0..=16.0, "") {
         d.count = c as u32;
@@ -563,7 +563,7 @@ fn dual_brush(ui: &mut egui::Ui, b: &mut BrushSettings, presets: &[BrushPreset])
 fn color_dynamics(ui: &mut egui::Ui, b: &mut BrushSettings) {
     let c = &mut b.color_dynamics;
     widgets::checkbox(ui, &mut c.per_tip, tl!("Apply Per Tip"));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     dynamic(ui, "brush-fgbg-ctl", tl!("Foreground/Background Jitter"), &mut c.fg_bg, 1.0, None, false);
     pct(ui, tl!("Hue Jitter"), &mut c.hue_jitter, 1.0);
     pct(ui, tl!("Saturation Jitter"), &mut c.saturation_jitter, 1.0);
@@ -586,12 +586,12 @@ fn transfer(ui: &mut egui::Ui, b: &mut BrushSettings, tool: Tool) {
 /// The Mixer Brush options the brush carries (Photoshop shows them in the Mixer Brush's options
 /// bar; `paint.mixerBrush` uses them unless its params override them).
 fn mixer_options(ui: &mut egui::Ui, b: &mut BrushSettings) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.add_space(t.space.gap.stack);
     widgets::hairline(ui);
     ui.add_space(t.space.gap.stack);
     ui.label(RichText::new(tl!("Mixer Brush")).font(theme::semibold(11.5)).color(t.color.text.muted.to_egui()));
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     let m = &mut b.mixer;
     pct(ui, tl!("Wet"), &mut m.wet, 1.0);
     pct(ui, tl!("Load"), &mut m.load, 1.0);
@@ -614,13 +614,13 @@ fn pose(ui: &mut egui::Ui, b: &mut BrushSettings) {
     let p = &mut b.pose;
     tilt(ui, tl!("Tilt X"), &mut p.tilt_x);
     widgets::checkbox(ui, &mut p.override_tilt_x, tl!("Override Tilt X"));
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     tilt(ui, tl!("Tilt Y"), &mut p.tilt_y);
     widgets::checkbox(ui, &mut p.override_tilt_y, tl!("Override Tilt Y"));
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     num(ui, tl!("Rotation"), &mut p.rotation, 0.0..=360.0, "°");
     widgets::checkbox(ui, &mut p.override_rotation, tl!("Override Rotation"));
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     pct(ui, tl!("Pressure"), &mut p.pressure, 1.0);
     widgets::checkbox(ui, &mut p.override_pressure, tl!("Override Pressure"));
 }
@@ -639,7 +639,7 @@ fn smoothing(ui: &mut egui::Ui, b: &mut BrushSettings) {
 /// `brush.presets.setCurrent`.
 /// The active `tool` determines which Transfer controls apply.
 pub fn section_body(ui: &mut egui::Ui, b: &mut BrushSettings, i: usize, presets: &[BrushPreset], current: Option<&str>, tool: Tool) -> Option<String> {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let note = |ui: &mut egui::Ui, s: &str| {
         ui.label(RichText::new(s).color(t.color.text.faint.to_egui()).font(theme::medium(11.5)));
     };
@@ -661,7 +661,7 @@ pub fn section_body(ui: &mut egui::Ui, b: &mut BrushSettings, i: usize, presets:
         9 => note(ui, "Builds up paint along the edges of the stroke for a watercolour look. No options: turn it on in the list."),
         10 => {
             note(ui, tl!("Airbrush: keeps depositing paint while the pointer rests."));
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             num(ui, tl!("Rate"), &mut b.build_up_rate, 1.0..=200.0, "/s");
         }
         11 => smoothing(ui, b),

@@ -1,9 +1,9 @@
 use super::dialogs::toolbar_tab;
 use super::{BTreeMap, Map, PhotocraftApp, RichText, Value, default_shortcut, json, prefs};
-use craft_ui::controls::{Button, ButtonVariant, ControlSize, TextField};
-use craft_ui::edit::EditEvent;
-use craft_ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
-use craft_ui::theme::ToEgui;
+use craft::ui::controls::{Button, ButtonVariant, ControlSize, TextField};
+use craft::ui::edit::EditEvent;
+use craft::ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
+use craft::ui::theme::ToEgui;
 
 /// Every shortcut-bearing command (engine registry plus shell commands): (id, label, menu path,
 /// default shortcut), menu items first in Photoshop order.
@@ -180,7 +180,7 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
 /// Keyboard Shortcuts and Menus: a searchable list of commands by menu with editable shortcuts
 /// (click a shortcut, press keys; ⌫ removes it), menu visibility and colours, toolbar tools.
 pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut tab = f.get("tab").and_then(Value::as_u64).unwrap_or(0);
     let tabs = [Tab::new(0u64, tl!("Keyboard Shortcuts")), Tab::new(1u64, tl!("Menus")), Tab::new(2u64, tl!("Toolbar"))];
     for event in TabStrip::new("shortcuts-tabs", tl!("Keyboard Shortcuts, Menus and Toolbar"), TabKind::Text).selected(&tab).show(ui, &tabs).events {
@@ -190,7 +190,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         }
     }
     f.insert("tab".into(), json!(tab));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if tab == 2 {
         toolbar_tab(ui, f);
         return;
@@ -218,7 +218,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     // The Set row, then the search (the Menus tab searches too).
     if tab == 0 {
         set_row(app, ui, f, &mut overrides, &mut alt_overrides, &items, &mut message, &mut message_warning);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
     ui.horizontal(|ui| {
@@ -377,7 +377,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     let changed = overrides.contains_key(id) || alt_overrides.contains_key(id);
                     // The Shortcuts grid stays PhotoCraft's own until the library table row and a
                     // Button text tone land: a changed shortcut shows in the accent text colour.
-                    let t = craft_ui::theme::current(ui.ctx());
+                    let t = craft::ui::theme::current(ui.ctx());
                     let r = ui.add(
                         egui::Button::new(egui::RichText::new(tl!(&text)).size(12.0).color(if changed {
                             t.color.accent.text.to_egui()
@@ -418,7 +418,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
                     let hideable = photocraft_engine::prefs::MenuCustomization::hideable(id);
                     let mut visible = !hideable || !hidden.contains(id);
-                    ui.add_enabled_ui(hideable, |ui| craft_ui::controls::Checkbox::bool(tl!("Visible"), &mut visible).show(ui).response);
+                    ui.add_enabled_ui(hideable, |ui| craft::ui::controls::Checkbox::bool(tl!("Visible"), &mut visible).show(ui).response);
                     if visible {
                         hidden.retain(|h| h != id);
                     } else if !hidden.contains(id) {
@@ -427,7 +427,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     let mut col = colors.get(id).cloned().unwrap_or_else(|| "none".into());
                     let opts: Vec<(String, &str)> =
                         ["none", "red", "orange", "yellow", "green", "blue", "violet", "gray"].iter().map(|c| (c.to_string(), *c)).collect();
-                    craft_ui::controls::Select::new(&format!("menu-color-{id}"), tl!("Color"), &mut col)
+                    craft::ui::controls::Select::new(&format!("menu-color-{id}"), tl!("Color"), &mut col)
                         .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
                         .show(ui)
                         .response
@@ -442,7 +442,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             }
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if tab == 0 {
         ui.horizontal(|ui| {
             let has_sel = !selected.is_empty();
@@ -612,7 +612,7 @@ fn set_row(
         ui.label(tl!("Set:"));
         let mut chosen = active.clone();
         let pairs: Vec<(String, &str)> = names.iter().map(|(n, l)| (n.clone(), l.as_str())).collect();
-        if craft_ui::controls::Select::new("shortcut-set", tl!("Set:"), &mut chosen)
+        if craft::ui::controls::Select::new("shortcut-set", tl!("Set:"), &mut chosen)
             .rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1))
             .show(ui)
             .response

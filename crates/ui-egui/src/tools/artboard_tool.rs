@@ -7,8 +7,8 @@
 //! engine command (`layer.new.artboard`, `layer.artboard.set`, `layer.artboard.addBeside`), so each
 //! gesture is one undo step; this module only turns pointer gestures into them.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{CursorIcon, Pos2, Rect, Stroke, vec2};
 use photocraft_doc::{Document, Layer, LayerId};
 use serde::{Deserialize, Serialize};
@@ -260,12 +260,12 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     if app.ui.tool != Tool::Artboard {
         return;
     }
-    let t = craft_ui::theme::current(painter.ctx());
+    let t = craft::ui::theme::current(painter.ctx());
     let pt = |x: i64, y: i64| xf.to_screen(x as f32, y as f32);
     let outline = |r: [i64; 4]| -> Vec<Pos2> { vec![pt(r[0], r[1]), pt(r[2], r[1]), pt(r[2], r[3]), pt(r[0], r[3]), pt(r[0], r[1])] };
     let drag = app.ui.artboard_tool.drag;
     if let Some(d) = drag.as_ref() {
-        painter.add(egui::Shape::line(outline(preview(d)), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.color.accent.solid.to_egui())));
+        painter.add(egui::Shape::line(outline(preview(d)), craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.color.accent.solid.to_egui())));
     }
     let Some((_, r)) = active_board(app).filter(|_| !matches!(drag, Some(ArtboardDrag::New { .. }))) else { return };
     if drag.is_none()
@@ -274,9 +274,9 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         let rad = PLUS_RADIUS_PX as f32;
         for (_, c) in buttons {
             let c = xf.to_screen(c[0] as f32, c[1] as f32);
-            painter.circle(c, rad, t.color.surface.panel.to_egui(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()));
+            painter.circle(c, rad, t.color.surface.panel.to_egui(), craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()));
             let arm = rad * 0.5;
-            let s = craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.color.accent.solid.to_egui());
+            let s = craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), t.color.accent.solid.to_egui());
             painter.line_segment([c - vec2(arm, 0.0), c + vec2(arm, 0.0)], s);
             painter.line_segment([c - vec2(0.0, arm), c + vec2(0.0, arm)], s);
         }
@@ -285,11 +285,11 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     let (mx, my) = (r[0].saturating_add(r[2]) / 2, r[1].saturating_add(r[3]) / 2);
     for (x, y) in [(r[0], r[1]), (mx, r[1]), (r[2], r[1]), (r[2], my), (r[2], r[3]), (mx, r[3]), (r[0], r[3]), (r[0], my)] {
         let h = Rect::from_center_size(pt(x, y), vec2(7.0, 7.0));
-        painter.rect_filled(h, craft_ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
+        painter.rect_filled(h, craft::ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
         painter.rect_stroke(
             h,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.solid.to_egui()),
             egui::StrokeKind::Inside,
         );
     }
@@ -301,7 +301,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     if tool != Tool::Artboard {
         return false;
     }
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let board = active_board(app);
     let preset = board.and_then(|(id, _)| app.session.active()?.doc.layer(id)?.artboard().map(|a| a.preset.clone()));
     let mut edit: Option<Value> = None;

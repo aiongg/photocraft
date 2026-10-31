@@ -8,7 +8,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-pub use craft_docpath::Refused;
+pub use craft::docpath::Refused;
 
 /// Why a stored path is not followed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,9 +35,9 @@ impl std::error::Error for NotFollowed {}
 /// a relative `document` is taken from the working directory, where it was opened from.
 pub fn resolve(stored: &str, document: Option<&Path>) -> Result<PathBuf, NotFollowed> {
     let document = document.map(|d| if d.is_relative() { std::path::absolute(d).unwrap_or_else(|_| d.to_path_buf()) } else { d.to_path_buf() });
-    craft_docpath::resolve_absolute(stored, document.as_deref()).map_err(|r| match r {
+    craft::docpath::resolve_absolute(stored, document.as_deref()).map_err(|r| match r {
         // Without a document, a relative path resolves but stays relative.
-        Refused::Invalid if document.is_none() && craft_docpath::resolve(stored, None).is_ok_and(|p| cfg!(windows) || !is_windows_form(&p)) => {
+        Refused::Invalid if document.is_none() && craft::docpath::resolve(stored, None).is_ok_and(|p| cfg!(windows) || !is_windows_form(&p)) => {
             NotFollowed::NoDocumentFolder
         }
         r => NotFollowed::Refused(r),

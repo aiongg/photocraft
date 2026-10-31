@@ -1,5 +1,5 @@
-use craft_keymap::CommandRef;
-use craft_menu::MenuBarUi;
+use craft::keymap::CommandRef;
+use craft::menu::MenuBarUi;
 
 use super::invoke::invoke;
 use super::items::{ItemCache, menu_items};
@@ -14,7 +14,7 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
     let lang = crate::i18n::current();
     let cache = fresh_cache(app, ui);
     let label = |english: &'static str| crate::i18n::tr(lang, english).to_string();
-    let english = |labeled: craft_menu::Labeled<'_>| cache.english.of(labeled);
+    let english = |labeled: craft::menu::Labeled<'_>| cache.english.of(labeled);
     let preferred = top_mnemonics(lang);
     let preferred: Vec<(&str, char)> = preferred.iter().map(|(t, c)| (t.as_str(), *c)).collect();
     let shown = MenuBarUi::new(&cache.menus)
@@ -24,7 +24,7 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
         .label(&label)
         .english(&english)
         .mnemonics(&preferred)
-        .gate(craft_menu::Gate { text_editing: ctx.text_edit_focused(), ..Default::default() })
+        .gate(craft::menu::Gate { text_editing: ctx.text_edit_focused(), ..Default::default() })
         .show(ui);
     let titles = shown.titles;
     let commands = shown.commands;
@@ -32,7 +32,7 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
     for command in commands {
         run(app, &ctx, command);
     }
-    if craft_ui::direction::is_rtl(&ctx) { titles.left() } else { titles.right() }
+    if craft::ui::direction::is_rtl(&ctx) { titles.left() } else { titles.right() }
 }
 
 /// The cached menu rows, built again when the menus may have changed and someone can see them:
@@ -44,11 +44,11 @@ fn fresh_cache(app: &mut PhotocraftApp, ui: &egui::Ui) -> ItemCache {
     let ctx = ui.ctx();
     let lang = crate::i18n::current();
     let kept = app.menu_cache.take();
-    let open = craft_ui::menu::bar::is_open(ctx) || craft_ui::menu::bar::is_focused(ctx);
+    let open = craft::ui::menu::bar::is_open(ctx) || craft::ui::menu::bar::is_focused(ctx);
     let keys =
         ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, key, modifiers, .. } if modifiers.alt || *key == egui::Key::F10)));
     let hovered = ctx.pointer_hover_pos().is_some_and(|p| ui.max_rect().contains(p));
-    let input = craft_menu::had_input(ctx);
+    let input = craft::menu::had_input(ctx);
     let state = super::state::state_hash(app, None);
     let language = lang.code().to_string();
     match kept {

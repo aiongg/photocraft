@@ -38,7 +38,7 @@ impl PhotocraftApp {
     }
 
     /// Shows the resolved library base on screen as `kind`.
-    pub(crate) fn apply_theme_base(&mut self, ctx: &egui::Context, base: &craft_ui::theme::Base, kind: theme::ThemeKind) {
+    pub(crate) fn apply_theme_base(&mut self, ctx: &egui::Context, base: &craft::ui::theme::Base, kind: theme::ThemeKind) {
         self.note_theme_change(kind);
         theme::install_base(ctx, base, kind);
         self.checker = None;
@@ -72,7 +72,7 @@ impl PhotocraftApp {
         ctx.add_plugin(text_field_menu::TextFieldMenu);
         // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; PhotoCraft zooms the canvas instead
         // (shortcuts.rs), like Photoshop.
-        craft_ui::interface_scale::InterfaceScale::disable_keyboard_zoom(ctx);
+        craft::ui::interface_scale::InterfaceScale::disable_keyboard_zoom(ctx);
         // ⌘/Ctrl + wheel scrolls sideways, as in Photoshop; only a pinch zooms (wheel_nav.rs).
         wheel_nav::configure(ctx);
     }

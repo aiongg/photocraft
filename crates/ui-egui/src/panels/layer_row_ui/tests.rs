@@ -512,7 +512,7 @@ fn the_footer_is_a_bar_along_the_panel_bottom_with_its_buttons_centred() {
         let h = harness(s, 1.0, theme, 290.0);
         let group = crate::panel_docking::probe::group_rect(h.state(), &h.ctx, "layers").unwrap();
         let delete = h.get_by_label("Delete layer").rect();
-        let bar = craft_ui::theme::current(&h.ctx).component.panel_footer.height;
+        let bar = craft::ui::theme::current(&h.ctx).component.panel_footer.height;
         assert!(
             delete.top() >= group.bottom() - bar && delete.bottom() <= group.bottom(),
             "{theme}: button at {delete:?} inside the {bar} pt bar of {group:?}"

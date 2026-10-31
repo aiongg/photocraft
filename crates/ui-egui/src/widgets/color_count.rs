@@ -1,11 +1,11 @@
 //! Indexed Color count: an integer field over a slider with the common palette sizes marked.
 
 use super::{Response, Ui};
-use craft_theme::ControlSize;
-use craft_ui::composites::PropertyRow;
-use craft_ui::controls::{NumberField, Slider};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::LocaleNumbers;
+use craft::theme::ControlSize;
+use craft::ui::composites::PropertyRow;
+use craft::ui::controls::{NumberField, Slider};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::LocaleNumbers;
 
 const STOPS: [u32; 6] = [8, 16, 32, 64, 128, 256];
 
@@ -79,7 +79,7 @@ mod tests {
         for count in STOPS {
             let mut harness = harness(2);
             let rect = harness.get_by_role(egui::accesskit::Role::Slider).rect();
-            let style = Slider::style(&craft_ui::theme::current(&harness.ctx), ControlSize::Md);
+            let style = Slider::style(&craft::ui::theme::current(&harness.ctx), ControlSize::Md);
             let (x0, x1) = (rect.left() + style.thumb_width / 2.0, rect.right() - style.thumb_width / 2.0);
             let at = |value: f32| pos2(x0 + (value - 2.0) / 254.0 * (x1 - x0), (rect.top() + style.height / 2.0));
             let point = pos2(at(count as f32).x - 2.0, (rect.top() + style.height / 2.0));

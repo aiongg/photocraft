@@ -10,7 +10,7 @@
 //! full resolution (one history step). Reduced previews approximate fine detail and effects.
 //! Cancel never touches the document, so the previous selection stays as it was.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -394,7 +394,7 @@ fn eyedropper(ui: &mut egui::Ui, badge: &str, selected: bool, label: &str) -> eg
             egui::Align2::CENTER_CENTER,
             badge,
             crate::theme::semibold(12.0),
-            if selected { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text },
+            if selected { craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text },
         );
     }
     r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), selected, label));
@@ -417,14 +417,14 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.insert("select".into(), json!(cur));
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     ui.add_enabled_ui(c.sampling, |ui| {
         let mut on = flag(f, "localized");
         if widgets::checkbox(ui, &mut on, tl!("Localized Color Clusters")).changed() {
             f.insert("localized".into(), json!(on));
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     ui.add_enabled_ui(c.fuzziness, |ui| {
         if c.tonal {
             let mut v = num(f, "toneFuzziness", 20.0);
@@ -460,12 +460,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         }
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.horizontal_top(|ui| {
         // Preview: the selection as a grayscale mask, or the image to pick colours from.
         let box_size = vec2(PREVIEW as f32, PREVIEW as f32);
         let (frame, resp) = ui.allocate_exact_size(box_size, Sense::click_and_drag());
-        ui.painter().rect_filled(frame, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+        ui.painter().rect_filled(frame, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
         let shown = preview(app, ui.ctx(), f);
         if let Some((tex, [w, h], k)) = shown {
             let scale = (box_size.x / w.max(1) as f32).min(box_size.y / h.max(1) as f32);
@@ -488,7 +488,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         }
         // A preview that can't be drawn says why (#145) instead of staying blank.
         if let Some(e) = app.color_range.as_ref().and_then(|p| p.error.clone()) {
-            ui.painter().rect_filled(frame, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+            ui.painter().rect_filled(frame, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
             let msg = format!(
                 "Preview unavailable:
 {e}"
@@ -498,8 +498,8 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         }
         ui.painter().rect_stroke(
             frame,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
             StrokeKind::Outside,
         );
         let label = match app.color_range.as_ref().and_then(|p| p.error.as_deref()) {
@@ -507,7 +507,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             None => tl!("Color Range preview").to_string(),
         };
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Image, ui.is_enabled(), &label));
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.add_enabled_ui(c.sampling, |ui| {
                 let tool = s(f, "__tool", "sample").to_string();
@@ -536,7 +536,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     f.insert("__order".into(), json!([]));
                 }
             });
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             let mut inv = flag(f, "invert");
             // Selection invert (≠ Image › Adjustments › Invert → Đảo màu).
             if widgets::checkbox(ui, &mut inv, crate::i18n::tr_ctx(crate::i18n::current(), "colorRange", "Invert")).changed() {
@@ -544,19 +544,19 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let view = s(f, "__view", "selection").to_string();
     let mut shown = view;
     let mut set =
-        craft_ui::controls::RadioSet::new("color-range-view", tl!("Preview"), &mut shown).item("selection".to_string()).item("image".to_string()).begin(ui);
+        craft::ui::controls::RadioSet::new("color-range-view", tl!("Preview"), &mut shown).item("selection".to_string()).item("image".to_string()).begin(ui);
     ui.horizontal(|ui| {
         set.radio(ui, 0, tl!("Selection"));
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         set.radio(ui, 1, tl!("Image"));
     });
     set.end(ui);
     f.insert("__view".into(), json!(shown));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!("Selection Preview:")).color(t.text_dim));
         let mode = s(f, "__selectionPreview", "none").to_string();

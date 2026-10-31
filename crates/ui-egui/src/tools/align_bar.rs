@@ -2,7 +2,7 @@
 //! active; they enable once enough layers are selected). Every button dispatches an existing
 //! `layer.align.*` / `layer.distribute.*` command.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use serde_json::json;
 
 use crate::theme::Tokens;
@@ -31,7 +31,7 @@ const DISTRIBUTE: [(&str, &str, &str); 8] = [
 
 /// The six align icons followed by a menu holding both groups with icons and names.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.spacing_mut().item_spacing.x = 0.0;
     for (cmd, icon, label) in ALIGN {
         let tip = format!("{}: {}", tl!("Align"), tl!(label));
@@ -40,7 +40,7 @@ pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let _ = app.run(cmd, json!({}));
         }
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let more = icons::button(ui, "ellipsis", 24.0, false, tl!("Align and distribute"));
     egui::Popup::menu(&more).show(|ui| {
         ui.set_min_width(200.0);

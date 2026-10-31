@@ -4,10 +4,10 @@ use super::fonts::{font_picker, fonts_ready, selected_style, style_label, styles
 use super::keys::is_vertical;
 use super::{Color32, LayerId, PhotocraftApp, Stroke, byte_of, insertion_style, json, selected_styles, text_layer};
 use crate::panels::{Field, number_cell_icon, select_cell};
-use craft_ui::controls::{ControlSize, NumberField};
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::patterns::{CellWidth, OptionsBar};
-use craft_ui::theme::StrokeExt;
+use craft::ui::controls::{ControlSize, NumberField};
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::theme::StrokeExt;
 
 /// Photoshop's Type options bar.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
@@ -60,7 +60,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let (unit, label) = type_unit(app);
     let mut display = size * unit;
     let field = Field::new("Size", unit..=1296.0 * unit, label, CellWidth::Md).scale(1.0);
-    let edit = number_cell_icon(ui, craft_ui::icons::Icon::Text, "Font size", &field, &mut display);
+    let edit = number_cell_icon(ui, craft::ui::icons::Icon::Text, "Font size", &field, &mut display);
     super::defaults::note_gesture(ui.ctx(), edit.gesture);
     if edit.changed {
         let size = display / unit;
@@ -130,11 +130,11 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .unwrap_or(app.session.tools.foreground);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 18.0), egui::Sense::click());
     let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
+    ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R2.px(), Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
     ui.painter().rect_stroke(
         rect,
-        craft_ui::theme::scale::Radius::R2.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        craft::ui::theme::scale::Radius::R2.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
         egui::StrokeKind::Outside,
     );
     let resp = resp.on_hover_text(tl!("Set the text color"));
@@ -152,7 +152,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if app.ui.text_edit.is_some() {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             if crate::icons::button(
                 ui,
                 "check",
@@ -273,7 +273,7 @@ pub(super) fn kerning_field(ui: &mut egui::Ui, shown: &str, width: f32) -> Optio
         }
         let presets = ["Metrics", "Optical", "0", "-100", "-75", "-50", "-25", "-10", "-5", "5", "10", "25", "50", "75", "100", "200"];
         let (press, close) = crate::press_menu::PressCombo::before(ui, "props-kern-presets");
-        let combo = craft_ui::ComboBox::from_id_salt("props-kern-presets")
+        let combo = craft::ui::ComboBox::from_id_salt("props-kern-presets")
             .selected_text("")
             .width(16.0)
             .height(420.0)
@@ -340,7 +340,7 @@ pub(super) fn num_field(ui: &mut egui::Ui, label: &str, tip: &str, v: f32, range
             let edit = field.show(ui);
             super::defaults::note_gesture(
                 ui.ctx(),
-                edit.event.as_ref().and_then(craft_ui::edit::EditEvent::id).map(|g| {
+                edit.event.as_ref().and_then(craft::ui::edit::EditEvent::id).map(|g| {
                     use std::hash::{Hash, Hasher};
                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                     g.hash(&mut hasher);
@@ -435,7 +435,7 @@ pub(super) fn toggle_cell(ui: &mut egui::Ui, w: f32, on: bool, tip: &str, paint:
     };
     ui.painter().rect_filled(r, t.radius_sm, bg);
     if on {
-        ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(r, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent_border), egui::StrokeKind::Inside);
     }
     let enabled = ui.is_enabled();
     paint(

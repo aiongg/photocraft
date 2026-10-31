@@ -1,7 +1,7 @@
 //! The control channel's `ui.screenshot`: bounded, cancelable capture requests.
 //!
 //! egui 0.37 removed `Event::Screenshot`/`UserData`; `ViewportCommand::Screenshot` now carries a
-//! one-shot callback that may run on an arbitrary thread. The shared `craft_ui::capture` slot is
+//! one-shot callback that may run on an arbitrary thread. The shared `craft::ui::capture` slot is
 //! the only correlation primitive: it stores at most one image, validates it against a per-image
 //! byte bound, wakes the owning viewport, and makes a late result after cancellation or drop
 //! inert. This module owns everything the slot deliberately leaves to the application:
@@ -33,7 +33,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use craft_ui::capture::CaptureSlot;
+use craft::ui::capture::CaptureSlot;
 use egui::{ColorImage, Context, ScreenshotCallback, ViewportId};
 use web_time::Instant;
 

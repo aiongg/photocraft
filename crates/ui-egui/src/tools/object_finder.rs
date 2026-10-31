@@ -11,7 +11,7 @@
 //! Sample All Layers, and clears when the pointer leaves the canvas, the tool changes, a button
 //! goes down or the option is off. Quality of the object found is out of scope here (#2788).
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 
 use egui::{Color32, TextureOptions, pos2};
@@ -219,7 +219,7 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
     let Some(f) = app.object_finder.as_mut() else { return };
     let key = Arc::as_ptr(&r) as usize;
     if f.texture.as_ref().is_none_or(|(k, _)| *k != key) {
-        let accent = craft_ui::theme::current(&ctx).color.accent.solid.to_egui();
+        let accent = craft::ui::theme::current(&ctx).color.accent.solid.to_egui();
         let tex = ctx.load_texture("object-finder", overlay_image(&r, accent), TextureOptions::LINEAR);
         f.texture = Some((key, tex));
     }

@@ -6,7 +6,7 @@
 //! The save is parked in [`Prompt`] while the modal is up (egui is immediate-mode) and written
 //! once answered. Cancel drops the save. Scripts skip the prompt by passing `tgaBits`.
 
-use craft_ui::dialog::Outcome;
+use craft::ui::dialog::Outcome;
 use photocraft_io::TgaBits;
 
 use crate::{ExportSettings, PhotocraftApp};
@@ -59,10 +59,10 @@ pub fn park(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.targa_options else { return };
     let mut bits = p.bits;
-    let answer = crate::dialogs::show_prompt(ctx, "targa-options", tl!("Targa Options"), craft_ui::dialog::Width::Compact, &mut bits, |ui, bits| {
-        craft_ui::composites::SectionLabel::new(tl!("Resolution")).show(ui);
+    let answer = crate::dialogs::show_prompt(ctx, "targa-options", tl!("Targa Options"), craft::ui::dialog::Width::Compact, &mut bits, |ui, bits| {
+        craft::ui::composites::SectionLabel::new(tl!("Resolution")).show(ui);
         ui.indent("targa-options-bits", |ui| {
-            _ = craft_ui::controls::RadioGroup::new("targa-options-bits", tl!("Resolution"), bits)
+            _ = craft::ui::controls::RadioGroup::new("targa-options-bits", tl!("Resolution"), bits)
                 .item(TgaBits::Bits24, tl!("24 bits/pixel"))
                 .item(TgaBits::Bits32, tl!("32 bits/pixel"))
                 .show(ui);

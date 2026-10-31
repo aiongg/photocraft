@@ -13,7 +13,7 @@
 //!   opacity, fill opacity, channels, knockout, the Advanced Blending switches, Blend If) plus
 //!   the page-only `blendIfChannel`; `channelNames`: the document's colour channels.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, RichText, Sense, Stroke, StrokeKind, vec2};
 use photocraft_doc::effects::{FxPaint, GlowSource, GlowTechnique, StrokePosition};
 use photocraft_doc::{Effect, Layer};
@@ -821,11 +821,11 @@ fn fx_checkbox_rect(row: egui::Rect) -> egui::Rect {
 /// An effect row's checkbox: an accent box with a tick when on, an outline when off.
 fn fx_checkbox(p: &egui::Painter, cb: egui::Rect, on: bool, t: &Tokens) {
     if on {
-        p.rect_filled(cb, craft_ui::theme::scale::Radius::R2.px(), t.accent);
+        p.rect_filled(cb, craft::ui::theme::scale::Radius::R2.px(), t.accent);
         p.line_segment([cb.left_center() + vec2(3.0, 0.5), cb.center_bottom() + vec2(-1.0, -3.5)], Stroke::new(1.8, Color32::WHITE));
         p.line_segment([cb.center_bottom() + vec2(-1.0, -3.5), cb.right_top() + vec2(-3.0, 3.5)], Stroke::new(1.8, Color32::WHITE));
     } else {
-        p.rect_stroke(cb, craft_ui::theme::scale::Radius::R2.px(), Stroke::new(1.5, t.text_faint), StrokeKind::Inside);
+        p.rect_stroke(cb, craft::ui::theme::scale::Radius::R2.px(), Stroke::new(1.5, t.text_faint), StrokeKind::Inside);
     }
 }
 
@@ -859,7 +859,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     f.insert("selected".into(), json!(id));
                 }
             }
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+            ui.add_space(craft::ui::theme::scale::Space::S4.px());
             for &(kind, label) in KINDS {
                 let ids: Vec<String> = effects_of(f)
                     .iter()
@@ -950,12 +950,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                         }
                     });
                 });
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                ui.add_space(craft::ui::theme::scale::Space::S8.px());
                 let ctx = ui.ctx().clone();
                 egui::ScrollArea::vertical().max_height(340.0).id_salt("layer-style-presets-main").show(ui, |ui| {
                     for group in &app.session.presets.styles {
                         ui.label(RichText::new(&group.name).size(12.0).color(t.text_dim));
-                        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                        ui.add_space(craft::ui::theme::scale::Space::S4.px());
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
                             for st in &group.items {
@@ -963,17 +963,17 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                                 let (rect, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
                                 ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
                                 let (stroke, kind) = if resp.hovered() {
-                                    (craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside)
+                                    (craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside)
                                 } else {
-                                    (craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside)
+                                    (craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside)
                                 };
-                                ui.painter().rect_stroke(rect, craft_ui::theme::scale::Radius::R2.px(), stroke, kind);
+                                ui.painter().rect_stroke(rect, craft::ui::theme::scale::Radius::R2.px(), stroke, kind);
                                 if resp.on_hover_text(&st.name).clicked() {
                                     style_click = Some(st.name.clone());
                                 }
                             }
                         });
-                        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+                        ui.add_space(craft::ui::theme::scale::Space::S12.px());
                     }
                 });
                 return;
@@ -993,7 +993,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     }
                 });
             });
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             // Only reachable through `ui.dialog.set`: say what is wrong once, keep the bad value.
             if let Some(error) = &invalid {
                 ui.colored_label(t.danger, error);
@@ -1151,12 +1151,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                         }
                     }
                 }
-                ui.add_space(craft_ui::theme::scale::Space::S2.px());
+                ui.add_space(craft::ui::theme::scale::Space::S2.px());
             }
             // Make Default stores this page as the user default; Reset to Default
             // restores it (or the factory defaults before the first Make).
             let page_kind = sel_kind != BLENDING && entry(f, &selected).is_some();
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+            ui.add_space(craft::ui::theme::scale::Space::S4.px());
             // Wrap: translated labels (ru, de) can be wider than the page column.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min).with_main_wrap(true), |ui| {
                 ui.add_enabled_ui(page_kind, |ui| {
@@ -1345,7 +1345,7 @@ fn blending_page(ui: &mut egui::Ui, p: &mut Value, names: &[String]) {
         {
             e[key] = json!(q);
         }
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
 }
 
@@ -1379,12 +1379,12 @@ fn blend_if_bar(ui: &mut egui::Ui, id: egui::Id, q: &mut [u8; 4]) -> bool {
         let x0 = ramp.left() + ramp.width() * s as f32 / strips as f32;
         let x1 = ramp.left() + ramp.width() * (s + 1) as f32 / strips as f32;
         let g = (255.0 * (s as f32 + 0.5) / strips as f32) as u8;
-        ui.painter().rect_filled(egui::Rect::from_x_y_ranges(x0..=x1, ramp.y_range()), craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(g));
+        ui.painter().rect_filled(egui::Rect::from_x_y_ranges(x0..=x1, ramp.y_range()), craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(g));
     }
     ui.painter().rect_stroke(
         ramp,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        craft::ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
         StrokeKind::Outside,
     );
     // Handles: triangles under the ramp; a split handle shows two half triangles.
@@ -1443,7 +1443,7 @@ fn blend_if_bar(ui: &mut egui::Ui, id: egui::Id, q: &mut [u8; 4]) -> bool {
             _ => (x - 5.0, x + 5.0),
         };
         let pts = vec![egui::pos2(x, base), egui::pos2(r, base + 10.0), egui::pos2(l, base + 10.0)];
-        ui.painter().add(egui::Shape::convex_polygon(pts, fill, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim)));
+        ui.painter().add(egui::Shape::convex_polygon(pts, fill, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim)));
     };
     let dark = Color32::from_gray(20);
     let light = Color32::from_gray(240);

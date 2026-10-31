@@ -7,9 +7,9 @@
 //! runs `edit.perspectiveWarp` with the planes. The preview is the layer texture on a 40×40 mesh
 //! pushed through the same piecewise-homography map the engine uses.
 
-use craft_ui::controls::{ControlSize, ToggleButton};
-use craft_ui::patterns::OptionsBar;
-use craft_ui::theme::StrokeExt;
+use craft::ui::controls::{ControlSize, ToggleButton};
+use craft::ui::patterns::OptionsBar;
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Stroke, TextureHandle, pos2};
@@ -298,7 +298,7 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
         }
         let q = if warp { &p.dst } else { &p.src };
         let pts: Vec<Pos2> = q.iter().map(|c| scr(*c)).collect();
-        painter.add(egui::Shape::closed_line(pts.clone(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
+        painter.add(egui::Shape::closed_line(pts.clone(), craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
         for c in pts {
             painter.circle_filled(c, 4.5, Color32::WHITE);
             painter.circle_stroke(c, 4.5, Stroke::new(1.25, accent));
@@ -308,8 +308,8 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
         let r = egui::Rect::from_two_pos(scr(*start), scr(*cur));
         painter.rect_stroke(
             r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent),
             egui::StrokeKind::Inside,
         );
     }

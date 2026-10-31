@@ -1,8 +1,8 @@
 //! Layer › Duplicate Layer… dialog (#3348): the copy's name and its destination document, as in
 //! Photoshop. Only the menu, palette and Layers panel menu open it; ⌘J, Alt-drag and dragging onto
 //! the New Layer button still duplicate at once.
-use craft_ui::composites::{FormGrid, SectionLabel};
-use craft_ui::controls::Select;
+use craft::ui::composites::{FormGrid, SectionLabel};
+use craft::ui::controls::Select;
 
 use crate::{PhotocraftApp, state::DialogKind};
 use serde_json::{Map, Value, json};

@@ -1160,7 +1160,7 @@ fn a_finger_held_on_a_pending_crop_opens_the_crop_menu() {
 
 #[test]
 fn crop_menu_rows_act_like_the_options_bar() {
-    use craft_ui::canvas::{CropGuide, GuideShow};
+    use craft::draw::ui::{CropGuide, GuideShow};
     let ctx = Context::default();
     let mut app = crop_app();
     draw_crop(&mut app);

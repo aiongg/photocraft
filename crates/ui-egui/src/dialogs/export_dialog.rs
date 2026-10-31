@@ -2,13 +2,13 @@
 //! with a preview and an estimated file size. The estimate encodes a small proxy and scales by
 //! pixel count, so the dialog stays instant on 36 MP documents.
 
-use craft_theme::TypeRole;
-use craft_ui::composites::{FieldControl as _, Form, FormGrid, Notice, SectionLabel, SliderRow, Tone};
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, Select, Spinner};
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::theme::TypeRole;
+use craft::ui::composites::{FieldControl as _, Form, FormGrid, Notice, SectionLabel, SliderRow, Tone};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, Select, Spinner};
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::primitives::{Content, Text};
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
@@ -797,7 +797,7 @@ fn preset_settings(f: &Map<String, Value>) -> Value {
 }
 
 fn preset_fields(app: &mut PhotocraftApp, form: &mut Form<'_>, f: &mut Map<String, Value>, src_w: f64, src_h: f64) {
-    form.space(craft_ui::theme::scale::Space::S8.px());
+    form.space(craft::ui::theme::scale::Space::S8.px());
     let names: Vec<String> = app.session.presets.export_presets.iter().map(|p| p.name.clone()).collect();
     if !names.is_empty() {
         let mut selected = s(f, "__preset");
@@ -873,7 +873,7 @@ fn preset_fields(app: &mut PhotocraftApp, form: &mut Form<'_>, f: &mut Map<Strin
 }
 
 pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let Some(doc) = app.session.active().map(|s| s.doc.clone()) else { return };
     ui.horizontal_top(|ui| {
         // Left: settings.
@@ -942,7 +942,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 f.insert("embedProfile".into(), json!(embed));
             });
             let fmt = s_fmt(f);
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             SectionLabel::new(tl!("Image Size")).show(ui);
             let (bw, bh) = (n(f, "__w", f64::from(doc.size.width)), n(f, "__h", f64::from(doc.size.height)));
             FormGrid::new("export-image-size").show(ui, |form| {
@@ -956,7 +956,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
             FormGrid::new("export-presets").show(ui, |form| preset_fields(app, form, f, bw, bh));
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         // Right: preview + estimated size.
         ui.vertical(|ui| {
             let layer = f.get("__layer").and_then(Value::as_u64);
@@ -1012,8 +1012,8 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
             ui.painter().rect_stroke(
                 r,
-                craft_ui::theme::scale::Radius::R0.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+                craft::ui::theme::scale::Radius::R0.px(),
+                craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
                 egui::StrokeKind::Outside,
             );
             #[cfg(not(target_arch = "wasm32"))]

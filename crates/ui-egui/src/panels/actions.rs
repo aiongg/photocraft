@@ -4,8 +4,8 @@
 //! `play` / `list` / `get` / `delete` / `move` / `rename`), so the panel, the CLI and MCP share them. This module
 //! keeps only which row is selected and which rows are expanded.
 
-use craft_ui::controls::{Checkbox, ControlSize};
-use craft_ui::theme::StrokeExt;
+use craft::ui::controls::{Checkbox, ControlSize};
+use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -452,7 +452,7 @@ pub fn insert_stop_body(ui: &mut egui::Ui, fields: &mut serde_json::Map<String, 
     let mut message = fields.get("message").and_then(Value::as_str).unwrap_or_default().to_string();
     ui.add(egui::TextEdit::multiline(&mut message).desired_rows(4).desired_width(320.0)).labelled_by(message_label.id);
     fields.insert("message".into(), json!(message));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let mut allow = fields.get("allowContinue").and_then(Value::as_bool).unwrap_or(false);
     ui.checkbox(&mut allow, tl!("Allow Continue"));
     fields.insert("allowContinue".into(), json!(allow));
@@ -700,7 +700,7 @@ fn drag_row(ui: &egui::Ui, response: &egui::Response, row: DragRow, t: &Tokens) 
     let to = if from < slot { slot.saturating_sub(1) } else { slot };
     let y = if after { response.rect.bottom() } else { response.rect.top() };
     ui.painter()
-        .line_segment([pos2(response.rect.left() + 22.0, y), pos2(response.rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
+        .line_segment([pos2(response.rect.left() + 22.0, y), pos2(response.rect.right(), y)], craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
     response.dnd_release_payload::<DragRow>().map(|source| (*source, to))
 }
 
@@ -825,7 +825,7 @@ fn draw_set_header(ui: &mut egui::Ui, set: &str, count: u64, collapsed: bool, to
     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::click());
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, !collapsed, set));
     if response.hovered() {
-        ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), tokens.hover.gamma_multiply(0.5));
+        ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), tokens.hover.gamma_multiply(0.5));
     }
     let triangle = Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), vec2(8.0, 8.0));
     let points = if collapsed {
@@ -983,11 +983,11 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let sel = app.ui.actions.selected == Some(i) && app.ui.actions.selected_step.is_none();
             resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, sel, name));
             if button_mode {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R3.px(), button_fill(swatch, &t));
+                ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R3.px(), button_fill(swatch, &t));
             } else if sel {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
+                ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), t.row_selected);
             } else if resp.hovered() {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
+                ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
             }
             if let Some(change) = drag_row(ui, &resp, DragRow { action: i, step: None }, &t) {
                 moved = Some(change);
@@ -1094,7 +1094,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some((source, to)) = moved {
         move_row(app, source, to);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         let recording_now = app.session.actions.recording.is_some();
@@ -1103,7 +1103,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         let (r, rec) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::click());
         if rec.hovered() {
-            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R3.px(), t.hover);
+            ui.painter().rect_filled(r, craft::ui::theme::scale::Radius::R3.px(), t.hover);
         }
         ui.painter().circle_filled(r.center(), 5.5, if recording_now { Color32::from_rgb(230, 60, 60) } else { t.icon });
         if rec.on_hover_text(tl!("Begin recording")).clicked() && !recording_now {
@@ -1208,9 +1208,9 @@ fn draw_step_label(app: &PhotocraftApp, ui: &egui::Ui, rect: Rect, response: &eg
     let selected = app.ui.actions.selected == Some(context.action) && app.ui.actions.selected_step == Some(step);
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, label));
     if selected {
-        ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), context.tokens.row_selected);
+        ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), context.tokens.row_selected);
     } else if response.hovered() {
-        ui.painter().rect_filled(response.rect, craft_ui::theme::scale::Radius::R0.px(), context.tokens.hover.gamma_multiply(0.5));
+        ui.painter().rect_filled(response.rect, craft::ui::theme::scale::Radius::R0.px(), context.tokens.hover.gamma_multiply(0.5));
     }
     let color = if context.disabled.contains(&step) { context.tokens.text_faint } else { context.tokens.text_dim };
     ui.painter().text(pos2(context.x0 + 62.0, rect.center().y), Align2::LEFT_CENTER, label, egui::FontId::proportional(11.5), color);

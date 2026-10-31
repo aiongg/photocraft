@@ -2,7 +2,7 @@
 //! set them (`ui.dialog.set`) and confirm (`ui.dialog.confirm`) exactly like a user.
 //!
 //! The frame, footer buttons, placement, stacking, Alt-reset, local undo and pass-through are
-//! `craft_ui::dialog::Dialog`; [`show`] feeds it the dialog's JSON fields (as [`Settings`]).
+//! `craft::ui::dialog::Dialog`; [`show`] feeds it the dialog's JSON fields (as [`Settings`]).
 //! A dialog body plugs in with four pieces:
 //! - a marker key in its fields and an `owns(fields)` test, routed in `command_body` (body),
 //!   `confirm_command` and [`ROUTES`] (confirm);
@@ -15,7 +15,7 @@ use std::cell::{Cell, RefCell};
 
 use crate::PhotocraftApp;
 use crate::state::{Dialog, DialogKind};
-use craft_ui::dialog::{Alert, Body, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
+use craft::ui::dialog::{Alert, Body, Dialog as HostDialog, DialogLabels, DialogStack, Footer, InitialFocus, Outcome, PlaceKey, Reset, dialog_id};
 
 /// A dialog body sets this field to the key of the text field whose Browse… button was clicked;
 /// [`show`] takes it out again and opens the matching file or folder dialog.
@@ -56,28 +56,28 @@ fn fill_field(app: &mut PhotocraftApp, id: u64, key: &str, path: String) -> Resu
 }
 
 // Canvas input under an open dialog (pan, zoom, eyedropper picks) is the library's: the dialogs
-// shown by `craft_ui::dialog` record where they are.
-pub use craft_ui::dialog::pass::{free_pointer_over, free_press, pan_delta};
+// shown by `craft::ui::dialog` record where they are.
+pub use craft::ui::dialog::pass::{free_pointer_over, free_press, pan_delta};
 
 /// The primary button's drag and click on the free canvas under an open dialog, as the canvas
 /// response would report them if it weren't inert: for the held Zoom (⌘Space / ⌥Space, #6460).
 pub fn free_buttons(ctx: &egui::Context, canvas: egui::Rect) -> crate::paint_mouse::Buttons {
-    let b = craft_ui::dialog::pass::free_buttons(ctx, canvas);
+    let b = craft::ui::dialog::pass::free_buttons(ctx, canvas);
     crate::paint_mouse::Buttons { started: b.started, dragged: b.dragged, stopped: b.stopped, clicked: b.clicked }
 }
 
 /// The egui id of the area dialog `id` is drawn in.
 #[cfg(test)]
 pub(crate) fn area_id(id: u64) -> egui::Id {
-    craft_ui::dialog::dialog_id(id)
+    craft::ui::dialog::dialog_id(id)
 }
 
 /// Tells the title bar where the library dialog `key` (the key it was built with: `Dialog::new`,
 /// `Alert::new`, `Prompt::new`) is, so a drag of the bar's free gap does not cross it. Call it
 /// after the dialog is shown, on every pass it is open.
 pub(crate) fn push_modal_rect(ctx: &egui::Context, key: impl std::hash::Hash + std::fmt::Debug) {
-    if let Some(rect) = ctx.memory(|m| m.area_rect(craft_ui::dialog::dialog_id(key))) {
-        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
+    if let Some(rect) = ctx.memory(|m| m.area_rect(craft::ui::dialog::dialog_id(key))) {
+        craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
     }
 }
 
@@ -156,16 +156,16 @@ const CURVES_HEIGHT: f32 = 420.0;
 /// The size the Curves dialog first opens at: the editor's width for `CURVES_VALUE_SIDE` at the
 /// active size, plus the dialog's padding.
 fn curves_size(ctx: &egui::Context) -> egui::Vec2 {
-    let editor = craft_ui::composites::CurveEditor::outer_width(ctx, CURVES_VALUE_SIDE);
-    egui::vec2(editor + 2.0 * craft_ui::theme::current(ctx).component.dialog.pad, CURVES_HEIGHT)
+    let editor = craft::ui::composites::CurveEditor::outer_width(ctx, CURVES_VALUE_SIDE);
+    egui::vec2(editor + 2.0 * craft::ui::theme::current(ctx).component.dialog.pad, CURVES_HEIGHT)
 }
 
 /// The sizes of a resizable dialog and whether it reopens at the size it was left at (Curves only,
 /// #8984), or `None` for a dialog sized by its contents. The smallest size keeps Curves a usable
 /// graph (#8984) and the others their two-column layouts; Curves is no wider than its graph can
 /// grow, so no blank column.
-fn resize_of(ctx: &egui::Context, fields: &Fields) -> Option<(craft_ui::dialog::Resize, bool)> {
-    use craft_ui::dialog::{Resize, ResizeMax};
+fn resize_of(ctx: &egui::Context, fields: &Fields) -> Option<(craft::ui::dialog::Resize, bool)> {
+    use craft::ui::dialog::{Resize, ResizeMax};
     let min = egui::vec2(560.0, 400.0);
     if crate::prefs_ui::is_preferences(fields) {
         Some((Resize { default: crate::prefs_ui::PREFERENCES_SIZE, min, max: ResizeMax::Window }, false))
@@ -181,8 +181,8 @@ fn resize_of(ctx: &egui::Context, fields: &Fields) -> Option<(craft_ui::dialog::
 }
 
 /// The content width class of a dialog that isn't resizable.
-fn width_of(d: &Dialog) -> craft_ui::dialog::Width {
-    use craft_ui::dialog::Width;
+fn width_of(d: &Dialog) -> craft::ui::dialog::Width {
+    use craft::ui::dialog::Width;
     let f = &d.fields;
     // The About window: room for the contributor table, the same width on every tab.
     let about_tabs = d.kind == DialogKind::About && f.get("systemInfo").and_then(Value::as_bool) != Some(true);
@@ -292,8 +292,8 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
             for l in &lines {
                 ui.add(egui::Label::new(egui::RichText::new(l).font(crate::theme::mono(12.0))).selectable(true));
             }
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            if ui.add(craft_ui::controls::Button::new(tl!("Copy")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked() {
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
+            if ui.add(craft::ui::controls::Button::new(tl!("Copy")).variant(craft::ui::controls::ButtonVariant::Secondary).min_width(84.0)).clicked() {
                 ui.ctx().copy_text(crate::gpu_status::system_info(app).join("\n"));
             }
         }
@@ -312,7 +312,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
             if chosen != tab {
                 fields.insert("tab".into(), json!(chosen));
             }
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             about_tab_body(app, ui, chosen);
         }
         DialogKind::Command => outcome = command_body(app, ui, d, fields, id, interactive),
@@ -499,12 +499,12 @@ pub(crate) fn show_prompt<H: Clone + PartialEq + Send + Sync + 'static>(
     ctx: &egui::Context,
     key: &'static str,
     title: &str,
-    width: craft_ui::dialog::Width,
+    width: craft::ui::dialog::Width,
     fields: &mut H,
     body: impl FnOnce(&mut egui::Ui, &mut H),
-) -> craft_ui::dialog::DialogResponse {
+) -> craft::ui::dialog::DialogResponse {
     let slot = egui::Id::NULL.with(("save-options-prompt", key));
-    let mut state: craft_ui::dialog::DialogState<H> = ctx.data(|d| d.get_temp(slot)).unwrap_or_else(craft_ui::dialog::DialogState::new);
+    let mut state: craft::ui::dialog::DialogState<H> = ctx.data(|d| d.get_temp(slot)).unwrap_or_else(craft::ui::dialog::DialogState::new);
     let response = HostDialog::new(key, title)
         .width(width)
         .place_key(PlaceKey(slot))
@@ -515,7 +515,7 @@ pub(crate) fn show_prompt<H: Clone + PartialEq + Send + Sync + 'static>(
         if state.is_open() {
             d.insert_temp(slot, state);
         } else {
-            d.remove::<craft_ui::dialog::DialogState<H>>(slot);
+            d.remove::<craft::ui::dialog::DialogState<H>>(slot);
         }
     });
     response
@@ -684,7 +684,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
     }
     for rect in shown {
-        craft_ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
+        craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
     }
 }
 
@@ -705,13 +705,13 @@ fn about_tab_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, tab: &str) {
         _ => {
             ui.label(tl!("PhotoCraft — an open-source, native image editor written in Rust."));
             ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &photocraft_engine::build_info::long_version())]));
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.add_space(craft::ui::theme::scale::Space::S12.px());
             ui.vertical_centered(|ui| {
                 crate::links::discord_button(app, ui, 220.0);
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                ui.add_space(craft::ui::theme::scale::Space::S8.px());
                 crate::links::link_row(app, ui);
             });
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.add_space(craft::ui::theme::scale::Space::S12.px());
             ui.weak("egui · wgpu · photocraft-engine");
         }
     }
@@ -1116,7 +1116,7 @@ mod preference_resize_tests {
             PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::of_library("craft.artcraft", true, size));
             resize_of(&ctx, curves.as_object().unwrap()).unwrap().0.default.x
         };
-        let (compact, comfortable) = (width(craft_theme::Size::Compact), width(craft_theme::Size::Comfortable));
+        let (compact, comfortable) = (width(craft::theme::Size::Compact), width(craft::theme::Size::Comfortable));
         // 270 + bar 8 + gap 4 + 2 * pad 5 + 2 * dialog pad 7 at both sizes.
         assert_eq!((compact, comfortable), (306.0, 306.0));
     }

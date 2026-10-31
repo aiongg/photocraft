@@ -5,12 +5,12 @@
 
 use std::ops::RangeInclusive;
 
-use craft_theme::Rgba;
-use craft_ui::controls::{Button, ButtonVariant, ControlSize, TextField};
-use craft_ui::edit::EditEvent;
-use craft_ui::interface_scale::{Fit, InterfaceScale, InterfaceScaleLabels};
-use craft_ui::localized::{Labels as _, LocaleNumbers};
-use craft_ui::preferences::{GroupSpec, PageSpec, PrefValue, PreferencesBody, PreferencesHost, PreferencesTexts, RowKind, RowSpec};
+use craft::theme::Rgba;
+use craft::ui::controls::{Button, ButtonVariant, ControlSize, TextField};
+use craft::ui::edit::EditEvent;
+use craft::ui::interface_scale::{Fit, InterfaceScale, InterfaceScaleLabels};
+use craft::ui::localized::{Labels as _, LocaleNumbers};
+use craft::ui::preferences::{GroupSpec, PageSpec, PrefValue, PreferencesBody, PreferencesModel, RowKind, RowSpec};
 use egui::RichText;
 
 use super::appearance::{ThemeChoice, system_theme, theme_choices, theme_slot};
@@ -287,25 +287,6 @@ fn interface_groups(obj: &Map<String, Value>, rows: Vec<Row>) -> Vec<Group> {
     groups
 }
 
-fn prefs_texts(lang: crate::i18n::Lang) -> PreferencesTexts {
-    PreferencesTexts {
-        title: tl!("Preferences").into(),
-        search_label: tl!("Search settings…").into(),
-        search_placeholder: tl!("Search settings…").into(),
-        clear_search: tl!("Clear search").into(),
-        pages_label: tl!("Pages").into(),
-        no_matches: tl!("No matching settings").into(),
-        empty_page: tl!("These settings aren't available in PhotoCraft yet.").into(),
-        ok: tl!("OK").into(),
-        cancel: tl!("Cancel").into(),
-        apply: tl!("Apply").into(),
-        reset_section: tl!("Reset Section").into(),
-        hex_label: tl!("Color").into(),
-        default_hint: tl!("Default").into(),
-        numbers: LocaleNumbers::from_tag(lang.code()),
-    }
-}
-
 pub(super) struct Host<'a> {
     app: &'a mut PhotocraftApp,
     fields: &'a mut Map<String, Value>,
@@ -344,11 +325,7 @@ impl<'a> Host<'a> {
     }
 }
 
-impl PreferencesHost for Host<'_> {
-    fn texts(&self) -> PreferencesTexts {
-        prefs_texts(self.lang)
-    }
-
+impl PreferencesModel for Host<'_> {
     fn pages(&self) -> Vec<PageSpec<'_>> {
         self.pages
             .iter()
@@ -466,7 +443,7 @@ impl PreferencesHost for Host<'_> {
                         ui.horizontal(|ui| {
                             let mut on = d.get("enabled").and_then(Value::as_bool).unwrap_or(false);
                             let mut path = d.get("path").and_then(Value::as_str).unwrap_or("").to_string();
-                            let _ = craft_ui::controls::Checkbox::bool(tl!("Enabled"), &mut on).show(ui);
+                            let _ = craft::ui::controls::Checkbox::bool(tl!("Enabled"), &mut on).show(ui);
                             let edit = TextField::new(("scratch-disk-path", n), tl!("Path"), path.as_str()).show(ui);
                             if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event {
                                 path = value;
@@ -554,11 +531,11 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
         crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(tl!(&name)));
     }
     match out.closed {
-        Some(craft_ui::preferences::Closed::Ok) => {
+        Some(craft::ui::preferences::Closed::Ok) => {
             f.insert(super::APPLIED.into(), json!(true));
             Some(true)
         }
-        Some(craft_ui::preferences::Closed::Cancel) => Some(false),
+        Some(craft::ui::preferences::Closed::Cancel) => Some(false),
         None => None,
     }
 }

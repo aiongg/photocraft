@@ -171,8 +171,8 @@ pub fn add_point_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64
 
 pub(crate) fn picker_button(ui: &mut egui::Ui, selected: bool, enabled: bool, tooltip: &str, color: egui::Color32) -> egui::Response {
     ui.add(
-        craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Eyedropper, tooltip)
-            .size(craft_ui::controls::ControlSize::Md)
+        craft::ui::controls::IconButton::new(craft::ui::icons::Icon::Eyedropper, tooltip)
+            .size(craft::ui::controls::ControlSize::Md)
             .selected(selected)
             .badge(color)
             .enabled(enabled),
@@ -184,7 +184,7 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
     let current = picker(fields.get(CURVE_PICKER));
     let mut chosen = None;
     ui.horizontal(|ui| {
-        ui.add(craft_ui::primitives::Text::new(tl!("Eyedroppers:")).role(craft_theme::TypeRole::Label).content(craft_ui::primitives::Content::Muted));
+        ui.add(craft::ui::primitives::Text::new(tl!("Eyedroppers:")).role(craft::theme::TypeRole::Label).content(craft::ui::primitives::Content::Muted));
         // The badge is the tone the picker maps the sample to (image data, like the Curves
         // gradient bars), not chrome, so it is the same in every theme.
         for (id, eyedropper, label, tone) in [
@@ -199,9 +199,9 @@ fn picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mode: pho
         }
         if !matches!(mode, photocraft_doc::ColorMode::Rgb | photocraft_doc::ColorMode::Grayscale) {
             ui.add(
-                craft_ui::primitives::Text::new(tl!("Unavailable in this color mode"))
-                    .role(craft_theme::TypeRole::Caption)
-                    .content(craft_ui::primitives::Content::Faint),
+                craft::ui::primitives::Text::new(tl!("Unavailable in this color mode"))
+                    .role(craft::theme::TypeRole::Caption)
+                    .content(craft::ui::primitives::Content::Faint),
             );
         }
     });
@@ -330,7 +330,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String,
     let mode = curve_mode(app, &kind);
     if matches!(kind.as_str(), "levels" | "curves") {
         picker_controls(ui, fields, mode);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     let mut values = crate::filter_dialog::params_of(fields);
     let active = fields
@@ -381,7 +381,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String,
         }
     }
     let mut preview = fields.get("__preview").and_then(Value::as_bool).unwrap_or(true);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if crate::widgets::checkbox(ui, &mut preview, tl!("Preview")).changed() {
         fields.insert("__preview".into(), json!(preview));
     }

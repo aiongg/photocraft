@@ -1,11 +1,11 @@
 use super::brush_controls::{brush_preset_chip, mixer_load_swatch, paint_mode_dropdown, smoothing_options, tool_mode_dropdown};
 use super::{BlendMode, Color32, PhotocraftApp, RichText, Sense, Tokens, Tool, Value, icons, json, widgets};
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField, Select};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
-use craft_ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField, Select};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
+use craft::ui::patterns::{CellWidth, OptionsBar};
 use egui::Response;
 use photocraft_paint::BrushSettings;
 use std::hash::{Hash, Hasher};
@@ -167,8 +167,8 @@ pub(crate) fn number_cell(ui: &mut egui::Ui, field: &Field<'_>, value: &mut f32)
 }
 
 /// [`number_cell`] whose caption is `icon`: the glyph scrubs the field beside it.
-pub(crate) fn number_cell_icon(ui: &mut egui::Ui, icon: craft_ui::icons::Icon, tip: &str, field: &Field<'_>, value: &mut f32) -> CellEdit {
-    let glyph = ui.add(craft_ui::primitives::Icon::new(icon).size(craft_ui::icons::IconSize::Sm).content(craft_ui::primitives::Content::Muted).label(tl!(tip)));
+pub(crate) fn number_cell_icon(ui: &mut egui::Ui, icon: craft::ui::icons::Icon, tip: &str, field: &Field<'_>, value: &mut f32) -> CellEdit {
+    let glyph = ui.add(craft::ui::primitives::Icon::new(icon).size(craft::ui::icons::IconSize::Sm).content(craft::ui::primitives::Content::Muted).label(tl!(tip)));
     let glyph = glyph.on_hover_text(tl!(tip));
     number_cell_in(ui, field, value, None, None, None, Some(&glyph))
 }
@@ -661,8 +661,8 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 let fw = widgets::value_field_prec(ui, &mut rw, 0.0..=99_999.0, "", 54.0, decimals);
                 let swap = ui
                     .add(
-                        craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width"))
-                            .size(craft_ui::controls::ControlSize::Sm),
+                        craft::ui::controls::IconButton::new(craft::ui::icons::Icon::SwapHorizontal, tl!("Swaps height and width"))
+                            .size(craft::ui::controls::ControlSize::Sm),
                     )
                     .clicked();
                 let fh = widgets::value_field_prec(ui, &mut rh, 0.0..=99_999.0, "", 54.0, decimals);
@@ -686,17 +686,17 @@ fn selection_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: 
                 }
             }
             widgets::vline(ui, 22.0);
-            if ui.add(craft_ui::controls::Button::new(tl!("Clear")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
+            if ui.add(craft::ui::controls::Button::new(tl!("Clear")).variant(craft::ui::controls::ButtonVariant::Secondary)).clicked() {
                 crate::crop_size::clear_ratio(o);
             }
             crate::crop_straighten::options_button(&mut app.crop.straighten, ui);
             crate::crop_overlay::options_button(o, ui);
             let pick_shield_color = crate::crop_shield::options_button(&mut o.crop_shield, ui);
-            craft_ui::controls::Checkbox::bool(tl!("Delete Cropped Pixels"), &mut o.crop_delete).show(ui).response;
+            craft::ui::controls::Checkbox::bool(tl!("Delete Cropped Pixels"), &mut o.crop_delete).show(ui).response;
             // Fill: what a turned or extending crop puts where the image doesn't reach
             // (#3823). Generative Expand is not offered.
             ui.label(tl!("Fill:"));
-            craft_ui::controls::Select::new("crop-fill", tl!("Fill:"), &mut o.crop_content_aware)
+            craft::ui::controls::Select::new("crop-fill", tl!("Fill:"), &mut o.crop_content_aware)
                 .fit(true)
                 .option(false, tl!("Background (Default)"))
                 .option(true, tl!("Content-Aware Fill"))

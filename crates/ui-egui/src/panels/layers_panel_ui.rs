@@ -1,8 +1,8 @@
 //! Layers panel flyout and display preferences, observed from Photoshop's panel menu.
 //! UI options do not edit document pixels or add history steps.
-use craft_ui::composites::GroupBox;
-use craft_ui::controls::{Checkbox, RadioGroup, RadioSet};
-use craft_ui::theme::StrokeExt;
+use craft::ui::composites::GroupBox;
+use craft::ui::controls::{Checkbox, RadioGroup, RadioSet};
+use craft::ui::theme::StrokeExt;
 use egui::{self, Ui};
 use photocraft_doc::Document;
 use serde_json::{Map, Value, json};
@@ -126,7 +126,7 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
         let f = n as f32 / 22.0;
         painter.rect_filled(
             UiRect::from_min_max(point(0.0, y0), point(1.0, y1)),
-            craft_ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Radius::R0.px(),
             Color32::from_gray((119.0 + f * 30.0) as u8),
         );
     }
@@ -179,8 +179,8 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
     }
     painter.rect_stroke(
         rect,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(92)),
+        craft::ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(92)),
         egui::StrokeKind::Inside,
     );
 }
@@ -216,8 +216,8 @@ fn is_lock(fields: &Map<String, Value>) -> bool {
 }
 
 /// The content width of the dialog with `fields`.
-pub fn width(fields: &Map<String, Value>) -> craft_ui::dialog::Width {
-    if is_lock(fields) { craft_ui::dialog::Width::Compact } else { craft_ui::dialog::Width::Fixed(360.0) }
+pub fn width(fields: &Map<String, Value>) -> craft::ui::dialog::Width {
+    if is_lock(fields) { craft::ui::dialog::Width::Compact } else { craft::ui::dialog::Width::Fixed(360.0) }
 }
 
 /// The Panel Options dialog's `fields`: the options under their saved names, and Thumbnail Contents

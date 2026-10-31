@@ -6,9 +6,9 @@
 //! On the layer mask (double-click its Channels row, or Mask Options… on its Layers thumbnail)
 //! it is Photoshop's Layer Mask Display Options: just the rubylith's colour and opacity.
 
-use craft_ui::composites::FormGrid;
-use craft_ui::controls::RadioGroup;
-use craft_ui::primitives::Divider;
+use craft::ui::composites::FormGrid;
+use craft::ui::controls::RadioGroup;
+use craft::ui::primitives::Divider;
 use photocraft_doc::ColorIndicates;
 use serde_json::{Map, Value, json};
 
@@ -103,7 +103,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
     let quick = f.get("channel").and_then(Value::as_str) == Some("quickMask");
     name_row(ui, f);
-    craft_ui::composites::SectionLabel::new(tl!("Color Indicates:")).show(ui);
+    craft::ui::composites::SectionLabel::new(tl!("Color Indicates:")).show(ui);
     Divider::horizontal().show(ui);
     let mut indicates = f.get("indicates").and_then(Value::as_str).unwrap_or("masked").to_string();
     let before = indicates.clone();
@@ -121,8 +121,8 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         f.insert("indicates".into(), json!(indicates));
     }
     let spot = indicates == "spot";
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    craft_ui::composites::SectionLabel::new(tl!("Color")).show(ui);
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
+    craft::ui::composites::SectionLabel::new(tl!("Color")).show(ui);
     Divider::horizontal().show(ui);
     let what = if spot { tl!("Spot Color") } else { tl!("Channel Color") };
     let caption = if spot { tl!("Solidity:") } else { tl!("Opacity:") };
@@ -141,7 +141,7 @@ fn color_and_amount(ui: &mut egui::Ui, f: &mut Map<String, Value>, color: (&str,
         if swatch.clicked() {
             crate::color_picker_ui::request(f, &crate::color_picker_ui::title_for(color.1));
         }
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         ui.label(amount.1);
         let mut pct = f.get(amount.0).and_then(Value::as_f64).unwrap_or(f64::from(default)) as f32;
         if crate::widgets::dialog_number(ui, ("channel-options", amount.0), amount.1, &mut pct, 0.0..=100.0, "{n}%", 0) {
@@ -230,7 +230,7 @@ pub fn confirm_new_spot(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Resu
 pub fn new_spot_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     ui.spacing_mut().item_spacing.y = 6.0;
     name_row(ui, f);
-    craft_ui::composites::SectionLabel::new(tl!("Ink Characteristics")).show(ui);
+    craft::ui::composites::SectionLabel::new(tl!("Ink Characteristics")).show(ui);
     Divider::horizontal().show(ui);
     FormGrid::new("channel-options-ink").show(ui, |form| {
         form.row(tl!("Color:"), |ui, _| color_and_amount(ui, f, ("color", tl!("Spot Color")), ("solidity", tl!("Solidity:")), 0.0));

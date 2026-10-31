@@ -6,12 +6,12 @@
 //! Colors) and Make Ramp Web Safe. Shift-click on the ramp cycles the ramps, Alt-click picks the
 //! colour the panel isn't editing, and a right-click opens the ramp menu.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
-use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
-use craft_ui::composites::{ColorRamp, ColorWarning, ColorWarningChip, ColorWheel};
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
+use craft::color::ui::{ColorRamp, ColorWarning, ColorWarningChip, ColorWheel};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
 use egui::{Color32, Rect, Sense, StrokeKind, UiBuilder, pos2, vec2};
 use serde_json::json;
 
@@ -21,7 +21,7 @@ use crate::panels::{color_field_fill_id, field_chips};
 use crate::state::{ColorPanelMode, ColorPanelState, ColorRamp as PanelRamp};
 use crate::theme::Tokens;
 use crate::widgets;
-use craft_ui::controls::{Slider, SliderThumb};
+use craft::ui::controls::{Slider, SliderThumb};
 use photocraft_color::convert;
 
 /// Width of the chips column, as the cube field's.
@@ -251,7 +251,7 @@ fn hex_pair(ui: &mut egui::Ui, id: egui::Id, value: &mut f32) -> bool {
     let (rect, _) = ui.allocate_exact_size(vec2(FIELD_W, ROW_H), Sense::hover());
     widgets::surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     let byte = value.clamp(0.0, 255.0).round() as u8;
     let typing = if ui.memory(|m| m.has_focus(id)) { ui.data(|d| d.get_temp::<String>(id)) } else { None };
@@ -300,7 +300,7 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, mode: ColorPanelMode) {
     if let Some(v) = edited {
         apply_values(app, ui, model, v);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let fill = ui.data(|d| d.get_temp::<f32>(color_field_fill_id()));
     let gaps = 2.0 * ui.spacing().item_spacing.y + 6.0;
     let ramp_h = fill.filter(|f| f.is_finite()).map_or(36.0, |f| (f - top_h - gaps).clamp(28.0, 2000.0));
@@ -403,7 +403,7 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     let mut v = edited.unwrap_or(v);
     let mut changed = edited.is_some();
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let fill = ui.data(|d| d.get_temp::<f32>(color_field_fill_id()));
     let w = ui.available_width();
     // The wheel takes what the dock group has left under the sliders as drawn (they stand taller
@@ -419,14 +419,14 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Photoshop's add-to-swatches button under the wheel.
     let area = shown.area;
     let add = Rect::from_min_size(pos2(area.right() - 16.0, area.bottom() - 16.0), vec2(14.0, 14.0));
-    ui.painter().rect_stroke(add, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Inside);
+    ui.painter().rect_stroke(add, craft::ui::theme::scale::Radius::R2.px(), craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), StrokeKind::Inside);
     ui.painter().line_segment(
         [pos2(add.center().x, add.top() + 3.5), pos2(add.center().x, add.bottom() - 3.5)],
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim),
     );
     ui.painter().line_segment(
         [pos2(add.left() + 3.5, add.center().y), pos2(add.right() - 3.5, add.center().y)],
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim),
     );
     let add_resp = ui.interact(add, ui.scope_id().with("color-wheel-add"), Sense::click());
     add_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), "Add to Swatches"));

@@ -1,7 +1,7 @@
 //! Camera Raw navigation in source-pixel coordinates. No document edits.
-use craft_ui::canvas::Orientation;
-use craft_ui::icons::Icon;
-use craft_ui::patterns::{Toolbar, ToolbarItem};
+use craft::ui::canvas::Orientation;
+use craft::ui::icons::Icon;
+use craft::ui::patterns::{Toolbar, ToolbarItem};
 use egui::{Key, Modifiers, PointerButton, Pos2, Rect, Response, Sense, Ui, Vec2, vec2};
 use serde_json::Value;
 
@@ -252,7 +252,7 @@ pub(crate) fn interact(
 }
 
 pub(crate) fn toolbar(ui: &mut Ui, state: &mut CameraRawPreviewState, viewport: Rect, size: Vec2, sampler: &mut bool) {
-    let style = Toolbar::style(&craft_ui::theme::current(ui.ctx()));
+    let style = Toolbar::style(&craft::ui::theme::current(ui.ctx()));
     let tools = Toolbar::new("camera-raw-preview-tools", Orientation::Horizontal)
         .label(tl!("Preview tools"))
         .group([ToolbarItem::new(Icon::ZoomIn, tl!("Zoom Tool")), ToolbarItem::new(Icon::Hand, tl!("Hand Tool"))])

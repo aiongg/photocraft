@@ -3,13 +3,13 @@ use super::commit::{cancel, commit};
 use super::pointer::{apply_state, box_state, point_on_quad};
 use super::warp::edit_session_warp;
 use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
-use craft_ui::canvas::ReferencePoint;
-use craft_ui::canvas::quad::{Anchor9, Parts as BoxParts, SKEW_LIMIT};
-use craft_ui::controls::{ControlSize, IconButton, NumberField};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::canvas::ReferencePoint;
+use craft::ui::canvas::quad::{Anchor9, Parts as BoxParts, SKEW_LIMIT};
+use craft::ui::controls::{ControlSize, IconButton, NumberField};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::patterns::{CellWidth, OptionsBar};
 use std::ops::RangeInclusive;
 
 /// How much the box enlarges its pixels: the longest edge relative to the original (picks the
@@ -23,8 +23,8 @@ pub(super) fn quad_scale(t: &TransformSession) -> f32 {
 }
 
 /// The session's box before the transform, as the library's box maths takes it.
-fn start_rect(t: &TransformSession) -> craft_ui::canvas::kurbo::Rect {
-    craft_ui::canvas::kurbo::Rect::new(t.rect[0], t.rect[1], t.rect[2], t.rect[3])
+fn start_rect(t: &TransformSession) -> craft::ui::canvas::kurbo::Rect {
+    craft::ui::canvas::kurbo::Rect::new(t.rect[0], t.rect[1], t.rect[2], t.rect[3])
 }
 
 /// W and H (%), the angle (°) and the horizontal skew (°) the options bar shows for the box
@@ -471,7 +471,7 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
     let c = rect.center();
     let stroke = Stroke::new(1.15, ink);
     let box_r = egui::Rect::from_center_size(c, vec2(13.0, 13.0));
-    ui.painter().rect_stroke(box_r, craft_ui::theme::scale::Radius::R2.px(), stroke, egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(box_r, craft::ui::theme::scale::Radius::R2.px(), stroke, egui::StrokeKind::Inside);
     let h = 5.2;
     match kind {
         "vertical" => {
@@ -497,9 +497,9 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
 /// Warp switch, cancel and commit, kept on the right of the options bar.
 /// `mode_switch`: the Free Transform / Warp switch (not for Content-Aware Scale, which only scales).
 fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, mode_switch: bool) {
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     // Cancel and Commit keep the library order at the end of the bar; Reset, the divider and the mode switch follow them.
-    let style = OptionsBar::style(&<craft_theme::Tokens as craft_ui::theme::TokensOf>::of(ui), false);
+    let style = OptionsBar::style(&<craft::theme::Tokens as craft::ui::theme::TokensOf>::of(ui), false);
     let pair = 2.0 * style.button + ui.spacing().item_spacing.x;
     let done = ui
         .allocate_ui_with_layout(egui::vec2(pair, ui.available_height()), egui::Layout::left_to_right(egui::Align::Center), |ui| {

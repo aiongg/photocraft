@@ -2,8 +2,8 @@
 //! collapsible section header every section uses (separator, disclosure chevron, title), column
 //! widths that make field rows fill the panel, and the Quick Actions each layer kind offers.
 
-use craft_ui::composites::SectionHeader;
-use craft_ui::theme::ToEgui;
+use craft::ui::composites::SectionHeader;
+use craft::ui::theme::ToEgui;
 use egui::{Rect, Sense, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 
@@ -41,7 +41,7 @@ pub fn kind_label(layer: &Layer) -> String {
 
 /// Header row: kind icon, the layer's name, and its kind right-aligned in the dim text colour.
 pub fn header(ui: &mut egui::Ui, layer: &Layer) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
     let icon_r = Rect::from_center_size(pos2(r.left() + 10.0, r.center().y), vec2(20.0, 20.0));
     crate::icons::paint(ui, icon_r, kind_icon(&layer.content), 15.0, t.color.text.normal.to_egui());

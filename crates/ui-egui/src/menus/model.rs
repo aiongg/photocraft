@@ -1,13 +1,13 @@
 //! PhotoCraft's menus as a craft-menu model.
 //!
 //! [`menu_model`] turns the flat rows of [`menu_items`](super::menu_items) into a
-//! [`craft_menu::MenuBar`] in English, with the roles the Mac layout needs, the Edit › Menus
+//! [`craft::menu::MenuBar`] in English, with the roles the Mac layout needs, the Edit › Menus
 //! tints and the row tooltips. [`translated`] writes it in the UI language for the in-window bar.
 
 use std::collections::HashMap;
 
-use craft_keymap::{Chord, CommandRef};
-use craft_menu::{Item, ItemRole, MenuRole, Node, Row};
+use craft::keymap::{Chord, CommandRef};
+use craft::menu::{Item, ItemRole, MenuRole, Node, Row};
 
 use super::items::{MenuItem, menu_tint};
 use super::state::translated_label;
@@ -30,7 +30,7 @@ const TOP_PREFERRED: [(&str, char); 10] = [
 
 /// The menus as craft-menu's tree, in English. A shortcut that is not a craft-keymap chord is left
 /// off the row.
-pub fn menu_model(items: &[MenuItem]) -> craft_menu::MenuBar {
+pub fn menu_model(items: &[MenuItem]) -> craft::menu::MenuBar {
     let by_id: HashMap<&str, &MenuItem> = items.iter().map(|it| (it.id.as_str(), it)).collect();
     let rows: Vec<Row> = items
         .iter()
@@ -40,10 +40,10 @@ pub fn menu_model(items: &[MenuItem]) -> craft_menu::MenuBar {
             label: it.label.clone(),
             shortcut: it.shortcut.as_deref().and_then(|s| s.parse::<Chord>().ok()),
             enabled: it.enabled,
-            kind: it.checked.map_or(craft_menu::ItemKind::Plain, craft_menu::ItemKind::Check),
+            kind: it.checked.map_or(craft::menu::ItemKind::Plain, craft::menu::ItemKind::Check),
         })
         .collect();
-    let mut bar = craft_menu::from_items(&TOP_MENUS, &rows);
+    let mut bar = craft::menu::from_items(&TOP_MENUS, &rows);
     for (title, role) in [("File", MenuRole::File), ("Edit", MenuRole::Edit), ("View", MenuRole::View), ("Window", MenuRole::Window), ("Help", MenuRole::Help)]
     {
         bar.tag_menu(title, role);
@@ -90,17 +90,17 @@ pub(crate) struct English {
 }
 
 impl English {
-    pub(crate) fn of(&self, labeled: craft_menu::Labeled<'_>) -> Option<String> {
+    pub(crate) fn of(&self, labeled: craft::menu::Labeled<'_>) -> Option<String> {
         match labeled {
-            craft_menu::Labeled::Command(c) => self.commands.get(&c.id).cloned(),
-            craft_menu::Labeled::Title(t) => self.titles.get(t).cloned(),
+            craft::menu::Labeled::Command(c) => self.commands.get(&c.id).cloned(),
+            craft::menu::Labeled::Title(t) => self.titles.get(t).cloned(),
         }
     }
 }
 
 /// The model written in `lang`, with the English names of what differs. A menu left with no rows
 /// shows a disabled "(coming soon)".
-pub(crate) fn translated(model: &craft_menu::MenuBar, lang: Lang) -> (craft_menu::MenuBar, English) {
+pub(crate) fn translated(model: &craft::menu::MenuBar, lang: Lang) -> (craft::menu::MenuBar, English) {
     let mut bar = model.clone();
     let mut english = English::default();
     fn walk(nodes: &mut [Node], lang: Lang, english: &mut English) {

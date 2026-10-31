@@ -9,15 +9,15 @@
 //! groups and where a floated panel docks back.
 
 use crate::dock::Group;
-use craft_ui::docking::{Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side};
-use craft_ui::layout::{SplitAxis, SplitSize};
-use craft_ui::theme::StrokeExt;
+use craft::ui::docking::{Action, Column, DockCommand, DockHeights, FloatSpace, Floating, Layout, Location, Node, PanelState, Permissions, Placement, Side};
+use craft::ui::layout::{SplitAxis, SplitSize};
+use craft::ui::theme::StrokeExt;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 
 /// The saved arrangement: layout, hidden panels with their return places, and the lock.
-pub(crate) type Workspace = craft_ui::docking::Workspace<String>;
+pub(crate) type Workspace = craft::ui::docking::Workspace<String>;
 
 type Returns = std::collections::BTreeMap<String, Location<String>>;
 
@@ -221,7 +221,7 @@ fn legacy_layout(app: &PhotocraftApp, all: bool) -> Layout<String> {
             continue;
         }
         let height = app.ui.dock.heights.contains_key(&group).then(|| app.ui.dock.height(group));
-        groups.push(craft_ui::docking::Group { height, minimized: app.ui.dock.is_collapsed(group), ..craft_ui::docking::Group::new(panels, active) });
+        groups.push(craft::ui::docking::Group { height, minimized: app.ui.dock.is_collapsed(group), ..craft::ui::docking::Group::new(panels, active) });
     }
     let (columns, width) = if groups.is_empty() { (Vec::new(), 0.0) } else { (vec![Column::new(groups, default_width(pro))], default_width(pro)) };
     Layout { root: Some(with_canvas(Node::Dock { side: Side::End, columns }, width)), floating }
@@ -333,7 +333,7 @@ fn default_place(app: &PhotocraftApp, layout: &Layout<String>, panel: &str) -> A
 
 /// The panel a command names, if any.
 fn command_panel(command: &DockCommand<String>) -> Option<&String> {
-    use craft_ui::docking::{DockOperation, UiDock};
+    use craft::ui::docking::{DockOperation, UiDock};
     match command {
         DockCommand::Move { panel, .. }
         | DockCommand::Float { panel, .. }
@@ -359,7 +359,7 @@ fn command_panel(command: &DockCommand<String>) -> Option<&String> {
 
 /// Commands that bring their panel to the front.
 fn reveals(command: &DockCommand<String>) -> bool {
-    use craft_ui::docking::{DockOperation, UiDock};
+    use craft::ui::docking::{DockOperation, UiDock};
     matches!(
         command,
         DockCommand::Activate { .. }
@@ -372,7 +372,7 @@ fn reveals(command: &DockCommand<String>) -> bool {
 
 /// Commands that close their panel, so a hidden one is not shown first.
 fn closes(command: &DockCommand<String>) -> bool {
-    use craft_ui::docking::{DockOperation, UiDock};
+    use craft::ui::docking::{DockOperation, UiDock};
     matches!(
         command,
         DockCommand::Close { .. }
@@ -467,7 +467,7 @@ fn run(app: &mut PhotocraftApp, command: DockCommand<String>) -> Result<Value, S
         ensure(app, &mut workspace, panel)?;
     }
     let space = FloatSpace::new(FLOAT_AREA);
-    let rtl = craft_ui::direction::is_rtl(&app.direction());
+    let rtl = craft::ui::direction::is_rtl(&app.direction());
     let closed = match &command {
         DockCommand::Dock { panel, anchor: None, side: None, zone: None, group: false, column: false, .. } if dock_back(&mut workspace, &returns, panel)? => {
             Vec::new()
@@ -564,7 +564,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         previous.is_some_and(|generation| generation != app.ui.docking_generation)
     });
     if changed_workspace {
-        craft_ui::docking::cancel_drag::<String>(ui.ctx(), area);
+        craft::ui::docking::cancel_drag::<String>(ui.ctx(), area);
     }
     if app.ui.docking.as_ref().is_some_and(|workspace| !valid_workspace(workspace)) {
         app.ui.docking = None;
@@ -586,7 +586,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let reveal = app.ui.docking_reveal.take();
     let t = crate::theme::Tokens::get(ui.ctx());
     let locked = app.session.prefs().workspace_locked;
-    let mut style = craft_ui::docking::DockStyle::from_ui(ui);
+    let mut style = craft::ui::docking::DockStyle::from_ui(ui);
     style.tab_height = if t.pro { 28.0 } else { 40.0 };
     style.min_pane = 0.0;
     style.background = t.card;
@@ -596,15 +596,15 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     style.active_background = t.card;
     style.text = t.text;
     style.inactive_text = t.text_dim;
-    style.border = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border);
+    style.border = craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border);
     style.accent = t.accent;
-    style.right_to_left = craft_ui::direction::is_rtl(ui.ctx());
+    style.right_to_left = craft::ui::direction::is_rtl(ui.ctx());
     style.new_dock_zones = true;
     // The panel menu button ends every tab strip; its menu has the panel's items, then the group's
     // (collapse, float, move up and down, close).
     style.panel_menu_button = true;
     let style = style.localized(|key| DOCK_LABELS.iter().find(|(k, _)| *k == key).map(|(_, english)| tl!(english).to_string()));
-    let mut dock = craft_ui::docking::DockArea::new(area)
+    let mut dock = craft::ui::docking::DockArea::new(area)
         .locked(locked)
         .auto_collapse_iconic(app.session.prefs().workspace.auto_collapse_icon_panels)
         .input_blocked(modal_open(app, ui.ctx()));
@@ -633,13 +633,13 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         permissions,
         |id| {
             if id == CANVAS {
-                craft_ui::docking::PanelLimits { min: egui::vec2(200.0, 120.0), ..Default::default() }
+                craft::ui::docking::PanelLimits { min: egui::vec2(200.0, 120.0), ..Default::default() }
             } else if collapsed.contains(id) {
-                craft_ui::docking::PanelLimits { min: egui::vec2(220.0, 0.0), max: egui::vec2(1_000_000.0, 0.0) }
+                craft::ui::docking::PanelLimits { min: egui::vec2(220.0, 0.0), max: egui::vec2(1_000_000.0, 0.0) }
             } else {
                 // The native group's smallest height, tab strip included.
                 let height = PANELS.iter().find(|p| p.0 == id).map_or(80.0, |p| p.2.min_height() - strip);
-                craft_ui::docking::PanelLimits { min: egui::vec2(panel_min_width(id, layers_min), height), ..Default::default() }
+                craft::ui::docking::PanelLimits { min: egui::vec2(panel_min_width(id, layers_min), height), ..Default::default() }
             }
         },
         &mut PanelContent { app, collapsed: &collapsed, fillers: &fillers, card: &card, strip },
@@ -685,7 +685,7 @@ pub(crate) fn native_viewports(app: &PhotocraftApp, ctx: &egui::Context) -> Vec<
             .floating
             .iter()
             .filter(|window| window.id != PROPERTIES_WINDOW)
-            .map(|window| craft_ui::docking::DockArea::<String>::window_viewport(area_id(), window.id))
+            .map(|window| craft::ui::docking::DockArea::<String>::window_viewport(area_id(), window.id))
             .collect();
     }
     let _ = (app, ctx);
@@ -721,7 +721,7 @@ pub(crate) fn other_window_keyboard(ctx: &egui::Context) -> Option<bool> {
 /// Files dropped on a floating panel's own OS window open as documents, as files dropped on the
 /// main window away from the canvas and the tab strip do, and the main window comes forward.
 #[cfg(not(target_arch = "wasm32"))]
-fn open_window_drops(app: &mut PhotocraftApp, ctx: &egui::Context, windows: Vec<craft_ui::docking::WindowFiles<String>>) {
+fn open_window_drops(app: &mut PhotocraftApp, ctx: &egui::Context, windows: Vec<craft::ui::docking::WindowFiles<String>>) {
     let dropped: Vec<egui::DroppedFileHandle> = windows.into_iter().flat_map(|window| window.dropped).collect();
     if !dropped.is_empty() {
         app.open_dropped(ctx, dropped, None);
@@ -733,7 +733,7 @@ fn open_window_drops(app: &mut PhotocraftApp, ctx: &egui::Context, windows: Vec<
 /// still at their defaults, which give way to the filler, don't shift while one is resized. The
 /// last open group fills the column and stays unpinned.
 fn pin_group_heights(ctx: &egui::Context, layout: &Layout<String>, actions: &mut Vec<Action<String>>) {
-    use craft_ui::docking::{DockArea, Hit};
+    use craft::ui::docking::{DockArea, Hit};
     let resized: Vec<String> = actions.iter().filter_map(|a| if let Action::ResizeGroup { panel, .. } = a { Some(panel.clone()) } else { None }).collect();
     if resized.is_empty() {
         return;
@@ -755,7 +755,7 @@ fn pin_group_heights(ctx: &egui::Context, layout: &Layout<String>, actions: &mut
                             .map(|(_, rect)| rect.top())
                             .reduce(f32::min);
                         let bottom =
-                            hits.iter().find(|(hit, _)| *hit == Hit::Divider(craft_ui::docking::Divider::Group(first.clone()))).map(|(_, r)| r.center().y);
+                            hits.iter().find(|(hit, _)| *hit == Hit::Divider(craft::ui::docking::Divider::Group(first.clone()))).map(|(_, r)| r.center().y);
                         if let (Some(top), Some(bottom)) = (top, bottom) {
                             pins.push(Action::ResizeGroup { panel: first.clone(), height: Some(bottom - top) });
                         }
@@ -879,7 +879,7 @@ fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
 #[cfg(test)]
 pub(crate) mod probe {
     use super::*;
-    use craft_ui::docking::{DockArea, Hit};
+    use craft::ui::docking::{DockArea, Hit};
     use egui::Rect;
 
     pub(crate) fn hit_rect(ctx: &egui::Context, hit: &Hit<String>) -> Option<Rect> {
@@ -1212,7 +1212,7 @@ fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: &str) {
     }
 }
 
-impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
+impl craft::ui::docking::DockContent<String> for PanelContent<'_> {
     fn body(&mut self, ui: &mut egui::Ui, id: &String) {
         #[cfg(test)]
         ui.ctx().data_mut(|data| data.get_temp_mut_or_default::<Vec<(String, egui::Rect)>>(bodies_id()).push((id.clone(), ui.max_rect())));

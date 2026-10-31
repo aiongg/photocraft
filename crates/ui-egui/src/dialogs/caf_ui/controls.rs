@@ -163,9 +163,9 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ],
         )
     });
-    match craft_ui::dialog::take_step(ctx) {
-        Some(craft_ui::dialog::Step::Redo) => return redo(app),
-        Some(craft_ui::dialog::Step::Undo) => return undo(app),
+    match craft::ui::dialog::take_step(ctx) {
+        Some(craft::ui::dialog::Step::Redo) => return redo(app),
+        Some(craft::ui::dialog::Step::Undo) => return undo(app),
         None => {}
     }
     let Some(w) = app.distort.caf.as_mut() else { return };

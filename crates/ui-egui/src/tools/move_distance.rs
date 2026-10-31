@@ -10,7 +10,7 @@
 //! (`pick_cmds::auto_select_target`), cached per document revision, selection and pointer pixel,
 //! so a pointer resting on the canvas costs nothing per frame.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, Pos2, Stroke, pos2, vec2};
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_engine::snap::{layer_rect, union};
@@ -175,13 +175,13 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
     let (dpi, size) = (f64::from(st.doc.resolution_dpi), st.doc.size);
     let ur = &app.session.prefs().units_and_rulers;
     let color = crate::snap_ui::smart_color(app);
-    let stroke = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
+    let stroke = craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), color);
     let px = |p: Pos2| pos2(p.x.round() + 0.5, p.y.round() + 0.5);
     for e in &overlay.extensions {
         let (a, b) = (xf.to_screen(e[0] as f32, e[1] as f32), xf.to_screen(e[2] as f32, e[3] as f32));
         painter.add(egui::Shape::dashed_line(&[px(a), px(b)], stroke, 3.0, 3.0));
     }
-    let t = craft_ui::theme::current(painter.ctx());
+    let t = craft::ui::theme::current(painter.ctx());
     let font = egui::FontId::proportional(11.0);
     for m in &overlay.measures {
         let (a, b) = if m.horizontal {

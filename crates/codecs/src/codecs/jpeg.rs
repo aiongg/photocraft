@@ -201,18 +201,18 @@ fn err(e: impl std::fmt::Display) -> CodecError {
 /// 12-bit progressive Huffman (SOF2) go there too: craft-jpeg reports them unsupported, where
 /// zune-jpeg's failure would read as a damaged file.
 fn uses_craft_jpeg(bytes: &[u8]) -> bool {
-    match craft_jpeg::frame(bytes) {
+    match craft::jpeg::frame(bytes) {
         Some(f) if (0xC9..=0xCB).contains(&f.marker) || f.marker == 0xC3 => true,
         Some(f) if matches!(f.marker, 0xC0..=0xC2) => f.precision != 8,
         _ => false,
     }
 }
 
-fn craft_jpeg_error(e: craft_jpeg::Error) -> CodecError {
+fn craft_jpeg_error(e: craft::jpeg::Error) -> CodecError {
     match e {
-        craft_jpeg::Error::Malformed(m) => err(m),
-        craft_jpeg::Error::Unsupported(m) => CodecError::unsupported(F, m),
-        craft_jpeg::Error::LimitExceeded(m) => CodecError::LimitExceeded(m),
+        craft::jpeg::Error::Malformed(m) => err(m),
+        craft::jpeg::Error::Unsupported(m) => CodecError::unsupported(F, m),
+        craft::jpeg::Error::LimitExceeded(m) => CodecError::LimitExceeded(m),
         e => err(e),
     }
 }
@@ -220,10 +220,10 @@ fn craft_jpeg_error(e: craft_jpeg::Error) -> CodecError {
 /// Decode a file [`uses_craft_jpeg`] routes away from `zune-jpeg`; `damaged` says entropy-coded
 /// data was cut short or corrupt.
 fn decode_craft_jpeg(bytes: &[u8], limits: &Limits, adobe_transform: Option<u8>) -> Result<(Image, bool), CodecError> {
-    let mut lim = craft_jpeg::Limits::default();
+    let mut lim = craft::jpeg::Limits::default();
     lim.max_pixels = limits.max_pixels;
     lim.max_alloc = limits.max_alloc;
-    let d = craft_jpeg::decode(bytes, &lim, adobe_transform).map_err(craft_jpeg_error)?;
+    let d = craft::jpeg::decode(bytes, &lim, adobe_transform).map_err(craft_jpeg_error)?;
     let layout = match d.components {
         1 => ChannelLayout::Gray,
         3 => ChannelLayout::Rgb,
@@ -231,8 +231,8 @@ fn decode_craft_jpeg(bytes: &[u8], limits: &Limits, adobe_transform: Option<u8>)
         n => return Err(err(format!("{n} components"))),
     };
     let img = match d.samples {
-        craft_jpeg::Samples::U8(px) => Image::from_raw(d.width, d.height, layout, SampleType::U8, px)?,
-        craft_jpeg::Samples::U16(px) => Image::from_u16(d.width, d.height, layout, &px)?,
+        craft::jpeg::Samples::U8(px) => Image::from_raw(d.width, d.height, layout, SampleType::U8, px)?,
+        craft::jpeg::Samples::U16(px) => Image::from_u16(d.width, d.height, layout, &px)?,
     };
     Ok((img, d.damaged))
 }

@@ -12,8 +12,8 @@
 //! from that proxy (veil fill layers, a layer mask, the refined selection for the ants) and the
 //! normal filter-preview path composites it.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 
 use photocraft_color::{Color, PixelFormat};
@@ -166,7 +166,7 @@ fn keys(ctx: &egui::Context, fields: &mut Map<String, Value>) {
         crate::dialog_keys::DialogKeys::new("Select and Mask view", &rows).with_repeat(false)
     });
     for command in KEYS.pressed(ctx) {
-        if let Some(key) = craft_keymap::Key::parse(&command).map(craft_keymap::Key::to_egui) {
+        if let Some(key) = craft::keymap::Key::parse(&command).map(craft::keymap::Key::to_egui) {
             apply_key(fields, key);
         }
     }
@@ -177,7 +177,7 @@ fn keys(ctx: &egui::Context, fields: &mut Map<String, Value>) {
 /// The View Mode controls at the top of the Select and Mask dialog.
 pub fn controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
     keys(ui.ctx(), fields);
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut current = mode(fields);
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!("View")).color(t.color.text.muted.to_egui()));
@@ -201,9 +201,9 @@ pub fn controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
     let mut remember = remembers(fields);
     crate::widgets::checkbox(ui, &mut remember, tl!("Remember Settings"));
     fields.insert(REMEMBER.into(), json!(remember));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     crate::widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     brush_controls(ui, fields);
 }
 
@@ -217,7 +217,7 @@ pub fn remembers(fields: &Map<String, Value>) -> bool {
 
 /// The Refine Edge Brush (R): painting on the canvas sets where edge refinement happens.
 fn brush_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut on = brush_on(fields);
     crate::widgets::checkbox(ui, &mut on, tl!("Refine Edge Brush (R)"));
     fields.insert("__brush".into(), json!(on));
@@ -238,9 +238,9 @@ fn brush_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
     if painted && crate::widgets::secondary_button(ui, tl!("Clear Brush Strokes"), 0.0).clicked() {
         fields.remove("refineStrokes");
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     crate::widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
 }
 
 /// The Refine Edge Brush's diameters (px) in the dialog.
@@ -305,14 +305,14 @@ pub fn canvas_brush(app: &mut PhotocraftApp, painter: &egui::Painter, over: egui
     let subtract = brush_subtract(&d.fields) != alt;
     let r = (brush_size(&d.fields) / 2.0 * zoom).max(1.5);
     let (dark, light) = (
-        craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_black_alpha(140)),
-        craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220)),
+        craft::ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_black_alpha(140)),
+        craft::ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220)),
     );
     painter.circle_stroke(over, r + 0.5, dark);
     painter.circle_stroke(over, r, light);
     let arm = 3.0;
     for stroke in
-        [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), craft_ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220))]
+        [egui::Stroke::new(2.5, egui::Color32::from_black_alpha(140)), craft::ui::theme::scale::Stroke::W1.egui(&ctx, egui::Color32::from_white_alpha(220))]
     {
         painter.line_segment([over - egui::vec2(arm, 0.0), over + egui::vec2(arm, 0.0)], stroke);
         if !subtract {

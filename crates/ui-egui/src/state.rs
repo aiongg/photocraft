@@ -385,10 +385,10 @@ pub struct UiState {
     pub dock: crate::dock::DockLayout,
     /// Authoritative custom panel membership and placement; legacy fields are compatibility projections.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub docking: Option<craft_ui::docking::Workspace<String>>,
+    pub docking: Option<craft::ui::docking::Workspace<String>>,
     /// Where each floating panel docks back to.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub docking_returns: std::collections::BTreeMap<String, craft_ui::docking::Location<String>>,
+    pub docking_returns: std::collections::BTreeMap<String, craft::ui::docking::Location<String>>,
     /// Invalidates in-flight gestures when a workspace is replaced.
     #[serde(skip)]
     pub docking_generation: u64,

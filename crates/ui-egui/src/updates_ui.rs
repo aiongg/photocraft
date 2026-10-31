@@ -1,6 +1,6 @@
 //! One background check at startup and a non-modal window for release information.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use photocraft_engine::updates_cmds::Status;
 use serde_json::Value;
 
@@ -11,7 +11,7 @@ pub(crate) struct Runtime {
     notified_version: Option<String>,
     /// The startup prompt and the self-update behind it (desktop).
     #[cfg(not(target_arch = "wasm32"))]
-    updater: craft_update::updater::Updater,
+    updater: craft::update::updater::Updater,
 }
 
 impl Default for Runtime {
@@ -20,17 +20,17 @@ impl Default for Runtime {
             startup_checked: false,
             notified_version: None,
             #[cfg(not(target_arch = "wasm32"))]
-            updater: craft_update::updater::Updater::new(&crate::UPDATE_APP, photocraft_engine::build_info::VERSION),
+            updater: craft::update::updater::Updater::new(&crate::UPDATE_APP, photocraft_engine::build_info::VERSION),
         }
     }
 }
 
 /// The release the engine found, as `craft-update` knows it.
 #[cfg(not(target_arch = "wasm32"))]
-fn release_of(found: &photocraft_engine::updates_cmds::Release) -> craft_update::Release {
-    craft_update::Release {
+fn release_of(found: &photocraft_engine::updates_cmds::Release) -> craft::update::Release {
+    craft::update::Release {
         tag: format!("v{}", found.version),
-        version: craft_update::parse_version(&found.version),
+        version: craft::update::parse_version(&found.version),
         name: format!("PhotoCraft {}", found.version),
         html_url: found.url.clone(),
         ..Default::default()
@@ -89,11 +89,11 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // The restart helper is scheduled before the app closes, so no update starts over unsaved work.
         let clean = !app.has_unsaved_work();
         match app.updates_rt.updater.show_if(ctx, clean) {
-            craft_update::updater::Action::None => {}
-            craft_update::updater::Action::OpenUrl(url) => download = Some(url),
+            craft::update::updater::Action::None => {}
+            craft::update::updater::Action::OpenUrl(url) => download = Some(url),
             // The guarded close path asks about unsaved work and waits for saves; the restart helper
             // relaunches once the process exits.
-            craft_update::updater::Action::Close => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            craft::update::updater::Action::Close => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
         if was_open && !app.updates_rt.updater.prompt_open() {
             app.ui.updates_open = false;
@@ -119,9 +119,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .resizable(false)
         .default_width(380.0)
         .show(ctx, |ui| {
-            let t = craft_ui::theme::current(ctx);
+            let t = craft::ui::theme::current(ctx);
             ui.label(crate::i18n::fmt(crate::i18n::t("Installed version: {version}"), &[("version", photocraft_engine::build_info::VERSION)]));
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             match &status {
                 Status::Checking => {
                     ui.horizontal(|ui| {

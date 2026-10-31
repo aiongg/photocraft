@@ -451,16 +451,16 @@ pub fn mono(size: f32) -> FontId {
 /// [`install_base`].
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     let sel = selection_for(kind);
-    let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
+    let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
     let base =
-        craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
+        craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft::theme::builtins().iter().find(|t| t.id == *id).cloned());
     install_base(ctx, &base, kind);
 }
 
 /// Installs the library base (egui's light and dark styles, the egui theme preference) and
 /// publishes the flat [`Tokens`] of the variant shown, which is `kind`'s.
-pub fn install_base(ctx: &egui::Context, base: &craft_ui::theme::Base, kind: ThemeKind) {
-    craft_ui::theme::install(ctx, base);
+pub fn install_base(ctx: &egui::Context, base: &craft::ui::theme::Base, kind: ThemeKind) {
+    craft::ui::theme::install(ctx, base);
     let shown = base.shown(kind.mode());
     let t = Tokens::from_library(kind, &shown.resolved.tokens, shown.appearance);
     ctx.data_mut(|d| d.insert_temp(egui::Id::unique("photocraft-theme"), t));

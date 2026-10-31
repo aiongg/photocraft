@@ -5,7 +5,7 @@
 //! "started" hook once the first frames have rendered (the crash-safe startup marker), and
 //! provides the Help › System Info text (including the monitor profile in use).
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -262,7 +262,7 @@ fn choose_recovery(app: &mut PhotocraftApp, retry: bool) -> Result<(), String> {
 pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(reason) = app.ui.gpu_fallback_notice.clone() else { return };
     let retry_now = can_retry_now(app);
-    let t = craft_ui::theme::current(ctx);
+    let t = craft::ui::theme::current(ctx);
     let mut choice = None;
     egui::Window::new(tl!("Switched to CPU rendering"))
         .id(egui::Id::unique("gpu-fallback-warning"))
@@ -281,7 +281,7 @@ pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
             } else {
                 ui.label(tl!("Retry GPU requires a restart. Save your work first."));
             }
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             ui.horizontal(|ui| {
                 use crate::widgets::{ButtonRole, DialogButton};
                 let buttons =

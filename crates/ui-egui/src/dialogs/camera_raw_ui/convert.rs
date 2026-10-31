@@ -183,7 +183,7 @@ pub(super) fn open_pixels(
         source_key: crate::camera_raw_gpu::source_key(),
         develop_ms: 0.0,
         develop_backend: "cpu",
-        history: craft_ui::dialog::LocalHistory::new(&original),
+        history: craft::ui::dialog::LocalHistory::new(&original),
     };
     d.render(ctx);
     app.camera_raw = Some(d);

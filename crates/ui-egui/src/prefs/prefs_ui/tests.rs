@@ -1,6 +1,6 @@
 /// Whether the page of `section` has a setting the window shows.
 fn has_visible_fields(values: &Value, section: &str) -> bool {
-    super::window::pages(values, &Value::Null, None, &craft_ui::interface_scale::InterfaceScaleLabels::default())
+    super::window::pages(values, &Value::Null, None, &craft::ui::interface_scale::InterfaceScaleLabels::default())
         .iter()
         .any(|p| p.id == section && p.has_content())
 }
@@ -124,20 +124,20 @@ fn preferences_search_matches_editable_fields_across_sections() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let id = open_preferences(&mut app, "general");
     let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
-    let host = super::window::Host::new(&mut app, &mut fields, None, &craft_ui::interface_scale::InterfaceScaleLabels::default());
-    let specs = craft_ui::preferences::PreferencesHost::pages(&host);
-    let contains = |needle: &str, section: &str| craft_ui::preferences::list_pages(&specs, needle).iter().any(|l| specs[l.index].id == section);
+    let host = super::window::Host::new(&mut app, &mut fields, None, &craft::ui::interface_scale::InterfaceScaleLabels::default());
+    let specs = craft::ui::preferences::PreferencesModel::pages(&host);
+    let contains = |needle: &str, section: &str| craft::ui::preferences::list_pages(&specs, needle).iter().any(|l| specs[l.index].id == section);
     assert!(contains("UI Scale", "interface"));
     assert!(contains("placeholder", "type"));
     assert!(contains("performance", "performance"));
     assert!(contains("interface.uiScale", "interface"));
-    assert!(craft_ui::preferences::list_pages(&specs, "this setting does not exist").is_empty());
-    assert_eq!(craft_ui::preferences::list_pages(&specs, "").len(), SECTIONS.len());
+    assert!(craft::ui::preferences::list_pages(&specs, "this setting does not exist").is_empty());
+    assert_eq!(craft::ui::preferences::list_pages(&specs, "").len(), SECTIONS.len());
 }
 
 #[test]
 fn preferences_dialog_width_follows_its_resizable_area() {
-    use craft_ui::dialog::Width;
+    use craft::ui::dialog::Width;
     let prefs = serde_json::json!({"__prefsui": "prefs"});
     let prefs = prefs.as_object().unwrap();
     assert_eq!(super::width(prefs, 200.0), Some(Width::Fixed(380.0)));
@@ -469,7 +469,7 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     h.run_steps(2);
     assert_eq!(h.state().session.prefs().interface.favorite_themes, vec!["craft.classic".to_string()]);
     assert!(h.query_by_label("Remove from favorites: Classic").is_some());
-    let choices: Vec<_> = craft_theme::builtins()
+    let choices: Vec<_> = craft::theme::builtins()
         .iter()
         .map(|def| appearance::ThemeChoice { id: def.id.as_str().into(), name: def.name.clone(), variants: def.variants, def: def.clone() })
         .collect();
@@ -526,7 +526,7 @@ fn preferences_interface_shows_language_without_scrolling() {
     assert!(dark.bottom() < language.top(), "Presentation {language:?} follows the theme swatches {dark:?}");
     assert!(language.bottom() < ok.top() - 20.0, "Language {language:?} must show above the buttons {ok:?} without scrolling");
     // Every theme in the option lists gets a swatch, Breeze included.
-    for def in craft_theme::builtins() {
+    for def in craft::theme::builtins() {
         assert!(h.query_all_by_label(&def.name).next().is_some(), "missing theme swatch {}", def.name);
     }
 }

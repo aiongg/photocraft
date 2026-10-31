@@ -12,7 +12,7 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{CamTransform, Tool, TransformSession};
 use crate::transform_tool::{Gesture, Hit};
-use craft_ui::canvas::quad::{BoxRules, ScaleRule};
+use craft::ui::canvas::quad::{BoxRules, ScaleRule};
 
 /// Where the patch lands: the drag offset (px) and the scale (%, per axis) and clockwise rotation
 /// (degrees) about its centre, as `paint.contentAwareMove` takes them.

@@ -262,8 +262,8 @@ fn native_rgb_route_preserves_pdf_only_color_and_page_content() {
 fn test_printers() -> PrinterSource {
     std::sync::Arc::new(|| {
         vec![
-            craft_print::Printer { name: "Studio".into(), default: false, two_sided: None, description: String::new() },
-            craft_print::Printer { name: "Office".into(), default: true, two_sided: Some(true), description: String::new() },
+            craft::print::Printer { name: "Studio".into(), default: false, two_sided: None, description: String::new() },
+            craft::print::Printer { name: "Office".into(), default: true, two_sided: Some(true), description: String::new() },
         ]
     })
 }
@@ -286,7 +286,7 @@ fn printer_commands_answer_without_a_document_and_reject_bad_settings() {
 #[test]
 fn stand_in_printers_reach_the_gdi_route_on_windows_only() {
     let source = test_printers();
-    assert_eq!(stand_in_rgb_printers(&source, false), Err(craft_print::rgb::PrintError::Unsupported));
+    assert_eq!(stand_in_rgb_printers(&source, false), Err(craft::print::rgb::PrintError::Unsupported));
     let listed = stand_in_rgb_printers(&source, true).unwrap();
     assert_eq!(listed.iter().map(|p| (p.name.as_str(), p.default)).collect::<Vec<_>>(), [("Studio", false), ("Office", true)]);
 }
@@ -318,7 +318,7 @@ fn devmode(size: u16, extra: u16) -> Vec<u8> {
 fn turned_settings_set_the_orientation_and_keep_the_rest() {
     for (size, extra) in [(220u16, 0u16), (220, 48)] {
         let before = devmode(size, extra);
-        let dm = craft_print::rgb::DevMode::from_bytes(before.clone()).unwrap();
+        let dm = craft::print::rgb::DevMode::from_bytes(before.clone()).unwrap();
         for (landscape, orient) in [(true, 2i16), (false, 1i16)] {
             let after = turned_settings(&dm, landscape).unwrap().as_bytes().to_vec();
             assert_eq!(after.len(), before.len());
@@ -365,8 +365,8 @@ fn printer_page_refuses_an_unknown_orientation() {
 #[ignore]
 fn a_portrait_driver_turns_for_a_landscape_layout() {
     let printer = "Microsoft Print to PDF";
-    let defaults = craft_print::rgb::default_settings(printer).unwrap();
-    let a4 = craft_print::rgb::page(printer, Some(&defaults)).unwrap().paper;
+    let defaults = craft::print::rgb::default_settings(printer).unwrap();
+    let a4 = craft::print::rgb::page(printer, Some(&defaults)).unwrap().paper;
     let (settings, page) = settings_for_layout(printer, None, (a4.1, a4.0)).unwrap();
     assert!(settings.is_some(), "turned settings come back");
     assert!((page.paper.0 - a4.1).abs() <= 2.0 && (page.paper.1 - a4.0).abs() <= 2.0, "wide: {:?}", page.paper);
@@ -746,7 +746,7 @@ fn printer_listings_enter_the_spooler_one_thread_at_a_time() {
                     most.fetch_max(now, Ordering::SeqCst);
                     std::thread::sleep(std::time::Duration::from_millis(5));
                     inside.fetch_sub(1, Ordering::SeqCst);
-                    vec![craft_print::Printer { name: "Office".into(), default: true, two_sided: None, description: String::new() }]
+                    vec![craft::print::Printer { name: "Office".into(), default: true, two_sided: None, description: String::new() }]
                 }));
                 start.wait();
                 for _ in 0..3 {
@@ -807,7 +807,7 @@ fn listings_without_waiting_return_the_last_lists_while_the_spooler_is_busy() {
     let mut s = Session::new();
     s.printer_source = Some(Arc::new(move || {
         counted.fetch_add(1, Ordering::SeqCst);
-        vec![craft_print::Printer { name: "Office".into(), default: true, two_sided: None, description: String::new() }]
+        vec![craft::print::Printer { name: "Office".into(), default: true, two_sided: None, description: String::new() }]
     }));
     let (held_tx, held) = mpsc::channel();
     let (release, released_rx) = mpsc::channel::<()>();
@@ -857,7 +857,7 @@ fn uncached_listings_do_not_wait(cache_other: bool) {
     let mut s = Session::new();
     s.printer_source = Some(Arc::new(move || {
         counted.fetch_add(1, Ordering::SeqCst);
-        vec![craft_print::Printer { name: "Proofing".into(), default: true, two_sided: None, description: String::new() }]
+        vec![craft::print::Printer { name: "Proofing".into(), default: true, two_sided: None, description: String::new() }]
     }));
     let (held_tx, held) = mpsc::channel();
     let (release, released_rx) = mpsc::channel();
@@ -888,7 +888,7 @@ fn uncached_listings_do_not_wait(cache_other: bool) {
     assert!(!waited, "an uncached listing waited for the spooler");
     assert_eq!(asked.load(Ordering::SeqCst), 0);
     assert_eq!(listed, printers_answer(Vec::new()));
-    assert_eq!(listed_rgb, Err(craft_print::rgb::PrintError::Unsupported));
+    assert_eq!(listed_rgb, Err(craft::print::rgb::PrintError::Unsupported));
     with_spooler(|| {
         let listed = printers_without_waiting(&mut s);
         let listed_rgb = rgb_printers_without_waiting(&s);
@@ -897,7 +897,7 @@ fn uncached_listings_do_not_wait(cache_other: bool) {
         if cfg!(windows) {
             assert_eq!(names, Ok(vec!["Proofing".to_string()]));
         } else {
-            assert_eq!(names, Err(craft_print::rgb::PrintError::Unsupported));
+            assert_eq!(names, Err(craft::print::rgb::PrintError::Unsupported));
         }
     });
 }
@@ -1010,14 +1010,14 @@ fn a_printer_listing_past_its_deadline_is_killed_and_reaped() {
 
 #[test]
 fn lp_takes_the_job_only_when_cups_lists_a_printer_and_picks_the_only_one() {
-    let p = |name: &str, default: bool| craft_print::Printer { name: name.into(), default, two_sided: None, description: String::new() };
-    let job = craft_print::Job::default();
+    let p = |name: &str, default: bool| craft::print::Printer { name: name.into(), default, two_sided: None, description: String::new() };
+    let job = craft::print::Job::default();
     // No printers: no lp route, so the portal still gets the job.
     assert!(lp_route(&job, &[]).is_none());
     assert_eq!(lp_route(&job, &[p("Office", false)]).and_then(|j| j.printer), Some("Office".into()));
     assert_eq!(lp_route(&job, &[p("Office", false), p("Lab", true)]).and_then(|j| j.printer), None, "lp picks the default itself");
     assert_eq!(lp_route(&job, &[p("Office", false), p("Lab", false)]).and_then(|j| j.printer), None);
-    let asked = craft_print::Job { printer: Some("Lab".into()), ..Default::default() };
+    let asked = craft::print::Job { printer: Some("Lab".into()), ..Default::default() };
     assert_eq!(lp_route(&asked, &[p("Office", false)]).and_then(|j| j.printer), Some("Lab".into()));
     // A named printer goes to lp even when CUPS lists none: listing can be forbidden while
     // printing is not, and the portal can't honour a name.

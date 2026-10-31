@@ -1,11 +1,11 @@
 use super::{Color32, PhotocraftApp, Tool, icons, json};
-use craft_theme::Srgba;
-use craft_ui::composites::{PairWell, SwatchPair, Well};
-use craft_ui::controls::IconButton;
-use craft_ui::icons::Icon;
-use craft_ui::localized::LocaleNumbers;
-use craft_ui::patterns::{FlyoutButton, FlyoutItem, LastUsed, RailTool, ToolRail, ToolSlot};
-use craft_ui::theme::{ToEgui, Tokens, TokensOf};
+use craft::theme::Srgba;
+use craft::color::ui::{PairWell, SwatchPair, Well};
+use craft::ui::controls::IconButton;
+use craft::ui::icons::Icon;
+use craft::ui::localized::LocaleNumbers;
+use craft::ui::patterns::{FlyoutButton, FlyoutItem, LastUsed, RailTool, ToolRail, ToolSlot};
+use craft::ui::theme::{ToEgui, Tokens, TokensOf};
 
 // ----------------------------------------------------------------------------- toolbar
 
@@ -117,10 +117,10 @@ fn footer_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, columns: usize) {
     let button = FlyoutButton::<&str>::style(&tokens).icon_button;
     let rail_fill = tokens.component.rail.fill.to_egui();
     drop(tokens);
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     color_pair(app, ui, rail_fill);
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    let layout = match (columns > 1, craft_ui::direction::is_rtl(&ctx)) {
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
+    let layout = match (columns > 1, craft::ui::direction::is_rtl(&ctx)) {
         (false, _) => egui::Layout::top_down(egui::Align::Min),
         (true, false) => egui::Layout::left_to_right(egui::Align::Min),
         (true, true) => egui::Layout::right_to_left(egui::Align::Min),

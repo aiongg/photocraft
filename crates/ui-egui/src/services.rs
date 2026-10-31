@@ -325,7 +325,7 @@ pub type RightButtonDownFn = Box<dyn Fn() -> bool + Send + Sync>;
 pub struct Services {
     /// Where the Craft suite keeps its themes and selection (`SuiteDir::resolve(false)` on the
     /// desktop). `None` keeps them in memory: tests, headless runs and the web.
-    pub suite_dir: Option<craft_theme_store::SuiteDir>,
+    pub suite_dir: Option<craft::theme_store::SuiteDir>,
     /// User-initiated desktop/browser pixel sampling.
     pub screen_pick: Option<screen_picker::Service>,
     /// Decode a file's bytes into a document (PSD, PNG, JPEG, …).
@@ -441,7 +441,7 @@ pub struct Services {
     /// `monitor_status`). Without one, the canvas uses the profile chosen in Color Settings, or sRGB.
     pub read_displays: Option<monitor_status::ReadDisplaysFn>,
     /// The macOS menu bar, when the desktop app installed one; the in-window menus are hidden then.
-    pub native_menu: Option<craft_menu::NativeMenu>,
+    pub native_menu: Option<craft::menu::NativeMenu>,
     /// Ends the app once leaving is settled (nothing unsaved, or the prompt answered), instead of
     /// letting eframe close the window. macOS: `-[NSApplication terminate:]`. Closing the window
     /// while AppKit's run loop is still going crashes or hangs Touch Bar Macs (#1575, #1458).

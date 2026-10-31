@@ -113,7 +113,7 @@ pub struct CameraRawDialog {
     pub(crate) develop_backend: &'static str,
     /// The settings' undo and redo steps, so Ctrl+Z works inside the dialog (#4100). A drag is
     /// one step.
-    history: craft_ui::dialog::LocalHistory<CameraRaw>,
+    history: craft::ui::dialog::LocalHistory<CameraRaw>,
 }
 
 impl CameraRawDialog {

@@ -13,7 +13,7 @@
 //!
 //! A pending quad belongs to the document it was drawn on, like the Crop tool's frame.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, Pos2, Stroke};
 use photocraft_algo::transform::{Homography, convex_quad};
 use photocraft_engine::prefs::Unit;
@@ -252,18 +252,18 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
                 painter.line_segment([at(0.0, t), at(1.0, t)], thin);
             }
         }
-        painter.add(egui::Shape::closed_line(pts.clone(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), color)));
+        painter.add(egui::Shape::closed_line(pts.clone(), craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), color)));
         if !matches!(app.pcrop.drag, Some(Drag::New { .. })) {
             for c in pts {
                 let r = egui::Rect::from_center_size(c, egui::vec2(8.0, 8.0));
-                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-                painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(1.25, color), egui::StrokeKind::Inside);
+                painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                painter.rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), Stroke::new(1.25, color), egui::StrokeKind::Inside);
             }
         }
     }
     let clicks: Vec<Pos2> = app.pcrop.clicks.iter().map(|c| scr(*c)).collect();
     if clicks.len() > 1 {
-        painter.add(egui::Shape::line(clicks.clone(), craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
+        painter.add(egui::Shape::line(clicks.clone(), craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent)));
     }
     for c in clicks {
         painter.circle_filled(c, 4.0, Color32::WHITE);

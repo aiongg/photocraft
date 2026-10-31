@@ -716,7 +716,7 @@ fn toggle_panels(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<Value, 
     if app.ui.view.hides_chrome() {
         // Full Screen Mode: Tab only reveals or hides the chrome (#6760); the panels' own state,
         // `hidden_by_tab` included, stays as it was before entering.
-        craft_ui::shell::AppShell::toggle_reveal(ctx, &PhotocraftApp::window_key());
+        craft::ui::shell::AppShell::toggle_reveal(ctx, &PhotocraftApp::window_key());
         return Ok(Value::Null);
     }
     let panels = &mut app.ui.panels;

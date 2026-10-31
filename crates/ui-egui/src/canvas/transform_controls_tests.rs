@@ -374,8 +374,8 @@ fn canvas_view_maps_points_and_vectors_as_the_view_xform_does() {
         aspect: 1.2,
     };
     let view = xf.canvas_view();
-    let p = view.to_screen(craft_ui::canvas::kurbo::Point::new(250.0, -40.0));
+    let p = view.to_screen(craft::ui::canvas::kurbo::Point::new(250.0, -40.0));
     assert!((p - xf.to_screen(250.0, -40.0)).length() < 1e-2);
-    let v = view.map_vec(craft_ui::canvas::kurbo::Vec2::new(3.0, -7.0));
+    let v = view.map_vec(craft::ui::canvas::kurbo::Vec2::new(3.0, -7.0));
     assert!((v - xf.map_vec(vec2(3.0, -7.0))).length() < 1e-3);
 }

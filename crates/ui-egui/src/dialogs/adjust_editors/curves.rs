@@ -1,7 +1,7 @@
 use super::{Edit, EditorCx, ToneSpace, Value, adjust_params, json, label, space_of};
-use craft_ui::composites::{ChannelColor, Curve, CurveChannel, CurveEditor, HistogramData};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::LocaleNumbers;
+use craft::ui::composites::{ChannelColor, Curve, CurveChannel, CurveEditor, HistogramData};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::LocaleNumbers;
 
 // ---------------------------------------------------------------------------------------------
 // Channels of Levels / Curves
@@ -56,9 +56,9 @@ fn channel_picker_opts(ui: &mut egui::Ui, id: egui::Id, opts: &[(usize, &str)], 
         label(ui, text);
         let key = format!("{id:?}-ch");
         if translate {
-            craft_ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
+            craft::ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
         } else {
-            craft_ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| opts[i].1).show(ui).response.changed();
+            craft::ui::controls::Select::new(&key, text, &mut ch).rows(opts.len(), |i| opts[i].0.clone(), |i| opts[i].1).show(ui).response.changed();
         }
     });
     ui.data_mut(|d| d.insert_temp(id, ch));
@@ -160,8 +160,8 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
     ui.horizontal(|ui| {
         if ui
             .add(
-                craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Spline, tl!("Edit points to modify the curve"))
-                    .size(craft_ui::controls::ControlSize::Md)
+                craft::ui::controls::IconButton::new(craft::ui::icons::Icon::Spline, tl!("Edit points to modify the curve"))
+                    .size(craft::ui::controls::ControlSize::Md)
                     .selected(!pencil),
             )
             .clicked()
@@ -171,8 +171,8 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
         }
         if ui
             .add(
-                craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Pencil, tl!("Draw to modify the curve"))
-                    .size(craft_ui::controls::ControlSize::Md)
+                craft::ui::controls::IconButton::new(craft::ui::icons::Icon::Pencil, tl!("Draw to modify the curve"))
+                    .size(craft::ui::controls::ControlSize::Md)
                     .selected(pencil),
             )
             .clicked()
@@ -182,7 +182,7 @@ fn curves_mode_row(ui: &mut egui::Ui, v: &mut Value, key: &str, gray: bool) -> E
         }
         let label = crate::i18n::tr_ctx(crate::i18n::current(), "curves", "Smooth");
         let smooth = ui
-            .add_enabled_ui(pencil, |ui| ui.add(craft_ui::controls::Button::new(tl!(label)).variant(craft_ui::controls::ButtonVariant::Secondary)))
+            .add_enabled_ui(pencil, |ui| ui.add(craft::ui::controls::Button::new(tl!(label)).variant(craft::ui::controls::ButtonVariant::Secondary)))
             .inner
             .on_hover_text(tl!("Smooth the curve values"))
             .on_disabled_hover_text(tl!("Smooth the curve values"));
@@ -239,7 +239,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let key = curve_key(&chan);
     let mut e = curves_mode_row(ui, v, key, cx.gray);
     let pencil = v.get("pencil").and_then(Value::as_bool).unwrap_or(false);
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
 
     let neutral = |c: ChannelColor| if tinted { c } else { ChannelColor::Neutral };
     let channels: Vec<CurveChannel> = match isolated {
@@ -260,7 +260,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         crate::i18n::fmt(tl!("Click to add a point · drag off or {key}-click or Delete to remove"), &[("key", &crate::shortcuts::pretty("Cmd"))])
     };
     let numbers = LocaleNumbers::of(ui);
-    let sampler: &craft_ui::composites::Sampler = &sample_levels;
+    let sampler: &craft::ui::composites::Sampler = &sample_levels;
     let salt = cx.mem.with("curves-editor-salt");
     // A point the host added on the image (⌘/Ctrl-click) is the selected one.
     if let Some(i) = ui.data_mut(|d| d.remove_temp::<usize>(cx.mem.with("curves-select"))) {
@@ -274,7 +274,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         .pencil(pencil)
         .overlays(&overlays)
         .hint(hint)
-        .labels(craft_ui::composites::CurveLabels {
+        .labels(craft::ui::composites::CurveLabels {
             input: tl!("Input:").into(),
             output: tl!("Output:").into(),
             point: tl!("Point {i} of {n}").into(),
@@ -292,7 +292,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     }
     let shown = editor.show(ui);
     // The graph's value area, for the tests' pointer input and the canvas pick.
-    let style = CurveEditor::style(&craft_ui::theme::current(ui.ctx()));
+    let style = CurveEditor::style(&craft::ui::theme::current(ui.ctx()));
     ui.data_mut(|d| {
         d.insert_temp(cx.mem.with("curves-graph"), shown.response.rect.shrink(style.pad));
     });

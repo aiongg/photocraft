@@ -1,5 +1,5 @@
 use super::*;
-use craft_ui::canvas::quad::{BoxAllow, BoxRules};
+use craft::ui::canvas::quad::{BoxAllow, BoxRules};
 
 fn session() -> TransformSession {
     TransformSession {
@@ -270,7 +270,7 @@ fn skew_fields_lean_the_box_about_the_reference_point() {
     assert!(eq6(t.quad[1][1], d) && eq6(t.quad[0][1], -d), "{:?}", t.quad);
     // A skew past ±90° would flatten the box: the field stops at the limit.
     let t = type_into_bar_field(5, "120");
-    assert!(eq6(readout(&t).3, craft_ui::canvas::quad::SKEW_LIMIT), "{}", readout(&t).3);
+    assert!(eq6(readout(&t).3, craft::ui::canvas::quad::SKEW_LIMIT), "{}", readout(&t).3);
 }
 
 /// Types `text` + Enter into the `n`th numeric field of the transform bar (X, Y, W, H, angle…).
@@ -682,8 +682,8 @@ fn drag_on(mode: TransformMode, type_layer: bool, from: [f64; 2], to: [f64; 2], 
     let s = session();
     let state = pointer::box_state(&s);
     let rules = BoxRules { mode: pointer::box_mode(mode), allow: BoxAllow { distort: !type_layer, ..BoxAllow::default() }, ..BoxRules::default() };
-    let point = |p: [f64; 2]| craft_ui::canvas::kurbo::Point::new(p[0], p[1]);
-    craft_ui::canvas::quad::drag(&state, &state, hit(&s, from, 8.0).into(), point(from), point(to), mods, &rules).quad.map(|p| [p.x, p.y])
+    let point = |p: [f64; 2]| craft::ui::canvas::kurbo::Point::new(p[0], p[1]);
+    craft::ui::canvas::quad::drag(&state, &state, hit(&s, from, 8.0).into(), point(from), point(to), mods, &rules).quad.map(|p| [p.x, p.y])
 }
 
 /// Skew on editable type, checked in Photoshop: a corner can't move alone (type stays a
@@ -1607,8 +1607,8 @@ fn the_rotate_zone_draws_the_turn_arrow_where_the_pointer_is_hidden() {
     h.run_steps(3);
     let tol = handle_tolerance(h.state());
     let xf = ViewXform::active(h.state()).unwrap();
-    let tokens = craft_ui::theme::current(&h.ctx);
-    let (ink, line) = (craft_ui::theme::ToEgui::to_egui(tokens.color.overlay.stroke), tokens.component.transform.turn_line);
+    let tokens = craft::ui::theme::current(&h.ctx);
+    let (ink, line) = (craft::ui::theme::ToEgui::to_egui(tokens.color.overlay.stroke), tokens.component.transform.turn_line);
     // The arrow's ink stroke: a 17-point arc in the library's overlay colour around the pointer.
     let arrows = |h: &egui_kittest::Harness<'_, PhotocraftApp>, at: egui::Pos2| {
         h.output()
@@ -1717,11 +1717,11 @@ fn warp_hit(w: &Warp, p: [f64; 2], tol: f64) -> Option<usize> {
     let at = egui::pos2((p[0] * zoom) as f32, (p[1] * zoom) as f32);
     let none = egui::Modifiers::NONE;
     match warp::with_grid(w, None, none, |g, _| {
-        g.hit(&pointer::point_view(zoom), &craft_ui::canvas::WarpGrid::style(&craft_ui::theme::current(&egui::Context::default())), at, none)
+        g.hit(&pointer::point_view(zoom), &craft::imaging::ui::WarpGrid::style(&craft::ui::theme::current(&egui::Context::default())), at, none)
     })
     .flatten()
     {
-        Some(craft_ui::canvas::WarpTarget::Point(i)) => Some(i),
+        Some(craft::imaging::ui::WarpTarget::Point(i)) => Some(i),
         _ => None,
     }
 }

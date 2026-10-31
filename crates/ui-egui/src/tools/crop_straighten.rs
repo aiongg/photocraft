@@ -14,10 +14,10 @@
 //! ↵ commits it and Esc cancels it as any crop. A line shorter than [`MIN_LINE_PX`] screen points
 //! does nothing.
 
-use craft_ui::canvas::CropBox;
-use craft_ui::canvas::kurbo::{Rect, Size};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::draw::ui::CropBox;
+use craft::ui::canvas::kurbo::{Rect, Size};
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{Modifiers, Pos2};
 
 use crate::PhotocraftApp;
@@ -137,10 +137,10 @@ fn apply(app: &mut PhotocraftApp, a: [f64; 2], b: [f64; 2], zoom: f64) {
 /// screen.
 pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, to_screen: impl Fn([f64; 2]) -> Pos2, hover: Option<Pos2>) {
     let Some([a, b]) = app.crop.straighten.line.filter(|_| app.ui.tool == Tool::Crop) else { return };
-    let t = craft_ui::theme::current(painter.ctx());
+    let t = craft::ui::theme::current(painter.ctx());
     let seg = [to_screen(a), to_screen(b)];
     painter.line_segment(seg, egui::Stroke::new(3.0, t.color.surface.shadow.to_egui()));
-    painter.line_segment(seg, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.text.to_egui()));
+    painter.line_segment(seg, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.color.accent.text.to_egui()));
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     let deg = (-dy).atan2(dx).to_degrees();
     if let Some(h) = hover.filter(|_| deg.is_finite() && (dx != 0.0 || dy != 0.0)) {

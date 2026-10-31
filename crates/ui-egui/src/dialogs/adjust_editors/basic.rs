@@ -1,9 +1,9 @@
 use super::hue_saturation::RANGE_LABELS;
 use super::{Color32, Edit, EditorCx, HUE_RANGES, PHOTO_FILTERS, Row, Value, adjust_params, color_button, flag, json, label, num, nums, rgb_of, round};
-use craft_theme::TypeRole;
-use craft_ui::controls::RadioSet;
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::{ToEgui as _, Tokens as LibTokens, TokensOf as _};
+use craft::theme::TypeRole;
+use craft::ui::controls::RadioSet;
+use craft::ui::primitives::{Content, Text};
+use craft::ui::theme::{ToEgui as _, Tokens as LibTokens, TokensOf as _};
 
 /// Labelled slider rows over top-level keys: (key, label, min, max, default, unit).
 /// A row of [`sliders`]: params key, label, range, default, unit, and its decimal places (None:
@@ -54,7 +54,7 @@ pub(super) fn brightness_contrast(ui: &mut egui::Ui, v: &mut Value) -> Edit {
     let lo = if legacy { -100.0 } else { -50.0 };
     let mut e = sliders(ui, v, &[("brightness", tl!("Brightness"), -150.0, 150.0, 0.0, "", None), ("contrast", tl!("Contrast"), lo, 100.0, 0.0, "", None)]);
     let mut l = legacy;
-    if craft_ui::controls::Checkbox::bool(tl!("Use Legacy"), &mut l).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Use Legacy"), &mut l).show(ui).response.changed() {
         v["legacy"] = json!(l);
         if !l {
             v["contrast"] = json!(num(v, "contrast", 0.0).max(-50.0));
@@ -71,13 +71,13 @@ pub(super) fn threshold(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit
     let level = num(v, "level", 128.0);
     ui.scope(|ui| {
         ui.set_max_width(ui.available_width().min(300.0));
-        let mut histogram = craft_ui::composites::Histogram::new("threshold-histogram", tl!("Histogram")).height(90.0).bordered(true).marker(Some(level));
+        let mut histogram = craft::ui::composites::Histogram::new("threshold-histogram", tl!("Histogram")).height(90.0).bordered(true).marker(Some(level));
         if let Some(h) = cx.hist.as_ref().and_then(|h| h.ch.first()) {
-            histogram = histogram.tone(h.as_slice(), craft_ui::composites::ChannelColor::Neutral);
+            histogram = histogram.tone(h.as_slice(), craft::ui::composites::ChannelColor::Neutral);
         }
         histogram.show(ui);
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     sliders(ui, v, &[("level", tl!("Threshold Level"), 1.0, 255.0, 128.0, "", None)])
 }
 
@@ -139,7 +139,7 @@ pub(super) fn color_balance(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
         v[key] = json!(vals.map(f32::round));
     }
     let mut pl = flag(v, "preserveLuminosity", true);
-    if craft_ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
         v["preserveLuminosity"] = json!(pl);
         e.add(Edit::discrete(true));
     }
@@ -162,10 +162,10 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
         }
         e.add(r);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     ui.horizontal(|ui| {
         let mut on = flag(v, "tint", false);
-        if craft_ui::controls::Checkbox::bool(tl!("Tint"), &mut on).show(ui).response.changed() {
+        if craft::ui::controls::Checkbox::bool(tl!("Tint"), &mut on).show(ui).response.changed() {
             v["tint"] = json!(on);
             e.add(Edit::discrete(true));
         }
@@ -175,7 +175,7 @@ pub(super) fn black_white(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Ed
             v["tintColor"] = json!(adjust_params::hex(c));
         }
         e.add(r);
-        if ui.add(craft_ui::controls::Button::new(tl!("Default")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
+        if ui.add(craft::ui::controls::Button::new(tl!("Default")).variant(craft::ui::controls::ButtonVariant::Secondary)).clicked() {
             for (i, key) in HUE_RANGES.iter().enumerate() {
                 v[*key] = json!(adjust_params::BW_DEFAULTS[i]);
             }
@@ -207,7 +207,7 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         }
         let changed = ui
             .add_enabled_ui(!use_color, |ui| {
-                craft_ui::controls::Select::new(&format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel)
+                craft::ui::controls::Select::new(&format!("{mode_id:?}-filter"), tl!("Filter:"), &mut sel)
                     .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
                     .show(ui)
                     .response
@@ -232,7 +232,7 @@ pub(super) fn photo_filter(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
     ui.data_mut(|d| d.insert_temp(mode_id, mode == 1));
     e.add(sliders(ui, v, &[("density", tl!("Density"), 0.0, 100.0, 25.0, "%", None)]));
     let mut pl = flag(v, "preserveLuminosity", true);
-    if craft_ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Preserve Luminosity"), &mut pl).show(ui).response.changed() {
         v["preserveLuminosity"] = json!(pl);
         e.add(Edit::discrete(true));
     }
@@ -252,7 +252,7 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
     }
     ui.horizontal(|ui| {
         label(ui, tl!("Output Channel:"));
-        craft_ui::controls::Select::new(&format!("{out_id:?}"), tl!("Output Channel:"), &mut out)
+        craft::ui::controls::Select::new(&format!("{out_id:?}"), tl!("Output Channel:"), &mut out)
             .rows(outs.len(), |i| outs[i].0.clone(), |i| tl!(outs[i].1))
             .show(ui)
             .response
@@ -274,7 +274,7 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
         label(ui, tl!("Total:"));
         let mut format = Text::format(&LibTokens::of(ui), TypeRole::Mono, Content::Normal);
         if total > 100.0 {
-            format.color = craft_ui::theme::current(ui.ctx()).color.status.warn.fg.to_egui();
+            format.color = craft::ui::theme::current(ui.ctx()).color.status.warn.fg.to_egui();
         }
         ui.label(egui::text::LayoutJob::single_section(format!("{total:+.0}%"), format));
     });
@@ -285,7 +285,7 @@ pub(super) fn channel_mixer(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> 
         v[key] = json!(row.map(f32::round));
     }
     let mut m = mono;
-    if craft_ui::controls::Checkbox::bool(tl!("Monochrome"), &mut m).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Monochrome"), &mut m).show(ui).response.changed() {
         v["monochrome"] = json!(m);
         if m {
             v["gray"] = json!([40.0, 40.0, 20.0, 0.0]);

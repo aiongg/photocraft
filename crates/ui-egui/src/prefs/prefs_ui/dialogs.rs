@@ -1,9 +1,9 @@
 use super::shortcuts::shortcut_items;
 use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Value, json, prefs};
-use craft_ui::controls::{Button, ButtonVariant, ControlSize, TextField};
-use craft_ui::edit::EditEvent;
-use craft_ui::list::ListRow;
-use craft_ui::theme::ToEgui;
+use craft::ui::controls::{Button, ButtonVariant, ControlSize, TextField};
+use craft::ui::edit::EditEvent;
+use craft::ui::list::ListRow;
+use craft::ui::theme::ToEgui;
 
 /// A secondary command button of the Preferences-family dialogs.
 fn secondary(label: &str) -> Button {
@@ -121,12 +121,12 @@ pub fn apply(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 
 /// The size Preferences opens at: room for the widest section and about 30 settings rows. The
 /// dialog's resize grip changes it, and its contents follow (#7420).
-pub const PREFERENCES_SIZE: egui::Vec2 = craft_ui::preferences::DEFAULT_SIZE;
+pub const PREFERENCES_SIZE: egui::Vec2 = craft::ui::preferences::DEFAULT_SIZE;
 
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
-pub fn width(fields: &Map<String, Value>, available: f32) -> Option<craft_ui::dialog::Width> {
-    use craft_ui::dialog::Width;
+pub fn width(fields: &Map<String, Value>, available: f32) -> Option<craft::ui::dialog::Width> {
+    use craft::ui::dialog::Width;
     match fields.get("__prefsui").and_then(Value::as_str)? {
         "prefs" => Some(Width::Fixed(available.max(380.0))),
         "shortcuts" => Some(Width::Range { min: 460.0, max: 720.0 }),
@@ -201,7 +201,7 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             for tool in crate::state::Tool::ALL {
                 let name = format!("{tool:?}");
                 let mut on = !hidden.contains(&name);
-                craft_ui::controls::Checkbox::bool(tl!(tool.label()), &mut on).show(ui).response;
+                craft::ui::controls::Checkbox::bool(tl!(tool.label()), &mut on).show(ui).response;
                 if on {
                     hidden.retain(|h| *h != name);
                 } else if !hidden.contains(&name) {
@@ -220,12 +220,12 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut kind = f.get("kind").and_then(Value::as_str).unwrap_or("brushes").to_string();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Preset Type")).color(t.color.text.muted.to_egui()));
         let opts = [("brushes".to_string(), tl!("Brushes")), ("customShapes".to_string(), tl!("Custom Shapes")), ("patterns".to_string(), tl!("Patterns"))];
-        craft_ui::controls::Select::new("preset-kind", tl!("Type"), &mut kind)
+        craft::ui::controls::Select::new("preset-kind", tl!("Type"), &mut kind)
             .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
             .show(ui)
             .response
@@ -273,11 +273,11 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
 }
 
 pub(super) fn presets_io_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut action = f.get("action").and_then(Value::as_str).unwrap_or("export").to_string();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Action")).color(t.color.text.muted.to_egui()));
-        craft_ui::controls::Select::new("presets-io", tl!("Action"), &mut action)
+        craft::ui::controls::Select::new("presets-io", tl!("Action"), &mut action)
             .fit(true)
             .option("export".to_string(), tl!("Export Presets"))
             .option("import".to_string(), tl!("Import Presets"))
@@ -287,16 +287,16 @@ pub(super) fn presets_io_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     });
     for (k, label) in [("brushes", tl!("Brushes")), ("customShapes", tl!("Custom Shapes")), ("tools", tl!("Tool Presets"))] {
         let mut on = f.get(k).and_then(Value::as_bool).unwrap_or(true);
-        craft_ui::controls::Checkbox::bool(tl!(label), &mut on).show(ui).response;
+        craft::ui::controls::Checkbox::bool(tl!(label), &mut on).show(ui).response;
         f.insert(k.into(), json!(on));
     }
     f.insert("action".into(), json!(action));
 }
 
 pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.label(RichText::new(f.get("message").and_then(Value::as_str).unwrap_or("")).color(t.color.text.normal.to_egui()));
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let mut action = f.get("action").and_then(Value::as_str).unwrap_or("preserve").to_string();
     let missing = f.get("missing").and_then(Value::as_bool).unwrap_or(false);
     let name = |k: &str| f.get(k).and_then(Value::as_str).unwrap_or("?").to_string();
@@ -315,9 +315,9 @@ pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     f.insert("action".into(), json!(action));
     // Remembering sets the Color Settings policy and stops asking, so it needs a mode with a policy.
     if !missing && f.get("policyKey").is_some_and(Value::is_string) {
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         let mut remember = f.get("remember").and_then(Value::as_bool).unwrap_or(false);
-        craft_ui::controls::Checkbox::bool(tl!("Remember this choice for future images"), &mut remember)
+        craft::ui::controls::Checkbox::bool(tl!("Remember this choice for future images"), &mut remember)
             .show(ui)
             .response
             .on_hover_text(tl!("Turn the prompt back on with Ask On Mismatch in Edit › Color Settings."));

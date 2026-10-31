@@ -368,7 +368,7 @@ pub(super) fn ime_delete_bytes(app: &mut PhotocraftApp, before_bytes: usize, aft
     let start_byte = byte_of(&text, start);
     let end_byte = byte_of(&text, end);
     let (before_chars, after_chars) =
-        craft_ui::ime::surrounding_chars(text.get(..start_byte).unwrap_or(""), text.get(end_byte..).unwrap_or(""), before_bytes, after_bytes);
+        craft::ui::ime::surrounding_chars(text.get(..start_byte).unwrap_or(""), text.get(end_byte..).unwrap_or(""), before_bytes, after_bytes);
     let from = start.saturating_sub(before_chars);
     let to = end.saturating_add(after_chars).min(n);
     ime_delete_around(app, ed, from, start, end, to)

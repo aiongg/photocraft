@@ -4,16 +4,16 @@
 //! `View::zoom` is device pixels per document pixel and its centre is `f32`; the library works in
 //! points with a `CanvasView`, so each call converts in and writes the moved centre back.
 
-use craft_ui::canvas::kurbo::{Point, Rect as DocRect};
-use craft_ui::canvas::{CanvasScrollbars, CanvasView, ScrollbarNames};
-use craft_ui::localized::Labels as _;
+use craft::ui::canvas::kurbo::{Point, Rect as DocRect};
+use craft::ui::canvas::{CanvasScrollbars, CanvasView, ScrollbarNames};
+use craft::ui::localized::Labels as _;
 use egui::{Id, Rect, Ui};
 
 use crate::state::View;
 
 /// Thickness of a bar, in points.
 pub fn thickness(ctx: &egui::Context) -> f32 {
-    CanvasScrollbars::style(&craft_ui::theme::current(ctx)).width
+    CanvasScrollbars::style(&craft::ui::theme::current(ctx)).width
 }
 
 /// `view` as the library's view of `rect` at `ppp` physical pixels per point.

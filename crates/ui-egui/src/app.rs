@@ -86,12 +86,12 @@ impl PhotocraftApp {
             input_waiters: Vec::new(),
             live_adjust: None,
             frame: 0,
-            direction_setting: craft_ui::direction::Setting::Language,
+            direction_setting: craft::ui::direction::Setting::Language,
             styled: false,
             integrated_titlebar: false,
             custom_titlebar: false,
             native_frame: false,
-            traffic_lights: craft_window::mac::TrafficLights::new(),
+            traffic_lights: craft::window::mac::TrafficLights::new(),
             #[cfg(target_os = "macos")]
             titlebar_movable: None,
             last_window_title: String::new(),
@@ -238,8 +238,8 @@ impl eframe::App for PhotocraftApp {
         }
         // In Full Screen Mode Tab reveals or hides the chrome (#6760) when the key still runs
         // Show/Hide All Panels and no control has the keyboard.
-        if self.ui.view.hides_chrome() && self.tab_runs_toggle_panels(raw_input) && craft_ui::shell::take_tab_toggle(ctx, raw_input) {
-            craft_ui::shell::AppShell::toggle_reveal(ctx, &Self::window_key());
+        if self.ui.view.hides_chrome() && self.tab_runs_toggle_panels(raw_input) && craft::ui::shell::take_tab_toggle(ctx, raw_input) {
+            craft::ui::shell::AppShell::toggle_reveal(ctx, &Self::window_key());
         }
         // Native menu key equivalents become the key presses they were (see `mac_bar`).
         if let Some(menu) = self.services.native_menu.as_mut() {
@@ -247,7 +247,7 @@ impl eframe::App for PhotocraftApp {
         }
         // While a text field of a floating panel's own window has the keyboard, the dock area
         // hands that window the text keys in this input and converts them there.
-        if craft_ui::docking::typing_window(ctx).is_none() {
+        if craft::ui::docking::typing_window(ctx).is_none() {
             shortcuts::clipboard_keys(ctx, ctx.text_edit_focused() || self.ui.text_edit.is_some(), raw_input);
         }
         // Windows precision touchpads and some Linux Wayland compositors send pinches

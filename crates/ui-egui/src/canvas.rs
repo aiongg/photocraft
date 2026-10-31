@@ -4,7 +4,7 @@
 //! update only their damage rectangle (`set_partial`). The wgpu compositor (M5) will replace this
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Rect as DRect;
@@ -1295,8 +1295,8 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     if border == photocraft_engine::prefs::CanvasBorder::Line && !beyond && !crate::crop_shield::hides_outside(app) {
         painter.rect_stroke(
             edge_rect,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20)),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(20)),
             egui::StrokeKind::Outside,
         );
     }
@@ -1350,7 +1350,7 @@ fn draw_canvas_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &C
         let d = xf.to_doc(p);
         if let Some(k) = crate::transform_tool::rotate_cursor_dir(app, d) {
             let toward = xf.to_screen((d[0] + k[0] * 16.0) as f32, (d[1] + k[1] * 16.0) as f32) - p;
-            craft_ui::canvas::turn_cursor(ctx, p, toward);
+            craft::ui::canvas::turn_cursor(ctx, p, toward);
         } else if c == egui::CursorIcon::None {
             // Likewise the distort and skew pointers over a handle (#5405).
             crate::transform_tool::draw_handle_cursor(app, ctx, xf, p, mods);
@@ -1371,7 +1371,7 @@ fn draw_canvas_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &C
         // Give them their resize/rotate cursors before the first pointer press (#2871).
         ui.ctx().set_cursor_icon(c);
         if let Some(toward) = transform_controls_turn(r, p) {
-            craft_ui::canvas::turn_cursor(ctx, p, toward);
+            craft::ui::canvas::turn_cursor(ctx, p, toward);
         }
     } else if let Some(c) = response.hover_pos().filter(|_| tool.is_type()).and_then(|p| {
         let mods = crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers));
@@ -1490,8 +1490,8 @@ fn draw_default_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &
                             painter.circle_stroke(sq.center(), r + px / 2.0, dark);
                             painter.circle_stroke(sq.center(), (r - px / 2.0).max(0.0), light);
                         } else {
-                            painter.rect_stroke(sq, craft_ui::theme::scale::Radius::R0.px(), dark, egui::StrokeKind::Outside);
-                            painter.rect_stroke(sq, craft_ui::theme::scale::Radius::R0.px(), light, egui::StrokeKind::Inside);
+                            painter.rect_stroke(sq, craft::ui::theme::scale::Radius::R0.px(), dark, egui::StrokeKind::Outside);
+                            painter.rect_stroke(sq, craft::ui::theme::scale::Radius::R0.px(), light, egui::StrokeKind::Inside);
                         }
                         // Too small to see where it is: the hotspot as well.
                         if cur.show_crosshair_in_brush_tip || sq.width() < 6.0 {
@@ -1574,8 +1574,8 @@ fn draw_default_tool_cursor(app: &mut PhotocraftApp, ui: &mut egui::Ui, input: &
             let pupil = app.ui.tool_options.red_eye_pupil_size.clamp(1.0, 100.0);
             let r_doc = photocraft_algo::redeye::search_radius(pupil);
             let r = (r_doc * xf.zoom).max(2.0);
-            painter.circle_stroke(p, r + 0.5, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(140)));
-            painter.circle_stroke(p, r, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_white_alpha(220)));
+            painter.circle_stroke(p, r + 0.5, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(140)));
+            painter.circle_stroke(p, r, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_white_alpha(220)));
             for (w, c) in [(2.5, Color32::from_black_alpha(140)), (1.0, Color32::from_white_alpha(220))] {
                 painter.line_segment([p - vec2(3.0, 0.0), p + vec2(3.0, 0.0)], Stroke::new(w, c));
                 painter.line_segment([p - vec2(0.0, 3.0), p + vec2(0.0, 3.0)], Stroke::new(w, c));
@@ -1637,7 +1637,7 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
     if let Some(b) = layer_edges_rect(app, idx) {
         painter.set(
             layer_edges,
-            egui::Shape::rect_stroke(xf.doc_rect(b), 0, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), LAYER_EDGES), egui::StrokeKind::Outside),
+            egui::Shape::rect_stroke(xf.doc_rect(b), 0, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), LAYER_EDGES), egui::StrokeKind::Outside),
         );
     }
     // A tool drag held past the canvas edge scrolls the view toward the pointer (#4183); the
@@ -1823,7 +1823,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
 
     match crate::prefs_ui::pasteboard_color(app) {
         Some(c) => {
-            ui.painter_at(rect).rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), c);
+            ui.painter_at(rect).rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), c);
         }
         None => paint_dots(ui, rect, app.session.prefs().interface.show_canvas_dots),
     }

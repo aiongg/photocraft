@@ -1,6 +1,6 @@
 use super::panel::surface;
 use super::{Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, theme, vec2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 /// The most characters a [`text_field`] holds unless its caller sets a limit: far beyond any
 /// search, name or hex value, yet a pasted multi-gigabyte string is cut at the field instead of
@@ -79,7 +79,7 @@ fn text_field_in(
     let (rect, _) = ui.allocate_exact_size(vec2(width.max(16.0), TEXT_FIELD_H), Sense::hover());
     surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     let font = if mono { theme::mono(12.0) } else { egui::FontId::proportional(12.5) };
     let mut inner = rect.shrink2(TEXT_FIELD_PAD);

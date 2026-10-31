@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use craft_ui::canvas::{WarpPress, WarpSplitPress};
+use craft::imaging::ui::{WarpPress, WarpSplitPress};
 use egui::{Color32, CursorIcon, Pos2, Stroke, pos2, vec2};
 use photocraft_algo::transform::Homography;
 use photocraft_doc::{DocId, Document, LayerContent, LayerId};

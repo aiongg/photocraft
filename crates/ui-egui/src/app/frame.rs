@@ -8,18 +8,18 @@ use super::{
 impl PhotocraftApp {
     /// The interface direction: the UI language's, unless [`PhotocraftApp::direction_setting`] or
     /// `CRAFT_UI_DIRECTION` forces one.
-    pub fn direction(&self) -> craft_ui::direction::Direction {
-        craft_ui::direction::resolve(crate::i18n::current().code(), self.direction_setting)
+    pub fn direction(&self) -> craft::ui::direction::Direction {
+        craft::ui::direction::resolve(crate::i18n::current().code(), self.direction_setting)
     }
 
     /// Records the direction on the context for the library's bars and rows. PhotoCraft's
     /// popups and docking still read egui's `Style::right_to_left` as left to right, so the
     /// style flag `apply` sets is cleared again (the docking style sets it itself).
     fn sync_direction(&self, ctx: &egui::Context) {
-        use craft_ui::direction::HasDirection as _;
+        use craft::ui::direction::HasDirection as _;
         let want = self.direction();
         if ctx.direction() != want {
-            craft_ui::direction::apply(ctx, want);
+            craft::ui::direction::apply(ctx, want);
             ctx.all_styles_mut(|s| s.right_to_left = false);
         }
     }
@@ -263,7 +263,7 @@ impl PhotocraftApp {
         // View › Screen Mode › Full Screen Mode: only the image, on black (F or Esc returns).
         screen_picker::show(&ctx);
         if screen_picker::busy(&ctx) && screen_picker::showing(&ctx) {
-            let cancelled = craft_ui::dialog::BlockingOverlay::new("screen-color-wait")
+            let cancelled = craft::ui::dialog::BlockingOverlay::new("screen-color-wait")
                 .message(tl!("Pick a screen pixel or press Esc to cancel"))
                 .cancel(tl!("Cancel"))
                 .show(&ctx);
@@ -311,17 +311,17 @@ impl PhotocraftApp {
         gpu_status::show_fallback(self, &ctx);
         kys_import::show_offer(self, &ctx);
         if self.titlebar_modal_drag(chrome) {
-            let rects = craft_ui::title_bar::ModalRects::take(&ctx, ctx.viewport_id());
-            craft_ui::title_bar::TitleBar::modal_drag_overlay(&ctx, ctx.viewport_id(), &rects);
+            let rects = craft::ui::title_bar::ModalRects::take(&ctx, ctx.viewport_id());
+            craft::ui::title_bar::TitleBar::modal_drag_overlay(&ctx, ctx.viewport_id(), &rects);
         }
         // TitleBar sets the window's `movable` flag from where the pointer is. Without the bar the
         // transparent strip is no title bar, and AppKit would still drag the window from it.
         #[cfg(target_os = "macos")]
         if self.integrated_titlebar {
             if !self.ui.panels.menu_bar {
-                craft_window::title_bar::set_window_movable(&ctx, false);
+                craft::window::title_bar::set_window_movable(&ctx, false);
             }
-            craft_window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
+            craft::window::title_bar::sync_movable(&ctx, &mut self.titlebar_movable);
         }
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);
@@ -345,7 +345,7 @@ impl PhotocraftApp {
         mac_bar::sync(self, &ctx);
         if screen_picker::busy(&ctx) {
             // Block input without a backdrop: the worker may still be capturing the screen.
-            craft_ui::dialog::BlockingOverlay::new("screen-color-wait").show(&ctx);
+            craft::ui::dialog::BlockingOverlay::new("screen-color-wait").show(&ctx);
         }
         true
     }

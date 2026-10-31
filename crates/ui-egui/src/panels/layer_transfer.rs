@@ -12,9 +12,9 @@
 //! A Move-tool drag starting inside a selection or moving a floating piece stays a move: Photoshop
 //! would copy just the selected pixels, which is not supported yet.
 
-use craft_ui::behavior::ListDrag;
-use craft_ui::list::ListRow;
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::behavior::ListDrag;
+use craft::ui::list::ListRow;
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
 
@@ -191,7 +191,7 @@ fn drop(app: &mut PhotocraftApp, ctx: &egui::Context, dest: usize, at: Option<[f
 /// (layers, effects, filters, masks, history states, channels, paths).
 pub fn show_ghost(ui: &egui::Ui, p: egui::Pos2, label: &str) {
     let style = ListRow::<u8>::style(&LibTokens::of(ui));
-    craft_ui::list::paint_ghost(ui, egui::Id::unique("pc-row-drag"), &style, label, p, 320.0, None);
+    craft::ui::list::paint_ghost(ui, egui::Id::unique("pc-row-drag"), &style, label, p, 320.0, None);
 }
 
 #[cfg(test)]

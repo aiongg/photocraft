@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use craft_ui::composites::{Toast, ToastEnd, ToastStack, Tone};
+use craft::ui::composites::{Toast, ToastEnd, ToastStack, Tone};
 use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;

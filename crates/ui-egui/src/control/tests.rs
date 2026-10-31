@@ -849,7 +849,7 @@ fn ui_set_drives_the_crop_fill() {
 /// #1919: the Crop tool's overlay menu over the control channel, reported by `ui.inspect`.
 #[test]
 fn ui_set_drives_the_crop_overlay_options() {
-    use craft_ui::canvas::{CropGuide, GuideShow};
+    use craft::draw::ui::{CropGuide, GuideShow};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     let good = call(&mut app, &ctx, "ui.set", json!({"tool": "crop", "cropOverlay": "goldenSpiral", "cropOverlayShow": "always", "cropOverlayOrientation": 2}));

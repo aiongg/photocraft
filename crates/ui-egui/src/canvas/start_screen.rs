@@ -1,9 +1,9 @@
 use super::PhotocraftApp;
 use super::tabs::{open_on_double_click, paint_dots};
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 
 pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let area = ui.available_rect_before_wrap();
     paint_dots(ui, area, app.session.prefs().interface.show_canvas_dots);
     open_on_double_click(app, ui, area);
@@ -15,18 +15,18 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let open_label = crate::shortcuts::command_label(app, "Open…", "file.open");
     let hint = start_screen_drop_hint(app).into_owned();
     let mut recent_action = None;
-    let out = craft_ui::composites::EmptyState::centred(tl!("PhotoCraft"))
+    let out = craft::ui::composites::EmptyState::centred(tl!("PhotoCraft"))
         .brand(tl!("open source"))
         .description(tl!("Create a new document or open an existing file."))
-        .action(craft_ui::controls::Button::new(tl!(&new_label)))
-        .action(craft_ui::controls::Button::new(tl!(&open_label)))
+        .action(craft::ui::controls::Button::new(tl!(&new_label)))
+        .action(craft::ui::controls::Button::new(tl!(&open_label)))
         .below_actions(|ui| {
-            ui.add_space(craft_ui::theme::scale::Space::S24.px());
+            ui.add_space(craft::ui::theme::scale::Space::S24.px());
             ui.horizontal(|ui| {
                 ui.add(
-                    craft_ui::primitives::Icon::new(craft_ui::icons::Icon::Image)
-                        .size(craft_ui::icons::IconSize::Sm)
-                        .content(craft_ui::primitives::Content::Faint),
+                    craft::ui::primitives::Icon::new(craft::ui::icons::Icon::Image)
+                        .size(craft::ui::icons::IconSize::Sm)
+                        .content(craft::ui::primitives::Content::Faint),
                 );
                 ui.label(egui::RichText::new(hint).color(t.color.text.faint.to_egui()));
             });
@@ -34,10 +34,10 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .footer(|ui| {
             if !recent.is_empty() {
                 recent_action = home_recent(ui, &recent);
-                ui.add_space(craft_ui::theme::scale::Space::S24.px());
+                ui.add_space(craft::ui::theme::scale::Space::S24.px());
             }
             crate::links::discord_button(app, ui, 190.0);
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.add_space(craft::ui::theme::scale::Space::S12.px());
             crate::links::link_row(app, ui);
         })
         .show(ui);
@@ -88,19 +88,19 @@ const HOME_RECENT_WIDTH: f32 = 380.0;
 /// row shows a × that takes it off the list, and right-click offers Remove from Recent and Clear
 /// Recent Files (#2691).
 fn home_recent(ui: &mut egui::Ui, recent: &[String]) -> Option<RecentAction> {
-    use craft_ui::controls::{ControlSize, IconButton};
-    use craft_ui::icons::Icon;
-    use craft_ui::list::ListRow;
-    use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
+    use craft::ui::controls::{ControlSize, IconButton};
+    use craft::ui::icons::Icon;
+    use craft::ui::list::ListRow;
+    use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
     #[derive(Clone, Copy)]
     enum Command {
         Remove,
         Clear,
     }
-    let t = craft_ui::theme::current(ui.ctx());
-    ui.add_space(craft_ui::theme::scale::Space::S24.px());
+    let t = craft::ui::theme::current(ui.ctx());
+    ui.add_space(craft::ui::theme::scale::Space::S24.px());
     ui.label(egui::RichText::new(tl!("Recent")).color(t.color.text.muted.to_egui()));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut action = None;
     ui.allocate_ui(egui::vec2(HOME_RECENT_WIDTH.min(ui.available_width()), 0.0), |ui| {
         for path in recent {

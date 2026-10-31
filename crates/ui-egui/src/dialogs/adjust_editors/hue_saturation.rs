@@ -1,10 +1,10 @@
 use super::basic::{sliders, track_stops};
 use super::{Color32, Edit, EditorCx, HUE_RANGES, HueRange, Rect, Row, Value, apply_event, color32, flag, hue_color, json, num, nums, pos2, vec2, widgets};
-use craft_theme::{Srgba, TypeRole};
-use craft_ui::composites::gradient::GradientRamp;
-use craft_ui::controls::{Thumb, ThumbRow};
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::{ToEgui, Tokens as LibTokens, TokensOf as _};
+use craft::theme::{Srgba, TypeRole};
+use craft::draw::ui::gradient::GradientRamp;
+use craft::ui::controls::{Thumb, ThumbRow};
+use craft::ui::primitives::{Content, Text};
+use craft::ui::theme::{ToEgui, Tokens as LibTokens, TokensOf as _};
 
 // ---------------------------------------------------------------------------------------------
 // Hue/Saturation
@@ -61,7 +61,7 @@ fn spectrum_bar(ui: &egui::Ui, r: Rect, colors: &[Color32]) {
 }
 
 pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let range_id = cx.mem.with("hs-range");
     let mut range: usize = ui.data(|d| d.get_temp(range_id)).unwrap_or(0);
     let colorize = flag(v, "colorize", false);
@@ -71,7 +71,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
     ui.horizontal(|ui| {
         let opts: Vec<(usize, &str)> = std::iter::once((0, tl!("Master"))).chain(RANGE_LABELS.iter().enumerate().map(|(i, l)| (i + 1, *l))).collect();
         ui.add_enabled_ui(!colorize, |ui| {
-            craft_ui::controls::Select::new(&format!("{range_id:?}"), tl!("Range"), &mut range)
+            craft::ui::controls::Select::new(&format!("{range_id:?}"), tl!("Range"), &mut range)
                 .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
                 .show(ui)
                 .response
@@ -129,7 +129,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         e.add(sub);
     }
     let mut c = colorize;
-    if craft_ui::controls::Checkbox::bool(tl!("Colorize"), &mut c).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Colorize"), &mut c).show(ui).response.changed() {
         v["colorize"] = json!(c);
         let h = num(v, "hue", 0.0);
         v["hue"] = json!(if c {
@@ -145,7 +145,7 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
         e.add(Edit::discrete(true));
     }
     // Spectrum bars: input hues above, adjusted below; the selected range's thumbs between.
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     // As wide as the sliders above, whatever the panel's width (#9242).
     let w = ui.available_width();
     let tokens = LibTokens::of(ui);
@@ -170,10 +170,10 @@ pub(super) fn hue_saturation(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) ->
             let strip = |x0: f32, x1: f32| Rect::from_min_max(pos2(x0, band_rect.top()), pos2(x1, band_rect.bottom()));
             let p = ui.painter();
             if xa <= xz {
-                p.rect_filled(strip(xa, xz), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(xa, xz), craft::ui::theme::scale::Radius::R0.px(), color);
             } else {
-                p.rect_filled(strip(xa, band_rect.right()), craft_ui::theme::scale::Radius::R0.px(), color);
-                p.rect_filled(strip(band_rect.left(), xz), craft_ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(xa, band_rect.right()), craft::ui::theme::scale::Radius::R0.px(), color);
+                p.rect_filled(strip(band_rect.left(), xz), craft::ui::theme::scale::Radius::R0.px(), color);
             }
         };
         band(b[0], b[3], t.color.text.faint.to_egui());

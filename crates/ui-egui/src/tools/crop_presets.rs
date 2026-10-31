@@ -16,8 +16,8 @@
 //! - The dropdown shows the name of the preset whose values the fields hold, so a preset just saved
 //!   or chosen reads as selected, and the mode again once the fields change or it is deleted.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::vec2;
 use serde_json::{Map, Value, json};
 
@@ -146,7 +146,7 @@ pub fn dropdown(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut chosen: Option<Choice> = None;
     let parent_layer = ui.layer_id();
     let combo =
-        craft_ui::ComboBox::from_id_salt("crop-ratio").selected_text(label).width(140.0).height(420.0).icon(crate::widgets::chevron_icon).show_ui(ui, |ui| {
+        craft::ui::ComboBox::from_id_salt("crop-ratio").selected_text(label).width(140.0).height(420.0).icon(crate::widgets::chevron_icon).show_ui(ui, |ui| {
             crate::press_menu::above_parent_ui(parent_layer, ui);
             let (before, after): (Vec<_>, Vec<_>) = builtin.iter().partition(|(k, _)| k != crop_size::FRONT);
             for (k, l) in &before {
@@ -306,10 +306,10 @@ fn delete_body(app: &PhotocraftApp, ui: &mut egui::Ui, fields: &mut Map<String, 
     let mut selected: Vec<String> =
         fields.get("selected").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default();
     ui.label(tl!("Select the crop presets to delete:"));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let toggle = ui.input(|i| i.modifiers.command || i.modifiers.shift);
     egui::Frame::NONE
-        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft_ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()))
+        .stroke(craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), craft::ui::theme::current(ui.ctx()).color.line.control_edge.to_egui()))
         .inner_margin(2.0)
         .show(ui, |ui| {
             egui::ScrollArea::vertical().id_salt("crop-preset-delete").max_height(220.0).auto_shrink([false, true]).show(ui, |ui| {

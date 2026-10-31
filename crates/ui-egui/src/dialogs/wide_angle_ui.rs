@@ -9,7 +9,7 @@
 //! "add":{"a":[x,y],"b":[x,y],"orientation":"…"}, "orient":{"index":i,"orientation":"…"}, "remove":i,
 //! "commit":true | "cancel":true}}}`.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::transform::Interp;
 use photocraft_algo::wideangle::{self, Camera, Constraint, Orientation, WideAngle, WideModel};
@@ -270,14 +270,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::hover());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
+        painter.rect_filled(full, craft::ui::theme::scale::Radius::R0.px(), t.chrome);
         let title = ERect::from_min_size(full.min, vec2(full.width(), 30.0));
-        painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.rect_filled(title, craft::ui::theme::scale::Radius::R0.px(), t.dock);
         painter.text(title.center(), Align2::CENTER_CENTER, format!("Adaptive Wide Angle ({})", d.layer_name), FontId::proportional(13.0), t.text);
         let footer_h = 48.0;
         let body = ERect::from_min_max(pos2(full.left(), title.bottom()), pos2(full.right(), full.bottom() - footer_h));
         let view = ERect::from_min_max(body.min, pos2(body.right() - PANEL_W, body.bottom())).shrink(16.0);
-        painter.rect_filled(view, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+        painter.rect_filled(view, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
         let s = (view.width() / d.pw as f32).min(view.height() / d.ph as f32);
         let img_r = ERect::from_center_size(view.center(), vec2(d.pw as f32 * s, d.ph as f32 * s));
         // Screen ↔ document mapping.
@@ -352,16 +352,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 painter.circle_filled(*a, 3.5, color(c.orientation));
                 painter.circle_filled(*b, 3.5, color(c.orientation));
             }
-            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), color(c.orientation))));
+            painter.add(egui::Shape::line(pts, craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), color(c.orientation))));
         }
         if let Some((a, b)) = d.drag {
             let pts: Vec<Pos2> = cam.arc(a, b, 24).iter().map(|q| to_screen(*q)).collect();
-            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent_soft)));
+            painter.add(egui::Shape::line(pts, craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent_soft)));
         }
         // Panel.
         let right = ERect::from_min_max(pos2(body.right() - PANEL_W, body.top()), body.max);
-        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(right, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([right.left_top(), right.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut props = ui.new_child(egui::UiBuilder::new().max_rect(right.shrink2(vec2(14.0, 10.0))));
         egui::ScrollArea::vertical().id_salt("awa-props").show(&mut props, |ui| {
             ui.spacing_mut().item_spacing.y = 5.0;
@@ -436,7 +436,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             );
         });
         let foot = ERect::from_min_max(pos2(full.left(), full.bottom() - footer_h), full.max);
-        painter.rect_filled(foot, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.rect_filled(foot, craft::ui::theme::scale::Radius::R0.px(), t.dock);
         let mut fu = ui.new_child(egui::UiBuilder::new().max_rect(foot.shrink2(vec2(16.0, 9.0))).layout(egui::Layout::right_to_left(egui::Align::Center)));
         if let Some(role) = widgets::dialog_buttons(
             &mut fu,

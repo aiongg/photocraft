@@ -7,7 +7,7 @@
 //! two commands an agent would run. Painting tools keep their plain right-click (the Brush
 //! Preset picker, #268); the ⌘/Ctrl variant reaches the layer list from them too.
 
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
 use egui::{Modifiers, Response, Ui};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

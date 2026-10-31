@@ -264,6 +264,6 @@ pub(crate) struct ItemCache {
     pub(super) state: u64,
     /// The UI language the rows are written in.
     pub(super) language: String,
-    pub(super) menus: craft_menu::MenuBar,
+    pub(super) menus: craft::menu::MenuBar,
     pub(super) english: super::model::English,
 }

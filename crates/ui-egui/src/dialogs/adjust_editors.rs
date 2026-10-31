@@ -6,11 +6,12 @@
 //! and `commit` when a gesture ends (the Properties host then runs one `layer.setAdjustment`; a
 //! dialog commits on OK). Selective Color and Color Lookup keep their editors in `adjust_ui`.
 
-use craft_theme::{Srgba, TypeRole};
-use craft_ui::composites::{ColorPopover, SliderRow};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::primitives::{Content, Text};
+use craft::theme::{Srgba, TypeRole};
+use craft::ui::composites::{SliderRow};
+use craft::color::ui::{ColorPopover};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::primitives::{Content, Text};
 use std::sync::Arc;
 
 use egui::{Color32, Rect, pos2, vec2};

@@ -1,12 +1,12 @@
 //! Photoshop-style guide layout dialog. Its preview is a pure guide overlay, never an edit.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::Color32;
 use photocraft_doc::{Document, Guides};
 use serde_json::{Map, Value, json};
 
-use craft_ui::composites::{FormGrid, GroupBox, LabelAlign};
-use craft_ui::controls::Select;
+use craft::ui::composites::{FormGrid, GroupBox, LabelAlign};
+use craft::ui::controls::Select;
 
 use crate::{PhotocraftApp, widgets};
 
@@ -194,12 +194,12 @@ pub fn preview_on(f: &Map<String, Value>) -> bool {
 /// The Preview check under the footer's Cancel button; `Some(on)` when the user toggled it.
 pub fn preview_check(ui: &mut egui::Ui, on: bool) -> Option<bool> {
     let mut value = on;
-    craft_ui::controls::Checkbox::bool(tl!("Preview"), &mut value).show(ui).response.changed().then_some(value)
+    craft::ui::controls::Checkbox::bool(tl!("Preview"), &mut value).show(ui).response.changed().then_some(value)
 }
 
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str, fallback: bool) -> bool {
     let mut value = on(f, key, fallback);
-    if craft_ui::controls::Checkbox::bool(tl!(label), &mut value).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!(label), &mut value).show(ui).response.changed() {
         f.insert(key.into(), json!(value));
     }
     value
@@ -305,7 +305,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
             f.insert("target".into(), json!(target));
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S12.px());
+    ui.add_space(craft::ui::theme::scale::Space::S12.px());
     GroupBox::new(tl!("Color")).show(ui, |ui| {
         FormGrid::new("guide-color-row").label_align(LabelAlign::Start).show(ui, |form| {
             form.row(tl!("Color:"), |ui, _| {
@@ -315,7 +315,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
                 if edit.response.changed() {
                     f.insert("color".into(), json!(color));
                 }
-                let shown = rgb(&color).unwrap_or(craft_ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
+                let shown = rgb(&color).unwrap_or(craft::ui::theme::current(ui.ctx()).color.accent.solid.to_egui());
                 let swatch = widgets::color_swatch_button(ui, shown, tl!("Guide color"));
                 if swatch.clicked() {
                     crate::color_picker_ui::request(f, tl!("Guide color"));
@@ -324,13 +324,13 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
             });
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S12.px());
+    ui.add_space(craft::ui::theme::scale::Space::S12.px());
     ui.horizontal_top(|ui| {
         axis(ui, f, false);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         axis(ui, f, true);
     });
-    ui.add_space(craft_ui::theme::scale::Space::S12.px());
+    ui.add_space(craft::ui::theme::scale::Space::S12.px());
     let mut enabled = on(f, "__marginEnabled", true);
     let mut margins = f.get("margin").and_then(Value::as_array).cloned().unwrap_or_else(|| vec![json!(0); 4]);
     GroupBox::new(tl!("Margin")).checkbox(&mut enabled).show(ui, |ui| {
@@ -350,7 +350,7 @@ fn main_fields(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value
         f.insert("__marginEnabled".into(), json!(enabled));
     }
     f.insert("margin".into(), Value::Array(margins));
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     check(ui, f, "centerColumns", tl!("Center Columns"), false);
     check(ui, f, "clearExisting", tl!("Clear Existing Guides"), false);
     // A typed edit makes a named preset custom; changing target/colour/preview does not.
@@ -374,7 +374,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
             f.insert("__previewSource".into(), source(app));
         }
         Err(error) => {
-            ui.colored_label(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui(), tl!("Invalid guide layout")).on_hover_text(error);
+            ui.colored_label(craft::ui::theme::current(ui.ctx()).color.text.muted.to_egui(), tl!("Invalid guide layout")).on_hover_text(error);
         }
     }
     // The canvas paints before the dialog. Schedule the frame that displays this draft edit.

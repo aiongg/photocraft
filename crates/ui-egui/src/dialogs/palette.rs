@@ -1,8 +1,8 @@
 //! ⌘F command palette: search over every menu command and tool, on craft-ui's `CommandPalette`.
 
-use craft_ui::behavior::PaletteEntry;
-use craft_ui::controls::Kbd;
-use craft_ui::patterns::{CommandPalette, PaletteLabels};
+use craft::ui::behavior::PaletteEntry;
+use craft::ui::controls::Kbd;
+use craft::ui::patterns::{CommandPalette, PaletteLabels};
 
 use crate::PhotocraftApp;
 

@@ -1,10 +1,10 @@
 use std::cell::{Cell, RefCell};
 
-use craft_theme::LabelColor;
-use craft_ui::edit::{EditEvent, GestureId};
-use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
-use craft_ui::menu::{ContextMenu, OpenAt};
-use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
+use craft::theme::LabelColor;
+use craft::ui::edit::{EditEvent, GestureId};
+use craft::ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, ToggleEdit, TreeRow, TreeText};
+use craft::ui::menu::{ContextMenu, OpenAt};
+use craft::ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 
 use super::layer_drag::{start_fx_drag, start_layer_drag, start_mask_drag, starts_mask_drag};
 use super::layer_row_ui::{ICON_W, Indicator, TRIANGLE_W};
@@ -153,7 +153,7 @@ fn indicator_items<'a>(
     mut row: ListRow<'a, u64>,
     cells: &'a Cells,
 ) -> ListRow<'a, u64> {
-    let t = craft_ui::theme::current(ctx);
+    let t = craft::ui::theme::current(ctx);
     let (muted, faint, normal, warn) =
         (t.color.text.muted.to_egui(), t.color.text.faint.to_egui(), t.color.text.normal.to_egui(), t.color.status.warn.fg.to_egui());
     let has_fx = !l.effects.items.is_empty();
@@ -632,7 +632,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
     let p = ui.painter();
     match &l.content {
         LayerContent::Adjustment(_) | LayerContent::Group(_) => {
-            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), t.field);
+            p.rect_filled(rect, craft::ui::theme::scale::Radius::R6.px(), t.field);
             let icon = if l.is_group() { "folder" } else { "contrast" };
             icons::paint(ui, rect, icon, 18.0, t.icon);
         }
@@ -647,7 +647,7 @@ fn draw_layer_thumb(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui,
             crate::solid_fill_ui::paint_thumbnail(ui, crate::solid_fill_ui::thumbnail_color(app, doc.id, l.id, *color), rect);
         }
         LayerContent::Fill(_) => {
-            p.rect_filled(rect, craft_ui::theme::scale::Radius::R6.px(), Color32::from_rgba_unmultiplied(128, 128, 128, 255));
+            p.rect_filled(rect, craft::ui::theme::scale::Radius::R6.px(), Color32::from_rgba_unmultiplied(128, 128, 128, 255));
         }
         _ => {
             // Keep row layout and outside thumbnail decorations when the image is clipped.
@@ -688,7 +688,7 @@ fn paint_mask_thumb(
             painter.image(tex, r, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
         }
         if !enabled {
-            let st = craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger);
+            let st = craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger);
             let k = r.shrink(1.0);
             painter.line_segment([k.left_top(), k.right_bottom()], st);
             painter.line_segment([k.right_top(), k.left_bottom()], st);
@@ -697,7 +697,7 @@ fn paint_mask_thumb(
     if app.ui.layers_panel_options.show_layer_mask_badges {
         // Distinguish pixel and vector masks without altering their thumbnails.
         let badge = Rect::from_min_size(pos2(r.right() - 9.0, r.bottom() - 9.0), vec2(9.0, 9.0));
-        painter.rect_filled(badge, craft_ui::theme::scale::Radius::R2.px(), t.card);
+        painter.rect_filled(badge, craft::ui::theme::scale::Radius::R2.px(), t.card);
         icons::paint(ui, badge, if kind == MaskKind::Vector { "pen-tool" } else { "circle-dot" }, 8.0, t.text);
     }
 }

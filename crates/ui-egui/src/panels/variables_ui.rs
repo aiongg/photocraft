@@ -169,7 +169,7 @@ fn normalize(state: &Value) -> Value {
 fn define_page(ui: &mut egui::Ui, _t: &Tokens, layers: &[(u64, String, bool)], state: &mut Value) {
     let Some(defs) = state.get_mut("defs").and_then(Value::as_array_mut) else { return };
     ui.label(tl!("Variables bind a layer's visibility, text or pixels to a named data slot."));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut remove = None;
     for (i, d) in defs.iter_mut().enumerate() {
         ui.horizontal(|ui| {
@@ -219,7 +219,7 @@ fn define_page(ui: &mut egui::Ui, _t: &Tokens, layers: &[(u64, String, bool)], s
     if let Some(i) = remove {
         defs.remove(i);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     if ui.button(tl!("+ Add variable")).clicked() {
         let n = defs.len() + 1;
         defs.push(json!({"name": format!("var{n}"), "layer": layers[0].0, "type": "visibility", "method": "fit", "align": "center", "clip": false}));
@@ -296,7 +296,7 @@ fn data_sets_page(ui: &mut egui::Ui, _t: &Tokens, state: &mut Value, fields: &mu
                 set["name"] = json!(sname);
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         let Some(values) = set.get_mut("values").and_then(Value::as_array_mut) else { return };
         for (vname, vty) in &def_meta {
             // find or create a value entry for this variable
@@ -337,7 +337,7 @@ fn data_sets_page(ui: &mut egui::Ui, _t: &Tokens, state: &mut Value, fields: &mu
                 }
             });
         }
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+        ui.add_space(craft::ui::theme::scale::Space::S6.px());
         if crate::widgets::secondary_button(ui, tl!("Apply"), 84.0).clicked() {
             fields.insert("__apply".into(), json!(sname));
         }

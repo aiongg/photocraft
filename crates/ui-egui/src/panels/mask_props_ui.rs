@@ -1,9 +1,9 @@
 //! Non-destructive layer-mask controls (pixel and vector), shared by docked and floating Properties.
 
-use craft_ui::composites::SliderRow;
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::theme::ToEgui;
+use craft::ui::composites::SliderRow;
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::theme::ToEgui;
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::json;
 
@@ -117,7 +117,7 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: u64, document: u64
 fn refine_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let refine: [(&str, &str); 3] = [(tl!("Select and Mask…"), "select.selectAndMask"), (tl!("Color Range…"), "select.colorRange"), (tl!("Invert"), INVERT)];
     ui.add_space(theme::ROW_GAP / 2.0);
-    ui.label(egui::RichText::new(tl!("Refine")).color(craft_ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
+    ui.label(egui::RichText::new(tl!("Refine")).color(craft::ui::theme::current(ui.ctx()).color.text.muted.to_egui()));
     ui.add_space(theme::ROW_GAP / 2.0);
     let avail = ui.available_width();
     // Two buttons to a row in a wide panel, as Quick Actions do; a narrow one stacks them.
@@ -132,7 +132,7 @@ fn refine_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let enabled = crate::menus::is_enabled(app, id);
                 if ui
                     .add_enabled_ui(enabled, |ui| {
-                        ui.add(craft_ui::controls::Button::new(label).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(w)).clicked()
+                        ui.add(craft::ui::controls::Button::new(label).variant(craft::ui::controls::ButtonVariant::Secondary).min_width(w)).clicked()
                     })
                     .inner
                 {

@@ -540,7 +540,7 @@ fn contour_picker_and_editor_edit_the_effect_curve() {
         let (mut points, mut corners) = contour::editor_levels(f).unwrap();
         points[1] = [input * 2.55, output * 2.55];
         corners[0] = corner;
-        craft_ui::composites::Curve::from_parts(points, corners)
+        craft::ui::composites::Curve::from_parts(points, corners)
     };
     let curve = edited(&f, true, 10.0, 30.0);
     assert!(contour::set_curve(&mut f, &curve));

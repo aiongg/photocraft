@@ -276,7 +276,7 @@ pub struct Interface {
     /// The legacy appearance keys have been imported into the override (see `appearance::migrate`).
     pub appearance_imported: bool,
     /// The suite selection last accepted, kept so the web build (no files) and a missing
-    /// selection file show the same look (`craft_theme_store::Accepted`, opaque here).
+    /// selection file show the same look (`craft::theme_store::Accepted`, opaque here).
     pub last_suite: Value,
     /// Pasteboard colour in standard screen mode (`canvasCustomColor` when "custom").
     pub canvas_color: CanvasColor,

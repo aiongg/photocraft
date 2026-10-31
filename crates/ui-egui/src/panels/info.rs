@@ -27,7 +27,7 @@ pub(crate) fn pointer_sample(app: &mut PhotocraftApp, (x, y): (i32, i32)) -> Opt
 pub(super) fn info_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
+        craft::ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let (size, origin) = (st.doc.size, st.doc.ruler_origin);

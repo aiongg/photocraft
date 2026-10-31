@@ -7,7 +7,7 @@ use super::strokes::{EngineStroke, SPOT_HEALING_TRAIL, draw_smoothing_string, st
 use super::textures::texture_side;
 use super::view_xform::ViewXform;
 use super::{Color32, DRect, Document, Mesh, PhotocraftApp, Pos2, Rect, Stroke, TextureOptions, Tool, json, pos2, vec2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 /// A texture mapped over the `size` document area starting at `origin` (follows a rotated view).
 pub(super) fn paint_mapped_image_at(painter: &egui::Painter, xf: &ViewXform, tex: egui::TextureId, uv: Rect, origin: [f32; 2], size: [f32; 2], tint: Color32) {
@@ -77,7 +77,7 @@ pub(super) fn paint_cpu_document(
             if rotated {
                 paint_mapped_quad(painter, xf, origin, size, Color32::WHITE);
             } else {
-                painter.rect_filled(img_rect, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                painter.rect_filled(img_rect, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
         }
     }
@@ -181,7 +181,7 @@ pub(crate) fn marching_ants_lines(painter: &egui::Painter, lines: impl Iterator<
 /// Photoshop crop overlay: the `shield` outside (`crop_shield::fill`; none when disabled), bright
 /// frame, the composition `guides` (unit-square polylines, `crop_overlay::guides`), corner and
 /// edge handles.
-fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guides: &[craft_ui::canvas::Polyline]) {
+fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guides: &[craft::draw::ui::Polyline]) {
     let clip = painter.clip_rect();
     if let Some(dim) = shield {
         for band in [
@@ -190,13 +190,13 @@ fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guide
             Rect::from_min_max(egui::pos2(clip.min.x, r.min.y), egui::pos2(r.min.x, r.max.y)),
             Rect::from_min_max(egui::pos2(r.max.x, r.min.y), egui::pos2(clip.max.x, r.max.y)),
         ] {
-            painter.rect_filled(band, craft_ui::theme::scale::Radius::R0.px(), dim);
+            painter.rect_filled(band, craft::ui::theme::scale::Radius::R0.px(), dim);
         }
     }
     painter.rect_stroke(
         r,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE),
+        craft::ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE),
         egui::StrokeKind::Middle,
     );
     draw_crop_guides(painter, guides, |a, b| r.min + r.size() * vec2(a, b));
@@ -216,7 +216,7 @@ fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guide
 
 /// [`crop_overlay`] for a turned frame (or a rotated view): `q` is the frame's top-left, top-right,
 /// bottom-right and bottom-left corner on screen, a parallelogram.
-fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Color32>, guides: &[craft_ui::canvas::Polyline]) {
+fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Color32>, guides: &[craft::draw::ui::Polyline]) {
     let (u, v) = (q[1] - q[0], q[3] - q[0]);
     let (lu, lv) = (u.length(), v.length());
     if !(lu.is_finite() && lv.is_finite()) || lu < 1e-3 || lv < 1e-3 {
@@ -240,7 +240,7 @@ fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Col
         }
         painter.add(egui::Shape::mesh(mesh));
     }
-    painter.add(egui::Shape::closed_line(q.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
+    painter.add(egui::Shape::closed_line(q.to_vec(), craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
     draw_crop_guides(painter, guides, at);
     let h = Stroke::new(3.0, Color32::WHITE);
     let l = 14.0f32.min(lu / 3.0).min(lv / 3.0);
@@ -257,8 +257,8 @@ fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Col
 }
 
 /// The crop overlay's guides, each unit-square point placed on screen by `at`.
-fn draw_crop_guides(painter: &egui::Painter, guides: &[craft_ui::canvas::Polyline], at: impl Fn(f32, f32) -> Pos2) {
-    let thin = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(90));
+fn draw_crop_guides(painter: &egui::Painter, guides: &[craft::draw::ui::Polyline], at: impl Fn(f32, f32) -> Pos2) {
+    let thin = craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(90));
     for l in guides {
         painter.add(egui::Shape::line(l.iter().map(|p| at(p[0], p[1])).collect(), thin));
     }
@@ -395,7 +395,7 @@ pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painte
                 painter.image(id, r, uv, Color32::WHITE);
             }
             None => {
-                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
         }
     }
@@ -578,7 +578,7 @@ pub(super) fn draw_drag_preview(app: &mut PhotocraftApp, painter: &egui::Painter
             if let Some(lasso) = &d.lasso {
                 pts.push(xf.to_screen(lasso.cursor[0] as f32, lasso.cursor[1] as f32));
             }
-            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent)));
+            painter.add(egui::Shape::line(pts, craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent)));
         }
         Tool::Lasso | Tool::Patch | Tool::ContentAwareMove => {
             let mut pts: Vec<Pos2> = d.points.iter().map(|p| xf.to_screen(p[0] as f32, p[1] as f32)).collect();
@@ -600,21 +600,21 @@ pub(super) fn draw_drag_preview(app: &mut PhotocraftApp, painter: &egui::Painter
             let a = xf.to_screen(d.start[0] as f32, d.start[1] as f32);
             let b = xf.to_screen(last[0] as f32, last[1] as f32);
             painter.line_segment([a, b], Stroke::new(3.0, Color32::from_black_alpha(140)));
-            painter.line_segment([a, b], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+            painter.line_segment([a, b], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
             painter.circle_filled(a, 3.0, Color32::WHITE);
             painter.circle_filled(b, 3.0, Color32::WHITE);
         }
         Tool::Type | Tool::VerticalType | Tool::HorizontalTypeMask | Tool::VerticalTypeMask => {
             let r = Rect::from_two_pos(xf.to_screen(d.start[0] as f32, d.start[1] as f32), xf.to_screen(last[0] as f32, last[1] as f32));
             let pts = [r.left_top(), r.right_top(), r.right_bottom(), r.left_bottom(), r.left_top()];
-            painter.add(egui::Shape::line(pts.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
-            painter.add(egui::Shape::dashed_line(&pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::BLACK), 3.0, 3.0));
+            painter.add(egui::Shape::line(pts.to_vec(), craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
+            painter.add(egui::Shape::dashed_line(&pts, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::BLACK), 3.0, 3.0));
         }
         // The layers themselves follow the pointer (`move_ui`); the arrow only when they can't.
         Tool::Move if !crate::move_ui::showing(app) => {
             let from = xf.to_screen(d.start[0] as f32, d.start[1] as f32);
             let off = xf.to_screen(last[0] as f32, last[1] as f32) - from;
-            painter.arrow(from, off, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent));
+            painter.arrow(from, off, craft::ui::theme::scale::Stroke::W2.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent));
         }
         _ => {}
     }

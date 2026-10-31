@@ -1,6 +1,6 @@
 use super::*;
-use craft_keymap::Chord;
-use craft_menu::{Backend, ClipboardKeys, Dispatch, Event, MenuRole, NativeMenu};
+use craft::keymap::Chord;
+use craft::menu::{Backend, ClipboardKeys, Dispatch, Event, MenuRole, NativeMenu};
 use egui::{Key, Modifiers};
 use serde_json::json;
 use std::collections::HashMap;
@@ -177,8 +177,8 @@ fn opening_a_document_changes_state_not_structure() {
     let flips: Vec<&String> = ka.iter().filter(|(id, k)| kb.get(*id).is_some_and(|o| o != *k)).map(|(id, _)| id).collect();
     assert!(flips.is_empty(), "items that change kind: {flips:?}");
     let (no_doc, one_doc) = (layout(false).bar, layout(true).bar);
-    assert_eq!(craft_menu::structure_key(&no_doc), craft_menu::structure_key(&one_doc));
-    assert_ne!(craft_menu::window_key(&no_doc), craft_menu::window_key(&one_doc), "the Window menu is rebuilt for its new row");
+    assert_eq!(craft::menu::structure_key(&no_doc), craft::menu::structure_key(&one_doc));
+    assert_ne!(craft::menu::window_key(&no_doc), craft::menu::window_key(&one_doc), "the Window menu is rebuilt for its new row");
 }
 
 /// #2991: the open documents follow Bring All to Front, where a Mac app lists its windows,
@@ -202,8 +202,8 @@ fn the_documents_follow_bring_all_to_front() {
     let switched = mac_layout(&crate::menus::menu_items(&a), Lang::EN, "auto").bar;
     assert_eq!(checked(&switched, "window.document.0"), Some(true));
     assert_eq!(
-        (craft_menu::structure_key(&switched), craft_menu::window_key(&switched)),
-        (craft_menu::structure_key(&bar), craft_menu::window_key(&bar)),
+        (craft::menu::structure_key(&switched), craft::menu::window_key(&switched)),
+        (craft::menu::structure_key(&bar), craft::menu::window_key(&bar)),
         "a check moves in place"
     );
 }

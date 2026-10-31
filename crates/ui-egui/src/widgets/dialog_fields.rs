@@ -1,8 +1,8 @@
 //! Library fields over a dialog's JSON `fields` map: each edits a plain value in place and reports
 //! whether the user changed it.
 
-use craft_ui::controls::{NumberField, TextField};
-use craft_ui::localized::{LocaleNumbers, Unit};
+use craft::ui::controls::{NumberField, TextField};
+use craft::ui::localized::{LocaleNumbers, Unit};
 use egui::{AsIdSalt, Ui};
 
 /// A [`NumberField`] named `label` over `value`, clamped to `range`, showing `decimals` places and

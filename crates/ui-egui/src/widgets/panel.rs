@@ -1,5 +1,5 @@
 use super::{Color32, CornerRadius, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, pos2, theme, vec2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 /// Match the Spectrum application-menu padding and blue/white hover state in
 /// secondary menus (status bar, dock hamburger, layer context menus; #2187).
@@ -26,7 +26,7 @@ pub fn style_spectrum_popup_menu(ui: &mut Ui) {
 /// An accent insertion line on one edge of `r` while a drag hovers it (vertical: on its left or,
 /// `after`, right edge; else on its top or bottom).
 pub fn drop_line(ui: &Ui, r: Rect, after: bool, vertical: bool, t: &Tokens) {
-    let s = craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent);
+    let s = craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent);
     if vertical {
         let x = if after { r.right() } else { r.left() };
         ui.painter().line_segment([pos2(x, r.top() + 2.0), pos2(x, r.bottom() - 2.0)], s);
@@ -43,10 +43,10 @@ pub fn surface(ui: &Ui, rect: Rect, fill: Color32, raised: bool) {
     p.rect_filled(rect, t.radius_sm, fill);
     if t.bevel {
         let (hi, lo) = if raised { (Color32::WHITE, Color32::from_gray(64)) } else { (Color32::from_gray(64), Color32::WHITE) };
-        p.line_segment([rect.left_bottom(), rect.left_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), hi));
-        p.line_segment([rect.left_top(), rect.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), hi));
-        p.line_segment([rect.right_top(), rect.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), lo));
-        p.line_segment([rect.right_bottom(), rect.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), lo));
+        p.line_segment([rect.left_bottom(), rect.left_top()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), hi));
+        p.line_segment([rect.left_top(), rect.right_top()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), hi));
+        p.line_segment([rect.right_top(), rect.right_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), lo));
+        p.line_segment([rect.right_bottom(), rect.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), lo));
     }
 }
 
@@ -74,7 +74,7 @@ pub fn panel_footer<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), footer_height(ui)), Sense::hover());
     let y = r.top() + 0.5;
     ui.painter()
-        .line_segment([pos2(r.left() - m.left as f32, y), pos2(r.right() + m.right as f32, y)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        .line_segment([pos2(r.left() - m.left as f32, y), pos2(r.right() + m.right as f32, y)], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     let bar = Rect::from_min_size(pos2(r.left(), r.top() + 1.0), vec2(r.width(), FOOTER_BAR));
     let mut bar_ui = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::right_to_left(egui::Align::Center)));
     // The bar runs on over the body's bottom margin, past where the body's own clip ends: without
@@ -86,7 +86,7 @@ pub fn panel_footer<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
 
 /// The panel menu button: the hamburger of the docks' tab strips, on a card's header.
 pub fn panel_menu_button(ui: &mut Ui) -> Response {
-    ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Menu, tl!("Panel menu")).size(craft_ui::controls::ControlSize::Sm))
+    ui.add(craft::ui::controls::IconButton::new(craft::ui::icons::Icon::Menu, tl!("Panel menu")).size(craft::ui::controls::ControlSize::Sm))
 }
 
 pub fn pill_tab(ui: &mut Ui, label: &str, selected: bool) -> Response {
@@ -99,7 +99,7 @@ pub fn pill_tab(ui: &mut Ui, label: &str, selected: bool) -> Response {
     if selected {
         surface(ui, rect, t.hover, true);
         if !t.bevel {
-            ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+            ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
         }
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.6));
@@ -118,14 +118,14 @@ pub fn section_label(ui: &mut Ui, text: &str) {
 
 /// Hairline separator.
 pub fn hairline(ui: &mut Ui) {
-    craft_ui::primitives::Divider::horizontal().show(ui);
+    craft::ui::primitives::Divider::horizontal().show(ui);
 }
 
 /// Vertical hairline for horizontal layouts.
 pub fn vline(ui: &mut Ui, height: f32) {
     let t = Tokens::get(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(9.0, height), Sense::hover());
-    ui.painter().line_segment([r.center_top(), r.center_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+    ui.painter().line_segment([r.center_top(), r.center_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
 }
 
 /// Small chevron for dropdowns (replaces egui's filled triangle).

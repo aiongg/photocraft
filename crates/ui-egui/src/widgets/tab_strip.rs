@@ -3,17 +3,17 @@
 //! that still don't fit move into a » chevron menu at the end of the strip. The selected tab
 //! always stays on the strip, and no tab ever runs under the menu button.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
 use crate::theme::{self, Tokens};
 
-pub use craft_ui::tabs::TabFit;
+pub use craft::ui::tabs::TabFit;
 
 /// Fit tabs to a strip using the shared, bounded width policy. Local wrappers retain the
 /// application's themes, translated labels and panel/document overflow menus.
 pub fn fit(natural: &[f32], selected: usize, avail: f32, min_w: f32, chevron_w: f32) -> TabFit {
-    craft_ui::tabs::fit(natural, selected, avail, min_w, chevron_w)
+    craft::ui::tabs::fit(natural, selected, avail, min_w, chevron_w)
 }
 
 /// A label laid out on one row no wider than `max_w`, cut with '…' when it doesn't fit.
@@ -91,7 +91,7 @@ fn tabs_in(
         // The padding gives way (down to a third) before the label is cut.
         let galley = elided(ui, name, font.clone(), t.text, (w - pad / 3.0).max(1.0));
         let cut = galley.size().x + pad + 0.5 < natural.get(i).copied().unwrap_or(0.0) && galley.size().x + pad / 3.0 >= w - 0.5;
-        let resp = craft_ui::primitives::Interactive::with_id(id.with(("tab", i)), egui::Role::Tab, *name)
+        let resp = craft::ui::primitives::Interactive::with_id(id.with(("tab", i)), egui::Role::Tab, *name)
             .sense(Sense::click())
             .selected(i == *selected)
             .position_in_set(i)
@@ -148,7 +148,7 @@ pub fn pill_tabs(ui: &mut Ui, id: egui::Id, area: Rect, tabs: &[&str], selected:
             if active {
                 crate::widgets::surface(ui, r, t.hover, true);
                 if !t.bevel {
-                    ui.painter().rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+                    ui.painter().rect_stroke(r, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
                 }
             } else if resp.hovered() {
                 ui.painter().rect_filled(r, t.radius_sm, t.hover.gamma_multiply(0.6));

@@ -15,18 +15,18 @@ fn hidden(app: &PhotocraftApp, panel: &str) -> bool {
     app.ui.docking.as_ref().is_some_and(|workspace| workspace.hidden.iter().any(|(id, _)| id == panel))
 }
 
-fn hit_rect(h: &Harness<'static, PhotocraftApp>, hit: craft_ui::docking::Hit<String>) -> egui::Rect {
-    let hits = craft_ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
+fn hit_rect(h: &Harness<'static, PhotocraftApp>, hit: craft::ui::docking::Hit<String>) -> egui::Rect {
+    let hits = craft::ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
     hits.iter().find(|(drawn, _)| *drawn == hit).map(|(_, rect)| *rect).unwrap_or_else(|| panic!("{hit:?} is not drawn"))
 }
 
 fn tab_rect(h: &Harness<'static, PhotocraftApp>, panel: &str) -> egui::Rect {
-    hit_rect(h, craft_ui::docking::Hit::Tab(panel.to_owned()))
+    hit_rect(h, craft::ui::docking::Hit::Tab(panel.to_owned()))
 }
 
 fn floating_rect(h: &Harness<'static, PhotocraftApp>, panel: &str) -> egui::Rect {
     let window = lay(h.state()).floating.iter().find(|window| window.contains(&panel.to_owned())).unwrap();
-    let layer = craft_ui::docking::DockArea::<String>::floating_layer(area_id(), window).unwrap();
+    let layer = craft::ui::docking::DockArea::<String>::floating_layer(area_id(), window).unwrap();
     h.ctx.memory(|memory| memory.area_rect(layer.id)).unwrap()
 }
 
@@ -146,10 +146,10 @@ fn drag(h: &mut Harness<'static, PhotocraftApp>, from: Pos2, to: Pos2) {
 
 /// The canvas's rect: from the area's start to the dock column's inner edge.
 fn canvas_rect(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
-    let hits = craft_ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
+    let hits = craft::ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
     let divider = hits
         .iter()
-        .find(|(hit, _)| matches!(hit, craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Column(_))))
+        .find(|(hit, _)| matches!(hit, craft::ui::docking::Hit::Divider(craft::ui::docking::Divider::Column(_))))
         .map(|(_, rect)| *rect)
         .expect("the dock column's edge is drawn");
     egui::Rect::from_min_max(egui::pos2(0.0, divider.top()), egui::pos2(divider.left(), divider.bottom()))
@@ -176,8 +176,8 @@ fn a_fresh_launch_draws_the_native_groups_beside_the_protected_canvas() {
     let tops: Vec<f32> = ["color", "properties", "layers"].iter().map(|panel| tab_rect(&h, panel).top()).collect();
     assert!(tops.windows(2).all(|pair| pair[0] < pair[1]), "top to bottom: {tops:?}");
     assert!(tab_rect(&h, "color").left() > canvas.right(), "the dock is at the end edge");
-    let hits = craft_ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
-    assert!(!hits.iter().any(|(hit, _)| *hit == craft_ui::docking::Hit::Tab(CANVAS.into())), "the canvas has no tab");
+    let hits = craft::ui::docking::DockArea::<String>::hit_rects(&h.ctx, area_id());
+    assert!(!hits.iter().any(|(hit, _)| *hit == craft::ui::docking::Hit::Tab(CANVAS.into())), "the canvas has no tab");
     for command in ["window.panel.close", "window.panel.float"] {
         assert!(h.state_mut().run(command, json!({"panel": CANVAS})).is_err(), "{command}");
     }
@@ -390,7 +390,7 @@ fn serialized_layout_actions_cover_geometry_reorder_accordion_and_atomic_rejecti
     let mut app = app();
     app.run("window.panel.move", json!({"panel":"swatches","anchor":"layers","zone":"top"})).unwrap();
     app.run("window.panel.layout", json!({"action":{"ResizeSplit":{"path":[],"size":{"Ratio":0.35}}}})).unwrap();
-    assert!(matches!(lay(&app).root, Some(Node::Split { size: craft_ui::layout::SplitSize::Ratio(value), .. }) if (value - 0.35).abs() < 0.001));
+    assert!(matches!(lay(&app).root, Some(Node::Split { size: craft::ui::layout::SplitSize::Ratio(value), .. }) if (value - 0.35).abs() < 0.001));
     app.run("window.panel.float", json!({"panel":"properties"})).unwrap();
     app.run("window.panel.layout", json!({"action":{"MoveFloating":{"panel":"properties","rect":[44,66,360,450]}}})).unwrap();
     assert_eq!(lay(&app).floating.iter().find(|group| group.contains(&"properties".to_string())).unwrap().rect, [44.0, 66.0, 360.0, 450.0]);
@@ -408,7 +408,7 @@ fn serialized_layout_actions_cover_geometry_reorder_accordion_and_atomic_rejecti
         assert_eq!(app.ui.docking, before);
         assert_eq!(app.ui.docking_returns, hidden);
     }
-    let stack = Node::Stack { entries: vec![craft_ui::docking::StackEntry { panel: "layers".into(), open: true, height: Some(100.0) }] };
+    let stack = Node::Stack { entries: vec![craft::ui::docking::StackEntry { panel: "layers".into(), open: true, height: Some(100.0) }] };
     app.ui.docking = Some(Workspace::new(Layout { root: Some(with_canvas(stack, 300.0)), floating: Vec::new() }));
     app.run("window.panel.layout", json!({"action":{"SetStackOpen":{"panel":"layers","open":false}}})).unwrap();
     app.run("window.panel.layout", json!({"action":{"ResizeStack":{"panel":"layers","height":150}}})).unwrap();
@@ -836,7 +836,7 @@ fn floating_group_grip_redocks_all_tabs_as_one_atomic_move() {
     app.run("window.panel.float", json!({"panel":"swatches","x":30,"y":60})).unwrap();
     app.run("window.panel.move", json!({"panel":"patterns","anchor":"swatches"})).unwrap();
     let mut h = harness(app, vec2(1280.0, 800.0));
-    let from = hit_rect(&h, craft_ui::docking::Hit::DragBar("swatches".into())).center();
+    let from = hit_rect(&h, craft::ui::docking::Hit::DragBar("swatches".into())).center();
     let to = tab_rect(&h, "layers").center();
     drag(&mut h, from, to);
     let layout = lay(h.state());

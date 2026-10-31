@@ -14,7 +14,7 @@
 //! `filter.vanishingPoint` with the planes, the paste and the strokes, so the whole session is
 //! one history step and an action or agent can replay it exactly.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Stroke, TextureHandle, pos2};
@@ -1132,8 +1132,8 @@ pub fn draw(s: &VpSession, painter: &egui::Painter, xf: &ViewXform) {
             let nodes = pts.into_iter().chain(s.edge_nodes(i).into_iter().flatten().map(scr));
             for c in nodes {
                 let r = egui::Rect::from_center_size(c, egui::vec2(7.0, 7.0));
-                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
-                painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(1.25, colour), egui::StrokeKind::Inside);
+                painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                painter.rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), Stroke::new(1.25, colour), egui::StrokeKind::Inside);
             }
         }
     }
@@ -1145,7 +1145,7 @@ pub fn draw(s: &VpSession, painter: &egui::Painter, xf: &ViewXform) {
         }
         painter.add(egui::Shape::line(pts.clone(), Stroke::new(1.25, tokens.accent)));
         for c in pts.iter().take(s.pending.len()) {
-            painter.rect_filled(egui::Rect::from_center_size(*c, egui::vec2(6.0, 6.0)), craft_ui::theme::scale::Radius::R0.px(), tokens.accent);
+            painter.rect_filled(egui::Rect::from_center_size(*c, egui::vec2(6.0, 6.0)), craft::ui::theme::scale::Radius::R0.px(), tokens.accent);
         }
     }
     if s.tool == VpTool::Stamp {
@@ -1158,13 +1158,13 @@ pub fn draw(s: &VpSession, painter: &egui::Painter, xf: &ViewXform) {
 fn draw_stamp(s: &VpSession, painter: &egui::Painter, xf: &ViewXform, scr: &dyn Fn([f64; 2]) -> Pos2) {
     let outline = |pts: &[Pos2]| {
         painter.add(egui::Shape::closed_line(pts.to_vec(), Stroke::new(2.5, Color32::from_black_alpha(160))));
-        painter.add(egui::Shape::closed_line(pts.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
+        painter.add(egui::Shape::closed_line(pts.to_vec(), craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE)));
     };
     if let Some(src) = s.source {
         let c = scr(src);
         for (a, b) in [(egui::vec2(-7.0, 0.0), egui::vec2(7.0, 0.0)), (egui::vec2(0.0, -7.0), egui::vec2(0.0, 7.0))] {
             painter.line_segment([c + a, c + b], Stroke::new(2.5, Color32::from_black_alpha(160)));
-            painter.line_segment([c + a, c + b], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+            painter.line_segment([c + a, c + b], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
         }
     }
     let Some(hover) = painter.ctx().pointer_hover_pos() else { return };

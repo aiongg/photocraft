@@ -9,8 +9,8 @@
 //! initialization, reusing the cached solver factorization. Warm-starting from earlier drag
 //! previews made the result depend on pointer history and snap to a different shape on release.
 
-use craft_ui::patterns::{CellWidth, OptionsBar};
-use craft_ui::theme::StrokeExt;
+use craft::ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::{Color32, Stroke, TextureHandle, pos2, vec2};
@@ -388,8 +388,8 @@ pub fn draw(s: &PuppetSession, painter: &egui::Painter, xf: &ViewXform) {
             painter.circle_filled(c, 2.0, Color32::BLACK);
             if let Some(r) = p.rotate {
                 let a = (r as f32).to_radians();
-                painter.circle_stroke(c, 18.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
-                painter.line_segment([c, c + vec2(a.cos(), a.sin()) * 18.0], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+                painter.circle_stroke(c, 18.0, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+                painter.line_segment([c, c + vec2(a.cos(), a.sin()) * 18.0], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
             }
         }
     }

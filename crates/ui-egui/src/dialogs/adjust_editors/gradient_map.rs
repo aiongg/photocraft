@@ -1,11 +1,11 @@
 use super::{Edit, EditorCx, GradientPreset, Group, PhotocraftApp, Value, adjust_params, flag, json, label, rgb_of, round, vec2};
 use crate::gradient_ui::stops_bar::{self, BarOptions, StopsEvent};
-use craft_theme::Srgba;
-use craft_ui::composites::gradient::{ColorStop, GradientRamp, GradientStops, StopRows};
-use craft_ui::controls::Select;
-use craft_ui::edit::EditEvent;
-use craft_ui::menu::{MenuEntry, MenuItem};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::theme::Srgba;
+use craft::draw::ui::gradient::{ColorStop, GradientRamp, GradientStops, StopRows};
+use craft::ui::controls::Select;
+use craft::ui::edit::EditEvent;
+use craft::ui::menu::{MenuEntry, MenuItem};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 
 // ---------------------------------------------------------------------------------------------
 // Gradient Map
@@ -151,7 +151,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
         }
         _ => {}
     }
-    if stops.len() < 64 && ui.add(craft_ui::controls::Button::new(tl!("Add Stop")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked() {
+    if stops.len() < 64 && ui.add(craft::ui::controls::Button::new(tl!("Add Stop")).variant(craft::ui::controls::ButtonVariant::Secondary)).clicked() {
         // Halfway along the widest gap, in the gradient's colour there.
         let mut sorted = stops.clone();
         sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -167,7 +167,7 @@ pub(super) fn gradient_map(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> E
     ui.horizontal(|ui| {
         for (key, text) in [("reverse", tl!("Reverse")), ("dither", tl!("Dither"))] {
             let mut b = flag(v, key, false);
-            if craft_ui::controls::Checkbox::bool(text, &mut b).show(ui).response.changed() {
+            if craft::ui::controls::Checkbox::bool(text, &mut b).show(ui).response.changed() {
                 v[key] = json!(b);
                 e.add(Edit::discrete(true));
             }

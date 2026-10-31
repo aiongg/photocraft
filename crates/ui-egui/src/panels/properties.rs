@@ -1,5 +1,5 @@
 use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Tokens, icons, json, pos2, theme, vec2, widgets};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- properties
 
@@ -23,7 +23,7 @@ pub fn properties_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let pos = pos2(canvas.right() - width - 12.0, canvas.top() + 44.0);
     let frame = egui::Frame::NONE
         .fill(t.card)
-        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ctx, t.card_border))
+        .stroke(craft::ui::theme::scale::Stroke::W1.egui(ctx, t.card_border))
         .corner_radius(CornerRadius::same(t.radius_lg as u8))
         .shadow(egui::Shadow { offset: [0, 12], blur: 36, spread: 0, color: t.shadow })
         .inner_margin(egui::Margin::same(14));
@@ -66,9 +66,9 @@ pub fn properties_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 Some(crate::tab_strip::TabContextAction::CloseGroup) => app.ui.panels.properties = false,
                 None => {}
             }
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             widgets::hairline(ui);
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             match indices.get(sel) {
                 Some(0) | None => properties_body(app, ui),
                 Some(_) => adjustments_grid(app, ui),
@@ -92,15 +92,15 @@ fn adjustment_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, 
     {
         let _ = app.run("layer.setProps", json!({"layer": id.0, "clipped": clip}));
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     crate::adjust_editors::layer_editor(app, ui, id, adj);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if let Some(mut vis) = app.session.active().and_then(|s| s.doc.layer(id).map(|l| l.visible))
         && widgets::toggle(ui, &mut vis, tl!("Adjustment visible")).changed()
     {
         let _ = app.run("layer.setProps", json!({"layer": id.0, "visible": vis}));
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if widgets::secondary_button(ui, tl!("Reset to defaults"), ui.available_width()).clicked() {
         let doc = app.session.active().map_or(0, |s| s.doc.id.0);
         // Photoshop's two-step Reset where measured (Color Balance), else the defaults.
@@ -121,7 +121,7 @@ fn layer_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
                 ui.end_row();
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+        ui.add_space(craft::ui::theme::scale::Space::S6.px());
     }
     let mut o = layer.opacity * 100.0;
     let r = widgets::slider_row(ui, tl!("Opacity"), &mut o, 0.0..=100.0, "%", None);
@@ -144,7 +144,7 @@ pub(super) fn properties_body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 fn properties_body_inner(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        craft_ui::composites::EmptyState::new(tl!("No properties")).show(ui);
+        craft::ui::composites::EmptyState::new(tl!("No properties")).show(ui);
         return;
     };
     let doc = st.doc.clone();
@@ -179,9 +179,9 @@ fn properties_body_inner(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     crate::props_layout::header(ui, layer);
     let is_adjustment = matches!(layer.content, LayerContent::Adjustment(_));
     if is_adjustment || layer.artboard().is_some() || !t.pro {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+        ui.add_space(craft::ui::theme::scale::Space::S6.px());
     }
     if let LayerContent::Adjustment(adj) = &layer.content {
         adjustment_controls(app, ui, id, adj);
@@ -193,7 +193,7 @@ fn properties_body_inner(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     } else {
         if matches!(layer.content, LayerContent::Fill(photocraft_doc::Fill::Gradient { .. })) {
             crate::gradient_ui::properties(app, ui, layer);
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
         }
         layer_controls(app, ui, layer);
         if matches!(layer.content, LayerContent::Text(_)) {
@@ -210,7 +210,7 @@ fn properties_body_inner(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 pub(super) fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(tl!("Add an adjustment")).color(t.text_dim));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let items: [(&str, &str, &str); 16] = [
         ("brightnessContrast", "sun", tl!("Brightness/Contrast")),
         ("levels", "gauge", tl!("Levels")),

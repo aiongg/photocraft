@@ -68,7 +68,7 @@ pub fn body_done(fields: &mut Map<String, Value>) {
 
 /// The Load… and Save… buttons at the footer's trailing edge: the button pressed, if any.
 pub fn buttons(ui: &mut egui::Ui) -> Option<Action> {
-    use craft_ui::controls::{Button, ButtonVariant};
+    use craft::ui::controls::{Button, ButtonVariant};
     let mut action = None;
     if ui.add(Button::new(tl!("Load…")).variant(ButtonVariant::Secondary)).clicked() {
         action = Some(Action::Load);

@@ -6,7 +6,7 @@
 //! modifiers. Selection outlines and drag previews are drawn as black-and-white dashes (marching
 //! ants) so they read on light and dark pixels alike.
 
-use craft_ui::canvas::SelectionBadge;
+use craft::ui::canvas::SelectionBadge;
 use egui::{Color32, Pos2, Shape, Stroke, pos2, vec2};
 
 use crate::PhotocraftApp;
@@ -164,9 +164,9 @@ fn move_glyph(c: Pos2, h: f32) -> Vec<[Pos2; 2]> {
 pub fn draw_badge(painter: &egui::Painter, p: Pos2, b: Badge, centred: bool) {
     if let Some(badge) = b.selection() {
         if centred {
-            craft_ui::canvas::selection_badge_at(painter.ctx(), p, badge);
+            craft::ui::canvas::selection_badge_at(painter.ctx(), p, badge);
         } else {
-            craft_ui::canvas::selection_badge_beside_pointer(painter.ctx(), p, badge);
+            craft::ui::canvas::selection_badge_beside_pointer(painter.ctx(), p, badge);
         }
         return;
     }

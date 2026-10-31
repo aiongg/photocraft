@@ -7,7 +7,7 @@
 //! once answered. Cancel drops the save. Scripts skip the prompt by passing `ddsCompression` or
 //! `ddsMipmaps`.
 
-use craft_ui::dialog::Outcome;
+use craft::ui::dialog::Outcome;
 use photocraft_io::{DdsCompression, DdsOptions};
 
 use crate::{ExportSettings, PhotocraftApp};
@@ -69,17 +69,17 @@ fn label(c: DdsCompression) -> &'static str {
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.dds_options else { return };
     let mut options = p.options;
-    let answer = crate::dialogs::show_prompt(ctx, "dds-options", tl!("DDS Options"), craft_ui::dialog::Width::Compact, &mut options, |ui, options| {
-        craft_ui::composites::SectionLabel::new(tl!("Compression")).show(ui);
+    let answer = crate::dialogs::show_prompt(ctx, "dds-options", tl!("DDS Options"), craft::ui::dialog::Width::Compact, &mut options, |ui, options| {
+        craft::ui::composites::SectionLabel::new(tl!("Compression")).show(ui);
         ui.indent("dds-options-compression", |ui| {
-            let mut group = craft_ui::controls::RadioGroup::new("dds-options-compression", tl!("Compression"), &mut options.compression);
+            let mut group = craft::ui::controls::RadioGroup::new("dds-options-compression", tl!("Compression"), &mut options.compression);
             for c in DdsCompression::ALL {
                 group = group.item(c, label(c));
             }
             _ = group.show(ui);
         });
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
-        _ = craft_ui::controls::Checkbox::bool(tl!("Generate Mipmaps"), &mut options.mipmaps).show(ui);
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
+        _ = craft::ui::controls::Checkbox::bool(tl!("Generate Mipmaps"), &mut options.mipmaps).show(ui);
     });
     p.options = options;
     let outcome = answer.outcome;

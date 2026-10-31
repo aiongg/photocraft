@@ -39,7 +39,7 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
 
 pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
     ui.label(fields.get("message").and_then(Value::as_str).unwrap_or(tl!("Delete layer?")));
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     let mut skip = fields.get("skip").and_then(Value::as_bool).unwrap_or(false);
     ui.checkbox(&mut skip, tl!("Don't show again"));
     fields.insert("skip".into(), json!(skip));

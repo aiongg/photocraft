@@ -1,11 +1,11 @@
 use super::dialogs::open_preferences;
 use super::fields::color_of;
 use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
-use craft_theme::{
+use craft::theme::{
     AppChoice, AppDefaults, AppId, Appearance, Mode, ModeChoice, MotionChoice, Selection, Size, SystemAppearance, ThemeDef, ThemeId, ThemePair, Variants,
 };
-use craft_theme_store::{Accepted, StoreOptions, SuiteClient, SuiteDir, SuiteWatch};
-use craft_ui::theme::StrokeExt;
+use craft::theme_store::{Accepted, StoreOptions, SuiteClient, SuiteDir, SuiteWatch};
+use craft::ui::theme::StrokeExt;
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
@@ -63,7 +63,7 @@ pub(crate) fn app_choice(i: &prefs::Interface, suite: &Selection) -> AppChoice {
 
 /// The selection shown: the suite's choice with PhotoCraft's own on top, reduced motion where
 /// Enable Animations is off.
-pub(crate) fn app_selection(i: &prefs::Interface, suite: &craft_theme::SuiteChoice) -> Selection {
+pub(crate) fn app_selection(i: &prefs::Interface, suite: &craft::theme::SuiteChoice) -> Selection {
     let suite = suite.with_defaults(&app_defaults());
     let mut sel = app_choice(i, &suite).apply(&suite);
     if !i.enable_animations {
@@ -119,7 +119,7 @@ pub(crate) struct ThemeChoice {
 
 /// The built-in themes, then the library's.
 pub(crate) fn theme_choices(app: &PhotocraftApp) -> Vec<ThemeChoice> {
-    let mut defs: Vec<ThemeDef> = craft_theme::builtins().to_vec();
+    let mut defs: Vec<ThemeDef> = craft::theme::builtins().to_vec();
     if let Some(client) = app.prefs_rt.suite.client() {
         let extra: Vec<ThemeDef> = client.snapshot().index.iter().map(|e| e.theme.clone()).filter(|t| !defs.iter().any(|d| d.id == t.id)).collect();
         defs.extend(extra);
@@ -227,7 +227,7 @@ pub(super) fn system_theme(app: &PhotocraftApp, ctx: &egui::Context) -> Option<e
 }
 
 pub(super) fn sync_display_scale(app: &PhotocraftApp, ctx: &egui::Context) {
-    craft_ui::interface_scale::InterfaceScale::from_code(app.session.prefs().interface.ui_scale.name()).unwrap_or_default().apply(ctx);
+    craft::ui::interface_scale::InterfaceScale::from_code(app.session.prefs().interface.ui_scale.name()).unwrap_or_default().apply(ctx);
 }
 
 /// Interface › Show Tooltips and Tools › Show Tooltips (either one off hides them): egui never
@@ -287,7 +287,7 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     let Some(client) = rt.client.as_ref() else { return };
     let app_id = AppId::parse("photocraft").ok();
-    let mut base = craft_ui::theme::Base::resolve(&sel, system, &defaults, app_id.as_ref(), &mut |id| client.theme(id));
+    let mut base = craft::ui::theme::Base::resolve(&sel, system, &defaults, app_id.as_ref(), &mut |id| client.theme(id));
     let mode = match sel.mode {
         ModeChoice::Light => Mode::Light,
         ModeChoice::Dark => Mode::Dark,
@@ -329,23 +329,23 @@ fn theme_swatch(ui: &mut egui::Ui, choice: &ThemeChoice, mode: Mode, selected: &
     let id = choice.id.as_str();
     let label = tl!(&choice.name).to_string();
     let appearance = Appearance { mode, contrast: Default::default(), size: Size::Compact, text_size: Default::default(), reduced_motion: false };
-    let c = craft_theme::resolve(&choice.def, appearance, None).tokens.color;
-    let col = |v: craft_theme::Rgba| craft_ui::theme::ToEgui::to_egui(v);
+    let c = craft::theme::resolve(&choice.def, appearance, None).tokens.color;
+    let col = |v: craft::theme::Rgba| craft::ui::theme::ToEgui::to_egui(v);
     let on = selected.as_str() == id;
     let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 26.0), Sense::click());
     let painter = ui.painter();
     let inner = rect.shrink(3.0);
-    painter.rect_filled(inner, craft_ui::theme::scale::Radius::R2.px(), col(c.surface.background));
-    painter.rect_filled(egui::Rect::from_min_size(inner.min, vec2(inner.width(), 5.0)), craft_ui::theme::scale::Radius::R0.px(), col(c.surface.chrome));
+    painter.rect_filled(inner, craft::ui::theme::scale::Radius::R2.px(), col(c.surface.background));
+    painter.rect_filled(egui::Rect::from_min_size(inner.min, vec2(inner.width(), 5.0)), craft::ui::theme::scale::Radius::R0.px(), col(c.surface.chrome));
     painter.circle_filled(inner.right_bottom() - vec2(6.0, 6.0), 2.5, col(c.accent.solid));
     let stroke = if on {
-        craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
+        craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
     } else if resp.hovered() {
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim)
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim)
     } else {
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border)
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border)
     };
-    painter.rect_stroke(rect.shrink(1.0), craft_ui::theme::scale::Radius::R3.px(), stroke, egui::StrokeKind::Inside);
+    painter.rect_stroke(rect.shrink(1.0), craft::ui::theme::scale::Radius::R3.px(), stroke, egui::StrokeKind::Inside);
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, true, on, &label));
     if resp.on_hover_text(&label).clicked() {
         *selected = id.to_string();
@@ -356,7 +356,7 @@ fn theme_swatch(ui: &mut egui::Ui, choice: &ThemeChoice, mode: Mode, selected: &
     if !(favorite || ui.rect_contains_pointer(rect.union(badge))) {
         return;
     }
-    ui.painter().circle(center, BADGE, t.card, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border));
+    ui.painter().circle(center, BADGE, t.card, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border));
     let (icon, tint) = if favorite { ("star-filled", t.accent) } else { ("star", t.text_dim) };
     let action = if favorite { tl!("Remove from favorites") } else { tl!("Add to favorites") };
     // Interact and paint without allocating: a widget placed at `badge` would grow the row by the
@@ -394,8 +394,8 @@ pub(super) fn theme_slot(ui: &mut egui::Ui, obj: &mut Map<String, Value>, choice
             theme_swatch(ui, choice, if dark { Mode::Dark } else { Mode::Light }, &mut selected, &mut favorites);
         }
         if active {
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
-            ui.label(RichText::new(tl!("Active")).color(craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.accent.text)).small());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
+            ui.label(RichText::new(tl!("Active")).color(craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).color.accent.text)).small());
         }
     });
     obj.insert(key.into(), json!(selected));

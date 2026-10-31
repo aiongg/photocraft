@@ -141,10 +141,10 @@ fn menu_update(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &Value) -> Opti
         update.apply(d, &mut app.ui.camera_raw_scope);
     }
     if ui.get("undo").and_then(Value::as_bool) == Some(true) {
-        step_edit(d, craft_ui::dialog::Step::Undo);
+        step_edit(d, craft::ui::dialog::Step::Undo);
     }
     if ui.get("redo").and_then(Value::as_bool) == Some(true) {
-        step_edit(d, craft_ui::dialog::Step::Redo);
+        step_edit(d, craft::ui::dialog::Step::Redo);
     }
     if d.dirty {
         d.render(ctx);

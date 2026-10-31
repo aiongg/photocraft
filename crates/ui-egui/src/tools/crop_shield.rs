@@ -9,7 +9,7 @@
 //! `ui.set {cropShield: {...}}` patches. [`fill`] resolves it to the colour the canvas paints over
 //! the area outside the box.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::{Color32, Key, Modifiers};
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,7 @@ pub const DEFAULT_OPACITY: f32 = 75.0;
 /// Auto Adjust Opacity: the share of the opacity the shield keeps while the box is dragged.
 pub const EDITING_FACTOR: f32 = 0.5;
 
-pub use craft_ui::canvas::ShieldColor;
+pub use craft::draw::ui::ShieldColor;
 
 /// The gear menu's options. Every field defaults on its own, so older settings load.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -100,7 +100,7 @@ pub fn fill(s: &CropShield, canvas: Color32, editing: bool) -> Option<Color32> {
 /// Mode (the backdrop there) and the theme's canvas otherwise.
 pub fn canvas_color(app: &PhotocraftApp, ctx: &egui::Context) -> Color32 {
     crate::prefs_ui::pasteboard_color(app)
-        .unwrap_or_else(|| if app.ui.view.hides_chrome() { Color32::BLACK } else { craft_ui::theme::current(ctx).color.surface.canvas.to_egui() })
+        .unwrap_or_else(|| if app.ui.view.hides_chrome() { Color32::BLACK } else { craft::ui::theme::current(ctx).color.surface.canvas.to_egui() })
 }
 
 /// The shield over the pending crop box now ([`fill`]).
@@ -305,7 +305,7 @@ mod tests {
     fn match_canvas_is_the_black_full_screen_pasteboard() {
         let mut app = crop_app();
         let ctx = egui::Context::default();
-        let theme_canvas = craft_ui::theme::current(&ctx).color.surface.canvas.to_egui();
+        let theme_canvas = craft::ui::theme::current(&ctx).color.surface.canvas.to_egui();
         assert_ne!(theme_canvas, Color32::BLACK);
         app.ui.tool_options.crop_shield.show_cropped_area = false;
         assert!(hides_outside(&app));

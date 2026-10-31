@@ -7,8 +7,8 @@
 
 use crate::PhotocraftApp;
 use crate::panels::select_cell;
-use craft_ui::controls::{Checkbox, ControlSize};
-use craft_ui::patterns::OptionsBar;
+use craft::ui::controls::{Checkbox, ControlSize};
+use craft::ui::patterns::OptionsBar;
 
 /// The Sample Size menu: each size with its label, in Photoshop's order.
 pub fn size_options() -> [(u32, &'static str); 7] {

@@ -10,13 +10,13 @@
 //! `PHOTOCRAFT_CAPTION_ICONS` (an icon theme, or `none` for PhotoCraft's own glyphs) override what
 //! is found.
 
-use craft_platform::appearance::EguiService;
+use craft::platform::appearance::EguiService;
 #[cfg(target_os = "linux")]
-use craft_ui::title_bar::{CaptionIconCache, caption_icon_theme};
+use craft::ui::title_bar::{CaptionIconCache, caption_icon_theme};
 #[cfg(target_os = "linux")]
-use craft_window::Layout;
+use craft::window::Layout;
 #[cfg(target_os = "linux")]
-use craft_window::policy::{CaptionFamily, DesktopKind, Frame, LayoutWatch};
+use craft::window::policy::{CaptionFamily, DesktopKind, Frame, LayoutWatch};
 #[cfg(target_os = "linux")]
 use photocraft_ui_egui::{CaptionStyle, Captions};
 
@@ -41,7 +41,7 @@ fn icon_theme_name(portal: Option<&str>, desktop: Option<&str>, var: &dyn Fn(&st
 /// The caption style of `decision`'s app-drawn frame, following the layout and the icon theme as
 /// the desktop watcher (`appearance`) hears them; it wakes the UI when they change. `None` for any
 /// other frame, and off Linux.
-pub fn service(decision: &craft_window::policy::Decision, appearance: Option<EguiService>) -> Option<photocraft_ui_egui::CaptionStyleFn> {
+pub fn service(decision: &craft::window::policy::Decision, appearance: Option<EguiService>) -> Option<photocraft_ui_egui::CaptionStyleFn> {
     #[cfg(target_os = "linux")]
     {
         use std::sync::{Mutex, PoisonError};
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn the_overrides_replace_the_family_and_fix_the_layout() {
-        use craft_window::Button::{Close, Maximize, Minimize};
+        use craft::window::Button::{Close, Maximize, Minimize};
         assert_eq!(overrides(CaptionFamily::Adwaita, &env(&[])), (CaptionFamily::Adwaita, None));
         let forced = env(&[("PHOTOCRAFT_CAPTION_STYLE", "Breeze"), ("PHOTOCRAFT_CAPTION_LAYOUT", "minimize,close:maximize")]);
         let (family, layout) = overrides(CaptionFamily::Adwaita, &forced);

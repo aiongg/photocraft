@@ -14,7 +14,7 @@
 //!
 //! Each click is one command and one history step; a click on nothing it can edit does nothing.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, Modifiers, Pos2, Stroke};
 use photocraft_doc::vector::Path;
 use photocraft_geom::Point;
@@ -183,8 +183,8 @@ fn draw_hit(painter: &egui::Painter, to_scr: &dyn Fn([f64; 2]) -> Pos2, accent: 
             let c = to_scr([kn.anchor.x, kn.anchor.y]);
             painter.rect_stroke(
                 egui::Rect::from_center_size(c, egui::vec2(11.0, 11.0)),
-                craft_ui::theme::scale::Radius::R0.px(),
-                craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent),
+                craft::ui::theme::scale::Radius::R0.px(),
+                craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), accent),
                 egui::StrokeKind::Inside,
             );
             crate::vector_ui::draw_anchor(painter, c, true, accent);

@@ -221,8 +221,8 @@ pub fn show_offer(app: &mut PhotocraftApp, ctx: &egui::Context) {
         &[("set", &offer.set), ("n", &n)],
     );
     let message = format!("{line}\n\n{}", tl!("Edit › Keyboard Shortcuts › Reset All to Defaults undoes an import."));
-    use craft_ui::dialog::ButtonRole;
-    let answer = craft_ui::dialog::Prompt::new("kys-offer", tl!("Import keyboard shortcuts?"), message)
+    use craft::ui::dialog::ButtonRole;
+    let answer = craft::ui::dialog::Prompt::new("kys-offer", tl!("Import keyboard shortcuts?"), message)
         .answer(ButtonRole::Default, tl!("Import"), None)
         .answer(ButtonRole::Alternate, tl!("Don't Import"), None)
         .show(ctx)

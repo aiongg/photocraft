@@ -1,17 +1,17 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Value, WebSettings, b, check_row, json, n, number_row, params, s, select_row, web_cmds, web_preview};
-use craft_theme::TypeRole;
-use craft_ui::composites::{Form, FormGrid, SectionLabel};
-use craft_ui::controls::{Checkbox, IconButton, Segmented, Select};
-use craft_ui::icons::Icon;
-use craft_ui::primitives::{Content, Text};
+use craft::theme::TypeRole;
+use craft::ui::composites::{Form, FormGrid, SectionLabel};
+use craft::ui::controls::{Checkbox, IconButton, Segmented, Select};
+use craft::ui::icons::Icon;
+use craft::ui::primitives::{Content, Text};
 
 /// Width of the settings column beside the previews.
 const SETTINGS_WIDTH: f32 = 290.0;
 
 /// The gap and scroll bar between the previews and the settings, kept out of the previews' width.
 const SETTINGS_SLACK: f32 = 20.0;
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 
 const WEB_FORMATS: [(&str, &str); 6] = [("gif", "GIF"), ("png8", "PNG-8"), ("png24", "PNG-24"), ("jpeg", "JPEG"), ("webp", "WebP"), ("wbmp", "WBMP")];
 
@@ -100,7 +100,7 @@ pub(super) type WebCache = (String, Arc<egui::TextureHandle>, Option<(usize, Opt
 
 /// Renders one preview pane: the original (`None`) or an optimised variant.
 fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<&Value>, f: &mut Map<String, Value>, pane: usize, frame: Option<usize>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let Some(st) = app.session.active() else { return };
     let doc = st.doc.clone();
     let rev = st.revision;
@@ -174,8 +174,8 @@ fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<
         web_preview::paint(ui, r, &response, &tex, source_size, f);
         ui.painter().rect_stroke(
             r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
             egui::StrokeKind::Inside,
         );
         let (l1, l2) = match (p, info) {
@@ -272,7 +272,7 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
         app.ui.web_view = Some(view.clone());
     }
     f.insert("__view".into(), json!(view));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let frame = web_playback(ui, f, &doc);
     web_preview::controls(ui, f);
     if let Err(error) = web_preview::prepare_table(app, f) {
@@ -311,7 +311,7 @@ pub(super) fn web_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<S
                 }
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         // Settings scroll independently on smaller windows.
         ui.vertical(|ui| {
             ui.set_width(SETTINGS_WIDTH);
@@ -417,12 +417,12 @@ fn web_settings(ui: &mut egui::Ui, f: &mut Map<String, Value>, doc: &photocraft_
     if matches!(s(f, "format", "jpeg").as_str(), "gif" | "png8") {
         web_preview::table(ui, f);
     }
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     SectionLabel::new(tl!("Image Size")).show(ui);
     web_size(ui, f, doc);
     let nslices = photocraft_doc::slices::resolve(doc).len();
     if !doc.slices.is_empty() {
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+        ui.add_space(craft::ui::theme::scale::Space::S6.px());
         ui.add(Text::new(crate::i18n::trn(crate::i18n::current(), nslices as u64, "{n} slice", "{n} slices")).content(Content::Muted));
         FormGrid::new("web-slices-form").show(ui, |form| {
             check_row(form, f, "html", tl!("Save HTML and Images"), true);

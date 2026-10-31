@@ -5,11 +5,11 @@
 //! While it is the top dialog the image is its eyedropper, as in Photoshop: the pointer over the
 //! canvas is a pipette, and a click or drag there samples into the new colour ([`sample_at`]).
 
-use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
-use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
-use craft_ui::controls::{Button, ButtonVariant};
-use craft_ui::localized::LocaleNumbers;
-use craft_ui::theme::scale::Space;
+use craft::theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
+use craft::color::ui::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
+use craft::ui::controls::{Button, ButtonVariant};
+use craft::ui::localized::LocaleNumbers;
+use craft::ui::theme::scale::Space;
 use egui::{Rect, UiBuilder, pos2};
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
@@ -538,7 +538,7 @@ mod tests;
 mod screen_integration_tests {
     use super::*;
     use crate::screen_picker::{Capture, Pending};
-    use craft_ui::theme::scale::Space;
+    use craft::ui::theme::scale::Space;
     use egui::{Rect, UiBuilder, pos2, vec2};
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]

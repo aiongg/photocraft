@@ -3,7 +3,7 @@
 //! document, its layers merged, or only the current layer). The command stays directly callable
 //! with the same params by agents and Actions.
 
-use craft_ui::composites::FormGrid;
+use craft::ui::composites::FormGrid;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -32,7 +32,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use craft_ui::controls::Select;
+    use craft::ui::controls::Select;
     FormGrid::new("new-snapshot").show(ui, |form| {
         form.row(tl!("Name:"), |ui, _| {
             let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();

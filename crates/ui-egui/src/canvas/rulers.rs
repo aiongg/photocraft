@@ -7,11 +7,11 @@
 
 use std::cell::RefCell;
 
-use craft_ui::canvas::kurbo::{Point, Rect as DocRect};
-use craft_ui::canvas::{CanvasGrid, Guide, GuideLine, GuideNames, Guides, Orientation, RulerNames, RulerUnits, Rulers, Ticks};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::{Labels as _, LocaleNumbers};
-use craft_ui::menu::{ContextMenu, OpenAt};
+use craft::ui::canvas::kurbo::{Point, Rect as DocRect};
+use craft::ui::canvas::{CanvasGrid, Guide, GuideLine, GuideNames, Guides, Orientation, RulerNames, RulerUnits, Rulers, Ticks};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::{Labels as _, LocaleNumbers};
+use craft::ui::menu::{ContextMenu, OpenAt};
 use egui::{Color32, Pos2, Rect, vec2};
 use photocraft_doc::Document;
 use photocraft_engine::prefs::{GuidesGridAndSlices, Unit};
@@ -65,8 +65,8 @@ fn unit_menu_items(current: Unit, units: &[Unit]) -> Vec<(String, &'static str, 
 
 /// The rows of a number field's unit menu: every unit, with `current` marked. A pick is an index
 /// into the units; [`unit_name_at`] names it.
-pub(crate) fn unit_entries(current: Unit) -> Vec<craft_ui::menu::MenuEntry<usize>> {
-    UNITS.iter().enumerate().map(|(i, &u)| craft_ui::menu::MenuItem::new(tl!(unit_label(u)), i).radio(u == current).into()).collect()
+pub(crate) fn unit_entries(current: Unit) -> Vec<craft::ui::menu::MenuEntry<usize>> {
+    UNITS.iter().enumerate().map(|(i, &u)| craft::ui::menu::MenuItem::new(tl!(unit_label(u)), i).radio(u == current).into()).collect()
 }
 
 /// The name of the unit at `index` of [`unit_entries`].
@@ -150,12 +150,12 @@ pub fn draw_grid(app: &PhotocraftApp, ui: &egui::Ui, xf: &ViewXform, doc: &Docum
     let (w, h) = (f64::from(doc.size.width), f64::from(doc.size.height));
     let major = grid_major_px(g, f64::from(doc.resolution_dpi.max(1.0)), [w, h], ppi);
     let line = match line_style(g.grid_style) {
-        GuideLine::Solid => craft_ui::canvas::GridLine::Solid,
-        GuideLine::Dashed => craft_ui::canvas::GridLine::Dashed,
-        GuideLine::Dots => craft_ui::canvas::GridLine::Dots,
+        GuideLine::Solid => craft::ui::canvas::GridLine::Solid,
+        GuideLine::Dashed => craft::ui::canvas::GridLine::Dashed,
+        GuideLine::Dots => craft::ui::canvas::GridLine::Dots,
     };
     CanvasGrid::new("pc-grid")
-        .spacing(craft_ui::canvas::kurbo::Vec2::new(major[0], major[1]))
+        .spacing(craft::ui::canvas::kurbo::Vec2::new(major[0], major[1]))
         .subdivisions(g.subdivisions)
         .bounds(DocRect::new(0.0, 0.0, w, h))
         .color(Some(pref_color(&g.grid_color, Color32::from_gray(140))))
@@ -184,7 +184,7 @@ pub(crate) fn ruler_units(app: &PhotocraftApp, ui: &egui::Ui, doc: &Document) ->
         per_doc: 1.0 / unit.to_px(1.0, dpi, extent, ppi).max(1e-9),
         ticks: Ticks::Decimal { whole: unit == Unit::Pixels },
         numbers: numbers.clone(),
-        unit: craft_ui::localized::Unit::new(&format!("{{n}} {}", unit.suffix())),
+        unit: craft::ui::localized::Unit::new(&format!("{{n}} {}", unit.suffix())),
         decimals: unit.decimals(),
     })
 }

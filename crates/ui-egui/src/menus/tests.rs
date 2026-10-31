@@ -221,13 +221,13 @@ fn menu_model_and_bar_rows_keep_the_items() {
     app.session.execute("prefs.set", json!({"values": {"menus.colors.file.close": "red"}})).unwrap();
     let items = menu_items(&app);
     let model = menu_model(&items);
-    let in_model: Vec<&craft_menu::Item> = model.items();
+    let in_model: Vec<&craft::menu::Item> = model.items();
     for it in items.iter().filter(|i| i.label != "---" && i.path.first().is_some_and(|top| TOP_MENUS.contains(&top.as_str()))) {
         let found = in_model.iter().find(|m| m.command.id == it.id).unwrap_or_else(|| panic!("{} is in the model", it.id));
         assert_eq!((found.label.as_str(), found.enabled, found.kind.checked()), (it.label.as_str(), it.enabled, it.checked), "{}", it.id);
         if let Some(sc) = &it.shortcut {
             let chord = found.shortcut.unwrap_or_else(|| panic!("{}: `{sc}` is not a craft-keymap chord", it.id));
-            assert_eq!(chord.portable(), sc.parse::<craft_keymap::Chord>().unwrap().portable());
+            assert_eq!(chord.portable(), sc.parse::<craft::keymap::Chord>().unwrap().portable());
         }
     }
     assert_eq!(model.menus.iter().map(|m| m.title.as_str()).collect::<Vec<_>>(), TOP_MENUS);
@@ -237,8 +237,8 @@ fn menu_model_and_bar_rows_keep_the_items() {
     let fr = crate::i18n::Lang::from_code("fr").unwrap();
     let (shown, english) = model::translated(&model, fr);
     assert_eq!(shown.menus.len(), TOP_MENUS.len());
-    let distort = craft_keymap::CommandRef::new("edit.transform.distort");
-    assert_eq!(english.of(craft_menu::Labeled::Command(&distort)).as_deref(), Some("Distort"), "the English name stays known");
+    let distort = craft::keymap::CommandRef::new("edit.transform.distort");
+    assert_eq!(english.of(craft::menu::Labeled::Command(&distort)).as_deref(), Some("Distort"), "the English name stays known");
     assert_eq!(shown.find(&"image.mode.bits32".into()).and_then(|i| i.tooltip.clone()), Some(crate::i18n::tr(fr, "Floating point").to_string()));
 }
 

@@ -6,8 +6,8 @@
 //! drive it like any dialog. OK remembers the choices in the preferences (`dialogs["edit.fill"]`),
 //! which are saved to disk, so the dialog opens with them again after a restart.
 
-use craft_ui::composites::{FieldControl, FormGrid};
-use craft_ui::controls::{Checkbox, Select};
+use craft::ui::composites::{FieldControl, FormGrid};
+use craft::ui::controls::{Checkbox, Select};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;

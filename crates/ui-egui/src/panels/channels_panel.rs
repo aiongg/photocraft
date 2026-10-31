@@ -8,13 +8,13 @@
 use std::cell::Cell;
 use std::ops::Range;
 
-use craft_ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
-use craft_ui::composites::PanelFooter;
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::list::{DropMark, ListRow, RowEvent, ThumbSize, ToggleColumn, paint_drop_mark};
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
+use craft::ui::composites::PanelFooter;
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::list::{DropMark, ListRow, RowEvent, ThumbSize, ToggleColumn, paint_drop_mark};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use egui::{Align2, Color32, Rect, pos2, vec2};
 use photocraft_doc::ColorIndicates;
 use photocraft_engine::channel_cmds::{self, ChannelTarget};
@@ -215,7 +215,7 @@ fn paint_spot_swatch(painter: &egui::Painter, thumb: Rect, spot: Option<(photocr
     let c = ink.to_rgb().map(|v| (v.clamp(0.0, 1.0) * 255.0) as u8);
     painter.rect_filled(
         Rect::from_min_size(thumb.right_bottom() - vec2(9.0, 9.0), vec2(9.0, 9.0)),
-        craft_ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Radius::R0.px(),
         Color32::from_rgb(c[0], c[1], c[2]),
     );
 }

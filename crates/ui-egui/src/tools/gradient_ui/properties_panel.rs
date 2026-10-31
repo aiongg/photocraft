@@ -2,12 +2,12 @@
 
 use super::{Fill, GradientStyle, Layer, LayerId, PhotocraftApp, Sink, cmds, fill_of, json, stops_editor_for, vec2};
 use crate::props_layout;
-use craft_ui::composites::PropertyRow;
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::primitives::{Content, Text};
+use craft::ui::composites::PropertyRow;
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::primitives::{Content, Text};
 
 const STYLES: [(GradientStyle, &str); 5] = [
     (GradientStyle::Linear, "Linear Gradient"),
@@ -44,7 +44,7 @@ fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     let Some(Fill::Gradient { angle, scale, style, reverse, dither, align, .. }) = fill_of(layer).cloned() else { return };
     if props_layout::section(ui, "gradient-fill-options", "Gradient Options") {
         ui.horizontal(|ui| {
-            let theme = craft_ui::theme::current(ui.ctx());
+            let theme = craft::ui::theme::current(ui.ctx());
             ui.add_sized(
                 vec2(theme.component.property.word_width, theme.component.field.height.get(ControlSize::Md)),
                 Text::new(tl!("Style")).content(Content::Muted),

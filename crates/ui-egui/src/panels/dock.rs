@@ -32,8 +32,8 @@ pub(crate) fn canvas_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// Narrow icon rail, unless an embedding app hides it: shows, expands or collapses panel groups.
 fn rail(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     use crate::dock::Group;
-    use craft_ui::icons::Icon;
-    use craft_ui::patterns::{PanelRail, PanelRailItem, PanelRailRequest};
+    use craft::ui::icons::Icon;
+    use craft::ui::patterns::{PanelRail, PanelRailItem, PanelRailRequest};
     let t = Tokens::get(ui.ctx());
     let customized = app.ui.docking.is_some();
     let p = app.ui.panels.clone();

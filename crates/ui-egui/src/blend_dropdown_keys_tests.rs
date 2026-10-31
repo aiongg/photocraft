@@ -79,7 +79,7 @@ fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     assert_eq!(h.state().ui.tool, Tool::Move, "M doesn't also pick the Marquee tool");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
-    assert!(!craft_ui::popover::any_open(&h.ctx), "↩ closes the list");
+    assert!(!craft::ui::popover::any_open(&h.ctx), "↩ closes the list");
     assert_eq!(blend(&h), BlendMode::Multiply, "↩ keeps the mode");
     // With the list closed the letters are the tools' again.
     h.key_press(egui::Key::M);

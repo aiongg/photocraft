@@ -2,12 +2,12 @@
 //! (W/H/X/Y of the layer content, editable), Align and Distribute, the kind's sections and Quick Actions. Edits dispatch
 //! `edit.transform`, `layer.translate`, `layer.align.*` and selection commands.
 
-use craft_ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
-use craft_ui::controls::{Button, ButtonVariant, ControlSize, IconButton, NumberField};
-use craft_ui::edit::{EditEvent, EditResponse};
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::theme::ToEgui;
+use craft::ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
+use craft::ui::controls::{Button, ButtonVariant, ControlSize, IconButton, NumberField};
+use craft::ui::edit::{EditEvent, EditResponse};
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::theme::ToEgui;
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::{Value, json};
@@ -143,7 +143,7 @@ fn align_glyph(ui: &egui::Ui, r: Rect, kind: &str, color: egui::Color32) {
                 "rightEdges" => x - w,
                 _ => x - w / 2.0,
             };
-            p.rect_filled(Rect::from_min_size(pos2(x0, c.y + dy - 1.5), vec2(w, 3.0)), craft_ui::theme::scale::Radius::R0.px(), color);
+            p.rect_filled(Rect::from_min_size(pos2(x0, c.y + dy - 1.5), vec2(w, 3.0)), craft::ui::theme::scale::Radius::R0.px(), color);
         }
     } else {
         let y = match kind {
@@ -158,7 +158,7 @@ fn align_glyph(ui: &egui::Ui, r: Rect, kind: &str, color: egui::Color32) {
                 "bottomEdges" => y - h,
                 _ => y - h / 2.0,
             };
-            p.rect_filled(Rect::from_min_size(pos2(c.x + dx - 1.5, y0), vec2(3.0, h)), craft_ui::theme::scale::Radius::R0.px(), color);
+            p.rect_filled(Rect::from_min_size(pos2(c.x + dx - 1.5, y0), vec2(3.0, h)), craft::ui::theme::scale::Radius::R0.px(), color);
         }
     }
 }
@@ -264,7 +264,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
 /// The Align and Distribute section: its buttons run `layer.align.*` and `layer.distribute.*` on
 /// the selected layers (pushed onto `run`), greyed where the engine says they can't.
 fn align_and_distribute(app: &PhotocraftApp, ui: &mut egui::Ui, run: &mut Vec<(String, Value)>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     if !section(ui, "align", tl!("Align and Distribute")) {
         return;
     }
@@ -272,7 +272,7 @@ fn align_and_distribute(app: &PhotocraftApp, ui: &mut egui::Ui, run: &mut Vec<(S
         ui.spacing_mut().item_spacing.x = 2.0;
         for (i, kind) in ["leftEdges", "horizontalCenters", "rightEdges", "topEdges", "verticalCenters", "bottomEdges"].into_iter().enumerate() {
             if i == 3 {
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                ui.add_space(craft::ui::theme::scale::Space::S8.px());
             }
             let id = format!("layer.align.{kind}");
             let on = app.session.is_enabled(&id);

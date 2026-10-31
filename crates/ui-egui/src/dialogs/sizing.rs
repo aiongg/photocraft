@@ -3,9 +3,9 @@
 //! Field values are stored in pixels (plus a display unit), so automation can set `width`/`height`
 //! directly and the dialog maps them to `image.imageSize` / `image.canvasSize` unchanged.
 
-use craft_ui::composites::{FieldControl, FormGrid, SectionHeader, SectionLabel};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::composites::{FieldControl, FormGrid, SectionHeader, SectionLabel};
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use serde_json::{Map, Value, json};
 
@@ -177,7 +177,7 @@ fn dim_cell(
     label: &str,
     editable: bool,
     changed: &mut bool,
-) -> (craft_ui::composites::OwnName<egui::Response>, egui::Response) {
+) -> (craft::ui::composites::OwnName<egui::Response>, egui::Response) {
     let unit = f.get("__unit").and_then(Value::as_str).unwrap_or("px").to_string();
     let res = f.get("resolution").and_then(Value::as_f64).unwrap_or(num(f, "__origRes"));
     let orig = num(f, orig_key);
@@ -204,7 +204,7 @@ fn dim_cell(
 fn unit_select(ui: &mut egui::Ui, f: &mut Map<String, Value>, id: &str) -> egui::Response {
     let mut unit = f.get("__unit").and_then(Value::as_str).unwrap_or("px").to_string();
     let opts: Vec<(String, &str)> = UNITS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-    let edit = craft_ui::controls::Select::new(id, tl!("Units"), &mut unit).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
+    let edit = craft::ui::controls::Select::new(id, tl!("Units"), &mut unit).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
     if edit.response.changed() {
         f.insert("__unit".into(), json!(unit));
     }
@@ -212,8 +212,8 @@ fn unit_select(ui: &mut egui::Ui, f: &mut Map<String, Value>, id: &str) -> egui:
 }
 
 fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use craft_ui::controls::Checkbox;
-    let t = craft_ui::theme::current(ui.ctx());
+    use craft::ui::controls::Checkbox;
+    let t = craft::ui::theme::current(ui.ctx());
     let (ow, oh) = (num(f, "__origW"), num(f, "__origH"));
     let bpp = num(f, "__bytesPerPixel").max(1.0);
     let resample = f.get("resample").and_then(Value::as_str).unwrap_or("bicubic").to_string();
@@ -239,7 +239,7 @@ fn image_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             crate::i18n::fmt(tl!("{size} (was {old})"), &[("size", &human_bytes(w * h * bpp)), ("old", &human_bytes(ow * oh * bpp))]),
         );
         form.value(tl!("Dimensions:"), format!("{} px × {} px", w as i64, h as i64));
-        form.space(craft_ui::theme::scale::Space::S6.px());
+        form.space(craft::ui::theme::scale::Space::S6.px());
         form.linked(tl!("Constrain proportions"), &mut link_on, |form| {
             form.row(tl!("Width:"), |ui, _| dim_cell(ui, f, "width", "__origW", "is-w", "is-unit-w", tl!("Width"), editable, &mut w_changed));
             form.row(tl!("Height:"), |ui, _| dim_cell(ui, f, "height", "__origH", "is-h", "is-unit-h", tl!("Height"), editable, &mut h_changed));
@@ -334,15 +334,15 @@ fn resample_select(ui: &mut egui::Ui, f: &mut Map<String, Value>, current: &str)
     // which the command doesn't use and a save quantises away (#6019).
     let indexed = f.get("__indexed").and_then(Value::as_bool) == Some(true);
     let opts: Vec<_> = opts.into_iter().filter(|(k, _)| !indexed || k == "automatic" || k == "nearest").collect();
-    let edit = craft_ui::controls::Select::new("is-resample", tl!("Resample"), &mut cur).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
+    let edit = craft::ui::controls::Select::new("is-resample", tl!("Resample"), &mut cur).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui);
     if edit.response.changed() {
         f.insert("resample".into(), json!(cur));
     }
 }
 
 fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use craft_ui::controls::{Checkbox, Select};
-    let t = craft_ui::theme::current(ui.ctx());
+    use craft::ui::controls::{Checkbox, Select};
+    let t = craft::ui::theme::current(ui.ctx());
     let (ow, oh) = (num(f, "__origW"), num(f, "__origH"));
     let bpp = num(f, "__bytesPerPixel").max(1.0);
     let relative = f.get("relative").and_then(Value::as_bool).unwrap_or(false);
@@ -412,7 +412,7 @@ fn canvas_size(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 /// PhotoCraft's own widget: the library has no direction-arrow grid. The response is the
 /// grid's area, for the row that holds it.
 fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> (Option<&'static str>, egui::Response) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let cell = 24.0;
     let (rect, grid) = ui.allocate_exact_size(vec2(cell * 3.0, cell * 3.0), Sense::hover());
     let ci = ANCHORS.iter().position(|a| *a == current).unwrap_or(4) as i32;
@@ -425,7 +425,7 @@ fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> (Option<&'
         let selected = i as i32 == ci;
         ui.painter().rect_filled(
             r,
-            craft_ui::theme::scale::Radius::R2.px(),
+            craft::ui::theme::scale::Radius::R2.px(),
             if selected {
                 t.color.surface.sunken.to_egui().gamma_multiply(1.6)
             } else if resp.hovered() {
@@ -436,14 +436,14 @@ fn anchor_grid(ui: &mut egui::Ui, current: &str, dw: f64, dh: f64) -> (Option<&'
         );
         ui.painter().rect_stroke(
             r,
-            craft_ui::theme::scale::Radius::R2.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+            craft::ui::theme::scale::Radius::R2.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
             StrokeKind::Inside,
         );
         if selected {
             ui.painter().rect_filled(
                 Rect::from_center_size(r.center(), vec2(8.0, 8.0)),
-                craft_ui::theme::scale::Radius::R2.px(),
+                craft::ui::theme::scale::Radius::R2.px(),
                 t.color.text.normal.to_egui(),
             );
         } else {

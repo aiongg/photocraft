@@ -5,10 +5,10 @@
 //! index (the tag travels with a stop through moves and reorders) and [`command`] reads the edit
 //! back from the tags.
 
-use craft_theme::Srgba;
-use craft_ui::composites::gradient::{ColorStop, GradientEditor, GradientLabels, GradientStops, OpacityStop, StopRow, StopRows};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::LocaleNumbers;
+use craft::theme::Srgba;
+use craft::draw::ui::gradient::{ColorStop, GradientEditor, GradientLabels, GradientStops, OpacityStop, StopRow, StopRows};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::LocaleNumbers;
 use egui::Ui;
 use photocraft_doc::Fill;
 use serde_json::{Value, json};

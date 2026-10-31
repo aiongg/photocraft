@@ -13,7 +13,7 @@
 //! again from the menu (its dialog, window or mode opens, or it runs), a smart filter on the Smart
 //! Object. `ui.dialog.set` with `"choice": "smartObject"` picks the conversion.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -189,7 +189,7 @@ pub fn owns(fields: &Map<String, Value>) -> bool {
 
 /// The prompt's body: the question, with a caution mark.
 pub fn body(ui: &mut egui::Ui, f: &Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let text = f.get("message").and_then(Value::as_str).unwrap_or("This layer must be rasterized before proceeding.");
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;

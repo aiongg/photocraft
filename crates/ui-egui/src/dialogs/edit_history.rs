@@ -2,17 +2,17 @@
 //! Photoshop, instead of reaching the document's History beneath it (which the dialog previews
 //! and is about to change), or doing nothing.
 //!
-//! A parameter dialog keeps its history in `craft_ui::dialog::Dialog` (`history`); this module
+//! A parameter dialog keeps its history in `craft::ui::dialog::Dialog` (`history`); this module
 //! is the history of the workspaces without a dialog host. Liquify, Puppet Warp and Camera Raw keep
 //! their own histories.
 
 use crate::PhotocraftApp;
 
-pub use craft_ui::dialog::{LocalHistory as EditHistory, Step, take_step};
+pub use craft::ui::dialog::{LocalHistory as EditHistory, Step, take_step};
 
 /// ⌘Z / ⇧⌘Z while a workspace without a dialog host is in front (Filter Gallery, Adaptive Wide
 /// Angle, Vanishing Point): steps its own history, and the keys never reach the document's
-/// History beneath it. The parameter dialogs step theirs inside `craft_ui::dialog::Dialog`.
+/// History beneath it. The parameter dialogs step theirs inside `craft::ui::dialog::Dialog`.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if ctx.text_edit_focused() || !app.ui.dialogs.is_empty() {
         return;

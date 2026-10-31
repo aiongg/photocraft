@@ -266,7 +266,7 @@ fn contributors_in(app: &mut PhotocraftApp, ui: &mut egui::Ui, contributors: &[C
         ui.separator();
         ui.label(tl!("Sort"));
         let (press, close) = crate::press_menu::PressCombo::before(ui, "credits_sort");
-        let sort = craft_ui::ComboBox::from_id_salt("credits_sort").selected_text(v.key.label().0).close_behavior(close).show_ui(ui, |ui| {
+        let sort = craft::ui::ComboBox::from_id_salt("credits_sort").selected_text(v.key.label().0).close_behavior(close).show_ui(ui, |ui| {
             for k in SortKey::ALL {
                 let item = ui.selectable_label(v.key == k, k.label().0);
                 if press.chosen(ui, &item) {
@@ -333,7 +333,7 @@ fn table_height(ui: &egui::Ui, rows: usize) -> f32 {
 /// desktop build can't rely on (egui_winit needs its "links" feature, which we don't enable).
 fn link(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &Contributor, names: NameMode) -> egui::Response {
     let url = format!("https://github.com/{}", c.login);
-    let r = ui.add(craft_ui::controls::Link::new(c.name(names)).id_salt(&c.login)).on_hover_text(c.summary());
+    let r = ui.add(craft::ui::controls::Link::new(c.name(names)).id_salt(&c.login)).on_hover_text(c.summary());
     if r.clicked() {
         crate::links::open(app, ui.ctx(), &url);
     }
@@ -480,7 +480,7 @@ fn header_cell(ui: &mut egui::Ui, t: &crate::theme::Tokens, label: &str, numeric
         ui.painter().add(egui::Shape::convex_polygon(pts, t.accent, egui::Stroke::NONE));
     }
     let line = egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 1.0), rect.max);
-    ui.painter().rect_filled(line, craft_ui::theme::scale::Radius::R0.px(), t.separator);
+    ui.painter().rect_filled(line, craft::ui::theme::scale::Radius::R0.px(), t.separator);
     resp
 }
 

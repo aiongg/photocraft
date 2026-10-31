@@ -13,7 +13,7 @@ fn draw_rulers(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: Rect, xf: &View
 #[test]
 fn ruler_strip_matches_the_library_ruler_size() {
     let ctx = egui::Context::default();
-    assert_eq!(Rulers::style(&craft_ui::theme::current(&ctx)).size, RULER);
+    assert_eq!(Rulers::style(&craft::ui::theme::current(&ctx)).size, RULER);
 }
 
 /// Rulers alone in a 400×300 frame at 100 %, centred on a 256×128 document.

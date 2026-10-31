@@ -1,6 +1,6 @@
 //! Keyboard shortcuts: Photoshop defaults from the command registry, plus single-key tools.
 
-use craft_keymap::{Chord, Key as CKey, Mods as CMods, Platform};
+use craft::keymap::{Chord, Key as CKey, Mods as CMods, Platform};
 use egui::{Key, KeyboardShortcut, Modifiers};
 use serde_json::json;
 
@@ -91,7 +91,7 @@ pub fn key_matches(sc: &KeyboardShortcut, key: Key, mods: Modifiers) -> bool {
         (Key::Backspace, Key::Delete) => Key::Backspace,
         _ => key,
     };
-    craft_keymap::egui::matches(&binding, key, &mods, platform)
+    craft::keymap::egui::matches(&binding, key, &mods, platform)
 }
 
 /// Consume a press of `sc` (see [`key_matches`]); true when one was found.
@@ -441,11 +441,11 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // once Alt or F10 put the keyboard on it (#4988), and an open dropdown list, whose letters
     // pick an option rather than a tool (#1481). A command shortcut (⌘D, F7…) takes the keyboard
     // off the bar first and runs, as with a native menu bar (#6573).
-    craft_ui::menu::bar::leave_for_shortcut(ctx);
+    craft::ui::menu::bar::leave_for_shortcut(ctx);
     if app.ui.dialogs.is_empty() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
         return false;
     }
-    if craft_ui::menu::any_open(ctx) || craft_ui::menu::bar::is_focused(ctx) || crate::widgets::dropdown_list_open(ctx) || craft_ui::popover::any_open(ctx) {
+    if craft::ui::menu::any_open(ctx) || craft::ui::menu::bar::is_focused(ctx) || crate::widgets::dropdown_list_open(ctx) || craft::ui::popover::any_open(ctx) {
         return false;
     }
     // ⌘Z in a filter or adjustment dialog steps the dialog's settings, not the document (#4697).

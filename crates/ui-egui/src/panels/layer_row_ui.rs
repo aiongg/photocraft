@@ -4,7 +4,7 @@
 //! The row itself is a craft-ui `ListRow` ([`layer_row`](super::layer_row)); its trailing items
 //! drop out and its label is cut by the library.
 
-use craft_ui::list::{ListRow, RenameEnd, RowEvent};
+use craft::ui::list::{ListRow, RenameEnd, RowEvent};
 use egui::{Align2, FontId, Galley, Painter, Rect, pos2};
 use photocraft_doc::{Adjustment, Layer, LayerContent};
 use serde_json::{Value, json};
@@ -177,7 +177,7 @@ pub fn panel_menu(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui) {
     ui.separator();
     // Photoshop's Clip Thumbnails to Layer Bounds: frame each layer's pixels, not the canvas (#4281).
     let mut clip = app.session.prefs().interface.clip_thumbnails_to_layer_bounds;
-    if craft_ui::controls::Checkbox::bool(tl!("Clip Thumbnails to Layer Bounds"), &mut clip).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(tl!("Clip Thumbnails to Layer Bounds"), &mut clip).show(ui).response.changed() {
         if let Err(e) = app.run("prefs.set", json!({"path": "interface.clipThumbnailsToLayerBounds", "value": clip})) {
             app.ui.status = e;
             app.ui.status_error = true;

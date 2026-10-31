@@ -3,14 +3,14 @@
 //! `resolution` in ppi, `mode`, `depth`, `background`, `name`), so `ui.dialog.set` drives it and
 //! Create runs `file.new` with them.
 
-use craft_theme::TypeRole;
-use craft_ui::composites::{Field, SectionHeader};
-use craft_ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch};
-use craft_ui::icons::Icon;
-use craft_ui::list::ListRow;
-use craft_ui::primitives::{Content, Interactive, SurfaceKind, Text};
-use craft_ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
-use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
+use craft::theme::TypeRole;
+use craft::ui::composites::{Field, SectionHeader};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch};
+use craft::ui::icons::Icon;
+use craft::ui::list::ListRow;
+use craft::ui::primitives::{Content, Interactive, SurfaceKind, Text};
+use craft::ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
+use craft::ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 use egui::accesskit::Role;
 use egui::{Align2, Rect, Stroke, StrokeKind, pos2, vec2};
 use serde_json::{Map, Value, json};
@@ -312,7 +312,7 @@ fn card_title(painter: &egui::Painter, title: &str, width: f32, format: &egui::T
 fn page_icon(ui: &egui::Ui, r: Rect, w: u32, h: u32, color: egui::Color32) {
     let s = 30.0 / (w.max(h) as f32);
     let page = Rect::from_center_size(r.center(), vec2(w as f32 * s, h as f32 * s));
-    ui.painter().rect_stroke(page, craft_ui::theme::scale::Radius::R2.px(), Stroke::new(1.2, color), StrokeKind::Inside);
+    ui.painter().rect_stroke(page, craft::ui::theme::scale::Radius::R2.px(), Stroke::new(1.2, color), StrokeKind::Inside);
 }
 
 /// The Background Contents menu's entry for a colour of the user's own ([`body`]).
@@ -483,7 +483,7 @@ fn saved_presets(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<
 }
 
 fn save_preset(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    ui.add_space(craft_ui::theme::scale::Space::S12.px());
+    ui.add_space(craft::ui::theme::scale::Space::S12.px());
     if f.get("__savingPreset").and_then(Value::as_bool) != Some(true) {
         if ui.add(Button::new(tl!("Save Preset…")).variant(ButtonVariant::Secondary).min_width(240.0)).clicked() {
             f.insert("__savingPreset".into(), json!(true));
@@ -545,7 +545,7 @@ fn preset_card(ui: &mut egui::Ui, index: usize, c: &Card, units: &UnitsAndRulers
     let r = resp.rect;
     if on {
         let radius: egui::CornerRadius = tokens.shape.radius.control.into();
-        ui.painter().rect_stroke(r, radius, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), tokens.color.accent.solid.to_egui()), StrokeKind::Inside);
+        ui.painter().rect_stroke(r, radius, craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), tokens.color.accent.solid.to_egui()), StrokeKind::Inside);
     }
     let (w, h, _) = c.size(units);
     page_icon(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 34.0), vec2(40.0, 40.0)), w, h, tokens.color.text.muted.to_egui());
@@ -600,7 +600,7 @@ fn preset_grid(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<St
     let mut create = false;
     let caption = crate::i18n::fmt(tl!("BLANK DOCUMENT PRESETS ({n})"), &[("n", &presets.len().to_string())]);
     SectionHeader::new("new-document-presets-caption", caption).collapsible(false).show(ui, |ui| {
-        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+        ui.add_space(craft::ui::theme::scale::Space::S6.px());
         let card = vec2(164.0, 112.0);
         // Up to 20 recent documents: scroll past three rows rather than grow the dialog.
         egui::ScrollArea::vertical().id_salt("new-document-presets").max_height(3.0 * (card.y + 8.0)).show(ui, |ui| {
@@ -623,7 +623,7 @@ fn preset_grid(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<St
                         }
                     }
                 });
-                ui.add_space(craft_ui::theme::scale::Space::S8.px());
+                ui.add_space(craft::ui::theme::scale::Space::S8.px());
             }
         });
     });
@@ -657,7 +657,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             ui.set_width(520.0);
             create |= preset_grid(app, ui, f, &cat, &presets, &units);
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         // Right: Preset Details.
         ui.vertical(|ui| {
             ui.set_width(260.0);
@@ -669,7 +669,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
 
 /// The Preset Details column: name, size, orientation, resolution, mode, profile and background.
 fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     // Keep the canonical English default in state; only the field shows a translation. The
     // dialog opens with the name selected (its first field), so typing replaces it and Tab goes
     // straight on to Width.
@@ -682,7 +682,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
         }
         edit.response
     });
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     let ppi = get_f(f, "resolution", 72.0);
     let mut unit = get_s(f, "__unit", "px");
     // A typed unit (`210mm` while in pixels) converts at the new document's resolution.
@@ -705,7 +705,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
         })
         .inner
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     Field::new(tl!("Height")).above().show(ui, |ui, _| {
         ui.horizontal(|ui| {
             let mut h = shown_size(f, "height", 1080.0, &unit, ppi);
@@ -713,7 +713,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
             if edit.changed {
                 set_size(f, "height", h, &unit, ppi);
             }
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             // Page orientation (≠ Type › Orientation → Hướng chữ).
             ui.label(crate::i18n::tr_ctx(crate::i18n::current(), "document", "Orientation"));
             let (w, h) = (get_f(f, "width", 1920.0), get_f(f, "height", 1080.0));
@@ -739,7 +739,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
     if Checkbox::bool(tl!("Artboards"), &mut artboard).show(ui).response.changed() {
         f.insert("artboard".into(), json!(artboard));
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     Field::new(tl!("Resolution")).above().show(ui, |ui, _| {
         ui.horizontal(|ui| {
             let per_cm = get_s(f, "__resUnit", "in") == "cm";
@@ -762,7 +762,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
         })
         .inner
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     Field::new(tl!("Color Mode")).above().show(ui, |ui, _| {
         ui.horizontal(|ui| {
             let mut mode = get_s(f, "mode", "rgb");
@@ -793,7 +793,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
         })
         .inner
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     // Photoshop's Advanced Options › Color Profile (#321): the working space by default,
     // or another profile of the mode's colour space, built in or installed in the system.
     Field::new(tl!("Color Profile")).above().show(ui, |ui, _| {
@@ -822,7 +822,7 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
         }
         edit
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     background(app, ui, f);
     save_preset(app, ui, f);
 }

@@ -8,7 +8,7 @@
 //! recorded exactly as the engine replays them (`stroke_begin` + `stroke_segment` per point), so
 //! OK runs `filter.liquify` with the same strokes and gets the same field.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::liquify::{LiquifyField, LiquifyStroke, LiquifyTool, ProxyImage, auto_cell};
 use photocraft_doc::{DocId, Document, LayerId};
@@ -889,8 +889,8 @@ fn backdrop_layering<T: Copy>(backdrop: Option<T>, mode: BackdropMode, opacity: 
 fn draw_tool_strip(ui: &mut egui::Ui, painter: &egui::Painter, t: &Tokens, d: &mut LiquifyDialog, body: ERect) -> ERect {
     // Left tool strip.
     let left = ERect::from_min_size(body.min, vec2(LEFT_W, body.height()));
-    painter.rect_filled(left, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-    painter.line_segment([left.right_top(), left.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+    painter.rect_filled(left, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+    painter.line_segment([left.right_top(), left.right_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     let mut strip = ui.new_child(egui::UiBuilder::new().max_rect(left.shrink2(vec2(6.0, 8.0))));
     strip.spacing_mut().item_spacing.y = 4.0;
     for tool in LiquifyTool::ALL {
@@ -903,7 +903,7 @@ fn draw_tool_strip(ui: &mut egui::Ui, painter: &egui::Painter, t: &Tokens, d: &m
             d.opts.tool = tool;
         }
         if matches!(tool, LiquifyTool::Smooth | LiquifyTool::PushLeft | LiquifyTool::Thaw) {
-            strip.add_space(craft_ui::theme::scale::Space::S6.px());
+            strip.add_space(craft::ui::theme::scale::Space::S6.px());
         }
     }
     left
@@ -973,11 +973,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         d.upload(ctx);
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::hover());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
+        painter.rect_filled(full, craft::ui::theme::scale::Radius::R0.px(), t.chrome);
         // Title strip.
         let title = ERect::from_min_size(full.min, vec2(full.width(), 30.0));
-        painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(title, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([title.left_bottom(), title.right_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let pct = if d.zoom > 0.0 { d.zoom * 100.0 } else { 100.0 };
         painter.text(
             title.center(),
@@ -990,8 +990,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let left = draw_tool_strip(ui, &painter, &t, d, body);
         // Right properties panel.
         let right = ERect::from_min_size(pos2(body.right() - RIGHT_W, body.top()), vec2(RIGHT_W, body.height()));
-        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(right, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([right.left_top(), right.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let mut props = ui.new_child(egui::UiBuilder::new().max_rect(right.shrink2(vec2(14.0, 12.0))));
         egui::ScrollArea::vertical().id_salt("liquify-props").show(&mut props, |ui| {
             ui.spacing_mut().item_spacing.y = 6.0;
@@ -1081,7 +1081,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         // Preview.
         let area = ERect::from_min_max(pos2(left.right(), body.top()), pos2(right.left(), body.bottom()));
-        painter.rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+        painter.rect_filled(area, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
         let (cw, ch) = (d.canvas.width() as f32, d.canvas.height() as f32);
         if d.zoom <= 0.0 {
             d.zoom = ((area.width() - 40.0) / cw).min((area.height() - 40.0) / ch).clamp(ZOOM_MIN, 4.0);
@@ -1147,22 +1147,22 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         {
             let color = if *subtract { t.accent } else { t.danger };
             let line: Vec<Pos2> = pts.iter().map(|p| to_screen(d, area, *p)).collect();
-            clip.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), color)));
+            clip.add(egui::Shape::line(line, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), color)));
         }
         // Brush outline (the lasso has none). While Alt-dragging its size it stays where the drag
         // started, so only its size changes (#7884).
         if let Some(hp) = brush_circle_at(d.brush_resize, resp.hover_pos()) {
             if d.opts.tool != LiquifyTool::LassoMask {
                 let r = d.opts.size * 0.5 * d.zoom;
-                clip.circle_stroke(hp, r, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::BLACK));
+                clip.circle_stroke(hp, r, craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::BLACK));
                 clip.circle_stroke(hp, r, Stroke::new(0.75, Color32::WHITE));
             }
             d.hover = Some(to_doc(d, area, hp));
         }
         clip.rect_stroke(
             img,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
             egui::StrokeKind::Outside,
         );
         // Mouse → strokes (Space or middle button pans). Alt+right-drag resizes the brush (#4702).

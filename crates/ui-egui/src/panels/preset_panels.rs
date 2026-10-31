@@ -8,7 +8,7 @@
 //! an engine command (`gradient.presets.*`, `pattern.presets.*`, `style.presets.*`,
 //! `shape.presets.*`, `tool.presets.*`, `cloneSource.*`); this module only draws and dispatches.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align2, Color32, ColorImage, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, TextureHandle, TextureOptions, pos2, vec2};
@@ -267,8 +267,8 @@ pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &
     }
     ui.painter().rect_stroke(
         r,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        craft::ui::theme::scale::Radius::R0.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
         egui::StrokeKind::Outside,
     );
     let name = current.map_or(String::new(), |p| p.display_name().to_string());
@@ -296,7 +296,7 @@ pub(crate) fn pattern_grid(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &st
             let (r, cell) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
             ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
             let (w, c) = if p.id == selected { (2.0, t.accent) } else { (1.0, t.field_border) };
-            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), Stroke::new(w, c), egui::StrokeKind::Outside);
+            ui.painter().rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), Stroke::new(w, c), egui::StrokeKind::Outside);
             let cell = cell.on_hover_text(p.display_name());
             cell.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), p.display_name()));
             if cell.clicked() {
@@ -378,8 +378,8 @@ fn group_name(key: &str) -> Option<&str> {
 }
 
 /// The words of the library browser and footer, in the app's language.
-fn labels(new_tip: &str) -> craft_ui::presets::PresetLabels {
-    let mut l = craft_ui::presets::PresetLabels::default();
+fn labels(new_tip: &str) -> craft::ui::presets::PresetLabels {
+    let mut l = craft::ui::presets::PresetLabels::default();
     l.name = tl!("Name:").into();
     l.rename = tl!("Rename…").into();
     l.rename_group = tl!("Rename Group…").into();
@@ -404,9 +404,9 @@ pub(crate) fn browser(
     place: Place,
     thumb: &mut dyn FnMut(&egui::Painter, Rect, usize, usize),
 ) -> Vec<Ev> {
-    use craft_ui::behavior::{DropPosition, ListDrag};
-    use craft_ui::edit::EditEvent;
-    use craft_ui::presets::{DefaultOpen, FooterEvent, PresetBrowser, PresetEvent, PresetFooter, PresetReorder, PresetRow, PresetState, PresetView};
+    use craft::ui::behavior::{DropPosition, ListDrag};
+    use craft::ui::edit::EditEvent;
+    use craft::ui::presets::{DefaultOpen, FooterEvent, PresetBrowser, PresetEvent, PresetFooter, PresetReorder, PresetRow, PresetState, PresetView};
     let Place { canvas, max_h, new_tip, flush } = place;
     let mut ev = Vec::new();
     let size = *st.sizes.get(panel).unwrap_or(&40.0);
@@ -525,7 +525,7 @@ pub(crate) fn browser(
 
     // Footer: thumbnail size | New Group, New, Delete.
     let footer_top = ui.min_rect().bottom();
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     for event in PresetFooter::new(&mut state, &labels).thumb_range(MIN_THUMB..=96.0).can_delete(selected.is_some()).show(ui) {
         match event {
             FooterEvent::Delete => ev.extend(selected.clone().map(Ev::Delete)),

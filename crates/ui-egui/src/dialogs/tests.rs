@@ -260,7 +260,7 @@ fn an_alert_reports_where_it_is_to_the_title_bar() {
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 600.0)).build_ui_state(
         move |ui, app| {
             show(app, ui.ctx());
-            *sink.borrow_mut() = craft_ui::title_bar::ModalRects::take(ui.ctx(), ui.ctx().viewport_id()).rects().to_vec();
+            *sink.borrow_mut() = craft::ui::title_bar::ModalRects::take(ui.ctx(), ui.ctx().viewport_id()).rects().to_vec();
         },
         app,
     );

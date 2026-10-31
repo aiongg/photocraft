@@ -1,7 +1,7 @@
 use super::{Color32, Rect, Response, Stroke, StrokeKind, Tokens, Ui, vec2};
-use craft_ui::controls::{Button, ButtonVariant, Checkbox};
-use craft_ui::dialog::{FooterButton, FooterButtons};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox};
+use craft::ui::dialog::{FooterButton, FooterButtons};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf};
 
 /// A check box with a label. The library check box draws the same box in every theme; `toggle`
 /// keeps its callers' name for the options that read as switches.
@@ -26,7 +26,7 @@ pub fn secondary_button(ui: &mut Ui, label: &str, min_width: f32) -> Response {
 
 /// What a dialog button does, which decides where the platform's button order puts it: the
 /// library's role and order rule.
-pub use craft_ui::dialog::ButtonRole;
+pub use craft::ui::dialog::ButtonRole;
 
 /// One button of a [`dialog_buttons`] row.
 #[derive(Clone, Copy)]
@@ -56,7 +56,7 @@ impl<'a> DialogButton<'a> {
 }
 
 /// A button row at the cursor, in the platform's order (see [`ButtonRole`]), for the windows that
-/// are not hosted by `craft_ui::dialog::Dialog` (the workspaces, the modeless tool windows). Inside a right-to-left row it sits at the
+/// are not hosted by `craft::ui::dialog::Dialog` (the workspaces, the modeless tool windows). Inside a right-to-left row it sits at the
 /// right edge. The buttons are laid out left to right, so Tab walks them in reading order.
 /// Returns the role of the button clicked this frame.
 pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRole> {
@@ -69,7 +69,7 @@ pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRol
         + 1.0;
     let row: Vec<FooterButton> =
         buttons.iter().zip(&labels).map(|(b, l)| FooterButton::new(b.role, l.as_str()).min_width(b.min_width).enabled(b.enabled)).collect();
-    let height = ui.spacing().interact_size.y.max(tokens.component.button.height.get(craft_ui::controls::ControlSize::Md));
+    let height = ui.spacing().interact_size.y.max(tokens.component.button.height.get(craft::ui::controls::ControlSize::Md));
     ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::left_to_right(egui::Align::Center), |ui| {
         let shown = FooterButtons::new(("dialog-buttons", ui.scope_id()), row).show(ui);
         for (b, r) in buttons.iter().zip(&shown.responses) {
@@ -102,7 +102,7 @@ pub fn check_box_fill(on: bool, pressed: bool, t: &Tokens) -> Color32 {
 /// Paint a check box in `rect`: [`check_box_fill`] with a white tick when `on`, else an
 /// outline that brightens while `hovered` or `pressed`.
 pub fn check_box(p: &egui::Painter, rect: Rect, on: bool, hovered: bool, pressed: bool, t: &Tokens) {
-    p.rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), check_box_fill(on, pressed, t));
+    p.rect_filled(rect, craft::ui::theme::scale::Radius::R2.px(), check_box_fill(on, pressed, t));
     if on {
         let a = rect.left_center() + vec2(3.0, 0.5);
         let b = rect.center_bottom() + vec2(-1.0, -3.5);
@@ -113,7 +113,7 @@ pub fn check_box(p: &egui::Painter, rect: Rect, on: bool, hovered: bool, pressed
     } else {
         p.rect_stroke(
             rect,
-            craft_ui::theme::scale::Radius::R2.px(),
+            craft::ui::theme::scale::Radius::R2.px(),
             Stroke::new(1.5, if hovered || pressed { t.text_dim } else { t.text_faint }),
             StrokeKind::Inside,
         );

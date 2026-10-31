@@ -2,7 +2,7 @@
 //! name and what the preset captures in the middle, OK and Cancel on the right. Every way of making
 //! a preset opens it: the picker's [+] and its gear menu, the Brush Settings [+] and the Brushes
 //! tab's [+]. Nothing is saved until OK.
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::{Color32, pos2, vec2};
 use photocraft_paint::{BrushPreset, BrushSettings};
 use serde_json::{Map, Value, json};
@@ -67,14 +67,14 @@ fn problem(app: &PhotocraftApp, f: &Map<String, Value>) -> Option<&'static str> 
 
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str) {
     let mut v = on(f, key);
-    if craft_ui::controls::Checkbox::bool(label, &mut v).show(ui).response.changed() {
+    if craft::ui::controls::Checkbox::bool(label, &mut v).show(ui).response.changed() {
         f.insert(key.into(), json!(v));
     }
 }
 
 /// The dialog's three columns; it owns its OK and Cancel, so they stand in their own column.
 pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, interactive: bool) -> Option<bool> {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut outcome = None;
     let brush: BrushSettings = f.get("brush").and_then(|b| serde_json::from_value(b.clone()).ok()).unwrap_or_else(|| app.session.tools.brush.clone());
     ui.horizontal_top(|ui| {
@@ -99,7 +99,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
             egui::FontId::proportional(11.0),
             t.color.text.muted.to_egui(),
         );
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label(tl!("Name:"));
@@ -119,26 +119,26 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, 
                     f.insert("name".into(), json!(text));
                 }
             });
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             check(ui, f, "captureSize", tl!("Capture Brush Size in Preset"));
             check(ui, f, "toolSettings", tl!("Include Tool Settings"));
             // Include Color belongs to the tool settings: only with them, as in Photoshop.
             ui.horizontal(|ui| {
-                ui.add_space(craft_ui::theme::scale::Space::S20.px());
+                ui.add_space(craft::ui::theme::scale::Space::S20.px());
                 ui.add_enabled_ui(on(f, "toolSettings"), |ui| check(ui, f, "color", tl!("Include Color")));
             });
             if let Some(why) = problem(app, f).filter(|_| !name(f).is_empty()) {
-                ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                ui.add_space(craft::ui::theme::scale::Space::S4.px());
                 ui.colored_label(t.color.text.muted.to_egui(), why);
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             let ok = problem(app, f).is_none();
             if ui.add_enabled_ui(ok, |ui| widgets::primary_button(ui, tl!("OK"), 84.0)).inner.clicked() {
                 outcome = Some(true);
             }
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+            ui.add_space(craft::ui::theme::scale::Space::S4.px());
             if widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked() {
                 outcome = Some(false);
             }

@@ -42,7 +42,7 @@ fn print_dialog_keeps_saved_settings_when_the_cached_printer_list_is_empty() {
     let listed = Arc::clone(&available);
     app.session.printer_source = Some(Arc::new(move || {
         if listed.load(Ordering::SeqCst) {
-            vec![craft_print::Printer { name: "Saved printer".into(), default: true, two_sided: None, description: String::new() }]
+            vec![craft::print::Printer { name: "Saved printer".into(), default: true, two_sided: None, description: String::new() }]
         } else {
             Vec::new()
         }
@@ -88,7 +88,7 @@ fn print_dialog_retries_an_uncached_printer_list_after_the_spooler_is_released()
     let counted = Arc::clone(&asked);
     app.session.printer_source = Some(Arc::new(move || {
         counted.fetch_add(1, Ordering::SeqCst);
-        vec![craft_print::Printer { name: "Retry printer".into(), default: true, two_sided: None, description: String::new() }]
+        vec![craft::print::Printer { name: "Retry printer".into(), default: true, two_sided: None, description: String::new() }]
     }));
     let (held_tx, held) = std::sync::mpsc::channel();
     let (release, released_rx) = std::sync::mpsc::channel::<()>();
@@ -219,7 +219,7 @@ fn print_drag_rejects_nonfinite_input_and_bounds_offsets() {
 fn app() -> (PhotocraftApp, egui::Context) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.printer_source =
-        Some(Arc::new(|| vec![craft_print::Printer { name: "Test printer".into(), default: true, two_sided: None, description: String::new() }]));
+        Some(Arc::new(|| vec![craft::print::Printer { name: "Test printer".into(), default: true, two_sided: None, description: String::new() }]));
     app.run("file.new", json!({"width": 120, "height": 80, "name": "web"})).unwrap();
     (app, egui::Context::default())
 }
@@ -665,7 +665,7 @@ fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() });
         app.session.printer_source =
-            Some(Arc::new(|| vec![craft_print::Printer { name: "Test printer".into(), default: true, two_sided: None, description: String::new() }]));
+            Some(Arc::new(|| vec![craft::print::Printer { name: "Test printer".into(), default: true, two_sided: None, description: String::new() }]));
         app
     });
     h.state_mut().run("file.new", json!({"width": 120, "height": 80, "name": "poster"})).unwrap();
@@ -714,7 +714,7 @@ fn turning_without_a_driver_keeps_the_settings_and_shows_the_error() {
     let mut dm = vec![0u8; 220];
     dm[68..70].copy_from_slice(&220u16.to_le_bytes());
     let hex: String = dm.iter().map(|b| format!("{b:02x}")).collect();
-    assert!(craft_print::rgb::DevMode::from_hex(&hex).is_ok());
+    assert!(craft::print::rgb::DevMode::from_hex(&hex).is_ok());
     let (mut app, _) = app();
     let mut f = Map::new();
     f.insert("printer".into(), json!("photocraft-no-such-printer"));

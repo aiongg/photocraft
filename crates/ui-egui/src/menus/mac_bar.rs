@@ -1,5 +1,5 @@
 //! The macOS menu bar: the same menus as the in-window bar ([`menu_model`]), laid out the way a Mac
-//! app's are by craft-menu ([`craft_menu::mac_layout`]) and shown by its AppKit backend.
+//! app's are by craft-menu ([`craft::menu::mac_layout`]) and shown by its AppKit backend.
 //!
 //! What the layout does:
 //! - an **app menu** named PhotoCraft: About (from Help), Settings (Edit › Preferences), Language,
@@ -17,10 +17,10 @@
 //! clipboard keys too): the shortcut runs through [`crate::shortcuts::handle`] exactly as without
 //! a native menu. A click is a command and runs like an in-window menu click.
 
-use craft_keymap::CommandRef;
+use craft::keymap::CommandRef;
 #[cfg(target_os = "macos")]
-use craft_menu::{ClipboardKeys, NativeMenu};
-use craft_menu::{Document, Item, ItemRole, Layout, LayoutOptions, Menu, MenuBar, Node};
+use craft::menu::{ClipboardKeys, NativeMenu};
+use craft::menu::{Document, Item, ItemRole, Layout, LayoutOptions, Menu, MenuBar, Node};
 
 use super::items::MenuItem;
 use super::model::menu_model;
@@ -46,7 +46,7 @@ pub fn mac_layout(items: &[MenuItem], lang: Lang, language: &str) -> Layout {
     }
     let label = |english: &'static str| tr(lang, english).to_string();
     let options = LayoutOptions { label: &label, ..LayoutOptions::new(APP_NAME) };
-    craft_menu::mac_layout(&bar, &options)
+    craft::menu::mac_layout(&bar, &options)
 }
 
 /// Language in the app menu: Auto, then every UI language in its own name, with the current
@@ -104,7 +104,7 @@ pub fn install(ctx: &egui::Context, app: &PhotocraftApp) -> Option<NativeMenu> {
     let layout = layout_of(app);
     // Never crash for a menu: if AppKit refuses, keep the in-window menus.
     let built =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| craft_menu::mac::install_with(ctx, &layout.bar, craft_menu::mac::MacOptions::default())));
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| craft::menu::mac::install_with(ctx, &layout.bar, craft::menu::mac::MacOptions::default())));
     match built {
         // PhotoCraft runs its clipboard shortcuts itself (`shortcuts::clipboard_keys`).
         Ok(menu) => menu.map(|m| m.clipboard_keys(ClipboardKeys::Raw)),
@@ -147,7 +147,7 @@ pub fn run(app: &mut PhotocraftApp, ctx: &egui::Context) {
 pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // Out of the app while the layout reads it.
     let Some(mut menu) = app.services.native_menu.take() else { return };
-    let state = state_hash(app, craft_menu::had_input(ctx).then_some(app.frame));
+    let state = state_hash(app, craft::menu::had_input(ctx).then_some(app.frame));
     for clash in menu.sync_with(state, || layout_of(app)) {
         log::info!("menu: {:?} is {} on macOS and {} in PhotoCraft; {}", clash.shortcut, clash.system, clash.command.id, clash.resolution);
     }

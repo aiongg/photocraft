@@ -4,12 +4,12 @@
 //! (History: the first shell used Unicode glyphs; half of them rendered as tofu boxes because the
 //! bundled fonts lacked them. Vector icons fix that for good.)
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use std::sync::OnceLock;
 
-use craft_ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
-use craft_ui::icons::{SvgIconSet, SvgStyle};
+use craft::ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
+use craft::ui::icons::{SvgIconSet, SvgStyle};
 use egui::{Color32, Rect, Response, Vec2};
 
 use crate::icon_data::ICONS;
@@ -155,8 +155,8 @@ pub fn tool_icon(t: Tool) -> &'static str {
 }
 
 /// The library icon for `t` (the same glyph as [`tool_icon`], by meaning).
-pub fn tool_library_icon(t: Tool) -> craft_ui::icons::Icon {
-    use craft_ui::icons::Icon;
+pub fn tool_library_icon(t: Tool) -> craft::ui::icons::Icon {
+    use craft::ui::icons::Icon;
     match t {
         Tool::Move => Icon::Move,
         Tool::Artboard => Icon::Artboard,
@@ -229,14 +229,14 @@ pub fn tool_library_icon(t: Tool) -> craft_ui::icons::Icon {
 
 /// Selected and hover fill shared by square icon buttons. Returns the icon tint.
 pub fn button_chrome(ui: &egui::Ui, rect: Rect, selected: bool, hovered: bool) -> Color32 {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let on = &t.component.icon_button.selected;
     if selected {
         ui.painter().rect_filled(rect, t.shape.radius.control, on.on_fill.to_egui());
         ui.painter().rect_stroke(
             rect,
             t.shape.radius.control,
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
             egui::StrokeKind::Inside,
         );
     } else if hovered {
@@ -264,7 +264,7 @@ pub fn button_with_icon_size(ui: &mut egui::Ui, name: &str, box_size: f32, icon_
 /// [`button_with_icon_size`] whose tooltip shows only when `show_tip`; the tooltip text still
 /// names the button (for screen readers and tests) when it is hidden.
 pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, icon_size: f32, selected: bool, tooltip: &str, show_tip: bool) -> Response {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let on = &t.component.icon_button.selected;
     let style = IconButtonStyle {
         normal: ButtonVisuals { fill: Color32::TRANSPARENT, stroke: egui::Stroke::NONE, icon: t.color.text.normal.to_egui() },
@@ -272,11 +272,11 @@ pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, i
         pressed: None,
         selected: ButtonVisuals {
             fill: on.on_fill.to_egui(),
-            stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
+            stroke: craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), on.on_border.to_egui()),
             icon: on.on_text.to_egui(),
         },
         corner_radius: t.shape.radius.control.into(),
-        focus_stroke: craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
+        focus_stroke: craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
     };
     let label = if tooltip.is_empty() { name } else { tl!(tooltip) };
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |ui, rect, tint| {

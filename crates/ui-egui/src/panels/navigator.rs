@@ -1,11 +1,11 @@
 use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, icons, pos2, vec2, widgets};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 
 pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let Some(idx) = app.session.active_index() else {
-        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
+        craft::ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let ctx = ui.ctx().clone();
@@ -106,14 +106,14 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let vr = Rect::from_center_size(c, vec2(vw, vh)).intersect(frame.shrink(1.0));
     ui.painter().rect_stroke(
         vr,
-        craft_ui::theme::scale::Radius::R2.px(),
-        craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::from_rgb(255, 84, 84)),
+        craft::ui::theme::scale::Radius::R2.px(),
+        craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), Color32::from_rgb(255, 84, 84)),
         StrokeKind::Middle,
     );
     // Photoshop's one row under the preview (#4840): the zoom, typed in percent, then Zoom Out,
     // the slider and Zoom In.
     let controls = ui.vertical(|ui| {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = t.space.gap.inline;
             let set = |app: &mut PhotocraftApp, zoom: f32, animate: bool| {

@@ -1,7 +1,7 @@
 use super::path_ops::active_path_name;
 use super::shapes::is_shape_tool;
 use super::{GradientChoices, LayerContent, PaintChange, PhotocraftApp, Tokens, Tool, Value, json, paint_param, swatch};
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 
 // ---------------------------------------------------------------------------------------------
 // Options bars
@@ -16,7 +16,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     {
         return false;
     }
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let lbl = |ui: &mut egui::Ui, s: &str| {
         let label = ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
         // The caption scrubs and names the control drawn right after it.
@@ -167,7 +167,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     }) else {
         return;
     };
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut edit: Option<Value> = None;
     let doc_id = app.session.active().map(|st| st.doc.id);
     let key = |k: &str| format!("shape-{doc_id:?}-{}-{k}", id.0);
@@ -195,7 +195,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
                 };
                 edit = Some(json!({"fill": fill, "coalesce": coalesce("fill")}));
             }
-            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+            ui.add_space(craft::ui::theme::scale::Space::S12.px());
             ui.label(egui::RichText::new(tl!("Stroke")).color(t.color.text.muted.to_egui()).size(12.0));
             if let Some(change) = swatch(ui, sh.stroke.as_ref().map(|s| &s.paint), fg, tl!("Set shape stroke type"), &mut gradients) {
                 let width = enabled_stroke_width(sh.stroke.as_ref().map_or(0.0, |s| s.width));

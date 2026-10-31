@@ -421,8 +421,8 @@ fn eyedropper_sample_param(p: &Value) -> std::result::Result<Option<String>, Str
 // -- the Crop tool's overlay, Fill and gear menu --
 
 struct CropSet {
-    overlay: Option<craft_ui::canvas::CropGuide>,
-    overlay_show: Option<craft_ui::canvas::GuideShow>,
+    overlay: Option<craft::draw::ui::CropGuide>,
+    overlay_show: Option<craft::draw::ui::GuideShow>,
     orientation: Option<u8>,
     content_aware: Option<bool>,
     shield: Option<crate::crop_shield::CropShield>,
@@ -464,18 +464,18 @@ impl CropSet {
     }
 }
 
-fn crop_overlay_param(p: &Value) -> std::result::Result<Option<craft_ui::canvas::CropGuide>, String> {
+fn crop_overlay_param(p: &Value) -> std::result::Result<Option<craft::draw::ui::CropGuide>, String> {
     let Some(v) = p.get("cropOverlay") else { return Ok(None) };
-    v.as_str().and_then(crate::crop_overlay::from_wire_id::<craft_ui::canvas::CropGuide>).map(Some).ok_or_else(|| {
-        let ids: Vec<String> = craft_ui::canvas::CropGuide::ALL.iter().map(crate::crop_overlay::wire_id).collect();
+    v.as_str().and_then(crate::crop_overlay::from_wire_id::<craft::draw::ui::CropGuide>).map(Some).ok_or_else(|| {
+        let ids: Vec<String> = craft::draw::ui::CropGuide::ALL.iter().map(crate::crop_overlay::wire_id).collect();
         format!("cropOverlay must be one of {}", ids.join(", "))
     })
 }
 
-fn crop_overlay_show_param(p: &Value) -> std::result::Result<Option<craft_ui::canvas::GuideShow>, String> {
+fn crop_overlay_show_param(p: &Value) -> std::result::Result<Option<craft::draw::ui::GuideShow>, String> {
     let Some(v) = p.get("cropOverlayShow") else { return Ok(None) };
     v.as_str()
-        .and_then(crate::crop_overlay::from_wire_id::<craft_ui::canvas::GuideShow>)
+        .and_then(crate::crop_overlay::from_wire_id::<craft::draw::ui::GuideShow>)
         .map(Some)
         .ok_or_else(|| "cropOverlayShow must be one of auto, always, never".to_string())
 }

@@ -407,8 +407,8 @@ pub fn restore(app: &mut PhotocraftApp) {
 /// (a workspace or `panelLayout`). Missing or invalid dock parts are left alone; old
 /// layouts without Timeline visibility restore it closed.
 ///
-/// `craft_ui::docking::DockArea` keeps only transient drag/focus data in `ctx.data`; the
-/// split/tab arrangement is the app's own `craft_ui::docking::Layout` JSON stored here. If a
+/// `craft::ui::docking::DockArea` keeps only transient drag/focus data in `ctx.data`; the
+/// split/tab arrangement is the app's own `craft::ui::docking::Layout` JSON stored here. If a
 /// layout saved by a different craft-ui revision no longer deserializes, it is dropped and the
 /// legacy layout is rebuilt (the split/tab arrangement resets). Panel widths are a separate
 /// `egui::PanelState` migration and still carry over.

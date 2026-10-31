@@ -2,7 +2,7 @@
 //! bar all open these. URLs follow the crafting-app pattern (`getartcraft.com/apps/<app>`,
 //! `github.com/storytold/<app>`).
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -36,7 +36,7 @@ pub fn open(app: &mut PhotocraftApp, ctx: &egui::Context, url: &str) -> Value {
 /// The prominent "Join us on Discord" button.
 pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32) -> egui::Response {
     let r = ui
-        .add(craft_ui::controls::Button::new(tl!("Join us on Discord")).variant(craft_ui::controls::ButtonVariant::Primary).min_width(min_width))
+        .add(craft::ui::controls::Button::new(tl!("Join us on Discord")).variant(craft::ui::controls::ButtonVariant::Primary).min_width(min_width))
         .on_hover_text(DISCORD);
     if r.clicked() {
         open(app, ui.ctx(), DISCORD);
@@ -47,7 +47,7 @@ pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32
 /// "PhotoCraft website · GitHub · ArtCraft" as links, centred. Clicks route through [`open`] (the
 /// platform browser service) rather than `ui.hyperlink_to`, which uses the unreliable `ctx.open_url`.
 pub fn link_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let links = [(tl!("PhotoCraft website"), APP_PAGE), (tl!("GitHub"), GITHUB), (tl!("ArtCraft"), ARTCRAFT_WEBSITE)];
     let font = egui::FontId::proportional(12.5);
     let sep = "  ·  ";
@@ -61,7 +61,7 @@ pub fn link_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if i > 0 {
                 ui.label(egui::RichText::new(sep).font(font.clone()).color(t.color.text.faint.to_egui()));
             }
-            if ui.add(craft_ui::controls::Link::new(*label)).on_hover_text(*url).clicked() {
+            if ui.add(craft::ui::controls::Link::new(*label)).on_hover_text(*url).clicked() {
                 clicked = Some(url);
             }
         }

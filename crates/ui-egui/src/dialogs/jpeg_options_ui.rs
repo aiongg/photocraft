@@ -16,10 +16,10 @@
 //! without the path for a plain `file.save`, which writes whichever file an action is played on
 //! ([`plain_save_step`]).
 
-use craft_ui::composites::FieldControl as _;
-use craft_ui::composites::FormGrid;
-use craft_ui::controls::{RadioGroup, Select, Slider};
-use craft_ui::dialog::Outcome;
+use craft::ui::composites::FieldControl as _;
+use craft::ui::composites::FormGrid;
+use craft::ui::controls::{RadioGroup, Select, Slider};
+use craft::ui::dialog::Outcome;
 use photocraft_codecs::JpegFormat;
 use serde_json::Value;
 
@@ -200,8 +200,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = &mut app.jpeg_options else { return };
     let mut values = (p.quality, p.format);
     let answer =
-        crate::dialogs::show_prompt(ctx, "jpeg-options", tl!("JPEG Options"), craft_ui::dialog::Width::Compact, &mut values, |ui, (quality, format)| {
-            craft_ui::composites::SectionLabel::new(tl!("Image Options")).show(ui);
+        crate::dialogs::show_prompt(ctx, "jpeg-options", tl!("JPEG Options"), craft::ui::dialog::Width::Compact, &mut values, |ui, (quality, format)| {
+            craft::ui::composites::SectionLabel::new(tl!("Image Options")).show(ui);
             FormGrid::new("jpeg-options-quality").show(ui, |form| {
                 form.row(tl!("Quality"), |ui, _| {
                     let mut q = f32::from(*quality);
@@ -230,8 +230,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     edit
                 });
             });
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            craft_ui::composites::SectionLabel::new(tl!("Format Options")).show(ui);
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
+            craft::ui::composites::SectionLabel::new(tl!("Format Options")).show(ui);
             ui.indent("jpeg-options-format", |ui| {
                 _ = RadioGroup::new("jpeg-options-format", tl!("Format Options"), format)
                     .item(JpegFormat::Baseline, tl!("Baseline (\"Standard\")"))

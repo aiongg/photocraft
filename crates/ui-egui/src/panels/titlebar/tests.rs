@@ -1,10 +1,10 @@
 use super::*;
-use craft_ui::title_bar::{ModalRects, TitleBar, WINDOWS_BUTTON_WIDTH, caption_id};
+use craft::ui::title_bar::{ModalRects, TitleBar, WINDOWS_BUTTON_WIDTH, caption_id};
 use egui::{Color32, CursorIcon, Event, Id, Order, Pos2, RawInput, Rect, ResizeDirection, ViewportCommand, ViewportId, pos2, vec2};
 use photocraft_engine::Session;
 use serde_json::json;
 
-use craft_ui::title_bar::Caption;
+use craft::ui::title_bar::Caption;
 
 /// Windows' order, left to right.
 const CAPTIONS: [Caption; 3] = [Caption::Minimize, Caption::Maximize, Caption::Close];
@@ -251,12 +251,12 @@ fn a_hidden_menu_bar_keeps_the_edges_resizing() {
 
 #[test]
 fn gtk_layouts_give_the_caption_style() {
-    use craft_window::Button::{Close, Maximize, Minimize};
+    use craft::window::Button::{Close, Maximize, Minimize};
     let s = CaptionStyle::from_gtk_layout(CaptionFamily::Adwaita, "appmenu:minimize,maximize,close");
     assert_eq!((s.captions.layout.left, s.captions.layout.right), (vec![], vec![Minimize, Maximize, Close]));
     let s = CaptionStyle::from_gtk_layout(CaptionFamily::Breeze, "minimize,close");
     assert_eq!((s.captions.family, s.captions.layout.left), (CaptionFamily::Breeze, vec![Minimize, Close]), "no colon: GTK puts them all at the start");
-    assert_eq!(CaptionStyle::default().captions, Captions { family: CaptionFamily::Windows, layout: craft_window::Layout::default() });
+    assert_eq!(CaptionStyle::default().captions, Captions { family: CaptionFamily::Windows, layout: craft::window::Layout::default() });
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn linux_buttons_sit_where_the_layout_says_and_drag_the_window() {
         let width = 1100.0;
         let mut w = Win::new(width);
         let layout =
-            craft_window::Layout { left: vec![craft_window::Button::Close], right: vec![craft_window::Button::Minimize, craft_window::Button::Maximize] };
+            craft::window::Layout { left: vec![craft::window::Button::Close], right: vec![craft::window::Button::Minimize, craft::window::Button::Maximize] };
         w.app.services.caption_style = Some(Box::new(move |_| CaptionStyle { captions: Captions { family, layout: layout.clone() }, icons: None }));
         w.frame(vec![]);
         w.frame(vec![]);

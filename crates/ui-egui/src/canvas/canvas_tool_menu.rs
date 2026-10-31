@@ -2,7 +2,7 @@
 //! Transform box, text being edited with a Type tool, committed type under a Type tool, the
 //! pasteboard (outside the image), a guide and a pending crop.
 
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
 use egui::{Context, Response, Ui};
 use photocraft_doc::LayerContent;
 use photocraft_engine::prefs::{self, CanvasColor};
@@ -218,7 +218,7 @@ pub const CROP_COMMIT: &str = "crop.commit";
 /// order, and its Clear; the overlay and when it shows; then Cancel and Crop, the bar's ⊘ and ✓.
 /// Built from the bar's own lists, so the two cannot disagree. Empty for any other menu.
 pub fn crop_rows(menu: &CanvasToolMenu) -> Vec<Row<String>> {
-    use craft_ui::canvas::{CropGuide, GuideShow};
+    use craft::draw::ui::{CropGuide, GuideShow};
     let Some(users) = menu.crop.as_ref() else { return Vec::new() };
     let ratio = |(k, l): &(String, &str)| Some((l.to_string(), format!("{CROP_RATIO}{k}")));
     let (before, after): (Vec<_>, Vec<_>) = crate::crop_size::dropdown_options().into_iter().partition(|(k, _)| k != crate::crop_size::FRONT);
@@ -311,7 +311,7 @@ pub fn open_crop(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
 /// A crop row: each runs what its options-bar twin runs.
 fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
     use crate::crop_presets::{Choice, apply_choice};
-    use craft_ui::canvas::{CropGuide, GuideShow};
+    use craft::draw::ui::{CropGuide, GuideShow};
     match command {
         CROP_CANCEL => crate::crop_ui::cancel(app),
         CROP_COMMIT => crate::canvas::commit_crop(app),

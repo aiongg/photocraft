@@ -10,10 +10,10 @@
 /// PhotoCraft as craft-update knows it, with its 128 px icon and accent colour: the update
 /// prompt shows the accent, and an AppImage's menu entry gets the icon.
 #[cfg(not(target_arch = "wasm32"))]
-pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
+pub const UPDATE_APP: craft::update::app::App = craft::update::app::App {
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.photocraft.png")),
     accent: Some([0x2f, 0x7b, 0xf5]),
-    ..craft_update::suite::PHOTOCRAFT
+    ..craft::update::suite::PHOTOCRAFT
 };
 
 /// Translate a string literal into the current UI language: `tl!("Image Size…")`.
@@ -48,7 +48,7 @@ pub mod screenshot;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
-pub use craft_ui::title_bar::{Caption, CaptionFamily, CaptionIcon, CaptionIcons, Captions, RenderIconFn};
+pub use craft::ui::title_bar::{Caption, CaptionFamily, CaptionIcon, CaptionIcons, Captions, RenderIconFn};
 pub use titlebar::CaptionStyle;
 pub(crate) mod tool_memory;
 pub mod updates_ui;
@@ -109,7 +109,7 @@ pub use canvas::wheel_nav;
 pub use canvas::zoom_hold;
 pub use canvas::zoom_levels;
 pub use canvas::zoom_window_fit;
-pub use craft_theme_store::SuiteDir;
+pub use craft::theme_store::SuiteDir;
 pub use dialogs::adjust_dialog;
 pub use dialogs::adjust_editors;
 pub use dialogs::adjust_preview;
@@ -428,7 +428,7 @@ pub struct PhotocraftApp {
     pub frame: u64,
     /// Where the interface direction comes from: the UI language, or forced (tests, the
     /// `CRAFT_UI_DIRECTION` environment variable).
-    pub direction_setting: craft_ui::direction::Setting,
+    pub direction_setting: craft::ui::direction::Setting,
     /// Apply theme on first frame.
     styled: bool,
     /// Whether the window uses an integrated (transparent) macOS title bar.
@@ -441,8 +441,8 @@ pub struct PhotocraftApp {
     /// brand mark and the centred title. False for embedders, tests and the web.
     pub native_frame: bool,
     /// macOS: the traffic lights, measured for the integrated title bar's leading inset.
-    pub(crate) traffic_lights: craft_window::mac::TrafficLights,
-    /// macOS: the window's `movable` flag as last set (`craft_window::title_bar::sync_movable`).
+    pub(crate) traffic_lights: craft::window::mac::TrafficLights,
+    /// macOS: the window's `movable` flag as last set (`craft::window::title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     pub(crate) titlebar_movable: Option<bool>,
     /// Last window title sent to the OS (`ViewportCommand::Title`, see `panels::sync_window_title`):
@@ -569,7 +569,7 @@ pub struct PhotocraftApp {
     /// Filter › Adaptive Wide Angle dialog (wide_angle_ui).
     pub(crate) wide_angle: Option<wide_angle_ui::WideAngleDialog>,
     /// The chrome state (outer gesture, ⌘Z history, focus) of each open dialog, by dialog id.
-    pub(crate) dialog_chrome: std::collections::HashMap<u64, craft_ui::dialog::DialogState<dialogs::Settings>>,
+    pub(crate) dialog_chrome: std::collections::HashMap<u64, craft::ui::dialog::DialogState<dialogs::Settings>>,
     /// The filter a "Rasterize?" prompt answered for, run after the dialog closes, where the
     /// egui context is available again (rasterize_prompt).
     pub(crate) pending_after_prompt: Option<(String, serde_json::Value)>,

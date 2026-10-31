@@ -7,9 +7,11 @@ use super::{
     BezierMesh, Color32, DocId, Homography, LayerId, PhotocraftApp, Pos2, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag, WarpStyle, corners,
     pos2,
 };
-use craft_ui::canvas::kurbo::Vec2;
-use craft_ui::canvas::{PointerInk, Readout as LibReadout, TransformBox, WarpGrid, distort_cursor, paint_pivot, skew_cursor, turn_cursor};
-use craft_ui::primitives::{Handle, HandleShape};
+use craft::ui::canvas::kurbo::Vec2;
+use craft::ui::canvas::{PointerInk, Readout as LibReadout, distort_cursor, skew_cursor, turn_cursor};
+use craft::draw::ui::{TransformBox, paint_pivot};
+use craft::imaging::ui::{WarpGrid};
+use craft::ui::primitives::{Handle, HandleShape};
 
 /// The library's distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
 /// pointer over a handle. The canvas calls it from its cursor branch, so nothing is drawn where a
@@ -165,7 +167,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 /// The box's outline, its eight handles and its reference point, as the library draws them. Shared
 /// with the Type and Camera Raw transform boxes.
 pub(crate) fn paint_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSession) {
-    let style = TransformBox::style(&craft_ui::theme::current(painter.ctx()));
+    let style = TransformBox::style(&craft::ui::theme::current(painter.ctx()));
     let ppp = painter.ctx().pixels_per_point();
     let pts: Vec<Pos2> = t.quad.iter().map(|q| xf.to_screen(q[0] as f32, q[1] as f32)).collect();
     painter.add(egui::Shape::closed_line(pts.clone(), style.line));
@@ -406,14 +408,14 @@ pub(super) fn handle_anchor(i: usize, j: usize) -> (usize, usize) {
 
 /// Anchors always. A handle and its arm show only while the pointer is within the library's
 /// reveal distance of them or they are being dragged, so a dense grid does not bury the picture in dots.
-fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 2]) -> Pos2, pv: &TransformPreview, style: &craft_ui::canvas::WarpStyle) {
+fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 2]) -> Pos2, pv: &TransformPreview, style: &craft::imaging::ui::WarpStyle) {
     let (nx, ny) = (m.nx(), m.ny());
     let hover = painter.ctx().input(|i| i.pointer.hover_pos());
     let ppp = painter.ctx().pixels_per_point();
     let dragged = match &pv.warp_drag {
         Some(WarpDrag::Point { press, .. }) => match press.target() {
-            craft_ui::canvas::WarpTarget::Point(index) => Some(handle_anchor(index % nx, index / nx)),
-            craft_ui::canvas::WarpTarget::Surface(..) => None,
+            craft::imaging::ui::WarpTarget::Point(index) => Some(handle_anchor(index % nx, index / nx)),
+            craft::imaging::ui::WarpTarget::Surface(..) => None,
         },
         _ => None,
     };
@@ -486,7 +488,7 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
             accent,
         );
     }
-    let style = WarpGrid::style(&craft_ui::theme::current(painter.ctx()));
+    let style = WarpGrid::style(&craft::ui::theme::current(painter.ctx()));
     let (line, thin) = (style.line, style.minor);
     let curve = |fixed_u: Option<f64>, fixed_v: Option<f64>| -> Vec<Pos2> {
         (0..=40)

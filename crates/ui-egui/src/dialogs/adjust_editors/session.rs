@@ -1,7 +1,7 @@
 use super::basic::reset_color_balance;
 use super::gradient_map::{gradient_presets, is_gray, swatches};
 use super::{Adjustment, EditorCx, HistSource, LayerId, PhotocraftApp, Value, adjust_params, editor, json, needs_histogram, space_of, tone};
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::RichText;
 
 /// Root of an adjustment layer's Properties editor view state in egui memory.
@@ -84,7 +84,7 @@ pub fn properties_reset(ctx: &egui::Context, doc: u64, id: LayerId, adj: &Adjust
 /// The Properties-panel editor of an adjustment layer: previews live (`app.live_adjust`) while a
 /// control moves and commits one `layer.setAdjustment` per gesture.
 pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj: &Adjustment) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let kind = photocraft_engine::commands::adjustment_kind(adj);
     match adj {
         Adjustment::SelectiveColor { .. } => return crate::adjust_ui::selective_color_editor(app, ui, id, adj),

@@ -7,14 +7,14 @@
 
 use std::cell::RefCell;
 
-use craft_ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
-use craft_ui::composites::{PanelFooter, Tone};
-use craft_ui::controls::{ControlSize, IconButton};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, paint_drop_mark};
-use craft_ui::menu::{ContextMenu, MenuItem};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
+use craft::ui::composites::{PanelFooter, Tone};
+use craft::ui::controls::{ControlSize, IconButton};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, paint_drop_mark};
+use craft::ui::menu::{ContextMenu, MenuItem};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use egui::{Rect, vec2};
 use serde_json::{Value, json};
 
@@ -79,7 +79,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
 
         if doc.layer_comps.is_empty() {
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             ui.weak(tl!("Capture the visibility, position and style of every layer with + below, then switch between versions."));
         }
         let mut rects: Vec<Rect> = Vec::new();

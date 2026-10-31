@@ -3,9 +3,9 @@
 //! Both commands support the same layer blend modes, opacity and transparency lock.
 //! Keeping one widget and validation implementation prevents their options diverging.
 
-use craft_ui::composites::{FormGrid, SectionLabel};
-use craft_ui::controls::{Checkbox, Select};
-use craft_ui::primitives::Divider;
+use craft::ui::composites::{FormGrid, SectionLabel};
+use craft::ui::controls::{Checkbox, Select};
+use craft::ui::primitives::Divider;
 use serde_json::{Map, Value, json};
 
 /// Validate a persisted blending choice before restoring it from Preferences.
@@ -20,7 +20,7 @@ pub fn valid(key: &str, v: &Value) -> bool {
 
 /// The Blending section of Fill and Stroke: Mode, Opacity and Preserve Transparency.
 pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>, prefix: &str) {
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     SectionLabel::new(tl!("Blending")).show(ui);
     Divider::horizontal().show(ui);
     FormGrid::new(format!("{prefix}-blending")).min_label_width(LABEL_WIDTH).show(ui, |form| {

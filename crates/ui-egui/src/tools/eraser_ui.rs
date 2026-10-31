@@ -1,7 +1,7 @@
 //! UI for the Eraser group's colour-aware tools: Magic Eraser (click → `paint.magicEraser`) and
 //! Background Eraser (stroke → `paint.backgroundEraser`), with their options bars.
 
-use craft_ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::patterns::{CellWidth, OptionsBar};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

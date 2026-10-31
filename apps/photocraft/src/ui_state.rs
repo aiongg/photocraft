@@ -17,7 +17,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use craft_window::restore::{FILE_NAME, MAIN, Store, legacy};
+use craft::window::restore::{FILE_NAME, MAIN, Store, legacy};
 
 /// Panel rects and other coordinates beyond this many points or pixels are corrupt.
 const MAX_COORD: f64 = 1.0e6;
@@ -156,7 +156,7 @@ fn field<'a>(v: &'a ron::Value, name: &str) -> Option<&'a ron::Value> {
 #[cfg(test)]
 mod tests {
     use super::{check, open_window_store, sanitize};
-    use craft_window::restore::{FILE_NAME, MAIN, Placement, Store};
+    use craft::window::restore::{FILE_NAME, MAIN, Placement, Store};
     use std::collections::HashMap;
 
     fn file(window: &str, zoom: &str) -> String {

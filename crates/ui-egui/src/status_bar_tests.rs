@@ -26,7 +26,7 @@ fn harness(kind: ThemeKind) -> Harness<'static, PhotocraftApp> {
                 let bottom = ui.max_rect().bottom();
                 ui.ctx().data_mut(|d| d.insert_temp(bottom_id(), bottom));
                 // The shell's status slot.
-                let height = craft_ui::theme::current(ui.ctx()).size.bar.status;
+                let height = craft::ui::theme::current(ui.ctx()).size.bar.status;
                 egui::Panel::bottom("status")
                     .exact_size(height)
                     .frame(egui::Frame::NONE)
@@ -46,7 +46,7 @@ fn status_bar_controls_sit_inside_the_bar_with_even_margins() {
     for kind in ThemeKind::ALL {
         let h = harness(kind);
         let t = Tokens::for_kind(kind);
-        let bar_h = craft_ui::theme::current(&h.ctx).size.bar.status;
+        let bar_h = craft::ui::theme::current(&h.ctx).size.bar.status;
         assert_eq!(bar_h, if t.pro { 24.0 } else { 30.0 }, "{kind:?}");
         let bottom = h.ctx.data(|d| d.get_temp::<f32>(bottom_id())).unwrap();
         let bar = Rect::from_min_max(pos2(0.0, bottom - bar_h), pos2(SIZE.x, bottom));

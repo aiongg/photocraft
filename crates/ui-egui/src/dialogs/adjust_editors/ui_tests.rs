@@ -134,8 +134,8 @@ fn every_adjustment_layer_edits_through_properties() {
                 "levels" => {
                     // The output black handle sits below the output gradient bar.
                     let r = label_rect(&h, "Output Levels").unwrap_or_else(|| panic!("{kind} {mode}: Output Levels"));
-                    let style = craft_ui::composites::LevelsEditor::style(&craft_ui::theme::current(&h.ctx));
-                    let y = r.bottom() + craft_ui::theme::scale::Space::S4.px() + style.bar + style.row / 2.0;
+                    let style = craft::imaging::ui::LevelsEditor::style(&craft::ui::theme::current(&h.ctx));
+                    let y = r.bottom() + craft::ui::theme::scale::Space::S4.px() + style.bar + style.row / 2.0;
                     drag(&mut h, Pos2::new(r.left() + 6.0, y), Pos2::new(r.left() + 60.0, y));
                 }
                 "gradientMap" => {

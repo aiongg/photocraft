@@ -3,10 +3,10 @@
 //! and the other direction angles of the filter dialogs (#3152) share it.
 
 use super::{Response, Ui};
-use craft_ui::controls::AngleDial;
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::LocaleNumbers;
-use craft_ui::primitives::{Content, Text};
+use craft::ui::controls::AngleDial;
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::LocaleNumbers;
+use craft::ui::primitives::{Content, Text};
 
 /// `Label (dial) [field°]`. The dial points anywhere in -180..=180 and the result is clamped to
 /// `range`; the field accepts the whole of `range` (Motion Blur takes -360..=360, so a typed or

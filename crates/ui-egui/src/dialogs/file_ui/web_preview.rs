@@ -1,11 +1,11 @@
 //! Save for Web navigation and indexed palette UI. Draft state is serialized in dialog fields.
 use super::{Arc, Map, Optimized, PhotocraftApp, Value, WebSettings, json, n, params, s, web_cmds};
-use craft_theme::TypeRole;
-use craft_ui::composites::SectionLabel;
-use craft_ui::controls::{Button, ButtonVariant, ControlSize};
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::theme::TypeRole;
+use craft::ui::composites::SectionLabel;
+use craft::ui::controls::{Button, ButtonVariant, ControlSize};
+use craft::ui::primitives::{Content, Text};
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 
 /// Export dimensions, using the same percent/width/height precedence as web_document.
 pub fn dimensions(doc: &photocraft_doc::Document, p: &Value) -> Result<(f64, f64), String> {
@@ -89,15 +89,15 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let p = params(f);
     let Ok(settings) = WebSettings::from_params(&p, "preview") else { return };
     let Some(table) = settings.color_table else { return };
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     SectionLabel::new(tl!("Color Table…").trim_end_matches('…')).show(ui);
     let edited = |i: usize| settings.color_table_edits.get(&i).copied().unwrap_or(table[i]);
     let swatches = (0..table.len()).map(|i| {
         let [r, g, b] = edited(i);
-        (format!("Index {i}: {}", web_cmds::rgb_hex([r, g, b])), craft_theme::Srgba::rgb(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0))
+        (format!("Index {i}: {}", web_cmds::rgb_hex([r, g, b])), craft::theme::Srgba::rgb(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0))
     });
     let selected = f.get("__selectedColor").and_then(Value::as_u64).map(|i| i as usize);
-    let shown = craft_ui::composites::SwatchPalette::table("web-color-table", tl!("Color Table").trim_end_matches('…'), swatches)
+    let shown = craft::color::ui::SwatchPalette::table("web-color-table", tl!("Color Table").trim_end_matches('…'), swatches)
         .selected(selected)
         .columns(16)
         .show(ui);

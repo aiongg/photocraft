@@ -1,8 +1,8 @@
 use super::{Map, PhotocraftApp, Show, SnapTo, Value, ViewOptions};
 
 /// The shell's screen mode for a `view.screenMode.*` key.
-pub(super) fn screen_mode(key: &str) -> craft_ui::shell::ScreenMode {
-    use craft_ui::shell::ScreenMode;
+pub(super) fn screen_mode(key: &str) -> craft::ui::shell::ScreenMode {
+    use craft::ui::shell::ScreenMode;
     match key {
         "fullScreen" => ScreenMode::FullScreen,
         "fullScreenWithMenuBar" => ScreenMode::FullScreenWithMenuBar,

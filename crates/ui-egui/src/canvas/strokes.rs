@@ -3,7 +3,7 @@ use super::drag::Drag;
 use super::textures::{canvas_texture_options, shown_as_document};
 use super::view_xform::ViewXform;
 use super::{Color32, DRect, PhotocraftApp, Pos2, Stroke, Tool, json, pos2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 pub(crate) struct ClonePreviewCache {
     pub(super) key: String,
@@ -616,7 +616,7 @@ pub(super) fn draw_smoothing_string(painter: &egui::Painter, xf: &ViewXform, (br
         return;
     }
     painter.line_segment([a, b], Stroke::new(3.0, Color32::from_black_alpha(110)));
-    painter.line_segment([a, b], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+    painter.line_segment([a, b], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
     painter.circle_filled(a, 2.5, Color32::WHITE);
 }
 

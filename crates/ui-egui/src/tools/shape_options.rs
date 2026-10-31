@@ -1,6 +1,6 @@
 //! Shape toolbar edits share the engine commands used by the Properties panel.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use photocraft_doc::LayerContent;
 use serde_json::{Value, json};
 
@@ -34,7 +34,7 @@ fn selected_shape(session: &photocraft_engine::Session) -> Option<SelectedShape>
 }
 
 pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let lbl = |ui: &mut egui::Ui, s: &str| {
         let label = ui.label(egui::RichText::new(s).color(t.color.text.muted.to_egui()).size(12.0));
         // The caption scrubs and names the control drawn right after it.

@@ -114,8 +114,8 @@ impl ColorRamp {
 
     /// What the library ramp draws for this choice; the CMYK Spectrum is the spectrum through the
     /// CMYK gamut (`ColorRamp::gamut`).
-    pub fn kind(self) -> craft_ui::composites::RampKind {
-        use craft_ui::composites::RampKind;
+    pub fn kind(self) -> craft::color::ui::RampKind {
+        use craft::color::ui::RampKind;
         match self {
             ColorRamp::RgbSpectrum | ColorRamp::CmykSpectrum => RampKind::Spectrum,
             ColorRamp::GrayscaleRamp => RampKind::Grayscale,

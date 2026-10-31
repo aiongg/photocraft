@@ -1,6 +1,6 @@
 use super::defaults::apply;
 use super::{Arc, HashMap, PhotocraftApp, PoisonError, json};
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 
 /// Font families: bundled, system, and those the host serves (`photocraft_text::served`, fetched
 /// when picked). Cached until the shared engine registers fonts or the served catalog changes.
@@ -194,26 +194,26 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
         let faces = engine.lock().unwrap_or_else(PoisonError::into_inner).fonts.faces(&c.font_family);
         slider_axes(&faces, c.italic)
     };
-    let numbers = craft_ui::localized::LocaleNumbers::of(ui);
+    let numbers = craft::ui::localized::LocaleNumbers::of(ui);
     for axis in &axes {
         let (min, max) = (axis.1, axis.3);
         let mut v = axis_value(c, axis);
         let mut changed = false;
         let salt = ("type-axis", &axis.0);
         let before = ui.scope_id().with(("type-axis-before", &axis.0));
-        let response = craft_ui::composites::SliderRow::new(salt, axis_label(&axis.0), f64::from(v), f64::from(min)..=f64::from(max), &numbers).show(ui);
+        let response = craft::ui::composites::SliderRow::new(salt, axis_label(&axis.0), f64::from(v), f64::from(min)..=f64::from(max), &numbers).show(ui);
         for event in response.edits() {
             match event {
-                craft_ui::edit::EditEvent::Begin { .. } => {
+                craft::ui::edit::EditEvent::Begin { .. } => {
                     ui.data_mut(|d| d.insert_temp(before, v));
                 }
-                craft_ui::edit::EditEvent::Update { value, .. }
-                | craft_ui::edit::EditEvent::Set { value, .. }
-                | craft_ui::edit::EditEvent::Commit { value, changed: true, .. } => {
+                craft::ui::edit::EditEvent::Update { value, .. }
+                | craft::ui::edit::EditEvent::Set { value, .. }
+                | craft::ui::edit::EditEvent::Commit { value, changed: true, .. } => {
                     v = value as f32;
                     changed = true;
                 }
-                craft_ui::edit::EditEvent::Cancel { .. } => {
+                craft::ui::edit::EditEvent::Cancel { .. } => {
                     if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
                         v = old;
                         changed = true;
@@ -682,7 +682,7 @@ pub(crate) fn family_picker_in(
                                         }
                                     }
                                 } else {
-                                    ui.add_space(craft_ui::theme::scale::Space::S16.px());
+                                    ui.add_space(craft::ui::theme::scale::Space::S16.px());
                                 }
                                 ui.add_sized([ui.available_width(), row_h], button)
                             })
@@ -714,7 +714,7 @@ pub(crate) fn family_picker_in(
                         // The format badge (O, TT, VAR) just left of the sample.
                         if let Some(format) = format {
                             let center = egui::pos2(response.rect.right() - 8.0 - slot - FONT_BADGE_WIDTH / 2.0, response.rect.center().y);
-                            let t = craft_ui::theme::current(ui.ctx());
+                            let t = craft::ui::theme::current(ui.ctx());
                             ui.painter().text(
                                 center,
                                 egui::Align2::CENTER_CENTER,
@@ -745,7 +745,7 @@ pub(crate) fn family_picker_in(
                         for style in &styles {
                             let style_row = ui
                                 .horizontal(|ui| {
-                                    ui.add_space(craft_ui::theme::scale::Space::S32.px());
+                                    ui.add_space(craft::ui::theme::scale::Space::S32.px());
                                     ui.add_sized(
                                         [ui.available_width(), 22.0],
                                         egui::Button::selectable(false, style_label(style)).truncate().stroke(egui::Stroke::NONE),

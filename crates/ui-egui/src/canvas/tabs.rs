@@ -1,7 +1,7 @@
 use super::start_screen::start_screen;
 use super::textures::retain_gpu_documents;
 use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, TextureOptions, canvas_view, fmt_zoom, json, mode_label, pos2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 /// Tabs + canvas for the active document, or the start screen; then drops layers dragged onto
 /// another document (`layer_transfer`).
@@ -80,11 +80,11 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
             }
             let stroke = if d == idx {
-                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent)
+                craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent)
             } else {
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160))
+                craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_black_alpha(160))
             };
-            ui.painter().rect_stroke(cell, craft_ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(cell, craft::ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Inside);
         }
         return;
     }
@@ -112,9 +112,9 @@ fn doc_index(app: &PhotocraftApp, key: DocTab) -> Option<usize> {
 /// #4487). Files opening in the background are tabs after the documents, with a progress bar and
 /// a × that cancels the open. Returns where the document tabs are.
 pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, previous: Option<TabStrip>) -> TabStrip {
-    use craft_ui::edit::EditEvent;
-    use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
-    use craft_ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip as LibStrip, TabStripText};
+    use craft::ui::edit::EditEvent;
+    use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+    use craft::ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip as LibStrip, TabStripText};
     let tab_count = app.session.documents().len();
     let opening = crate::jobs_ui::open_tabs(app);
     let mut strip_tabs: Vec<Tab<DocTab>> = (0..tab_count)
@@ -176,7 +176,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, previous: Option<
             TabEvent::Reorder(EditEvent::Commit { value: mv, .. } | EditEvent::Set { value: mv, .. }) => {
                 if let Some(from) = mv.items.first().and_then(|&key| doc_index(app, key)) {
                     // A tab dropped next to an opening one lands after the last document.
-                    let at = doc_index(app, mv.target).map_or(tab_count, |t| if mv.position == craft_ui::behavior::DropPosition::After { t + 1 } else { t });
+                    let at = doc_index(app, mv.target).map_or(tab_count, |t| if mv.position == craft::ui::behavior::DropPosition::After { t + 1 } else { t });
                     let to = tab_move_target(from, at);
                     if to != from {
                         tab_move = Some((from, to));
@@ -203,7 +203,7 @@ pub(super) fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, previous: Option<
         let ghost = Rect::from_min_size(drag.pointer - egui::vec2(40.0, 12.0), egui::vec2(240.0, 160.0));
         let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, ui.scope_id().with("tab-tear-off")));
         painter.rect_filled(ghost, t.radius_sm, t.accent.gamma_multiply(0.12));
-        painter.rect_stroke(ghost, t.radius_sm, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(ghost, t.radius_sm, craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
     }
     // Every tab action goes through the guarded File commands, as the menu bar does.
     let target = ui.data(|d| d.get_temp::<photocraft_doc::DocId>(menu_id)).and_then(|id| doc_index(app, DocTab::Doc(id)));

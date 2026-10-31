@@ -19,8 +19,8 @@
 //! sending the colour only when it was changed, so a guide that uses the preference colour keeps
 //! doing so.
 
-use craft_ui::composites::{FormGrid, LabelAlign, Notice, Tone};
-use craft_ui::controls::{RadioGroup, Select};
+use craft::ui::composites::{FormGrid, LabelAlign, Notice, Tone};
+use craft::ui::controls::{RadioGroup, Select};
 use photocraft_engine::edit_cmds::GUIDE_COLORS;
 use photocraft_engine::prefs::Unit;
 use serde_json::{Map, Value, json};
@@ -156,7 +156,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut color = f.get("color").and_then(Value::as_str).filter(|c| is_color_name(c)).unwrap_or(DEFAULT_COLOR).to_string();
     if let Some(error) = f.get("__error").and_then(Value::as_str) {
         Notice::new(error).tone(Tone::Bad).show(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     FormGrid::new("new-guide-dialog").label_align(LabelAlign::Start).show(ui, |form| {
         form.row(tl!("Orientation"), |ui, _| {

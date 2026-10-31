@@ -6,7 +6,7 @@
 //! Ctrl is the corner-distortion modifier. Smart guides follow View › Show › Smart Guides and also snap the Move
 //! tool to other layers' edges and centres. The threshold is 8 screen pixels at the current zoom.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, Stroke, pos2};
 use photocraft_doc::LayerId;
 use photocraft_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
@@ -584,8 +584,8 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
         );
         painter.rect_stroke(
             r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), crate::theme::Tokens::get(painter.ctx()).accent),
             egui::StrokeKind::Middle,
         );
     }
@@ -608,7 +608,7 @@ fn draw_line(painter: &egui::Painter, xf: &ViewXform, l: &SnapLine, color: Color
     };
     painter.line_segment(
         [pos2(a.x.round() + 0.5, a.y.round() + 0.5), pos2(b.x.round() + 0.5, b.y.round() + 0.5)],
-        craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color),
+        craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), color),
     );
 }
 

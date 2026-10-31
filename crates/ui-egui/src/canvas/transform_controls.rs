@@ -1,9 +1,10 @@
 use super::selection::floating_outline;
 use super::view_xform::ViewXform;
 use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Tool, Vec2, pos2, vec2};
-use craft_ui::canvas::quad::{BoxPart, BoxState};
-use craft_ui::canvas::{RotateZone, TransformBox, TransformNames, kurbo::Point};
-use craft_ui::theme::ToEgui;
+use craft::ui::canvas::quad::{BoxPart, BoxState};
+use craft::ui::canvas::{kurbo::Point};
+use craft::draw::ui::{RotateZone, TransformBox, TransformNames};
+use craft::ui::theme::ToEgui;
 
 /// View › Show › Layer Edges: the colour of the active layer's outline.
 pub(crate) const LAYER_EDGES: Color32 = Color32::from_rgb(0x2d, 0x8c, 0xeb);
@@ -136,18 +137,18 @@ pub(super) fn begin_transform_controls_at(app: &mut PhotocraftApp, ctx: &egui::C
 /// and the outline of every selected shape layer, as in Photoshop.
 pub(super) fn draw_transform_controls(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(r) = transform_controls_rect(app, xf) else { return };
-    let accent = craft_ui::theme::current(painter.ctx()).color.accent.solid.to_egui();
+    let accent = craft::ui::theme::current(painter.ctx()).color.accent.solid.to_egui();
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     for l in transform_controls_layers(app) {
         if let LayerContent::Shape(sh) = &l.content {
             crate::vector_ui::draw_outline(painter, &sh.path, &to_scr, accent);
         }
     }
-    let tokens = craft_ui::theme::current(painter.ctx());
-    let style = craft_ui::canvas::TransformBox::style(&tokens);
-    painter.rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), style.line, egui::StrokeKind::Middle);
+    let tokens = craft::ui::theme::current(painter.ctx());
+    let style = craft::draw::ui::TransformBox::style(&tokens);
+    painter.rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), style.line, egui::StrokeKind::Middle);
     let ppp = painter.ctx().pixels_per_point();
     for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
-        painter.extend(craft_ui::primitives::Handle::shapes_with(&style.handle, craft_ui::primitives::HandleShape::Square, p, ppp));
+        painter.extend(craft::ui::primitives::Handle::shapes_with(&style.handle, craft::ui::primitives::HandleShape::Square, p, ppp));
     }
 }

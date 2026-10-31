@@ -1,13 +1,13 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Value, b, check_row, json, n, number_row, params, s, select_row};
-use craft_theme::TypeRole;
-use craft_ui::composites::{FieldControl, Form, FormGrid, Notice, SectionLabel, Tone};
-use craft_ui::controls::{Button, ButtonVariant, Segmented, Select, TextField};
-use craft_ui::primitives::{Content, Text};
+use craft::theme::TypeRole;
+use craft::ui::composites::{FieldControl, Form, FormGrid, Notice, SectionLabel, Tone};
+use craft::ui::controls::{Button, ButtonVariant, Segmented, Select, TextField};
+use craft::ui::primitives::{Content, Text};
 
 /// Width of the settings column beside the page preview.
 const PRINT_SETTINGS_WIDTH: f32 = 340.0;
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 
 /// Print's Printer menu: the default printer (value ""), then every printer `file.printers`
 /// listed. A saved name the spooler no longer lists stays selectable rather than vanishing.
@@ -140,8 +140,8 @@ pub(super) fn take_turned_page(f: &mut Map<String, Value>, r: &Value) {
 /// Takes the paper from the printer's driver settings (Windows), as Photoshop does.
 pub(super) fn driver_page(f: &mut Map<String, Value>) -> bool {
     let printer = s(f, "printer", "");
-    let settings = f.get("printerSettings").and_then(Value::as_str).and_then(|h| craft_print::rgb::DevMode::from_hex(h).ok());
-    match photocraft_engine::print_cmds::try_with_spooler(|| craft_print::rgb::page(&printer, settings.as_ref())) {
+    let settings = f.get("printerSettings").and_then(Value::as_str).and_then(|h| craft::print::rgb::DevMode::from_hex(h).ok());
+    match photocraft_engine::print_cmds::try_with_spooler(|| craft::print::rgb::page(&printer, settings.as_ref())) {
         Some(Ok(pg)) => {
             f.insert("paper".into(), json!([pg.paper.0, pg.paper.1]));
             f.insert("printable".into(), json!([pg.printable.0, pg.printable.1, pg.printable.2, pg.printable.3]));
@@ -323,7 +323,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
     // PDF exports and previews retain editable paper on Windows too. Only a real native
     // submission takes its media from the printer; entering that mode refreshes the driver
@@ -352,17 +352,17 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
         // Page preview.
         ui.vertical(|ui| {
             let (area, _) = ui.allocate_exact_size(egui::vec2(330.0, 400.0), egui::Sense::hover());
-            ui.painter().rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.color.surface.canvas.to_egui());
+            ui.painter().rect_filled(area, craft::ui::theme::scale::Radius::R0.px(), t.color.surface.canvas.to_egui());
             match photocraft_engine::print_cmds::layout(&doc, &p, "file.print") {
                 Ok(mut l) => {
                     let (pw, ph) = l.paper;
                     let k = ((area.width() - 20.0) / pw as f32).min((area.height() - 20.0) / ph as f32);
                     let page = egui::Rect::from_center_size(area.center(), egui::vec2(pw as f32 * k, ph as f32 * k));
-                    ui.painter().rect_filled(page, craft_ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
+                    ui.painter().rect_filled(page, craft::ui::theme::scale::Radius::R0.px(), egui::Color32::WHITE);
                     ui.painter().rect_stroke(
                         page,
-                        craft_ui::theme::scale::Radius::R0.px(),
-                        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
+                        craft::ui::theme::scale::Radius::R0.px(),
+                        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
                         egui::StrokeKind::Outside,
                     );
                     let mut img = print_preview_image(l, page, k);
@@ -408,7 +408,7 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                         egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0))
                     };
                     clip.image(tex.id(), img, uv, egui::Color32::WHITE);
-                    let mark = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), egui::Color32::BLACK);
+                    let mark = craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), egui::Color32::BLACK);
                     if l.marks.corner_crop {
                         // Bleed puts the marks on the trim line, inside the image edge.
                         let b = l.marks.bleed as f32 * k;
@@ -448,11 +448,11 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
                 }
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S12.px());
+        ui.add_space(craft::ui::theme::scale::Space::S12.px());
         ui.vertical(|ui| {
             ui.set_width(PRINT_SETTINGS_WIDTH);
             let head = |ui: &mut egui::Ui, s: &str| {
-                ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                ui.add_space(craft::ui::theme::scale::Space::S4.px());
                 SectionLabel::new(s).show(ui);
             };
             head(ui, tl!("Printer Setup"));
@@ -499,8 +499,8 @@ pub(super) fn print_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map
             if printers.is_some() {
                 if print_settings {
                     let printer = s(f, "printer", "");
-                    let current = f.get("printerSettings").and_then(Value::as_str).and_then(|h| craft_print::rgb::DevMode::from_hex(h).ok());
-                    match photocraft_engine::print_cmds::try_with_spooler(|| craft_print::rgb::settings_dialog(&printer, current.as_ref(), None)) {
+                    let current = f.get("printerSettings").and_then(Value::as_str).and_then(|h| craft::print::rgb::DevMode::from_hex(h).ok());
+                    match photocraft_engine::print_cmds::try_with_spooler(|| craft::print::rgb::settings_dialog(&printer, current.as_ref(), None)) {
                         Some(Ok(Some(dm))) => {
                             f.insert("printerSettings".into(), json!(dm.to_hex()));
                             driver_page(f);

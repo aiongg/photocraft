@@ -10,7 +10,7 @@
 //! `ui.dialog.set` and `ui.dialog.confirm` work as for every schema dialog. The units are view
 //! state (`__resUnit`, `__freqUnit`).
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -65,7 +65,7 @@ fn text(f: &Map<String, Value>, key: &str, default: &str) -> String {
 }
 
 fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.add_sized([96.0, 20.0], egui::Label::new(egui::RichText::new(text).color(t.color.text.muted.to_egui())).truncate());
 }
 
@@ -90,7 +90,7 @@ fn per_unit_row(ui: &mut egui::Ui, f: &mut Map<String, Value>, field: &str, name
 
 /// The dialog body.
 pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     ui.spacing_mut().item_spacing.y = t.space.gap.stack;
     let res_units = [("ppi", tl!("Pixels/Inch")), ("ppcm", tl!("Pixels/Centimeter"))];
 
@@ -108,7 +108,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, "__resUnit", res_units);
     });
 
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     crate::widgets::section_label(ui, tl!("Method"));
     crate::widgets::hairline(ui);
     let mut method = text(f, "method", "diffusion");
@@ -133,7 +133,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     });
 
     if method == "halftone" {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         crate::widgets::section_label(ui, tl!("Halftone Screen"));
         crate::widgets::hairline(ui);
         ui.horizontal(|ui| {
@@ -158,7 +158,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     }
 
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
         f.insert("__preview".into(), json!(preview));
     }

@@ -415,7 +415,7 @@ fn the_narrow_options_bar_preference_shortens_the_bar() {
         let mut out = ctx.run_ui(input_at_scale(screen, 1.0), |ui| {
             options_bar(app, ui);
             top = ui.available_rect_before_wrap().top() - ui.spacing().item_spacing.y;
-            expected = craft_ui::patterns::OptionsBar::style(&<craft_ui::theme::Tokens as craft_ui::theme::TokensOf>::of(ui), narrow).height;
+            expected = craft::ui::patterns::OptionsBar::style(&<craft::ui::theme::Tokens as craft::ui::theme::TokensOf>::of(ui), narrow).height;
         });
         out.textures_delta.clear();
         (top, expected)

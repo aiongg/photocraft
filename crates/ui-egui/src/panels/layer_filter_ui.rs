@@ -8,10 +8,10 @@ use photocraft_doc::{Layer, LayerContent};
 use serde::{Deserialize, Serialize};
 
 use crate::state::UiState;
-use craft_ui::controls::{ControlSize, IconButton, NumberField, SearchField, Select};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::controls::{ControlSize, IconButton, NumberField, SearchField, Select};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use egui::{Align, Layout, vec2};
 
 use crate::PhotocraftApp;
@@ -141,7 +141,7 @@ pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 .response
                 .changed();
         });
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         match app.ui.layer_filter_by {
             FilterBy::Kind => {
                 for (kind, icon, tip) in [

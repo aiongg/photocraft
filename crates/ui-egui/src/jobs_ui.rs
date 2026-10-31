@@ -19,7 +19,7 @@
 //!
 //! The canvas keeps showing the pre-job state: workers never touch the session's documents.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
@@ -31,7 +31,7 @@ use serde_json::{Value, json};
 
 use crate::theme::Tokens;
 use crate::{ControlResponse, ExportSettings, PhotocraftApp, SaveFileFn, notices};
-use craft_ui::patterns::{StatusBar, StatusProgress};
+use craft::ui::patterns::{StatusBar, StatusProgress};
 
 /// Delay before the modal progress dialog appears (quick jobs finish without it).
 pub const DIALOG_DELAY_MS: f64 = 250.0;
@@ -636,7 +636,7 @@ pub fn bar(ui: &egui::Ui, rect: Rect, frac: Option<f32>, t: &Tokens) {
     let p = ui.painter();
     let r = rect.height() / 2.0;
     p.rect_filled(rect, r, t.field);
-    p.rect_stroke(rect, r, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+    p.rect_stroke(rect, r, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
     let fill = match frac {
         Some(f) => Rect::from_min_size(rect.min, vec2((rect.width() * f.clamp(0.0, 1.0)).max(rect.height()), rect.height())),
         None => {
@@ -733,23 +733,23 @@ pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
             Some(j) if j.elapsed_ms >= DIALOG_DELAY_MS && !app.jobs.saves.iter().any(|s| s.job == j.id) => j,
             _ => {
                 // The next job's window opens afresh.
-                ctx.data_mut(|d| d.remove_temp::<craft_ui::dialog::DialogState>(state_id));
+                ctx.data_mut(|d| d.remove_temp::<craft::ui::dialog::DialogState>(state_id));
                 return;
             }
         },
     };
     let t = Tokens::get(ctx);
-    let mut state = ctx.data(|d| d.get_temp::<craft_ui::dialog::DialogState>(state_id)).unwrap_or_default();
+    let mut state = ctx.data(|d| d.get_temp::<craft::ui::dialog::DialogState>(state_id)).unwrap_or_default();
     let hint = tl!("Esc to cancel");
     // No close box and no OK: Cancel stops the work. A click on the backdrop doesn't cancel it, and
     // Esc is handled in `tick`.
-    let shown = craft_ui::dialog::Dialog::new("job-progress", tl!(&j.label))
-        .backdrop(craft_ui::dialog::Backdrop::Scrim)
+    let shown = craft::ui::dialog::Dialog::new("job-progress", tl!(&j.label))
+        .backdrop(craft::ui::dialog::Backdrop::Scrim)
         .close_label(None)
-        .width(craft_ui::dialog::Width::Fixed(360.0))
-        .initial_focus(craft_ui::dialog::InitialFocus::None)
+        .width(craft::ui::dialog::Width::Fixed(360.0))
+        .initial_focus(craft::ui::dialog::InitialFocus::None)
         .footer(
-            craft_ui::dialog::Footer::standard()
+            craft::ui::dialog::Footer::standard()
                 .without_ok()
                 .cancel(tl!("Cancel"))
                 .trailing_extra(move |ui| _ = ui.label(RichText::new(hint).color(t.text_faint).size(11.0))),
@@ -757,10 +757,10 @@ pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, &mut state, &mut (), |ui, ()| {
             let msg = if j.message.is_empty() || j.message == j.label { tl!("Working…").to_string() } else { j.message.clone() };
             ui.label(RichText::new(msg).color(t.text_dim));
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             let (br, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
             bar(ui, br, shown_fraction(&j), &t);
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -810,7 +810,7 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     let Some(j) = app.session.job(job) else { return };
     let t = Tokens::get(ui.ctx());
     let area = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+    ui.painter().rect_filled(area, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
     // Centre the card at the height its content needed last frame; the background is painted
     // once the rows are laid out, so a taller content (a long translation) still gets a card.
     let height_id = egui::Id::unique(("open-card-height", job));
@@ -822,19 +822,19 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     let title = child
         .add(egui::Label::new(RichText::new(crate::i18n::fmt(tl!("Opening {name}"), &[("name", &tab.name)])).font(crate::theme::semibold(14.0))).truncate())
         .rect;
-    child.add_space(craft_ui::theme::scale::Space::S4.px());
+    child.add_space(craft::ui::theme::scale::Space::S4.px());
     let msg = if j.message.is_empty() { tl!("Reading…").to_string() } else { format!("{}…", j.message) };
     child.add(egui::Label::new(RichText::new(msg).color(t.text_dim).size(12.0)).truncate());
-    child.add_space(craft_ui::theme::scale::Space::S12.px());
+    child.add_space(craft::ui::theme::scale::Space::S12.px());
     let (br, _) = child.allocate_exact_size(vec2(child.available_width(), 8.0), Sense::hover());
     bar(&child, br, shown_fraction(&j), &t);
-    child.add_space(craft_ui::theme::scale::Space::S12.px());
+    child.add_space(craft::ui::theme::scale::Space::S12.px());
     let mut cancel_it = false;
     let mut cancel_rect = Rect::NOTHING;
     child.horizontal(|ui| {
         ui.label(RichText::new(percent(&j)).color(t.text_faint).size(11.5));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add(craft_ui::controls::Button::new(tl!("Cancel")).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(76.0));
+            let r = ui.add(craft::ui::controls::Button::new(tl!("Cancel")).variant(craft::ui::controls::ButtonVariant::Secondary).min_width(76.0));
             cancel_it = r.clicked();
             cancel_rect = r.rect;
         });
@@ -844,7 +844,7 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
     let card = Rect::from_min_size(card.min, vec2(OPEN_CARD_WIDTH, height.max(needed)));
     ui.painter().set(fill, egui::Shape::rect_filled(card, t.radius_lg, t.card));
     ui.painter()
-        .set(border, egui::Shape::rect_stroke(card, t.radius_lg, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside));
+        .set(border, egui::Shape::rect_stroke(card, t.radius_lg, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside));
     if (needed - height).abs() > 0.5 {
         ui.ctx().data_mut(|d| d.insert_temp(height_id, needed));
         ui.ctx().request_repaint();
@@ -863,9 +863,9 @@ pub fn open_tabs(app: &PhotocraftApp) -> Vec<(JobId, String, f32)> {
 /// Draw one opening tab's progress underline inside tab rect `r`.
 pub fn tab_underline(ui: &egui::Ui, r: Rect, frac: f32, t: &Tokens) {
     let line = Rect::from_min_max(egui::pos2(r.left() + 4.0, r.bottom() - 3.0), egui::pos2(r.right() - 4.0, r.bottom() - 1.0));
-    ui.painter().rect_filled(line, craft_ui::theme::scale::Radius::R2.px(), t.field_border);
+    ui.painter().rect_filled(line, craft::ui::theme::scale::Radius::R2.px(), t.field_border);
     let f = Rect::from_min_size(line.min, vec2(line.width() * frac.clamp(0.0, 1.0), line.height()));
-    ui.painter().rect_filled(f, craft_ui::theme::scale::Radius::R2.px(), t.accent);
+    ui.painter().rect_filled(f, craft::ui::theme::scale::Radius::R2.px(), t.accent);
 }
 
 /// Jobs for `ui.inspect`.

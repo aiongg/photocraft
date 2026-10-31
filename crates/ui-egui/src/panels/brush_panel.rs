@@ -14,7 +14,7 @@
 //! The lock beside a section name keeps that section's settings when another preset is picked
 //! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Color32, CornerRadius, Sense, Stroke, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
@@ -261,14 +261,14 @@ fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
         if br_resp.clicked() {
             let _ = crate::menus::invoke(app, ui.ctx(), "window.panel.brushes", json!({}));
         }
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         widgets::hairline(ui);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         for (i, (name, has_box)) in SECTIONS.iter().enumerate() {
             let toggle_only = checkbox_only(i);
             // Group the switches with whitespace, not separators between individual rows.
             if i == CHECKBOX_ONLY_START {
-                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                ui.add_space(craft::ui::theme::scale::Space::S6.px());
             }
             let sel = !toggle_only && app.ui.brush_section == i;
             let (r, resp) = ui.allocate_exact_size(vec2(150.0, 23.0), Sense::click());
@@ -330,7 +330,7 @@ fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
                 let tint = if *lock { t.text } else { t.text_faint };
                 icons::paint(ui, lr, if *lock { "lock" } else { "lock-open" }, 12.0, tint);
                 if lresp.has_focus() {
-                    ui.painter().rect_stroke(lr, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(lr, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent), egui::StrokeKind::Inside);
                 }
                 let tip =
                     if *lock { tl!("Unlock: picking a preset replaces these settings") } else { tl!("Lock: keep these settings when picking another preset") };
@@ -343,7 +343,7 @@ fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
                 app.ui.brush_section = i;
             }
             if i == 0 {
-                ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                ui.add_space(craft::ui::theme::scale::Space::S4.px());
             }
         }
     });
@@ -382,9 +382,9 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             });
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(STRIP.0 as f32, STRIP.1 as f32), Sense::hover());
         ui.painter().rect_filled(r, t.radius_sm, t.field);
@@ -505,7 +505,7 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let t = Tokens::get(ctx);
     let frame = egui::Frame::NONE
         .fill(t.card)
-        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ctx, t.card_border))
+        .stroke(craft::ui::theme::scale::Stroke::W1.egui(ctx, t.card_border))
         .corner_radius(CornerRadius::same(t.radius_lg as u8))
         .shadow(egui::Shadow { offset: [0, 10], blur: 30, spread: 0, color: t.shadow })
         .inner_margin(egui::Margin::same(10));
@@ -548,9 +548,9 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     });
                 });
             });
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             widgets::hairline(ui);
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             if app.ui.brush_tab == 1 {
                 crate::brushes_tab::show(app, ui);
             } else {

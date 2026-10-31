@@ -7,8 +7,8 @@ use crate::{
     theme::Tokens,
     widgets,
 };
-use craft_ui::patterns::OptionsBar;
-use craft_ui::theme::StrokeExt;
+use craft::ui::patterns::OptionsBar;
+use craft::ui::theme::StrokeExt;
 use egui::{Atom, Key, Stroke, vec2};
 use photocraft_doc::Document;
 use photocraft_engine::symmetry_cmds::PaintingSymmetry;
@@ -139,7 +139,7 @@ pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     // A popup owns Enter/Escape; dismissing it must not commit or cancel the transform.
-    if craft_ui::menu::any_open(ctx) || egui::Popup::is_any_open(ctx) {
+    if craft::ui::menu::any_open(ctx) || egui::Popup::is_any_open(ctx) {
         return;
     }
     if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape)) {
@@ -296,7 +296,7 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let screen = |p: [f64; 2]| xf.to_screen(p[0] as f32, p[1] as f32);
     let t = Tokens::get(painter.ctx());
     for [a, b] in p.segments(size) {
-        painter.line_segment([screen(a), screen(b)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent));
+        painter.line_segment([screen(a), screen(b)], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), t.accent));
     }
     if edit.is_some() {
         let center = screen(p.center);

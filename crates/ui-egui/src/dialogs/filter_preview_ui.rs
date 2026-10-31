@@ -8,8 +8,8 @@
 //! point whatever the proxy factor. The Preview checkbox keeps toggling the on-canvas live result
 //! (`canvas::ensure_filter_preview`), unchanged.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{Color32, Rect, Sense, Stroke, Vec2, pos2, vec2};
 use photocraft_doc::Document;
 use serde_json::{Map, Value, json};
@@ -62,7 +62,7 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
         crate::canvas::filter_preview_factor(app, &st.doc, &cmd, &params)
     });
 
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let cache_id = egui::Id::unique(("filter-preview-ui", dialog));
     let mut cache: Cache = ui.ctx().data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Cache>(cache_id)));
     // Channel visibility and the active mask can change without a document revision. Both the
@@ -126,7 +126,7 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
     painter.rect_stroke(
         rect,
         t.shape.radius.control,
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
         egui::StrokeKind::Inside,
     );
 

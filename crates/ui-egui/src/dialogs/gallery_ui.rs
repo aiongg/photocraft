@@ -11,7 +11,7 @@
 //! Everything is drivable over the control channel with `filter.filterGallery {"ui": {...}}`
 //! while the dialog is open.
 
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use std::hash::{Hash, Hasher};
 
 use egui::{Align2, Color32, FontId, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
@@ -644,10 +644,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         d.history.settle(&d.effects, ctx.input(|i| i.pointer.any_down()));
         let (full, _) = ui.allocate_exact_size(screen.size(), Sense::hover());
         let painter = ui.painter().clone();
-        painter.rect_filled(full, craft_ui::theme::scale::Radius::R0.px(), t.chrome);
+        painter.rect_filled(full, craft::ui::theme::scale::Radius::R0.px(), t.chrome);
         let title = ERect::from_min_size(full.min, vec2(full.width(), 30.0));
-        painter.rect_filled(title, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([title.left_bottom(), title.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(title, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([title.left_bottom(), title.right_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let pct = if d.zoom > 0.0 { format!("{:.0}%", d.zoom * 100.0) } else { tl!("Fit").into() };
         let name = d.effects.get(d.selected).map_or("", |e| tl!(e.filter.name()));
         painter.text(title.center(), Align2::CENTER_CENTER, format!("{name} ({}, {pct})", d.layer_name), FontId::proportional(13.0), t.text);
@@ -658,7 +658,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let zoom_bar = ERect::from_min_max(pos2(body.left(), area.bottom()), pos2(mid.left(), body.bottom()));
 
         // ---- Preview ----
-        painter.rect_filled(area, craft_ui::theme::scale::Radius::R0.px(), t.canvas);
+        painter.rect_filled(area, craft::ui::theme::scale::Radius::R0.px(), t.canvas);
         let shown = update_preview(d, ctx, area, background);
         let clip = painter.with_clip_rect(area);
         if let (Some(tex), Some(r)) = (&d.tex, shown) {
@@ -666,8 +666,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             clip.image(tex.id(), r, ERect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
             clip.rect_stroke(
                 r,
-                craft_ui::theme::scale::Radius::R0.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+                craft::ui::theme::scale::Radius::R0.px(),
+                craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
                 egui::StrokeKind::Outside,
             );
         }
@@ -677,7 +677,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             d.center = [d.center[0] - dl.x, d.center[1] - dl.y];
         }
         // ---- Zoom bar ----
-        painter.rect_filled(zoom_bar, craft_ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.rect_filled(zoom_bar, craft::ui::theme::scale::Radius::R0.px(), t.dock);
         let mut zb = ui.new_child(egui::UiBuilder::new().max_rect(zoom_bar.shrink2(vec2(10.0, 3.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         if crate::icons::button(&mut zb, "minus", 22.0, false, tl!("Zoom out")).clicked() {
             d.zoom = step_zoom(d, -1);
@@ -706,8 +706,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
 
         // ---- Category folders with thumbnails ----
-        painter.rect_filled(mid, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([mid.left_top(), mid.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(mid, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([mid.left_top(), mid.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         update_thumbs(d, ctx, 6);
         let mut mu = ui.new_child(egui::UiBuilder::new().max_rect(mid.shrink2(vec2(8.0, 8.0))));
         egui::ScrollArea::vertical().id_salt("gallery-tree").show(&mut mu, |ui| {
@@ -736,15 +736,15 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                     ui.painter().image(tex.id(), r, ERect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                                 }
                                 None => {
-                                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R2.px(), t.field);
+                                    ui.painter().rect_filled(r, craft::ui::theme::scale::Radius::R2.px(), t.field);
                                 }
                             }
                             let stroke = if selected {
-                                craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
+                                craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent)
                             } else {
-                                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator)
+                                craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator)
                             };
-                            ui.painter().rect_stroke(r, craft_ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Outside);
+                            ui.painter().rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), stroke, egui::StrokeKind::Outside);
                             ui.add_sized(
                                 [THUMB[0] as f32, 14.0],
                                 egui::Label::new(egui::RichText::new(tl!(f.name())).size(10.5).color(if selected { t.text } else { t.text_dim })).truncate(),
@@ -759,13 +759,13 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         }
                     }
                 });
-                ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                ui.add_space(craft::ui::theme::scale::Space::S4.px());
             }
         });
 
         // ---- Right: buttons, filter settings, effect layers ----
-        painter.rect_filled(right, craft_ui::theme::scale::Radius::R0.px(), t.dock);
-        painter.line_segment([right.left_top(), right.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        painter.rect_filled(right, craft::ui::theme::scale::Radius::R0.px(), t.dock);
+        painter.line_segment([right.left_top(), right.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
         let inner = right.shrink2(vec2(12.0, 10.0));
         let mut ru = ui.new_child(egui::UiBuilder::new().max_rect(inner));
         ru.spacing_mut().item_spacing.y = 6.0;
@@ -780,7 +780,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 action = Some(if role == widgets::ButtonRole::Default { "ok" } else { "cancel" });
             }
         });
-        ru.add_space(craft_ui::theme::scale::Space::S4.px());
+        ru.add_space(craft::ui::theme::scale::Space::S4.px());
         let mut cur = d.effects[d.selected].filter;
         let names: Vec<(GalleryFilter, &str)> = GalleryFilter::ALL.iter().map(|f| (*f, f.name())).collect();
         if widgets::dropdown(&mut ru, "gallery-filter", tl!("Filter"), &mut cur, &names, inner.width() - 8.0) {
@@ -849,7 +849,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 let sel = i == d.selected;
                 let (row, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::click());
                 if sel {
-                    ui.painter().rect_filled(row, craft_ui::theme::scale::Radius::R2.px(), t.accent_soft);
+                    ui.painter().rect_filled(row, craft::ui::theme::scale::Radius::R2.px(), t.accent_soft);
                 }
                 let eye = ERect::from_min_size(row.min + vec2(4.0, 4.0), vec2(16.0, 16.0));
                 crate::icons::paint(ui, eye, if d.effects[i].visible { "eye" } else { "eye-off" }, 14.0, t.icon);

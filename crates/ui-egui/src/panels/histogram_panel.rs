@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use craft_ui::composites::{ChannelColor, Histogram};
+use craft::ui::composites::{ChannelColor, Histogram};
 use egui::vec2;
 use photocraft_color::ColorMode;
 use photocraft_doc::adjust::ToneSpace;
@@ -665,13 +665,13 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
     }
     if opts.show_statistics {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         let levels = app.ui.histogram_range.or_else(|| hover.map(|l| [l, l]));
         statistics(ui, &s.hist, s.mode, channel, levels, &t);
     }
     if opts.view == HistView::AllChannels {
         for c in color_channels(s.mode) {
-            ui.add_space(craft_ui::theme::scale::Space::S4.px());
+            ui.add_space(craft::ui::theme::scale::Space::S4.px());
             ui.label(egui::RichText::new(tl!(channel_label(s.mode, *c))).color(t.text).size(11.5));
             plot(&format!("hist-all-{}", channel_id(*c)), &s.hist, s.mode, *c, colored).height(90.0).show(ui);
         }

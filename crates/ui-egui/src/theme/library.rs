@@ -2,8 +2,8 @@
 //! themes, and the flat colour struct the widgets read, derived from resolved library tokens.
 
 use super::{ThemeKind, Tokens};
-use craft_theme::{Appearance, Mode, ModeChoice, Selection, Size, ThemeId, ThemePair};
-use craft_ui::theme::ToEgui;
+use craft::theme::{Appearance, Mode, ModeChoice, Selection, Size, ThemeId, ThemePair};
+use craft::ui::theme::ToEgui;
 use egui::Color32;
 
 impl ThemeKind {
@@ -60,19 +60,19 @@ pub fn selection_for(kind: ThemeKind) -> Selection {
     Selection {
         theme: ThemePair::same(id),
         mode: if kind.is_dark() { ModeChoice::Dark } else { ModeChoice::Light },
-        contrast: craft_theme::ContrastChoice::Standard,
-        motion: craft_theme::MotionChoice::Full,
+        contrast: craft::theme::ContrastChoice::Standard,
+        motion: craft::theme::MotionChoice::Full,
         size: kind.size(),
-        text_size: craft_theme::TextSize::Default,
+        text_size: craft::theme::TextSize::Default,
     }
 }
 
 impl Tokens {
     /// Derives the flat tokens for `kind` from library tokens resolved for `mode`.
-    pub fn from_library(kind: ThemeKind, t: &craft_theme::Tokens, appearance: Appearance) -> Tokens {
+    pub fn from_library(kind: ThemeKind, t: &craft::theme::Tokens, appearance: Appearance) -> Tokens {
         let c = &t.color;
         let dark = appearance.mode == Mode::Dark;
-        let col = |v: craft_theme::Rgba| -> Color32 { v.to_egui() };
+        let col = |v: craft::theme::Rgba| -> Color32 { v.to_egui() };
         let pro = kind.is_pro();
         let primary = &t.component.button.primary;
         let canvas = col(c.surface.canvas);
@@ -107,7 +107,7 @@ impl Tokens {
             radius_sm: r.control,
             radius: r.popup,
             radius_lg: r.window,
-            bevel: matches!(t.shape.edge, craft_theme::Edge::Bevel { .. }),
+            bevel: matches!(t.shape.edge, craft::theme::Edge::Bevel { .. }),
             pro,
             // The Studio-layout themes paint neither (they use `hover` and `accent_soft`).
             tab_strip: if pro || kind == ThemeKind::Classic { col(t.component.tab.strip) } else { Color32::TRANSPARENT },
@@ -123,9 +123,9 @@ impl Tokens {
     /// The tokens of a built-in legacy kind at its own Size, resolved without a theme store.
     pub fn for_kind(kind: ThemeKind) -> Tokens {
         let sel = selection_for(kind);
-        let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
+        let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
         let base =
-            craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
+            craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft::theme::builtins().iter().find(|t| t.id == *id).cloned());
         let shown = base.shown(kind.mode());
         Tokens::from_library(kind, &shown.resolved.tokens, shown.appearance)
     }

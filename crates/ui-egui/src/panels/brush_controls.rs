@@ -1,8 +1,8 @@
 use super::options_bar::select_cell;
 use super::{Align2, BlendMode, Color32, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, c32, icons, json, pos2, vec2};
-use craft_ui::controls::{Checkbox, ControlSize, IconButton};
-use craft_ui::icons::Icon;
-use craft_ui::theme::StrokeExt;
+use craft::ui::controls::{Checkbox, ControlSize, IconButton};
+use craft::ui::icons::Icon;
+use craft::ui::theme::StrokeExt;
 
 /// A painting tool's Mode dropdown over `modes` (`None` is Clear); the wheel over it steps the
 /// mode. Returns the mode picked this frame.
@@ -54,14 +54,14 @@ pub(super) fn mixer_load_swatch(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let p = ui.painter();
     match app.session.tools.mixer.next_load(app.session.tools.foreground) {
         Some(c) => {
-            p.rect_filled(chip, craft_ui::theme::scale::Radius::R2.px(), c32(c));
+            p.rect_filled(chip, craft::ui::theme::scale::Radius::R2.px(), c32(c));
         }
         None => {
-            p.rect_filled(chip, craft_ui::theme::scale::Radius::R2.px(), t.field);
-            p.line_segment([chip.left_bottom(), chip.right_top()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
+            p.rect_filled(chip, craft::ui::theme::scale::Radius::R2.px(), t.field);
+            p.line_segment([chip.left_bottom(), chip.right_top()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
         }
     }
-    p.rect_stroke(chip, craft_ui::theme::scale::Radius::R2.px(), craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
+    p.rect_stroke(chip, craft::ui::theme::scale::Radius::R2.px(), craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Outside);
     icons::paint(ui, Rect::from_center_size(pos2(r.right() - 9.0, r.center().y), vec2(10.0, 10.0)), "chevron-down", 9.0, t.text_faint);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Current Brush Load")));
     let resp = resp.on_hover_text(tl!("Current Brush Load"));

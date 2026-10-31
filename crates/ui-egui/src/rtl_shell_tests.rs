@@ -2,7 +2,7 @@
 //! running shell. The shell tests force the direction with `PhotocraftApp::direction_setting`, so
 //! they don't depend on a right-to-left language being selected.
 
-use craft_ui::direction::{Direction as Dir, Setting};
+use craft::ui::direction::{Direction as Dir, Setting};
 
 use crate::PhotocraftApp;
 use crate::i18n::{self, Lang};

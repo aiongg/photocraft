@@ -1,5 +1,5 @@
 use super::PhotocraftApp;
-use craft_ui::patterns::StatusBar;
+use craft::ui::patterns::StatusBar;
 
 // ----------------------------------------------------------------------------- status bar
 
@@ -41,9 +41,9 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
             if app.session.has_jobs() {
                 crate::jobs_ui::status_progress(app, ui);
-                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                ui.add_space(craft::ui::theme::scale::Space::S6.px());
             }
-            if app.session.active().is_some() && ui.add(craft_ui::controls::Button::new(tl!("Fit")).size(craft_ui::controls::ControlSize::Sm)).clicked() {
+            if app.session.active().is_some() && ui.add(craft::ui::controls::Button::new(tl!("Fit")).size(craft::ui::controls::ControlSize::Sm)).clicked() {
                 if let Some(i) = app.session.active_index() {
                     app.ui.views[i].fit_pending = true;
                 }

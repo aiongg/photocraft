@@ -7,7 +7,7 @@ use photocraft_doc::{BlendMode, LabelColor};
 use photocraft_engine::new_layer::neutral_color;
 use serde_json::{Map, Value, json};
 
-use craft_ui::composites::FormGrid;
+use craft::ui::composites::FormGrid;
 
 use crate::PhotocraftApp;
 use crate::state::DialogKind;
@@ -72,7 +72,7 @@ pub fn neutral_label(mode: BlendMode) -> String {
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use craft_ui::controls::{Checkbox, Select};
+    use craft::ui::controls::{Checkbox, Select};
     FormGrid::new("new-layer").show(ui, |form| {
         form.row(tl!("Name:"), |ui, _| {
             let mut name = f.get("name").and_then(Value::as_str).unwrap_or("").to_string();

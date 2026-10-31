@@ -136,7 +136,7 @@ impl Desktop {
     /// The OS window of the floating window holding `panel`, once the dock area opened one.
     fn window_of(&self, panel: &str) -> Option<ViewportId> {
         let window = lay(self.h.state()).floating.iter().find(|window| window.contains(&panel.to_owned()))?;
-        let viewport = craft_ui::docking::DockArea::<String>::window_viewport(area_id(), window.id);
+        let viewport = craft::ui::docking::DockArea::<String>::window_viewport(area_id(), window.id);
         self.host.borrow().windows.contains_key(&viewport).then_some(viewport)
     }
 
@@ -187,7 +187,7 @@ fn undocking_a_panel_opens_its_own_window_and_the_studio_card_stays_in_the_main_
     let viewport = desktop.window_of("info").expect("Info floats in its own OS window");
     let window = lay(desktop.h.state()).floating.iter().find(|window| window.contains(&"info".to_owned())).unwrap().clone();
     assert!(
-        craft_ui::docking::DockArea::<String>::floating_layer(area_id(), &window).is_none_or(|layer| desktop.h.ctx.memory(|m| m.area_rect(layer.id)).is_none()),
+        craft::ui::docking::DockArea::<String>::floating_layer(area_id(), &window).is_none_or(|layer| desktop.h.ctx.memory(|m| m.area_rect(layer.id)).is_none()),
         "and not in the main window"
     );
     // Undock Panel's window opens over its place in the main window.
@@ -207,7 +207,7 @@ fn undocking_a_panel_opens_its_own_window_and_the_studio_card_stays_in_the_main_
     desktop.steps(3);
     let card = legacy(desktop.h.state()).floating.into_iter().find(|window| window.id == PROPERTIES_WINDOW).expect("the Studio Properties card");
     assert!(desktop.host.borrow().windows.is_empty(), "the card opens no OS window");
-    let layer = craft_ui::docking::DockArea::<String>::floating_layer(area_id(), &card).unwrap();
+    let layer = craft::ui::docking::DockArea::<String>::floating_layer(area_id(), &card).unwrap();
     assert!(desktop.h.ctx.memory(|m| m.area_rect(layer.id)).is_some(), "the card is drawn in the main window");
     let refused = desktop.h.state_mut().run("window.panel.window", json!({"panel": "properties"}));
     assert!(refused.is_err(), "{refused:?}");
@@ -234,7 +234,7 @@ fn the_studio_card_stays_in_the_main_window_after_a_reload() {
     let card = lay(desktop.h.state()).floating.iter().find(|window| window.contains(&"properties".to_owned())).expect("the card").clone();
     assert_eq!(card.id, PROPERTIES_WINDOW);
     assert!(desktop.host.borrow().windows.is_empty(), "the card opens no OS window");
-    let layer = craft_ui::docking::DockArea::<String>::floating_layer(area_id(), &card).unwrap();
+    let layer = craft::ui::docking::DockArea::<String>::floating_layer(area_id(), &card).unwrap();
     assert!(desktop.h.ctx.memory(|m| m.area_rect(layer.id)).is_some(), "the card is drawn in the main window");
     let refused = desktop.h.state_mut().run("window.panel.window", json!({"panel": "properties"}));
     assert!(refused.is_err(), "{refused:?}");
@@ -260,14 +260,14 @@ fn keys_pressed_in_a_panel_window_run_photocrafts_shortcuts() {
 }
 
 /// The Mac menu bar, reporting one key equivalent.
-struct MenuKey(Vec<craft_menu::Event>);
+struct MenuKey(Vec<craft::menu::Event>);
 
-impl craft_menu::Backend for MenuKey {
-    fn sync(&mut self, _: &craft_menu::MenuBar) {}
-    fn drain(&mut self) -> Vec<craft_menu::Event> {
+impl craft::menu::Backend for MenuKey {
+    fn sync(&mut self, _: &craft::menu::MenuBar) {}
+    fn drain(&mut self) -> Vec<craft::menu::Event> {
         std::mem::take(&mut self.0)
     }
-    fn attach(&mut self, _: craft_menu::Dispatch) {}
+    fn attach(&mut self, _: craft::menu::Dispatch) {}
 }
 
 #[test]
@@ -286,9 +286,9 @@ fn a_menu_key_typed_in_a_panel_windows_text_field_goes_to_the_field() {
 
     let layers = |desktop: &Desktop| desktop.h.state().session.active().unwrap().doc.layers.len();
     let before = layers(&desktop);
-    let paste = "Cmd+V".parse::<craft_menu::Chord>().unwrap();
+    let paste = "Cmd+V".parse::<craft::menu::Chord>().unwrap();
     desktop.h.state_mut().services.native_menu =
-        Some(craft_menu::NativeMenu::new(Box::new(MenuKey(vec![craft_menu::Event::Key(paste)]))).clipboard_keys(craft_menu::ClipboardKeys::Raw));
+        Some(craft::menu::NativeMenu::new(Box::new(MenuKey(vec![craft::menu::Event::Key(paste)]))).clipboard_keys(craft::menu::ClipboardKeys::Raw));
     let mut raw = egui::RawInput { viewports: desktop.host.borrow().infos(), ..Default::default() };
     let ctx = desktop.h.ctx.clone();
     eframe::App::raw_input_hook(desktop.h.state_mut(), &ctx, &mut raw);

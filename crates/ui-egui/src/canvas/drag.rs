@@ -1,7 +1,7 @@
 use super::view_xform::ViewXform;
 use super::{PhotocraftApp, Pos2, Rect, Tool};
-use craft_ui::canvas::kurbo::Point;
-use craft_ui::canvas::{Constraint, fixed_size_pixels, marquee_pixels, square_pixels};
+use craft::ui::canvas::kurbo::Point;
+use craft::ui::canvas::{Constraint, fixed_size_pixels, marquee_pixels, square_pixels};
 
 /// An in-progress pointer gesture on the canvas.
 #[derive(Clone, Debug)]
@@ -259,6 +259,6 @@ pub(crate) fn draw_value_readout<const N: usize>(app: &PhotocraftApp, ctx: &egui
 
 /// A readout of `N` rows beside the pointer (labels left, values right-aligned), above everything.
 pub(crate) fn draw_readout<const N: usize>(ctx: &egui::Context, id: &str, cursor: Pos2, labels: [&str; N], values: [String; N]) {
-    let readout = labels.into_iter().zip(values).fold(craft_ui::canvas::Readout::new(id), |r, (label, value)| r.row(tl!(label), value));
+    let readout = labels.into_iter().zip(values).fold(craft::ui::canvas::Readout::new(id), |r, (label, value)| r.row(tl!(label), value));
     readout.show(ctx, cursor);
 }

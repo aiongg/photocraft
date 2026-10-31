@@ -2,8 +2,8 @@
 //! unavailable ones are greyed using the same enablement as the main menus. Items marked as menu
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
-use craft_ui::theme::ToEgui as _;
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
+use craft::ui::theme::ToEgui as _;
 use photocraft_doc::{LabelColor, Layer, LayerContent};
 use serde_json::{Value, json};
 
@@ -294,7 +294,7 @@ fn common_color(app: &crate::PhotocraftApp, l: &Layer, on_set: bool) -> Option<L
 /// The label-colour rows: the current colour checked, each colour tinting its row.
 pub(crate) fn color_rows(app: &crate::PhotocraftApp, ctx: &egui::Context, l: &Layer, on_set: bool) -> Vec<MenuEntry<Choice>> {
     let current = common_color(app, l, on_set);
-    let lib = craft_ui::theme::current(ctx);
+    let lib = craft::ui::theme::current(ctx);
     let mut rows = Vec::new();
     for color in LabelColor::ALL {
         if color == LabelColor::Red {

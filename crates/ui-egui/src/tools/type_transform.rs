@@ -14,7 +14,7 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{TransformSession, TypeTransform};
 use crate::transform_tool::{Gesture, Hit};
-use craft_ui::canvas::quad::{BoxRules, ScaleRule};
+use craft::ui::canvas::quad::{BoxRules, ScaleRule};
 
 const PREVIEW_BASE: u64 = 1 << 37;
 const ROTATE_PX: f64 = 28.0;
@@ -410,7 +410,7 @@ pub(crate) fn rotation_cursor(ctx: &egui::Context, xf: &ViewXform, quad: &[[f64;
     let p = xf.to_doc(at);
     if let Some(k) = crate::transform_tool::corner_bisector(quad, p) {
         let toward = xf.to_screen((p[0] + k[0] * 16.0) as f32, (p[1] + k[1] * 16.0) as f32) - at;
-        craft_ui::canvas::turn_cursor(ctx, at, toward);
+        craft::ui::canvas::turn_cursor(ctx, at, toward);
     }
 }
 
@@ -436,8 +436,8 @@ pub(crate) fn cursor(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXfor
         Some(Hit::Corner(i)) => crate::tool_cursor::corner_resize(&t.quad, i, xf),
         Some(Hit::Edge(i)) => {
             if let (Some(a), Some(b)) = (t.quad.get(i), t.quad.get((i + 1) % 4)) {
-                let dir = craft_ui::canvas::kurbo::Vec2::new(b[0] - a[0], b[1] - a[1]);
-                craft_ui::canvas::skew_cursor(ctx, p, &xf.canvas_view(), dir, craft_ui::canvas::PointerInk::Painted);
+                let dir = craft::ui::canvas::kurbo::Vec2::new(b[0] - a[0], b[1] - a[1]);
+                craft::ui::canvas::skew_cursor(ctx, p, &xf.canvas_view(), dir, craft::ui::canvas::PointerInk::Painted);
             }
             CursorIcon::None
         }

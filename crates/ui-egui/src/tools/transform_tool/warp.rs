@@ -1,8 +1,8 @@
 use super::begin::warps_type;
 use super::pointer::point_view;
 use super::{BezierMesh, CursorIcon, PhotocraftApp, SplitTool, ToolEvent, TransformPreview, ViewXform, Warp, WarpDrag, WarpStyle, json};
-use craft_ui::canvas::kurbo::{PathEl, Point, Rect};
-use craft_ui::canvas::{WarpEdit, WarpGrid, WarpMesh, WarpNames, WarpSplit, WarpStyle as WarpGridStyle, WarpTarget};
+use craft::ui::canvas::kurbo::{PathEl, Point, Rect};
+use craft::imaging::ui::{WarpEdit, WarpGrid, WarpMesh, WarpNames, WarpSplit, WarpStyle as WarpGridStyle, WarpTarget};
 use egui::{Pos2, pos2};
 use std::sync::OnceLock;
 
@@ -27,7 +27,7 @@ pub(super) fn surface_at(mesh: &BezierMesh, p: [f64; 2]) -> Option<(f64, f64)> {
 /// The library's sizes for the warp grid's points (`transform.hit`): the same in every theme.
 fn warp_reach() -> &'static WarpGridStyle {
     static STYLE: OnceLock<WarpGridStyle> = OnceLock::new();
-    STYLE.get_or_init(|| WarpGrid::style(&craft_ui::theme::current(&egui::Context::default())))
+    STYLE.get_or_init(|| WarpGrid::style(&craft::ui::theme::current(&egui::Context::default())))
 }
 
 fn split_of(tool: SplitTool) -> WarpSplit {
@@ -92,7 +92,7 @@ pub(super) fn split_guide(w: &Warp, pv: &TransformPreview, xf: &ViewXform, p: [f
         with_grid(w, pv.split_tool, mods, |g, lib| g.split_hit(&view, pv.split_press.as_ref(), at, mods).map(|s| s.lines(lib))).flatten().unwrap_or_default();
     let mut out: Vec<Vec<Pos2>> = Vec::new();
     for path in lines {
-        craft_ui::canvas::kurbo::flatten(path, 0.25 / f64::from(xf.zoom.max(1e-3)), |el| match el {
+        craft::ui::canvas::kurbo::flatten(path, 0.25 / f64::from(xf.zoom.max(1e-3)), |el| match el {
             PathEl::MoveTo(q) => out.push(vec![xf.to_screen(q.x as f32, q.y as f32)]),
             PathEl::LineTo(q) => {
                 if let Some(line) = out.last_mut() {

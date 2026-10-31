@@ -8,9 +8,9 @@
 //! Sampler points themselves live in the engine (`DocState.color_samplers`) so every front end
 //! shares them; this module only maps pointer input and draws the numbered markers.
 
-use craft_ui::controls::{ControlSize, Select};
-use craft_ui::patterns::{CellWidth, OptionsBar};
-use craft_ui::theme::StrokeExt;
+use craft::ui::controls::{ControlSize, Select};
+use craft::ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, CornerRadius, FontId, Pos2, RichText, Stroke, pos2, vec2};
 use photocraft_doc::{Document, Ruler};
 use serde::{Deserialize, Serialize};
@@ -431,7 +431,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         }
         for seg in &segs {
             painter.line_segment(*seg, Stroke::new(3.0, Color32::from_black_alpha(160)));
-            painter.line_segment(*seg, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
+            painter.line_segment(*seg, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::WHITE));
             handle(painter, seg[1]);
         }
         handle(painter, s);
@@ -463,10 +463,10 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             // Folded corner and text lines.
             let ink = Color32::from_black_alpha(140);
             painter
-                .line_segment([r.right_top() + vec2(-5.0, 0.0), r.right_top() + vec2(0.0, 5.0)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
+                .line_segment([r.right_top() + vec2(-5.0, 0.0), r.right_top() + vec2(0.0, 5.0)], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
             for k in 0..3 {
                 let y = r.top() + 7.0 + 4.0 * k as f32;
-                painter.line_segment([pos2(r.left() + 3.0, y), pos2(r.right() - 3.0, y)], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
+                painter.line_segment([pos2(r.left() + 3.0, y), pos2(r.right() - 3.0, y)], craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), ink));
             }
         }
     }
@@ -495,7 +495,7 @@ fn readout(ui: &mut egui::Ui, label: &str, value: Option<f64>) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(tl!(&label)).color(t.text_dim).size(11.0));
     ui.label(RichText::new(value.map_or(String::new(), |v| format!("{v:.2}"))).color(t.text).size(11.0).monospace());
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
 }
 
 /// Options bar of the Ruler, Count, Note and Color Sampler tools. Returns true when drawn.
@@ -647,7 +647,7 @@ pub(crate) fn title_row(ui: &mut egui::Ui, title: &str) -> bool {
         });
     });
     crate::widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     close
 }
 
@@ -717,7 +717,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                 other => other.to_string(),
                             });
                             let txt = RichText::new(v.unwrap_or_default()).size(10.5).color(if on {
-                                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text)
+                                craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).component.icon_button.selected.on_text)
                             } else {
                                 t.text
                             });
@@ -906,7 +906,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.label(RichText::new(tl!(&title)).color(t.text).size(13.0).strong());
             crate::widgets::hairline(ui);
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             match kind.as_str() {
                 "scale" => {
                     choice(ui, &mut f, "preset", tl!("Presets:"), &[("custom", tl!("Custom")), ("default", tl!("Default"))]);
@@ -954,7 +954,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                     f.insert(source.into(), json!(list));
                                 }
                             });
-                            ui.add_space(craft_ui::theme::scale::Space::S12.px());
+                            ui.add_space(craft::ui::theme::scale::Space::S12.px());
                         }
                     });
                 }
@@ -970,7 +970,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     choice(ui, &mut f, "color", tl!("Color:"), &[("black", tl!("Black")), ("white", tl!("White"))]);
                 }
             }
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if let Some(role) = crate::widgets::dialog_buttons(

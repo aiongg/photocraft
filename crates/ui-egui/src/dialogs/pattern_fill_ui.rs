@@ -5,9 +5,9 @@
 //! one), so it is one History step; Cancel changes nothing. The fields are the command's params,
 //! so `ui.dialog.set` / `ui.dialog.confirm` drive it like any dialog.
 
-use craft_ui::composites::{FormGrid, LabelAlign};
-use craft_ui::controls::{AngleDial, Button, ButtonVariant, Checkbox};
-use craft_ui::localized::LocaleNumbers;
+use craft::ui::composites::{FormGrid, LabelAlign};
+use craft::ui::controls::{AngleDial, Button, ButtonVariant, Checkbox};
+use craft::ui::localized::LocaleNumbers;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -167,7 +167,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
         } else if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
             f.insert("pattern".into(), json!(id));
         }
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         // Photoshop: Snap to Origin puts the pattern's origin back at the layer's (or canvas's).
         if ui.add(Button::new(tl!("Snap to Origin")).variant(ButtonVariant::Secondary)).clicked() {
             f.insert("phase".into(), json!([0.0, 0.0]));

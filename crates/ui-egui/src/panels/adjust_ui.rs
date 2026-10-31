@@ -4,9 +4,9 @@
 //! values). Selective Color previews live while a slider drags, via `app.live_adjust` carrying
 //! the full parameter set; Color Lookup commits on every change (its table isn't in the params).
 
-use craft_theme::TypeRole;
-use craft_ui::controls::RadioSet;
-use craft_ui::primitives::{Content, Text};
+use craft::theme::TypeRole;
+use craft::ui::controls::RadioSet;
+use craft::ui::primitives::{Content, Text};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use photocraft_doc::{Adjustment, LayerId};
@@ -42,7 +42,7 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
     ui.horizontal(|ui| {
         ui.add(Text::new(tl!("Colors")).role(TypeRole::Label).content(Content::Muted));
         let opts: Vec<(usize, &str)> = RANGE_LABELS.iter().copied().enumerate().collect();
-        if craft_ui::controls::Select::new(&format!("selc-colors-{}", id.0), tl!("Color"), &mut range)
+        if craft::ui::controls::Select::new(&format!("selc-colors-{}", id.0), tl!("Color"), &mut range)
             .rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1))
             .show(ui)
             .response
@@ -51,7 +51,7 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
             ui.data_mut(|d| d.insert_temp(key, range));
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut live = false;
     let mut commit = false;
     for (k, label) in [tl!("Cyan"), tl!("Magenta"), tl!("Yellow"), tl!("Black")].iter().enumerate() {
@@ -63,7 +63,7 @@ pub fn selective_color_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: La
         }
         commit |= r.commit;
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut method = usize::from(values["method"].as_str() == Some("absolute"));
     let mut methods = RadioSet::new(egui::Id::unique(("selc-method", id.0)), tl!("Method"), &mut method).item(0).item(1).begin(ui);
     ui.horizontal(|ui| {
@@ -252,7 +252,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
         app.ui.status = e;
         app.ui.status_error = true;
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut tet = *tetrahedral;
     let mut interpolation = RadioSet::new(egui::Id::unique(("clrl-interpolation", id.0)), tl!("Interpolation"), &mut tet).item(false).item(true).begin(ui);
     ui.horizontal(|ui| {
@@ -264,7 +264,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
         params = Some(json!({"tetrahedral": tet}));
     }
     let mut d = *dither;
-    if craft_ui::controls::Switch::new(tl!("Dither"), &mut d).show(ui).response.changed() {
+    if craft::ui::controls::Switch::new(tl!("Dither"), &mut d).show(ui).response.changed() {
         params = Some(json!({"dither": d}));
     }
     if let Some(mut p) = params {

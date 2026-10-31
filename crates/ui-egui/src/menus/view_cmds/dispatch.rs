@@ -328,7 +328,7 @@ fn run(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p: &Value) -> Res
         // Both full-screen modes take the whole display; the menu bar stays in the first. The
         // window commands also end the Tab reveal of Full Screen Mode (#6760).
         let window = crate::PhotocraftApp::window_key();
-        for command in craft_ui::shell::full_screen_commands(ctx, &window, screen_mode(next), cfg!(target_os = "windows")) {
+        for command in craft::ui::shell::full_screen_commands(ctx, &window, screen_mode(next), cfg!(target_os = "windows")) {
             ctx.send_viewport_cmd(command);
         }
         return Ok(json!({"screenMode": next}));

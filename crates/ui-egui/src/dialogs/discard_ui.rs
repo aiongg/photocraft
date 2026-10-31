@@ -10,7 +10,7 @@ use photocraft_doc::DocId;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use craft_ui::dialog::ButtonRole;
+use craft::ui::dialog::ButtonRole;
 
 const EXIT: &str = "file.exit";
 
@@ -285,7 +285,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // every platform (#4582). macOS still hides the letters and keeps the shortcut. Each question
     // comes up with its default answer focused, as in Photoshop (#6441); a prompt of its own per
     // document starts afresh for the next one.
-    let mut prompt = craft_ui::dialog::Prompt::new(("discard", doc), tl!(title), message);
+    let mut prompt = craft::ui::dialog::Prompt::new(("discard", doc), tl!(title), message);
     let cancel = (ButtonRole::Cancel, "Cancel", Key::C, Answer::Cancel);
     let buttons = if reverts {
         vec![(ButtonRole::Default, "Revert", Key::R, Answer::Discard), cancel]

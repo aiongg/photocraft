@@ -1,8 +1,9 @@
 use super::curves::{ToneChannel, channel_color, channel_picker, tone_channels};
 use super::{Edit, EditorCx, Value, json, round, space_of};
-use craft_ui::composites::{HistogramData, Levels, LevelsEditor, LevelsLabels};
-use craft_ui::edit::EditEvent;
-use craft_ui::localized::LocaleNumbers;
+use craft::ui::composites::{HistogramData};
+use craft::imaging::ui::{Levels, LevelsEditor, LevelsLabels};
+use craft::ui::edit::EditEvent;
+use craft::ui::localized::LocaleNumbers;
 
 // ---------------------------------------------------------------------------------------------
 // Levels
@@ -60,7 +61,7 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     ui.horizontal(|ui| {
         ch = channel_picker(ui, cx.mem.with("levels-ch"), chans, tl!("Channel:"));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            auto = ui.add(craft_ui::controls::Button::new(tl!("Auto")).variant(craft_ui::controls::ButtonVariant::Secondary)).clicked();
+            auto = ui.add(craft::ui::controls::Button::new(tl!("Auto")).variant(craft::ui::controls::ButtonVariant::Secondary)).clicked();
         });
     });
     let chan = chans.get(ch).copied().unwrap_or(ToneChannel { key: "", label: "" });

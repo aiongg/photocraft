@@ -1,11 +1,11 @@
 use super::layer_drag::dropped_on;
 use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, Tool, Value, icons, json, pos2, vec2, widgets};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
+        craft::ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let entries = st.history.entries();
@@ -61,7 +61,7 @@ pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if selected {
                 ui.painter().rect_filled(rect, if t.pro { 0.0 } else { t.radius_sm }, if t.pro { t.row_selected } else { t.accent_soft });
             } else if resp.hovered() {
-                ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
+                ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
             }
             let icon = match e.as_str() {
                 s if s.contains("Brush") || s.contains("Eraser") => "brush",
@@ -280,7 +280,7 @@ fn snapshot_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, selected: Option<u6
         if is_selected {
             ui.painter().rect_filled(rect, if t.pro { 0.0 } else { t.radius_sm }, if t.pro { t.row_selected } else { t.accent_soft });
         } else if resp.hovered() {
-            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
+            ui.painter().rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
         }
         let thumb = Rect::from_min_size(pos2(rect.left() + 28.0, rect.center().y - 14.0), vec2(28.0, 28.0));
         widgets::checker(ui.painter(), thumb, 4.0);
@@ -288,8 +288,8 @@ fn snapshot_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, selected: Option<u6
         ui.painter().image(tex, thumb, Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
         ui.painter().rect_stroke(
             thumb,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
             StrokeKind::Outside,
         );
         match renaming.as_mut().filter(|(id, _)| *id == snap.id) {
@@ -336,7 +336,7 @@ fn snapshot_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, selected: Option<u6
     }
     if !snaps.is_empty() {
         let y = ui.cursor().top();
-        ui.painter().hline(ui.max_rect().x_range(), y, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+        ui.painter().hline(ui.max_rect().x_range(), y, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
     }
     ui.data_mut(|d| d.insert_temp(rename_id, renaming));
     cmd

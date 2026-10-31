@@ -124,7 +124,7 @@ pub(super) fn arrange(app: &mut PhotocraftApp, k: &str, p: &Value) -> Result<Val
 /// Screen rectangles for `n` documents in an arrangement (`None` = tabs). The active document
 /// always gets a cell; n-up layouts show that many documents starting from the active one.
 pub fn cells(layout: &str, rect: egui::Rect, n: usize) -> Option<Vec<egui::Rect>> {
-    use craft_ui::layout::{SplitAxis, SplitSize, split_rect};
+    use craft::ui::layout::{SplitAxis, SplitSize, split_rect};
 
     if n < 2 || !LAYOUTS.contains(&layout) {
         return None;

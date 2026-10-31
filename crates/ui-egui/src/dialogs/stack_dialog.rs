@@ -3,8 +3,8 @@
 //! Sort By Name, then Attempt to Automatically Align Source Images and Create Smart Object after
 //! Loading Layers. Statistics adds Stack Mode and always creates a smart object. OK runs the
 //! corresponding engine command with the list or the folder.
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{RichText, vec2};
 use serde_json::{Map, Value, json};
 
@@ -114,7 +114,7 @@ fn browse(app: &mut PhotocraftApp, id: u64, folder: bool) {
 
 /// The dialog's body (dialog `id`); OK and Cancel are the standard ones below it.
 pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, id: u64) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     if statistics(f) {
         ui.horizontal(|ui| {
             ui.label(tl!("Choose Stack Mode:"));
@@ -124,7 +124,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 f.insert("mode".into(), json!(mode));
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
     }
     ui.label(RichText::new(tl!("Source Files")).font(crate::theme::semibold(13.0)));
     ui.add_space(t.space.gap.stack);
@@ -137,7 +137,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.remove("selected");
         }
     });
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     let folder_mode = folder_mode(f);
     let mut browse_now = false;
     ui.horizontal_top(|ui| {
@@ -150,7 +150,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         let sel = selected(f);
         egui::Frame::NONE
             .fill(t.color.surface.sunken.to_egui())
-            .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
+            .stroke(craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
             .corner_radius(t.shape.radius.control)
             .inner_margin(4.0)
             .show(ui, |ui| {
@@ -170,7 +170,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                     });
                 });
             });
-        ui.add_space(craft_ui::theme::scale::Space::S8.px());
+        ui.add_space(craft::ui::theme::scale::Space::S8.px());
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = t.space.gap.stack;
             if widgets::secondary_button(ui, tl!("Browse…"), 120.0).clicked() {
@@ -197,7 +197,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             }
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S8.px());
+    ui.add_space(craft::ui::theme::scale::Space::S8.px());
     for (key, label) in [("align", tl!("Attempt to Automatically Align Source Images")), ("smartObject", tl!("Create Smart Object after Loading Layers"))] {
         if statistics(f) && key == "smartObject" {
             continue;

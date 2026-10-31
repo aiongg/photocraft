@@ -7,9 +7,9 @@
 
 use std::cell::Cell;
 
-use craft_ui::edit::EditEvent;
-use craft_ui::list::{ListRow, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, TreeRow};
-use craft_ui::theme::{StrokeExt, ToEgui};
+use craft::ui::edit::EditEvent;
+use craft::ui::list::{ListRow, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, TreeRow};
+use craft::ui::theme::{StrokeExt, ToEgui};
 use egui::{Color32, Rect, Sense, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
@@ -50,11 +50,11 @@ pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
     let Some(kind) = thumb_badge_kind(l) else { return };
     let t = Tokens::get(ui.ctx());
     let r = thumb_badge_rect(thumb);
-    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R2.px(), t.field);
+    ui.painter().rect_filled(r, craft::ui::theme::scale::Radius::R2.px(), t.field);
     ui.painter().rect_stroke(
         r,
-        craft_ui::theme::scale::Radius::R2.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
+        craft::ui::theme::scale::Radius::R2.px(),
+        craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
         egui::StrokeKind::Inside,
     );
     match kind {
@@ -65,12 +65,12 @@ pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
             let path = r.shrink(SHAPE_PATH_INSET);
             ui.painter().rect_stroke(
                 path,
-                craft_ui::theme::scale::Radius::R0.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.icon),
+                craft::ui::theme::scale::Radius::R0.px(),
+                craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.icon),
                 egui::StrokeKind::Middle,
             );
             for anchor in [path.left_top(), path.right_top(), path.right_bottom(), path.left_bottom()] {
-                ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), craft_ui::theme::scale::Radius::R0.px(), t.icon);
+                ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), craft::ui::theme::scale::Radius::R0.px(), t.icon);
             }
         }
     }
@@ -96,7 +96,7 @@ pub fn has_filters(l: &Layer) -> bool {
 /// The two rings in the layer row indicate an attached Smart Filters stack.
 pub fn paint_badge(painter: &egui::Painter, center: egui::Pos2, color: Color32) {
     for dx in [-2.5, 2.5] {
-        painter.circle_stroke(center + vec2(dx, 0.0), 3.5, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), color));
+        painter.circle_stroke(center + vec2(dx, 0.0), 3.5, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), color));
     }
 }
 
@@ -110,7 +110,7 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
     if sm.smart_filters.is_empty() {
         return;
     }
-    let colors = craft_ui::theme::current(ui.ctx()).color;
+    let colors = craft::ui::theme::current(ui.ctx()).color;
     let (muted, normal) = (colors.text.muted.to_egui(), colors.text.normal.to_egui());
     let thumb_size = super::layer_row::thumb_size_of(app.ui.layers_panel_options.thumbnail_size);
     let Some(st) = app.session.active() else { return };
@@ -169,11 +169,11 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
                 let tex = app.mask_thumb_kind(ui.ctx(), doc, l.id, mask, crate::mask_thumbs_ui::THUMB_SMART_MASK);
                 ui.painter().image(tex, sw, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                 if !mask.enabled {
-                    ui.painter().line_segment([sw.left_top(), sw.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
-                    ui.painter().line_segment([sw.right_top(), sw.left_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
+                    ui.painter().line_segment([sw.left_top(), sw.right_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
+                    ui.painter().line_segment([sw.right_top(), sw.left_bottom()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.danger));
                 }
             } else {
-                ui.painter().rect_filled(sw, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
+                ui.painter().rect_filled(sw, craft::ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
         }
 
@@ -362,7 +362,7 @@ fn reorder_target(src: usize, row: Option<usize>, above: bool, n: usize) -> Opti
 /// sharpening is blurred). `rows` are the stack's rects, the Smart Filters row first and then the
 /// filters top first. Returns the filter's new index and the command.
 fn stack_drop(ui: &egui::Ui, l: &Layer, n: usize, rows: &[(Option<usize>, Rect)]) -> Option<(usize, (String, Value))> {
-    use craft_ui::behavior::{Axis, DropPosition, Reorder, RowInfo};
+    use craft::ui::behavior::{Axis, DropPosition, Reorder, RowInfo};
     let ctx = ui.ctx();
     let drag = super::layer_drag::current(ctx)?;
     let &super::layer_drag::RowKey::Filters(from, Some(src)) = drag.items.first()? else { return None };

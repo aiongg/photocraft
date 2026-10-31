@@ -1,6 +1,6 @@
 use super::pointer::{Hit, box_rules};
 use super::{PhotocraftApp, TransformSession};
-use craft_ui::canvas::quad::BoxDrag;
+use craft::ui::canvas::quad::BoxDrag;
 
 /// Only a freely distorted corner can snap its proposed position. Perspective moves paired
 /// corners on one axis; Skew, Warp and Content-Aware Scale have their own constrained geometry.

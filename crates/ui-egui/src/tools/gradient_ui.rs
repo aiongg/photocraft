@@ -11,10 +11,10 @@
 //! on release: one history step. The Properties panel's stops editor ([`properties`]) previews
 //! through the same path.
 
-use craft_ui::composites::gradient::GradientSwatch;
-use craft_ui::controls::{Button, ButtonVariant, ControlSize};
-use craft_ui::primitives::{Content, Text};
-use craft_ui::theme::StrokeExt;
+use craft::draw::ui::gradient::GradientSwatch;
+use craft::ui::controls::{Button, ButtonVariant, ControlSize};
+use craft::ui::primitives::{Content, Text};
+use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
 
 use egui::emath::GuiRounding;
@@ -457,12 +457,12 @@ fn c32(c: [f32; 4]) -> Color32 {
 
 fn line(painter: &egui::Painter, a: Pos2, b: Pos2) {
     painter.line_segment([a, b], Stroke::new(3.0, Color32::from_black_alpha(90)));
-    painter.line_segment([a, b], craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE));
+    painter.line_segment([a, b], craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE));
 }
 
 fn diamond(painter: &egui::Painter, c: Pos2, r: f32, fill: Color32, outline: Color32) {
     let pts = vec![pos2(c.x, c.y - r), pos2(c.x + r, c.y), pos2(c.x, c.y + r), pos2(c.x - r, c.y)];
-    painter.add(egui::Shape::convex_polygon(pts, fill, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), outline)));
+    painter.add(egui::Shape::convex_polygon(pts, fill, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), outline)));
 }
 
 /// Draws the live gradient widget over the canvas.
@@ -477,7 +477,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     let (s, e) = (sp(w.start), sp(w.end));
     let r = s.distance(e);
     let shadow = Stroke::new(3.0, Color32::from_black_alpha(90));
-    let white = craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE);
+    let white = craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE);
     match w.style {
         GradientStyle::Radial | GradientStyle::Angle => {
             painter.circle_stroke(s, r, shadow);
@@ -492,7 +492,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         }
         GradientStyle::Reflected => {
             let m = s - (e - s);
-            painter.add(egui::Shape::dashed_line(&[s, m], craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE), 5.0, 4.0));
+            painter.add(egui::Shape::dashed_line(&[s, m], craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE), 5.0, 4.0));
         }
         GradientStyle::Linear => {}
     }
@@ -508,14 +508,14 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     for (p, g) in [(s, Grab::Start), (e, Grab::End)] {
         let ring = if grabbed == Some(g) { accent } else { Color32::WHITE };
         painter.circle_stroke(p, 8.0, Stroke::new(3.5, Color32::from_black_alpha(90)));
-        painter.circle_stroke(p, 8.0, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), ring));
+        painter.circle_stroke(p, 8.0, craft::ui::theme::scale::Stroke::W2.egui(painter.ctx(), ring));
     }
     for (i, (t, c)) in w.stops.iter().enumerate() {
         let p = sp(w.at(*t));
         let sel = grabbed == Some(Grab::Stop(i));
         painter.circle_filled(p, 5.0, c32(*c));
-        painter.circle_stroke(p, 5.5, craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), if sel { accent } else { Color32::WHITE }));
-        painter.circle_stroke(p, 6.8, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(110)));
+        painter.circle_stroke(p, 5.5, craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), if sel { accent } else { Color32::WHITE }));
+        painter.circle_stroke(p, 6.8, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(110)));
     }
 }
 
@@ -600,7 +600,7 @@ fn selected_gradient(app: &PhotocraftApp) -> Option<Layer> {
 /// below, selected-stop fields and Gradient Options. Without a gradient fill layer, the same
 /// stop controls edit the tool's current gradient and offer saving it as a preset.
 pub fn editor_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    use craft_ui::dialog::{Body, Dialog, DialogState, InitialFocus, Outcome, Resize, ResizeMax};
+    use craft::ui::dialog::{Body, Dialog, DialogState, InitialFocus, Outcome, Resize, ResizeMax};
 
     let state_id = egui::Id::unique("gradient-editor-state");
     if !app.ui.panels.gradient_editor {
@@ -623,9 +623,9 @@ pub fn editor_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 // Photoshop's editor edits the gradient the tool paints with, so with no gradient
                 // fill layer around the strip edits the current gradient in place.
                 ui.add(Text::new(tl!("The gradient the Gradient tool paints with")).content(Content::Muted));
-                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                ui.add_space(craft::ui::theme::scale::Space::S6.px());
                 preset_stops_editor(app, ui);
-                ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                ui.add_space(craft::ui::theme::scale::Space::S6.px());
                 ui.horizontal(|ui| {
                     if ui
                         .add(Button::new(tl!("Save As Preset")).variant(ButtonVariant::Secondary))

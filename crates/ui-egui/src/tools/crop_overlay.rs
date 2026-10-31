@@ -8,7 +8,7 @@
 //! state lives in `ToolOptions` (`crop_overlay`, `crop_overlay_show`, `crop_overlay_orientation`),
 //! which `ui.inspect` reports and `ui.set` drives by the types' serde names.
 
-use craft_ui::canvas::{CropGuide, GuideShow, Polyline};
+use craft::draw::ui::{CropGuide, GuideShow, Polyline};
 use egui::{Key, Modifiers};
 use serde::Serialize;
 use serde::de::DeserializeOwned;

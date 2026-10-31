@@ -3,8 +3,8 @@
 //! selection tools (Quick Selection, Object Selection): gesture → engine command, options bars,
 //! and the clone-source marker.
 
-use craft_ui::patterns::{CellWidth, OptionsBar};
-use craft_ui::theme::ToEgui;
+use craft::ui::patterns::{CellWidth, OptionsBar};
+use craft::ui::theme::ToEgui;
 use egui::{Color32, Stroke, vec2};
 use serde_json::{Value, json};
 
@@ -294,7 +294,7 @@ pub fn draw_remove_pending(app: &mut PhotocraftApp, painter: &egui::Painter, xf:
     }
     let Some(bounds) = app.session.active().map(|st| st.doc.bounds()) else { return };
     let doc_rect = xf.doc_rect(bounds);
-    let col = craft_ui::theme::current(painter.ctx()).color.status.bad.fg.to_egui().gamma_multiply(0.45);
+    let col = craft::ui::theme::current(painter.ctx()).color.status.bad.fg.to_egui().gamma_multiply(0.45);
     if let Some(trail) = app.remove_trail.as_mut() {
         trail.draw(painter, doc_rect, xf.flip, col);
     }

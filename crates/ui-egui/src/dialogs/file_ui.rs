@@ -5,8 +5,8 @@
 //! Events Manager, Package and Paths to Illustrator. Every OK runs the engine command with the
 //! dialog's fields, so the control channel can drive them with `ui.dialog.set` / `confirm`.
 
-use craft_ui::composites::Form;
-use craft_ui::controls::{Checkbox, Select};
+use craft::ui::composites::Form;
+use craft::ui::controls::{Checkbox, Select};
 use std::sync::Arc;
 
 use photocraft_engine::web_cmds::{self, Optimized, WebSettings};
@@ -215,7 +215,7 @@ fn b(f: &Map<String, Value>, k: &str, d: bool) -> bool {
 #[path = "file_ui/web_preview.rs"]
 mod web_preview;
 
-/// A labelled [`Select`](craft_ui::controls::Select) row over the string field `key`; the row's
+/// A labelled [`Select`](craft::ui::controls::Select) row over the string field `key`; the row's
 /// label names the control. `opts` are (value, label) pairs, the first the default.
 fn select_row(form: &mut Form<'_>, id: &str, label: &str, f: &mut Map<String, Value>, key: &str, opts: &[(&str, &str)]) {
     let mut v = s(f, key, opts.first().map_or("", |o| o.0));

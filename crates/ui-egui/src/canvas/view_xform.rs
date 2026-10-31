@@ -71,12 +71,12 @@ impl ViewXform {
         self
     }
 
-    /// The same view for the library's canvas kit (`craft_ui::canvas`), whose document points are
+    /// The same view for the library's canvas kit (`craft::ui::canvas`), whose document points are
     /// `kurbo` points: it maps every point and vector as [`Self::to_screen`] and [`Self::map_vec`].
-    pub fn canvas_view(&self) -> craft_ui::canvas::CanvasView {
-        let mut v = craft_ui::canvas::CanvasView::new(
+    pub fn canvas_view(&self) -> craft::ui::canvas::CanvasView {
+        let mut v = craft::ui::canvas::CanvasView::new(
             self.rect,
-            craft_ui::canvas::kurbo::Point::new(f64::from(self.center[0]), f64::from(self.center[1])),
+            craft::ui::canvas::kurbo::Point::new(f64::from(self.center[0]), f64::from(self.center[1])),
             f64::from(self.zoom),
         );
         v.rotation = f64::from(self.rotation);
@@ -93,18 +93,18 @@ impl ViewXform {
     /// Unflip, unrotate and unstretch a screen-space vector (no zoom). Hand pan and zoom-about
     /// use this.
     pub fn unmap_vec(self, d: Vec2) -> Vec2 {
-        let v = craft_ui::canvas::CanvasView { zoom: 1.0, ..self.canvas_view() }.unmap_vec(d);
+        let v = craft::ui::canvas::CanvasView { zoom: 1.0, ..self.canvas_view() }.unmap_vec(d);
         vec2(v.x as f32, v.y as f32)
     }
 
     /// A document-space vector on screen: stretched, rotated, flipped and zoomed as the view
     /// draws it (the inverse of [`Self::unmap_vec`], with the zoom).
     pub fn map_vec(self, d: Vec2) -> Vec2 {
-        self.canvas_view().map_vec(craft_ui::canvas::kurbo::Vec2::new(f64::from(d.x), f64::from(d.y)))
+        self.canvas_view().map_vec(craft::ui::canvas::kurbo::Vec2::new(f64::from(d.x), f64::from(d.y)))
     }
 
     pub fn to_screen(&self, x: f32, y: f32) -> Pos2 {
-        self.canvas_view().to_screen(craft_ui::canvas::kurbo::Point::new(f64::from(x), f64::from(y)))
+        self.canvas_view().to_screen(craft::ui::canvas::kurbo::Point::new(f64::from(x), f64::from(y)))
     }
     pub fn to_doc(&self, p: Pos2) -> [f64; 2] {
         let d = self.canvas_view().to_doc(p);
@@ -112,12 +112,12 @@ impl ViewXform {
     }
     /// On-screen bounds of the image, including camera rotation and pixel aspect correction.
     pub fn image_bounds(self, size: [u32; 2]) -> Rect {
-        self.quad_bounds(craft_ui::canvas::kurbo::Rect::new(0.0, 0.0, f64::from(size[0]), f64::from(size[1])))
+        self.quad_bounds(craft::ui::canvas::kurbo::Rect::new(0.0, 0.0, f64::from(size[0]), f64::from(size[1])))
     }
     pub fn doc_rect(&self, r: DRect) -> Rect {
-        self.quad_bounds(craft_ui::canvas::kurbo::Rect::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1)))
+        self.quad_bounds(craft::ui::canvas::kurbo::Rect::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1)))
     }
-    fn quad_bounds(&self, r: craft_ui::canvas::kurbo::Rect) -> Rect {
+    fn quad_bounds(&self, r: craft::ui::canvas::kurbo::Rect) -> Rect {
         let pts = self.canvas_view().quad(r);
         pts.iter().skip(1).fold(Rect::from_min_max(pts[0], pts[0]), |acc, &p| acc.union(Rect::from_min_max(p, p)))
     }

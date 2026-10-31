@@ -21,7 +21,7 @@
 //! the spell checker (`edit.checkSpelling`) checks type layers, so they head the Type tool's edit
 //! menu instead (`canvas_tool_menu`, over a misspelled word of the text being edited, #4370).
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::text::CCursorRange;
 use egui::{Context, Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, SurrenderFocusOn, Ui};
 
@@ -223,7 +223,7 @@ fn draw(ctx: &Context, open: &Open) -> Option<Action> {
     let mut chosen = None;
     egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
         egui::Frame::menu(ui.style()).show(ui, |ui| {
-            let t = craft_ui::theme::current(ui.ctx());
+            let t = craft::ui::theme::current(ui.ctx());
             let v = &mut ui.style_mut().visuals;
             v.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
             v.widgets.inactive.bg_stroke = egui::Stroke::NONE;

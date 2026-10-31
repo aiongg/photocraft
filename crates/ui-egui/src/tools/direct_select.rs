@@ -535,7 +535,7 @@ pub fn arrow_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 /// The paths the overlay shows with their anchors, the drag's preview in place of its path, and
 /// the selection (selected anchors filled, their handles shown). `paths` false (View › Show ›
 /// Target Path off) shows none.
-pub fn overlay_paths(app: &PhotocraftApp, mods: Modifiers, paths: bool) -> (Vec<(PathRef, Path)>, craft_ui::canvas::PathSelection) {
+pub fn overlay_paths(app: &PhotocraftApp, mods: Modifiers, paths: bool) -> (Vec<(PathRef, Path)>, craft::draw::ui::PathSelection) {
     let ds = &app.ui.direct_selection;
     // The idle Curvature Pen shows the anchors of the path it edits, not every shape's.
     let shown = if !paths {
@@ -552,8 +552,8 @@ pub fn overlay_paths(app: &PhotocraftApp, mods: Modifiers, paths: bool) -> (Vec<
             _ => (r, path),
         })
         .collect();
-    use craft_ui::canvas::KnotRef;
-    let selection = craft_ui::canvas::PathSelection {
+    use craft::draw::ui::KnotRef;
+    let selection = craft::draw::ui::PathSelection {
         path: ds.target.map(crate::vector_ui::path_key),
         anchors: ds.anchors.iter().map(|&[s, k]| KnotRef::new(s, k)).collect(),
         segment: ds.segment.map(|[s, k]| KnotRef::new(s, k)),

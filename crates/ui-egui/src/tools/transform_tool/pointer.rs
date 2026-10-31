@@ -3,8 +3,9 @@ use super::commit::{commit, committing, moves_type};
 use super::drag_modes::handle_indicator;
 use super::warp::{warp_cursor, warp_pointer};
 use super::{CursorIcon, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, handle_tolerance};
-use craft_ui::canvas::quad::{BoxAllow, BoxPart, BoxRules, BoxState, ScaleRule, TransformMode as BoxMode};
-use craft_ui::canvas::{BoxPress, BoxRelease, CanvasView, TransformBox, TransformNames, TransformStyle, kurbo::Point, kurbo::Vec2, resize_cursor};
+use craft::ui::canvas::quad::{BoxAllow, BoxPart, BoxRules, BoxState, ScaleRule, TransformMode as BoxMode};
+use craft::ui::canvas::{CanvasView, kurbo::Point, kurbo::Vec2, resize_cursor};
+use craft::draw::ui::{BoxPress, BoxRelease, TransformBox, TransformNames, TransformStyle};
 use egui::{Modifiers, Pos2, pos2};
 use std::sync::OnceLock;
 
@@ -46,7 +47,7 @@ impl From<Hit> for BoxPart {
 /// without a context.
 pub(crate) fn reach() -> &'static TransformStyle {
     static STYLE: OnceLock<TransformStyle> = OnceLock::new();
-    STYLE.get_or_init(|| TransformBox::style(&craft_ui::theme::current(&egui::Context::default())))
+    STYLE.get_or_init(|| TransformBox::style(&craft::ui::theme::current(&egui::Context::default())))
 }
 
 /// The library's canvas points for document points: `zoom` canvas points per document pixel, no
@@ -146,7 +147,7 @@ pub(crate) struct Gesture {
 pub(crate) fn apply_drag(s: &mut TransformSession, g: Gesture, p: [f64; 2], mods: Modifiers, rules: &BoxRules) {
     let point = |q: [f64; 2]| Point::new(q[0], q[1]);
     let start = BoxState { quad: g.quad0.map(point), pivot: point(g.pivot0) };
-    let next = craft_ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, rules);
+    let next = craft::ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, rules);
     apply_state(s, &next);
 }
 

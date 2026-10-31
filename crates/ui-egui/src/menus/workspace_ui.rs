@@ -6,7 +6,7 @@
 //! State is [`ShellUi`] (serialisable, part of `UiState`); saved workspaces and the lock live in
 //! `Preferences::workspaces` / `workspace_locked` so they persist with the preferences.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use egui::{Align2, RichText, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -405,7 +405,7 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some((kind, mut f)) = app.ui.shell.dialog.clone() else { return };
-    let t = craft_ui::theme::current(ctx);
+    let t = craft::ui::theme::current(ctx);
     let title = title(&kind);
     let names: Vec<String> = app.session.prefs().workspaces.keys().cloned().collect();
     let mut result: Option<bool> = None;
@@ -414,7 +414,7 @@ fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
         |ui| {
             ui.label(RichText::new(tl!(&title)).color(t.color.text.normal.to_egui()).size(13.0).strong());
             crate::widgets::hairline(ui);
-            ui.add_space(craft_ui::theme::scale::Space::S6.px());
+            ui.add_space(craft::ui::theme::scale::Space::S6.px());
             let text = |ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(tl!(&label)).color(t.color.text.muted.to_egui()).size(11.0));

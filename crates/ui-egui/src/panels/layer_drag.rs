@@ -1,10 +1,10 @@
 use super::layers::footer_label;
 use super::{Layer, LayerId, MaskKind, PhotocraftApp, Rect, StrokeKind, Tokens, Value, json};
-use craft_ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, TreeRow, paint_drop_mark};
-use craft_ui::theme::StrokeExt;
+use craft::ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, TreeRow, paint_drop_mark};
+use craft::ui::theme::StrokeExt;
 use photocraft_doc::LayerContent;
 use std::ops::Range;
 use std::sync::Arc;
@@ -151,7 +151,7 @@ pub(crate) fn dropped_on(ui: &egui::Ui, button: &egui::Response) -> bool {
         return false;
     }
     let t = Tokens::get(ui.ctx());
-    ui.painter().rect_stroke(button.rect, t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
+    ui.painter().rect_stroke(button.rect, t.radius_sm, craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
     ui.ctx().input(|i| i.pointer.any_released())
 }
 

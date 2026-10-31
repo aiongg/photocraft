@@ -31,7 +31,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, answered: &str, path: &str) {
 
 pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {
     ui.label(fields.get("message").and_then(Value::as_str).unwrap_or_default());
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.label(fields.get("detail").and_then(Value::as_str).unwrap_or_default());
 }
 

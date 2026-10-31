@@ -5,13 +5,13 @@
 //! the Gradient Editor's grammar ([`apply_stop`]); the tab returns the edited gradient and the
 //! swatch's caller applies it to the next shape or as one `shape.edit`.
 
-use craft_theme::Srgba;
-use craft_ui::composites::ColorPicker;
-use craft_ui::composites::ColorPickerLayout;
-use craft_ui::composites::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
-use craft_ui::controls::{ControlSize, IconButton};
-use craft_ui::localized::LocaleNumbers;
-use craft_ui::theme::ToEgui;
+use craft::theme::Srgba;
+use craft::color::ui::ColorPicker;
+use craft::color::ui::ColorPickerLayout;
+use craft::draw::ui::gradient::{GradientEditor, GradientGroup, GradientItem, GradientPalette, GradientRef, GradientStops, StopRef};
+use craft::ui::controls::{ControlSize, IconButton};
+use craft::ui::localized::LocaleNumbers;
+use craft::ui::theme::ToEgui;
 use photocraft_doc::{Fill, GradientStyle};
 use photocraft_engine::gradient_fill_cmds::apply_stop;
 use photocraft_engine::presets::Group;
@@ -84,7 +84,7 @@ fn take_stops(fill: &mut Fill, from: &Fill) {
 /// The Gradient tab of the swatch `id`. Returns the edited gradient.
 pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientChoices, id: egui::Id) -> Option<Fill> {
     let Fill::Gradient { angle, scale, style, reverse, align, .. } = fill else { return None };
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut out: Option<Fill> = None;
     // The library palette: the recent gradients, then the preset library, as the bar shows them.
     let recent: Vec<GradientStops> = choices.recent.iter().map(stops_bar::stops_of).collect();
@@ -120,7 +120,7 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
         ui.data_mut(|d| d.remove::<usize>(picker_key(id)));
         GradientEditor::select(ui.ctx(), GradientEditor::id_in(ui, bar_key(id)), Some(StopRef::Color(0)));
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     if let Some(f) = stops_editor(ui, out.as_ref().unwrap_or(fill), id, choices.fg, choices.bg) {
         out = Some(f);
     }
@@ -161,13 +161,13 @@ pub(crate) fn gradient_tab(ui: &mut egui::Ui, fill: &Fill, choices: &GradientCho
     });
     ui.horizontal(|ui| {
         let mut rev = *reverse;
-        if craft_ui::controls::Checkbox::bool(tl!("Reverse"), &mut rev).show(ui).response.changed()
+        if craft::ui::controls::Checkbox::bool(tl!("Reverse"), &mut rev).show(ui).response.changed()
             && let Fill::Gradient { reverse, .. } = edited(&mut out, fill)
         {
             *reverse = rev;
         }
         let mut al = *align;
-        if craft_ui::controls::Checkbox::bool(tl!("Align with layer"), &mut al).show(ui).response.changed()
+        if craft::ui::controls::Checkbox::bool(tl!("Align with layer"), &mut al).show(ui).response.changed()
             && let Fill::Gradient { align, .. } = edited(&mut out, fill)
         {
             *align = al;

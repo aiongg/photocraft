@@ -211,7 +211,7 @@ pub(crate) fn native_scale(ctx: &egui::Context) -> f32 {
 /// and Warp splits), the type box, Content-Aware Move's box, the Artboard tool and guides pick
 /// their arrows here.
 pub(crate) fn resize(d: [f64; 2], xf: &ViewXform) -> CursorIcon {
-    craft_ui::canvas::resize_cursor(&xf.canvas_view(), craft_ui::canvas::kurbo::Vec2::new(d[0], d[1]))
+    craft::ui::canvas::resize_cursor(&xf.canvas_view(), craft::ui::canvas::kurbo::Vec2::new(d[0], d[1]))
 }
 
 pub(crate) fn corner_resize(quad: &[[f64; 2]; 4], i: usize, xf: &ViewXform) -> CursorIcon {
@@ -226,7 +226,7 @@ pub(crate) fn corner_resize(quad: &[[f64; 2]; 4], i: usize, xf: &ViewXform) -> C
     match bisector {
         Some(s) => {
             let view = xf.canvas_view();
-            craft_ui::canvas::resize_cursor(&view, view.unmap_vec(s))
+            craft::ui::canvas::resize_cursor(&view, view.unmap_vec(s))
         }
         // A collapsed or folded corner has no bisector: aim away from the opposite corner.
         None => {

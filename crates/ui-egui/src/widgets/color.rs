@@ -1,12 +1,12 @@
 use super::dropdown::swatch_popup;
 use super::{Color32, CornerRadius, Pos2, Rect, Response, Sense, StrokeKind, Tokens, Ui, Vec2, pos2};
-use craft_theme::Srgba;
-use craft_ui::theme::StrokeExt;
+use craft::theme::Srgba;
+use craft::ui::theme::StrokeExt;
 
 /// Camera Raw-style continuous RGB ribbons on craft-ui's [`Histogram`]. Raw bins remain exact;
 /// the library filters them for display.
 pub(crate) mod rgb_histogram {
-    use craft_ui::composites::{Histogram, HistogramScale};
+    use craft::ui::composites::{Histogram, HistogramScale};
     use photocraft_algo::histogram::RgbHistogram;
 
     /// `h` as RGB ribbons. `typical` scales by the typical columns as Camera Raw does, so a shadow or
@@ -38,14 +38,14 @@ pub fn hue_stops() -> Vec<Color32> {
 
 /// Paint a small checkerboard (transparency) in `rect`.
 pub fn checker(painter: &egui::Painter, rect: Rect, cell: f32) {
-    painter.rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(250));
+    painter.rect_filled(rect, craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(250));
     let nx = (rect.width() / cell).ceil() as i32;
     let ny = (rect.height() / cell).ceil() as i32;
     for j in 0..ny {
         for i in 0..nx {
             if (i + j) % 2 == 1 {
                 let r = Rect::from_min_size(Pos2::new(rect.left() + i as f32 * cell, rect.top() + j as f32 * cell), Vec2::splat(cell)).intersect(rect);
-                painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(214));
+                painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(214));
             }
         }
     }
@@ -96,7 +96,7 @@ pub(crate) fn color_swatch(ui: &mut Ui, color: Color32) -> Response {
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, ui.is_enabled(), tl!("Color")));
     checker_rounded(ui.painter(), rect, 4.0, t.radius_sm);
     ui.painter().rect_filled(rect.shrink(1.0), t.radius_sm, color);
-    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     response
 }
 
@@ -119,7 +119,7 @@ pub fn color_swatch_button(ui: &mut Ui, color: Color32, label: &str) -> Response
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ColorWell, true, label));
     checker_rounded(ui.painter(), rect, 4.0, t.radius_sm);
     ui.painter().rect_filled(rect.shrink(1.0), t.radius_sm, color);
-    ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     response.on_hover_text(label)
 }
 
@@ -146,8 +146,8 @@ fn color_edit_button(ui: &mut Ui, color: &mut Color32) -> Response {
 /// The eyedropper starts a screen pick for `screen_id`; the caller takes the result, also when
 /// the popup has closed meanwhile.
 fn popup_picker(ui: &mut Ui, screen_id: egui::Id, color: Srgba, alpha: bool) -> Option<Srgba> {
-    use craft_ui::composites::{ColorPicker, ColorPickerLayout};
-    let numbers = craft_ui::localized::LocaleNumbers::of(ui);
+    use craft::color::ui::{ColorPicker, ColorPickerLayout};
+    let numbers = craft::ui::localized::LocaleNumbers::of(ui);
     let shown = ColorPicker::new("popup-picker", tl!("Color"), color, &numbers)
         .layout(ColorPickerLayout::Compact)
         .alpha(alpha)

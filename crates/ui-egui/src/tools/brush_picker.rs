@@ -19,8 +19,8 @@
 //! `tools.setBrush` ([`crate::brush_panel::commit_gesture`]) and applies the returned [`Pick`]s
 //! with [`apply`], so every change is a journaled command (Rule 1).
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{CursorIcon, RichText, Stroke, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE, TipShape};
@@ -191,8 +191,8 @@ pub fn settings_toggle(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let on = app.ui.panels.brush_settings;
     if ui
         .add(
-            craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Adjustments, tl!("Toggle the Brush Settings panel"))
-                .size(craft_ui::controls::ControlSize::Md)
+            craft::ui::controls::IconButton::new(craft::ui::icons::Icon::Adjustments, tl!("Toggle the Brush Settings panel"))
+                .size(craft::ui::controls::ControlSize::Md)
                 .shortcut("F5")
                 .selected(on),
         )
@@ -225,7 +225,7 @@ pub fn body(
     st: &mut BrushesPanelState,
     size: egui::Vec2,
 ) -> Vec<Pick> {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let mut picks = Vec::new();
     // The picker is its dragged (or remembered) size: at least that tall even when every group
     // is closed, so reopening one has the room to show it.
@@ -267,7 +267,7 @@ pub fn body(
     ui.add_space(t.space.gap.stack);
     ui.horizontal(|ui| {
         icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.color.text.faint.to_egui());
-        ui.add_space(craft_ui::theme::scale::Space::S20.px());
+        ui.add_space(craft::ui::theme::scale::Space::S20.px());
         widgets::text_field(ui, ui.scope_id().with("brush-picker-search"), &mut st.filter, tl!("Search Brushes"), (size.x - 118.0).max(60.0), false);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             gear_menu(ui, current, presets, st, &mut picks);
@@ -281,7 +281,7 @@ pub fn body(
             }
         });
     });
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     // The list takes the picker's height past the controls above it and the footer below.
     let mut layout = LIST;
     layout.max_height = (size.y - (ui.cursor().min.y - top) - FOOTER_H).max(80.0);
@@ -336,7 +336,7 @@ pub fn clamp_size(size: [f32; 2], screen: egui::Vec2) -> egui::Vec2 {
 /// a limit (the minimum, the screen), the overshoot isn't banked, so coming back the picker grows
 /// only once the pointer reaches the corner again — it waits for the pointer.
 pub fn resize_grip(ui: &mut egui::Ui, frame: egui::Rect, content: egui::Vec2) -> Option<egui::Vec2> {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let grip = egui::Rect::from_min_size(frame.right_bottom() - vec2(16.0, 16.0), vec2(16.0, 16.0));
     let resp = ui.interact(grip, ui.scope_id().with("brush-picker-resize"), egui::Sense::drag());
     dismiss_popup(&resp);
@@ -344,7 +344,7 @@ pub fn resize_grip(ui: &mut egui::Ui, frame: egui::Rect, content: egui::Vec2) ->
     for i in 0..3 {
         let o = i as f32 * 4.0;
         ui.painter()
-            .line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui()));
+            .line_segment([corner - vec2(o, 0.0), corner - vec2(0.0, o)], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.faint.to_egui()));
     }
     if resp.hovered() || resp.dragged() {
         ui.ctx().set_cursor_icon(CursorIcon::ResizeNwSe);

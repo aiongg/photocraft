@@ -1,13 +1,13 @@
 use super::overlay::path_lines;
 use super::shapes::hex;
 use super::{Color32, Document, LayerContent, Path, PhotocraftApp, Rect, Value, json, pos2, vec2};
-use craft_ui::behavior::ListDrag;
-use craft_ui::composites::PanelFooter;
-use craft_ui::icons::Icon;
-use craft_ui::list::{ListRow, RowEvent, ThumbSize};
-use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::behavior::ListDrag;
+use craft::ui::composites::PanelFooter;
+use craft::ui::icons::Icon;
+use craft::ui::list::{ListRow, RowEvent, ThumbSize};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::cell::Cell;
 
 use crate::theme::Tokens;
@@ -19,16 +19,16 @@ fn thumb(painter: &egui::Painter, r: Rect, path: &Path, doc: &Document) {
     let t = Tokens::get(painter.ctx());
     // At the document's aspect ratio, like the Channels thumbnails.
     let r = crate::channels_panel::fit_thumb(r, doc.size.width, doc.size.height).0;
-    painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(if t.pro { 222 } else { 240 }));
+    painter.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), Color32::from_gray(if t.pro { 222 } else { 240 }));
     let (w, h) = (doc.size.width.max(1) as f64, doc.size.height.max(1) as f64);
     let s = (r.width() as f64 / w).min(r.height() as f64 / h);
     let off = r.center() - vec2((w * s) as f32 / 2.0, (h * s) as f32 / 2.0);
     let map = |q: [f64; 2]| pos2(off.x + (q[0] * s) as f32, off.y + (q[1] * s) as f32);
     for (pts, closed) in path_lines(path, &map) {
         if closed && pts.len() >= 3 {
-            painter.add(egui::Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
+            painter.add(egui::Shape::closed_line(pts, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
         } else {
-            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
+            painter.add(egui::Shape::line(pts, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
         }
     }
 }
@@ -224,7 +224,7 @@ fn show_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, layer: O
             RowEvent::RenameEnded { end, .. } => {
                 ui.data_mut(|d| d.remove::<bool>(rename_id));
                 // The Work Path is saved even under its proposed name.
-                if *kind == PathRow::Work && !renamed && *end != craft_ui::list::RenameEnd::Escape {
+                if *kind == PathRow::Work && !renamed && *end != craft::ui::list::RenameEnd::Escape {
                     out.action = Some(("path.rename", json!({"name": key, "to": proposed.clone().unwrap_or_default()})));
                 }
             }
@@ -232,7 +232,7 @@ fn show_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, layer: O
         }
     }
     if resp.drag_started() && entry.delete_command().is_some() {
-        let order = [craft_ui::behavior::RowInfo { key: key.clone(), depth: 0, has_children: false, open: false, section: false }];
+        let order = [craft::ui::behavior::RowInfo { key: key.clone(), depth: 0, has_children: false, open: false, section: false }];
         egui::DragAndDrop::set_payload(ui.ctx(), PathDrag::new(list_id(), &order[..], &[], key.clone(), label.clone()));
     }
     // Ctrl/Cmd-click loads only the thumbnail's path, without changing the panel target.

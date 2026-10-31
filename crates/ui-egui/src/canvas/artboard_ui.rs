@@ -2,8 +2,8 @@
 //! View › Fit Artboard on Screen, and the Properties panel section (X/Y/W/H, preset,
 //! background). Everything that changes the document is `layer.artboard.set` and friends.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 use egui::{Align2, Color32, Pos2, Stroke};
 use photocraft_doc::{ArtboardBackground, Document, Layer};
 use serde_json::{Value, json};
@@ -93,15 +93,15 @@ fn subtract(r: photocraft_geom::Rect, holes: &[photocraft_geom::Rect]) -> Vec<ph
 /// Board outlines and names (the active board's name is highlighted, as in Photoshop).
 pub fn draw_frames(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(st) = app.session.active() else { return };
-    let t = craft_ui::theme::current(painter.ctx());
+    let t = craft::ui::theme::current(painter.ctx());
     let active = st.active_layer.and_then(|id| st.doc.artboard_of(id));
     for (id, name, a) in st.doc.artboards() {
         let r = xf.doc_rect(a.rect);
         let on = active == Some(id);
         painter.rect_stroke(
             r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), if on { t.color.accent.solid.to_egui() } else { Color32::from_black_alpha(90) }),
+            craft::ui::theme::scale::Radius::R0.px(),
+            craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), if on { t.color.accent.solid.to_egui() } else { Color32::from_black_alpha(90) }),
             egui::StrokeKind::Outside,
         );
         let pos = Pos2::new(r.left(), r.top() - 4.0);
@@ -142,13 +142,13 @@ pub fn fit_artboard(app: &mut PhotocraftApp) -> Result<Value, String> {
 /// Properties panel for an artboard.
 pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     let Some(a) = layer.artboard().cloned() else { return };
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let key = |k: &str| format!("artboard-{}-{k}", layer.id.0);
     let mut edit: Option<Value> = None;
     // The custom background swatch was clicked: its colour, for the Color Picker.
     let mut pick: Option<[f32; 3]> = None;
     ui.label(egui::RichText::new(tl!("Artboard")).font(crate::theme::semibold(12.0)).color(t.color.text.normal.to_egui()));
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
+    ui.add_space(craft::ui::theme::scale::Space::S4.px());
     let mut preset = a.preset.clone();
     let mut opts: Vec<(String, &str)> = vec![(String::new(), tl!("Custom"))];
     opts.extend(photocraft_engine::artboard_cmds::PRESETS.iter().map(|(n, _, _)| (n.to_string(), *n)));

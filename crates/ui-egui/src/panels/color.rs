@@ -1,8 +1,8 @@
 use super::{PhotocraftApp, Rect, RichText, Sense, Tokens, theme, vec2, widgets};
-use craft_theme::{ColorModel, HsbModel, ModelValues, Rgba, Srgba, kept_or_converted};
-use craft_ui::composites::{AreaMode, ColorArea, ColorStrip, HexField, PairWell, SwatchPair, Well};
-use craft_ui::localized::LocaleNumbers;
-use craft_ui::theme::TokensOf as _;
+use craft::theme::{ColorModel, HsbModel, ModelValues, Rgba, Srgba, kept_or_converted};
+use craft::color::ui::{AreaMode, ColorArea, ColorStrip, HexField, PairWell, SwatchPair, Well};
+use craft::ui::localized::LocaleNumbers;
+use craft::ui::theme::TokensOf as _;
 use egui::UiBuilder;
 
 /// The Color panel's foreground and background chips. A click picks the colour the field edits,
@@ -74,7 +74,7 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let w = ui.available_width();
     let strip_w = 14.0;
     // The strip takes the room of its pointers on both sides.
-    let strip_outer = ColorStrip::outer_width(&ColorStrip::style(&craft_ui::theme::Tokens::of(ui)), strip_w);
+    let strip_outer = ColorStrip::outer_width(&ColorStrip::style(&craft::ui::theme::Tokens::of(ui)), strip_w);
     // Photoshop's Color panel field fills the panel in every theme (#6000): take the height the
     // dock offers, less the hex/RGB readout (which folds onto a second line in a narrow dock) and
     // the theme's spacing between the rows. Without a dock, 120 pt.
@@ -112,7 +112,7 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             crate::apply_color::foreground_changed(app, crate::apply_color::gesture(ui.ctx()));
         }
     }
-    ui.add_space(craft_ui::theme::scale::Space::S6.px());
+    ui.add_space(craft::ui::theme::scale::Space::S6.px());
     ui.horizontal(|ui| {
         let mut c = if bg_active { app.session.tools.background } else { app.session.tools.foreground };
         if color_readout(ui, ui.scope_id().with(("color-field", bg_active)), &mut c) {

@@ -1,5 +1,5 @@
 //! A live, locally owned popup: egui's memory popup slot belongs to its child ComboBoxes.
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{LineCap, LineJoin, StrokeAlign};
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
     let t = Tokens::get(ui.ctx());
     let font = egui::TextStyle::Button.resolve(ui.style());
     let color =
-        if selected && t.bevel { craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text };
+        if selected && t.bevel { craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).component.icon_button.selected.on_text) } else { t.text };
     let galley = ui.painter().layout_no_wrap(tl!(label).to_owned(), font, color);
     let height = (galley.size().y + if opener { 8.0 } else { 14.0 }).max(if opener { 24.0 } else { 32.0 });
     let (rect, response) = ui.allocate_exact_size(vec2(width.max(galley.size().x + 92.0), height), Sense::click());
@@ -53,7 +53,7 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
     });
     let active = selected || response.has_focus();
     let fill = if selected {
-        craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_fill)
+        craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).component.icon_button.selected.on_fill)
     } else if response.hovered() {
         t.hover
     } else {
@@ -63,10 +63,10 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
     ui.painter().rect_stroke(
         rect,
         t.radius_sm,
-        craft_ui::theme::scale::Stroke::W1.egui(
+        craft::ui::theme::scale::Stroke::W1.egui(
             ui.ctx(),
             if selected {
-                craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).component.icon_button.selected.on_border)
+                craft::ui::theme::ToEgui::to_egui(craft::ui::theme::current(ui.ctx()).component.icon_button.selected.on_border)
             } else if active {
                 t.accent_border
             } else {
@@ -83,10 +83,10 @@ fn style_button(ui: &mut egui::Ui, options: &StrokeOptions, label: &str, selecte
     if enabled {
         paint_sample(ui, sample, response.id.with("sample"), options, false, color);
     } else {
-        ui.painter().line_segment([sample.left_center(), sample.right_center()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
+        ui.painter().line_segment([sample.left_center(), sample.right_center()], craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
         ui.painter().line_segment(
             [sample.center() + vec2(-4.0, 6.0), sample.center() + vec2(4.0, -6.0)],
-            craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger),
+            craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger),
         );
     }
     if opener {
@@ -249,7 +249,7 @@ pub fn button(
             let (rect, sample_response) = ui.allocate_exact_size(vec2(width, 58.0), Sense::hover());
             ui.painter().rect_filled(rect, t.radius_sm, t.field);
             paint_sample(ui, rect, sample_response.id, s, true, t.text);
-            ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
             if !s.valid() {
                 ui.colored_label(t.danger, tl!("Use finite lengths and a positive pattern total"));
             }
@@ -281,7 +281,7 @@ pub fn button(
 fn choice<T: Copy + PartialEq>(ui: &mut egui::Ui, label: &str, value: &mut T, choices: &[(T, &str)], children: &mut Children) {
     let parent_layer = ui.layer_id();
     let (press, close) = crate::press_menu::PressCombo::before(ui, label);
-    let response = craft_ui::ComboBox::from_id_salt(label)
+    let response = craft::ui::ComboBox::from_id_salt(label)
         .width(152.0)
         .selected_text(choices.iter().find(|(v, _)| v == value).map_or("", |(_, n)| tl!(*n)))
         .close_behavior(close)

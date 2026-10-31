@@ -4,7 +4,7 @@ use super::slider::slider;
 use super::text_field::first_field_id;
 use super::units::{FieldUnits, field_resolution_id, fmt_num, fmt_num_prec, fmt_num2, parse_num_in, plain, unit_of_suffix};
 use super::{Align2, Color32, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2, theme, vec2};
-use craft_ui::theme::StrokeExt;
+use craft::ui::theme::StrokeExt;
 
 /// Monospace numeric field with a dimmed unit suffix, Photoshop style. Drag to scrub. Typed
 /// arithmetic (`1920/2`) applies on Enter, Tab or click-away, and a unit after a number converts
@@ -142,7 +142,7 @@ fn value_field_box(
     };
     surface(ui, rect, t.field, false);
     if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
     }
     // The number's slot ends 1 pt left of the suffix, by its measured width (the suffix is drawn
     // 6 pt from the right edge), so a one-character unit like `%` leaves the number room (#3040).

@@ -94,7 +94,7 @@ fn every_model_round_trips_its_colours() {
     // Hostile values give a valid colour.
     for model in [Model::Gray, Model::Rgb, Model::Hsb, Model::Cmyk, Model::Lab, Model::Web] {
         for v in [[f32::NAN; 4], [f32::INFINITY; 4], [-1e9; 4], [1e9; 4]] {
-            let v = craft_theme::ModelValues::new("hostile", &v);
+            let v = craft::theme::ModelValues::new("hostile", &v);
             assert!(model.to_rgb(&v).iter().all(|x| (0.0..=1.0).contains(x)), "{model:?} {v:?}");
         }
         assert_eq!(
@@ -534,7 +534,7 @@ fn every_slider_mode_recolours_the_selected_shape() {
 
 /// The wheel the library draws in `area`: its centre and the ring's inner and outer radii.
 fn wheel_geometry(area: Rect) -> (egui::Pos2, f32, f32) {
-    let g = craft_ui::composites::WheelGeometry::new(area, 2.0, (6.0, 22.0), 0.09, 1.0);
+    let g = craft::color::ui::WheelGeometry::new(area, 2.0, (6.0, 22.0), 0.09, 1.0);
     (g.center, g.inner, g.outer)
 }
 

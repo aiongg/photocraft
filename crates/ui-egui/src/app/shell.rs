@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use craft_ui::shell::{AppShell, BodyMode, Slot, WindowKey};
+use craft::ui::shell::{AppShell, BodyMode, Slot, WindowKey};
 
 use super::{PhotocraftApp, canvas, panels, prefs_ui, theme, titlebar};
 

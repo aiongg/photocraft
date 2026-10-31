@@ -172,9 +172,9 @@ pub struct ToolOptions {
     /// Crop overlay (#1919): the guide in the crop box, when it shows and its orientation
     /// (Photoshop's defaults: Rule of Thirds, Auto Show Overlay). See `crop_overlay`.
     #[serde(default)]
-    pub crop_overlay: craft_ui::canvas::CropGuide,
+    pub crop_overlay: craft::draw::ui::CropGuide,
     #[serde(default)]
-    pub crop_overlay_show: craft_ui::canvas::GuideShow,
+    pub crop_overlay_show: craft::draw::ui::GuideShow,
     #[serde(default)]
     pub crop_overlay_orientation: u8,
     /// Crop gear menu (#1919): Show Cropped Area and the crop shield. See `crop_shield`.

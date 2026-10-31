@@ -1,11 +1,11 @@
 use super::layer_drag::{DrawnRow, drag_feedback, dropped_on, edge_scroll, effect_rows, footer_drop, fx_trash_drop, held, layer_drop};
 use super::layer_row::{RowSel, layer_row};
-use craft_ui::composites::PanelFooter;
-use craft_ui::controls::{ControlSize, IconButton, NumberField, Select};
-use craft_ui::edit::EditEvent;
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use craft::ui::composites::PanelFooter;
+use craft::ui::controls::{ControlSize, IconButton, NumberField, Select};
+use craft::ui::edit::EditEvent;
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::hash::{Hash, Hasher};
 
 use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action};
@@ -187,7 +187,7 @@ fn lock_row(ui: &mut egui::Ui, pro: bool, locks: [bool; 5], any: bool, fill: f32
         // In a narrow panel with long translated labels, drop the "Lock:" text (the icons keep
         // their tooltips) rather than let the Fill label run over the lock icons.
         let gap = ui.spacing().item_spacing.x;
-        let lock_button = craft_ui::controls::IconButton::style(&LibTokens::of(ui), ControlSize::Sm).side;
+        let lock_button = craft::ui::controls::IconButton::style(&LibTokens::of(ui), ControlSize::Sm).side;
         let icons_w = if pro { 5.0 * lock_button + gap } else { lock_button + gap };
         let fits = body_text_width(ui, lock_label) + icons_w + body_text_width(ui, fill_label) + LAYER_PCT_W + 2.0 * gap <= ui.available_width();
         if fits {
@@ -239,7 +239,7 @@ fn inactive_blend_rows(ui: &mut egui::Ui, pro: bool) {
         // Docks zero the item spacing: keep the Opacity and Fill fields apart (#155).
         ui.add_space((theme::ROW_GAP - ui.spacing().item_spacing.y).max(0.0));
         lock_row(ui, pro, [false; 5], false, 100.0, true);
-        ui.add_space(craft_ui::theme::scale::Space::S2.px());
+        ui.add_space(craft::ui::theme::scale::Space::S2.px());
     });
 }
 
@@ -247,7 +247,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // A new active layer opens its parent groups and is scrolled into view (#152).
     let reveal = crate::layer_reveal::track(app, ui.ctx());
     let Some(st) = app.session.active() else {
-        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
+        craft::ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let doc = st.doc.clone();
@@ -264,7 +264,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if t.pro && app.ui.layers_panel_options.show_filters {
         crate::layer_filter_ui::bar(app, ui);
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     if let Some(l) = active_layer {
         // With several layers selected, blend mode, Opacity, Fill and the locks change every one
@@ -314,7 +314,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if let Some((pct, gesture)) = row.fill {
             actions.push(pct_action(&targets, "fill", pct, gesture));
         }
-        ui.add_space(craft_ui::theme::scale::Space::S2.px());
+        ui.add_space(craft::ui::theme::scale::Space::S2.px());
     } else {
         inactive_blend_rows(ui, t.pro);
     }

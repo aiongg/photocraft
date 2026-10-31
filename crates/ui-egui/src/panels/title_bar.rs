@@ -3,7 +3,7 @@ use super::{PhotocraftApp, Sense, Tokens, icons, vec2, widgets};
 // ----------------------------------------------------------------------------- title bar
 
 /// The app's top bar: brand mark, menus, the document title and the workspace controls, drawn as
-/// a [`craft_ui::title_bar::TitleBar`] for the frame craft-window chose. With
+/// a [`craft::ui::title_bar::TitleBar`] for the frame craft-window chose. With
 /// [`PhotocraftApp::custom_titlebar`] (Windows and most Linux desktops) it is also the window's
 /// title bar, as in Photoshop on Windows: the caption buttons take its ends (`titlebar`). On
 /// macOS it leaves room for the traffic lights. With the system title bar (`system_title_bar`)
@@ -21,10 +21,10 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let active = app.session.active();
     let name = active.filter(|_| show_name).map_or_else(|| "PhotoCraft".to_owned(), |d| d.doc.name.clone());
     let dirty = active.is_some_and(|d| d.is_dirty());
-    let mut bar = craft_ui::title_bar::TitleBar::new(&frame).labels(&labels).icons(style.icons.as_ref()).separator(true);
+    let mut bar = craft::ui::title_bar::TitleBar::new(&frame).labels(&labels).icons(style.icons.as_ref()).separator(true);
     if !system {
         // Under the native frame the library draws the title itself, as it does in the other frames.
-        bar = bar.title_when_native(true).title(craft_ui::title_bar::Title::new(name.clone()).unsaved(dirty).unsaved_label(tl!("Unsaved changes")));
+        bar = bar.title_when_native(true).title(craft::ui::title_bar::Title::new(name.clone()).unsaved(dirty).unsaved_label(tl!("Unsaved changes")));
     }
     let mut response = None;
     // The leading and trailing groups run one after the other, each needing the app.
@@ -34,7 +34,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui,
             |ui, slots| {
                 let mut end = 0.0;
-                centred_on(ui, &slots, craft_ui::direction::row(ui), |ui| {
+                centred_on(ui, &slots, craft::ui::direction::row(ui), |ui| {
                     // Beside caption buttons the contents keep 4 pt clear of them.
                     if custom && slots.leading_caption > 0.0 {
                         ui.add_space(CAPTION_CLEARANCE);
@@ -44,17 +44,17 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         let side = if t.pro { 18.0 } else { 20.0 };
                         let (mark, _) = ui.allocate_exact_size(vec2(side, side), Sense::hover());
                         crate::brand::paint_mark(ui, mark);
-                        ui.add_space(craft_ui::theme::scale::Space::S6.px());
+                        ui.add_space(craft::ui::theme::scale::Space::S6.px());
                     }
                     // With the macOS menu bar the menus are at the top of the screen instead.
                     // Either way this is the menus' inner edge, facing the title.
                     let app = &mut **shared.borrow_mut();
-                    end = if app.services.native_menu.is_some() { craft_ui::title_bar::LeadingEnd::from_ui(ui) } else { crate::menus::menu_bar(app, ui) };
+                    end = if app.services.native_menu.is_some() { craft::ui::title_bar::LeadingEnd::from_ui(ui) } else { crate::menus::menu_bar(app, ui) };
                 });
                 end
             },
             |ui, slots| {
-                centred_on(ui, &slots, craft_ui::direction::trailing(ui), |ui| {
+                centred_on(ui, &slots, craft::ui::direction::trailing(ui), |ui| {
                     if custom && slots.trailing_caption > 0.0 {
                         ui.add_space(CAPTION_CLEARANCE);
                     }
@@ -71,7 +71,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 /// `add` in the bar's slot, centred on the height the traffic lights are on (the bar's middle
 /// without them), in `layout`.
-fn centred_on(ui: &mut egui::Ui, slots: &craft_ui::title_bar::BarSlots, layout: egui::Layout, add: impl FnOnce(&mut egui::Ui)) {
+fn centred_on(ui: &mut egui::Ui, slots: &craft::ui::title_bar::BarSlots, layout: egui::Layout, add: impl FnOnce(&mut egui::Ui)) {
     let mut rect = ui.max_rect();
     rect = rect.translate(vec2(0.0, slots.centre_line - rect.center().y));
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect).layout(layout), add);

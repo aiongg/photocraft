@@ -3,8 +3,8 @@
 //! the panel's New Group button. OK runs `layer.new.group` / `layer.new.groupFromLayers` with the
 //! options as one history step; explicit params from Actions, CLI and MCP run the engine directly.
 
-use craft_ui::composites::FormGrid;
-use craft_ui::theme::{StrokeExt, ToEgui};
+use craft::ui::composites::FormGrid;
+use craft::ui::theme::{StrokeExt, ToEgui};
 use egui::{Sense, vec2};
 use photocraft_color::BlendMode;
 use photocraft_doc::LabelColor;
@@ -64,10 +64,10 @@ fn swatch(ui: &mut egui::Ui, color: LabelColor) {
     let (r, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
     let p = ui.painter();
     if let Some(label) = crate::panels::label_of(color) {
-        let fill = craft_ui::theme::current(ui.ctx()).component.list.label(label).swatch.to_egui();
+        let fill = craft::ui::theme::current(ui.ctx()).component.list.label(label).swatch.to_egui();
         p.rect_filled(r, t.radius_sm, fill);
     } else {
-        let stroke = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
+        let stroke = craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim);
         p.rect_stroke(r, t.radius_sm, stroke, egui::StrokeKind::Inside);
         let x = r.shrink(4.0);
         p.line_segment([x.left_top(), x.right_bottom()], stroke);
@@ -76,7 +76,7 @@ fn swatch(ui: &mut egui::Ui, color: LabelColor) {
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use craft_ui::controls::Select;
+    use craft::ui::controls::Select;
     FormGrid::new("new-group").show(ui, |form| {
         form.row(tl!("Name:"), |ui, _| {
             let mut name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_string();

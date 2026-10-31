@@ -1,10 +1,10 @@
 //! Key tables of the full-window dialogs (Content-Aware Fill, Select and Mask, Camera Raw's
 //! scopes, Vanishing Point) as `craft_keymap` catalogs: one scope per dialog, run by
-//! [`craft_keymap::egui::Dispatcher`]. Plain keys wait while a text field has the keyboard.
+//! [`craft::keymap::egui::Dispatcher`]. Plain keys wait while a text field has the keyboard.
 //! The dialogs' keys are fixed (not in Edit › Keyboard Shortcuts), so a table is built once.
 
-use craft_keymap::egui::Dispatcher;
-use craft_keymap::{Active, Bindable, Binding, Keymap, Platform, Scope, Scopes};
+use craft::keymap::egui::Dispatcher;
+use craft::keymap::{Active, Bindable, Binding, Keymap, Platform, Scope, Scopes};
 
 /// One dialog's keys: `(command, chord)` rows in the dialog's own scope.
 pub struct DialogKeys {
@@ -46,7 +46,7 @@ impl DialogKeys {
 
 /// The canonical text of an egui key as a chord with no modifiers (`[`, `Backspace`, `W`).
 pub fn key_text(key: egui::Key) -> String {
-    craft_keymap::Key::from_egui(key).map(|k| k.to_string()).unwrap_or_default()
+    craft::keymap::Key::from_egui(key).map(|k| k.to_string()).unwrap_or_default()
 }
 
 #[cfg(test)]

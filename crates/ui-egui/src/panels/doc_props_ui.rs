@@ -2,12 +2,12 @@
 //! selected. Canvas size and orientation, resolution, colour mode and bit depth, and the
 //! Rulers & Grids toggles. Every edit dispatches an engine or view command, so the panel stays thin.
 
-use craft_ui::composites::FieldControl as _;
-use craft_ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
-use craft_ui::controls::{ControlSize, IconButton, NumberField};
-use craft_ui::icons::Icon;
-use craft_ui::localized::{LocaleNumbers, Unit};
-use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
+use craft::ui::composites::FieldControl as _;
+use craft::ui::composites::{PropertyGroup, PropertyLabel, PropertyRow};
+use craft::ui::controls::{ControlSize, IconButton, NumberField};
+use craft::ui::icons::Icon;
+use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 use egui::{RichText, Sense, StrokeKind, vec2};
 use photocraft_doc::{ColorMode, Document, Layer, LayerId, SampleType};
 use serde_json::{Value, json};
@@ -74,7 +74,7 @@ pub fn canvas_resize_params(old: (u32, u32), new_w: Option<f32>, new_h: Option<f
 }
 
 pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let Some(st) = app.session.active() else { return };
     let (w, h, mode, depth, dpi) = (st.doc.size.width, st.doc.size.height, st.doc.mode, st.doc.depth, st.doc.resolution_dpi);
     let has_bg = st.doc.layers.first().is_some_and(|l| is_background(&st.doc, l));
@@ -85,7 +85,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.painter().rect_stroke(
             r,
             t.shape.radius.control,
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
             StrokeKind::Inside,
         );
         icons::paint(ui, r, "file", 15.0, t.color.text.normal.to_egui());
@@ -93,7 +93,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     ui.add_space(t.space.gap.stack);
     widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     let tokens = LibTokens::of(ui);
     let row_style = PropertyRow::style(&tokens, ControlSize::Md);
     // The word column plus its gap: where the rows without a label start their control.
@@ -147,7 +147,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 run.push(("image.canvasSize".into(), json!({"width": h, "height": w, "anchor": "center"})));
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S2.px());
+        ui.add_space(craft::ui::theme::scale::Space::S2.px());
         ui.horizontal(|ui| {
             ui.add_space(indent);
             ui.label(
@@ -155,7 +155,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     .color(t.color.text.normal.to_egui()),
             );
         });
-        ui.add_space(craft_ui::theme::scale::Space::S2.px());
+        ui.add_space(craft::ui::theme::scale::Space::S2.px());
         // Mode, with the bit depth under it, then the canvas fill.
         PropertyRow::word(tl!("Mode")).show(ui, |ui, _| {
             ui.vertical(|ui| {
@@ -183,8 +183,8 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
                 ui.painter().rect_stroke(
                     r,
-                    craft_ui::theme::scale::Radius::R0.px(),
-                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+                    craft::ui::theme::scale::Radius::R0.px(),
+                    craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
                     StrokeKind::Inside,
                 );
                 // The canvas fill is only editable for documents without a Background layer.
@@ -196,13 +196,13 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             .response
             .own_name()
         });
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     if section(ui, "rulers", tl!("Rulers & Grids")) {
         ui.horizontal(|ui| {
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             ui.spacing_mut().item_spacing.x = t.space.gap.inline;
             let pixel_grid = crate::view_cmds::checked(app, "view.show.pixelGrid").unwrap_or(false);
             for (icon, tip, id, on) in [
@@ -214,20 +214,20 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     run.push((id.to_string(), Value::Null));
                 }
             }
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             let mut unit = app.session.prefs().units_and_rulers.rulers.name().to_string();
             let opts: Vec<(String, &str)> = UNITS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
             if widgets::dropdown(ui, "doc-props-units", tl!("Units"), &mut unit, &opts, 96.0) {
                 run.push(("prefs.set".into(), json!({"path": "unitsAndRulers.rulers", "value": unit})));
             }
         });
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
     }
     widgets::hairline(ui);
-    ui.add_space(craft_ui::theme::scale::Space::S2.px());
+    ui.add_space(craft::ui::theme::scale::Space::S2.px());
     if section(ui, "guides", tl!("Guides")) {
         ui.horizontal(|ui| {
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
+            ui.add_space(craft::ui::theme::scale::Space::S8.px());
             ui.spacing_mut().item_spacing.x = t.space.gap.inline;
             for (icon, tip, id) in [
                 ("eye", crate::shortcuts::tip_label(app, "Show Guides", "view.show.guides"), "view.show.guides"),

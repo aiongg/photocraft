@@ -5,8 +5,8 @@ use super::options_bar::{
     toggle_cell,
 };
 use super::{Color32, LayerId, PhotocraftApp, Stroke, json, text_layer};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::StrokeExt;
+use craft::ui::theme::ToEgui;
 
 /// The Character panel's OpenType buttons, in Photoshop's order: (feature tag, command id,
 /// tooltip). The tooltips are the Type › OpenType menu labels.
@@ -169,7 +169,7 @@ fn metric_field(
         }
         let near = |p: f32| (p * u - value).abs() <= 1e-4 * value.abs().max(1.0);
         let (press, close) = crate::press_menu::PressCombo::before(ui, menu);
-        let combo = craft_ui::ComboBox::from_id_salt(menu)
+        let combo = craft::ui::ComboBox::from_id_salt(menu)
             .selected_text("")
             .width(combo_w)
             .height(420.0)
@@ -220,7 +220,7 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
     let Some((c, para)) = styles_at(app).or_else(|| show_defaults.then(|| default_styles(app))) else { return };
     // Preferences ▸ Units & Rulers ▸ Type, as in the options bar: the model keeps points.
     let (u, unit) = type_unit(app);
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     // Row helper: `ui.horizontal` with the column gap, then the shared row gap.
     let row = |ui: &mut egui::Ui, add: &mut dyn FnMut(&mut egui::Ui)| {
         ui.horizontal(|ui| {
@@ -327,7 +327,7 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                 ui.painter().rect_stroke(
                     rect,
                     t.shape.radius.control,
-                    craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
+                    craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
                     egui::StrokeKind::Inside,
                 );
                 let resp = resp.on_hover_text(tl!("Text color"));
@@ -379,13 +379,13 @@ fn type_sections(app: &mut PhotocraftApp, ui: &mut egui::Ui, character: bool, pa
                     if i == 4 {
                         ui.painter().line_segment(
                             [egui::pos2(gr.left(), gr.bottom() - 2.0), egui::pos2(gr.right(), gr.bottom() - 2.0)],
-                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
+                            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
                         );
                     }
                     if i == 5 {
                         ui.painter().line_segment(
                             [egui::pos2(gr.left() - 1.0, gr.center().y), egui::pos2(gr.right() + 1.0, gr.center().y)],
-                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
+                            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), col),
                         );
                     }
                 });
@@ -510,7 +510,7 @@ fn type_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let dd_w = (full - crate::props_layout::LABEL_W - LABEL_GAP - COL_GAP - orient_w).max(60.0);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = LABEL_GAP;
-            let t = craft_ui::theme::current(ui.ctx());
+            let t = craft::ui::theme::current(ui.ctx());
             let (r, resp) = ui.allocate_exact_size(egui::vec2(crate::props_layout::LABEL_W, 22.0), egui::Sense::hover());
             ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "aa", crate::theme::semibold(11.0), t.color.text.muted.to_egui());
             resp.on_hover_text(tl!("Anti-aliasing method"));

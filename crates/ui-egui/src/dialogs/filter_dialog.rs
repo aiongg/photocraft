@@ -4,7 +4,7 @@
 //! The preview runs the *same engine command* on the downsampled proxy document (pixel-sized
 //! parameters scaled by the proxy factor), so what you preview is what you get.
 
-use craft_ui::theme::ToEgui;
+use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 
 use photocraft_doc::Document;
@@ -774,7 +774,7 @@ const RESULT_FROM: &str = "__resultFrom";
 /// the sampled colour becomes it.
 fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     use photocraft_algo::tone;
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let from = f.get("color").and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex).unwrap_or([0.0; 3]);
     let picked = f.get(RESULT_PICKED).and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex);
     if let Some(to) = picked
@@ -827,7 +827,7 @@ pub fn opens_on_angle_dial(f: &Map<String, Value>) -> bool {
 }
 
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft_ui::theme::current(ui.ctx());
+    let t = craft::ui::theme::current(ui.ctx());
     let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default().to_string();
     // Plug-in dialogs carry their own spec (from the plug-in's manifest).
     let spec = match f.get("__spec").and_then(Value::as_str) {
@@ -873,7 +873,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                     }
                     if uses_angle_dial(&cmd, &p.key) {
                         crate::widgets::angle_dial_row(ui, &label(&p.key), &mut v, min..=max);
-                        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                        ui.add_space(craft::ui::theme::scale::Space::S4.px());
                     } else if uses_logarithmic_slider(min, max) {
                         // Keep one numeric field for direct entry and one log-scaled slider for
                         // wide ranges. slider_row would add a second, linear slider (#146).
@@ -888,7 +888,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                         if crate::widgets::slider(ui, &mut lv, min.ln()..=max.ln(), None).changed() {
                             v = lv.exp();
                         }
-                        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+                        ui.add_space(craft::ui::theme::scale::Space::S4.px());
                     } else {
                         // A double-click on the slider puts it back to the filter's default.
                         let gestures = crate::widgets::RowGestures { reset: Some(default), wheel_step: None, ..Default::default() };
@@ -1057,11 +1057,11 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
     // Read-only context the dialog opener supplies (e.g. the monitor profile in use).
     if let Some(note) = f.get("__note").and_then(Value::as_str) {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         ui.add(egui::Label::new(egui::RichText::new(note).color(t.color.text.muted.to_egui())).wrap());
     }
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(craft_ui::theme::scale::Space::S4.px());
+        ui.add_space(craft::ui::theme::scale::Space::S4.px());
         crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
         f.insert("__preview".into(), json!(preview));
     }
