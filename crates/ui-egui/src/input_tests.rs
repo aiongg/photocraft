@@ -1269,8 +1269,8 @@ fn move_tool_controls_rotate_from_just_outside_the_box() {
         pos2(c.x + (x - v.center[0]) * v.zoom, c.y + (y - v.center[1]) * v.zoom)
     };
     let zoom = h.state().ui.views[0].zoom;
-    // Just outside the top edge, a quarter of the way along: the rotation band.
-    let at = screen(&h, 175.0, 100.0) - vec2(0.0, 12.0);
+    // Just outside the top-left corner: the rotation band (it is only at the corners).
+    let at = screen(&h, 150.0, 100.0) - vec2(12.0, 6.0);
     h.hover_at(at);
     h.run_steps(2);
     assert_eq!(h.output().platform_output.cursor_icon, egui::CursorIcon::None, "the drawn rotate arrow replaces the pointer");

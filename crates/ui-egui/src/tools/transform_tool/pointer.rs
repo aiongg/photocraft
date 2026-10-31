@@ -1,8 +1,8 @@
-use super::begin::{moving_layers, warps_type};
+use super::begin::moving_layers;
 use super::commit::{commit, committing, moves_type};
 use super::drag_modes::handle_indicator;
 use super::warp::{warp_cursor, warp_pointer};
-use super::{CursorIcon, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform};
+use super::{CursorIcon, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, handle_tolerance};
 use craft_ui::canvas::quad::{BoxAllow, BoxPart, BoxRules, BoxState, ScaleRule, TransformMode as BoxMode};
 use craft_ui::canvas::{BoxPress, BoxRelease, CanvasView, TransformBox, TransformNames, TransformStyle, kurbo::Point, kurbo::Vec2, resize_cursor};
 use egui::{Modifiers, Pos2, pos2};
@@ -75,6 +75,16 @@ fn apply_state(t: &mut TransformSession, s: &BoxState) {
     t.pivot = [s.pivot.x, s.pivot.y];
 }
 
+pub(super) fn box_mode(mode: TransformMode) -> BoxMode {
+    match mode {
+        TransformMode::Free => BoxMode::Free,
+        TransformMode::Rotate => BoxMode::Rotate,
+        TransformMode::Skew => BoxMode::Skew,
+        TransformMode::Distort => BoxMode::Distort,
+        TransformMode::Perspective => BoxMode::Perspective,
+    }
+}
+
 /// How drags change the session's box: its Edit › Transform mode, the preferences for legacy
 /// scaling and the aspect link, and what the content allows (editable type refuses distort;
 /// Content-Aware Scale only scales and moves).
@@ -82,13 +92,7 @@ pub(super) fn box_rules(app: &PhotocraftApp, t: &TransformSession) -> BoxRules {
     let legacy = app.session.prefs().general.use_legacy_free_transform;
     let scales_only = t.content_aware.is_some();
     BoxRules {
-        mode: match t.mode {
-            TransformMode::Free => BoxMode::Free,
-            TransformMode::Rotate => BoxMode::Rotate,
-            TransformMode::Skew => BoxMode::Skew,
-            TransformMode::Distort => BoxMode::Distort,
-            TransformMode::Perspective => BoxMode::Perspective,
-        },
+        mode: box_mode(t.mode),
         scale: if legacy { ScaleRule::Free } else { ScaleRule::Proportional },
         aspect_linked: !app.ui.transform_unlinked,
         allow: BoxAllow { rotate: !scales_only, skew: !scales_only, distort: !(scales_only || moves_type(app, t)) },
@@ -100,7 +104,11 @@ pub(super) fn box_rules(app: &PhotocraftApp, t: &TransformSession) -> BoxRules {
 /// layer or a path is moved or scaled, its edges stay on whole pixels, whatever the tool. The box
 /// rounds only while still an upright rectangle.
 fn snaps_to_pixels(app: &PhotocraftApp, t: &TransformSession) -> bool {
-    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid || t.selection || t.warp.is_some() || t.content_aware.is_some() || t.target.is_some()
+    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid
+        || t.selection
+        || t.warp.is_some()
+        || t.content_aware.is_some()
+        || t.target.is_some()
     {
         return false;
     }
@@ -125,15 +133,34 @@ pub(crate) fn hit(t: &TransformSession, p: [f64; 2], tol: f64) -> Hit {
     hit_at(t, p, f64::from(reach().hit) / tol.max(1e-9))
 }
 
-/// Transient drag state (kept in egui memory; not part of the serialised session).
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The drag the Move, Camera and Type transform boxes keep, which they run through [`apply_drag`].
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Gesture {
+    pub(crate) hit: Hit,
+    pub(crate) start: [f64; 2],
+    pub(crate) quad0: [[f64; 2]; 4],
+    pub(crate) pivot0: [f64; 2],
+}
+
+/// `g`'s drag of a box to document point `p` with `mods`, by the library's rules for Free
+/// Transform (no mode, the modifiers already adjusted by the caller).
+pub(crate) fn apply_drag(s: &mut TransformSession, g: Gesture, p: [f64; 2], mods: Modifiers) {
+    let point = |q: [f64; 2]| Point::new(q[0], q[1]);
+    let start = BoxState { quad: g.quad0.map(point), pivot: point(g.pivot0) };
+    let next = craft_ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, &BoxRules::default());
+    apply_state(s, &next);
+}
+
+/// Transient drag state of the Free Transform box (kept in egui memory; not part of the serialised
+/// session).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Held {
     pub(crate) press: BoxPress,
     pub(crate) quad0: [[f64; 2]; 4],
     pub(crate) pivot0: [f64; 2],
 }
 
-impl Gesture {
+impl Held {
     pub(crate) fn hit(&self) -> Hit {
         self.press.part().into()
     }
@@ -171,7 +198,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
                 s.pivot = [x, y];
             }
             if let Some(pv) = app.transform_preview.as_mut() {
-                pv.gesture = press.map(|press| Gesture { press, quad0: t.quad, pivot0: t.pivot });
+                pv.gesture = press.map(|press| Held { press, quad0: t.quad, pivot0: t.pivot });
             }
         }
         ToolEvent::Move { x, y, .. } | ToolEvent::Up { x, y } => {
@@ -246,18 +273,6 @@ pub(super) fn point_on_quad(quad: [[f64; 2]; 4], anchor: usize) -> [f64; 2] {
         8 => quad[2],
         _ => [(quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4.0, (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4.0],
     }
-}
-
-/// Where the reference point lands when the box goes from `quad0` to `quad`: the same place
-/// within the box, as in Photoshop, where it is attached to the bounding box (#1329). A box
-/// that has collapsed leaves it where it was.
-pub(super) fn carry_pivot(quad0: [[f64; 2]; 4], quad: [[f64; 2]; 4], pivot0: [f64; 2]) -> [f64; 2] {
-    let unit = [0.0, 0.0, 1.0, 1.0];
-    let (Some(h0), Some(h1)) = (Homography::rect_to_quad(unit, quad0), Homography::rect_to_quad(unit, quad)) else { return pivot0 };
-    let Some(inv) = h0.inverse() else { return pivot0 };
-    let (u, v) = inv.apply(pivot0[0], pivot0[1]);
-    let (x, y) = h1.apply(u, v);
-    if x.is_finite() && y.is_finite() { [x, y] } else { pivot0 }
 }
 
 /// True just outside a corner: rotate handle feedback lives here, not over the entire

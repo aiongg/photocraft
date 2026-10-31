@@ -4,8 +4,8 @@ use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
 use super::warp::{on_section_edge, single_patch, split_guide};
 use super::{
-    BezierMesh, Color32, DocId, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag,
-    WarpStyle, corners, pos2, vec2,
+    BezierMesh, Color32, DocId, Homography, LayerId, PhotocraftApp, Pos2, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag, WarpStyle, corners,
+    pos2,
 };
 use craft_ui::canvas::kurbo::Vec2;
 use craft_ui::canvas::{PointerInk, Readout as LibReadout, TransformBox, WarpGrid, distort_cursor, paint_pivot, skew_cursor, turn_cursor};

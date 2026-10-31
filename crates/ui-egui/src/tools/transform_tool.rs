@@ -11,11 +11,11 @@
 
 use std::sync::Arc;
 
+use craft_ui::canvas::{WarpPress, WarpSplitPress};
 use egui::{Color32, CursorIcon, Pos2, Stroke, pos2, vec2};
 use photocraft_algo::transform::Homography;
 use photocraft_doc::{DocId, Document, LayerContent, LayerId};
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome};
-use craft_ui::canvas::{WarpPress, WarpSplitPress};
 use photocraft_geom::warp::{BezierMesh, Warp, WarpStyle};
 use serde_json::json;
 
@@ -40,10 +40,10 @@ pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_placed, begin_selection
 pub(crate) use commit::{SAVE_FOR_WEB, committing, nudge};
 pub use commit::{cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event, track_steps};
 #[cfg(test)]
+pub(crate) use drag_modes::unlinked_mods;
+#[cfg(test)]
 use drag_modes::{HandleIndicator, handle_indicator};
 pub(crate) use drag_modes::{corner_distorts, legacy_mods};
-#[cfg(test)]
-pub(crate) use drag_modes::unlinked_mods;
 pub(crate) use draw::draw_handle_cursor;
 #[cfg(test)]
 use draw::scale_values;
@@ -60,10 +60,10 @@ use options_bar::{
     set_size_unit, size_pct, size_shown, size_unit, warp_grid_id,
 };
 pub use options_bar::{options_bar, reset_warp};
-pub(crate) use pointer::{Gesture, Hit, hit, point_view, reach, rotate_cursor_dir};
-#[cfg(test)]
-use pointer::{carry_pivot, near_rotate_corner, point_on_quad, rotation_degrees};
+pub(crate) use pointer::{Gesture, Held, Hit, apply_drag, hit, point_view, reach, rotate_cursor_dir};
 pub use pointer::{cursor, pointer};
+#[cfg(test)]
+use pointer::{near_rotate_corner, point_on_quad, rotation_degrees};
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};
 #[cfg(test)]
@@ -118,7 +118,7 @@ pub struct TransformPreview {
     /// A layer with a style: its pixels composited with the style as the box has them now,
     /// drawn instead of the bare pixels (transform_fx.rs, #3653).
     styled: Option<crate::transform_fx::StyledPreview>,
-    gesture: Option<Gesture>,
+    gesture: Option<Held>,
     /// Warp-mode drag in progress.
     warp_drag: Option<WarpDrag>,
     /// Armed split tool. None while the buttons are off and control points drag as usual.

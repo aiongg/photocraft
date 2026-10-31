@@ -323,20 +323,22 @@ fn move_transform_controls_show_resize_and_rotate_cursors_before_first_interacti
         (r.center_bottom(), egui::CursorIcon::ResizeVertical),
         (r.right_center(), egui::CursorIcon::ResizeHorizontal),
         (r.left_center(), egui::CursorIcon::ResizeHorizontal),
-        // Between handles: the rotation band (a point above the top-centre handle is that handle),
-        // where the curved rotate arrow replaces the pointer (#4658).
-        (pos2(r.left() + r.width() * 0.25, r.top() - 12.0), egui::CursorIcon::None),
+        // Beside a corner, between the handles' reach and `transform.band_outer`: the rotation
+        // band, where the curved rotate arrow replaces the pointer (#4658).
+        (pos2(r.left() - 12.0, r.top() - 6.0), egui::CursorIcon::None),
     ] {
         assert_eq!(transform_controls_cursor(r, p), Some(expected), "hover at {p:?}");
         assert!(transform_controls_hit(r, p), "same region must start a transform");
     }
     assert_eq!(transform_controls_cursor(r, r.center()), None, "interior stays Move");
     assert_eq!(transform_controls_cursor(r, pos2(r.center().x, r.top() - 30.0)), None);
+    // The band belongs to the corners: above the middle of an edge the press is the Move tool's.
+    assert_eq!(transform_controls_cursor(r, pos2(r.center().x, r.top() - 12.0)), None);
     // The rotate arrow bends round the nearest corner, pointing into the box; handles and the
     // interior have none.
     let into = |p: Pos2| transform_controls_turn(r, p).map(|v| (v.x.signum(), v.y.signum()));
-    assert_eq!(into(pos2(r.left() + r.width() * 0.25, r.top() - 12.0)), Some((1.0, 1.0)), "top left");
-    assert_eq!(into(pos2(r.right() + 12.0, r.bottom() - r.height() * 0.25)), Some((-1.0, -1.0)), "bottom right");
+    assert_eq!(into(pos2(r.left() - 12.0, r.top() - 6.0)), Some((1.0, 1.0)), "top left");
+    assert_eq!(into(pos2(r.right() + 12.0, r.bottom() + 6.0)), Some((-1.0, -1.0)), "bottom right");
     assert_eq!(into(pos2(r.left() - 12.0, r.bottom() + 12.0)), Some((1.0, -1.0)), "beyond the bottom-left corner");
     assert_eq!(into(r.left_top()), None);
     assert_eq!(into(r.center()), None);
@@ -353,7 +355,8 @@ fn move_transform_controls_show_resize_and_rotate_cursors_before_first_interacti
 fn transform_control_hit_keeps_move_interior_free_and_has_rotation_band() {
     let r = Rect::from_min_max(pos2(20.0, 30.0), pos2(100.0, 70.0));
     assert!(transform_controls_hit(r, r.left_top()));
-    assert!(transform_controls_hit(r, pos2(60.0, 18.0)));
+    assert!(transform_controls_hit(r, pos2(8.0, 24.0)));
+    assert!(!transform_controls_hit(r, pos2(60.0, 18.0)), "the middle of an edge has no band");
     assert!(!transform_controls_hit(r, r.center()));
     assert!(!transform_controls_hit(r, pos2(60.0, 4.0)));
 }

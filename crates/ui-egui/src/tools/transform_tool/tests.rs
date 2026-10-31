@@ -1,4 +1,5 @@
 use super::*;
+use craft_ui::canvas::quad::{BoxAllow, BoxRules};
 
 fn session() -> TransformSession {
     TransformSession {
@@ -54,15 +55,23 @@ fn a_plain_click_far_outside_accepts_transform_but_a_rotation_drag_does_not() {
 
 #[test]
 fn a_click_near_rotation_handles_accepts_but_drags_and_option_pivot_do_not() {
-    let t = session();
-    let tol = 12.0;
-    let near = Gesture { hit: Hit::Outside, start: [-18.0, -18.0], quad0: t.quad, pivot0: t.pivot };
-    assert!(accepts_outside_click(near, near.start, tol), "a click in the rotation zone accepts; a drag still rotates");
-    let far = Gesture { start: [500.0, 500.0], ..near };
-    assert!(accepts_outside_click(far, far.start, tol));
-    assert!(!accepts_outside_click(far, [512.0, 500.0], tol), "drag does not commit");
-    let handle = Gesture { hit: Hit::Corner(0), ..near };
-    assert!(!accepts_outside_click(handle, handle.start, tol), "resize handles stay interactive");
+    let none = egui::Modifiers::NONE;
+    let click_at = |app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]| {
+        pointer(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, none);
+        pointer(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, none);
+        pointer(app, ToolEvent::Up { x: to[0], y: to[1] }, none);
+    };
+    for (from, to, accepts) in [([-18.0, -18.0], [-18.0, -18.0], true), ([500.0, 500.0], [500.0, 500.0], true), ([500.0, 500.0], [512.0, 500.0], false)] {
+        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        begin(&mut app, &egui::Context::default()).unwrap();
+        click_at(&mut app, from, to);
+        assert_eq!(app.ui.transform.is_none(), accepts, "{from:?} to {to:?}: a click accepts, a drag rotates");
+    }
+    let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    begin(&mut app, &egui::Context::default()).unwrap();
+    let corner = app.ui.transform.as_ref().unwrap().quad[0];
+    click_at(&mut app, corner, corner);
+    assert!(app.ui.transform.is_some(), "resize handles stay interactive");
 
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
     begin(&mut app, &egui::Context::default()).unwrap();
@@ -669,10 +678,11 @@ fn drag_in(mode: TransformMode, from: [f64; 2], to: [f64; 2], mods: egui::Modifi
 }
 
 fn drag_on(mode: TransformMode, type_layer: bool, from: [f64; 2], to: [f64; 2], mods: egui::Modifiers) -> [[f64; 2]; 4] {
-    let mut s = session();
-    let g = Gesture { hit: hit(&s, from, 8.0), start: from, quad0: s.quad, pivot0: s.pivot };
-    apply_mode_drag(&mut s, g, to, mode, type_layer, mods);
-    s.quad
+    let s = session();
+    let state = pointer::box_state(&s);
+    let rules = BoxRules { mode: pointer::box_mode(mode), allow: BoxAllow { distort: !type_layer, ..BoxAllow::default() }, ..BoxRules::default() };
+    let point = |p: [f64; 2]| craft_ui::canvas::kurbo::Point::new(p[0], p[1]);
+    craft_ui::canvas::quad::drag(&state, &state, hit(&s, from, 8.0).into(), point(from), point(to), mods, &rules).quad.map(|p| [p.x, p.y])
 }
 
 /// Skew on editable type, checked in Photoshop: a corner can't move alone (type stays a
@@ -965,8 +975,6 @@ fn the_reference_point_moves_with_the_box() {
     let mut s = session();
     drag(&mut s, [150.0, 25.0], [50.0, 125.0], egui::Modifiers::NONE);
     assert!(near(s.pivot, [50.0, 25.0]), "{:?}", s.pivot);
-    // From a box collapsed to a point there is no place within it to keep: it stays put.
-    assert_eq!(carry_pivot([[0.0, 0.0]; 4], corners([0.0, 0.0, 10.0, 10.0]), [5.0, 5.0]), [5.0, 5.0]);
 }
 
 #[test]
@@ -1696,11 +1704,31 @@ fn warp_split_cursors_turn_with_the_grid_and_the_view() {
         let (s, c) = f64::to_radians(grid).sin_cos();
         let m = BezierMesh::identity(rect, 1, 1).map_points(|[x, y]| [100.0 + (x - 100.0) * c - (y - 50.0) * s, 50.0 + (x - 100.0) * s + (y - 50.0) * c]);
         let xf = ViewXform { rotation: view, ..level };
-        let got = [SplitTool::Vertical, SplitTool::Horizontal].map(|tool| split_cursor(&m, tool, m.param_at([100.0, 50.0]), &xf));
+        let got = [SplitTool::Vertical, SplitTool::Horizontal].map(|tool| split_cursor_at(&Warp::custom(m.clone(), rect), tool, [100.0, 50.0], &xf));
         assert_eq!(got, want, "grid turned {grid}°, view {view}°");
     }
-    let m = BezierMesh::identity(rect, 1, 1);
-    assert_eq!(split_cursor(&m, SplitTool::Cross, (0.5, 0.5), &level), CursorIcon::Crosshair);
+    assert_eq!(split_cursor_at(&Warp::custom(BezierMesh::identity(rect, 1, 1), rect), SplitTool::Cross, [100.0, 50.0], &level), CursorIcon::Crosshair);
+}
+
+/// The warp point within `tol` document pixels of `p`, by the library's grid.
+fn warp_hit(w: &Warp, p: [f64; 2], tol: f64) -> Option<usize> {
+    let zoom = f64::from(pointer::reach().hit) / tol;
+    let at = egui::pos2((p[0] * zoom) as f32, (p[1] * zoom) as f32);
+    let none = egui::Modifiers::NONE;
+    match warp::with_grid(w, None, none, |g, _| {
+        g.hit(&pointer::point_view(zoom), &craft_ui::canvas::WarpGrid::style(&craft_ui::theme::current(&egui::Context::default())), at, none)
+    })
+    .flatten()
+    {
+        Some(craft_ui::canvas::WarpTarget::Point(i)) => Some(i),
+        _ => None,
+    }
+}
+
+fn split_cursor_at(w: &Warp, tool: SplitTool, p: [f64; 2], xf: &ViewXform) -> CursorIcon {
+    let at = xf.to_screen(p[0] as f32, p[1] as f32);
+    let none = egui::Modifiers::NONE;
+    warp::with_grid(w, Some(tool), none, |g, _| g.split_hit(&xf.canvas_view(), None, at, none).map(|s| s.cursor())).flatten().unwrap()
 }
 
 /// #1767: the readout beside the pointer during a drag (Photoshop's transformation values):
@@ -1766,6 +1794,12 @@ fn the_scale_readout_follows_the_ruler_unit() {
 
 #[test]
 fn a_distort_corner_stops_before_the_box_folds_over() {
+    let turns = |q: &[[f64; 2]; 4]| -> [f64; 4] {
+        std::array::from_fn(|k| {
+            let (a, b, c) = (q[k], q[(k + 1) % 4], q[(k + 2) % 4]);
+            (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+        })
+    };
     // #1323: dragging a corner across the opposite diagonal stops short of it, so the box
     // stays convex instead of folding into a bow tie.
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
@@ -1783,16 +1817,9 @@ fn a_distort_corner_stops_before_the_box_folds_over() {
     assert!(q[0][0] > 15.0 && q[0][0] < 16.0 && (q[0][0] - q[0][1]).abs() < 1e-6, "{q:?}");
     // A drag that keeps the box convex is not held back.
     press_drag(&mut app, q[0], [2.0, 4.0], egui::Modifiers::NONE);
-    assert_eq!(app.ui.transform.as_ref().unwrap().quad[0], [2.0, 4.0]);
-}
-
-#[test]
-fn keep_convex_leaves_a_degenerate_start_alone() {
-    let flat = [[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0]];
-    let to = [[5.0, 5.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0]];
-    assert_eq!(keep_convex(flat, to), to);
-    let nan = [[f64::NAN, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
-    let _ = keep_convex(nan, to);
+    // The library takes canvas points in f32, so a drag lands within a millionth of a pixel.
+    let q = app.ui.transform.as_ref().unwrap().quad[0];
+    assert!((q[0] - 2.0).abs() < 1e-4 && (q[1] - 4.0).abs() < 1e-4, "{q:?}");
 }
 
 #[test]
@@ -3034,11 +3061,13 @@ fn anchor_grid_point_on_quad_and_carry_pivot() {
     assert_eq!(point_on_quad(quad, 7), [50.0, 50.0]);
     assert_eq!(point_on_quad(quad, 8), [100.0, 50.0]);
 
-    let quad_scaled = [[0.0, 0.0], [200.0, 0.0], [200.0, 100.0], [0.0, 100.0]];
-    let p_top_right = carry_pivot(quad, quad_scaled, [100.0, 0.0]);
-    assert_eq!(p_top_right, [200.0, 0.0]);
-    let p_center = carry_pivot(quad, quad_scaled, [50.0, 25.0]);
-    assert_eq!(p_center, [100.0, 50.0]);
+    // The reference point keeps its place in the box as the box doubles.
+    for (pivot, doubled) in [([100.0, 0.0], [200.0, 0.0]), ([50.0, 25.0], [100.0, 50.0])] {
+        let mut s = session();
+        s.pivot = pivot;
+        drag(&mut s, [100.0, 50.0], [200.0, 100.0], egui::Modifiers::NONE);
+        assert_eq!(s.pivot, doubled);
+    }
 
     for anchor in 0..9 {
         assert_eq!(matching_anchor(quad, point_on_quad(quad, anchor)), Some(anchor));

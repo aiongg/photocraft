@@ -49,7 +49,7 @@ fn tool_of(split: WarpSplit) -> SplitTool {
 /// Runs `f` with the library's grid over warp `w`: its anchors and handles, the surface under a
 /// point, and the split the armed button (or ⌥ and ⌘) makes. `None` for a mesh the library
 /// refuses.
-fn with_grid<R>(w: &Warp, armed: Option<SplitTool>, mods: egui::Modifiers, f: impl FnOnce(&WarpGrid, &WarpMesh) -> R) -> Option<R> {
+pub(super) fn with_grid<R>(w: &Warp, armed: Option<SplitTool>, mods: egui::Modifiers, f: impl FnOnce(&WarpGrid, &WarpMesh) -> R) -> Option<R> {
     let m = w.to_mesh(1, 1);
     let points = m.points.iter().map(|p| Point::new(p[0], p[1])).collect();
     let lib = WarpMesh::new(m.us.clone(), m.vs.clone(), points)?;
@@ -77,7 +77,7 @@ pub(super) fn warp_cursor(app: &PhotocraftApp, w: &Warp, xf: &ViewXform, p: [f64
     if w.style != WarpStyle::Custom {
         return CursorIcon::Crosshair;
     }
-    match with_grid(w, None, mods, |g, _| g.hit(&view, warp_reach(), at)).flatten() {
+    match with_grid(w, None, mods, |g, _| g.hit(&view, warp_reach(), at, mods)).flatten() {
         Some(WarpTarget::Point(_)) => CursorIcon::Crosshair,
         Some(WarpTarget::Surface(..)) => CursorIcon::Grab,
         None => CursorIcon::Default,
@@ -88,7 +88,8 @@ pub(super) fn warp_cursor(app: &PhotocraftApp, w: &Warp, xf: &ViewXform, p: [f64
 /// follows the pointer; empty where no split is armed or the pointer is off the surface.
 pub(super) fn split_guide(w: &Warp, pv: &TransformPreview, xf: &ViewXform, p: [f64; 2], mods: egui::Modifiers) -> Vec<Vec<Pos2>> {
     let (view, at) = (xf.canvas_view(), xf.to_screen(p[0] as f32, p[1] as f32));
-    let lines = with_grid(w, pv.split_tool, mods, |g, lib| g.split_hit(&view, pv.split_press.as_ref(), at, mods).map(|s| s.lines(lib))).flatten().unwrap_or_default();
+    let lines =
+        with_grid(w, pv.split_tool, mods, |g, lib| g.split_hit(&view, pv.split_press.as_ref(), at, mods).map(|s| s.lines(lib))).flatten().unwrap_or_default();
     let mut out: Vec<Vec<Pos2>> = Vec::new();
     for path in lines {
         craft_ui::canvas::kurbo::flatten(path, 0.25 / f64::from(xf.zoom.max(1e-3)), |el| match el {
@@ -113,7 +114,12 @@ fn split_gesture(app: &mut PhotocraftApp, ev: ToolEvent, zoom: f64, mods: egui::
     let (view, canvas) = (point_view(zoom), |x: f64, y: f64| pos2((x * zoom) as f32, (y * zoom) as f32));
     match ev {
         ToolEvent::Down { x, y, .. } if armed.is_some() || mods.alt || mods.command => {
-            let press = app.ui.transform.as_ref().and_then(|t| t.warp.as_ref()).and_then(|w| with_grid(w, armed, mods, |g, _| g.split_press(&view, canvas(x, y), mods)).flatten());
+            let press = app
+                .ui
+                .transform
+                .as_ref()
+                .and_then(|t| t.warp.as_ref())
+                .and_then(|w| with_grid(w, armed, mods, |g, _| g.split_press(&view, canvas(x, y), mods)).flatten());
             if let Some(pv) = app.transform_preview.as_mut() {
                 pv.split_placing = true;
                 pv.split_pointer = Some([x, y]);
@@ -134,9 +140,9 @@ fn split_gesture(app: &mut PhotocraftApp, ev: ToolEvent, zoom: f64, mods: egui::
                 pv.split_pointer = None;
                 pv.split_press = None;
             }
-            let edit = press.zip(app.ui.transform.as_ref().and_then(|t| t.warp.as_ref())).and_then(|(press, w)| {
-                with_grid(w, armed, mods, |g, _| g.split_release(&view, &press, canvas(x, y))).flatten()
-            });
+            let edit = press
+                .zip(app.ui.transform.as_ref().and_then(|t| t.warp.as_ref()))
+                .and_then(|(press, w)| with_grid(w, armed, mods, |g, _| g.split_release(&view, &press, canvas(x, y))).flatten());
             if let Some(WarpEdit::Split { split: kind, .. }) = edit {
                 // On an existing line, or a click the drag path also delivers, this is a no-op.
                 let _ = split(app, tool_of(kind).command(), Some([x, y]));
@@ -168,7 +174,7 @@ pub(super) fn warp_pointer(app: &mut PhotocraftApp, ev: ToolEvent, zoom: f64, mo
             let custom = if w.mesh.is_none() || w.style != WarpStyle::Custom { Warp::custom(w.to_mesh(1, 1), w.bounds) } else { w.clone() };
             let pts0 = custom.mesh.as_ref().map(|m| m.points.clone()).unwrap_or_default();
             let at = pos2((x * zoom) as f32, (y * zoom) as f32);
-            pv.warp_drag = with_grid(&custom, None, mods, |g, _| g.press(&view, style, at)).flatten().map(|press| match press.target() {
+            pv.warp_drag = with_grid(&custom, None, mods, |g, _| g.press(&view, style, at, mods)).flatten().map(|press| match press.target() {
                 WarpTarget::Point(_) => WarpDrag::Point { press, pts0 },
                 WarpTarget::Surface(..) => WarpDrag::Surface { press, pts0 },
             });

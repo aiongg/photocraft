@@ -75,10 +75,12 @@ fn control_part(r: Rect, p: Pos2) -> Option<BoxPart> {
     };
     // Screen points are the frame's own, so the view maps them to themselves.
     let view = crate::transform_tool::point_view(1.0);
-    let part = TransformBox::new("photocraft.move-controls", &state, TransformNames::default())
-        .rotate_zone(RotateZone::Band)
-        .inside_moves(false)
-        .hit(&view, crate::transform_tool::reach(), p, egui::Modifiers::NONE)?;
+    let part = TransformBox::new("photocraft.move-controls", &state, TransformNames::default()).rotate_zone(RotateZone::Band).inside_moves(false).hit(
+        &view,
+        crate::transform_tool::reach(),
+        p,
+        egui::Modifiers::NONE,
+    )?;
     (part != BoxPart::Pivot).then_some(part)
 }
 
