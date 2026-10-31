@@ -1,25 +1,34 @@
 use super::overlay::path_lines;
 use super::shapes::hex;
-use super::{Color32, Document, LayerContent, Path, PhotocraftApp, Rect, Sense, Stroke, Tokens, Value, json, pos2, vec2};
+use super::{Color32, Document, LayerContent, Path, PhotocraftApp, Rect, Value, json, pos2, vec2};
+use craft_ui::behavior::ListDrag;
+use craft_ui::composites::PanelFooter;
+use craft_ui::icons::Icon;
+use craft_ui::list::{ListRow, RowEvent, ThumbSize};
+use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem};
 use craft_ui::theme::StrokeExt;
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
+use std::cell::Cell;
+
+use crate::theme::Tokens;
 
 // ---------------------------------------------------------------------------------------------
 // Paths panel
 
-fn thumb(ui: &egui::Ui, r: Rect, path: &Path, doc: &Document) {
-    let t = Tokens::get(ui.ctx());
+fn thumb(painter: &egui::Painter, r: Rect, path: &Path, doc: &Document) {
+    let t = Tokens::get(painter.ctx());
     // At the document's aspect ratio, like the Channels thumbnails.
     let r = crate::channels_panel::fit_thumb(r, doc.size.width, doc.size.height).0;
-    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(if t.pro { 222 } else { 240 }));
+    painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), Color32::from_gray(if t.pro { 222 } else { 240 }));
     let (w, h) = (doc.size.width.max(1) as f64, doc.size.height.max(1) as f64);
     let s = (r.width() as f64 / w).min(r.height() as f64 / h);
     let off = r.center() - vec2((w * s) as f32 / 2.0, (h * s) as f32 / 2.0);
     let map = |q: [f64; 2]| pos2(off.x + (q[0] * s) as f32, off.y + (q[1] * s) as f32);
     for (pts, closed) in path_lines(path, &map) {
         if closed && pts.len() >= 3 {
-            ui.painter().add(egui::Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(40))));
+            painter.add(egui::Shape::closed_line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
         } else {
-            ui.painter().add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), Color32::from_gray(40))));
+            painter.add(egui::Shape::line(pts, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_gray(40))));
         }
     }
 }
@@ -64,17 +73,12 @@ fn footer_id() -> egui::Id {
     egui::Id::unique("paths-footer")
 }
 
-/// A Paths panel row being dragged, for a drop on the trash (#6553): its name and the command
-/// that deletes it.
-#[derive(Clone, Debug)]
-struct PathDrag {
-    name: String,
-    cmd: &'static str,
-    params: Value,
-}
+/// A Paths panel row being dragged (egui's `DragAndDrop` payload), for a drop on the trash
+/// (#6553): its key is `PathEntry::key`.
+type PathDrag = ListDrag<String>;
 
-fn path_drag_key() -> egui::Id {
-    egui::Id::unique("paths-drag")
+fn list_id() -> egui::Id {
+    egui::Id::unique("pc-paths-list")
 }
 
 fn ctx_data_footer(ctx: &egui::Context, r: Rect) {
@@ -99,17 +103,10 @@ fn free_path_name(doc: &Document) -> String {
     format!("Path {n}")
 }
 
-/// A Paths panel name being typed in place: the row's key ("work" or the saved path's name) and
-/// the text so far. It lives in egui's temp data, like the Channels panel's rename field.
-#[derive(Clone)]
-struct PathRename {
-    key: String,
-    text: String,
-    focused: bool,
-}
-
-fn rename_id(doc: &Document) -> egui::Id {
-    egui::Id::unique(("path-rename", doc.id.0))
+/// Whether the Paths panel is renaming a row (the row's key is "work" or the saved path's name).
+/// It lives in egui's temp data, like the Channels panel's rename flag.
+fn rename_id(doc: &Document, key: &str) -> egui::Id {
+    egui::Id::unique(("path-rename", doc.id.0, key.to_owned()))
 }
 
 /// Commands offered by a Paths row's context menu. The row's path is passed explicitly so a
@@ -154,6 +151,129 @@ pub(super) fn path_context_actions(entry: &PathEntry, doc: &Document, layer: Opt
     actions
 }
 
+impl PathEntry {
+    /// The row's reference in the path commands and the panel's selection.
+    fn key(&self) -> String {
+        match self.kind {
+            PathRow::Work => "work".to_string(),
+            PathRow::Layer => "layer".to_string(),
+            PathRow::Saved => self.name.clone(),
+        }
+    }
+
+    /// What dropping the row on the trash runs; a shape layer's path is not dragged.
+    fn delete_command(&self) -> Option<(&'static str, Value)> {
+        match self.kind {
+            PathRow::Work => Some(("path.delete", json!({"name": "work"}))),
+            PathRow::Saved => Some(("path.delete", json!({"name": self.name}))),
+            PathRow::Layer if self.name.ends_with(" Vector Mask") => Some(("layer.vectorMask.delete", json!({}))),
+            PathRow::Layer => None,
+        }
+    }
+}
+
+type Cmd = (&'static str, Value);
+
+/// The Paths panel's actions that need more than a command.
+#[derive(Default)]
+struct PanelOut {
+    action: Option<(&'static str, Value)>,
+    stroke_dialog: Option<String>,
+}
+
+fn show_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, layer: Option<photocraft_doc::LayerId>, entry: &PathEntry, out: &mut PanelOut) {
+    let PathEntry { name, path, kind } = entry;
+    let key = entry.key();
+    let rename_id = rename_id(doc, &key);
+    let renaming = ui.data(|d| d.get_temp::<bool>(rename_id)).unwrap_or(false);
+    // The name offered when a rename starts: the Work Path is saved under a free "Path N".
+    let proposed = match kind {
+        PathRow::Work => Some(free_path_name(doc)),
+        PathRow::Saved => Some(name.clone()),
+        PathRow::Layer => None,
+    };
+    let label = match kind {
+        PathRow::Work if renaming => proposed.clone().unwrap_or_default(),
+        PathRow::Work => tl!(name).to_string(),
+        _ => name.clone(),
+    };
+    // Temporary paths (the work path, the selected layer's shape path or vector mask) are italic.
+    let thumb_rect = Cell::new(None::<Rect>);
+    let shown = ListRow::new(key.clone(), label.as_str())
+        .selected(app.ui.selected_path.as_deref() == Some(key.as_str()))
+        .layer(true)
+        .italic(*kind != PathRow::Saved)
+        .renaming(renaming)
+        .thumb(ThumbSize::Small, |painter, cell| {
+            thumb(painter, cell, path, doc);
+            thumb_rect.set(Some(cell));
+        })
+        .show(ui);
+    let resp = shown.response.clone();
+    let mut renamed = false;
+    for event in &shown.events {
+        match event {
+            RowEvent::Renamed { text, .. } => {
+                let to = text.trim();
+                // An unchanged saved name is left alone.
+                if !to.is_empty() && to != name {
+                    out.action = Some(("path.rename", json!({"name": key, "to": to})));
+                    renamed = true;
+                }
+            }
+            RowEvent::RenameEnded { end, .. } => {
+                ui.data_mut(|d| d.remove::<bool>(rename_id));
+                // The Work Path is saved even under its proposed name.
+                if *kind == PathRow::Work && !renamed && *end != craft_ui::list::RenameEnd::Escape {
+                    out.action = Some(("path.rename", json!({"name": key, "to": proposed.clone().unwrap_or_default()})));
+                }
+            }
+            _ => {}
+        }
+    }
+    if resp.drag_started() && entry.delete_command().is_some() {
+        let order = [craft_ui::behavior::RowInfo { key: key.clone(), depth: 0, has_children: false, open: false, section: false }];
+        egui::DragAndDrop::set_payload(ui.ctx(), PathDrag::new(list_id(), &order[..], &[], key.clone(), label.clone()));
+    }
+    // Ctrl/Cmd-click loads only the thumbnail's path, without changing the panel target.
+    let modifiers = ui.input(|i| i.modifiers);
+    let load = resp.clicked() && modifiers.command && thumb_rect.get().zip(resp.interact_pointer_pos()).is_some_and(|(r, p)| r.contains(p));
+    if load {
+        let mode = match crate::channels_panel::load_operation(modifiers) {
+            "new" => "replace",
+            mode => mode,
+        };
+        out.action = Some(("path.toSelection", json!({"name": key, "mode": mode})));
+    } else if resp.clicked() {
+        // Selecting the Work Path ends the hide from Make Selection (#6079): deselected
+        // again, it is an ordinary unselected Work Path (#6551).
+        if *kind == PathRow::Work {
+            app.ui.hidden_work_path = None;
+        }
+        app.ui.selected_path = Some(key.clone());
+    }
+    // As in Photoshop, double-clicking a saved path's name renames it, and double-clicking
+    // the Work Path asks for the name to save it under (#6238).
+    if !load && resp.double_clicked() && proposed.is_some() {
+        ui.data_mut(|d| d.insert_temp(rename_id, true));
+    }
+    let can_paint = app.session.active().and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id))).is_some_and(|l| l.surface().is_some());
+    let entries: Vec<MenuEntry<Cmd>> = path_context_actions(entry, doc, layer)
+        .into_iter()
+        .map(|(label, cmd, params)| MenuItem::new(tl!(label), (cmd, params)).enabled(!matches!(cmd, "path.fill" | "path.stroke") || can_paint).into())
+        .collect();
+    if let Some((cmd, params)) = ContextMenu::new(&entries).show(ui, &resp).chosen {
+        if cmd == "path.stroke" {
+            // Stroke Path… asks for the tool first, as in Photoshop (#2978).
+            out.stroke_dialog = Some(params.get("name").and_then(Value::as_str).unwrap_or("work").to_string());
+        } else if cmd == "path.rename" && params.get("to").is_none() {
+            ui.data_mut(|d| d.insert_temp(rename_id, true));
+        } else {
+            out.action = Some((cmd, params));
+        }
+    }
+}
+
 pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
@@ -164,18 +284,12 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let st_layer = st.active_layer;
     let rows = path_rows(&doc, st_layer);
     let has_layer_path = rows.iter().any(|r| r.kind == PathRow::Layer);
-    let mut action: Option<(&str, Value)> = None;
-    let mut stroke_dialog: Option<String> = None;
-    // A row dragged onto the trash is deleted (#6553); a drag that never saw its release must not
-    // outlive it.
+    let mut out = PanelOut::default();
     let ctx = ui.ctx().clone();
-    if !ctx.input(|i| i.pointer.primary_down() || i.pointer.any_released()) {
-        ctx.data_mut(|d| d.remove::<PathDrag>(path_drag_key()));
-    }
-    let drag = ctx.data(|d| d.get_temp::<PathDrag>(path_drag_key()));
-    let rename_id = rename_id(&doc);
+    let dragged = egui::DragAndDrop::payload::<PathDrag>(&ctx);
     // The buttons sit in a footer at the panel's bottom, like Photoshop's.
-    let footer = crate::widgets::footer_height(ui) + ui.spacing().item_spacing.y;
+    let tokens = LibTokens::of(ui);
+    let footer = PanelFooter::reserved_height(&PanelFooter::style(&tokens, ui.pixels_per_point())) + ui.spacing().item_spacing.y;
     let fill = ui.available_height() > footer + 60.0;
     let rows_h = if fill { ui.available_height() - footer } else { f32::INFINITY };
     egui::ScrollArea::vertical().id_salt("path-rows").max_height(rows_h).min_scrolled_height(if fill { rows_h } else { 0.0 }).auto_shrink([false, !fill]).show(
@@ -184,197 +298,77 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if rows.is_empty() {
                 ui.label(egui::RichText::new(tl!("Draw with the Pen tool (P) or make a work path from a selection.")).color(t.text_faint).size(11.5));
             }
-            for PathEntry { name, path, kind } in &rows {
-                // What dropping the row on the trash runs; a shape layer's path is not dragged.
-                let delete = match kind {
-                    PathRow::Work => Some(("path.delete", json!({"name": "work"}))),
-                    PathRow::Saved => Some(("path.delete", json!({"name": name}))),
-                    PathRow::Layer if name.ends_with(" Vector Mask") => Some(("layer.vectorMask.delete", json!({}))),
-                    PathRow::Layer => None,
-                };
-                let sense = if delete.is_some() { Sense::click_and_drag() } else { Sense::click() };
-                let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), sense);
-                let key = match kind {
-                    PathRow::Work => "work".to_string(),
-                    PathRow::Layer => "layer".to_string(),
-                    PathRow::Saved => name.clone(),
-                };
-                if resp.drag_started()
-                    && let Some((cmd, params)) = delete
-                {
-                    let name = if *kind == PathRow::Work { tl!(name).to_string() } else { name.clone() };
-                    ui.ctx().data_mut(|d| d.insert_temp(path_drag_key(), PathDrag { name, cmd, params }));
-                }
-                // Rows are painted: name them for screen readers and UI tests.
-                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, name));
-                let sel = app.ui.selected_path.as_deref() == Some(key.as_str());
-                if sel {
-                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
-                } else if resp.hovered() {
-                    ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
-                }
-                let thumbnail = Rect::from_min_size(pos2(r.left() + 8.0, r.top() + 4.0), vec2(28.0, 28.0));
-                thumb(ui, thumbnail, path, &doc);
-                let mut job = egui::text::LayoutJob::default();
-                // Temporary paths (the work path, the selected layer's shape path or vector mask) are italic.
-                let italics = *kind != PathRow::Saved;
-                job.append(
-                    if *kind == PathRow::Work { tl!(name) } else { name },
-                    0.0,
-                    egui::TextFormat { font_id: egui::FontId::proportional(12.0), color: t.text, italics, ..Default::default() },
-                );
-                let renaming = ui.ctx().data(|d| d.get_temp::<PathRename>(rename_id)).filter(|e| e.key == key);
-                if let Some(mut edit) = renaming {
-                    let field = Rect::from_min_max(pos2(r.left() + 43.0, r.center().y - 11.0), pos2(r.right() - 8.0, r.center().y + 11.0));
-                    let id = rename_id.with("field");
-                    let te =
-                        ui.put(field, egui::TextEdit::singleline(&mut edit.text).id(id).font(egui::FontId::proportional(12.0))).accessible_name(tl!("Name"));
-                    let (enter, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
-                    if !edit.focused {
-                        te.request_focus();
-                        // Like Photoshop, the whole name starts selected so typing replaces it.
-                        if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
-                            let all = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(edit.text.chars().count()));
-                            state.cursor.set_char_range(Some(all));
-                            state.store(ui.ctx(), id);
-                        }
-                        edit.focused = true;
-                        ui.ctx().data_mut(|d| d.insert_temp(rename_id, edit));
-                    } else if esc {
-                        ui.ctx().data_mut(|d| d.remove::<PathRename>(rename_id));
-                    } else if enter || te.lost_focus() || !te.has_focus() {
-                        ui.ctx().data_mut(|d| d.remove::<PathRename>(rename_id));
-                        let to = edit.text.trim();
-                        // The Work Path is saved even under its proposed name; an unchanged saved name is left alone.
-                        if !to.is_empty() && (*kind == PathRow::Work || to != name) {
-                            action = Some(("path.rename", json!({"name": key, "to": to})));
-                        }
-                    } else {
-                        ui.ctx().data_mut(|d| d.insert_temp(rename_id, edit));
-                    }
-                } else {
-                    let g = ui.painter().layout_job(job);
-                    ui.painter().galley(pos2(r.left() + 46.0, r.center().y - g.size().y / 2.0), g, t.text);
-                }
-                // Ctrl/Cmd-click loads only the thumbnail's path, without changing the panel target.
-                let modifiers = ui.input(|i| i.modifiers);
-                let load = resp.clicked() && modifiers.command && resp.interact_pointer_pos().is_some_and(|p| thumbnail.contains(p));
-                if load {
-                    let mode = match crate::channels_panel::load_operation(modifiers) {
-                        "new" => "replace",
-                        mode => mode,
-                    };
-                    action = Some(("path.toSelection", json!({"name": key, "mode": mode})));
-                } else if resp.clicked() {
-                    // Selecting the Work Path ends the hide from Make Selection (#6079): deselected
-                    // again, it is an ordinary unselected Work Path (#6551).
-                    if *kind == PathRow::Work {
-                        app.ui.hidden_work_path = None;
-                    }
-                    app.ui.selected_path = Some(key.clone());
-                }
-                // As in Photoshop, double-clicking a saved path's name renames it, and double-clicking
-                // the Work Path asks for the name to save it under (#6238).
-                let proposed = match kind {
-                    PathRow::Work => Some(free_path_name(&doc)),
-                    PathRow::Saved => Some(name.clone()),
-                    PathRow::Layer => None,
-                };
-                if !load
-                    && resp.double_clicked()
-                    && let Some(text) = proposed
-                {
-                    ui.ctx().data_mut(|d| d.insert_temp(rename_id, PathRename { key: key.clone(), text, focused: false }));
-                }
-                resp.context_menu(|ui| {
-                    crate::widgets::menu_scroll(ui, |ui| {
-                        ui.set_min_width(190.0);
-                        let entry = PathEntry { name: name.clone(), path: path.clone(), kind: *kind };
-                        let can_paint = app.session.active().and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id))).is_some_and(|l| l.surface().is_some());
-                        for (label, cmd, params) in path_context_actions(&entry, &doc, st_layer) {
-                            let enabled = !matches!(cmd, "path.fill" | "path.stroke") || can_paint;
-                            if ui.add_enabled(enabled, egui::Button::new(tl!(label))).clicked() {
-                                if cmd == "path.stroke" {
-                                    // Stroke Path… asks for the tool first, as in Photoshop (#2978).
-                                    stroke_dialog = Some(params.get("name").and_then(Value::as_str).unwrap_or("work").to_string());
-                                } else if cmd == "path.rename" && params.get("to").is_none() {
-                                    let edit = PathRename { key: key.clone(), text: name.clone(), focused: false };
-                                    ui.ctx().data_mut(|d| d.insert_temp(rename_id, edit));
-                                } else {
-                                    action = Some((cmd, params));
-                                }
-                                ui.close();
-                            }
-                        }
-                    });
-                });
-                ui.painter().line_segment([r.left_bottom(), r.right_bottom()], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator));
+            for entry in &rows {
+                show_row(app, ui, &doc, st_layer, entry, &mut out);
             }
             // Clicking the empty area deselects the path, as in Photoshop: new fill and
             // adjustment layers then take the selection as their mask instead (#1419).
             let rest = ui.available_rect_before_wrap();
             let rest = rest.intersect(Rect::from_min_size(rest.min, vec2(rest.width(), rest.height().min(4000.0))));
-            if rest.is_positive() && ui.interact(rest, ui.scope_id().with("paths-empty"), Sense::click()).clicked() {
+            if rest.is_positive() && ui.interact(rest, ui.scope_id().with("paths-empty"), egui::Sense::click()).clicked() {
                 app.ui.selected_path = None;
             }
         },
     );
     // The dragged row follows the cursor.
-    if let Some(drag) = &drag
+    if let Some(drag) = &dragged
         && let Some(p) = ctx.input(|i| i.pointer.interact_pos())
     {
-        crate::layer_transfer::show_ghost(ui, p, &drag.name);
+        crate::layer_transfer::show_ghost(ui, p, &drag.label);
     }
     let sel = app.ui.selected_path.clone().filter(|s| s != "layer" || has_layer_path).unwrap_or_else(|| "work".into());
-    let buttons = crate::widgets::panel_footer(ui, |ui| {
+    let buttons = PanelFooter::show(ui, |ui| {
         let fg = hex(app.session.tools.foreground);
         let mut n = doc.paths.len() + 1;
         while doc.paths.iter().any(|p| p.name == format!("Path {n}")) {
             n += 1;
         }
-        let items: [(&str, &str, &str, Value); 7] = [
-            ("paint-bucket", "Fill path with foreground color", "path.fill", json!({"name": sel, "color": fg})),
-            ("circle", "Stroke path with brush", "path.stroke", json!({"name": sel, "tool": "brush"})),
-            ("square-dashed", "Load path as a selection", "path.toSelection", json!({"name": sel})),
-            ("spline", "Make work path from selection", "select.toWorkPath", json!({"tolerance": 2.0})),
-            ("square", "Add vector mask", "layer.vectorMask.fromPath", json!({"name": sel})),
-            ("square-plus", "Create new path", "path.set", json!({"name": format!("Path {n}"), "path": {"subpaths": []}})),
-            ("trash", "Delete path", "path.delete", json!({"name": sel})),
+        let items: [(Icon, &str, &str, Value); 7] = [
+            (Icon::PaintBucket, tl!("Fill path with foreground color"), "path.fill", json!({"name": sel, "color": fg})),
+            (Icon::Circle, tl!("Stroke path with brush"), "path.stroke", json!({"name": sel, "tool": "brush"})),
+            (Icon::MarqueeRect, tl!("Load path as a selection"), "path.toSelection", json!({"name": sel})),
+            (Icon::Spline, tl!("Make work path from selection"), "select.toWorkPath", json!({"tolerance": 2.0})),
+            (Icon::Square, tl!("Add vector mask"), "layer.vectorMask.fromPath", json!({"name": sel})),
+            (Icon::Plus, tl!("Create new path"), "path.set", json!({"name": format!("Path {n}"), "path": {"subpaths": []}})),
+            (Icon::Trash, tl!("Delete path"), "path.delete", json!({"name": sel})),
         ];
         // The layer's own path: deleting it deletes the vector mask (a shape keeps its path).
         let shape = rows.iter().any(|r| r.kind == PathRow::Layer && r.name.ends_with(" Shape Path"));
         let delete_layer_path = sel == "layer" && !shape;
         let items = items.map(|(icon, tip, cmd, p)| {
-            if cmd == "path.delete" && delete_layer_path { (icon, "Delete vector mask", "layer.vectorMask.delete", json!({})) } else { (icon, tip, cmd, p) }
+            if cmd == "path.delete" && delete_layer_path {
+                (icon, tl!("Delete vector mask"), "layer.vectorMask.delete", json!({}))
+            } else {
+                (icon, tip, cmd, p)
+            }
         });
         // Laid out from the right, so the last button goes first.
         let mut buttons = Rect::NOTHING;
         for (icon, tip, cmd, p) in items.into_iter().rev() {
-            let icon = if crate::icons::exists(icon) { icon } else { "square" };
-            let b = crate::icons::button(ui, icon, 26.0, false, tip);
+            let b = PanelFooter::button(ui, icon, tip);
             if b.clicked() {
                 if cmd == "path.stroke" && ui.input(|i| i.modifiers.alt) {
                     // Alt-click opens the Stroke Path dialog, as in Photoshop (#2978).
-                    stroke_dialog = Some(sel.clone());
+                    out.stroke_dialog = Some(sel.clone());
                 } else {
-                    action = Some((cmd, p));
+                    out.action = Some((cmd, p));
                 }
             }
             // A row dropped on the trash deletes that row's path, selected or not (#6553).
             if matches!(cmd, "path.delete" | "layer.vectorMask.delete")
-                && let Some(drag) = &drag
+                && let Some(drag) = &dragged
                 && crate::panels::dropped_on(ui, &b)
+                && let Some(entry) = drag.items.first().and_then(|k| rows.iter().find(|r| r.key() == *k))
+                && let Some(drop) = entry.delete_command()
             {
-                action = Some((drag.cmd, drag.params.clone()));
+                out.action = Some(drop);
             }
             buttons = buttons.union(b.rect);
         }
         buttons
     });
     ctx_data_footer(ui.ctx(), buttons);
-    if ctx.input(|i| i.pointer.any_released()) {
-        ctx.data_mut(|d| d.remove::<PathDrag>(path_drag_key()));
-    }
+    let PanelOut { action, stroke_dialog } = out;
     if let Some(name) = stroke_dialog {
         crate::canvas_tool_menu::stroke_path_dialog(app, &name);
     }
