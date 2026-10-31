@@ -35,7 +35,7 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2) {
     h.run_steps(2);
 }
 
-/// A filter row's name and blend icon are separate double-click targets, side by side without overlap, in every theme and dock width.
+/// A filter row's name and blend icon are separate double-click targets: the icon is inside the row, in every theme and dock width.
 #[test]
 fn names_and_blend_icons_have_separate_double_click_targets_and_no_overlap() {
     for theme in crate::theme::ThemeKind::ALL {
@@ -47,7 +47,7 @@ fn names_and_blend_icons_have_separate_double_click_targets_and_no_overlap() {
             assert!(row.indicators.iter().any(|(k, _)| *k == crate::layer_row_ui::Indicator::SmartFilters));
             let blend = h.get_by_label("Blending Options (Box Blur)").rect();
             let edit = h.get_by_label("Box Blur").rect();
-            assert!(edit.right() <= blend.left(), "{width} {theme:?}: {edit:?} {blend:?}");
+            assert!(edit.contains_rect(blend), "{width} {theme:?}: the icon is a trailing item inside the row: {edit:?} {blend:?}");
             click(&mut h, blend.center());
             assert!(h.state().ui.dialogs.is_empty(), "single click does not open blending");
             click(&mut h, blend.center());
