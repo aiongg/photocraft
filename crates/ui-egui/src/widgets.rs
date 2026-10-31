@@ -38,6 +38,7 @@ pub use color::{checker, checker_rounded, color_edit_button_rgb, color_edit_butt
 use color::{checker_tile_id, checker_uv};
 pub use dialog_fields::{
     NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units, text as dialog_text,
+    text_as as dialog_text_as,
 };
 pub use dropdown::{dropdown, dropdown_hovered, dropdown_literal, dropdown_wheel_hovered, dropdown_with_tooltips, menu_scroll, swatch_popup};
 pub(crate) use fields::compact_wrapping_value_field;
@@ -56,8 +57,6 @@ pub use scrub::{scrub_label, scrub_option_icon, scrub_option_label};
 use slider::DOUBLE_CLICK_S;
 pub use slider::{RowGestures, second_click, slider, slider_row, slider_row_prec, slider_row_with};
 pub(crate) use slider::{count_notches, wheel_notches_of};
-#[cfg(test)]
-pub(crate) use slider::{curve_fraction, curve_value};
 pub use text_field::{
     INPUT_EVENT_LIMIT, TEXT_FIELD_H, TEXT_FIELD_LIMIT, cap_text_events, focus_first_field, text_field, text_field_ex, text_field_with_trailing,
 };

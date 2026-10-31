@@ -1021,7 +1021,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let slider_w = (ui.available_width() - 90.0).clamp(100.0, 260.0);
         let mut lv = b.size.max(1.0).ln();
         ui.add_sized(vec2(slider_w, 18.0), |ui: &mut egui::Ui| {
-            let r = widgets::slider(ui, &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
+            let r = widgets::slider(ui, tl!("Size"), &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
             if r.changed() {
                 b.size = lv.exp().round().clamp(1.0, MAX_BRUSH_SIZE);
             }
@@ -1059,7 +1059,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let w = (inner_w - 112.0).clamp(90.0, inner_w - 40.0);
         ui.allocate_ui_with_layout(vec2(w, 18.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             let scale = &mut app.ui.brushes_panel.scale;
-            let resp = widgets::slider(ui, scale, PREVIEW_SCALE_RANGE, None).on_hover_text(tl!("Preview size"));
+            let resp = widgets::slider(ui, tl!("Preview size"), scale, PREVIEW_SCALE_RANGE, None).on_hover_text(tl!("Preview size"));
             if resp.changed() {
                 *scale = (*scale * 100.0).round() / 100.0;
             }

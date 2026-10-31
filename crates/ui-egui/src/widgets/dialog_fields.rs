@@ -1,6 +1,7 @@
 //! Library fields over a dialog's JSON `fields` map: each edits a plain value in place and reports
 //! whether the user changed it.
 
+use craft::theme::TypeRole;
 use craft::ui::controls::{NumberField, TextField};
 use craft::ui::localized::{LocaleNumbers, Unit};
 use egui::{AsIdSalt, Ui};
@@ -92,7 +93,16 @@ fn number_field_parsed(
 
 /// A single-line [`TextField`] named `label` over `text`; `changed` is set when the user changed the text.
 pub fn text(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, text: &mut String) -> TextEdit {
-    let edit = TextField::new(id_salt, label, text).show(ui);
+    text_as(ui, id_salt, label, text, None)
+}
+
+/// [`text`] set in `role` (the library's default role when `None`).
+pub fn text_as(ui: &mut Ui, id_salt: impl AsIdSalt, label: &str, text: &mut String, role: Option<TypeRole>) -> TextEdit {
+    let mut field = TextField::new(id_salt, label, text);
+    if let Some(role) = role {
+        field = field.role(role);
+    }
+    let edit = field.show(ui);
     let mut changed = false;
     if let Some(v) = edit.event.as_ref().and_then(|e| e.value()) {
         if v != text {

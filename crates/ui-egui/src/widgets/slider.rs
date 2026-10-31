@@ -1,18 +1,31 @@
-use super::fields::{FieldOpts, value_field_in};
-use super::panel::surface;
-use super::scrub::scrub_label_within;
-use super::{Color32, Pos2, Rect, Response, Sense, Stroke, Tokens, Ui, Vec2, pos2, vec2};
-use craft::ui::theme::StrokeExt;
+use super::{Color32, Pos2, Response, Ui, Vec2};
+use craft::ui::composites::SliderRow;
+use craft::ui::controls::{ControlSize, Slider};
+use craft::ui::edit::{EditEvent, EditResponse};
+use craft::ui::localized::{LocaleNumbers, Unit};
 
-/// Thin-track slider with a round knob. `gradient` paints the track (e.g. hue spectrum).
-pub fn slider(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {
-    slider_with(ui, value, range, gradient, RowGestures::default())
+/// Thin-track slider with a round knob over `*value`, named `label` for screen readers and
+/// automation. `gradient` paints the track (e.g. hue spectrum). The response is changed on every
+/// update the user makes.
+pub fn slider(ui: &mut Ui, label: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>) -> Response {
+    let salt = ui.next_auto_id();
+    let (lo, hi) = (*range.start(), *range.end());
+    let mut slider = Slider::new(salt, label, f64::from(*value), f64::from(lo)..=f64::from(hi)).size(ControlSize::Md).width(ui.available_width().max(60.0));
+    if let Some(stops) = gradient.filter(|g| g.len() >= 2) {
+        slider = slider.track_colors(stops.iter().copied());
+    }
+    let edit = slider.show(ui);
+    let mut response = edit.response.clone();
+    if apply(ui, salt, &edit, value, lo, hi) {
+        response.mark_changed();
+    }
+    response
 }
 
 /// Photoshop's gestures on a slider row beyond click and drag, as measured on Color Balance in
 /// Photoshop 25.4 (Image › Adjustments dialog and the adjustment layer's Properties). Shift, Ctrl
 /// and Alt change nothing about clicks, double-clicks or drags; the wheel takes ten steps with
-/// Shift. (Up/Down in the field are every value field's, see [`value_field`].)
+/// Shift. (Up/Down in the field are every number field's.)
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct RowGestures {
     /// A double-click on the slider (knob or track; not the label or field) sets this value.
@@ -26,38 +39,37 @@ pub struct RowGestures {
     pub curve: Option<f32>,
 }
 
-/// The value at fraction `f` of a track over `lo..=hi`, through `curve` (see [`RowGestures`]).
-pub(crate) fn curve_value(f: f32, lo: f32, hi: f32, curve: Option<f32>) -> f32 {
-    match curve {
-        Some(k) if k.is_finite() && k > 0.0 => lo + f.clamp(0.0, 1.0).powf(k) * (hi - lo),
-        _ => lo + f * (hi - lo),
-    }
+/// Writes the value an edit event reports into `value` (clamped to `lo..=hi`); a cancelled
+/// gesture restores the value it began with. Whether the value changed.
+fn apply(ui: &Ui, salt: egui::Id, edit: &EditResponse<f64>, value: &mut f32, lo: f32, hi: f32) -> bool {
+    apply_event(ui, salt, edit.event.as_ref(), value, lo, hi)
 }
 
-/// Where `v` sits on a track over `lo..=hi`, as a fraction: the inverse of [`curve_value`].
-pub(crate) fn curve_fraction(v: f32, lo: f32, hi: f32, curve: Option<f32>) -> f32 {
-    let f = ((v - lo) / (hi - lo)).clamp(0.0, 1.0);
-    match curve {
-        // An unset (NaN) value draws the knob at the start rather than nowhere.
-        Some(k) if k.is_finite() && k > 0.0 => {
-            if f.is_finite() {
-                f.powf(1.0 / k)
-            } else {
-                0.0
-            }
+fn apply_event(ui: &Ui, salt: egui::Id, event: Option<&EditEvent<f64>>, value: &mut f32, lo: f32, hi: f32) -> bool {
+    let before = salt.with("pc-before");
+    let (min, max) = (lo.min(hi), lo.max(hi));
+    match event {
+        Some(EditEvent::Begin { .. }) => {
+            let start = *value;
+            ui.data_mut(|d| d.insert_temp(before, start));
+            false
         }
-        _ => f,
+        Some(EditEvent::Update { value: v, .. } | EditEvent::Set { value: v, .. } | EditEvent::Commit { value: v, changed: true, .. }) => {
+            *value = (*v as f32).clamp(min, max);
+            true
+        }
+        Some(EditEvent::Cancel { .. }) => match ui.data(|d| d.get_temp::<f32>(before)) {
+            Some(old) => {
+                *value = old;
+                true
+            }
+            None => false,
+        },
+        _ => false,
     }
 }
 
-/// Wheel notches this frame while the pointer is over `resp` (Shift ×10). Wheel lines add up in
-/// egui memory until they make whole notches (high-resolution wheels report fractions of one);
-/// smooth (point) deltas count `line_scroll_speed` points per notch, like the canvas wheel.
-fn wheel_notches(ui: &Ui, resp: &Response) -> f32 {
-    wheel_notches_of(ui, resp.id, resp.hovered(), 10.0)
-}
-
-/// [`wheel_notches`] of widget `id` while `hovered`, a notch with Shift counting `shift_notches`.
+/// Wheel notches of widget `id` while `hovered`, a notch with Shift counting `shift_notches`.
 pub(crate) fn wheel_notches_of(ui: &Ui, id: egui::Id, hovered: bool, shift_notches: f32) -> f32 {
     if !hovered {
         return 0.0;
@@ -140,83 +152,6 @@ pub fn second_click(ui: &Ui, resp: &Response) -> bool {
     double
 }
 
-fn slider_with(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>, g: RowGestures) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let width = ui.available_width().max(60.0);
-    let (rect, mut resp) = ui.allocate_exact_size(vec2(width, 18.0), Sense::click_and_drag());
-    let (lo, hi) = (*range.start(), *range.end());
-    let track = Rect::from_center_size(rect.center(), vec2(rect.width() - 14.0, if gradient.is_some() { 5.0 } else { 3.0 }));
-    if let Some(p) = resp.interact_pointer_pos()
-        && (resp.dragged() || resp.clicked())
-    {
-        let f = ((p.x - track.left()) / track.width()).clamp(0.0, 1.0);
-        let nv = curve_value(f, lo, hi, g.curve);
-        if (nv - *value).abs() > f32::EPSILON {
-            *value = nv;
-            resp.mark_changed();
-        }
-    }
-    // The double-click's first click has moved the knob to the pointer; the second resets.
-    if let Some(reset) = g.reset
-        && second_click(ui, &resp)
-    {
-        *value = reset;
-        resp.mark_changed();
-    }
-    if let Some(step) = g.wheel_step {
-        let n = wheel_notches(ui, &resp);
-        if n != 0.0 {
-            let nv = (*value + n * step).clamp(lo, hi);
-            if nv != *value {
-                *value = nv;
-                resp.mark_changed();
-            }
-        }
-    }
-    let f = curve_fraction(*value, lo, hi, g.curve);
-    let knob_x = track.left() + f * track.width();
-    let painter = ui.painter();
-    match gradient {
-        Some(colors) if colors.len() >= 2 => {
-            let n = colors.len() - 1;
-            for (i, w) in colors.windows(2).enumerate() {
-                let x0 = track.left() + track.width() * i as f32 / n as f32;
-                let x1 = track.left() + track.width() * (i + 1) as f32 / n as f32;
-                let mut mesh = egui::Mesh::default();
-                let r = Rect::from_min_max(pos2(x0, track.top()), pos2(x1, track.bottom()));
-                mesh.colored_vertex(r.left_top(), w[0]);
-                mesh.colored_vertex(r.right_top(), w[1]);
-                mesh.colored_vertex(r.right_bottom(), w[1]);
-                mesh.colored_vertex(r.left_bottom(), w[0]);
-                mesh.add_triangle(0, 1, 2);
-                mesh.add_triangle(0, 2, 3);
-                painter.add(mesh);
-            }
-        }
-        _ => {
-            painter.rect_filled(track, craft::ui::theme::scale::Radius::R2.px(), t.field_border);
-            let filled = Rect::from_min_max(track.min, pos2(knob_x, track.max.y));
-            painter.rect_filled(filled, craft::ui::theme::scale::Radius::R2.px(), if t.bevel { t.accent } else { t.text_dim });
-        }
-    }
-    let knob = pos2(knob_x, rect.center().y);
-    if t.bevel {
-        let kr = Rect::from_center_size(knob, vec2(10.0, 16.0));
-        surface(ui, kr, t.card, true);
-    } else {
-        let kr = if t.pro { 6.0 } else { 7.0 };
-        painter.circle_filled(knob + vec2(0.0, 1.0), kr + 0.5, Color32::from_black_alpha(90));
-        painter.circle_filled(knob, kr, if t.pro { Color32::from_gray(236) } else { Color32::WHITE });
-        if let Some(outline) = t.knob_outline() {
-            painter.circle_stroke(knob, kr, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), outline));
-        }
-        if resp.hovered() || resp.dragged() {
-            painter.circle_stroke(knob, 9.5, craft::ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent_soft));
-        }
-    }
-    resp
-}
-
 /// Labelled slider row: `Label ........ [value field]` above a full-width thin slider.
 pub fn slider_row(ui: &mut Ui, label: &str, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, gradient: Option<&[Color32]>) -> Response {
     slider_row_with(ui, label, value, range, suffix, gradient, RowGestures::default())
@@ -248,43 +183,41 @@ pub fn slider_row_prec(
     g: RowGestures,
     decimals: Option<u32>,
 ) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let mut changed_resp = None;
-    // The row's caption names both its number (through the scrub link) and its slider.
-    let mut label_id = None;
-    ui.horizontal(|ui| {
-        // The label scrubs the row's field, across the row (Photoshop's scrubby labels).
-        let l = ui.label(egui::RichText::new(tl!(label)).color(t.text_dim));
-        label_id = Some(l.id);
-        scrub_label_within(ui, &l, f32::INFINITY);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            changed_resp = Some(
-                value_field_in(
-                    ui,
-                    value,
-                    range.clone(),
-                    suffix,
-                    74.0,
-                    0.0,
-                    FieldOpts { decimals, step_from_decimals: decimals.is_some(), ..Default::default() },
-                    None,
-                )
-                .0,
-            );
-        });
-    });
-    let s = slider_with(ui, value, range, gradient, g);
-    s.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(*value), tl!(label)));
-    let s = if let Some(id) = label_id { s.labelled_by(id) } else { s };
-    let mut r = s.clone();
-    if let Some(v) = changed_resp {
-        if v.changed() {
-            r.mark_changed();
-        }
-        // A scrub of the field or its label is one drag, like the slider's, for history.
-        use egui::response::Flags;
-        r.flags |= v.flags & (Flags::DRAG_STARTED | Flags::DRAGGED | Flags::DRAG_STOPPED);
+    let numbers = LocaleNumbers::of(ui);
+    // Rows repeat labels, so the row's own position names its gestures.
+    let salt = ui.next_auto_id();
+    let (lo, hi) = (*range.start(), *range.end());
+    let mut row = SliderRow::new(salt, tl!(label), f64::from(*value), f64::from(lo)..=f64::from(hi), &numbers)
+        .size(ControlSize::Md)
+        .wheel(g.wheel_step.is_some())
+        // `RowGestures::wheel_step` is the slider's step per notch; the library's default is a hundredth of the range.
+        .unit(if suffix.is_empty() { Unit::default() } else { Unit::new(&format!("{{n}}{suffix}")) });
+    if let Some(step) = g.wheel_step {
+        row = row.wheel_step(f64::from(step));
     }
-    ui.add_space(craft::ui::theme::scale::Space::S4.px());
+    if let Some(n) = decimals {
+        row = row.decimals(n as usize);
+    }
+    if let Some(reset) = g.reset {
+        row = row.default_value(f64::from(reset));
+    }
+    if let Some(k) = g.curve {
+        row = row.curve(f64::from(k));
+    }
+    if let Some(stops) = gradient.filter(|g| g.len() >= 2) {
+        row = row.track_colors(stops.iter().copied());
+    }
+    let shown = row.show(ui);
+    let mut r = shown.response.clone();
+    let mut changed = false;
+    for (n, event) in [shown.field.event.as_ref(), shown.slider.event.as_ref()].into_iter().enumerate() {
+        changed |= apply_event(ui, salt.with(n), event, value, lo, hi);
+    }
+    if changed {
+        r.mark_changed();
+    }
+    // A scrub of the field or its label is one drag, like the slider's, for history.
+    use egui::response::Flags;
+    r.flags |= shown.field.response.flags & (Flags::DRAG_STARTED | Flags::DRAGGED | Flags::DRAG_STOPPED);
     r
 }

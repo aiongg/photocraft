@@ -138,7 +138,8 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let (lo, hi) = (crate::zoom_levels::min(v.doc_size).min(v.zoom).log2(), crate::zoom_levels::MAX.max(v.zoom).log2());
             let mut lz = v.zoom.log2();
             let slider_w = (ui.available_width() - NAV_ROW_H - 4.0).max(60.0);
-            let slid = ui.allocate_ui(vec2(slider_w, NAV_ROW_H), |ui| lz.is_finite() && widgets::slider(ui, &mut lz, lo..=hi, None).changed()).inner;
+            let slid =
+                ui.allocate_ui(vec2(slider_w, NAV_ROW_H), |ui| lz.is_finite() && widgets::slider(ui, tl!("Zoom"), &mut lz, lo..=hi, None).changed()).inner;
             if slid {
                 set(app, 2f32.powf(lz), false);
             }

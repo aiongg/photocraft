@@ -179,7 +179,7 @@ fn size_row(ui: &mut egui::Ui, label: &str, size: &mut f32, max: f32, restore: O
         });
     });
     let mut lv = size.max(1.0).ln();
-    if widgets::slider(ui, &mut lv, 0.0..=max.ln(), None).changed() {
+    if widgets::slider(ui, tl!("Size"), &mut lv, 0.0..=max.ln(), None).changed() {
         *size = lv.exp().round().clamp(1.0, max);
     }
     ui.add_space(craft::ui::theme::scale::Space::S4.px());

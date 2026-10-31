@@ -5,7 +5,7 @@
 
 use craft::theme::TypeRole;
 use craft::ui::composites::{Field, SectionHeader};
-use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch, TextField};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch};
 use craft::ui::icons::Icon;
 use craft::ui::list::ListRow;
 use craft::ui::primitives::{Content, Interactive, SurfaceKind, Text};
@@ -676,12 +676,9 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
     let raw = get_s(f, "name", "Untitled-1");
     let mut name = if raw == "Untitled-1" { tl!("Untitled-1").to_string() } else { raw };
     Field::unlabelled().show(ui, |ui, _| {
-        let edit = TextField::new("new-document-name", tl!("Name"), &name).role(craft::theme::TypeRole::BodyLarge).show(ui);
-        if let Some(v) = edit.event.as_ref().and_then(|e| e.value()) {
-            if *v != name {
-                name = v.clone();
-                f.insert("name".into(), json!(name));
-            }
+        let edit = widgets::dialog_text_as(ui, "new-document-name", tl!("Name"), &mut name, Some(craft::theme::TypeRole::BodyLarge));
+        if edit.changed {
+            f.insert("name".into(), json!(name));
         }
         edit.response
     });

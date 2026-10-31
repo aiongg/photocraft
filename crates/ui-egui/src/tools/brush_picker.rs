@@ -248,7 +248,7 @@ pub fn body(
             });
         });
         let mut lv = b.size.max(1.0).ln();
-        let size_slider = widgets::slider(ui, &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
+        let size_slider = widgets::slider(ui, tl!("Size"), &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
         if size_slider.changed() {
             b.size = lv.exp().round().clamp(1.0, MAX_BRUSH_SIZE);
         }
@@ -302,7 +302,7 @@ pub fn body(
 fn scale_slider(ui: &mut egui::Ui, st: &mut BrushesPanelState) {
     let w = (ui.available_width() - GRIP_ROOM).max(60.0);
     ui.allocate_ui_with_layout(vec2(w, SLIDER_H), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-        let resp = widgets::slider(ui, &mut st.scale, SCALE_RANGE, None);
+        let resp = widgets::slider(ui, tl!("Preview size"), &mut st.scale, SCALE_RANGE, None);
         if resp.changed() {
             st.scale = (st.scale * 100.0).round() / 100.0;
         }
