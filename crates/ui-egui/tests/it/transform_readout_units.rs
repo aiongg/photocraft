@@ -97,12 +97,12 @@ fn the_scale_readout_shows_the_size_in_the_ruler_unit() {
             h.step();
         }
         h.run_steps(2);
-        // `query_all`: in percent W and H both read 200.0%.
-        assert!(h.query_all_by_label(w).next().is_some(), "{name}: W reads {w}");
-        assert!(h.query_all_by_label(h_text).next().is_some(), "{name}: H reads {h_text}");
+        // The library readout is one node holding every row's text.
+        assert!(h.query_by_label_contains(&format!("W: {w}")).is_some(), "{name}: W reads {w}");
+        assert!(h.query_by_label_contains(&format!("H: {h_text}")).is_some(), "{name}: H reads {h_text}");
         // The readout used to show percent whatever the ruler unit.
         if unit != Unit::Percent {
-            assert!(h.query_all_by_label("200.0%").next().is_none(), "{name}: no percent readout");
+            assert!(h.query_by_label_contains("200.0%").is_none(), "{name}: no percent readout");
         }
         if let Some(dir) = std::env::var_os("PHOTOCRAFT_TRANSFORM_READOUT_EVIDENCE_DIR") {
             let dir = std::path::PathBuf::from(dir);
