@@ -256,7 +256,7 @@ fn set_rgb(f: &mut Map<String, Value>, rgb: [f32; 3], keep: Keep) {
 
 /// Room for both component columns, including units, without overflowing the title's width; with
 /// the frame and title the window fits Photoshop's (about 534 x 376 points).
-pub(crate) const CONTENT_WIDTH: f32 = 430.0;
+pub(crate) const CONTENT_WIDTH: f32 = 488.0;
 
 /// Draw the picker and its top-right actions. `Some(true)` confirms, `Some(false)` cancels.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
