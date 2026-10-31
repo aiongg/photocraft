@@ -219,7 +219,8 @@ mod tests {
         h.run_steps(3);
         assert!(h.query_by_label("Color stops").is_none());
         assert!(h.query_by_label("Opacity stops").is_none());
-        assert!(h.get_by_label("Gradient stops").rect().bottom() < h.get_by_label("Gradient Options").rect().top());
+        let options = props_layout::sections_drawn(&h.ctx).into_iter().find(|(title, _)| title == "Gradient Options").expect("the options header").1;
+        assert!(h.get_by_label("Gradient stops").rect().bottom() < options.top());
         for opacity in [false, true] {
             let before = fill(h.state());
             let count = h.state().session.active().unwrap().history.past_len();
