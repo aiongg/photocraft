@@ -2550,8 +2550,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
     // The moving pixels: the mesh that spans the layer's box.
     let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
-    // The guide: a vertical line at x = 150.
-    let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01)));
+    // The guide: a vertical line at x = 150, drawn as a crisp one-pixel mesh.
+    let guide = position(&|s| matches!(s, egui::Shape::Mesh(m) if is_guide_mesh(&m.calc_bounds())));
     // The box: the closed four-point outline round the layer.
     let frame = position(&|s| matches!(s, egui::Shape::Path(p) if p.closed && p.points.len() == 4 && near(Rect::from_points(&p.points))));
     let (Some(preview), Some(guide), Some(frame)) = (preview, guide, frame) else {
@@ -2559,6 +2559,11 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     };
     assert!(preview < guide, "the guide ({guide}) draws over the transform preview ({preview})");
     assert!(guide < frame, "the box ({frame}) draws over the guide ({guide})");
+}
+
+/// The one-pixel mesh of a vertical guide at x = 150 that runs across the canvas.
+fn is_guide_mesh(b: &Rect) -> bool {
+    (b.center().x - 150.0).abs() < 1.0 && b.width() <= 2.0 && b.height() > 200.0
 }
 
 #[test]
@@ -2622,7 +2627,7 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
             _ => false,
         });
         // The guide: a vertical line at x = 150 across the whole view.
-        let is_guide = |s: &egui::Shape| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01) && (points[1].y - points[0].y).abs() > 200.0);
+        let is_guide = |s: &egui::Shape| matches!(s, egui::Shape::Mesh(m) if is_guide_mesh(&m.calc_bounds()));
         let guide = shapes.iter().position(|s| is_guide(s));
         // Over the guide: Puppet Warp's mesh lines, the Vanishing Point plane's outline, the
         // Perspective Warp plane's outline (exactly the dragged rectangle).

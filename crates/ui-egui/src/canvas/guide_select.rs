@@ -1,5 +1,5 @@
 //! Selecting a guide on the canvas, as in Photoshop: a click on a guide with the Move tool selects
-//! it (drawn in Photoshop's selected-guide blue), a press anywhere else deselects it, Delete
+//! it (drawn in the theme's selected-guide colour), a press anywhere else deselects it, Delete
 //! removes it, and right-click opens the guide menu (`canvas_tool_menu`), whose Edit Selected
 //! Guides reopens New Guide on it.
 //!
@@ -11,9 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::PhotocraftApp;
-
-/// Photoshop draws a selected guide in this blue, whatever the guide's own colour.
-pub const SELECTED_COLOR: egui::Color32 = egui::Color32::from_rgb(0x00, 0x00, 0xff);
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SelectedGuide {
@@ -33,11 +30,6 @@ pub fn selected(app: &PhotocraftApp) -> Option<(bool, usize)> {
     let guides = &app.session.active()?.doc.guides;
     let list = if sel.vertical { &guides.vertical } else { &guides.horizontal };
     list.iter().position(|p| *p == sel.position).map(|i| (sel.vertical, i))
-}
-
-/// Is the guide at `position` the selected one (drawn blue)?
-pub fn is_selected(app: &PhotocraftApp, vertical: bool, position: f64) -> bool {
-    selected(app).is_some() && app.ui.selected_guide.is_some_and(|s| s.vertical == vertical && s.position == position)
 }
 
 /// Guides take clicks only while they're shown and unlocked (as `rulers::guide_at` requires).

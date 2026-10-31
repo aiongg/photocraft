@@ -39,7 +39,6 @@ fn a_click_selects_a_guide_without_moving_it_and_a_press_elsewhere_deselects() {
     let steps = past(&app);
     click(&mut app, 50.0, 70.0);
     assert_eq!(selected(&app), Some((true, 0)));
-    assert!(is_selected(&app, true, 50.0) && !is_selected(&app, false, 30.0));
     assert_eq!((guides(&app), past(&app)), ((vec![50.0], vec![30.0]), steps), "a click is not a move");
     // One guide at a time: clicking another selects it instead.
     click(&mut app, 120.0, 30.0);

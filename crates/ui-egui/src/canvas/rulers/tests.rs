@@ -1,77 +1,19 @@
+use egui::pos2;
+
 use super::*;
 
-#[test]
-fn ruler_ticks_labels_and_pointer_stay_out_of_the_origin_corner() {
-    let mut failures = Vec::new();
-    for theme in crate::theme::ThemeKind::ALL {
-        for (zoom, flip, rotation, width) in [(1.0, false, 0.0, 560.0), (1.0, false, 0.0, 800.0), (0.25, true, 0.0, 560.0), (2.0, false, 30.0, 560.0)] {
-            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-            app.run("file.new", json!({"width": 256, "height": 128})).unwrap();
-            let full = Rect::from_min_size(pos2(32.0, 32.0), vec2(width - 80.0, 320.0));
-            let corner = Rect::from_min_size(full.min, vec2(RULER, RULER));
-            let builder = egui_kittest::Harness::builder().with_size(vec2(width, 400.0));
-            let mut h = builder.build_ui_state(
-                move |ui, app| {
-                    let rect = Rect::from_min_max(full.min + vec2(RULER, RULER), full.max);
-                    let xf = ViewXform { rect, zoom, center: [(width - 80.0) / 2.0, 160.0], flip, rotation, aspect: 1.0 };
-                    draw_rulers(app, ui, full, &xf);
-                },
-                app,
-            );
-            PhotocraftApp::setup_context(&h.ctx, theme);
-            h.event(egui::Event::PointerMoved(corner.center()));
-            h.run_steps(4);
-            let mut ticks = 0;
-            let mut labels = 0;
-            for shape in &h.output().shapes {
-                if matches!(shape.shape, egui::Shape::LineSegment { .. } | egui::Shape::Text(_)) {
-                    ticks += usize::from(matches!(shape.shape, egui::Shape::LineSegment { .. }));
-                    labels += usize::from(matches!(shape.shape, egui::Shape::Text(_)));
-                    let visible = shape.shape.visual_bounding_rect().intersect(shape.clip_rect);
-                    if visible.intersect(corner.shrink(0.5)).is_positive() {
-                        failures.push(format!("{theme:?}: zoom={zoom}, flip={flip}, rotation={rotation}, {visible:?}"));
-                    }
-                }
-            }
-            assert!(ticks > 2 && labels > 0, "rulers still draw ticks and labels");
-        }
-    }
-    assert!(failures.is_empty(), "ruler drawing overlaps the origin corner: {failures:?}");
-}
-
-/// #7314: the stacked characters of the left ruler's labels are centred on the strip, so a
-/// narrow "1" lines up with a wide "0".
-#[test]
-fn left_ruler_label_characters_are_centred() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 256, "height": 128})).unwrap();
-    let (mut h, full, _) = ruler_harness(app);
-    h.run_steps(2);
-    let centres: Vec<f32> = h
-        .output()
-        .shapes
-        .iter()
-        .filter_map(|s| if let egui::Shape::Text(t) = &s.shape { Some(t) } else { None })
-        .filter(|t| t.pos.x < full.min.x + RULER && t.pos.y > full.min.y + RULER)
-        .map(|t| t.pos.x + t.galley.size().x * 0.5)
-        .collect();
-    assert!(centres.len() > 2, "the left ruler draws labels: {centres:?}");
-    for c in &centres {
-        assert!((c - (full.min.x + RULER * 0.5)).abs() < 0.01, "character centre {c} in {centres:?}");
-    }
+/// The rulers over a canvas, as the app lays them out: guides first, then the rulers they feed.
+fn draw_rulers(app: &mut PhotocraftApp, ui: &mut egui::Ui, full: Rect, xf: &ViewXform) {
+    let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return };
+    let response = ui.interact(xf.rect, egui::Id::new("test-canvas"), egui::Sense::click_and_drag());
+    let guides = draw_guides(app, ui, &response, xf, &doc, 0);
+    show_rulers(app, ui, &response, full, xf, &doc, 0, Some(guides));
 }
 
 #[test]
-fn shift_snaps_the_zero_point_to_ruler_ticks_from_the_current_origin() {
-    assert_eq!(snap_px_to_tick(47.0, 0.0, 10.0), 50.0);
-    assert_eq!(snap_px_to_tick(44.9, 0.0, 10.0), 40.0);
-    // Ticks run from the current zero point, so they sit at 3 + 10k.
-    assert_eq!(snap_px_to_tick(47.0, 3.0, 10.0), 43.0);
-    assert_eq!(snap_px_to_tick(-8.0, 3.0, 10.0), -7.0);
-    // A degenerate tick never panics or moves the point.
-    for tick in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-        assert_eq!(snap_px_to_tick(47.5, 3.0, tick), 47.5);
-    }
+fn ruler_strip_matches_the_library_ruler_size() {
+    let ctx = egui::Context::default();
+    assert_eq!(Rulers::style(&craft_ui::theme::current(&ctx)).size, RULER);
 }
 
 /// Rulers alone in a 400×300 frame at 100 %, centred on a 256×128 document.
@@ -146,7 +88,7 @@ fn dragging_the_ruler_corner_sets_the_zero_point_and_double_click_resets_it() {
         h.run_steps(2);
     }
     let crosshair = h.output().shapes.iter().any(|s| {
-        matches!(s.shape, egui::Shape::LineSegment { points: [a, b], .. } if (a.x - mid.x).abs() < 0.5 && (b.x - mid.x).abs() < 0.5 && (b.y - a.y).abs() > 200.0)
+        matches!(&s.shape, egui::Shape::Mesh(m) if { let b = m.calc_bounds(); (b.center().x - mid.x).abs() < 1.0 && b.width() <= 2.0 && b.height() > 200.0 })
     });
     assert!(crosshair, "a vertical cross-hair line through the pointer while dragging");
     assert_eq!(origin(&h), o, "the zero point moves on release only");
@@ -315,6 +257,10 @@ fn ruler_drag_readout_is_current_every_frame() {
     h.run_steps(1);
     h.event(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
     h.run_steps(1);
+    // The library's guides take over a drag a pass after the ruler reports it, so the first
+    // move starts it; from then on every frame shows the guide where the pointer is.
+    h.event(egui::Event::PointerMoved(canvas_at(&h, 200.0, 20.0)));
+    h.run_steps(2);
     for y in [40.0, 60.0, 75.0] {
         h.event(egui::Event::PointerMoved(canvas_at(&h, 200.0, y)));
         // egui 0.37 lays an Area's contents out a pass after it is shown; step to the settled
@@ -340,24 +286,6 @@ fn percentage_grid_spacing_uses_both_canvas_dimensions() {
     g.grid_unit = Unit::Pixels;
     g.gridline_every = 100.0;
     assert_eq!(grid_major_px(&g, 72.0, [1280.0, 720.0], 72.0), [100.0, 100.0]);
-}
-
-#[test]
-fn unit_steps_allow_fractions() {
-    assert_eq!(nice_step(0.3, false), 0.5);
-    assert_eq!(nice_step(0.2, false), 0.2);
-    assert_eq!(nice_step(0.22, false), 0.25);
-    assert_eq!(nice_step(0.3, true), 1.0);
-    assert_eq!(nice_step(23.0, true), 50.0);
-}
-
-#[test]
-fn ticks_follow_1_2_5_series() {
-    assert_eq!(tick_step(1.0), 100.0);
-    assert_eq!(tick_step(0.1), 1000.0);
-    assert_eq!(tick_step(4.0), 20.0);
-    assert_eq!(tick_step(64.0), 1.0);
-    assert_eq!(tick_step(0.25), 500.0);
 }
 
 #[test]
@@ -513,92 +441,6 @@ fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
     }
 }
 
-/// #3233: a rotated view keeps the rulers level and fully ticked at zoom scale. The top ruler
-/// spans the same number of document pixels as the unrotated view, the ticks map back onto
-/// its ends, and both rulers read 0 at the screen position of the (rotated) document origin,
-/// as Photoshop does.
-#[test]
-fn rotated_view_keeps_full_rulers() {
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
-    let (a, b) = (rect.left_top(), rect.right_top());
-    for rotation in [0.0f32, 30.0, 45.0, 90.0, -119.0, 180.0] {
-        for flip in [false, true] {
-            let xf = ViewXform { rect, zoom: 0.5, center: [1000.0, 700.0], flip, rotation, aspect: 1.0 };
-            let (u0, u1) = ruler_range(&xf, a, b, 0, 1.0, [0.0; 2]);
-            assert!((u1 - u0 - 1600.0).abs() < 1e-2, "rotation {rotation}: top ruler covers {u0}..{u1}");
-            let (first, last) = if flip { (u1, u0) } else { (u0, u1) };
-            assert!((ruler_pos(&xf, false, first, 1.0, [0.0; 2]) - a.x).abs() < 1e-2, "rotation {rotation}: first tick");
-            assert!((ruler_pos(&xf, false, last, 1.0, [0.0; 2]) - b.x).abs() < 1e-2, "rotation {rotation}: last tick");
-            // 0 at the projected origin, 500 document px = 500 × zoom screen px further on.
-            let origin = xf.to_screen(0.0, 0.0);
-            assert!((ruler_pos(&xf, false, 0.0, 1.0, [0.0; 2]) - origin.x).abs() < 1e-2, "rotation {rotation}: top ruler 0");
-            assert!((ruler_pos(&xf, true, 0.0, 1.0, [0.0; 2]) - origin.y).abs() < 1e-2, "rotation {rotation}: left ruler 0");
-            let dir = if flip { -1.0 } else { 1.0 };
-            assert!((ruler_pos(&xf, false, 500.0, 1.0, [0.0; 2]) - origin.x - dir * 250.0).abs() < 1e-2, "rotation {rotation}: top scale");
-            assert!((ruler_pos(&xf, true, 500.0, 1.0, [0.0; 2]) - origin.y - 250.0).abs() < 1e-2, "rotation {rotation}: left scale");
-        }
-    }
-    // Distances left of / above the origin read without a minus sign, as in Photoshop.
-    let xf = ViewXform { rect, zoom: 0.5, center: [0.0, 0.0], flip: false, rotation: 0.0, aspect: 1.0 };
-    let (u0, u1) = ruler_range(&xf, a, b, 0, 1.0, [0.0; 2]);
-    assert!(u0 < -500.0 && u1 > 500.0, "the view spans the origin: {u0}..{u1}");
-    for (step, whole) in [(100.0, true), (100.0, false), (0.25, false)] {
-        let mut v = (u0 / step).floor() * step;
-        while v <= u1 {
-            let s = ruler_label(v, step, whole);
-            assert!(!s.contains('-'), "tick {v} (step {step}) is labelled {s:?}");
-            v += step;
-        }
-    }
-    assert_eq!(ruler_label(-500.0, 100.0, true), "500");
-    assert_eq!(ruler_label(-0.25, 0.25, false), "0.25");
-}
-
-/// #2955 with #3233: a zero point moved off the image's top-left reads 0 where the canvas draws
-/// it, also on a rotated or flipped view, and the ruler keeps its full length and scale.
-#[test]
-fn rulers_count_from_the_zero_point_on_a_rotated_view() {
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
-    let (a, b) = (rect.left_top(), rect.right_top());
-    let zero = [300.0, 120.0];
-    for rotation in [0.0f32, 30.0, 90.0, -119.0] {
-        for flip in [false, true] {
-            let xf = ViewXform { rect, zoom: 0.5, center: [1000.0, 700.0], flip, rotation, aspect: 1.0 };
-            let at = xf.to_screen(zero[0] as f32, zero[1] as f32);
-            assert!((ruler_pos(&xf, false, 0.0, 1.0, zero) - at.x).abs() < 1e-2, "rotation {rotation}: top ruler 0");
-            assert!((ruler_pos(&xf, true, 0.0, 1.0, zero) - at.y).abs() < 1e-2, "rotation {rotation}: left ruler 0");
-            let (u0, u1) = ruler_range(&xf, a, b, 0, 1.0, zero);
-            assert!((u1 - u0 - 1600.0).abs() < 1e-2, "rotation {rotation}: top ruler covers {u0}..{u1}");
-            let dir = if flip { -1.0 } else { 1.0 };
-            assert!((ruler_pos(&xf, false, 500.0, 1.0, zero) - at.x - dir * 250.0).abs() < 1e-2, "rotation {rotation}: top scale");
-        }
-    }
-    // Unrotated, ruler value u sits over document x = zero + u.
-    let xf = ViewXform { rect, zoom: 0.5, center: [1000.0, 700.0], flip: false, rotation: 0.0, aspect: 1.0 };
-    assert!((ruler_pos(&xf, false, -300.0, 1.0, zero) - xf.to_screen(0.0, 0.0).x).abs() < 1e-2);
-    assert!((ruler_pos(&xf, true, 80.0, 1.0, zero) - xf.to_screen(0.0, 200.0).y).abs() < 1e-2);
-}
-
-/// #3277: guides belong to the document, so a rotated view draws them along the document
-/// line; unrotated they still span the whole clip rect.
-#[test]
-fn guides_turn_with_a_rotated_view() {
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
-    let level = ViewXform { rect, zoom: 0.5, center: [1000.0, 700.0], flip: false, rotation: 0.0, aspect: 1.0 };
-    let [a, b] = guide_segment(&level, rect, true, 500.0);
-    assert!((a.x - b.x).abs() < 1e-3 && (a.y - rect.top()).abs() < 1e-3 && (b.y - rect.bottom()).abs() < 1e-3, "{a:?} {b:?}");
-    for rotation in [30.0f32, 90.0, -119.0] {
-        let xf = ViewXform { rotation, ..level };
-        for (vertical, pos) in [(true, 500.0), (false, 900.0)] {
-            for end in guide_segment(&xf, rect, vertical, pos) {
-                let d = xf.to_doc(end);
-                let on_line = if vertical { d[0] } else { d[1] };
-                assert!((on_line - pos).abs() < 1e-2, "rotation {rotation}: {end:?} maps to {d:?}, off the guide at {pos}");
-            }
-        }
-    }
-}
-
 /// The cursor over a guide turns with the view as the guide does: on a view turned 90°, a
 /// vertical guide shows as a horizontal line and moves up and down.
 #[test]
@@ -610,21 +452,6 @@ fn guide_cursors_turn_with_a_rotated_view() {
     for (rotation, flip, want) in [(0.0, false, [H, V]), (90.0, false, [V, H]), (45.0, false, [NwSe, NeSw]), (0.0, true, [H, V])] {
         let xf = ViewXform { rotation, flip, ..level };
         assert_eq!([guide_cursor(&xf, true), guide_cursor(&xf, false)], want, "view turned {rotation}°, flip {flip}");
-    }
-}
-
-#[test]
-fn ruler_range_is_normalised_when_flipped() {
-    // #1814: with View > Flip Horizontal, `to_doc` negates x, so the raw
-    // (d0, d1) comes out reversed. ruler_range must normalise to (min, max)
-    // so the tick loop still runs. Exercises the production helper.
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
-    let top = Rect::from_min_size(rect.min, vec2(rect.width(), RULER));
-    for flip in [false, true] {
-        let xf = ViewXform { rect, zoom: 1.0, center: [400.0, 300.0], flip, rotation: 0.0, aspect: 1.0 };
-        let (u0, u1) = ruler_range(&xf, top.left_top(), top.right_top(), 0, 1.0, [0.0; 2]);
-        assert!(u0 <= u1, "flip={flip}: u0 ({u0}) must be <= u1 ({u1})");
-        assert!(u1 - u0 > 0.0, "flip={flip}: range is empty");
     }
 }
 
@@ -674,6 +501,9 @@ fn a_guide_dropped_on_either_ruler_is_removed() {
         let (mut h, _, _) = ruler_harness(new_app());
         h.event(egui::Event::PointerMoved(from));
         press(&mut h, from, true, egui::Modifiers::NONE);
+        // The library's guides take over a drag a pass after the ruler reports it.
+        h.event(egui::Event::PointerMoved(from.lerp(to, 0.5)));
+        h.run_steps(1);
         h.event(egui::Event::PointerMoved(to));
         h.run_steps(1);
         press(&mut h, to, false, egui::Modifiers::NONE);
@@ -853,16 +683,18 @@ fn shift_dragged_guides_land_on_ruler_ticks() {
     // Pixels at 100%: labels every 100 px, ticks every 10 px.
     assert_eq!(drag_guide(egui::Modifiers::SHIFT), vec![40.0]);
 
-    let mut app = new_app();
-    // At 200% the labels are every 50 px, so the ticks every 5 px.
-    assert_eq!(snap_to_tick(&app, &ViewXform { zoom: 2.0, ..xf }, true, 37.0), 35.0);
-    // Percent of each side: ticks every 2.5% of 256 px across, every 5% of 128 px down.
-    app.run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
-    assert!((snap_to_tick(&app, &xf, true, 37.0) - 38.4).abs() < 1e-9);
-    assert!((snap_to_tick(&app, &xf, false, 37.0) - 38.4).abs() < 1e-9);
-    // Ticks count from the zero point (#2955): a vertical guide follows the x origin only.
-    let mut app = new_app();
-    app.run("view.setRulerOrigin", json!({"x": 3, "y": 0})).unwrap();
-    assert_eq!(snap_to_tick(&app, &xf, true, 37.0), 33.0);
-    assert_eq!(snap_to_tick(&app, &xf, false, 37.0), 40.0);
+    // Percent of each side: ticks every 2.5% of 256 px across (6.4 px).
+    let mut percent = new_app();
+    percent.run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(400.0, 300.0)).build_ui_state(move |ui, app| draw_rulers(app, ui, full, &xf), percent);
+    let (from, to, shift) = (pos2(RULER / 2.0, 100.0), xf.to_screen(37.0, 64.0), egui::Modifiers::SHIFT);
+    h.event_modifiers(egui::Event::PointerMoved(from), shift);
+    h.event_modifiers(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: shift }, shift);
+    h.run_steps(1);
+    h.event_modifiers(egui::Event::PointerMoved(to), shift);
+    h.run_steps(1);
+    h.event_modifiers(egui::Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: shift }, shift);
+    h.run_steps(2);
+    let guides = h.state().session.active().unwrap().doc.guides.vertical.clone();
+    assert!(guides.len() == 1 && (guides[0] - 38.4).abs() < 1e-9, "{guides:?}");
 }

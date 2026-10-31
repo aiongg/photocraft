@@ -1258,11 +1258,11 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     // So are Puppet Warp's, Perspective Warp's and Vanishing Point's warped pixels (#7781).
     crate::distort_ui::draw_content(app, painter, xf);
     if app.ui.extras.grid && app.ui.view.extras {
-        crate::rulers::draw_grid(app, painter, xf, doc);
+        crate::rulers::draw_grid(app, ui, xf, doc);
     }
-    if app.ui.view.shows(app.ui.view.show.canvas_guides) || crate::guide_layout_ui::preview(app, doc).is_some() {
-        crate::rulers::draw_guides(app, painter, xf, doc);
-    }
+    // Always shown, hidden guides or not: a guide dragged out of a ruler is run by them.
+    let guides_id = crate::rulers::draw_guides(app, ui, response, xf, doc, idx);
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(("pc-guides-id", idx)), guides_id));
     // The pending crop frame shows on its own document only, not on the other tiles (#1918).
     let foreign_crop = if app.session.active_index() == Some(idx) { None } else { app.ui.crop_rect.take() };
     draw_drag_preview(app, painter, xf);
@@ -1666,15 +1666,14 @@ fn finish_canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut Vie
         app.perf.span("scrollbars", crate::gpu_canvas::now_ms() - t0);
         app.hover_doc = response.hover_pos().map(|p| xf.to_doc(p));
     }
-    if primary && app.ui.extras.rulers {
+    if app.ui.extras.rulers {
         let before = app.guide_drag;
-        crate::rulers::draw_rulers(app, ui, full, &xf);
+        let guides = primary.then(|| ctx.data(|d| d.get_temp::<egui::Id>(egui::Id::new(("pc-guides-id", idx))))).flatten();
+        crate::rulers::show_rulers(app, ui, response, full, &xf, doc, idx, guides);
         // A guide dragged out of a ruler moved after this frame drew it: draw it again where it is.
         if app.guide_drag != before {
             ctx.request_repaint();
         }
-    } else if app.ui.extras.rulers {
-        crate::rulers::paint_rulers(app, ui, full, &xf, doc);
     }
     // After the ruler drags above, so the readout shows where the guide is now, and not after a
     // release ended the drag.
