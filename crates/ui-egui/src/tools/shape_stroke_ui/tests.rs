@@ -70,7 +70,9 @@ fn combo(h: &mut Harness<'_, State>, label: &str) {
 /// Whether one of the editor's Selects has its list open (the editor's own popover is open too, so
 /// the library's `any_open` cannot tell).
 pub(super) fn child_list_open<S>(h: &Harness<'_, S>) -> bool {
-    ["Alignment", "Caps", "Corners"].iter().any(|name| h.query_by_role_and_label(Role::ComboBox, name).is_some_and(|n| n.accesskit_node().data().is_expanded() == Some(true)))
+    ["Alignment", "Caps", "Corners"]
+        .iter()
+        .any(|name| h.query_by_role_and_label(Role::ComboBox, name).is_some_and(|n| n.accesskit_node().data().is_expanded() == Some(true)))
 }
 
 #[test]

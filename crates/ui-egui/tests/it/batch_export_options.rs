@@ -28,6 +28,11 @@ fn harness() -> Harness {
     h
 }
 
+fn fields(h: &Harness) -> serde_json::Map<String, Value> {
+    let ui = &h.state().ui;
+    ui.dialog_fields(ui.hosted.last().expect("a hosted dialog is open").id).unwrap()
+}
+
 fn open(h: &mut Harness, command: &str) {
     let ctx = h.ctx.clone();
     menus::invoke(h.state_mut(), &ctx, command, json!({})).expect("open the real menu dialog");
@@ -44,7 +49,7 @@ fn evidence(h: &mut Harness, name: &str) {
 fn open_format_choices(h: &mut Harness) {
     // The caption is a separate Label node with the same text; the accessible ComboBox name
     // identifies the actual form field without guessing from coordinates.
-    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Format").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Format:").click();
     h.run_steps(3);
 }
 
@@ -71,11 +76,11 @@ fn edit_path(h: &mut Harness, name: &str, value: &Path) {
 }
 
 fn edit_quality(h: &mut Harness, value: &str) {
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").click();
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality:").click();
     h.run_steps(2);
     replace_text(h, value);
     // Clicking the caption commits the field without Enter confirming the dialog.
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Quality").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "Quality:").click();
     h.run_steps(3);
 }
 
@@ -95,7 +100,7 @@ fn batch_menu_offers_quality() {
     let mut h = harness();
     open(&mut h, "file.automate.batch");
     evidence(&mut h, "batch-quality");
-    assert!(h.query_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").is_some(), "Batch must expose its supported output quality");
+    assert!(h.query_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality:").is_some(), "Batch must expose its supported output quality");
 }
 
 #[test]
@@ -184,24 +189,24 @@ fn batch_custom_quality_is_bounded_dialog_local_and_reversible() {
     let _gpu = photocraft_testkit::gpu_lock();
     let mut h = harness();
     open(&mut h, "file.automate.batch");
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null(), "default command quality remains unset");
+    assert!(fields(&h).get("quality").is_none_or(Value::is_null), "default command quality remains unset");
     h.get_by_label("Custom").click();
     h.run_steps(3);
     edit_quality(&mut h, "-5");
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(0.0));
+    assert_eq!(fields(&h)["quality"].as_f64(), Some(0.0));
     edit_quality(&mut h, "99");
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(12.0));
+    assert_eq!(fields(&h)["quality"].as_f64(), Some(12.0));
     edit_quality(&mut h, "5");
     h.get_by_label("Custom").click();
     h.run_steps(3);
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+    assert!(fields(&h).get("quality").is_none_or(Value::is_null));
     h.get_by_label("Custom").click();
     h.run_steps(3);
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(5.0), "switching defaults does not lose the dialog's custom value");
+    assert_eq!(fields(&h)["quality"].as_f64(), Some(5.0), "switching defaults does not lose the dialog's custom value");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
     open(&mut h, "file.automate.batch");
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null(), "reopening returns to the existing default");
+    assert!(fields(&h).get("quality").is_none_or(Value::is_null), "reopening returns to the existing default");
 }
 
 #[test]
@@ -224,24 +229,24 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
             let output = dir.0.join(format!("{prefix}-{quality}"));
             open(&mut h, command);
             if prefix == "batch" {
-                assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+                assert!(fields(&h).get("quality").is_none_or(Value::is_null));
                 h.get_by_label("Custom").click();
                 h.run_steps(3);
             } else {
-                let fields = &h.state().ui.dialogs.last().unwrap().fields;
-                assert_eq!(fields["quality"], json!(8));
-                assert_eq!(fields["width"], json!(0));
-                assert_eq!(fields["height"], json!(0));
-                assert_eq!(fields["convertToSrgb"], json!(true));
+                let f = fields(&h);
+                assert_eq!(f["quality"], json!(8));
+                assert_eq!(f["width"], json!(0));
+                assert_eq!(f["height"], json!(0));
+                assert_eq!(f["convertToSrgb"], json!(true));
             }
             choose_webp(&mut h);
-            edit_path(&mut h, "Input", &input);
-            edit_path(&mut h, "Output", &output);
+            edit_path(&mut h, "Input:", &input);
+            edit_path(&mut h, "Output:", &output);
             edit_quality(&mut h, &quality.to_string());
             evidence(&mut h, &format!("{prefix}-webp-quality-{quality}"));
             h.get_by_label("OK").click();
             h.run_steps(5);
-            assert!(h.state().ui.dialogs.is_empty());
+            assert!(!h.state().ui.any_dialog_open());
             let bytes = std::fs::read(output.join("owned-pattern.webp")).expect("the actual dialog confirmation writes the selected WebP");
             let decoded = photocraft_codecs::decode_as(Format::WebP, &bytes).unwrap();
             assert_eq!(decoded.dimensions(), (64, 48));
@@ -276,32 +281,32 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     }
     let mut h = harness();
     open(&mut h, "file.automate.batch");
-    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming").click();
+    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming:").click();
     h.run_steps(2);
     replace_text(&mut h, "cancelled_{serial}");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
     assert!(!output.exists());
     open(&mut h, "file.automate.batch");
-    let fields = &h.state().ui.dialogs.last().unwrap().fields;
-    assert_eq!(fields["naming"], "");
-    assert_eq!(fields["startingSerial"], 1);
-    edit_path(&mut h, "Input", &input);
-    edit_path(&mut h, "Output", &output);
-    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming").click();
+    let f = fields(&h);
+    assert_eq!(f["naming"], "");
+    assert_eq!(f["startingSerial"], 1);
+    edit_path(&mut h, "Input:", &input);
+    edit_path(&mut h, "Output:", &output);
+    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming:").click();
     h.run_steps(2);
     replace_text(&mut h, "{serial}_{name}");
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting serial").click();
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting serial:").click();
     h.run_steps(2);
     h.event(egui::Event::Text("7".into()));
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial:").click();
     h.run_steps(3);
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["startingSerial"], 7, "typing changes the starting serial");
+    assert_eq!(fields(&h)["startingSerial"], 7, "typing changes the starting serial");
     evidence(&mut h, "batch-naming");
     h.get_by_label("OK").click();
     h.run_steps(5);
-    assert!(h.state().ui.dialogs.is_empty());
+    assert!(!h.state().ui.any_dialog_open());
     let expected: Vec<_> = source.data().iter().map(|v| 255 - v).collect();
     for name in ["007_first.png", "008_second.png"] {
         let bytes = std::fs::read(output.join(name)).expect("dialog naming reaches the exporter");
@@ -332,9 +337,9 @@ fn batch_default_quality_keeps_lossless_webp_and_existing_jpeg_bytes() {
             h.get_by_label("Jpg").click();
             h.run_steps(3);
         }
-        edit_path(&mut h, "Input", &input);
-        edit_path(&mut h, "Output", &output);
-        assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+        edit_path(&mut h, "Input:", &input);
+        edit_path(&mut h, "Output:", &output);
+        assert!(fields(&h).get("quality").is_none_or(Value::is_null));
         evidence(&mut h, &format!("batch-default-{format}"));
         h.get_by_label("OK").click();
         h.run_steps(5);
