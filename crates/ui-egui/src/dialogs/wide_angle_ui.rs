@@ -9,6 +9,7 @@
 //! "add":{"a":[x,y],"b":[x,y],"orientation":"…"}, "orient":{"index":i,"orientation":"…"}, "remove":i,
 //! "commit":true | "cancel":true}}}`.
 
+use craft::ui::composites::SectionLabel;
 use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::transform::Interp;
@@ -365,7 +366,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let mut props = ui.new_child(egui::UiBuilder::new().max_rect(right.shrink2(vec2(14.0, 10.0))));
         egui::ScrollArea::vertical().id_salt("awa-props").show(&mut props, |ui| {
             ui.spacing_mut().item_spacing.y = 5.0;
-            widgets::section_label(ui, tl!("Correction"));
+            SectionLabel::new(tl!("Correction")).show(ui);
             let mut model = d.params.model;
             if widgets::dropdown(
                 ui,
@@ -399,7 +400,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 d.dirty = true;
             }
             widgets::hairline(ui);
-            widgets::section_label(ui, &crate::i18n::fmt(tl!("Constraints ({n})"), &[("n", &d.params.constraints.len().to_string())]));
+            SectionLabel::new(crate::i18n::fmt(tl!("Constraints ({n})"), &[("n", &d.params.constraints.len().to_string())])).show(ui);
             let mut remove = None;
             for (i, c) in d.params.constraints.iter_mut().enumerate() {
                 ui.horizontal(|ui| {

@@ -4,6 +4,7 @@ use super::{
     Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Sense, ToneZone, Value, Wheel, curve_lut, json, pos2, vec2,
     widgets,
 };
+use craft::ui::composites::SectionLabel;
 use craft::ui::composites::{Curve, CurveEditor, SectionHeader, SliderRow, SliderRowResponse};
 use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
@@ -152,7 +153,7 @@ fn section(ui: &mut egui::Ui, title: &str, open: bool, body: impl FnOnce(&mut eg
 }
 
 fn wheel(ui: &mut egui::Ui, dirty: &mut bool, title: &str, w: &mut Wheel) {
-    widgets::section_label(ui, crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title));
+    SectionLabel::new(crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title)).show(ui);
     let hs = widgets::hue_stops();
     row(ui, dirty, "Hue", &mut w.hue, 0.0..=360.0, Some(&hs));
     row(ui, dirty, "Saturation", &mut w.sat, 0.0..=100.0, None);
@@ -376,7 +377,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
                 tone_row(ui, &mut dirty, alt, ToneZone::Blacks, &mut p.blacks);
             });
             section(ui, "Color", false, |ui| {
-                widgets::section_label(ui, tl!("White Balance: As Shot"));
+                SectionLabel::new(tl!("White Balance: As Shot")).show(ui);
                 row(ui, &mut dirty, "Temperature", &mut p.temperature, -100.0..=100.0, Some(&ts));
                 row(ui, &mut dirty, "Tint", &mut p.tint, -100.0..=100.0, Some(&tn));
                 row(ui, &mut dirty, "Vibrance", &mut p.vibrance, -100.0..=100.0, None);
@@ -386,7 +387,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
                 row(ui, &mut dirty, "Texture", &mut p.texture, -100.0..=100.0, None);
                 row(ui, &mut dirty, "Clarity", &mut p.clarity, -100.0..=100.0, None);
                 row(ui, &mut dirty, "Dehaze", &mut p.dehaze, -100.0..=100.0, None);
-                widgets::section_label(ui, tl!("Vignetting"));
+                SectionLabel::new(tl!("Vignetting")).show(ui);
                 let mut style = p.vignette_style.clone();
                 if widgets::dropdown(
                     ui,
@@ -408,7 +409,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
                 row(ui, &mut dirty, "Roundness", &mut p.vignette_roundness, -100.0..=100.0, None);
                 row(ui, &mut dirty, "Feather", &mut p.vignette_feather, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Highlights", &mut p.vignette_highlights, 0.0..=100.0, None);
-                widgets::section_label(ui, tl!("Grain"));
+                SectionLabel::new(tl!("Grain")).show(ui);
                 row(ui, &mut dirty, "Amount", &mut p.grain_amount, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Size", &mut p.grain_size, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Roughness", &mut p.grain_roughness, 0.0..=100.0, None);
@@ -453,12 +454,12 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
                 if let Some(raw) = d.raw_open.as_mut() {
                     demosaic_row(ui, &mut raw.demosaic);
                 }
-                widgets::section_label(ui, tl!("Sharpening"));
+                SectionLabel::new(tl!("Sharpening")).show(ui);
                 row(ui, &mut dirty, "Amount", &mut p.sharpen_amount, 0.0..=150.0, None);
                 row(ui, &mut dirty, "Radius", &mut p.sharpen_radius, 0.5..=3.0, None);
                 row(ui, &mut dirty, "Detail", &mut p.sharpen_detail, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Masking", &mut p.sharpen_masking, 0.0..=100.0, None);
-                widgets::section_label(ui, tl!("Noise Reduction"));
+                SectionLabel::new(tl!("Noise Reduction")).show(ui);
                 row(ui, &mut dirty, "Luminance", &mut p.noise_luminance, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Luminance Detail", &mut p.noise_luminance_detail, 0.0..=100.0, None);
                 row(ui, &mut dirty, "Color", &mut p.noise_color, 0.0..=100.0, None);
@@ -467,10 +468,10 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
             // Camera Raw's Calibration panel: a tint for the shadows and each primary's hue and
             // saturation (Process Version is implied: 2012 and later).
             section(ui, "Calibration", false, |ui| {
-                widgets::section_label(ui, tl!("Shadows"));
+                SectionLabel::new(tl!("Shadows")).show(ui);
                 row(ui, &mut dirty, "Tint", &mut p.shadow_tint, -100.0..=100.0, Some(&tn));
                 for (i, name) in ["Red Primary", "Green Primary", "Blue Primary"].iter().enumerate() {
-                    widgets::section_label(ui, crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", name));
+                    SectionLabel::new(crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", name)).show(ui);
                     ui.push_id(name, |ui| {
                         row(ui, &mut dirty, "Hue", &mut p.calibration_hue[i], -100.0..=100.0, None);
                         row(ui, &mut dirty, "Saturation", &mut p.calibration_sat[i], -100.0..=100.0, None);
