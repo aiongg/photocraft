@@ -434,6 +434,13 @@ pub fn language_scope(lang: Lang) -> impl Drop {
     restore
 }
 
+/// The library Host for this context: the app identity and default services. PhotoCraft's
+/// catalogs are its own (`tl!`), so the Host has none and the library's words and numbers are
+/// English; a Host with a catalog would be rebuilt here with `with_lang` on a language change.
+fn install_host(ctx: &egui::Context) {
+    craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") }).install(ctx);
+}
+
 /// Apply a committed language to this context. Font caches are rebuilt only on a language
 /// change, so Han glyphs follow the selected script even when the previous font covered them.
 pub fn sync_context(ctx: &egui::Context, language: &str) {
@@ -443,6 +450,7 @@ pub fn sync_context(ctx: &egui::Context, language: &str) {
     let changed = ctx.data(|data| data.get_temp::<Lang>(id) != Some(lang));
     if changed {
         ctx.data_mut(|data| data.insert_temp(id, lang));
+        install_host(ctx);
         crate::theme::install_fonts(ctx);
         ctx.request_repaint();
     }
