@@ -41,7 +41,7 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 /// Builds the real dialog at an explicit physical-pixels-per-egui-point ratio so pointer
 /// events remain in egui points while exercising both standard and Retina display scales.
 fn harness_at_scale(app: PhotocraftApp, pixels_per_point: f32) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(vec2(1000.0, 900.0)).with_pixels_per_point(pixels_per_point).with_max_steps(64).build_ui_state(show, app);
+    let mut h = Harness::builder().with_size(vec2(1000.0, 960.0)).with_pixels_per_point(pixels_per_point).with_max_steps(64).build_ui_state(show, app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(4);
     h

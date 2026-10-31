@@ -661,7 +661,7 @@ fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
     use egui_kittest::{Harness, kittest::Queryable};
     let out = std::env::temp_dir().join(format!("pc-printui-browse-{}", std::process::id())).to_string_lossy().into_owned();
     let (show, asked) = crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo(out.clone()))]);
-    let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
+    let mut h = Harness::builder().with_size(egui::vec2(1440.0, 960.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() });
         app.session.printer_source =

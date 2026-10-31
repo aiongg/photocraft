@@ -148,10 +148,18 @@ fn is_curves(fields: &serde_json::Map<String, Value>) -> bool {
     fields.get("__adjust").and_then(Value::as_str) == Some("curves")
 }
 
-/// The size the Curves dialog first opens at; it grows to fit its controls below the graph. The
-/// width leaves the graph's value area (the width less the editor's axis bar and inset, which
-/// differ by theme) over 270 points in every theme.
-const CURVES_SIZE: egui::Vec2 = egui::vec2(306.0, 420.0);
+/// The value area's side the Curves dialog opens with, in points: 270 in every theme and size.
+const CURVES_VALUE_SIDE: f32 = 270.0;
+/// The height the Curves dialog first opens at; it grows to fit its controls below the graph.
+const CURVES_HEIGHT: f32 = 420.0;
+
+/// The size the Curves dialog first opens at: the editor's width for `CURVES_VALUE_SIDE` at the
+/// active size, plus the dialog's padding.
+fn curves_size(ctx: &egui::Context) -> egui::Vec2 {
+    let ui = egui::Ui::new(ctx.clone(), egui::Id::new("curves-size"), egui::UiBuilder::new());
+    let editor = craft_ui::composites::CurveEditor::outer_width(&ui, CURVES_VALUE_SIDE);
+    egui::vec2(editor + 2.0 * craft_ui::theme::current(ctx).component.dialog.pad, CURVES_HEIGHT)
+}
 
 /// The sizes of a resizable dialog and whether it reopens at the size it was left at (Curves only,
 /// #8984), or `None` for a dialog sized by its contents. The smallest size keeps Curves a usable
@@ -166,7 +174,8 @@ fn resize_of(ctx: &egui::Context, fields: &Fields) -> Option<(craft_ui::dialog::
         Some((Resize { default: egui::vec2(960.0, 900.0), min, max: ResizeMax::Window }, false))
     } else if is_curves(fields) {
         let max = ResizeMax::Fixed(egui::vec2(crate::adjust_editors::curve_side_max(ctx), f32::MAX));
-        Some((Resize { default: CURVES_SIZE, min: CURVES_SIZE, max }, true))
+        let size = curves_size(ctx);
+        Some((Resize { default: size, min: size, max }, true))
     } else {
         None
     }
@@ -1096,6 +1105,21 @@ mod preference_resize_tests {
         assert_eq!(size(&shortcuts), None);
         assert_eq!(size(&ordinary), None);
         assert_eq!(size(&web), Some(egui::vec2(960.0, 900.0)));
+    }
+
+    /// The Curves dialog's width follows the active size: the editor's width for the value area
+    /// plus the dialog padding.
+    #[test]
+    fn curves_dialog_width_follows_the_size() {
+        let curves = json!({"__adjust": "curves"});
+        let width = |size| {
+            let ctx = egui::Context::default();
+            PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::of_library("craft.artcraft", true, size));
+            resize_of(&ctx, curves.as_object().unwrap()).unwrap().0.default.x
+        };
+        let (compact, comfortable) = (width(craft_theme::Size::Compact), width(craft_theme::Size::Comfortable));
+        // 270 + bar 8 + gap 4 + 2 * pad 5 + 2 * dialog pad 7 at both sizes.
+        assert_eq!((compact, comfortable), (306.0, 306.0));
     }
 
     /// Drags the dialog's resize grip (its frame's bottom-right corner) by `by`.
