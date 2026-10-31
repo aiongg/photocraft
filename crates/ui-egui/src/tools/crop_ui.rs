@@ -525,18 +525,6 @@ pub fn frame_size(r: [f64; 4]) -> Option<[f64; 2]> {
     (w.is_finite() && h.is_finite()).then(|| [w.round().max(1.0), h.round().max(1.0)])
 }
 
-/// The frame is being drawn or resized: its W × H, for the readout beside the pointer (as the
-/// marquee's, in px).
-pub fn sizing(app: &PhotocraftApp) -> Option<[f64; 2]> {
-    match app.crop.drag.map(|d| (d.press.kind(), d.press)) {
-        // Until the pointer moves, the frame shown is still the previous one.
-        Some((CropPressKind::Draw, press)) if press.began() => {}
-        Some((CropPressKind::Resize(_), _)) => {}
-        _ => return None,
-    }
-    frame_size(app.ui.crop_rect?)
-}
-
 /// The Crop tool owns the arrow keys and X: a pending frame and no gesture in progress.
 pub fn takes_keys(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && app.crop.drag.is_none() && app.ui.transform.is_none() && app.ui.crop_rect.is_some_and(|r| r.iter().all(|v| v.is_finite()))

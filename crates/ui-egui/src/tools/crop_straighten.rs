@@ -149,17 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn the_angle_readout_never_shows_minus_zero_or_minus_180() {
-        use crate::canvas::angle_readout;
-        assert_eq!(angle_readout(-0.03), "0.0°");
-        assert_eq!(angle_readout(0.0), "0.0°");
-        assert_eq!(angle_readout(-179.97), "180.0°");
-        assert_eq!(angle_readout(179.97), "180.0°");
-        assert_eq!(angle_readout(12.34), "12.3°");
-        assert_eq!(angle_readout(-12.36), "-12.4°");
-    }
-
-    #[test]
     fn the_button_straightens_one_line_then_disarms() {
         for depth in [SampleType::U8, SampleType::U16] {
             let mut app = app(depth);

@@ -70,7 +70,7 @@ use display::texture_key;
 pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
 use display::{checker, hdr_preview, sync_display_lut};
 pub use drag::{Drag, marquee_corners, marquee_readout, readout_in, size_readout};
-pub(crate) use drag::{angle_readout, draw_readout, draw_value_readout};
+pub(crate) use drag::{draw_readout, draw_value_readout};
 #[cfg(test)]
 pub(crate) use drag::{marquee_drag_ants, marquee_preview_px};
 #[cfg(test)]

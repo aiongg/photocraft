@@ -156,7 +156,7 @@ const CURVES_HEIGHT: f32 = 420.0;
 /// The size the Curves dialog first opens at: the editor's width for `CURVES_VALUE_SIDE` at the
 /// active size, plus the dialog's padding.
 fn curves_size(ctx: &egui::Context) -> egui::Vec2 {
-    let editor = craft::ui::composites::CurveEditor::outer_width(ctx, CURVES_VALUE_SIDE);
+    let editor = craft::ui::composites::CurveEditor::outer_width(ctx, true, CURVES_VALUE_SIDE);
     egui::vec2(editor + 2.0 * craft::ui::theme::current(ctx).component.dialog.pad, CURVES_HEIGHT)
 }
 
