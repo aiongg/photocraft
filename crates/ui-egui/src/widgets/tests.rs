@@ -861,3 +861,123 @@ fn dropdown_list_keeps_its_width_while_scrolling() {
         assert_eq!(list(&h).map(|r| r.width()), Some(open.width()));
     }
 }
+
+const MODES: [(usize, &str); 4] = [(0, "Normal"), (1, "Dissolve"), (2, "Darken"), (3, "Multiply")];
+
+/// The dropdown over [`MODES`] with the wheel on or off, 120 wide: `Select` as the dropdowns draw it.
+fn wheel_select(ui: &mut egui::Ui, selected: &mut usize, wheel: bool) {
+    use craft::ui::controls::{ControlSize, Select};
+    ui.allocate_ui_with_layout(egui::vec2(120.0, 20.0), egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+        let mut select = Select::new("blend-mode", tl!("Blend Mode"), selected).size(ControlSize::Sm).wheel_steps(wheel);
+        for (value, label) in MODES {
+            select = select.option(value, label);
+        }
+        select.show(ui);
+    });
+}
+
+/// A wheel dropdown (or a plain one) of [`MODES`], whose state is the chosen index.
+fn mode_dropdown(wheel: bool) -> Harness<'static, usize> {
+    let h = Harness::builder().with_size(egui::vec2(300.0, 100.0)).build_ui_state(
+        move |ui, selected: &mut usize| {
+            wheel_select(ui, selected, wheel);
+        },
+        0,
+    );
+    // The theme install adds the plugin that takes the wheel for fields.
+    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    h
+}
+
+/// One wheel event over the dropdown: negative `delta.y` is down.
+fn wheel<T>(h: &mut Harness<'_, T>, unit: egui::MouseWheelUnit, delta: egui::Vec2, modifiers: Modifiers) {
+    let at = h.get_by_role(egui::accesskit::Role::ComboBox).rect().center();
+    h.event(egui::Event::ModifiersChanged(modifiers));
+    h.hover_at(at);
+    h.run();
+    h.event(egui::Event::MouseWheel { source: egui::MouseWheelSource::Unknown, unit, delta, phase: egui::TouchPhase::Move, modifiers });
+    h.run();
+    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+    h.run();
+}
+
+#[test]
+fn shift_wheel_steps_one_mode_per_notch() {
+    let mut h = mode_dropdown(true);
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(0.0, -1.0), Modifiers::SHIFT);
+    assert_eq!(*h.state(), 1, "not ten like a slider");
+    // Some systems turn Shift+wheel into a horizontal scroll.
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(-1.0, 0.0), Modifiers::SHIFT);
+    assert_eq!(*h.state(), 2);
+}
+
+#[test]
+fn fractional_wheel_deltas_add_up_to_whole_mode_steps() {
+    let mut h = mode_dropdown(true);
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(0.0, -0.5), Modifiers::NONE);
+    assert_eq!(*h.state(), 0, "half a notch");
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(0.0, -0.5), Modifiers::NONE);
+    assert_eq!(*h.state(), 1);
+    let per_line = h.ctx.options(|o| o.input_options.line_scroll_speed);
+    wheel(&mut h, egui::MouseWheelUnit::Point, egui::vec2(0.0, -per_line), Modifiers::NONE);
+    assert_eq!(*h.state(), 2, "a line's worth of points is a notch");
+}
+
+#[test]
+fn the_wheel_over_a_wheel_dropdown_does_not_scroll_its_container() {
+    let mut h = Harness::builder().with_size(egui::vec2(300.0, 100.0)).build_ui_state(
+        |ui, selected: &mut usize| {
+            egui::ScrollArea::vertical().max_height(80.0).show(ui, |ui| {
+                wheel_select(ui, selected, true);
+                ui.add_space(400.0);
+            });
+        },
+        0,
+    );
+    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    let top = h.get_by_role(egui::accesskit::Role::ComboBox).rect().top();
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(0.0, -1.0), Modifiers::NONE);
+    for _ in 0..10 {
+        h.run();
+    }
+    assert_eq!(*h.state(), 1);
+    assert_eq!(h.get_by_role(egui::accesskit::Role::ComboBox).rect().top(), top, "the container didn't scroll");
+}
+
+#[test]
+fn the_wheel_leaves_a_plain_dropdown_alone() {
+    let mut h = mode_dropdown(false);
+    wheel(&mut h, egui::MouseWheelUnit::Line, egui::vec2(0.0, -1.0), Modifiers::NONE);
+    assert_eq!(*h.state(), 0);
+}
+
+/// #2607: the open list is at least as wide as its widest option, wider than the closed box
+/// here, from the first frame, and keeps that width while a row under the pointer is hovered.
+#[test]
+fn dropdown_list_is_as_wide_as_its_widest_option_even_when_hovered() {
+    use egui_kittest::kittest::Queryable;
+    use photocraft_color::BlendMode;
+    let opts: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.iter().map(|m| (*m, m.label())).collect();
+    let longest = opts.iter().map(|(_, l)| *l).max_by_key(|l| l.chars().count()).unwrap();
+    let mut h = Harness::builder().with_size(egui::vec2(400.0, 700.0)).build_ui_state(
+        |ui, mode: &mut BlendMode| {
+            let opts: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.iter().map(|m| (*m, m.label())).collect();
+            super::dropdown(ui, "brush-mode", tl!("Mode"), mode, &opts, 96.0);
+        },
+        BlendMode::Normal,
+    );
+    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    h.run();
+    let closed = h.get_by_role(egui::accesskit::Role::ComboBox).rect();
+    h.get_by_role(egui::accesskit::Role::ComboBox).click();
+    h.run();
+    let list =
+        |h: &Harness<'_, BlendMode>| h.ctx.memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).find_map(|l| m.area_rect(l.id))).unwrap();
+    let open = list(&h);
+    let widest = h.get_by_label(longest).rect().width();
+    assert!(widest > closed.width(), "the longest mode ({longest}) is wider than the {} wide box", closed.width());
+    assert!(open.width() >= widest, "the list ({}) fits {longest} ({widest})", open.width());
+    h.hover_at(h.get_by_label(longest).rect().center());
+    h.run();
+    assert_eq!(list(&h).width(), open.width(), "hovering the widest row doesn't widen the list");
+}
