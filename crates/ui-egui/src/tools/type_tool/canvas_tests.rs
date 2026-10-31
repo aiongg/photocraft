@@ -676,7 +676,6 @@ fn size_applies_at_layer_and_selection_scope() {
 /// Scrubbing the options bar's size field previews live (the size changes every frame) and is
 /// one undo step per drag; each step only damages the type layer's area, not the whole canvas.
 #[test]
-#[ignore = "waits on library: NumberField scrub changes on its first move (gap row 52)"]
 fn size_drag_is_live_and_one_history_step_per_drag() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text": "Hello", "size": 20, "x": 300, "y": 420})).unwrap()["layer"].as_u64().unwrap());

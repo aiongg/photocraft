@@ -299,8 +299,12 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
 
     let before_id = cx.mem.with("curves-before");
     match shown.event {
-        Some(EditEvent::Begin { .. }) => {
+        Some(EditEvent::Begin { value, .. }) => {
             ui.data_mut(|d| d.insert_temp(before_id, curve.clone()));
+            if let Some(value) = value {
+                write_shape(v, key, space, &value);
+                e.changed = true;
+            }
         }
         Some(EditEvent::Update { value, .. }) => {
             write_shape(v, key, space, &value);

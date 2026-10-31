@@ -226,9 +226,9 @@ fn number_cell(ui: &mut egui::Ui, cell: &Cell<'_>, value: f32) -> Option<f32> {
         None => OptionsBar::cell(ui, "", cell.width, |ui, _| show(ui, None)),
     };
     match edit.event {
-        Some(EditEvent::Begin { .. }) => {
+        Some(EditEvent::Begin { value: first, .. }) => {
             ui.data_mut(|d| d.insert_temp(start, value));
-            None
+            first.map(|v| v as f32)
         }
         Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some(value as f32),
         Some(EditEvent::Commit { value, changed: true, .. }) => Some(value as f32),
