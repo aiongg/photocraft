@@ -1,7 +1,7 @@
 use super::brush_controls::{brush_preset_chip, mixer_load_swatch, paint_mode_dropdown, smoothing_options, tool_mode_dropdown};
 use super::{BlendMode, Color32, PhotocraftApp, RichText, Sense, Tokens, Tool, Value, icons, json, widgets};
 use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, NumberField, Select};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::icons::Icon;
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem};
@@ -127,7 +127,7 @@ fn shown(value: f32, scale: f64) -> f64 {
     (f64::from(value) * scale * 1e4).round() / 1e4
 }
 
-/// Applies a field's edit to `value`. A cancelled gesture puts back the value it began with.
+/// Applies a field's edit to `value`. A cancelled gesture puts back the value it began with, unless the host changed the value (external).
 fn apply(ui: &egui::Ui, id: egui::Id, scale: f64, event: Option<&EditEvent<f64>>, value: &mut f32) -> (bool, Option<u64>) {
     let start = id.with("gesture-start");
     let gesture = event.and_then(EditEvent::id).map(|g| {
@@ -153,7 +153,7 @@ fn apply(ui: &egui::Ui, id: egui::Id, scale: f64, event: Option<&EditEvent<f64>>
             }
             *changed
         }
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) if *reason != CancelReason::External => {
             if let Some(before) = ui.data(|d| d.get_temp::<f32>(start)) {
                 *value = before;
             }
@@ -939,4 +939,39 @@ fn fixed_size_field(ui: &mut egui::Ui, label: &str, px: &mut f32, units: widgets
         *px = unit.to_px(f64::from(v), dpi, extent, ppi).clamp(1.0, FIXED_SIZE_MAX_PX) as f32;
     }
     picked.map(crate::rulers::unit_name_at)
+}
+
+#[cfg(test)]
+mod cancel_tests {
+    use super::*;
+    use craft::ui::edit::GestureId;
+
+    /// Runs `f` inside one egui frame.
+    fn in_ui(f: impl FnOnce(&egui::Ui)) {
+        let mut f = Some(f);
+        let mut h = egui_kittest::Harness::new_ui(move |ui| {
+            if let Some(f) = f.take() {
+                f(ui);
+            }
+        });
+        h.run();
+    }
+
+    /// A value the host changed mid-gesture stays when the gesture is cancelled as external; any
+    /// other cancel puts back the value the gesture began with.
+    #[test]
+    fn external_cancel_keeps_the_host_value() {
+        in_ui(|ui| {
+            let id = egui::Id::new("field");
+            let gesture = GestureId::next();
+            let mut value = 10.0_f32;
+            apply(ui, id, 1.0, Some(&EditEvent::begin(gesture)), &mut value);
+            value = 40.0; // the host sets the value elsewhere
+            let (_, g) = apply(ui, id, 1.0, Some(&EditEvent::cancel(gesture, CancelReason::External)), &mut value);
+            assert_eq!(value, 40.0);
+            assert!(g.is_some(), "the gesture still ends");
+            apply(ui, id, 1.0, Some(&EditEvent::cancel(gesture, CancelReason::Escape)), &mut value);
+            assert_eq!(value, 10.0);
+        });
+    }
 }

@@ -2,7 +2,7 @@ use super::layer_drag::{DrawnRow, drag_feedback, dropped_on, edge_scroll, effect
 use super::layer_row::{RowSel, layer_row};
 use craft::ui::composites::PanelFooter;
 use craft::ui::controls::{ControlSize, IconButton, NumberField, Select};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::icons::Icon;
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::menu::{MenuEntry, MenuItem, PressMenu};
@@ -66,7 +66,7 @@ fn gesture_of<T>(event: &EditEvent<T>) -> Option<u64> {
 
 /// Turns a field's or select's `event` into the value to apply: updates and one-shot sets apply, a
 /// commit applies when it changed something, and a cancel puts back the value the gesture began
-/// with (kept in `start`).
+/// with (kept in `start`), except an external one: the host changed the value, which stays.
 fn edit_value<T: Clone + Send + Sync + 'static>(ui: &egui::Ui, start: egui::Id, event: Option<&EditEvent<T>>, current: &T) -> Option<(T, Option<u64>)> {
     match event? {
         e @ EditEvent::Begin { value, .. } => {
@@ -75,7 +75,7 @@ fn edit_value<T: Clone + Send + Sync + 'static>(ui: &egui::Ui, start: egui::Id, 
         }
         e @ (EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some((value.clone(), gesture_of(e))),
         e @ EditEvent::Commit { value, changed: true, .. } => Some((value.clone(), gesture_of(e))),
-        e @ EditEvent::Cancel { .. } => ui.data(|d| d.get_temp::<T>(start)).map(|before| (before, gesture_of(e))),
+        e @ EditEvent::Cancel { reason, .. } if *reason != CancelReason::External => ui.data(|d| d.get_temp::<T>(start)).map(|before| (before, gesture_of(e))),
         _ => None,
     }
 }
