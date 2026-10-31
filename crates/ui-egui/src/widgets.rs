@@ -56,7 +56,9 @@ use slider::DOUBLE_CLICK_S;
 pub use slider::{RowGestures, second_click, slider, slider_row, slider_row_prec, slider_row_with};
 pub(crate) use slider::{count_notches, wheel_notches_of};
 pub use text_field::{INPUT_EVENT_LIMIT, TEXT_FIELD_H, TEXT_FIELD_LIMIT, cap_text_events, text_field, text_field_ex, text_field_with_trailing};
-pub use units::{FieldUnits, fmt_num, fmt_num_prec, fmt_num2, parse_num, set_field_resolution, unit_decimals, unit_of_key, value_field_prec};
+pub use units::{
+    FieldUnits, fmt_num, fmt_num_prec, fmt_num2, parse_num, set_field_resolution, unit_decimals, unit_of_key, value_field_prec, value_field_prec_menu,
+};
 
 #[cfg(test)]
 mod tests;

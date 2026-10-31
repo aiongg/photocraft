@@ -25,7 +25,31 @@ pub fn unit_decimals(key: &str) -> u32 {
 /// A [`value_field`] showing `decimals` decimal places instead of the one (or two, for a small
 /// range) it picks itself: the ruler units need their own precision (#2434).
 pub fn value_field_prec(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, width: f32, decimals: u32) -> Response {
-    value_field_in(ui, value, range, suffix, vec2(width, field_height(ui)), FieldOpts { decimals: Some(decimals), ..Default::default() })
+    value_field_in(ui, value, range, suffix, vec2(width, field_height(ui)), FieldOpts { decimals: Some(decimals), ..Default::default() }, None)
+}
+
+/// [`value_field_prec`] whose right-click opens a menu of `entries` instead of the edit menu; a
+/// pick is written to `picked`.
+#[allow(clippy::too_many_arguments)]
+pub fn value_field_prec_menu(
+    ui: &mut Ui,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    suffix: &str,
+    width: f32,
+    decimals: u32,
+    entries: &[craft::ui::menu::MenuEntry<usize>],
+    picked: &mut Option<usize>,
+) -> Response {
+    value_field_in(
+        ui,
+        value,
+        range,
+        suffix,
+        vec2(width, field_height(ui)),
+        FieldOpts { decimals: Some(decimals), ..Default::default() },
+        Some((entries, picked)),
+    )
 }
 
 /// A field's unit and the resolution a typed unit converts at (`1in` in a px field).

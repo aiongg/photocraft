@@ -4,6 +4,7 @@ use super::{Response, Sense, Tokens, Ui, Vec2, vec2};
 use craft::ui::controls::{ControlSize, NumberField};
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::menu::MenuEntry;
 use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 
 /// Number field with a dimmed unit suffix, Photoshop style, `width` wide and as tall as the
@@ -11,7 +12,7 @@ use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 /// or click-away, and a unit after a number converts into the field's unit (`1in` in a px field,
 /// at the resolution [`set_field_resolution`](super::set_field_resolution) gave).
 pub fn value_field(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, width: f32) -> Response {
-    value_field_in(ui, value, range, suffix, vec2(width, field_height(ui)), FieldOpts::default())
+    value_field_in(ui, value, range, suffix, vec2(width, field_height(ui)), FieldOpts::default(), None)
 }
 
 /// The height of a [`value_field`].
@@ -42,12 +43,12 @@ pub fn elided_label(ui: &mut Ui, text: &str, max_w: f32) -> Response {
 
 /// A [`value_field`] in a box of `width` by `height`, for slim bars such as the status bar (#2823).
 pub fn compact_value_field(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, width: f32, height: f32) -> Response {
-    value_field_in(ui, value, range, suffix, vec2(width, height), FieldOpts::default())
+    value_field_in(ui, value, range, suffix, vec2(width, height), FieldOpts::default(), None)
 }
 
 /// A compact field whose mouse scrub wraps at the native fullscreen viewport's horizontal edges.
 pub(crate) fn compact_wrapping_value_field(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, size: Vec2) -> Response {
-    value_field_in(ui, value, range, suffix, size, FieldOpts { wrap_drag: true, ..Default::default() })
+    value_field_in(ui, value, range, suffix, size, FieldOpts { wrap_drag: true, ..Default::default() }, None)
 }
 
 /// How a [`value_field_in`] shows and reads its number, beyond its suffix.
@@ -59,6 +60,9 @@ pub(super) struct FieldOpts {
     pub(super) units: Option<FieldUnits>,
     pub(super) wrap_drag: bool,
 }
+
+/// A right-click menu of units: its rows and where a pick goes (the library's `unit_menu`).
+pub(super) type UnitMenu<'a> = Option<(&'a [MenuEntry<usize>], &'a mut Option<usize>)>;
 
 /// The unit template a suffix stands for: `{n}%`, `{n}°`, `{n} px`.
 fn unit_of(suffix: &str) -> Unit {
@@ -72,7 +76,15 @@ fn unit_of(suffix: &str) -> Unit {
 /// A library [`NumberField`] in a box of `size` that reads and steps like PhotoCraft's value
 /// fields: arrows and wheel step by 1 (0.01 over a range of 10 or less), a scrubby caption left
 /// by [`scrub_label`](super::scrub_label) drags it, and a dialog's Tab reaches it.
-pub(super) fn value_field_in(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, size: Vec2, opts: FieldOpts) -> Response {
+pub(super) fn value_field_in(
+    ui: &mut Ui,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    suffix: &str,
+    size: Vec2,
+    opts: FieldOpts,
+    menu: UnitMenu,
+) -> Response {
     let FieldOpts { decimals, units, wrap_drag } = opts;
     let numbers = (*LocaleNumbers::of(ui)).clone().ungrouped();
     let (lo, hi) = (f64::from(*range.start()), f64::from(*range.end()));
@@ -111,6 +123,9 @@ pub(super) fn value_field_in(ui: &mut Ui, value: &mut f32, range: std::ops::Rang
             .size(ControlSize::Sm);
         if let Some(caption) = &caption {
             field = field.scrub_by(caption);
+        }
+        if let Some((entries, picked)) = menu {
+            field = field.unit_menu(entries, picked);
         }
         let edit = field.show(ui);
         let mut response = edit.response.clone();
