@@ -148,9 +148,10 @@ fn is_curves(fields: &serde_json::Map<String, Value>) -> bool {
     fields.get("__adjust").and_then(Value::as_str) == Some("curves")
 }
 
-/// The size the Curves dialog first opens at: the 300-point graph it had before it could be
-/// resized (#5113); it grows to fit its controls below the graph.
-const CURVES_SIZE: egui::Vec2 = egui::vec2(300.0, 420.0);
+/// The size the Curves dialog first opens at; it grows to fit its controls below the graph. The
+/// width leaves the graph's value area (the width less the editor's axis bar and inset, which
+/// differ by theme) over 270 points in every theme.
+const CURVES_SIZE: egui::Vec2 = egui::vec2(306.0, 420.0);
 
 /// The sizes of a resizable dialog and whether it reopens at the size it was left at (Curves only,
 /// #8984), or `None` for a dialog sized by its contents. The smallest size keeps Curves a usable
