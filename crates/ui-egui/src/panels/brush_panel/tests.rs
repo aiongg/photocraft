@@ -1841,9 +1841,11 @@ fn section_boxes_show_a_pressed_state() {
     }
 }
 
-/// The shared check box (options bars, dialogs) does the same, and pressing its label counts.
+/// The shared check box (options bars, dialogs): pressing its label leaves it unchecked, and the
+/// release checks it, as AccessKit reports it.
 #[test]
 fn checkboxes_show_a_pressed_state_from_their_label() {
+    use egui::accesskit::Toggled;
     use egui_kittest::kittest::Queryable;
     let mut h = Harness::builder().with_size(vec2(300.0, 100.0)).build_ui_state(
         |ui, on: &mut bool| {
@@ -1852,27 +1854,14 @@ fn checkboxes_show_a_pressed_state_from_their_label() {
         false,
     );
     h.run();
-    let t = Tokens::get(&h.ctx);
+    let toggled = |h: &Harness<'_, bool>| h.get_by_label("Sample All Layers").accesskit_node().toggled();
+    assert_eq!(toggled(&h), Some(Toggled::False));
     let label = h.get_by_label("Sample All Layers").rect();
-    let boxr = egui::Rect::from_min_size(egui::pos2(label.left() - 6.0 - 14.0, label.center().y - 7.0), vec2(14.0, 14.0));
-    let fill = |h: &Harness<'_, bool>| {
-        h.output()
-            .shapes
-            .iter()
-            .filter_map(|c| match &c.shape {
-                egui::Shape::Rect(r) if (r.rect.center() - boxr.center()).length() < 1.5 && r.rect.width() < 15.0 && r.fill != Color32::TRANSPARENT => {
-                    Some(r.fill)
-                }
-                _ => None,
-            })
-            .next_back()
-    };
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(false, false, &t)));
     h.drag_at(label.center());
     h.run();
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(false, true, &t)), "pressing the label presses the box");
+    assert_eq!(toggled(&h), Some(Toggled::False), "pressing the label does not check the box yet");
     h.drop_at(label.center());
     h.run();
     assert!(*h.state(), "the release checks it");
-    assert_eq!(fill(&h), Some(widgets::check_box_fill(true, false, &t)));
+    assert_eq!(toggled(&h), Some(Toggled::True));
 }
