@@ -55,8 +55,8 @@ use draw::{front_vertices, handle_anchor};
 pub(crate) use options_bar::position_size_fields;
 #[cfg(test)]
 use options_bar::{
-    POSITION_LIMIT_PX, Parts, SCALE_LIMIT_PCT, SIZE_UNIT_KEY, SKEW_LIMIT_DEG, matching_anchor, readout, rotate_about_pivot, scale_about_pivot, scale_limit_pct,
-    set_size_unit, size_pct, size_shown, size_unit, warp_grid_id,
+    POSITION_LIMIT_PX, SCALE_LIMIT_PCT, SIZE_UNIT_KEY, matching_anchor, readout, rotate_about_pivot, scale_about_pivot, scale_limit_pct, set_size_unit,
+    size_pct, size_shown, size_unit, warp_grid_id,
 };
 pub use options_bar::{options_bar, reset_warp};
 pub(crate) use pointer::{Gesture, Held, Hit, apply_drag, corner_bisector, hit, point_view, reach, rotate_cursor_dir};

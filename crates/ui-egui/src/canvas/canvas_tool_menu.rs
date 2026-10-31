@@ -310,8 +310,8 @@ pub fn open_crop(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
 
 /// A crop row: each runs what its options-bar twin runs.
 fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
-    use craft_ui::canvas::{CropGuide, GuideShow};
     use crate::crop_presets::{Choice, apply_choice};
+    use craft_ui::canvas::{CropGuide, GuideShow};
     match command {
         CROP_CANCEL => crate::crop_ui::cancel(app),
         CROP_COMMIT => crate::canvas::commit_crop(app),

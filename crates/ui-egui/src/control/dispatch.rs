@@ -474,7 +474,10 @@ fn crop_overlay_param(p: &Value) -> std::result::Result<Option<craft_ui::canvas:
 
 fn crop_overlay_show_param(p: &Value) -> std::result::Result<Option<craft_ui::canvas::GuideShow>, String> {
     let Some(v) = p.get("cropOverlayShow") else { return Ok(None) };
-    v.as_str().and_then(crate::crop_overlay::from_wire_id::<craft_ui::canvas::GuideShow>).map(Some).ok_or_else(|| "cropOverlayShow must be one of auto, always, never".to_string())
+    v.as_str()
+        .and_then(crate::crop_overlay::from_wire_id::<craft_ui::canvas::GuideShow>)
+        .map(Some)
+        .ok_or_else(|| "cropOverlayShow must be one of auto, always, never".to_string())
 }
 
 fn crop_orientation_param(p: &Value) -> std::result::Result<Option<u8>, String> {

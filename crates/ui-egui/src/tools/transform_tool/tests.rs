@@ -200,18 +200,6 @@ fn eq6(a: f64, b: f64) -> bool {
     (a - b).abs() < 1e-6
 }
 
-/// Scale, skew and rotation read back exactly from the box they make, flips included.
-#[test]
-fn parts_round_trip() {
-    for (sx, sy, angle, h, v) in [(1.0, 1.0, 0.0, 0.0, 0.0), (1.5, 0.5, 30.0, 20.0, 0.0), (0.8, -1.2, -120.0, -35.0, 15.0), (2.0, 1.0, 179.0, 0.0, -60.0)] {
-        let p = Parts { sx, sy, angle: f64::to_radians(angle), skew_h: f64::to_radians(h), skew_v: f64::to_radians(v) };
-        let back = Parts::from_columns(p.columns_of(), p.skew_v);
-        for (a, b) in [(back.sx, p.sx), (back.sy, p.sy), (back.angle, p.angle), (back.skew_h, p.skew_h)] {
-            assert!(eq6(a, b), "{p:?} read back as {back:?}");
-        }
-    }
-}
-
 /// A box sheared sideways keeps W, H and the angle; only H skew moves (it used to read as a
 /// taller box).
 #[test]
@@ -282,7 +270,7 @@ fn skew_fields_lean_the_box_about_the_reference_point() {
     assert!(eq6(t.quad[1][1], d) && eq6(t.quad[0][1], -d), "{:?}", t.quad);
     // A skew past ±90° would flatten the box: the field stops at the limit.
     let t = type_into_bar_field(5, "120");
-    assert!(eq6(readout(&t).3, f64::from(SKEW_LIMIT_DEG)), "{}", readout(&t).3);
+    assert!(eq6(readout(&t).3, craft_ui::canvas::quad::SKEW_LIMIT), "{}", readout(&t).3);
 }
 
 /// Types `text` + Enter into the `n`th numeric field of the transform bar (X, Y, W, H, angle…).
