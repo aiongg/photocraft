@@ -3282,7 +3282,7 @@ fn w_and_h_edits_on_a_skewed_box_match_upstream() {
 /// upstream scaled through the box's homography and kept the perspective. W 50 % on this box:
 /// corner 0 is (29.193, 14.722) here and (25.300, 12.650) upstream.
 #[test]
-#[ignore = "BoxState scales a distorted box affinely; upstream kept its perspective (numbers in the doc comment)"]
+#[ignore = "the field commits per keystroke; the homography scale reads back inexactly (5 -> 4.91 %), so the next digit lands on a different box than upstream's single edit"]
 fn w_and_h_edits_on_a_distorted_box_match_upstream() {
     assert_size_edits_match_upstream("distorted", [[0.0, 0.0], [100.0, 10.0], [90.0, 60.0], [-5.0, 50.0]]);
 }

@@ -2,7 +2,7 @@ use super::begin::{enter_warp, leave_warp, warps_type};
 use super::commit::{cancel, commit};
 use super::pointer::{apply_state, box_state, point_on_quad};
 use super::warp::edit_session_warp;
-use super::{BezierMesh, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
+use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
 use craft::ui::canvas::ReferencePoint;
 use craft::ui::canvas::quad::{Anchor9, BoxState, Parts as BoxParts, SKEW_LIMIT};
 use craft::ui::controls::{ControlSize, IconButton, NumberField};
@@ -307,6 +307,19 @@ pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t
     let (w, h) = (size_pct(&u, w, side_w), size_pct(&u, h, side_h));
     if rw.changed() || rh.changed() {
         let (state, rect) = (box_state(t), start_rect(t));
+        if !state.is_parallelogram() {
+            // The factors come from the readout's W and H, as the homography path always took them.
+            let (sx, sy, _, _) = readout(t);
+            let (kx, ky) = if link {
+                let k = if rw.changed() { w / nonzero(sx) } else { h / nonzero(sy) };
+                let k = k.min(f64::from(wlim) / sx.abs().max(1e-9)).min(f64::from(hlim) / sy.abs().max(1e-9));
+                (k, k)
+            } else {
+                (w / nonzero(sx), h / nonzero(sy))
+            };
+            scale_about_pivot(app, kx, ky);
+            return;
+        }
         let (now_w, now_h) = state.signed_scale(rect, t.skew_v);
         let (now_w, now_h) = (now_w * 100.0, now_h * 100.0);
         let (w, h) = if link {
@@ -538,11 +551,29 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
     }
 }
 
+fn nonzero(v: f64) -> f64 {
+    if v.abs() < 1e-9 { 1e-9f64.copysign(v) } else { v }
+}
+
 /// Scale the box along its own axes about the reference point. A negative factor mirrors that
 /// side; both negative turn the box by a half turn.
 pub(super) fn scale_about_pivot(app: &mut PhotocraftApp, kx: f64, ky: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
-    let next = box_state(s).scaled_about_pivot(kx, ky);
+    let state = box_state(s);
+    if !state.is_parallelogram() {
+        // Through the box's homography, which keeps its perspective, until craft-ui row 109:
+        // BoxState scales a distorted box as a parallelogram.
+        let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], s.quad) else { return };
+        let Some(inv) = h.inverse() else { return };
+        let (pu, pv) = inv.apply(s.pivot[0], s.pivot[1]);
+        let m = |u: f64, v: f64| {
+            let (x, y) = h.apply(pu + (u - pu) * kx, pv + (v - pv) * ky);
+            [x, y]
+        };
+        s.quad = [m(0.0, 0.0), m(1.0, 0.0), m(1.0, 1.0), m(0.0, 1.0)];
+        return;
+    }
+    let next = state.scaled_about_pivot(kx, ky);
     apply_state(s, &next);
 }
 
