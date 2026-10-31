@@ -54,6 +54,8 @@ struct Row {
 struct Group {
     title: Option<String>,
     rows: Vec<Row>,
+    /// Checkboxes at the group's left edge rather than in the control column (Interface › Options only, as upstream).
+    checks: bool,
 }
 
 pub(super) struct Page {
@@ -97,7 +99,7 @@ fn info_row(key: &str, keywords: &str, info: Vec<(String, bool)>) -> Row {
 }
 
 fn group(rows: Vec<Row>) -> Group {
-    Group { title: None, rows }
+    Group { title: None, rows, checks: false }
 }
 
 /// The generic row of one setting, by the type of its JSON value and the engine's metadata.
@@ -150,7 +152,7 @@ fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) ->
             (launch_note().to_string(), true),
         ];
         let note = info_row("performance.renderingModeInfo", "performance Rendering Mode GPU CPU automatic launch", info);
-        groups.push(Group { title: Some(tl!("Rendering Mode").to_string()), rows: vec![mode, note] });
+        groups.push(Group { title: Some(tl!("Rendering Mode").to_string()), rows: vec![mode, note], checks: false });
     }
     {
         let mb = obj.get("memoryUsageMb").and_then(Value::as_i64).unwrap_or(8192);
@@ -171,11 +173,11 @@ fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) ->
         info.push((tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget.").to_string(), true));
         let row = Row::new("performance.memoryUsageMb", "Per-document RAM limit (MB)", Kind::Int { value: mb, range: 256..=1_048_576, unit: Some("MB") });
         let note = info_row("performance.memoryUsageInfo", "performance memory RAM limit document history GPU budget", info);
-        groups.push(Group { title: Some(tl!("Memory Usage").to_string()), rows: vec![row, note] });
+        groups.push(Group { title: Some(tl!("Memory Usage").to_string()), rows: vec![row, note], checks: false });
     }
     groups.push(group(generic));
     let graphics = info_row(GRAPHICS_KEY, "performance GPU graphics adapter backend", Vec::new());
-    groups.push(Group { title: Some(tl!("Graphics").to_string()), rows: vec![graphics] });
+    groups.push(Group { title: Some(tl!("Graphics").to_string()), rows: vec![graphics], checks: false });
     let mut advanced = vec![Row::new(
         "performance.gpuBackend",
         "GPU Backend",
@@ -191,7 +193,7 @@ fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) ->
                 .help(launch_note()),
         );
     }
-    groups.push(Group { title: Some(tl!("Advanced").to_string()), rows: advanced });
+    groups.push(Group { title: Some(tl!("Advanced").to_string()), rows: advanced, checks: false });
     groups
 }
 
@@ -281,8 +283,8 @@ fn interface_groups(obj: &Map<String, Value>, rows: Vec<Row>) -> Vec<Group> {
     let presentation = take(&mut rest, &PRESENTATION);
     let (checks, other): (Vec<Row>, Vec<Row>) = rest.into_iter().partition(|r| matches!(r.kind, Kind::Bool(_)));
     let options: Vec<Row> = checks.into_iter().chain(other).collect();
-    let titled = |title: &str, rows| Group { title: Some(tl!(title).to_string()), rows };
-    let mut groups = vec![titled("Appearance", appearance), titled("Presentation", presentation), titled("Options", options)];
+    let titled = |title: &str, rows| Group { title: Some(tl!(title).to_string()), rows, checks: false };
+    let mut groups = vec![titled("Appearance", appearance), titled("Presentation", presentation), Group { checks: true, ..titled("Options", options) }];
     groups.retain(|g| !g.rows.is_empty());
     groups
 }
@@ -362,7 +364,7 @@ impl PreferencesModel for Host<'_> {
                                 spec
                             })
                             .collect();
-                        GroupSpec::new(g.title.as_deref(), rows)
+                        if g.checks { GroupSpec::new(g.title.as_deref(), rows).checks() } else { GroupSpec::new(g.title.as_deref(), rows) }
                     })
                     .collect();
                 let mut page = PageSpec { id: p.id, title: &p.title, groups, footnote: None, custom: false, keywords: "" };
