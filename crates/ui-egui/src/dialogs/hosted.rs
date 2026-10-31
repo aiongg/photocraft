@@ -443,4 +443,34 @@ mod tests {
         assert_eq!(st.doc.size.width, 55);
         assert_eq!(st.history.past_len(), past + 1);
     }
+
+    #[test]
+    fn automation_confirm_is_refused_while_ok_is_disabled() {
+        let mut h = harness();
+        let id = open_fit_image(&mut h);
+        set_field(h.state_mut(), id, "width", json!(55)).unwrap();
+        h.state_mut().ui.host.get_mut::<CommandForm>().unwrap().set_ok_enabled(false);
+        let ctx = h.ctx.clone();
+        let error = crate::dialogs::confirm_in(h.state_mut(), &ctx, id).unwrap_err();
+        assert!(error.contains("OK is disabled"), "{error}");
+        assert!(h.state().ui.hosted(id).is_some() && h.state().ui.host.is_open::<CommandForm>(), "the dialog stays open");
+        assert_eq!(h.state().session.active().unwrap().doc.size.width, 400, "the command did not run");
+
+        h.state_mut().ui.host.get_mut::<CommandForm>().unwrap().set_ok_enabled(true);
+        crate::dialogs::confirm_in(h.state_mut(), &ctx, id).unwrap();
+        assert!(h.state().ui.hosted(id).is_none() && !h.state().ui.any_dialog_open());
+        assert_eq!(h.state().session.active().unwrap().doc.size.width, 55);
+    }
+
+    #[test]
+    fn opening_a_form_over_another_cancels_the_first_by_its_key() {
+        let mut h = harness();
+        let first = open_fit_image(&mut h);
+        let ctx = h.ctx.clone();
+        let second = crate::menus::invoke(h.state_mut(), &ctx, "file.automate.conditionalModeChange", json!({})).unwrap()["dialog"].as_u64().unwrap();
+        h.run_steps(2);
+        assert!(h.state().ui.hosted(first).is_none(), "the replaced form's record is gone");
+        assert!(h.state().ui.hosted(second).is_some() && h.state().ui.hosted_fields(second).is_some());
+        assert!(h.state().ui.hosted_fields(first).is_none());
+    }
 }

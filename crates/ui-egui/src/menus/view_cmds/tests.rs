@@ -241,6 +241,25 @@ fn batch_menu_requires_a_recorded_action() {
     assert_eq!(app.ui.dialog_fields(dialog).unwrap()["action"], "Invert");
 }
 
+/// Batch's quality is a number that the command never sees until Custom is on; its naming is a
+/// text row.
+#[test]
+fn batch_quality_is_absent_until_custom_and_naming_takes_text() {
+    let (mut app, ctx) = app_with(1);
+    app.run("actions.record", json!({"name": "Invert"})).unwrap();
+    app.run("image.adjustments.invert", json!({})).unwrap();
+    app.run("actions.stop", json!({})).unwrap();
+    let d = menu(&mut app, &ctx, "file.automate.batch", json!({})).unwrap()["dialog"].as_u64().unwrap();
+    let fields = app.ui.dialog_fields(d).unwrap();
+    assert!(!fields.contains_key("quality"), "unchecked Custom leaves the key out: {fields:?}");
+    assert_eq!(fields["naming"], json!(""));
+    crate::dialogs::hosted::set_field(&mut app, d, "naming", json!("{name}-{serial}")).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, d, "quality", json!(5.0)).unwrap();
+    assert!(crate::dialogs::hosted::set_field(&mut app, d, "quality", json!(40.0)).is_err(), "quality is 0 to 12");
+    let fields = app.ui.dialog_fields(d).unwrap();
+    assert_eq!((fields["naming"].as_str(), fields["quality"].as_f64()), (Some("{name}-{serial}"), Some(5.0)));
+}
+
 #[test]
 fn engine_commands_open_their_dialogs() {
     let (mut app, ctx) = app_with(2);
