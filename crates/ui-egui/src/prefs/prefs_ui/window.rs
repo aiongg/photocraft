@@ -46,6 +46,8 @@ struct Row {
     keywords: String,
     help: Option<String>,
     step: Option<f64>,
+    /// The lines of an info row (a custom row with an empty label): text, and whether it is dim.
+    info: Vec<(String, bool)>,
     kind: Kind,
 }
 
@@ -71,7 +73,7 @@ impl Page {
 
 impl Row {
     fn new(path: &str, human: &str, kind: Kind) -> Self {
-        Self { key: path.to_string(), label: tl!(human).to_string(), keywords: format!("{path} {human}"), help: None, step: None, kind }
+        Self { key: path.to_string(), label: tl!(human).to_string(), keywords: format!("{path} {human}"), help: None, step: None, info: Vec::new(), kind }
     }
 
     fn step(mut self, step: f64) -> Self {
@@ -83,6 +85,15 @@ impl Row {
         self.help = Some(help.into());
         self
     }
+}
+
+/// A row of explanatory lines under a group's title, with no label.
+fn info_row(key: &str, keywords: &str, info: Vec<(String, bool)>) -> Row {
+    let mut row = Row::new(key, "", Kind::Custom);
+    row.label = String::new();
+    row.keywords = keywords.into();
+    row.info = info;
+    row
 }
 
 fn group(rows: Vec<Row>) -> Group {
@@ -132,34 +143,38 @@ fn setting_row(path: &str, key: &str, v: &Value, scale: &[(String, String)]) -> 
 fn performance_groups(obj: &Map<String, Value>, generic: Vec<Row>, gpu: &Gpu) -> Vec<Group> {
     let mut groups = Vec::new();
     {
-        let note = format!("{}\n{}", tl!("Automatic uses GPU acceleration when available and falls back to CPU rendering on errors."), launch_note());
-        let row = Row::new("performance.renderingMode", "Rendering Mode", Kind::Choice { value: rendering_mode_value(obj), options: rendering_mode_options() })
-            .help(note);
-        groups.push(group(vec![row]));
+        let mode =
+            Row::new("performance.renderingMode", "Rendering Mode", Kind::Choice { value: rendering_mode_value(obj), options: rendering_mode_options() });
+        let info = vec![
+            (tl!("Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.").to_string(), false),
+            (launch_note().to_string(), true),
+        ];
+        let note = info_row("performance.renderingModeInfo", "performance Rendering Mode GPU CPU automatic launch", info);
+        groups.push(Group { title: Some(tl!("Rendering Mode").to_string()), rows: vec![mode, note] });
     }
     {
         let mb = obj.get("memoryUsageMb").and_then(Value::as_i64).unwrap_or(8192);
-        let mut help = Vec::new();
+        let mut info = Vec::new();
         if let Some(ram) = crate::gpu_canvas::physical_memory().filter(|n| *n > 0) {
             let installed = ram / (1 << 20);
             let percent = mb as f64 * 100.0 / (ram as f64 / (1 << 20) as f64);
-            help.push(crate::i18n::fmt(
-                tl!("Installed RAM: {ram} MB; this limit: {percent}%"),
-                &[("ram", &installed.to_string()), ("percent", &format!("{percent:.1}"))],
+            info.push((
+                crate::i18n::fmt(
+                    tl!("Installed RAM: {ram} MB; this limit: {percent}%"),
+                    &[("ram", &installed.to_string()), ("percent", &format!("{percent:.1}"))],
+                ),
+                false,
             ));
         }
-        help.push(tl!("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.").to_string());
-        help.push(tl!("Applies immediately when saved. Memory is not reserved in advance.").to_string());
-        help.push(tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget.").to_string());
-        let row = Row::new("performance.memoryUsageMb", "Per-document RAM limit (MB)", Kind::Int { value: mb, range: 256..=1_048_576, unit: Some("MB") })
-            .help(help.join("\n"));
-        groups.push(Group { title: Some(tl!("Memory Usage").to_string()), rows: vec![row] });
+        info.push((tl!("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded.").to_string(), true));
+        info.push((tl!("Applies immediately when saved. Memory is not reserved in advance.").to_string(), true));
+        info.push((tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget.").to_string(), true));
+        let row = Row::new("performance.memoryUsageMb", "Per-document RAM limit (MB)", Kind::Int { value: mb, range: 256..=1_048_576, unit: Some("MB") });
+        let note = info_row("performance.memoryUsageInfo", "performance memory RAM limit document history GPU budget", info);
+        groups.push(Group { title: Some(tl!("Memory Usage").to_string()), rows: vec![row, note] });
     }
     groups.push(group(generic));
-    // An empty label: the info lines take the whole row under the group's title.
-    let mut graphics = Row::new(GRAPHICS_KEY, "", Kind::Custom);
-    graphics.label = String::new();
-    graphics.keywords = "performance GPU graphics adapter backend".into();
+    let graphics = info_row(GRAPHICS_KEY, "performance GPU graphics adapter backend", Vec::new());
     groups.push(Group { title: Some(tl!("Graphics").to_string()), rows: vec![graphics] });
     let mut advanced = vec![Row::new(
         "performance.gpuBackend",
@@ -265,14 +280,9 @@ fn interface_groups(obj: &Map<String, Value>, rows: Vec<Row>) -> Vec<Group> {
     appearance.extend(take(&mut rest, &APPEARANCE));
     let presentation = take(&mut rest, &PRESENTATION);
     let (checks, other): (Vec<Row>, Vec<Row>) = rest.into_iter().partition(|r| matches!(r.kind, Kind::Bool(_)));
+    let options: Vec<Row> = checks.into_iter().chain(other).collect();
     let titled = |title: &str, rows| Group { title: Some(tl!(title).to_string()), rows };
-    let mut groups = vec![titled("Appearance", appearance), titled("Presentation", presentation)];
-    if !checks.is_empty() {
-        groups.push(Group { title: Some(tl!("Options").to_string()), rows: checks });
-    }
-    if !other.is_empty() {
-        groups.push(Group { title: None, rows: other });
-    }
+    let mut groups = vec![titled("Appearance", appearance), titled("Presentation", presentation), titled("Options", options)];
     groups.retain(|g| !g.rows.is_empty());
     groups
 }
@@ -404,6 +414,19 @@ impl PreferencesHost for Host<'_> {
 
     fn custom_row(&mut self, ui: &mut egui::Ui, key: &str) {
         let t = Tokens::get(ui.ctx());
+        let info = self.pages.iter().flat_map(|p| &p.groups).flat_map(|g| &g.rows).find(|r| r.key == key).map(|r| r.info.clone()).unwrap_or_default();
+        if !info.is_empty() {
+            ui.vertical(|ui| {
+                for (line, dim) in &info {
+                    if *dim {
+                        ui.label(RichText::new(line).color(t.text_dim));
+                    } else {
+                        ui.label(line);
+                    }
+                }
+            });
+            return;
+        }
         if key == GRAPHICS_KEY {
             ui.vertical(|ui| {
                 for line in &self.gpu.lines {

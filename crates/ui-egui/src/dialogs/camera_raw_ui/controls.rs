@@ -1,10 +1,10 @@
 use super::open::{Target, cancel, commit_open_raw, open_raw, raw_stage};
 use super::sidecar::{load_settings, report_file_error, save_settings};
 use super::{
-    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, Stroke, Tokens, ToneZone, Value, Wheel, curve_lut,
-    json, pos2, vec2, widgets,
+    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, ToneZone, Value, Wheel, curve_lut, json, pos2,
+    vec2, widgets,
 };
-use craft_ui::composites::{SliderRow, SliderRowResponse};
+use craft_ui::composites::{SectionHeader, SliderRow, SliderRowResponse};
 use craft_ui::edit::EditEvent;
 use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::StrokeExt;
@@ -139,10 +139,12 @@ fn tone_row(ui: &mut egui::Ui, dirty: &mut bool, alt: &mut Option<ToneZone>, zon
 }
 
 fn section(ui: &mut egui::Ui, title: &str, open: bool, body: impl FnOnce(&mut egui::Ui)) {
-    egui::CollapsingHeader::new(egui::RichText::new(crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title)).font(FontId::proportional(13.0)))
-        .id_salt(("camera-raw-section", title))
-        .default_open(open)
-        .show(ui, body);
+    // The header keeps a section open from the start; the closed-at-first ones keep their state here.
+    let key = egui::Id::unique(("camera-raw-section-open", title));
+    let mut shown = ui.data(|d| d.get_temp::<bool>(key)).unwrap_or(open);
+    let title_text = crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title);
+    SectionHeader::new(("camera-raw-section", title), title_text).open(&mut shown).show(ui, body);
+    ui.data_mut(|d| d.insert_temp(key, shown));
 }
 
 fn wheel(ui: &mut egui::Ui, dirty: &mut bool, title: &str, w: &mut Wheel) {

@@ -127,19 +127,6 @@ pub(crate) fn theme_choices(app: &PhotocraftApp) -> Vec<ThemeChoice> {
     defs.into_iter().map(|def| ThemeChoice { id: def.id.as_str().to_string(), name: def.name.clone(), variants: def.variants, def }).collect()
 }
 
-/// The legacy kind PhotoCraft's layout code reads for what the preferences show, without a theme
-/// store: the override's themes, or ArtCraft where it follows the suite.
-pub(super) fn selected_theme(interface: &prefs::Interface, system: Option<egui::Theme>) -> ThemeKind {
-    let dark = match interface.appearance_mode {
-        AppearanceMode::Light => false,
-        AppearanceMode::Dark => true,
-        AppearanceMode::Auto => system != Some(egui::Theme::Light),
-    };
-    let size = if interface.size == prefs::AppSize::Comfortable { Size::Comfortable } else { Size::Compact };
-    let id = if dark { &interface.theme_dark } else { &interface.theme_light };
-    ThemeKind::of_library(if id.is_empty() { "craft.artcraft" } else { id }, dark, size)
-}
-
 pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let next = match app.session.prefs().interface.appearance_mode {
         AppearanceMode::Auto => AppearanceMode::Light,
@@ -237,18 +224,6 @@ pub(crate) fn appearance_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui
 
 pub(super) fn system_theme(app: &PhotocraftApp, ctx: &egui::Context) -> Option<egui::Theme> {
     app.services.system_theme.as_ref().and_then(|read| read(ctx)).or_else(|| ctx.system_theme())
-}
-
-/// Resolve an absolute pixels-per-point preference without multiplying the OS DPI twice.
-/// Monitor dimensions are physical pixels, independent of window size and UI zoom.
-pub(super) fn display_scale(pref: prefs::UiScale, native: Option<f32>) -> f32 {
-    let native = native.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(1.0);
-    match pref {
-        // The system's scale, fractional ones included (125%, 150%, 175%: #1072), and 100% on a
-        // large 4K display run unscaled (#1278); 200% there is a fixed choice.
-        prefs::UiScale::Auto => native,
-        fixed => fixed.name().parse::<f32>().map_or(1.0, |pct| pct / 100.0),
-    }
 }
 
 pub(super) fn sync_display_scale(app: &PhotocraftApp, ctx: &egui::Context) {
