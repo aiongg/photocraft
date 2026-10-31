@@ -183,6 +183,7 @@ use input::opacity_keys;
 use input::page_keys;
 use input::scrub_wrap;
 pub use input::shortcut_dispatch;
+pub use input::shortcut_keymap;
 pub use input::shortcuts;
 use input::single_line_drag;
 pub use input::spring_tools;
@@ -364,6 +365,8 @@ pub struct PhotocraftApp {
     pub(crate) remove_trail: Option<stroke_trail::Trail>,
     /// The open menus' items, reused between frames (`menus::ItemCache`).
     pub(crate) menu_cache: Option<menus::ItemCache>,
+    /// The shortcut catalog with the user's assignments (`shortcut_keymap`).
+    pub(crate) keymap: shortcut_keymap::Cache,
     /// Move tool drag shown live (`move_ui`).
     pub(crate) move_preview: Option<move_ui::MovePreview>,
     /// Move tool › Show Highlight on Rollover: the last hover answer (`move_hover`).
