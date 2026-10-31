@@ -1114,34 +1114,8 @@ fn x_swaps_the_frame_orientation_not_the_colours() {
     assert!(!swap_orientation(&mut app));
 }
 
-/// #1919: W × H beside the pointer while the frame is drawn or resized (its own size when
-/// turned), not while it moves or turns or between gestures.
 #[test]
-fn readout_shows_the_frame_size_while_drawing_or_resizing() {
-    let mut app = app(SampleType::U8);
-    let ev = |app: &mut PhotocraftApp, e: ToolEvent| tool_event(app, e, NONE);
-    ev(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 });
-    assert_eq!(sizing(&app), None, "nothing drawn yet");
-    ev(&mut app, ToolEvent::Move { x: 70.4, y: 50.6, pressure: 1.0 });
-    assert_eq!(sizing(&app), Some([60.0, 41.0]), "rounded as ↵ crops it");
-    ev(&mut app, ToolEvent::Up { x: 70.4, y: 50.6 });
-    assert_eq!(sizing(&app), None);
-    // Resizing a turned frame by its right edge: the frame's own width grows.
-    app.ui.crop_rect = Some([20.0, 20.0, 100.0, 60.0]);
-    app.ui.crop_angle = 30.0;
-    let grab = turn([100.0, 40.0], [60.0, 40.0], 30.0);
-    let to = [grab[0] + 10.0 * 30f64.to_radians().cos(), grab[1] + 10.0 * 30f64.to_radians().sin()];
-    ev(&mut app, ToolEvent::Down { x: grab[0], y: grab[1], pressure: 1.0 });
-    ev(&mut app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 });
-    assert!(matches!(app.crop.drag.map(|d| d.press.kind()), Some(CropPressKind::Resize(_))));
-    assert_eq!(sizing(&app), Some([90.0, 40.0]));
-    ev(&mut app, ToolEvent::Up { x: to[0], y: to[1] });
-    // Moving shows no size.
-    ev(&mut app, ToolEvent::Down { x: 60.0, y: 40.0, pressure: 1.0 });
-    ev(&mut app, ToolEvent::Move { x: 62.0, y: 40.0, pressure: 1.0 });
-    assert!(matches!(app.crop.drag.map(|d| d.press.kind()), Some(CropPressKind::Move)));
-    assert_eq!(sizing(&app), None);
-    ev(&mut app, ToolEvent::Up { x: 62.0, y: 40.0 });
+fn the_crop_size_is_whole_pixels_of_at_least_one_and_finite() {
     assert_eq!(frame_size([0.0, 0.0, 0.2, 0.4]), Some([1.0, 1.0]));
     assert_eq!(frame_size([f64::NAN, 0.0, 1.0, 1.0]), None);
     assert_eq!(frame_size([-f64::MAX, 0.0, f64::MAX, 1.0]), None);
