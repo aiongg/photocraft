@@ -242,6 +242,23 @@ mod tests {
         assert!(app.crop.drag.is_none());
     }
 
+    /// A Straighten line's end points snap as point gestures (until craft-ui row 100): a line a
+    /// few pixels off level on both ends snaps onto the document's centre line, so it is level.
+    #[test]
+    fn straighten_line_end_points_snap() {
+        for snap in [false, true] {
+            let mut app = app(SampleType::U8);
+            app.ui.extras.snap = snap;
+            toggle(&mut app);
+            drag(&mut app, &[[10.0, 52.0], [100.0, 50.0], [190.0, 48.0]], NONE);
+            if snap {
+                assert_eq!(app.ui.crop_angle, 0.0, "both ends snap to y = 50");
+            } else {
+                assert!(app.ui.crop_angle.abs() > 1.0, "{}", app.ui.crop_angle);
+            }
+        }
+    }
+
     #[test]
     fn holding_command_is_a_temporary_straighten() {
         let mut app = app(SampleType::U8);

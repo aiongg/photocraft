@@ -781,6 +781,17 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     app.crop.press_step = Some(step_of(app));
     // Default mode: the view stays upright for the frame, about the pressed point.
     crate::crop_mode::sync(app, Some(p));
+    // A Straighten line's start snaps as a point, until craft-ui row 100. A ⌘-drag in the middle of
+    // a crop gesture doesn't hijack it.
+    let straight = !had_drag && (app.crop.straighten.armed || mods.command);
+    let p = match crate::snap_ui::crop_snap(app).filter(|_| straight) {
+        Some(snap) => {
+            let (q, lines) = snap.line_point(p);
+            app.prefs_rt.snap_lines = lines;
+            q
+        }
+        None => p,
+    };
     let Some((view, at)) = view_and_screen(app, p) else { return };
     // No frame yet: a drag draws one. The library draws inside its default frame, so the press is
     // made on a stand-in that covers the pointer.
@@ -792,8 +803,6 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     if stand_in.is_some() {
         app.ui.crop_angle = 0.0;
     }
-    // A ⌘-drag in the middle of a crop gesture doesn't hijack it.
-    let straight = !had_drag && (app.crop.straighten.armed || mods.command);
     let frame = library_frame(app, &b, mods, straight).default_frame(stand_in.is_some() || app.crop.default_frame);
     let kind = if stand_in.is_some() { DragKind::Draw } else { kind_at(app, &frame, &view, at) };
     let Some(press) = frame.press(&view, reach(), at) else { return };
@@ -804,13 +813,24 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
 /// The frame follows the pointer at document point `p`.
 fn track_to(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, release: bool) {
     let Some(mut drag) = app.crop.drag else { return };
-    let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
-    let before = view;
     let now = crate::snap_ui::crop_snap(app);
     if !release {
         app.crop.snap = now.clone();
     }
-    let snap = (drag.kind != DragKind::Line).then(|| now.or_else(|| app.crop.snap.clone().filter(|_| release))).flatten();
+    let snap = now.or_else(|| app.crop.snap.clone().filter(|_| release));
+    // A Straighten line's end point snaps as a point, until craft-ui row 100; the frame is not
+    // snapped then.
+    let (snap, p) = if drag.kind == DragKind::Line {
+        let q = snap.map(|s| s.line_point(p));
+        if let Some((_, lines)) = q.as_ref().filter(|_| !release) {
+            app.prefs_rt.snap_lines.clone_from(lines);
+        }
+        (None, q.map_or(p, |(q, _)| q))
+    } else {
+        (snap, p)
+    };
+    let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
+    let before = view;
     let lines = std::cell::RefCell::new(Vec::new());
     let frame = library_frame(app, &b, mods, false);
     let frame = match &snap {
@@ -841,6 +861,11 @@ fn track_to(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, release: bool
 fn release_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     track_to(app, p, mods, true);
     let Some(drag) = app.crop.drag.take() else { return };
+    // The line's end snaps as it did on the last move, until craft-ui row 100.
+    let p = match app.crop.snap.as_ref().filter(|_| drag.kind == DragKind::Line) {
+        Some(snap) => snap.line_point(p).0,
+        None => p,
+    };
     let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
     let before = view;
     let frame = library_frame(app, &b, mods, false);

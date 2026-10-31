@@ -347,16 +347,24 @@ pub(crate) struct CropSnap {
     targets: SnapTargets,
     smart: SnapTargets,
     tol: f64,
+    /// The default mode moves the image under the box.
+    image: bool,
 }
 
 /// The snapping of the Crop drag in progress: None when View › Snap is off, Ctrl turned it off for
 /// this gesture, or the drag isn't a crop's.
 pub(crate) fn crop_snap(app: &PhotocraftApp) -> Option<CropSnap> {
     let snap = app.prefs_rt.snap.as_ref().filter(|s| s.gesture == Gesture::Crop && !s.disabled)?;
-    snap_on(app).then(|| CropSnap { targets: snap.targets.clone(), smart: snap.smart.clone(), tol: tolerance(app) })
+    snap_on(app).then(|| CropSnap { targets: snap.targets.clone(), smart: snap.smart.clone(), tol: tolerance(app), image: crate::crop_mode::moves_image(app) })
 }
 
 impl CropSnap {
+    /// The Straighten line's end point `p` snapped as a point gesture, until craft-ui row 100, and
+    /// the lines it reaches.
+    pub(crate) fn line_point(&self, p: [f64; 2]) -> ([f64; 2], Vec<SnapLine>) {
+        self.targets.snap_point(p, self.tol)
+    }
+
     /// The document vector that moves the part `part` of `frame` (what the pointer gives now) onto
     /// its snap target, and the alignment lines it reaches. The frame's edges and centre snap when
     /// it moves (or the image moves under it), so content can be centred in it (#8580); a handle or
@@ -370,9 +378,18 @@ impl CropSnap {
             }
             let r = frame.rect.abs();
             let rect = [r.x0, r.y0, r.x1, r.y1];
-            // Smart guides still snap when nothing in View › Snap To is within reach: the
-            // document's bounds alone keep `targets` from ever being empty.
-            for set in [&self.targets, &self.smart] {
+            // The image moving under the box: smart guides still snap when nothing in View › Snap
+            // To is within reach (the document's bounds alone keep `targets` from ever being empty).
+            // A classic-mode frame move uses them only when there are no targets, until craft-ui
+            // row 101.
+            let sets: &[&SnapTargets] = if self.image {
+                &[&self.targets, &self.smart]
+            } else if self.targets.is_empty() {
+                &[&self.smart]
+            } else {
+                &[&self.targets]
+            };
+            for set in sets {
                 let (adj, lines) = set.snap_rect(rect, self.tol);
                 if !lines.is_empty() {
                     return (Vec2::new(adj[0], adj[1]), lines);

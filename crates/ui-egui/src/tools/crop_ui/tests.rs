@@ -327,6 +327,34 @@ fn moving_the_frame_snaps_its_edges() {
     assert_eq!(app.ui.crop_rect, Some([0.0, 10.0, 40.0, 40.0]), "left edge snaps to the document edge");
 }
 
+/// A classic-mode frame move uses smart guides only when there are no snap targets (until
+/// craft-ui row 101): with View › Snap To › Layers off, the document's bounds are targets and a
+/// layer's edge out of their reach doesn't snap; with every target off, smart guides snap to it.
+#[test]
+fn moving_the_frame_uses_smart_guides_only_without_snap_targets() {
+    for targets in [true, false] {
+        let mut app = app(SampleType::U8);
+        app.ui.extras.snap = true;
+        app.ui.view.show.smart_guides = true;
+        app.ui.view.snap_to.layers = false;
+        app.ui.view.snap_to.document_bounds = targets;
+        app.run("layer.new.layer", json!({"name": "logo"})).unwrap();
+        app.run("select.rect", json!({"x": 57, "y": 60, "width": 4, "height": 20})).unwrap();
+        app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+        app.run("select.deselect", json!({})).unwrap();
+        app.ui.crop_rect = Some([10.0, 10.0, 15.0, 40.0]);
+        // The frame's edges end at x = 55 and 60, within reach of the layer's at 57 to 61 and far
+        // from the document's.
+        drag(&mut app, &[[13.0, 25.0], [40.0, 25.0], [58.0, 25.0]], NONE);
+        let r = app.ui.crop_rect.unwrap();
+        if targets {
+            assert_eq!(r, [55.0, 10.0, 60.0, 40.0], "no snap to the layer");
+        } else {
+            assert_ne!(r[0], 55.0, "smart guides snap: {r:?}");
+        }
+    }
+}
+
 /// #3145: Edit › Undo while a crop is pending steps the *box*, not the document (Photoshop keeps
 /// Undo live during a crop), so a moved frame comes back.
 #[test]
