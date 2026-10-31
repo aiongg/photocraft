@@ -41,8 +41,6 @@ mod cursor;
 mod file_dialog_probe;
 mod gpu_startup;
 mod launch_args;
-#[cfg(target_os = "macos")]
-mod mac_window;
 // Pure logic is tested on every platform; only Linux runs the check.
 #[cfg(any(target_os = "linux", test))]
 mod linux_libs;
@@ -599,7 +597,9 @@ fn main() -> eframe::Result {
             {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
                 // Quit through AppKit, not by closing the window (Touch Bar Macs, #1575, #1458).
-                app.services.quit = Some(Box::new(mac_window::terminate_later));
+                app.services.quit = Some(Box::new(|| {
+                    craft_quit::quit();
+                }));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
                     app.services.native_menu = photocraft_ui_egui::mac_bar::install(&cc.egui_ctx, &app);

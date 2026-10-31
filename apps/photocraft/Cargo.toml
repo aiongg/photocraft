@@ -29,6 +29,7 @@ photocraft-automation = { workspace = true }
 craft-ui = { workspace = true }
 photocraft-ui-egui = { workspace = true }
 craft-window = { workspace = true, features = ["restore-egui"] }
+craft-quit = { workspace = true }
 # Pen tablet pressure/tilt on macOS and X11 (the workspace's one isolated unsafe helper crate).
 photocraft-tablet = { workspace = true }
 eframe = { workspace = true, features = ["wgpu", "accesskit", "wayland", "x11", "persistence", "clipboard"] }
@@ -58,16 +59,13 @@ core-graphics2 = { version = "=0.6.1", default-features = false, features = ["di
 # registers the handler (Objective-C interop needs unsafe, which our workspace forbids) behind a
 # safe API. Pinned exactly: review the diff before bumping.
 fmv-macos-events = "=0.1.0"
-# Safe AppKit calls only: turn off AppKit's title bar dragging (mac_window.rs) and find where the
+# Safe AppKit calls only: find where the
 # pointer is when files are dropped (cursor.rs; winit 0.30 drops carry no position), and play the
 # system alert sound for Beep When Done (services.rs, NSBeep). Already in
 # Cargo.lock (winit, photocraft-tablet); pinned exactly to the same versions.
 objc2 = "=0.6.5"
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSEnumerator", "NSGeometry"] }
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSApplicationScripting", "NSEvent", "NSGraphics", "NSResponder", "NSView", "NSWindow"] }
-# Quit with `terminate:` from the main queue, outside winit's event handler (mac_window.rs).
-# Already in Cargo.lock (winit, objc2-app-kit); pinned exactly to the same version.
-dispatch2 = { version = "=0.3.1", default-features = false, features = ["std"] }
 
 # Drop position on X11 (`cursor.rs`): pure-Rust X client, already in Cargo.lock; pinned exactly.
 [target.'cfg(target_os = "linux")'.dependencies]
