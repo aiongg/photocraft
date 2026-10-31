@@ -437,19 +437,14 @@ pub fn language_scope(lang: Lang) -> impl Drop {
 
 /// The craft-i18n catalogs of one PhotoCraft language, built on first use. PhotoCraft's catalogs
 /// use craft-i18n's row format (`context<TAB>source<TAB>translation`), so the unpacked text of a
-/// language is embedded as that locale's app catalog. Only the languages that are shown get
-/// unpacked; the text is kept for the life of the process, as craft-i18n's `Embedded` requires.
+/// language is handed over as that locale's app catalog. Only the languages that are shown get
+/// unpacked.
 fn library_i18n(lang: Lang) -> Arc<craft::i18n::I18n> {
     static BY_CODE: Mutex<BTreeMap<&'static str, Arc<craft::i18n::I18n>>> = Mutex::new(BTreeMap::new());
     let mut by_code = BY_CODE.lock().unwrap_or_else(PoisonError::into_inner);
     Arc::clone(by_code.entry(lang.code()).or_insert_with(|| {
-        let embedded: &'static craft::i18n::Embedded = if lang == Lang::EN {
-            &[]
-        } else {
-            let text: &'static str = Box::leak(lang.0.text().into_boxed_str());
-            Box::leak(Box::new([(lang.code(), "", text)]))
-        };
-        let (i18n, problems) = craft::i18n::I18n::new(embedded, &[lang.code()]);
+        let catalogs = (lang != Lang::EN).then(|| (lang.code().to_owned(), String::new(), lang.0.text()));
+        let (i18n, problems) = craft::i18n::I18n::from_owned(catalogs, &[lang.code()]);
         problems.iter().for_each(|p| log::warn!("translation catalog: {p}"));
         Arc::new(i18n)
     }))
