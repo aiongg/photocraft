@@ -1,6 +1,6 @@
 /// Whether the page of `section` has a setting the window shows.
 fn has_visible_fields(values: &Value, section: &str) -> bool {
-    super::window::pages(values, &Value::Null, None).iter().any(|p| p.id == section && p.has_content())
+    super::window::pages(values, &Value::Null, None, &craft_ui::interface_scale::InterfaceScaleLabels::default()).iter().any(|p| p.id == section && p.has_content())
 }
 
 /// The Preferences dialog of `section`, drawn by the dialog host.
