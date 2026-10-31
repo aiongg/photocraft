@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 use egui::Pos2;
-use egui::{Color32, Rect, Sense, Stroke, pos2, vec2};
+use egui::{Color32, Rect, pos2, vec2};
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Affine;
