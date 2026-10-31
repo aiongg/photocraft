@@ -1,5 +1,8 @@
 use super::dialogs::toolbar_tab;
-use super::{BTreeMap, Map, PhotocraftApp, RichText, Tokens, Value, default_shortcut, json, prefs, vec2};
+use super::{BTreeMap, Map, PhotocraftApp, RichText, Value, default_shortcut, json, prefs};
+use craft_ui::controls::{Button, ButtonVariant, ControlSize, TextField};
+use craft_ui::edit::EditEvent;
+use craft_ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip};
 use craft_ui::theme::ToEgui;
 
 /// Every shortcut-bearing command (engine registry plus shell commands): (id, label, menu path,
@@ -179,14 +182,13 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
 pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let t = craft_ui::theme::current(ui.ctx());
     let mut tab = f.get("tab").and_then(Value::as_u64).unwrap_or(0);
-    ui.horizontal(|ui| {
-        for (i, name) in [tl!("Keyboard Shortcuts"), tl!("Menus"), tl!("Toolbar")].iter().enumerate() {
-            if crate::widgets::pill_tab(ui, name, tab == i as u64).clicked() {
-                tab = i as u64;
-                f.insert("capture".into(), json!(false));
-            }
+    let tabs = [Tab::new(0u64, tl!("Keyboard Shortcuts")), Tab::new(1u64, tl!("Menus")), Tab::new(2u64, tl!("Toolbar"))];
+    for event in TabStrip::new("shortcuts-tabs", tl!("Keyboard Shortcuts, Menus and Toolbar"), TabKind::Text).selected(&tab).show(ui, &tabs).events {
+        if let TabEvent::Activate(i) = event {
+            tab = i;
+            f.insert("capture".into(), json!(false));
         }
-    });
+    }
     f.insert("tab".into(), json!(tab));
     ui.add_space(craft_ui::theme::scale::Space::S6.px());
     if tab == 2 {
@@ -221,7 +223,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Search")).color(t.color.text.muted.to_egui()));
-        ui.add(egui::TextEdit::singleline(&mut filter).desired_width(260.0).hint_text(tl!("command or shortcut")));
+        let edit = TextField::new("shortcuts-search", tl!("Search"), &filter).placeholder(tl!("command or shortcut")).size(ControlSize::Sm).show(ui);
+        if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event {
+            filter = value;
+        }
     });
     f.insert("filter".into(), json!(filter));
     // Menu path and command label as shown in the menus, in the UI language.
@@ -370,14 +375,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                         cur.as_deref().map(crate::shortcuts::pretty).unwrap_or_default()
                     };
                     let changed = overrides.contains_key(id) || alt_overrides.contains_key(id);
-                    let r = ui.add(
-                        egui::Button::new(RichText::new(tl!(&text)).size(12.0).color(if changed {
-                            t.color.accent.text.to_egui()
-                        } else {
-                            t.color.text.normal.to_egui()
-                        }))
-                        .min_size(vec2(120.0, 18.0)),
-                    );
+                    let r = ui.add(Button::new(tl!(&text)).variant(ButtonVariant::Secondary).size(ControlSize::Sm).min_width(120.0));
                     // An unassigned shortcut shows no text: name it by the command it binds.
                     let r = if text.is_empty() { r.labelled_by(name_row.id) } else { r };
                     if r.clicked() {
@@ -391,9 +389,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // lists them as rows of their own (#3665).
                     ui.horizontal(|ui| {
                         for k in &alts {
-                            let b =
-                                egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(11.0).color(t.color.text.normal.to_egui()))
-                                    .small();
+                            let b = Button::new(format!("{}  ×", crate::shortcuts::pretty(k))).variant(ButtonVariant::Secondary).size(ControlSize::Sm);
                             if ui.add(b).on_hover_text(tl!("Delete Shortcut")).clicked() {
                                 alt_overrides.insert(id.clone(), alts.iter().filter(|x| *x != k).cloned().collect());
                                 selected = id.clone();
@@ -436,24 +432,24 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     if tab == 0 {
         ui.horizontal(|ui| {
             let has_sel = !selected.is_empty();
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Add Shortcut"))).clicked() {
+            if ui.add_enabled(has_sel, button(tl!("Add Shortcut"))).clicked() {
                 capture = true;
                 capture_alt = true;
                 message.clear();
                 message_warning = false;
             }
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Use Default"))).clicked() {
+            if ui.add_enabled(has_sel, button(tl!("Use Default"))).clicked() {
                 overrides.remove(&selected);
                 alt_overrides.remove(&selected);
                 message = tl!("Default restored.").into();
                 message_warning = false;
             }
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Delete Shortcut"))).clicked() {
+            if ui.add_enabled(has_sel, button(tl!("Delete Shortcut"))).clicked() {
                 overrides.insert(selected.clone(), String::new());
                 message = tl!("Shortcut removed.").into();
                 message_warning = false;
             }
-            if ui.button(tl!("Reset All to Defaults")).clicked() {
+            if ui.add(button(tl!("Reset All to Defaults"))).clicked() {
                 overrides.clear();
                 alt_overrides.clear();
                 message = tl!("All shortcuts reset to PhotoCraft defaults.").into();
@@ -461,14 +457,14 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             }
             // A Photoshop set (`.kys`) fills the overrides; the file arrives after this frame
             // and `kys_import` writes the dialog's fields then (#1163).
-            if ui.button(tl!("Import Shortcuts…")).on_hover_text(tl!("Load a keyboard shortcut set saved as .kys")).clicked()
+            if ui.add(button(tl!("Import Shortcuts…"))).on_hover_text(tl!("Load a keyboard shortcut set saved as .kys")).clicked()
                 && let Err(e) = crate::kys_import::import_dialog(app)
             {
                 message = e;
                 message_warning = false;
             }
         });
-    } else if ui.button(tl!("Show All Menu Items")).clicked() {
+    } else if ui.add(button(tl!("Show All Menu Items"))).clicked() {
         hidden.clear();
         colors.clear();
     }
@@ -487,7 +483,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         let (key, with, command) =
             (c["shortcut"].as_str().unwrap_or_default(), c["with"].as_str().unwrap_or_default(), c["command"].as_str().unwrap_or_default());
         ui.horizontal(|ui| {
-            if ui.button(tl!("Accept and Go to Conflict")).on_hover_text(tl!("Take the shortcut from the other command and select it")).clicked() {
+            if ui.add(button(tl!("Accept and Go to Conflict"))).on_hover_text(tl!("Take the shortcut from the other command and select it")).clicked() {
                 let holders: Vec<String> = serde_json::from_value(c["holders"].clone()).unwrap_or_else(|_| vec![with.to_string()]);
                 for holder in &holders {
                     let def = items.iter().find(|i| i.0 == *holder).and_then(|i| i.3.clone());
@@ -506,7 +502,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 message_warning = false;
                 conflict = None;
             }
-            if ui.button(tl!("Undo Changes")).on_hover_text(tl!("Put this command's shortcuts back as they were")).clicked() {
+            if ui.add(button(tl!("Undo Changes"))).on_hover_text(tl!("Put this command's shortcuts back as they were")).clicked() {
                 match c["main"].as_str() {
                     Some(m) => overrides.insert(command.to_string(), m.to_string()),
                     None => overrides.remove(command),
@@ -608,32 +604,35 @@ fn set_row(
             active = chosen;
             message.clear();
         }
-        if ui.button(tl!("New Set…")).on_hover_text(tl!("Save these shortcuts as a new set")).clicked() {
+        if ui.add(button(tl!("New Set…"))).on_hover_text(tl!("Save these shortcuts as a new set")).clicked() {
             new_name = Some(String::new());
         }
-        if ui.add_enabled(!active.is_empty() && modified, egui::Button::new(tl!("Save"))).on_hover_text(tl!("Save the changes to this set")).clicked() {
+        if ui.add_enabled(!active.is_empty() && modified, button(tl!("Save"))).on_hover_text(tl!("Save the changes to this set")).clicked() {
             sets.insert(active.clone(), now.clone());
             *message = tl!("Set saved.").into();
             *warning = false;
         }
-        if ui.add_enabled(!active.is_empty(), egui::Button::new(tl!("Delete"))).on_hover_text(tl!("Delete this set")).clicked() {
+        if ui.add_enabled(!active.is_empty(), button(tl!("Delete"))).on_hover_text(tl!("Delete this set")).clicked() {
             sets.remove(&active);
             active.clear();
             *message = tl!("Set deleted.").into();
             *warning = false;
         }
-        export = ui.button(tl!("Export…")).on_hover_text(tl!("Save these shortcuts as a .kys file")).clicked();
-        summarize = ui.button(tl!("Summarize…")).on_hover_text(tl!("Save a list of these shortcuts as a web page")).clicked();
+        export = ui.add(button(tl!("Export…"))).on_hover_text(tl!("Save these shortcuts as a .kys file")).clicked();
+        summarize = ui.add(button(tl!("Summarize…"))).on_hover_text(tl!("Save a list of these shortcuts as a web page")).clicked();
     });
     if let Some(name) = new_name.as_mut() {
         let mut create = false;
         let mut cancel = false;
         ui.horizontal(|ui| {
             ui.label(tl!("Name:"));
-            let r = ui.add(egui::TextEdit::singleline(name).desired_width(220.0).hint_text(tl!("set name")));
-            create = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            create |= ui.button(tl!("Create")).clicked();
-            cancel = ui.button(tl!("Cancel")).clicked();
+            let edit = TextField::new("shortcut-set-name", tl!("Name:"), name.as_str()).placeholder(tl!("set name")).size(ControlSize::Sm).show(ui);
+            if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event.clone() {
+                *name = value;
+            }
+            create = edit.submitted;
+            create |= ui.add(button(tl!("Create"))).clicked();
+            cancel = ui.add(button(tl!("Cancel"))).clicked();
         });
         if create {
             match shortcut_sets::set_name(name) {
@@ -703,4 +702,9 @@ fn save_text(app: &mut PhotocraftApp, suggested: &str, text: String) -> Result<V
         write(&path, text.as_bytes())?;
         Ok(json!({"path": path}))
     })
+}
+
+/// A command button of the Keyboard Shortcuts tab.
+fn button(label: &str) -> Button {
+    Button::new(label).variant(ButtonVariant::Secondary).size(ControlSize::Sm)
 }

@@ -1,6 +1,14 @@
 use super::shortcuts::shortcut_items;
 use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Value, json, prefs};
+use craft_ui::controls::{Button, ButtonVariant, ControlSize, TextField};
+use craft_ui::edit::EditEvent;
+use craft_ui::list::ListRow;
 use craft_ui::theme::ToEgui;
+
+/// A secondary command button of the Preferences-family dialogs.
+fn secondary(label: &str) -> Button {
+    Button::new(label).variant(ButtonVariant::Secondary).size(ControlSize::Sm)
+}
 
 // ------------------------------------------------------------------ menu routing
 
@@ -205,7 +213,7 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             }
         });
     });
-    if ui.button(tl!("Restore Defaults")).clicked() {
+    if ui.add(secondary(tl!("Restore Defaults"))).clicked() {
         hidden.clear();
     }
     f.insert("toolbarHidden".into(), json!(hidden));
@@ -229,7 +237,7 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
     let mut selected = f.get("selected").and_then(Value::as_u64).unwrap_or(0) as usize;
     egui::ScrollArea::vertical().max_height(260.0).id_salt("preset-list").show(ui, |ui| {
         for (i, name) in list.iter().enumerate() {
-            if ui.selectable_label(i == selected, name).clicked() {
+            if ListRow::new(("preset", i), name.as_str()).selected(i == selected).show(ui).response.clicked() {
                 selected = i;
                 f.insert("newName".into(), json!(name));
             }
@@ -240,15 +248,18 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
     });
     let mut new_name = f.get("newName").and_then(Value::as_str).unwrap_or("").to_string();
     ui.horizontal(|ui| {
-        ui.add(egui::TextEdit::singleline(&mut new_name).desired_width(200.0)).accessible_name(tl!("Name"));
-        if ui.add_enabled(selected < list.len() && !new_name.trim().is_empty(), egui::Button::new(tl!("Rename"))).clicked() {
+        let edit = TextField::new("preset-name", tl!("Name"), new_name.as_str()).size(ControlSize::Sm).show(ui);
+        if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event {
+            new_name = value;
+        }
+        if ui.add_enabled(selected < list.len() && !new_name.trim().is_empty(), secondary(tl!("Rename"))).clicked() {
             let _ = app.run("edit.presets.presetManager", json!({"action": "rename", "kind": kind, "index": selected, "newName": new_name}));
         }
-        if ui.add_enabled(selected < list.len(), egui::Button::new(tl!("Delete"))).clicked() {
+        if ui.add_enabled(selected < list.len(), secondary(tl!("Delete"))).clicked() {
             let _ = app.run("edit.presets.presetManager", json!({"action": "delete", "kind": kind, "index": selected}));
         }
         // Load Photoshop brushes (.abr) into the library.
-        if kind == "brushes" && ui.button(tl!("Load…")).on_hover_text(tl!("Import brushes (.abr)")).clicked() {
+        if kind == "brushes" && ui.add(secondary(tl!("Load…"))).on_hover_text(tl!("Import brushes (.abr)")).clicked() {
             let _ = app.open_dialog_file();
         }
     });
