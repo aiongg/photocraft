@@ -37,8 +37,6 @@ pub enum Gesture {
     /// A marquee, Object Selection box or shape being drawn, repositioned with Space held
     /// (`hold_keys`): its bounds when Space went down.
     DrawMove { rect: [f64; 4] },
-    /// A guide being moved with the Move tool.
-    Guide,
     /// The Crop tool's drag: the library's frame asks [`CropSnap`] for the vector that snaps the
     /// part it drags, so the pointer itself is left as it is.
     Crop,
@@ -232,8 +230,6 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
         } else {
             None
         }
-    } else if tool == Tool::Move && crate::rulers::guide_at(app, p[0], p[1]).is_some() {
-        Some((Gesture::Guide, Vec::new()))
     } else if tool == Tool::Move || moves_layer {
         let exclude = app.session.active().map(|s| s.selected_layers()).unwrap_or_default();
         moving_rect(app, tool).map(|rect| (Gesture::Move { rect }, exclude))
@@ -262,10 +258,6 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
         // Explicit Distort fits corners to guides; preserve free placement near layer edges.
         targets = targets.filtered(|k| k == SnapKind::Guide);
     }
-    if gesture == Gesture::Guide {
-        // A guide never snaps to itself (or other guides).
-        targets = targets.filtered(|k| k != SnapKind::Guide);
-    }
     if matches!(gesture, Gesture::SelectionMove { .. }) || (matches!(gesture, Gesture::Move { .. }) && crate::move_ui::moves_selected_pixels_with(app, tool)) {
         // A moving selection never snaps back to where it started.
         targets = targets.filtered(|k| k != SnapKind::Selection);
@@ -276,14 +268,6 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) {
         SnapTargets::default()
     };
     app.prefs_rt.snap = Some(ActiveSnap { gesture, start: p, targets, smart, disabled: false });
-}
-
-/// Snap a guide drag that ⌘ with a selection tool starts at `p` (`canvas::command_guide_at`,
-/// #2690) as the Move tool's guide drag: never to guides, so not back onto itself.
-pub fn begin_guide(app: &mut PhotocraftApp, p: [f64; 2]) {
-    app.prefs_rt.snap_lines.clear();
-    let targets = if snap_on(app) { build(app, &[], false).filtered(|k| k != SnapKind::Guide) } else { SnapTargets::default() };
-    app.prefs_rt.snap = Some(ActiveSnap { gesture: Gesture::Guide, start: p, targets, smart: SnapTargets::default(), disabled: false });
 }
 
 /// Round to whole pixels when Preferences › Tools asks vector tools and transforms to snap to
@@ -314,7 +298,6 @@ fn apply(app: &mut PhotocraftApp, p: [f64; 2], mods: egui::Modifiers) -> [f64; 2
             ([p[0] + corner[0] - proposed[0], p[1] + corner[1] - proposed[1]], lines)
         }
         Gesture::TransformCorner { .. } => snap.targets.snap_point(p, tol),
-        Gesture::Guide => snap.targets.snap_point(p, tol),
         Gesture::Move { rect } | Gesture::TransformMove { rect } | Gesture::SelectionMove { rect } | Gesture::DrawMove { rect } => {
             let d = [p[0] - snap.start[0], p[1] - snap.start[1]];
             let moved = [rect[0] + d[0], rect[1] + d[1], rect[2] + d[0], rect[3] + d[1]];

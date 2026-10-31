@@ -1,9 +1,10 @@
 use egui::{Key, Modifiers, PointerButton, Pos2, vec2};
+
+type AppHarness = Harness<'static, PhotocraftApp>;
 use egui_kittest::Harness;
 use serde_json::json;
 
 use super::*;
-use crate::canvas::{ToolEvent, tool_event};
 use crate::canvas_tool_menu::{GUIDE_CLEAR, GUIDE_EDIT};
 use crate::state::Tool;
 
@@ -19,9 +20,40 @@ fn app() -> PhotocraftApp {
     app
 }
 
-fn click(app: &mut PhotocraftApp, x: f64, y: f64) {
-    tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(app, ToolEvent::Up { x, y }, Modifiers::NONE);
+/// The canvas of `app` at 100 %, document centred.
+fn canvas(app: PhotocraftApp) -> AppHarness {
+    let mut h = harness(app);
+    let v = &mut h.state_mut().ui.views[0];
+    (v.zoom, v.center, v.fit_pending) = (1.0, [100.0, 50.0], false);
+    h.run_steps(2);
+    h
+}
+
+/// Screen point of document point `(x, y)` in [`canvas`].
+fn at(h: &AppHarness, x: f32, y: f32) -> Pos2 {
+    let app = h.state();
+    let v = &app.ui.views[0];
+    crate::canvas::ViewXform { rect: app.last_canvas_rect, zoom: v.zoom, center: v.center, flip: false, rotation: 0.0, aspect: 1.0 }.to_screen(x, y)
+}
+
+/// Press at the first of `path` (screen points), move through the rest and let go at the last.
+fn drag_path(h: &mut AppHarness, path: &[Pos2], modifiers: Modifiers) {
+    let button = |pos, pressed| egui::Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers };
+    h.event_modifiers(egui::Event::PointerMoved(path[0]), modifiers);
+    h.run_steps(1);
+    h.event_modifiers(button(path[0], true), modifiers);
+    h.run_steps(1);
+    for &p in &path[1..] {
+        h.event_modifiers(egui::Event::PointerMoved(p), modifiers);
+        h.run_steps(2);
+    }
+    h.event_modifiers(button(*path.last().unwrap(), false), modifiers);
+    h.run_steps(2);
+}
+
+fn click(h: &mut AppHarness, x: f32, y: f32) {
+    let p = at(h, x, y);
+    drag_path(h, &[p], Modifiers::NONE);
 }
 
 fn guides(app: &PhotocraftApp) -> (Vec<f64>, Vec<f64>) {
@@ -35,86 +67,80 @@ fn past(app: &PhotocraftApp) -> usize {
 
 #[test]
 fn a_click_selects_a_guide_without_moving_it_and_a_press_elsewhere_deselects() {
-    let mut app = app();
-    let steps = past(&app);
-    click(&mut app, 50.0, 70.0);
-    assert_eq!(selected(&app), Some((true, 0)));
-    assert_eq!((guides(&app), past(&app)), ((vec![50.0], vec![30.0]), steps), "a click is not a move");
+    let mut h = canvas(app());
+    let steps = past(h.state());
+    click(&mut h, 50.0, 70.0);
+    assert_eq!(selected(h.state()), Some((true, 0)));
+    assert_eq!((guides(h.state()), past(h.state())), ((vec![50.0], vec![30.0]), steps), "a click is not a move");
     // One guide at a time: clicking another selects it instead.
-    click(&mut app, 120.0, 30.0);
-    assert_eq!(selected(&app), Some((false, 0)));
-    click(&mut app, 120.0, 70.0);
-    assert_eq!(selected(&app), None);
+    click(&mut h, 120.0, 30.0);
+    assert_eq!(selected(h.state()), Some((false, 0)));
+    click(&mut h, 120.0, 70.0);
+    assert_eq!(selected(h.state()), None);
     // A press with another tool deselects too.
-    click(&mut app, 50.0, 70.0);
-    app.ui.tool = Tool::RectMarquee;
-    tool_event(&mut app, ToolEvent::Down { x: 150.0, y: 80.0, pressure: 1.0 }, Modifiers::NONE);
-    assert_eq!(selected(&app), None);
+    click(&mut h, 50.0, 70.0);
+    h.state_mut().ui.tool = Tool::RectMarquee;
+    h.run_steps(2);
+    click(&mut h, 150.0, 80.0);
+    assert_eq!(selected(h.state()), None);
 }
 
 #[test]
 fn a_moved_guide_stays_selected_and_dragging_one_off_the_canvas_deletes_it() {
-    let mut app = app();
-    tool_event(&mut app, ToolEvent::Down { x: 50.0, y: 70.0, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(&mut app, ToolEvent::Move { x: 80.0, y: 70.0, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(&mut app, ToolEvent::Up { x: 80.0, y: 70.0 }, Modifiers::NONE);
-    assert_eq!(guides(&app).0, vec![80.0]);
-    assert_eq!(selected(&app), Some((true, 0)));
-    tool_event(&mut app, ToolEvent::Down { x: 80.0, y: 70.0, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(&mut app, ToolEvent::Up { x: -20.0, y: 70.0 }, Modifiers::NONE);
-    assert!(guides(&app).0.is_empty());
-    assert_eq!(selected(&app), None);
+    let mut h = canvas(app());
+    let (a, b, c) = (at(&h, 50.0, 70.0), at(&h, 65.0, 70.0), at(&h, 80.0, 70.0));
+    drag_path(&mut h, &[a, b, c], Modifiers::NONE);
+    assert_eq!(guides(h.state()).0, vec![80.0]);
+    assert_eq!(selected(h.state()), Some((true, 0)));
+    let (a, b, c) = (at(&h, 80.0, 70.0), at(&h, 40.0, 70.0), at(&h, -20.0, 70.0));
+    drag_path(&mut h, &[a, b, c], Modifiers::NONE);
+    assert!(guides(h.state()).0.is_empty());
+    assert_eq!(selected(h.state()), None);
 }
 
 #[test]
 fn the_selection_lapses_when_its_guide_goes_or_guides_are_hidden_or_locked() {
-    let mut app = app();
-    click(&mut app, 50.0, 70.0);
+    let mut h = canvas(app());
+    click(&mut h, 50.0, 70.0);
+    let app = h.state_mut();
     app.ui.extras.lock_guides = true;
-    assert_eq!(selected(&app), None, "locked guides can't be selected");
+    assert_eq!(selected(app), None, "locked guides can't be selected");
     app.ui.extras.lock_guides = false;
     app.ui.extras.guides = false;
-    assert_eq!(selected(&app), None, "nor hidden ones");
+    assert_eq!(selected(app), None, "nor hidden ones");
     app.ui.extras.guides = true;
-    assert_eq!(selected(&app), Some((true, 0)));
+    assert_eq!(selected(app), Some((true, 0)));
     app.run("view.clearGuides", json!({})).unwrap();
-    assert_eq!(selected(&app), None);
+    assert_eq!(selected(app), None);
     app.session.undo();
-    assert_eq!(selected(&app), Some((true, 0)), "undo brings the guide back, still selected");
+    assert_eq!(selected(app), Some((true, 0)), "undo brings the guide back, still selected");
     // Another document's guide at the same place isn't the selected one.
     app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
     app.run("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
-    assert_eq!(selected(&app), None);
+    assert_eq!(selected(app), None);
 }
 
 #[test]
 fn delete_removes_the_selected_guide_and_leaves_the_pixels() {
     let mut app = app();
     app.run("select.all", json!({})).unwrap();
-    let ctx = egui::Context::default();
-    let press = |app: &mut PhotocraftApp, key| {
-        let modifiers = Modifiers::NONE;
-        let raw = egui::RawInput {
-            events: vec![egui::Event::ModifiersChanged(modifiers), egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }],
-            ..Default::default()
-        };
-        ctx.begin_pass(raw);
-        crate::shortcuts::handle(app, &ctx);
-        ctx.end_pass().textures_delta.clear();
-    };
-    click(&mut app, 120.0, 30.0);
-    press(&mut app, Key::Delete);
-    assert_eq!(guides(&app), (vec![50.0], vec![]));
-    assert_eq!(selected(&app), None);
-    click(&mut app, 50.0, 70.0);
-    press(&mut app, Key::Backspace);
-    assert_eq!(guides(&app), (vec![], vec![]));
-    let st = app.session.active().unwrap();
+    let mut h = canvas(app);
+    click(&mut h, 120.0, 30.0);
+    h.key_press(Key::Delete);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![]));
+    assert_eq!(selected(h.state()), Some((true, 0)), "the guides keep one selected for the keys: the next");
+    click(&mut h, 50.0, 70.0);
+    h.key_press(Key::Backspace);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![], vec![]));
+    assert_eq!(selected(h.state()), None);
+    let st = h.state().session.active().unwrap();
     assert_eq!(st.history.undo_label(), Some("Delete Guide"), "Edit › Clear didn't run");
     assert!(st.doc.selection.is_some());
     // One undoable step per guide.
-    app.session.undo();
-    assert_eq!(guides(&app), (vec![50.0], vec![]));
+    h.state_mut().session.undo();
+    assert_eq!(guides(h.state()), (vec![50.0], vec![]));
 }
 
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
@@ -124,6 +150,7 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
+            crate::shortcuts::handle(app, &ctx);
             egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,
@@ -209,10 +236,11 @@ fn guide_menu_rows_clear_the_selected_guide_and_lock_guides() {
 
 #[test]
 fn edit_selected_guides_opens_new_guide_on_the_guide_and_applies_the_edit() {
-    let mut app = app();
-    app.run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
-    click(&mut app, 120.0, 30.0);
-    let id = crate::new_guide_ui::open_edit(&mut app).unwrap();
+    let mut h = canvas(app());
+    h.state_mut().run("prefs.set", json!({"path": "unitsAndRulers.rulers", "value": "percent"})).unwrap();
+    click(&mut h, 120.0, 30.0);
+    let app = h.state_mut();
+    let id = crate::new_guide_ui::open_edit(app).unwrap();
     let f = app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone();
     assert_eq!((f["orientation"].as_str(), f["position"].as_str(), f["color"].as_str()), (Some("horizontal"), Some("30 %"), Some("magenta")));
     assert_eq!(f["__label"], "Edit Selected Guides");
@@ -221,8 +249,8 @@ fn edit_selected_guides_opens_new_guide_on_the_guide_and_applies_the_edit() {
     edited.insert("orientation".into(), json!("vertical"));
     edited.insert("position".into(), json!("30"));
     app.ui.dialogs.retain(|d| d.id != id);
-    crate::new_guide_ui::confirm(&mut app, &edited).unwrap();
-    assert_eq!(guides(&app), (vec![50.0, 60.0], vec![]));
+    crate::new_guide_ui::confirm(app, &edited).unwrap();
+    assert_eq!(guides(app), (vec![50.0, 60.0], vec![]));
     let g = &app.session.active().unwrap().doc.guides;
     assert_eq!((g.color(true, 60.0), g.color(false, 30.0)), (Some([0xff, 0x00, 0xff]), None));
     assert_eq!(selected(&app), Some((true, 1)), "the edited guide stays selected");
@@ -230,9 +258,10 @@ fn edit_selected_guides_opens_new_guide_on_the_guide_and_applies_the_edit() {
 
 #[test]
 fn editing_an_uncoloured_guide_keeps_the_preference_colour_unless_one_is_chosen() {
-    let mut app = app();
-    click(&mut app, 50.0, 70.0);
-    let id = crate::new_guide_ui::open_edit(&mut app).unwrap();
+    let mut h = canvas(app());
+    click(&mut h, 50.0, 70.0);
+    let app = h.state_mut();
+    let id = crate::new_guide_ui::open_edit(app).unwrap();
     let f = app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone();
     // The default preference colour is Cyan's, so a guide dragged from a ruler shows as Cyan.
     assert_eq!(f["color"].as_str(), Some("cyan"));
@@ -245,13 +274,13 @@ fn editing_an_uncoloured_guide_keeps_the_preference_colour_unless_one_is_chosen(
     let mut bad = f.clone();
     bad.insert("position".into(), json!("far"));
     app.ui.dialogs.retain(|d| d.id != id);
-    assert!(crate::new_guide_ui::confirm(&mut app, &bad).is_err());
+    assert!(crate::new_guide_ui::confirm(app, &bad).is_err());
     assert_eq!(guides(&app).0, vec![50.0]);
     assert!(app.ui.dialogs.last().is_some_and(|d| d.fields.contains_key("__error")));
     // A preference colour that isn't a named one shows as Custom….
     app.ui.dialogs.clear();
     app.run("prefs.set", json!({"path": "guidesGridAndSlices.guideColor", "value": "#123456"})).unwrap();
-    let id = crate::new_guide_ui::open_edit(&mut app).unwrap();
+    let id = crate::new_guide_ui::open_edit(app).unwrap();
     let f = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
     assert_eq!((f["color"].as_str(), f["customColor"].as_str()), (Some("custom"), Some("#123456")));
 }
@@ -267,21 +296,22 @@ fn edit_selected_guides_needs_a_selected_guide() {
 /// leaves it selected; a locked guide can't be turned.
 #[test]
 fn alt_click_turns_a_guide_through_the_point_clicked() {
-    let mut app = app();
+    let mut h = canvas(app());
     let alt = Modifiers::ALT;
-    tool_event(&mut app, ToolEvent::Down { x: 120.0, y: 30.0, pressure: 1.0 }, alt);
-    tool_event(&mut app, ToolEvent::Up { x: 120.0, y: 30.0 }, alt);
-    assert_eq!(guides(&app), (vec![50.0, 120.0], vec![]), "the magenta horizontal guide is now vertical at x = 120");
-    let g = &app.session.active().unwrap().doc.guides;
+    let p = at(&h, 120.0, 30.0);
+    drag_path(&mut h, &[p], alt);
+    assert_eq!(guides(h.state()), (vec![50.0, 120.0], vec![]), "the magenta horizontal guide is now vertical at x = 120");
+    let g = &h.state().session.active().unwrap().doc.guides;
     assert_eq!(g.color(true, 120.0), Some([0xff, 0x00, 0xff]));
-    assert_eq!(selected(&app), Some((true, 1)));
-    assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Edit Guide"));
-    app.session.undo();
-    assert_eq!(guides(&app), (vec![50.0], vec![30.0]));
-    app.ui.extras.lock_guides = true;
-    tool_event(&mut app, ToolEvent::Down { x: 50.0, y: 70.0, pressure: 1.0 }, alt);
-    tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 70.0 }, alt);
-    assert_eq!(guides(&app), (vec![50.0], vec![30.0]), "locked guides stay put");
+    assert_eq!(selected(h.state()), Some((true, 1)));
+    assert_eq!(h.state().session.active().unwrap().history.undo_label(), Some("Edit Guide"));
+    h.state_mut().session.undo();
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]));
+    h.state_mut().ui.extras.lock_guides = true;
+    h.run_steps(2);
+    let p = at(&h, 50.0, 70.0);
+    drag_path(&mut h, &[p], alt);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]), "locked guides stay put");
 }
 
 /// Double-clicking a guide opens Preferences › Guides, Grid & Slices, as in Photoshop.
@@ -303,4 +333,75 @@ fn double_click_on_a_guide_opens_the_guide_preferences() {
     let dialog = h.state().ui.dialogs.last().map(|d| serde_json::to_string(&d.fields).unwrap_or_default()).unwrap_or_default();
     assert!(dialog.contains("guidesGridAndSlices"), "{dialog}");
     assert_eq!(guides(h.state()).0, vec![100.0], "the guide didn't move");
+}
+
+#[test]
+fn delete_from_anywhere_removes_the_selected_guide_and_clears_the_selection() {
+    let mut app = app();
+    app.run("select.all", json!({})).unwrap();
+    let mut h = canvas(app);
+    click(&mut h, 120.0, 30.0);
+    // The pointer leaves the canvas and the guides lose keyboard focus; the global Delete route
+    // still reaches the selected guide.
+    h.event(egui::Event::PointerMoved(Pos2::ZERO));
+    h.ctx.memory_mut(|m| m.surrender_focus(m.focused().unwrap_or_else(|| egui::Id::new("none"))));
+    h.run_steps(1);
+    h.key_press(Key::Delete);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![]));
+    assert_eq!(selected(h.state()), None, "a request from outside the guides clears the selection");
+    let st = h.state().session.active().unwrap();
+    assert_eq!(st.history.undo_label(), Some("Delete Guide"), "Edit › Clear didn't run");
+    assert!(st.doc.selection.is_some());
+}
+
+#[test]
+fn delete_in_a_text_field_leaves_the_selected_guide() {
+    let mut text = String::from("abc");
+    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            let ctx = ui.ctx().clone();
+            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            crate::shortcuts::handle(app, &ctx);
+            egui::Panel::top("field").show(ui, |ui| {
+                ui.add(egui::TextEdit::singleline(&mut text).id(egui::Id::new("guide-test-field")));
+            });
+            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
+        },
+        app(),
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    h.run_steps(4);
+    let v = &mut h.state_mut().ui.views[0];
+    (v.zoom, v.center, v.fit_pending) = (1.0, [100.0, 50.0], false);
+    h.run_steps(2);
+    click(&mut h, 120.0, 30.0);
+    assert_eq!(selected(h.state()), Some((false, 0)));
+    h.ctx.memory_mut(|m| m.request_focus(egui::Id::new("guide-test-field")));
+    h.run_steps(2);
+    h.key_press(Key::Delete);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]), "the text field keeps Delete");
+    assert_eq!(selected(h.state()), Some((false, 0)));
+}
+
+#[test]
+fn arrows_move_the_layer_when_the_guides_do_not_have_keyboard_focus() {
+    let mut app = app();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("select.rect", json!({"x": 40, "y": 40, "width": 20, "height": 20})).unwrap();
+    app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    app.run("select.deselect", json!({})).unwrap();
+    let mut h = canvas(app);
+    let x0 = |h: &AppHarness| {
+        let st = h.state().session.active().unwrap();
+        st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds().x0
+    };
+    let start = x0(&h);
+    h.key_press(Key::ArrowRight);
+    h.run_steps(2);
+    assert_eq!(x0(&h), start + 1, "the Move tool's nudge moves the layer");
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]), "and the guides stay");
 }

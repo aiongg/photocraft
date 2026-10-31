@@ -146,6 +146,34 @@ fn reopened_child_stays_above_a_parent_with_restored_area_order() {
     assert!(!egui::Popup::is_any_open(&h.ctx));
 }
 
+/// Layer ids and orders of the editor popup and an open list, and which one takes a click on a row.
+fn layers_at(h: &Harness<'_, State>, pos: Pos2) -> egui::LayerId {
+    h.ctx.layer_id_at(pos).expect("a layer under the pointer")
+}
+
+#[test]
+fn an_open_list_is_in_front_of_the_stroke_popup_and_a_click_on_its_row_picks_it() {
+    for name in ["Alignment", "Corners"] {
+        let mut h = harness();
+        open(&mut h);
+        let field = h.get_by_role_and_label(Role::ComboBox, name).rect().center();
+        let popup_layer = layers_at(&h, field);
+        combo(&mut h, name);
+        let row = h.get_by_label(if name == "Alignment" { "Outside" } else { "Bevel" });
+        let row_pos = row.rect().center();
+        let list_layer = layers_at(&h, row_pos);
+        assert_ne!(list_layer, popup_layer, "{name}: the row is under the editor popup, not the list");
+        assert_eq!(list_layer.order, egui::Order::Foreground, "{name}: {list_layer:?}");
+        click_at(&mut h, row_pos);
+        let s = h.state();
+        match name {
+            "Alignment" => assert_eq!(s.current.align, StrokeAlign::Outside),
+            _ => assert_eq!(s.current.join, LineJoin::Bevel),
+        }
+        assert!(s.editor.is_some(), "{name}: the click went to the list, not through it");
+    }
+}
+
 #[test]
 fn click_outside_parent_and_child_closes_both_without_changing_the_style() {
     let mut h = harness();
