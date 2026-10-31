@@ -5,6 +5,7 @@ use craft::ui::controls::{ControlSize, IconButton, NumberField, Select};
 use craft::ui::edit::EditEvent;
 use craft::ui::icons::Icon;
 use craft::ui::localized::{LocaleNumbers, Unit};
+use craft::ui::menu::{MenuEntry, MenuItem, PressMenu};
 use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::hash::{Hash, Hasher};
 
@@ -111,6 +112,15 @@ fn pct_field(ui: &mut egui::Ui, salt: &str, label: &str, show_label: bool, pct: 
         });
     });
     out
+}
+
+/// What a footer menu row does.
+#[derive(Clone)]
+enum FooterCmd {
+    /// Run a command.
+    Action(&'static str),
+    /// Open Layer Style on a kind (none: Blending Options).
+    Style(Option<&'static str>),
 }
 
 /// What the blend-mode select did this frame.
@@ -492,21 +502,17 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let adj_open = ui.scope_id().with("adjustment_menu_open");
         let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"), was_open(ui, adj_open));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).
-        crate::press_menu::show(&adj, |ui, menu| {
-            ui.set_min_width(190.0);
-            for c in photocraft_engine::command_specs().iter().filter(|c| c.id.starts_with("layer.newAdjustmentLayer.")) {
-                if menu.item(ui, tl!(c.label).trim_end_matches('…')) {
-                    actions.push((c.id.into(), json!({})));
-                }
-            }
-            ui.separator();
-            if menu.item(ui, tl!("Solid Color…")) {
-                actions.push(("layer.newFillLayer.solidColor".into(), json!({})));
-            }
-            if menu.item(ui, tl!("Gradient…")) {
-                actions.push(("layer.newFillLayer.gradient".into(), json!({})));
-            }
-        });
+        let mut entries: Vec<MenuEntry<FooterCmd>> = photocraft_engine::command_specs()
+            .iter()
+            .filter(|c| c.id.starts_with("layer.newAdjustmentLayer."))
+            .map(|c| MenuItem::new(tl!(c.label).trim_end_matches('…'), FooterCmd::Action(c.id)).into())
+            .collect();
+        entries.push(MenuEntry::Separator);
+        entries.push(MenuItem::new(tl!("Solid Color…"), FooterCmd::Action("layer.newFillLayer.solidColor")).into());
+        entries.push(MenuItem::new(tl!("Gradient…"), FooterCmd::Action("layer.newFillLayer.gradient")).into());
+        if let Some(FooterCmd::Action(id)) = PressMenu::new(&entries).size(ControlSize::Sm).show(ui, &adj).chosen {
+            actions.push((id.into(), json!({})));
+        }
         remember_open(ui, adj_open, &adj);
         // Like Photoshop the button never replaces a mask (#2075): with a layer mask it adds a
         // vector mask, and with both it is greyed.
@@ -531,18 +537,11 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         let fx_open = ui.scope_id().with("style_menu_open");
         let fx = PanelFooter::menu_button(ui, Icon::Fx, tl!("Add a layer style"), was_open(ui, fx_open));
-        crate::press_menu::show(&fx, |ui, menu| {
-            ui.set_min_width(180.0);
-            if menu.item(ui, tl!("Blending Options…")) {
-                crate::layer_style::open(app, None);
-            }
-            ui.separator();
-            for &(kind, label) in crate::layer_style::KINDS {
-                if menu.item(ui, format!("{}…", tl!(label))) {
-                    crate::layer_style::open(app, Some(kind));
-                }
-            }
-        });
+        let mut entries: Vec<MenuEntry<FooterCmd>> = vec![MenuItem::new(tl!("Blending Options…"), FooterCmd::Style(None)).into(), MenuEntry::Separator];
+        entries.extend(crate::layer_style::KINDS.iter().map(|&(kind, label)| MenuItem::new(format!("{}…", tl!(label)), FooterCmd::Style(Some(kind))).into()));
+        if let Some(FooterCmd::Style(kind)) = PressMenu::new(&entries).size(ControlSize::Sm).show(ui, &fx).chosen {
+            crate::layer_style::open(app, kind);
+        }
         remember_open(ui, fx_open, &fx);
         // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
         let can_link = app.session.is_enabled("layer.linkLayers");
