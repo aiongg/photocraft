@@ -366,7 +366,7 @@ pub(super) fn draw_tool_state(app: &PhotocraftApp, painter: &egui::Painter, xf: 
         frame.paint(painter, &view, &style, &b, None);
         // Straighten's line over its halo, and its angle beside the pointer.
         if let Some(press) = app.crop.drag.map(|d| d.press).filter(|p| p.line().is_some()) {
-            frame.paint_gesture(painter, &style, &press, hover.unwrap_or_default());
+            frame.paint_gesture(painter, &style, &press, hover.unwrap_or_default(), None);
             if let (Some([from, to]), Some(h)) = (press.line(), hover) {
                 let (a, b) = (xf.to_doc(from), xf.to_doc(to));
                 let deg = (-(b[1] - a[1])).atan2(b[0] - a[0]).to_degrees();
