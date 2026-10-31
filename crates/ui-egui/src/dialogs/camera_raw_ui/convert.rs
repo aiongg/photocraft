@@ -130,10 +130,11 @@ pub(super) fn open_pixels(
     let float = surf.format().sample == photocraft_color::SampleType::F32;
     // Builds the GPU pass the first time any Camera Raw dialog opens.
     let gpu = crate::camera_raw_gpu::for_app(app);
+    let original = params.clone();
     let mut d = CameraRawDialog {
         layer,
         layer_name: name,
-        original: params.clone(),
+        original: original.clone(),
         params,
         target,
         before_histogram: RgbHistogram::from_rgba(&proxy),
@@ -182,9 +183,7 @@ pub(super) fn open_pixels(
         source_key: crate::camera_raw_gpu::source_key(),
         develop_ms: 0.0,
         develop_backend: "cpu",
-        undo: Vec::new(),
-        redo: Vec::new(),
-        edit_origin: None,
+        history: craft_ui::dialog::LocalHistory::new(&original),
     };
     d.render(ctx);
     app.camera_raw = Some(d);
