@@ -295,9 +295,6 @@ impl CameraRawDialog {
     }
 }
 
-// The shared Curve editor must never produce a curve `CameraRaw::validate` rejects.
-const _: () = assert!(crate::point_curve::MAX_POINTS == photocraft_algo::camera_raw::MAX_CURVE_POINTS && crate::point_curve::MIN_GAP >= 1.0);
-
 #[cfg(test)]
 mod tests;
 

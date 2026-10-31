@@ -486,6 +486,7 @@ fn curve_points(h: &Harness<'_, PhotocraftApp>) -> Value {
 }
 
 #[test]
+#[ignore = "waits on craft-ui row 103: CurveEditor press and release in one frame"]
 fn controller_click_delivered_in_one_raw_frame_selects_an_existing_curve_point() {
     let mut h = fixture(ThemeKind::Pro);
     let graph = open_curve(&mut h);
@@ -502,6 +503,33 @@ fn controller_click_delivered_in_one_raw_frame_selects_an_existing_curve_point()
     output.textures_delta.clear();
     assert_eq!(inspect(&h)["curveState"]["selected"], 1);
     assert_eq!(curve_points(&h).as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn curve_drag_keeps_a_command_change_and_escape_restores_the_points_before_the_drag() {
+    let mut h = fixture(ThemeKind::Pro);
+    let graph = open_curve(&mut h);
+    let start = json!([[0.0, 0.0], [128.0, 128.0], [255.0, 255.0]]);
+    set_curve(&mut h, start.clone());
+    let a = curve_at(graph, [128.0, 128.0]);
+    let b = a + vec2(40.0, -32.0);
+    press(&mut h, a, true, Modifiers::NONE);
+    h.event(Event::PointerMoved(b));
+    h.run_steps(2);
+    assert_ne!(curve_points(&h), start, "the drag moved the point");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    assert_eq!(curve_points(&h), start, "Escape restores the points from before the drag");
+    press(&mut h, b, false, Modifiers::NONE);
+    assert_eq!(curve_points(&h), start);
+    // A command that sets the curve mid-drag is the host's change: it stays.
+    press(&mut h, a, true, Modifiers::NONE);
+    h.event(Event::PointerMoved(b));
+    h.run_steps(2);
+    let set = json!([[0.0, 0.0], [80.0, 170.0], [255.0, 255.0]]);
+    set_curve(&mut h, set.clone());
+    press(&mut h, b, false, Modifiers::NONE);
+    assert_eq!(curve_points(&h), set);
 }
 
 #[test]

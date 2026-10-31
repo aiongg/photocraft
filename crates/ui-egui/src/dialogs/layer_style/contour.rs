@@ -7,11 +7,11 @@
 //! - `contourEditor`: `{effect, key, original}` while the Contour Editor is open; `original` is
 //!   the param Cancel restores.
 
-use craft::ui::composites::{Curve, CurveEditor};
+use craft::ui::composites::{Curve, CurveEditor, CurvePreview};
 use craft::ui::edit::EditEvent;
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::StrokeExt;
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{RichText, Sense, Stroke, StrokeKind, vec2};
 use photocraft_doc::Contour;
 use photocraft_doc::adjust::CurvePoint;
 use photocraft_engine::layer_style::{CONTOURS, contour_from_param, contour_param, contour_to_shc, contours_from_shc};
@@ -52,20 +52,17 @@ fn sample(l: &[f32], x: f32) -> f32 {
     l.get(i).copied().unwrap_or(0.0)
 }
 
-/// Draws `c` into `r` (field background, the curve, a border).
-pub(super) fn draw(p: &egui::Painter, r: Rect, c: &Contour, line: Color32, t: &Tokens) {
-    p.rect_filled(r, craft::ui::theme::scale::Radius::R0.px(), t.field);
-    let inner = r.shrink(2.0);
-    let l = lut_of(c);
-    let n = (inner.width() as usize).clamp(8, 512);
-    let pts: Vec<Pos2> = (0..=n)
-        .map(|k| {
-            let x = k as f32 / n as f32;
-            pos2(inner.left() + x * inner.width(), inner.bottom() - sample(&l, x) * inner.height())
-        })
-        .collect();
-    p.add(egui::Shape::line(pts, Stroke::new(1.2, line)));
-    p.rect_stroke(r, craft::ui::theme::scale::Radius::R0.px(), Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+/// The contour as a read-only preview, `size` big: the engine's own lookup table as a drawn
+/// curve, so corners and every preset show as rendered.
+pub(super) fn thumbnail(ui: &mut egui::Ui, c: &Contour, size: f32, label: &str) -> egui::Response {
+    let curve = match c {
+        Contour::Linear => Curve::identity(255.0),
+        Contour::Custom { .. } => {
+            let lut = lut_of(c);
+            Curve::Map((0..256).map(|i| sample(&lut, i as f32 / 255.0) * 255.0).collect())
+        }
+    };
+    CurvePreview::new(&curve, vec2(size, size), label).show(ui)
 }
 
 fn picker_target(effect: &str, key: &str) -> Value {
@@ -112,8 +109,8 @@ pub(super) fn row(
             ui.label(RichText::new(tl!(label)).color(t.text_dim));
         }
         let c = contour_of(disp.get(key));
-        let (r, thumb) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::click());
-        draw(ui.painter(), r, &c, t.text, &t);
+        let thumb = thumbnail(ui, &c, 36.0, tl!("Contour")).interact(Sense::click());
+        let r = thumb.rect;
         if thumb.hovered() {
             ui.painter().rect_stroke(
                 r,
@@ -148,8 +145,8 @@ pub(super) fn row(
             egui::Grid::new(("contour-presets", effect, key)).spacing(vec2(4.0, 4.0)).show(ui, |ui| {
                 for (i, (name, _)) in CONTOURS.iter().enumerate() {
                     let preset = photocraft_engine::layer_style::builtin_contour(name).unwrap_or_default();
-                    let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
-                    draw(ui.painter(), r, &preset, t.text, &t);
+                    let resp = thumbnail(ui, &preset, 40.0, tl!(name)).interact(Sense::click());
+                    let r = resp.rect;
                     if preset == c || resp.hovered() {
                         ui.painter().rect_stroke(
                             r,
@@ -171,8 +168,8 @@ pub(super) fn row(
                 ui.add_space(craft::ui::theme::scale::Space::S4.px());
                 egui::Grid::new(("contour-user", effect, key)).spacing(vec2(4.0, 4.0)).show(ui, |ui| {
                     for (i, u) in user.iter().enumerate() {
-                        let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
-                        draw(ui.painter(), r, u, t.text, &t);
+                        let resp = thumbnail(ui, u, 40.0, name_of(u)).interact(Sense::click());
+                        let r = resp.rect;
                         if *u == c || resp.hovered() {
                             ui.painter().rect_stroke(
                                 r,
@@ -329,7 +326,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
     let mem = egui::Id::unique(("contour-editor", effect.as_str(), key.as_str()));
-    let (mut pts, mut corners) = levels_of(&c);
+    let (pts, corners) = levels_of(&c);
     let mut close: Option<bool> = None;
     let mut load = false;
     let mut save = false;
@@ -355,7 +352,24 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                 let curve = Curve::from_parts(pts.clone(), corners.clone());
                 let numbers = LocaleNumbers::of(ui);
                 let before = mem.with("before");
-                let edit = CurveEditor::new(mem.with("curve"), tl!("Contour"), &curve, &numbers).percent().corners(true).side(250.0).show(ui);
+                let name_row = |ui: &mut egui::Ui| {
+                    if let Some(name) = naming.as_mut() {
+                        ui.add_space(craft::ui::theme::scale::Space::S6.px());
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(tl!("Name:")).color(t.text_dim));
+                            let r = widgets::text_field(ui, mem.with("name-field"), name, "", 150.0, false).accessible_name(tl!("Name:"));
+                            r.request_focus();
+                            if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                commit_name = true;
+                            }
+                            if widgets::primary_button(ui, tl!("OK"), 60.0).clicked() {
+                                commit_name = true;
+                            }
+                        });
+                        ui.add_space(craft::ui::theme::scale::Space::S6.px());
+                    }
+                };
+                let edit = CurveEditor::new(mem.with("curve"), tl!("Contour"), &curve, &numbers).percent().corners(true).side(250.0).between(name_row).show(ui);
                 match edit.event {
                     Some(EditEvent::Begin { value, .. }) => {
                         ui.data_mut(|d| d.insert_temp(before, c.clone()));
@@ -372,21 +386,6 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                         }
                     }
                     _ => {}
-                }
-                ui.add_space(craft::ui::theme::scale::Space::S6.px());
-                if let Some(name) = naming.as_mut() {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(tl!("Name:")).color(t.text_dim));
-                        let r = widgets::text_field(ui, mem.with("name-field"), name, "", 150.0, false).accessible_name(tl!("Name:"));
-                        r.request_focus();
-                        if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                            commit_name = true;
-                        }
-                        if widgets::primary_button(ui, tl!("OK"), 60.0).clicked() {
-                            commit_name = true;
-                        }
-                    });
-                    ui.add_space(craft::ui::theme::scale::Space::S6.px());
                 }
             });
             ui.add_space(craft::ui::theme::scale::Space::S12.px());

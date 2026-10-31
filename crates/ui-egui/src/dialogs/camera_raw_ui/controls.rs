@@ -1,11 +1,11 @@
 use super::open::{Target, cancel, commit_open_raw, open_raw, raw_stage};
 use super::sidecar::{load_settings, report_file_error, save_settings};
 use super::{
-    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, ToneZone, Value, Wheel, curve_lut, json, pos2,
-    vec2, widgets,
+    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Sense, ToneZone, Value, Wheel, curve_lut, json, pos2, vec2,
+    widgets,
 };
-use craft::ui::composites::{SectionHeader, SliderRow, SliderRowResponse};
-use craft::ui::edit::EditEvent;
+use craft::ui::composites::{Curve, CurveEditor, SectionHeader, SliderRow, SliderRowResponse};
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
@@ -159,43 +159,53 @@ fn wheel(ui: &mut egui::Ui, dirty: &mut bool, title: &str, w: &mut Wheel) {
     row(ui, dirty, "Luminance", &mut w.lum, -100.0..=100.0, None);
 }
 
-/// Small point-curve editor (master channel): click to add, drag to move, right-click to delete.
+/// Point-curve editor (master channel): click to add, drag to move, right-click to delete.
 fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &mut crate::state::PointCurveState) -> ERect {
-    let t = craft::ui::theme::current(ui.ctx());
-    let side = ui.available_width().min(260.0);
-    let (rect, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click_and_drag());
-    let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, t.shape.radius.control, t.color.surface.sunken.to_egui());
-    for i in 1..4 {
-        let f = i as f32 / 4.0;
-        painter.line_segment(
-            [pos2(rect.left() + f * side, rect.top()), pos2(rect.left() + f * side, rect.bottom())],
-            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
-        );
-        painter.line_segment(
-            [pos2(rect.left(), rect.top() + f * side), pos2(rect.right(), rect.top() + f * side)],
-            craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.divider.to_egui()),
-        );
-    }
-    let to_screen = |x: f32, y: f32| pos2(rect.left() + x / 255.0 * side, rect.bottom() - y / 255.0 * side);
+    let numbers = LocaleNumbers::of(ui);
     // The identity handles are presentation until a gesture actually edits them.
-    let mut points = if p.point_curve.is_empty() { vec![[0.0, 0.0], [255.0, 255.0]] } else { p.point_curve.clone() };
-    if crate::point_curve::interact(ui, &resp, rect, &mut points, state).changed {
-        p.point_curve = points.clone();
-        *dirty = true;
-    }
-    // Curve (point curve after the parametric one).
-    let lut = curve_lut(&points, 256);
-    let pts: Vec<Pos2> = lut.iter().enumerate().map(|(i, value)| to_screen(i as f32, value * 255.0)).collect();
-    painter.add(egui::Shape::line(pts, craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.text.normal.to_egui())));
-    for (i, c) in points.iter().enumerate() {
-        let center = to_screen(c[0], c[1]);
-        if state.selected == Some(i) {
-            painter.circle_filled(center, 3.0, t.color.accent.solid.to_egui());
+    let points = if p.point_curve.is_empty() { vec![[0.0, 0.0], [255.0, 255.0]] } else { p.point_curve.clone() };
+    let curve = Curve::smooth(points);
+    let sampler = |points: &[[f32; 2]]| curve_lut(points, 256).into_iter().map(|v| v * 255.0).collect::<Vec<f32>>();
+    let side = ui.available_width().min(CurveEditor::outer_width(ui.ctx(), 260.0));
+    let salt = "camera-raw-curve";
+    let id = CurveEditor::id_in(ui, salt);
+    let before = id.with("before");
+    let edit = CurveEditor::new(salt, tl!("Curve"), &curve, &numbers)
+        .max_points(photocraft_algo::camera_raw::MAX_CURVE_POINTS)
+        .sampler(&sampler)
+        .fields(false)
+        .side(side)
+        .show(ui);
+    match edit.event {
+        Some(EditEvent::Begin { value, .. }) => {
+            ui.data_mut(|d| d.insert_temp(before, p.point_curve.clone()));
+            if let Some(Curve::Points { points, .. }) = value {
+                p.point_curve = points;
+                *dirty = true;
+            }
         }
-        painter.circle_stroke(center, 4.0, craft::ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()));
+        Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. }) => {
+            if let Curve::Points { points, .. } = value {
+                p.point_curve = points;
+                *dirty = true;
+            }
+        }
+        // An external change (a command set the curve mid-gesture) stays.
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
+            if let Some(old) = ui.data(|d| d.get_temp::<Vec<[f32; 2]>>(before)) {
+                p.point_curve = old;
+                *dirty = true;
+            }
+        }
+        _ => {}
     }
-    rect
+    // The automation protocol's `curveState` and `curveRect` come from the editor's own state.
+    let shown = CurveEditor::state(ui.ctx(), id);
+    *state = crate::state::PointCurveState {
+        selected: CurveEditor::selected(ui.ctx(), id),
+        drag: shown.and_then(|s| s.dragged).map(|i| crate::state::PointCurveDrag { index: Some(i), offset: [0.0; 2], removed: false }),
+    };
+    shown.map_or(edit.response.rect, |s| s.plot)
 }
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
