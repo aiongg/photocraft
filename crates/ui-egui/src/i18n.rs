@@ -26,7 +26,8 @@ mod system;
 pub use system::system_lang;
 
 use std::cell::Cell;
-use std::sync::OnceLock;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use catalog::Catalog;
 
@@ -434,11 +435,65 @@ pub fn language_scope(lang: Lang) -> impl Drop {
     restore
 }
 
-/// The library Host for this context: the app identity and default services. PhotoCraft's
-/// catalogs are its own (`tl!`), so the Host has none and the library's words and numbers are
-/// English; a Host with a catalog would be rebuilt here with `with_lang` on a language change.
-fn install_host(ctx: &egui::Context) {
-    craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") }).install(ctx);
+/// The craft-i18n catalogs of one PhotoCraft language, built on first use. PhotoCraft's catalogs
+/// use craft-i18n's row format (`context<TAB>source<TAB>translation`), so the unpacked text of a
+/// language is embedded as that locale's app catalog. Only the languages that are shown get
+/// unpacked; the text is kept for the life of the process, as craft-i18n's `Embedded` requires.
+fn library_i18n(lang: Lang) -> Arc<craft::i18n::I18n> {
+    static BY_CODE: Mutex<BTreeMap<&'static str, Arc<craft::i18n::I18n>>> = Mutex::new(BTreeMap::new());
+    let mut by_code = BY_CODE.lock().unwrap_or_else(PoisonError::into_inner);
+    Arc::clone(by_code.entry(lang.code()).or_insert_with(|| {
+        let embedded: &'static craft::i18n::Embedded = if lang == Lang::EN {
+            &[]
+        } else {
+            let text: &'static str = Box::leak(lang.0.text().into_boxed_str());
+            Box::leak(Box::new([(lang.code(), "", text)]))
+        };
+        let (i18n, problems) = craft::i18n::I18n::new(embedded, &[lang.code()]);
+        problems.iter().for_each(|p| log::warn!("translation catalog: {p}"));
+        Arc::new(i18n)
+    }))
+}
+
+/// The library Host for this context: the app identity and default services, with PhotoCraft's
+/// catalog of `lang` so the library's words read as PhotoCraft's own translations of them.
+fn install_host(ctx: &egui::Context, lang: Lang) {
+    let i18n = library_i18n(lang);
+    let library_lang = i18n.from_code(lang.code()).unwrap_or(craft::i18n::Lang::EN);
+    craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
+        .i18n(i18n)
+        .lang(library_lang)
+        .install(ctx);
+}
+
+/// Keep the library Host of `ctx` in `lang` until the guard drops, then in the language `ctx` was
+/// drawn in before. The Host is installed again only when the language differs, so the library's
+/// words are not rebuilt every frame. Pair it with [`language_scope`] for a previewed language.
+#[must_use]
+pub fn host_language_scope(ctx: &egui::Context, lang: Lang) -> impl Drop {
+    struct Restore {
+        ctx: egui::Context,
+        previous: Lang,
+    }
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_host_language(&self.ctx, self.previous);
+        }
+    }
+    let previous = ctx.data(|data| data.get_temp::<Lang>(host_lang_id())).unwrap_or(Lang::EN);
+    set_host_language(ctx, lang);
+    Restore { ctx: ctx.clone(), previous }
+}
+
+fn host_lang_id() -> egui::Id {
+    egui::Id::new("photocraft-host-language")
+}
+
+fn set_host_language(ctx: &egui::Context, lang: Lang) {
+    if ctx.data(|data| data.get_temp::<Lang>(host_lang_id())) != Some(lang) {
+        ctx.data_mut(|data| data.insert_temp(host_lang_id(), lang));
+        install_host(ctx, lang);
+    }
 }
 
 /// Apply a committed language to this context. Font caches are rebuilt only on a language
@@ -450,7 +505,7 @@ pub fn sync_context(ctx: &egui::Context, language: &str) {
     let changed = ctx.data(|data| data.get_temp::<Lang>(id) != Some(lang));
     if changed {
         ctx.data_mut(|data| data.insert_temp(id, lang));
-        install_host(ctx);
+        set_host_language(ctx, lang);
         crate::theme::install_fonts(ctx);
         ctx.request_repaint();
     }
