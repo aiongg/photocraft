@@ -102,19 +102,14 @@ pub(crate) fn bar_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Transfo
     let numbers = LocaleNumbers::of(ui).as_ref().clone().ungrouped();
     let mut pixels = RulerUnits::pixels(numbers.clone());
     pixels.decimals = 2;
-    // Percent is a length unit too, scaled per axis so 100 is the box's original side: a typed
-    // length converts to a percentage that keeps two decimals (the library's own percent size
-    // rounds to one, which would move "5cm" by up to 0.05 % of the side).
-    let per_doc =
-        |side: f64| if u.unit == photocraft_engine::prefs::Unit::Percent { 100.0 / side.abs().max(1e-9) } else { u.unit.from_px(1.0, u.dpi, 1.0, u.ppi) };
-    let (unit, decimals) = if u.unit == photocraft_engine::prefs::Unit::Percent {
-        (Unit::new("{n}%"), 2)
+    let size = if u.unit == photocraft_engine::prefs::Unit::Percent {
+        SizeUnit::Percent { decimals: 2 }
     } else {
-        (Unit::new(&format!("{{n}} {}", u.unit.suffix())), u.unit.decimals())
+        let unit = Unit::new(&format!("{{n}} {}", u.unit.suffix()));
+        let per_doc = u.unit.from_px(1.0, u.dpi, 1.0, u.ppi);
+        let units = || RulerUnits { per_doc, ticks: Ticks::Decimal { whole: false }, numbers: numbers.clone(), unit: unit.clone(), decimals: u.unit.decimals() };
+        SizeUnit::Length { x: units(), y: units() }
     };
-    let side_units =
-        |side: f64| RulerUnits { per_doc: per_doc(side), ticks: Ticks::Decimal { whole: false }, numbers: numbers.clone(), unit: unit.clone(), decimals };
-    let size = SizeUnit::Length { x: side_units(t.rect[2] - t.rect[0]), y: side_units(t.rect[3] - t.rect[1]) };
     let labels = TransformFieldLabels {
         x: FieldLabel::new(tl!("X"), tl!("X")),
         y: FieldLabel::new(tl!("Y"), tl!("Y")),
