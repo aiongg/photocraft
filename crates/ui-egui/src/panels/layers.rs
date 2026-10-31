@@ -1,7 +1,4 @@
-use super::layer_drag::{
-    FxDrag, MaskDrag, dropped_on, effect_rows, footer_drop, fx_drag_feedback, fx_drag_key, fx_trash_drop, layer_drag_edge_scroll, layer_drop_zone,
-    mask_drag_key,
-};
+use super::layer_drag::{DrawnRow, drag_feedback, dropped_on, edge_scroll, effect_rows, footer_drop, fx_trash_drop, held, layer_drop};
 use super::layer_row::{RowSel, layer_row};
 use craft_ui::composites::PanelFooter;
 use craft_ui::controls::{ControlSize, IconButton, NumberField, Select};
@@ -12,7 +9,7 @@ use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::hash::{Hash, Hasher};
 
 use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action};
-use super::{BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, json, label, pos2, theme, vec2, widgets};
+use super::{BlendMode, Layer, LayerId, PhotocraftApp, Rect, Sense, Tokens, Value, empty, json, label, pos2, theme, vec2, widgets};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -335,22 +332,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .min_scrolled_height(if fill { rows_h } else { 0.0 })
         .auto_shrink([false, !fill])
         .show(ui, |ui| {
-            // The drag keys are set only by actual layer-row and fx drags, not clicks or
-            // ordinary scrolling. The ScrollArea applies this to its own content.
-            // An fx drag that never saw its release (the panel was hidden) must not outlive the button.
-            if !ctx.input(|i| i.pointer.primary_down() || i.pointer.any_released()) {
-                ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
-                ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
-                ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
-            }
-            let held = ctx.data(|d| {
-                d.get_temp::<u64>(egui::Id::unique("layer-drag")).is_some()
-                    || d.get_temp::<FxDrag>(fx_drag_key()).is_some()
-                    || d.get_temp::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()).is_some()
-            });
-            let dragging = held && ctx.input(|i| i.pointer.primary_down());
-            let pointer = ctx.input(|i| i.pointer.interact_pos());
-            let delta = layer_drag_edge_scroll(pointer, ui.clip_rect(), dragging, ctx.input(|i| i.stable_dt));
+            let delta = edge_scroll(&ctx, ui.clip_rect());
             if delta != 0.0 {
                 ui.scroll_with_delta(vec2(0.0, delta));
                 ctx.request_repaint();
@@ -360,7 +342,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             crate::layer_row_ui::begin(ui.ctx());
             // The drawn rows, top to bottom (#1721): the space between them and below the last
             // one is a drop zone too.
-            let mut drawn: Vec<(LayerId, Rect)> = Vec::new();
+            let mut drawn: Vec<DrawnRow> = Vec::new();
             for &(depth, l) in &rows {
                 // Select › Isolate Layers.
                 if !photocraft_engine::select_extra_cmds::isolation_shows(&doc, &isolated, l.id) {
@@ -371,7 +353,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
                 let row = RowSel { selected: selection.contains(&l.id), primary: active == Some(l.id), multi: selection.len() > 1 };
                 let top = ui.cursor().top();
-                drawn.push((l.id, layer_row(app, &ctx, ui, &doc, l, depth, row, &mut actions)));
+                drawn.push(DrawnRow { layer: l, depth, rect: layer_row(app, &ctx, ui, &doc, l, depth, row, &mut actions) });
                 if reveal == Some(l.id) {
                     crate::layer_reveal::scroll_to_row(ui, top);
                 }
@@ -388,13 +370,9 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             // #1721: the list takes drops everywhere, not only on a row (Photoshop): the space
             // between two rows lands above the lower one, the empty space below the bottom-most
             // row below it. Both copy with ⌥ held, move without.
-            for w in drawn.windows(2) {
-                let gap = Rect::from_min_max(pos2(w[0].1.left(), w[0].1.bottom()), pos2(w[0].1.right(), w[1].1.top()));
-                layer_drop_zone(app, &ctx, ui, gap, (w[1].0, w[1].1), "above", &mut actions);
-            }
-            if let Some(&(last, last_rect)) = drawn.last() {
+            layer_drop(app, ui, &drawn, &mut actions);
+            if let Some(last_rect) = drawn.last().map(|d| d.rect) {
                 let below = Rect::from_min_max(pos2(last_rect.left(), last_rect.bottom()), pos2(last_rect.right(), ui.clip_rect().bottom()));
-                layer_drop_zone(app, &ctx, ui, below, (last, last_rect), "below", &mut actions);
                 // A click on that empty space deselects every layer, as in Photoshop (#8100). It
                 // starts under the last layer's sub-rows, which take their own clicks.
                 let empty = Rect::from_min_max(pos2(below.left(), rows_bottom), below.max);
@@ -405,8 +383,8 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             // Tab / ⇧Tab in a rename: rename the layer below / above next, as in Photoshop. The
             // Background isn't renamed in place (double-clicking it converts it), so it ends there.
             if let Some((from, up)) = crate::layer_row_ui::take_next_rename(ui.ctx())
-                && let Some(at) = drawn.iter().position(|(id, _)| id.0 == from)
-                && let Some(&(next, _)) = if up { at.checked_sub(1).and_then(|i| drawn.get(i)) } else { drawn.get(at + 1) }
+                && let Some(at) = drawn.iter().position(|d| d.layer.id.0 == from)
+                && let Some(next) = if up { at.checked_sub(1).and_then(|i| drawn.get(i)) } else { drawn.get(at + 1) }.map(|d| d.layer.id)
                 && let Some(l) = doc.layer(next).filter(|l| !crate::doc_props_ui::is_background(&doc, l))
                 && let Some(done) = crate::layer_row_ui::start_rename_in(ui, next.0, &l.name)
             {
@@ -431,31 +409,10 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.reorder_preview = None;
     }
     // A layer being dragged can also be dropped on the footer's Delete, New Layer and Group
-    // buttons (#736); read the drag before it ends.
-    let footer_drag = ctx.data(|d| d.get_temp::<u64>(egui::Id::unique("layer-drag"))).map(|id| {
-        let in_selection = selection.iter().any(|s| s.0 == id);
-        (id, in_selection)
-    });
-    // An effect row can be dropped on Delete too (#3102), and a mask's thumbnail (#3113, #3119).
-    let fx_footer_drag = ctx.data(|d| d.get_temp::<FxDrag>(fx_drag_key()));
-    fx_drag_feedback(&ctx, &doc);
-    // And a smart filter's row (#4271).
-    let filter_footer_drag = ctx.data(|d| d.get_temp::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
-    crate::smart_ui::drag_feedback(&ctx, &doc);
-    let mask_footer_drag = ctx.data(|d| d.get_temp::<MaskDrag>(mask_drag_key()));
-    if let Some((_, kind)) = mask_footer_drag
-        && let Some(p) = ctx.input(|i| i.pointer.interact_pos())
-    {
-        let label = if kind == MaskKind::Vector { tl!("Vector Mask") } else { tl!("Layer Mask") };
-        crate::layer_transfer::ghost(&ctx, p, label);
-    }
-    // End any layer drag after every row has had a chance to accept the drop.
-    if ctx.input(|i| i.pointer.any_released()) {
-        ctx.data_mut(|d| d.remove::<u64>(egui::Id::unique("layer-drag")));
-        ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
-        ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
-        ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
-    }
+    // buttons (#736), an effect row on Delete (#3102), a mask's thumbnail (#3113, #3119) and a
+    // smart filter's row (#4271); read the drag before it ends.
+    let held = held(&ctx, &selection);
+    drag_feedback(&ctx);
     PanelFooter::show(ui, |ui| {
         let active_layer = active.and_then(|id| doc.layer(id));
         let (delete, label) = if app.ui.vector_mask_target && active_layer.is_some_and(|l| l.vector_mask.is_some()) {
@@ -479,16 +436,16 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let params = if confirm { json!({"__trash": true}) } else { json!({}) };
             actions.push((delete.into(), params));
         }
-        actions.extend(footer_drop(ui, &trash, footer_drag, "layer.delete"));
-        actions.extend(fx_trash_drop(ui, &trash, fx_footer_drag));
-        if let Some(drag) = filter_footer_drag
+        actions.extend(footer_drop(ui, &trash, held.layer, "layer.delete"));
+        actions.extend(fx_trash_drop(ui, &trash, held.fx));
+        if let Some(drag) = held.filter
             && dropped_on(ui, &trash)
         {
             actions.push(crate::smart_ui::trash_action(drag));
         }
         // Photoshop asks "Apply mask to layer before removing?" or "Delete the vector mask?"
         // (`mask_trash_prompt`).
-        if let Some((layer, kind)) = mask_footer_drag
+        if let Some((layer, kind)) = held.mask
             && dropped_on(ui, &trash)
         {
             actions.push(crate::mask_trash_prompt::drop_action(layer, kind));
@@ -510,7 +467,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             };
             actions.push(("layer.new.layer".into(), params));
         }
-        actions.extend(footer_drop(ui, &new_layer, footer_drag, "layer.duplicate"));
+        actions.extend(footer_drop(ui, &new_layer, held.layer, "layer.duplicate"));
         let group = PanelFooter::button(ui, Icon::Folder, tl!("Create a new group"));
         if group.clicked() {
             // Like Photoshop CC 2014 and later, a click with two or more layers selected puts them
@@ -531,7 +488,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 actions.push((cmd.into(), json!({})));
             }
         }
-        actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
+        actions.extend(footer_drop(ui, &group, held.layer, "layer.groupLayers"));
         let adj_open = ui.scope_id().with("adjustment_menu_open");
         let adj = PanelFooter::menu_button(ui, Icon::AdjustmentLayer, tl!("Create new fill or adjustment layer"), was_open(ui, adj_open));
         // Opens on the press like Photoshop's: drag onto an item and release to choose it (#2071).

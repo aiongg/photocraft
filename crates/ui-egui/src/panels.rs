@@ -80,9 +80,9 @@ pub(crate) use history::selected_snapshot;
 #[cfg(test)]
 use info::info_panel;
 pub(crate) use info::{SamplerReadouts, sampler_readouts};
+pub(crate) use layer_drag::dropped_on;
 #[cfg(test)]
 use layer_drag::{background_drop_refused, layer_drop_payload};
-pub(crate) use layer_drag::{dropped_on, layer_drag_edge_scroll};
 pub(crate) use layer_row::label_of;
 #[cfg(test)]
 use layer_row::layer_thumb_fit;
@@ -1475,75 +1475,6 @@ mod embedding_tests {
         m.remove("menu_bar");
         let p: crate::state::Panels = serde_json::from_value(v).unwrap();
         assert!(p.rail && p.menu_bar);
-    }
-}
-
-#[cfg(test)]
-mod layer_drag_edge_scroll_tests {
-    use super::*;
-
-    #[test]
-    fn inside_edge_scrolls_proportional_to_proximity() {
-        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
-        let point = |y| Some(pos2(100.0, y));
-        let near_top = layer_drag_edge_scroll(point(33.0), viewport, true, 1.0 / 60.0);
-        let far_top = layer_drag_edge_scroll(point(53.0), viewport, true, 1.0 / 60.0);
-        let near_bottom = layer_drag_edge_scroll(point(327.0), viewport, true, 1.0 / 60.0);
-        let far_bottom = layer_drag_edge_scroll(point(307.0), viewport, true, 1.0 / 60.0);
-        assert!(near_top > far_top && far_top > 0.0, "approaching the top reveals earlier rows");
-        assert!(near_bottom < far_bottom && far_bottom < 0.0, "approaching the bottom reveals later rows");
-        assert!((near_top + near_bottom).abs() < 1e-5, "symmetric edge behavior");
-        assert_eq!(layer_drag_edge_scroll(point(160.0), viewport, true, 1.0 / 60.0), 0.0);
-    }
-
-    #[test]
-    fn outside_edges_scroll_in_drag_direction() {
-        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
-        let above = layer_drag_edge_scroll(Some(pos2(100.0, 20.0)), viewport, true, 1.0 / 60.0);
-        let below = layer_drag_edge_scroll(Some(pos2(100.0, 335.0)), viewport, true, 1.0 / 60.0);
-        assert!(above > 0.0, "dragging past the top continues scrolling upward");
-        assert!(below < 0.0, "dragging past the bottom continues scrolling downward");
-    }
-
-    #[test]
-    fn clamp_bounds_speed_outside_edges_and_across_frame_times() {
-        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
-        let at_top = layer_drag_edge_scroll(Some(pos2(100.0, 30.0)), viewport, true, 1.0 / 60.0);
-        let past_top = layer_drag_edge_scroll(Some(pos2(100.0, 15.0)), viewport, true, 1.0 / 60.0);
-        let far_past_top = layer_drag_edge_scroll(Some(pos2(100.0, -50.0)), viewport, true, 1.0 / 60.0);
-        assert_eq!(past_top, at_top, "speed past top edge is clamped to maximum edge speed");
-        assert_eq!(far_past_top, at_top, "speed far past top edge remains clamped");
-
-        let at_bottom = layer_drag_edge_scroll(Some(pos2(100.0, 330.0)), viewport, true, 1.0 / 60.0);
-        let past_bottom = layer_drag_edge_scroll(Some(pos2(100.0, 345.0)), viewport, true, 1.0 / 60.0);
-        let far_past_bottom = layer_drag_edge_scroll(Some(pos2(100.0, 500.0)), viewport, true, 1.0 / 60.0);
-        assert_eq!(past_bottom, at_bottom, "speed past bottom edge is clamped to maximum edge speed");
-        assert_eq!(far_past_bottom, at_bottom, "speed far past bottom edge remains clamped");
-
-        let active = Some(pos2(100.0, 325.0));
-        let step = layer_drag_edge_scroll(active, viewport, true, 1.0 / 60.0);
-        let twice = layer_drag_edge_scroll(active, viewport, true, 2.0 / 60.0);
-        assert!((twice - step * 2.0).abs() < 1e-4, "time-based scrolling scales across refresh rates");
-        assert!(layer_drag_edge_scroll(active, viewport, true, 0.5).abs() <= 30.0, "long frames have a bounded step");
-    }
-
-    #[test]
-    fn zero_when_no_drag_or_outside_horizontal_bounds() {
-        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
-        let active = Some(pos2(100.0, 325.0));
-        assert_eq!(layer_drag_edge_scroll(active, viewport, false, 1.0 / 60.0), 0.0);
-        assert_eq!(layer_drag_edge_scroll(None, viewport, true, 1.0 / 60.0), 0.0);
-        assert_eq!(layer_drag_edge_scroll(Some(pos2(9.0, 325.0)), viewport, true, 1.0 / 60.0), 0.0);
-        assert_eq!(layer_drag_edge_scroll(Some(pos2(311.0, 325.0)), viewport, true, 1.0 / 60.0), 0.0);
-        assert_eq!(layer_drag_edge_scroll(active, viewport, true, 0.0), 0.0);
-    }
-
-    #[test]
-    fn short_viewports_keep_the_edge_zones_disjoint() {
-        let viewport = Rect::from_min_max(pos2(0.0, 0.0), pos2(150.0, 40.0));
-        assert!(layer_drag_edge_scroll(Some(pos2(10.0, 2.0)), viewport, true, 0.016) > 0.0);
-        assert!(layer_drag_edge_scroll(Some(pos2(10.0, 38.0)), viewport, true, 0.016) < 0.0);
-        assert_eq!(layer_drag_edge_scroll(Some(pos2(10.0, 20.0)), viewport, true, 0.016), 0.0);
     }
 }
 
