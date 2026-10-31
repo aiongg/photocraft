@@ -141,7 +141,9 @@ fn paint_mapped_quad(painter: &egui::Painter, xf: &ViewXform, origin: [f32; 2], 
 
 /// Draw boundary segments as marching ants: white base, black dashes phased along x + y.
 pub(super) fn marching_ants_segments(painter: &egui::Painter, xf: &ViewXform, segs: &[crate::outline::Segment], time: f64) {
-    marching_ants_mapped(painter, segs, time, |p| xf.to_screen(p[0] as f32, p[1] as f32));
+    use craft::ui::canvas::{Marquee, MarqueeLook, kurbo::Point};
+    let point = |p: &[i32; 2]| Point::new(f64::from(p[0]), f64::from(p[1]));
+    Marquee::segments(segs.iter().map(|(a, b)| (point(a), point(b))), "").paint(painter, &xf.canvas_view(), MarqueeLook::Ants, time);
 }
 
 /// [`marching_ants_segments`] with each outline point placed on screen by `to_screen` (a
@@ -150,32 +152,10 @@ pub(crate) fn marching_ants_mapped(painter: &egui::Painter, segs: &[crate::outli
     marching_ants_lines(painter, segs.iter().map(|(a, b)| (to_screen(*a), to_screen(*b))), time);
 }
 
-/// The part of the line `a`–`b` inside `r` (Liang–Barsky), if any.
-pub(crate) fn clip_line(r: Rect, a: Pos2, b: Pos2) -> Option<(Pos2, Pos2)> {
-    // Perspective can put endpoints billions of pixels away. f32 subtraction/interpolation
-    // loses viewport-sized differences there, clipping visible ants to the wrong endpoints.
-    let (ax, ay) = (f64::from(a.x), f64::from(a.y));
-    let (dx, dy) = (f64::from(b.x) - ax, f64::from(b.y) - ay);
-    let (mut t0, mut t1) = (0.0f64, 1.0f64);
-    for (p, q) in [(-dx, ax - f64::from(r.min.x)), (dx, f64::from(r.max.x) - ax), (-dy, ay - f64::from(r.min.y)), (dy, f64::from(r.max.y) - ay)] {
-        if p == 0.0 {
-            if q < 0.0 {
-                return None;
-            }
-        } else if p < 0.0 {
-            t0 = t0.max(q / p);
-        } else {
-            t1 = t1.min(q / p);
-        }
-    }
-    let at = |t: f64| pos2((ax + dx * t) as f32, (ay + dy * t) as f32);
-    (t0 <= t1).then(|| (at(t0), at(t1)))
-}
-
 /// Marching ants along lines already placed on screen (a warped outline is a run of short ones),
 /// in device pixels like Photoshop's (`crate::ants`, #7489).
 pub(crate) fn marching_ants_lines(painter: &egui::Painter, lines: impl Iterator<Item = (Pos2, Pos2)>, time: f64) {
-    crate::ants::draw(painter, lines, time, true);
+    crate::ants::draw(painter, lines, time);
 }
 
 /// Photoshop crop overlay: the `shield` outside (`crop_shield::fill`; none when disabled), bright
@@ -460,7 +440,7 @@ pub(super) fn draw_tool_state(app: &PhotocraftApp, painter: &egui::Painter, xf: 
         }
         // Just the outline and its rubber band (the vertices aren't handles to grab), solid until
         // the selection is made (#7495).
-        crate::tool_feedback::draw_solid_path(painter, &pts, false);
+        crate::tool_feedback::draw_solid_path(painter, &pts);
     }
     crate::crop_straighten::draw(app, painter, |p| xf.to_screen(p[0] as f32, p[1] as f32), hover);
     crate::blur_pins::draw(app, painter, xf);
@@ -591,7 +571,7 @@ pub(super) fn draw_drag_preview(app: &mut PhotocraftApp, painter: &egui::Painter
                 // On pixel centres, so a 1 pt line stays crisp wherever the canvas sits (a pixel
                 // edge would blur it to grey).
                 let pts: Vec<Pos2> = pts.into_iter().map(|p| p.round() + vec2(0.5, 0.5)).collect();
-                crate::tool_feedback::draw_solid_path(painter, &pts, false);
+                crate::tool_feedback::draw_solid_path(painter, &pts);
             } else {
                 crate::tool_feedback::draw_ants(painter, &pts, false);
             }

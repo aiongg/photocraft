@@ -1138,8 +1138,36 @@ fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<MenuEntry<String>>
     out
 }
 
-pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
-    let Some(menu) = app.ui.canvas_tool_menu.clone() else { return };
+/// Show the menu if it is open already, ahead of the canvas tool's input, so a press outside it
+/// is known before the tool sees it. Returns whether that press closed the menu.
+pub fn show_open(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let Some(pos) = app.ui.canvas_tool_menu.as_ref().map(|m| m.pos) else { return false };
+    if !ContextMenu::<()>::is_open(ui.ctx(), &menu_widget(canvas)) {
+        return false;
+    }
+    let dismissed = show_now(app, ui, canvas);
+    let pass = ui.ctx().cumulative_pass_nr();
+    ui.ctx().data_mut(|d| d.insert_temp(shown_id(), (pass, pos)));
+    dismissed
+}
+
+fn shown_id() -> egui::Id {
+    egui::Id::unique("canvas-tool-menu-shown")
+}
+
+/// Show the open menu. Returns whether a press outside it closed it.
+pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let ctx = ui.ctx();
+    let pos = app.ui.canvas_tool_menu.as_ref().map(|m| m.pos);
+    let pass = ctx.cumulative_pass_nr();
+    if pos.is_some() && ctx.data(|d| d.get_temp::<(u64, [f32; 2])>(shown_id())) == pos.map(|p| (pass, p)) {
+        return false;
+    }
+    show_now(app, ui, canvas)
+}
+
+fn show_now(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let Some(menu) = app.ui.canvas_tool_menu.clone() else { return false };
     let ctx = ui.ctx();
     if app.ui.tool != menu.tool
         || (menu.transform && app.ui.transform.is_none())
@@ -1148,7 +1176,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
         || (menu.crop.is_some() && !crate::crop_ui::pending(app))
     {
         app.ui.canvas_tool_menu = None;
-        return;
+        return false;
     }
     let widget = menu_widget(canvas);
     let was_open = ContextMenu::<()>::is_open(ctx, &widget);
@@ -1160,6 +1188,24 @@ pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
     } else if was_open && !shown.open {
         app.ui.canvas_tool_menu = None;
     }
+    shown.dismissed
+}
+
+/// Whether the canvas tool skips this pass: a press outside a canvas menu closed it, and the
+/// widget under that press still gets the press, its drag and its release, which the tool must
+/// not act on. `dismissed` is true on the pass of the press; the gesture is consumed until the
+/// button is up.
+pub(crate) fn consume_dismissing_press(ctx: &egui::Context, dismissed: bool) -> bool {
+    let down = ctx.input(|i| i.pointer.any_down());
+    ctx.data_mut(|d| {
+        let held = d.get_temp_mut_or_default::<bool>(egui::Id::unique("canvas-menu-dismissing-press"));
+        *held |= dismissed;
+        let consumed = *held;
+        if consumed {
+            *held = down;
+        }
+        consumed
+    })
 }
 
 #[cfg(test)]

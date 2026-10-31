@@ -69,9 +69,37 @@ fn menu_widget(canvas: &Response) -> Response {
     widget
 }
 
-/// Show the open menu. Escape or a click outside closes it.
-pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
-    let Some(menu) = app.ui.layer_menu.clone() else { return };
+/// Show the menu if it is open already, ahead of the canvas tool's input; see
+/// [`crate::canvas_tool_menu::show_open`].
+pub fn show_open(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let Some(pos) = app.ui.layer_menu.as_ref().map(|m| m.pos) else { return false };
+    if !ContextMenu::<()>::is_open(ui.ctx(), &menu_widget(canvas)) {
+        return false;
+    }
+    let dismissed = show_now(app, ui, canvas);
+    let pass = ui.ctx().cumulative_pass_nr();
+    ui.ctx().data_mut(|d| d.insert_temp(shown_id(), (pass, pos)));
+    dismissed
+}
+
+fn shown_id() -> egui::Id {
+    egui::Id::unique("canvas-layer-menu-shown")
+}
+
+/// Show the open menu. Escape or a click outside closes it. Returns whether a press outside it
+/// closed it.
+pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let ctx = ui.ctx();
+    let pos = app.ui.layer_menu.as_ref().map(|m| m.pos);
+    let pass = ctx.cumulative_pass_nr();
+    if pos.is_some() && ctx.data(|d| d.get_temp::<(u64, [f32; 2])>(shown_id())) == pos.map(|p| (pass, p)) {
+        return false;
+    }
+    show_now(app, ui, canvas)
+}
+
+fn show_now(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
+    let Some(menu) = app.ui.layer_menu.clone() else { return false };
     let ctx = ui.ctx();
     let active = app.session.active().and_then(|st| st.active_layer).map(|l| l.0);
     let widget = menu_widget(canvas);
@@ -85,6 +113,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
     } else if was_open && !shown.open {
         app.ui.layer_menu = None;
     }
+    shown.dismissed
 }
 
 #[cfg(test)]
