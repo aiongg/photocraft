@@ -705,3 +705,15 @@ fn shift_dragged_guides_land_on_ruler_ticks() {
     let guides = h.state().session.active().unwrap().doc.guides.vertical.clone();
     assert!(guides.len() == 1 && (guides[0] - 38.4).abs() < 1e-9, "{guides:?}");
 }
+
+/// The guide readout prints the ruler unit and at most one decimal for pixels: `X: 103.2 px`.
+#[test]
+fn ruler_units_format_the_readout_with_the_unit_and_one_decimal() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", serde_json::json!({"width": 200, "height": 100})).unwrap();
+    let doc = &app.session.active().unwrap().doc;
+    let [x, _] = ruler_units_with(&app, LocaleNumbers::from_tag("en"), doc);
+    let decimals = 0..=x.decimals.max(1);
+    assert_eq!(x.format(103.2, 0.0, decimals.clone()), "103.2 px");
+    assert_eq!(x.format(103.0, 0.0, decimals), "103 px");
+}

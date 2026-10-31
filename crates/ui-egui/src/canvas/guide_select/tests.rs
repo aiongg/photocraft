@@ -334,3 +334,74 @@ fn double_click_on_a_guide_opens_the_guide_preferences() {
     assert!(dialog.contains("guidesGridAndSlices"), "{dialog}");
     assert_eq!(guides(h.state()).0, vec![100.0], "the guide didn't move");
 }
+
+#[test]
+fn delete_from_anywhere_removes_the_selected_guide_and_clears_the_selection() {
+    let mut app = app();
+    app.run("select.all", json!({})).unwrap();
+    let mut h = canvas(app);
+    click(&mut h, 120.0, 30.0);
+    // The pointer leaves the canvas and the guides lose keyboard focus; the global Delete route
+    // still reaches the selected guide.
+    h.event(egui::Event::PointerMoved(Pos2::ZERO));
+    h.ctx.memory_mut(|m| m.surrender_focus(m.focused().unwrap_or_else(|| egui::Id::new("none"))));
+    h.run_steps(1);
+    h.key_press(Key::Delete);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![]));
+    assert_eq!(selected(h.state()), None, "a request from outside the guides clears the selection");
+    let st = h.state().session.active().unwrap();
+    assert_eq!(st.history.undo_label(), Some("Delete Guide"), "Edit › Clear didn't run");
+    assert!(st.doc.selection.is_some());
+}
+
+#[test]
+fn delete_in_a_text_field_leaves_the_selected_guide() {
+    let mut text = String::from("abc");
+    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            let ctx = ui.ctx().clone();
+            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            crate::shortcuts::handle(app, &ctx);
+            egui::Panel::top("field").show(ui, |ui| {
+                ui.add(egui::TextEdit::singleline(&mut text).id(egui::Id::new("guide-test-field")));
+            });
+            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
+        },
+        app(),
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    h.run_steps(4);
+    let v = &mut h.state_mut().ui.views[0];
+    (v.zoom, v.center, v.fit_pending) = (1.0, [100.0, 50.0], false);
+    h.run_steps(2);
+    click(&mut h, 120.0, 30.0);
+    assert_eq!(selected(h.state()), Some((false, 0)));
+    h.ctx.memory_mut(|m| m.request_focus(egui::Id::new("guide-test-field")));
+    h.run_steps(2);
+    h.key_press(Key::Delete);
+    h.run_steps(2);
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]), "the text field keeps Delete");
+    assert_eq!(selected(h.state()), Some((false, 0)));
+}
+
+#[test]
+fn arrows_move_the_layer_when_the_guides_do_not_have_keyboard_focus() {
+    let mut app = app();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("select.rect", json!({"x": 40, "y": 40, "width": 20, "height": 20})).unwrap();
+    app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    app.run("select.deselect", json!({})).unwrap();
+    let mut h = canvas(app);
+    let x0 = |h: &AppHarness| {
+        let st = h.state().session.active().unwrap();
+        st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds().x0
+    };
+    let start = x0(&h);
+    h.key_press(Key::ArrowRight);
+    h.run_steps(2);
+    assert_eq!(x0(&h), start + 1, "the Move tool's nudge moves the layer");
+    assert_eq!(guides(h.state()), (vec![50.0], vec![30.0]), "and the guides stay");
+}

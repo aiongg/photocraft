@@ -161,6 +161,18 @@ pub fn guides_id(ui: &egui::Ui, idx: usize) -> egui::Id {
     ui.make_persistent_id(egui::IdSalt::new(guides_salt(idx)))
 }
 
+fn active_guides_key() -> egui::Id {
+    egui::Id::new("pc-active-guides")
+}
+
+/// Asks the interactive guides of the last pass to delete the selected guide (Delete, Backspace
+/// from the global shortcut route). False when no guides took keys in that pass.
+pub(crate) fn request_guide_delete(ctx: &egui::Context) -> bool {
+    let Some(id) = ctx.data(|d| d.get_temp::<egui::Id>(active_guides_key())) else { return false };
+    Guides::request_delete(ctx, id);
+    true
+}
+
 fn guides_salt(idx: usize) -> (&'static str, usize) {
     ("pc-guides", idx)
 }
@@ -172,7 +184,8 @@ pub struct GuidesTaken {
     pub claimed: bool,
     /// A guide right-clicked (vertical?, index): the guide menu opens on it.
     pub context: Option<(bool, usize)>,
-    /// The guides set the cursor (hover or drag): the tool cursors stand aside.
+    /// The pointer is over a guide the guides would take, or is dragging one: the guides set the
+    /// cursor and the tool cursors stand aside.
     pub cursor: bool,
 }
 
@@ -242,7 +255,6 @@ pub fn show_guides(
     let [ux, uy] = ruler_units(app, ui, doc);
     let view = xf.canvas_view();
     let origin = Point::new(doc.ruler_origin[0], doc.ruler_origin[1]);
-    let cursor_before = ctx.output(|o| o.cursor_icon);
     let cell = RefCell::new(&mut *app);
     let out = Guides::new(guides_salt(idx), &list, &ux, &uy, GuideNames::of(ui))
         .selected(selected)
@@ -254,6 +266,9 @@ pub fn show_guides(
         .snap(|orientation, position, _| crate::snap_ui::snap_guide(&mut cell.borrow_mut(), orientation == Orientation::Vertical, position))
         .show(ui, response, &view);
     drop(cell);
+    if interactive {
+        ctx.data_mut(|d| d.insert_temp(active_guides_key(), out.id));
+    }
     let find = |key: u64| keys.iter().find(|k| k.0 == key).map(|k| (k.1, k.2));
     let name = |vertical: bool| if vertical { "vertical" } else { "horizontal" };
     let mut deleted = None;
@@ -338,7 +353,7 @@ pub fn show_guides(
     {
         app.ui.status = e;
     }
-    GuidesTaken { claimed: out.claimed, context: out.context.and_then(find), cursor: ctx.output(|o| o.cursor_icon) != cursor_before }
+    GuidesTaken { claimed: out.claimed, context: out.context.and_then(find), cursor: out.hovered }
 }
 
 /// The rulers of `doc`'s view in `full` (the canvas rect before [`content_rect`]), counting from
