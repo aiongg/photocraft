@@ -1,57 +1,27 @@
-use super::panel::surface;
-use super::{Color32, Rect, Response, Sense, Stroke, StrokeKind, Tokens, Ui, Vec2, pos2, theme, vec2};
-use craft_ui::theme::StrokeExt;
+use super::{Color32, Rect, Response, Stroke, StrokeKind, Tokens, Ui, vec2};
+use craft_ui::controls::{Button, ButtonVariant, Checkbox};
+use craft_ui::dialog::{FooterButton, FooterButtons};
+use craft_ui::theme::{Tokens as LibTokens, TokensOf};
 
-/// iOS-style toggle switch.
+/// A check box with a label. The library check box draws the same box in every theme; `toggle`
+/// keeps its callers' name for the options that read as switches.
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
-    let t = Tokens::get(ui.ctx());
-    if t.pro {
-        return craft_ui::controls::Checkbox::bool(tl!(label), on).show(ui).response;
-    }
-    let mut resp = ui
-        .horizontal(|ui| {
-            let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 17.0), Sense::click());
-            let how_on = ui.ctx().animate_bool(resp.id, *on);
-            let bg = if *on { t.accent } else { t.field_border };
-            if t.bevel {
-                surface(ui, rect, if *on { t.accent } else { t.field }, false);
-            } else {
-                ui.painter().rect_filled(rect, 8.5, bg);
-            }
-            let x = egui::lerp((rect.left() + 8.5)..=(rect.right() - 8.5), how_on);
-            ui.painter().circle_filled(pos2(x, rect.center().y), 6.5, Color32::WHITE);
-            ui.label(egui::RichText::new(tl!(label)).color(if *on { t.text } else { t.text_dim }));
-            resp
-        })
-        .inner;
-    if resp.clicked() {
-        *on = !*on;
-        resp.mark_changed();
-    }
-    resp
+    checkbox(ui, on, label)
 }
 
-/// Big white primary button.
+/// Primary (filled accent) button, at least `min_width` wide.
 pub fn primary_button(ui: &mut Ui, label: &str, min_width: f32) -> Response {
-    let t = Tokens::get(ui.ctx());
-    button_impl(ui, label, min_width, t.primary_bg, t.primary_text, true)
+    ui.add(Button::new(tl!(label)).variant(ButtonVariant::Primary).min_width(min_width))
 }
 
 /// The width of the widest of `labels` as a button, for a column of equal-width buttons.
 pub fn button_width(ui: &Ui, labels: &[&str]) -> f32 {
-    let fg = Tokens::get(ui.ctx()).text;
-    labels.iter().map(|l| button_layout(ui, l, 0.0, None, fg).1.x).fold(0.0, f32::max)
+    labels.iter().map(|l| Button::new(tl!(l)).natural_width(ui)).fold(0.0, f32::max)
 }
 
+/// Secondary (outline) button, at least `min_width` wide.
 pub fn secondary_button(ui: &mut Ui, label: &str, min_width: f32) -> Response {
-    let t = Tokens::get(ui.ctx());
-    button_impl(ui, label, min_width, t.field, t.text, false)
-}
-
-/// A [`secondary_button`] `height` points tall, for slim bars such as the status bar (#2823).
-pub fn compact_button(ui: &mut Ui, label: &str, height: f32) -> Response {
-    let t = Tokens::get(ui.ctx());
-    button_impl_h(ui, label, 0.0, Some(height), t.field, t.text, false)
+    ui.add(Button::new(tl!(label)).min_width(min_width))
 }
 
 /// What a dialog button does, which decides where the platform's button order puts it: the
@@ -90,132 +60,31 @@ impl<'a> DialogButton<'a> {
 /// right edge. The buttons are laid out left to right, so Tab walks them in reading order.
 /// Returns the role of the button clicked this frame.
 pub fn dialog_buttons(ui: &mut Ui, buttons: &[DialogButton]) -> Option<ButtonRole> {
-    let platform = craft_ui::dialog::Platform::of(ui.ctx());
-    let gap = ui.spacing().item_spacing.x;
-    let size = buttons.iter().fold(Vec2::ZERO, |acc, b| {
-        let s = button_size(ui, b.label, b.min_width);
-        vec2(acc.x + s.x, acc.y.max(s.y))
-    }) + vec2(gap * buttons.len().saturating_sub(1) as f32, 0.0);
-    ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
-        let mut hit = None;
-        let roles: Vec<(ButtonRole, ())> = buttons.iter().map(|b| (b.role, ())).collect();
-        for i in craft_ui::dialog::order(&roles, platform) {
-            let b = &buttons[i];
-            let variant = if b.role == ButtonRole::Default { craft_ui::controls::ButtonVariant::Primary } else { craft_ui::controls::ButtonVariant::Secondary };
-            let r = ui.add_enabled(b.enabled, craft_ui::controls::Button::new(tl!(b.label)).variant(variant).min_width(b.min_width));
+    let tokens = LibTokens::of(ui);
+    let dialog = &tokens.component.dialog;
+    let labels: Vec<String> = buttons.iter().map(|b| tl!(b.label).to_owned()).collect();
+    // The library row sits against the trailing edge of the room it has, so it gets a `Ui` as wide as the buttons.
+    let width: f32 = buttons.iter().zip(&labels).map(|(b, l)| Button::new(l.as_str()).natural_width(ui).max(b.min_width).max(dialog.button_min)).sum::<f32>()
+        + dialog.button_gap * buttons.len().saturating_sub(1) as f32
+        + 1.0;
+    let row: Vec<FooterButton> =
+        buttons.iter().zip(&labels).map(|(b, l)| FooterButton::new(b.role, l.as_str()).min_width(b.min_width).enabled(b.enabled)).collect();
+    let height = ui.spacing().interact_size.y.max(tokens.component.button.height.get(craft_ui::controls::ControlSize::Md));
+    ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+        let shown = FooterButtons::new(("dialog-buttons", ui.scope_id()), row).show(ui);
+        for (b, r) in buttons.iter().zip(&shown.responses) {
             if b.focus && b.enabled {
                 r.request_focus();
             }
-            if r.clicked() {
-                hit = Some(b.role);
-            }
         }
-        hit
+        shown.clicked.map(|c| c.role)
     })
     .inner
 }
 
-/// The size of a primary or secondary button: its label plus padding, at least `min_width` wide.
-fn button_size(ui: &Ui, label: &str, min_width: f32) -> Vec2 {
-    button_layout(ui, label, min_width, None, Tokens::get(ui.ctx()).text).1
-}
-
-/// The height of a primary or secondary button (and so of a dialog's button row).
-pub fn button_height(ctx: &egui::Context) -> f32 {
-    if Tokens::get(ctx).pro { 28.0 } else { 30.0 }
-}
-
-fn button_layout(ui: &Ui, label: &str, min_width: f32, height: Option<f32>, fg: Color32) -> (std::sync::Arc<egui::Galley>, Vec2) {
-    let galley = ui.painter().layout_no_wrap(tl!(label).to_owned(), theme::medium(13.0), fg);
-    let h = height.unwrap_or(button_height(ui.ctx()));
-    let size = vec2((galley.size().x + 28.0).max(min_width), h);
-    (galley, size)
-}
-
-fn button_impl(ui: &mut Ui, label: &str, min_width: f32, bg: Color32, fg: Color32, primary: bool) -> Response {
-    button_impl_h(ui, label, min_width, None, bg, fg, primary)
-}
-
-/// [`button_impl`] with an explicit `height` (`None`: the theme's button height).
-fn button_impl_h(ui: &mut Ui, label: &str, min_width: f32, height: Option<f32>, bg: Color32, fg: Color32, primary: bool) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let (galley, size) = button_layout(ui, label, min_width, height, fg);
-    let h = size.y;
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-    // Painted text: name the button for accessibility (and so tests and agents can find it).
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
-    if resp.has_focus() {
-        // Keyboard focus (Tab); clicks don't focus egui buttons.
-        let r = if t.pro { h / 2.0 } else { t.radius_sm } + 2.0;
-        ui.painter().rect_stroke(rect.expand(2.0), r, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Outside);
-    }
-    if t.pro {
-        // Spectrum buttons: fully rounded; primary = filled accent, secondary = outline.
-        let down = resp.is_pointer_button_down_on();
-        let r = h / 2.0;
-        if primary {
-            let fill = if down {
-                bg.gamma_multiply(0.8)
-            } else if resp.hovered() {
-                bg.gamma_multiply(0.9)
-            } else {
-                bg
-            };
-            ui.painter().rect_filled(rect, r, fill);
-        } else {
-            if resp.hovered() || down {
-                ui.painter().rect_filled(rect, r, t.hover);
-            }
-            ui.painter().rect_stroke(
-                rect,
-                r,
-                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), if resp.hovered() { t.text } else { t.text_dim }),
-                StrokeKind::Inside,
-            );
-        }
-        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, fg);
-        return resp;
-    }
-    let fill = if resp.is_pointer_button_down_on() {
-        bg.gamma_multiply(0.85)
-    } else if resp.hovered() {
-        if primary { bg.gamma_multiply(0.93) } else { t.hover }
-    } else {
-        bg
-    };
-    surface(ui, rect, fill, !resp.is_pointer_button_down_on());
-    if !t.bevel && !primary {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
-    }
-    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, fg);
-    resp
-}
-
-/// Spectrum-style checkbox (blue when checked).
+/// Spectrum-style check box (blue when checked) with its label.
 pub fn checkbox(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let (mut resp, label_resp) = ui
-        .horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let (rect, resp) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::CLICK);
-            let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-            let l = ui
-                .add(egui::Label::new(egui::RichText::new(tl!(label)).color(t.text_dim)).selectable(false).sense(Sense::click()))
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            // Pressing the label presses the box (#4476).
-            let pressed = resp.is_pointer_button_down_on() || l.is_pointer_button_down_on();
-            check_box(ui.painter(), rect, *on, resp.hovered() || l.hovered(), pressed, &t);
-            (resp.union(l.clone()), l)
-        })
-        .inner;
-    if resp.clicked() {
-        *on = !*on;
-        resp.mark_changed();
-    }
-    // The label is the single named, focusable checkbox; the box is a mouse target.
-    // Override Label's metadata instead of creating a second node with the same name.
-    label_resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, ui.is_enabled(), *on, tl!(label)));
-    resp
+    Checkbox::bool(tl!(label), on).show(ui).response
 }
 
 /// The fill of a check box: the accent when `on`, else the field colour. While it's pressed
