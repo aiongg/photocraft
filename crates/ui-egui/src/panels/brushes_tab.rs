@@ -15,7 +15,7 @@
 
 use craft::ui::edit::EditEvent;
 use craft::ui::theme::StrokeExt;
-use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
+use egui::{Color32, RichText, Sense, pos2, vec2};
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
