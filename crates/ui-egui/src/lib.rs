@@ -790,6 +790,8 @@ mod new_layer_button_tests;
 
 #[cfg(test)]
 mod smart_filter_rows_tests;
+#[cfg(test)]
+mod startup_layer_tests;
 
 #[cfg(test)]
 mod blur_pins_tests;
