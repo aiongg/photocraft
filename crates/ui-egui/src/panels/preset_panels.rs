@@ -358,8 +358,6 @@ fn group_open(st: &PresetUi, panel: &str, gi: usize, name: &str) -> bool {
 
 /// The footer's height (gap, size slider and buttons) before it has been measured.
 const FOOTER_GUESS: f32 = 32.0;
-/// The list keeps this much height (egui's own scroll minimum) unless the dock group is shorter.
-const MIN_LIST_HEIGHT: f32 = 64.0;
 
 /// Where a browser sits: the canvas (drop target), its height cap and the New button's tooltip.
 /// `flush` lays the grid out as Photoshop's Swatches panel: the cells touch, square-cornered and
@@ -461,7 +459,8 @@ pub(crate) fn browser(
         .labels(labels.clone())
         .max_height(max_h)
         .shrink_to_content(true)
-        .min_height(max_h.min(MIN_LIST_HEIGHT));
+        // A short list keeps the full block so the footer stays at the panel bottom (Photoshop).
+        .min_height(max_h);
     if size <= MIN_THUMB + 0.5 {
         browser = browser.view_lock(PresetView::List);
     }
