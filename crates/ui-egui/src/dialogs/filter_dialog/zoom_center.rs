@@ -34,9 +34,8 @@ pub(super) fn row(ui: &mut Ui, fields: &mut Map<String, Value>) {
             for (key, value) in [("centerX", &mut center.x), ("centerY", &mut center.y)] {
                 let label = super::label(key);
                 let gestures = crate::widgets::RowGestures { reset: Some(0.5), wheel_step: None, ..Default::default() };
-                let slider = crate::widgets::slider_row_with(ui, &label, value, 0.0..=1.0, "", None, gestures);
+                crate::widgets::slider_row_with(ui, &label, value, 0.0..=1.0, "", None, gestures);
                 *value = rounded(*value);
-                slider.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(*value), &label));
             }
         });
         // Paint after both sliders so their edits move the marker in this very frame.
@@ -114,4 +113,28 @@ fn paint(ui: &Ui, rect: Rect, plot: Rect, center: Vec2, amount: f32, focused: bo
         craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), if focused { t.color.accent.solid.to_egui() } else { t.color.line.control_edge.to_egui() }),
         egui::StrokeKind::Inside,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+
+    /// The library's slider names itself and reports its value, so each Center slider is one
+    /// slider node carrying the row's caption and the current value.
+    #[test]
+    fn center_sliders_are_named_and_report_their_value() {
+        let mut fields = Map::new();
+        fields.insert("centerX".into(), json!(0.25));
+        let mut h = Harness::builder().with_size(vec2(400.0, 200.0)).build_ui_state(|ui, fields: &mut Map<String, Value>| row(ui, fields), fields);
+        crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+        h.run_steps(3);
+        let sliders: Vec<_> = h.get_all_by_role(egui::accesskit::Role::Slider).collect();
+        let x = sliders.iter().find(|n| n.accesskit_node().numeric_value() == Some(0.25)).expect("Center X slider with its value");
+        assert_eq!(x.accesskit_node().numeric_value(), Some(0.25));
+        assert!(h.query_all_by_label("Center X").next().is_some(), "the caption names the slider");
+    }
 }

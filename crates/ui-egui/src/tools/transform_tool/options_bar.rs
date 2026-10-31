@@ -2,9 +2,9 @@ use super::begin::{enter_warp, leave_warp, warps_type};
 use super::commit::{cancel, commit};
 use super::pointer::{apply_state, box_state, point_on_quad};
 use super::warp::edit_session_warp;
-use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
+use super::{BezierMesh, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
 use craft::ui::canvas::ReferencePoint;
-use craft::ui::canvas::quad::{Anchor9, Parts as BoxParts, SKEW_LIMIT};
+use craft::ui::canvas::quad::{Anchor9, BoxState, Parts as BoxParts, SKEW_LIMIT};
 use craft::ui::controls::{ControlSize, IconButton, NumberField};
 use craft::ui::edit::EditEvent;
 use craft::ui::icons::Icon;
@@ -46,11 +46,6 @@ fn skew_about_pivot(app: &mut PhotocraftApp, skew_h: f64, skew_v: f64) {
         apply_state(s, &next);
         s.skew_v = skew_v;
     }
-}
-
-/// `v`, kept off zero with its sign: a divisor for a W or H scale that may be negative.
-fn nonzero(v: f64) -> f64 {
-    if v.abs() < 1e-9 { 1e-9f64.copysign(v) } else { v }
 }
 
 /// Width of the mode, cancel and commit cluster kept on the right of the options bar.
@@ -309,17 +304,26 @@ pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t
             }
         });
     }
-    let (w, h) = (size_pct(&u, w, side_w) as f32, size_pct(&u, h, side_h) as f32);
+    let (w, h) = (size_pct(&u, w, side_w), size_pct(&u, h, side_h));
     if rw.changed() || rh.changed() {
-        let (kx, ky) = if link {
-            let k = if rw.changed() { w as f64 / nonzero(sx) } else { h as f64 / nonzero(sy) };
-            // Linked, the other side follows: keep it within its own limit too.
-            let k = k.min(f64::from(wlim) / sx.abs().max(1e-9)).min(f64::from(hlim) / sy.abs().max(1e-9));
-            (k, k)
+        let (state, rect) = (box_state(t), start_rect(t));
+        let (now_w, now_h) = state.signed_scale(rect, t.skew_v);
+        let (now_w, now_h) = (now_w * 100.0, now_h * 100.0);
+        let (w, h) = if link {
+            let (axis, typed, side) = if rw.changed() { (0, w, now_w) } else { (1, h, now_h) };
+            // Linked, the other side follows: keep both within their own limit.
+            let k = typed / if side.abs() < 1e-9 { 1e-9f64.copysign(side) } else { side };
+            let cap = (f64::from(wlim) / now_w.abs().max(1e-9)).min(f64::from(hlim) / now_h.abs().max(1e-9));
+            BoxState::linked_scale((now_w, now_h), axis, side * k.signum() * k.abs().min(cap))
         } else {
-            (w as f64 / nonzero(sx), h as f64 / nonzero(sy))
+            (w, h)
         };
-        scale_about_pivot(app, kx, ky);
+        let next = state.with_signed_scale(rect, t.skew_v, w / 100.0, h / 100.0);
+        if let Some(s) = app.ui.transform.as_mut()
+            && next.quad.iter().all(|p| p.is_finite())
+        {
+            apply_state(s, &next);
+        }
     }
 }
 
@@ -538,22 +542,12 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
 /// side; both negative turn the box by a half turn.
 pub(super) fn scale_about_pivot(app: &mut PhotocraftApp, kx: f64, ky: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
-    let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], s.quad) else { return };
-    let Some(inv) = h.inverse() else { return };
-    let (pu, pv) = inv.apply(s.pivot[0], s.pivot[1]);
-    let m = |u: f64, v: f64| {
-        let (x, y) = h.apply(pu + (u - pu) * kx, pv + (v - pv) * ky);
-        [x, y]
-    };
-    s.quad = [m(0.0, 0.0), m(1.0, 0.0), m(1.0, 1.0), m(0.0, 1.0)];
+    let next = box_state(s).scaled_about_pivot(kx, ky);
+    apply_state(s, &next);
 }
 
 pub(super) fn rotate_about_pivot(app: &mut PhotocraftApp, da: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
-    let (sn, cs) = da.sin_cos();
-    let c = s.pivot;
-    s.quad = s.quad.map(|q| {
-        let (x, y) = (q[0] - c[0], q[1] - c[1]);
-        [c[0] + x * cs - y * sn, c[1] + x * sn + y * cs]
-    });
+    let next = box_state(s).turned_about_pivot(da);
+    apply_state(s, &next);
 }
