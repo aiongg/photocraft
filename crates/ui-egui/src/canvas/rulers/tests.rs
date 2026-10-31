@@ -177,10 +177,10 @@ fn guide_drag_shows_its_position_beside_the_pointer() {
     let mut h = egui_kittest::Harness::builder().with_size(vec2(300.0, 200.0)).build_ui_state(|ui, app| draw_guide_drag_readout(app, ui.ctx()), app);
     h.event(egui::Event::PointerMoved(pos2(50.0, 50.0)));
     h.run_steps(2);
-    assert!(h.query_by_label("X:").is_some() && h.query_by_label("103.2 px").is_some());
+    assert!(h.query_by_label("X: 103.2 px").is_some());
     h.state_mut().guide_drag = None;
     h.run_steps(2);
-    assert!(h.query_by_label("X:").is_none(), "no readout once the drag ends");
+    assert!(h.query_by_label_contains("X:").is_none(), "no readout once the drag ends");
 }
 
 type AppHarness = egui_kittest::Harness<'static, PhotocraftApp>;
@@ -236,13 +236,13 @@ fn moving_a_guide_on_the_canvas_shows_its_y() {
         h.run_steps(2);
     }
     assert!(h.state().guide_drag.is_some_and(|d| !d.vertical), "a horizontal guide is being dragged");
-    assert!(h.query_by_label("Y:").is_some() && h.query_by_label("140 px").is_some(), "Y readout at the guide");
-    assert!(h.query_by_label("X:").is_none());
+    assert!(h.query_by_label("Y: 140 px").is_some(), "Y readout at the guide");
+    assert!(h.query_by_label_contains("X:").is_none());
     let up = at(&h, 210.0, 140.0);
     h.event(egui::Event::PointerButton { pos: up, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
     h.run_steps(2);
     assert_eq!(h.state().session.active().unwrap().doc.guides.horizontal, vec![140.0]);
-    assert!(h.query_by_label("Y:").is_none(), "gone after the drop");
+    assert!(h.query_by_label_contains("Y:").is_none(), "gone after the drop");
 }
 
 /// A guide dragged out of the top ruler: in each frame the readout shows where the guide is
@@ -265,13 +265,13 @@ fn ruler_drag_readout_is_current_every_frame() {
         h.run_steps(2);
         let pos = h.state().guide_drag.map(|d| d.pos);
         assert_eq!(pos, Some(f64::from(y)), "the drag follows the pointer");
-        assert!(h.query_by_label(&format!("{y} px")).is_some(), "readout at {y} in the same frame");
+        assert!(h.query_by_label(&format!("Y: {y} px")).is_some(), "readout at {y} in the same frame");
     }
     let up = canvas_at(&h, 200.0, 75.0);
     h.event(egui::Event::PointerButton { pos: up, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
     h.run_steps(2);
     assert!(h.state().guide_drag.is_none());
-    assert!(h.query_by_label("Y:").is_none(), "no readout in the frame that drops the guide");
+    assert!(h.query_by_label_contains("Y:").is_none(), "no readout in the frame that drops the guide");
     assert!(h.state().session.active().unwrap().doc.guides.horizontal.contains(&75.0), "the guide lands at y = 75");
 }
 
