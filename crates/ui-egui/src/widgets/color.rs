@@ -88,12 +88,6 @@ fn checker_tile(ctx: &egui::Context) -> egui::TextureHandle {
     tile
 }
 
-/// A compact colour popup with the shared desktop eyedropper. Keep egui's colour cache so hue
-/// survives black/white and alpha edits, and keep linear and encoded call sites distinct.
-pub fn color_edit_button_srgba(ui: &mut Ui, color: &mut Color32) -> Response {
-    color_edit_button(ui, color, egui::color_picker::Alpha::BlendOrAdditive)
-}
-
 pub(crate) fn color_swatch(ui: &mut Ui, color: Color32) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, response) = ui.allocate_exact_size(ui.spacing().interact_size, Sense::click());
@@ -129,24 +123,19 @@ pub fn color_swatch_button(ui: &mut Ui, color: Color32, label: &str) -> Response
     response.on_hover_text(label)
 }
 
-fn color_edit_button(ui: &mut Ui, color: &mut Color32, alpha: egui::color_picker::Alpha) -> Response {
+fn color_edit_button(ui: &mut Ui, color: &mut Color32) -> Response {
     let mut response = color_swatch(ui, *color);
     let id = response.id.with("screen-color");
     if let Some(rgb) = crate::screen_picker::take(ui.ctx(), id) {
-        *color = sampled_color(rgb, *color, alpha);
+        *color = sampled_color(rgb);
         response.mark_changed();
     }
-    let with_alpha = !matches!(alpha, egui::color_picker::Alpha::Opaque);
     swatch_popup(&response).show(|ui| {
-        let [r, g, b, a] = color.to_srgba_unmultiplied();
-        let current = Srgba::new(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0, if with_alpha { f32::from(a) / 255.0 } else { 1.0 });
-        if let Some(picked) = popup_picker(ui, id, current, with_alpha) {
+        let [r, g, b, _] = color.to_srgba_unmultiplied();
+        let current = Srgba::new(f32::from(r) / 255.0, f32::from(g) / 255.0, f32::from(b) / 255.0, 1.0);
+        if let Some(picked) = popup_picker(ui, id, current, false) {
             let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-            *color = if with_alpha {
-                Color32::from_rgba_unmultiplied(byte(picked.r), byte(picked.g), byte(picked.b), byte(picked.a))
-            } else {
-                Color32::from_rgb(byte(picked.r), byte(picked.g), byte(picked.b))
-            };
+            *color = Color32::from_rgb(byte(picked.r), byte(picked.g), byte(picked.b));
             response.mark_changed();
         }
     });
@@ -172,22 +161,14 @@ fn popup_picker(ui: &mut Ui, screen_id: egui::Id, color: Srgba, alpha: bool) -> 
     shown.edit.event.as_ref().and_then(|e| e.value()).map(|p| p.color)
 }
 
-fn sampled_color(rgb: [f32; 3], original: Color32, alpha: egui::color_picker::Alpha) -> Color32 {
+fn sampled_color(rgb: [f32; 3]) -> Color32 {
     let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    if matches!(alpha, egui::color_picker::Alpha::BlendOrAdditive) && original.is_additive() {
-        return Color32::from_rgb_additive(byte(rgb[0]), byte(rgb[1]), byte(rgb[2]));
-    }
-    Color32::from_rgba_unmultiplied(
-        byte(rgb[0]),
-        byte(rgb[1]),
-        byte(rgb[2]),
-        if matches!(alpha, egui::color_picker::Alpha::Opaque) { 255 } else { original.a() },
-    )
+    Color32::from_rgb(byte(rgb[0]), byte(rgb[1]), byte(rgb[2]))
 }
 
 pub fn color_edit_button_srgb(ui: &mut Ui, rgb: &mut [u8; 3]) -> Response {
     let mut color = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
-    let response = color_edit_button(ui, &mut color, egui::color_picker::Alpha::Opaque);
+    let response = color_edit_button(ui, &mut color);
     if response.changed() {
         *rgb = [color.r(), color.g(), color.b()];
     }

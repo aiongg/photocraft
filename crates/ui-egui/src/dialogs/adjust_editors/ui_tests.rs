@@ -415,13 +415,10 @@ fn color_balance_sliders_reset_and_step_like_photoshop() {
     h.run_steps(3);
     clicks_with(&mut h, label.center(), 2, egui::Modifiers::NONE);
     assert_eq!(cb(&h).1, [40.0, -30.0, 20.0], "double-click on the label");
-    // The panel's sliders ignore the wheel until focused (the library steps a focused slider).
-    h.ctx.memory_mut(|m| {
-        if let Some(id) = m.focused() {
-            m.surrender_focus(id);
-        }
-    });
-    h.run_steps(2);
+    // The panel's sliders never take the wheel, also when focused (a click focuses the slider).
+    clicks_with(&mut h, on_track, 1, egui::Modifiers::NONE);
+    h.state_mut().run("layer.setAdjustment", start.clone()).unwrap();
+    h.run_steps(3);
     wheel_at(&mut h, on_track, 3.0, egui::Modifiers::NONE);
     wheel_at(&mut h, on_track, 3.0, egui::Modifiers::SHIFT);
     assert_eq!(cb(&h).1, [40.0, -30.0, 20.0], "wheel over a Properties slider");
