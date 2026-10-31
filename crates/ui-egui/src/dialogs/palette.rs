@@ -122,7 +122,9 @@ mod tests {
                 out.platform_output.ime.map(|ime| ime.should_interrupt_composition)
             })
             .collect();
-        assert_eq!(interrupts, [None, Some(false), Some(false), Some(false)]);
+        // The box takes focus on its second pass (the first sizes it), interrupting once; after that the
+        // field owns the input method and is never asked again.
+        assert_eq!(interrupts, [None, Some(true), Some(false), Some(false)]);
     }
 
     #[test]
@@ -169,6 +171,9 @@ mod tests {
         h.run_steps(2);
         crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
         h.run_steps(2);
+        // The first Enter is still held: a repeat of it would not submit.
+        h.event(Event::Key { key: Key::Enter, physical_key: None, pressed: false, repeat: false, modifiers: Modifiers::NONE });
+        h.run_steps(1);
         h.event(Event::Key { key: Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
         h.run_steps(3);
         assert!(
