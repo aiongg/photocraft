@@ -548,7 +548,7 @@ fn preset_card(ui: &mut egui::Ui, index: usize, c: &Card, units: &UnitsAndRulers
     }
     let (w, h, _) = c.size(units);
     page_icon(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 34.0), vec2(40.0, 40.0)), w, h, tokens.color.text.muted.to_egui());
-    let title_format = Text::format(&tokens, TypeRole::Label, Content::Normal);
+    let title_format = Text::format(&tokens, TypeRole::Body, Content::Normal);
     let galley = card_title(ui.painter(), title, card.x - 12.0, &title_format);
     let elided = galley.elided;
     let color = title_format.color;
