@@ -1,7 +1,7 @@
 use super::view_xform::ViewXform;
-use super::{PhotocraftApp, Pos2, Rect, Stroke, Tool, vec2};
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
+use super::{PhotocraftApp, Pos2, Rect, Tool};
+use craft_ui::canvas::kurbo::Point;
+use craft_ui::canvas::{Constraint, fixed_size_pixels, marquee_pixels, square_pixels};
 
 /// An in-progress pointer gesture on the canvas.
 #[derive(Clone, Debug)]
@@ -91,21 +91,14 @@ impl Drag {
 /// style (fixed ratio / fixed size), ⇧ for a square or circle, ⌥ to draw from the centre.
 pub fn marquee_corners(o: &crate::state::ToolOptions, d: &Drag, end: [f64; 2]) -> ([f64; 2], [f64; 2]) {
     let (shift, alt) = d.marquee_mods();
-    if o.marquee_style == "fixedSize" {
-        // A fixed box is positioned, not sized, by the drag. Using the press plus the drag's
-        // sign pinned it there and flipped it by its full width/height when the pointer crossed
-        // the press. The preview and release both follow the current pointer instead.
-        let (w, h) = (f64::from(o.marquee_width).max(1.0), f64::from(o.marquee_height).max(1.0));
-        let a = if alt { [end[0] - w / 2.0, end[1] - h / 2.0] } else { end };
-        return (a, [a[0] + w, a[1] + h]);
-    }
-    let e = crate::chrome_ui::marquee_end(&o.marquee_style, o.marquee_width as f64, o.marquee_height as f64, shift, d.start, end);
-    if !alt {
-        return (d.start, e);
-    }
-    let (dx, dy) = (e[0] - d.start[0], e[1] - d.start[1]);
-    // For a sized marquee the drag is the half extent when drawing from the centre.
-    ([d.start[0] - dx, d.start[1] - dy], [d.start[0] + dx, d.start[1] + dy])
+    let (w, h) = (f64::from(o.marquee_width), f64::from(o.marquee_height));
+    let constraint = match o.marquee_style.as_str() {
+        "fixedSize" => Constraint::Size(w, h),
+        "fixedRatio" => Constraint::Ratio(w, h),
+        _ => Constraint::Free,
+    };
+    let (a, b) = constraint.corners(Point::new(d.start[0], d.start[1]), Point::new(end[0], end[1]), shift, alt);
+    ([a.x, a.y], [b.x, b.y])
 }
 
 /// The pixel rectangle a Rectangular/Elliptical Marquee drag selects so far: shown live (ants
@@ -121,30 +114,16 @@ pub(crate) fn marquee_preview_px(o: &crate::state::ToolOptions, d: &Drag, zoom: 
     }
     let last = d.points.last().map_or(d.start, |p| [p[0], p[1]]);
     let (a, b) = marquee_corners(o, d, last);
-    let mut r = if fixed { fixed_size_px(a, b, o.marquee_width, o.marquee_height) } else { marquee_px(a, b) };
+    let (a, b) = (Point::new(a[0], a[1]), Point::new(b[0], b[1]));
+    let mut r = if fixed { fixed_size_pixels(a, b, (f64::from(o.marquee_width), f64::from(o.marquee_height))) } else { marquee_pixels(a, b) };
     if marquee_is_square(o, d) {
-        r = square_px(r, d.start, last);
+        r = square_pixels(r, Point::new(d.start[0], d.start[1]), Point::new(last[0], last[1]));
     }
-    (r[2] > r[0] && r[3] > r[1]).then_some(r)
-}
-
-/// The pixel rectangle `[x0, y0, x1, y1]` a marquee between two corners selects.
-pub fn marquee_px(a: [f64; 2], b: [f64; 2]) -> [f64; 4] {
-    [a[0].min(b[0]).floor(), a[1].min(b[1]).floor(), a[0].max(b[0]).ceil(), a[1].max(b[1]).ceil()]
-}
-
-/// The pixel rectangle of a Fixed Size marquee between the corners `a` and `b`: exactly `w` × `h`
-/// whole pixels. Snapping both edges outwards (`marquee_px`) added a pixel to each side whenever
-/// the press point sat between pixels, so 10 × 10 selected 11 × 11 (#6015). The near edge goes
-/// to the closest pixel edge and the far one is the size away.
-pub fn fixed_size_px(a: [f64; 2], b: [f64; 2], w: f32, h: f32) -> [f64; 4] {
-    let (w, h) = (f64::from(w).round().max(1.0), f64::from(h).round().max(1.0));
-    let (x0, y0) = (a[0].min(b[0]).round(), a[1].min(b[1]).round());
-    [x0, y0, x0 + w, y0 + h]
+    (r.width() > 0.0 && r.height() > 0.0).then_some([r.x0, r.y0, r.x1, r.y1])
 }
 
 /// Whether the marquee drag `d` is constrained to a square (or circle): ⇧ during the drag with
-/// the Normal style, or a Fixed Ratio of 1:1. Mirrors the branches of `chrome_ui::marquee_end`.
+/// the Normal style, or a Fixed Ratio of 1:1. Mirrors the branches of `Constraint::corners`.
 fn marquee_is_square(o: &crate::state::ToolOptions, d: &Drag) -> bool {
     let (w, h) = (f64::from(o.marquee_width), f64::from(o.marquee_height));
     match o.marquee_style.as_str() {
@@ -152,26 +131,6 @@ fn marquee_is_square(o: &crate::state::ToolOptions, d: &Drag) -> bool {
         "fixedRatio" if w > 0.0 && h > 0.0 => w == h,
         _ => d.marquee_mods().0,
     }
-}
-
-/// A constrained square `r` (`marquee_px` of its corners) with equal sides on whole pixels.
-///
-/// The square is built in continuous coordinates, and snapping each axis to the pixel grid on
-/// its own (floor the near edge, ceil the far one) made one side a pixel longer than the other
-/// whenever the press point sat between pixels: a ⇧ drag read 101 × 102 (#5472). The shorter
-/// side grows to the longer one, away from the press point (`start`, towards `end`), so the
-/// square still covers every pixel the drag touched.
-pub fn square_px(r: [f64; 4], start: [f64; 2], end: [f64; 2]) -> [f64; 4] {
-    let [x0, y0, x1, y1] = r;
-    let (w, h) = (x1 - x0, y1 - y0);
-    let n = w.max(h);
-    let grow = |lo: f64, hi: f64, extent: f64, from: f64, to: f64| {
-        let d = (n - extent).max(0.0);
-        if to < from { (lo - d, hi) } else { (lo, hi + d) }
-    };
-    let (x0, x1) = grow(x0, x1, w, start[0], end[0]);
-    let (y0, y1) = grow(y0, y1, h, start[1], end[1]);
-    [x0, y0, x1, y1]
 }
 
 /// The one-pixel line `[x0, y0, x1, y1]` a Single Row (Single Column) Marquee at `p` selects: the
@@ -300,31 +259,6 @@ pub(crate) fn draw_value_readout<const N: usize>(app: &PhotocraftApp, ctx: &egui
 
 /// A readout of `N` rows beside the pointer (labels left, values right-aligned), above everything.
 pub(crate) fn draw_readout<const N: usize>(ctx: &egui::Context, id: &str, cursor: Pos2, labels: [&str; N], values: [String; N]) {
-    let t = craft_ui::theme::current(ctx);
-    let font = egui::FontId::proportional(11.5);
-    let width = |text: &str| ctx.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), font.clone(), t.color.text.normal.to_egui()).size().x);
-    let labels = labels.map(|label| tl!(label));
-    let (lw, vw) = (labels.map(width), values.each_ref().map(|v| width(v)));
-    let (label_col, value_col) = (lw.iter().fold(0.0f32, |a, &b| a.max(b)), vw.iter().fold(0.0f32, |a, &b| a.max(b)));
-    egui::Area::new(egui::Id::unique(id)).order(egui::Order::Tooltip).fixed_pos(cursor + vec2(16.0, 18.0)).interactable(false).constrain(true).show(
-        ctx,
-        |ui| {
-            egui::Frame::new()
-                .fill(t.color.surface.panel.to_egui())
-                .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.border.to_egui()))
-                .corner_radius(t.shape.radius.control)
-                .inner_margin(egui::Margin::symmetric(7, 4))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing = vec2(0.0, 1.0);
-                    for (i, value) in values.into_iter().enumerate() {
-                        // Labels left, values right-aligned on one edge, sharing a baseline.
-                        ui.horizontal(|ui| {
-                            ui.add(egui::Label::new(egui::RichText::new(labels[i]).font(font.clone()).color(t.color.text.muted.to_egui())).extend());
-                            ui.add_space(label_col - lw[i] + 12.0 + value_col - vw[i]);
-                            ui.add(egui::Label::new(egui::RichText::new(value).font(font.clone()).color(t.color.text.normal.to_egui())).extend());
-                        });
-                    }
-                });
-        },
-    );
+    let readout = labels.into_iter().zip(values).fold(craft_ui::canvas::Readout::new(id), |r, (label, value)| r.row(tl!(label), value));
+    readout.show(ctx, cursor);
 }

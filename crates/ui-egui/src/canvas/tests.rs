@@ -1,32 +1,3 @@
-/// #5472: a ⇧ square pressed between pixels snapped to 101 × 102; the short side grows to
-/// match, on the side the drag points to.
-#[test]
-fn square_px_equalises_the_sides_away_from_the_press_point() {
-    use super::{marquee_px, square_px};
-    // Down-right drag: the continuous square (50.3, 50.7)..(150.8, 151.2) snaps unevenly.
-    let r = marquee_px([50.3, 50.7], [150.8, 151.2]);
-    assert_eq!(r, [50.0, 50.0, 151.0, 152.0], "uneven before the fix");
-    assert_eq!(square_px(r, [50.3, 50.7], [150.8, 90.0]), [50.0, 50.0, 152.0, 152.0]);
-    // Up-left drag: the short side grows towards lower coordinates.
-    let r = marquee_px([150.8, 151.2], [50.3, 50.7]);
-    assert_eq!(square_px(r, [150.8, 151.2], [60.0, 50.7]), [49.0, 50.0, 151.0, 152.0]);
-    // Already square: unchanged.
-    assert_eq!(square_px([10.0, 20.0, 30.0, 40.0], [10.0, 20.0], [30.0, 40.0]), [10.0, 20.0, 30.0, 40.0]);
-}
-
-/// #6015: a Fixed Size marquee pressed between pixels selected one pixel more on each side.
-#[test]
-fn fixed_size_px_is_exactly_the_size() {
-    use super::fixed_size_px;
-    // Down-right from (10.4, 20.6): 10 × 10 from the closest pixel edges.
-    assert_eq!(fixed_size_px([10.4, 20.6], [20.4, 30.6], 10.0, 10.0), [10.0, 21.0, 20.0, 31.0]);
-    // Up-left: the far corner is the low one; still exactly the size.
-    assert_eq!(fixed_size_px([10.4, 20.6], [-53.6, -11.4], 64.0, 32.0), [-54.0, -11.0, 10.0, 21.0]);
-    // 1 × 1 is one pixel, and a fractional size rounds to whole pixels.
-    assert_eq!(fixed_size_px([3.5, 3.5], [4.5, 4.5], 1.0, 1.0), [4.0, 4.0, 5.0, 5.0]);
-    assert_eq!(fixed_size_px([0.0, 0.0], [2.6, 2.4], 2.6, 2.4), [0.0, 0.0, 3.0, 2.0]);
-}
-
 #[test]
 fn display_image_matches_egui_unmultiplied_conversion() {
     // Several parallel pieces and a ragged one; translucent, out-of-range and NaN values.

@@ -125,7 +125,6 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
                 return;
             }
             egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
-            crate::canvas_tool_menu::show(app, &ctx);
         },
         app,
     );

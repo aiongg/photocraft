@@ -6,6 +6,7 @@
 //! modifiers. Selection outlines and drag previews are drawn as black-and-white dashes (marching
 //! ants) so they read on light and dark pixels alike.
 
+use craft_ui::canvas::SelectionBadge;
 use egui::{Color32, Pos2, Shape, Stroke, pos2, vec2};
 
 use crate::PhotocraftApp;
@@ -132,37 +133,48 @@ pub fn badge(app: &PhotocraftApp, tool: Tool, m: egui::Modifiers) -> Option<Badg
     Badge::from_mode(selection_mode(tool, app.ui.selection_mode, m))
 }
 
-/// The badge's glyph as line segments around `c` (half-size `h`).
-pub fn badge_glyph(b: Badge, c: Pos2, h: f32) -> Vec<[Pos2; 2]> {
-    match b {
-        Badge::Add => vec![[c - vec2(h, 0.0), c + vec2(h, 0.0)], [c - vec2(0.0, h), c + vec2(0.0, h)]],
-        Badge::Subtract => vec![[c - vec2(h, 0.0), c + vec2(h, 0.0)]],
-        Badge::Move => {
-            let a = h * 0.45;
-            let mut v = vec![[c - vec2(h, 0.0), c + vec2(h, 0.0)], [c - vec2(0.0, h), c + vec2(0.0, h)]];
-            for d in [vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0)] {
-                let tip = c + d * h;
-                let side = vec2(-d.y, d.x) * a;
-                v.push([tip, tip - d * a + side]);
-                v.push([tip, tip - d * a - side]);
-            }
-            v
-        }
-        Badge::Intersect => {
-            let d = h * 0.8;
-            vec![[c + vec2(-d, -d), c + vec2(d, d)], [c + vec2(-d, d), c + vec2(d, -d)]]
+impl Badge {
+    /// The library badge for the three selection modes; `Move` has none.
+    fn selection(self) -> Option<SelectionBadge> {
+        match self {
+            Badge::Add => Some(SelectionBadge::Add),
+            Badge::Subtract => Some(SelectionBadge::Subtract),
+            Badge::Intersect => Some(SelectionBadge::Intersect),
+            Badge::Move => None,
         }
     }
+}
+
+/// The Move badge's glyph as line segments around `c` (half-size `h`): four arrows. The library's
+/// `SelectionBadge` has no such variant.
+fn move_glyph(c: Pos2, h: f32) -> Vec<[Pos2; 2]> {
+    let a = h * 0.45;
+    let mut v = vec![[c - vec2(h, 0.0), c + vec2(h, 0.0)], [c - vec2(0.0, h), c + vec2(0.0, h)]];
+    for d in [vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0)] {
+        let tip = c + d * h;
+        let side = vec2(-d.y, d.x) * a;
+        v.push([tip, tip - d * a + side]);
+        v.push([tip, tip - d * a - side]);
+    }
+    v
 }
 
 /// Draw the badge next to the cursor hotspot `p` (Photoshop puts it below-right of the
 /// crosshair; Quick Selection shows it inside the brush circle, at the centre).
 pub fn draw_badge(painter: &egui::Painter, p: Pos2, b: Badge, centred: bool) {
-    // Right of the system arrow cursor: at 1× the arrow covers (11, 11), so the badge sat under it.
+    if let Some(badge) = b.selection() {
+        if centred {
+            craft_ui::canvas::selection_badge_at(painter.ctx(), p, badge);
+        } else {
+            craft_ui::canvas::selection_badge_beside_pointer(painter.ctx(), p, badge);
+        }
+        return;
+    }
+    // Right of the system arrow cursor: at 1x the arrow covers (11, 11), so the badge sat under it.
     let c = if centred { p } else { p + vec2(30.0, 11.0) };
     // White glyph with a dark halo: readable on any pixels.
     for (w, col) in [(3.0, Color32::from_black_alpha(200)), (1.2, Color32::WHITE)] {
-        for seg in badge_glyph(b, c, 3.5) {
+        for seg in move_glyph(c, 3.5) {
             painter.line_segment(seg, Stroke::new(w, col));
         }
     }
@@ -258,11 +270,6 @@ mod tests {
         for t in [Tool::Brush, Tool::Move, Tool::Zoom, Tool::Crop] {
             assert_eq!(badge(&app, t, shift), None);
         }
-        // Distinct glyphs: + has two strokes, − one, × two diagonals.
-        let c = pos2(10.0, 10.0);
-        assert_eq!(badge_glyph(Badge::Add, c, 3.0).len(), 2);
-        assert_eq!(badge_glyph(Badge::Subtract, c, 3.0).len(), 1);
-        assert!(badge_glyph(Badge::Intersect, c, 3.0).iter().all(|[a, b]| a.x != b.x && a.y != b.y));
     }
 
     /// #7495: an outline still being drawn is one unbroken line (no dashes, nothing marching),
