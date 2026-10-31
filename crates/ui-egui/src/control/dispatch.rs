@@ -849,7 +849,7 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
         },
         "ui.dialog.set" => dialog_set(app, p),
         "ui.dialog.confirm" | "ui.dialog.apply" => match u("dialog") {
-            Some(id) => dialog_confirm_or_apply(app, req, id),
+            Some(id) => dialog_confirm_or_apply(app, ctx, req, id),
             None => err("missing `dialog`"),
         },
         "ui.dialog.cancel" => match u("dialog") {
@@ -993,7 +993,7 @@ fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     }
 }
 
-fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u64) -> Outcome {
+fn dialog_confirm_or_apply(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest, id: u64) -> Outcome {
     let apply = req.method == "ui.dialog.apply";
     let command = app.ui.dialog_fields(id).and_then(|fields| {
         if apply {
@@ -1008,7 +1008,7 @@ fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u6
     {
         return err(error);
     }
-    run_waiting(app, wait_param(&req.params), |app| if apply { crate::prefs_ui::apply(app, id) } else { crate::dialogs::confirm(app, id) })
+    run_waiting(app, wait_param(&req.params), |app| if apply { crate::prefs_ui::apply(app, id) } else { crate::dialogs::confirm_in(app, ctx, id) })
 }
 
 // ---- synthetic input: pointer events, clicks, keys, text ----

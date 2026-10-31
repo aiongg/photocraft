@@ -36,8 +36,6 @@ pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, fields: &mut Map<Stri
         crate::adjust_dialog::reset(app, ctx, fields);
     } else if fields.contains_key("__filter") {
         crate::filter_dialog::reset_fields(app, fields);
-    } else if fields.contains_key("__form") {
-        crate::view_cmds::reset_form(fields);
     }
 }
 
@@ -57,8 +55,6 @@ fn match_arm(fields: &Map<String, Value>) -> Option<&'static str> {
         Some("adjust")
     } else if fields.contains_key("__filter") {
         Some("filter")
-    } else if fields.contains_key("__form") && fields.contains_key("__formOrig") {
-        Some("form")
     } else {
         None
     }

@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::DialogKind;
 
 mod arrange;
 mod dialogs;
@@ -20,10 +19,11 @@ mod options;
 
 pub use arrange::cells;
 pub(crate) use arrange::float_window;
+pub(crate) use dialogs::form;
+pub use dialogs::form_keys;
 pub(crate) use dialogs::write_copy;
 #[cfg(test)]
-use dialogs::{form, front, label_of};
-pub use dialogs::{form_body, form_keys, reset_form};
+use dialogs::{front, label_of};
 #[cfg(test)]
 use dispatch::is_enabled_with_engine;
 pub use dispatch::{checked, handles, invoke, is_enabled};
@@ -198,26 +198,6 @@ mod label_tests {
             assert_eq!(label_of("radius"), "Radius");
             assert_eq!(label_of("iPhone 14 Pro Max"), "iPhone 14 Pro Max");
         });
-    }
-}
-
-#[cfg(test)]
-mod form_reset_tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn alt_reset_restores_form_orig() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        // A folder field keeps the form on the legacy body (the library form has no Browse… button).
-        let id = form(&mut app, "test.form", "Test", json!({"dir": "/a", "on": true}), json!({}));
-        let f = &mut app.ui.dialog_mut(id).unwrap().fields;
-        f.insert("dir".into(), json!("/b"));
-        f.insert("on".into(), json!(false));
-        reset_form(f);
-        assert_eq!(f["dir"], json!("/a"));
-        assert_eq!(f["on"], json!(true));
-        assert!(f.contains_key("__formOrig"));
     }
 }
 

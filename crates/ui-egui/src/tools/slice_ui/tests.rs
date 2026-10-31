@@ -30,7 +30,7 @@ fn slice_tool_draws_and_select_tool_moves() {
     pointer(&mut app, ToolEvent::Up { x: 90.0, y: 75.0 }, m);
     let r = open_options(&mut app).unwrap();
     let id = r["dialog"].as_u64().unwrap();
-    app.ui.dialog_mut(id).unwrap().fields.insert("name".into(), json!("footer"));
+    crate::dialogs::hosted::set_field(&mut app, id, "name", json!("footer")).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
     assert!(doc.slices.list.iter().any(|s| s.name == "footer"));

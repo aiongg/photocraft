@@ -57,17 +57,9 @@ fn doc_stem(app: &PhotocraftApp) -> String {
     app.session.active().map(|d| d.doc.name.rsplit_once('.').map_or(d.doc.name.clone(), |(a, _)| a.to_string())).unwrap_or_else(|| tl!("Untitled").into())
 }
 
-/// A generic form dialog for `command` (rendered by `view_cmds::form_body`).
+/// A generic form dialog for `command` (`view_cmds::form`).
 fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: Value, choices: Value) -> Value {
-    let mut f = Map::new();
-    f.insert("__command".into(), json!(command));
-    f.insert("__label".into(), json!(label));
-    f.insert("__form".into(), json!(true));
-    f.insert("__choices".into(), choices);
-    if let Value::Object(m) = fields {
-        f.extend(m);
-    }
-    json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)})
+    json!({"dialog": crate::view_cmds::form(app, command, label, fields, choices)})
 }
 
 /// File › Scripts › Browse… lists Photoshop's script types (matching its filter, #2452) plus the

@@ -1,9 +1,8 @@
 use super::dispatch::no_params;
-use super::{DialogKind, Map, PhotocraftApp, Value, json};
+use super::{Map, PhotocraftApp, Value, json};
 
 // ---------- dialogs and pickers in front of engine commands ----------
 
-/// A generic form dialog that runs `command` with its fields on OK (rendered by [`form_body`]).
 /// File › Open EXR Parts…: pick an EXR, then choose the parts and channel groups that become
 /// the layers of one document (a Maya/Arnold render writes one part per AOV). The dialog is
 /// a plain command form, so the control channel can drive the same selection headlessly.
@@ -57,7 +56,8 @@ fn open_exr_parts_dialog(app: &mut PhotocraftApp) -> Option<Result<Value, String
     }))
 }
 
-pub(super) fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: Value, choices: Value) -> u64 {
+/// Opens a generic form dialog that runs `command` with its fields on OK (see [`open_hosted`]).
+pub(crate) fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: Value, choices: Value) -> u64 {
     let mut f = Map::new();
     f.insert("__command".into(), json!(command));
     f.insert("__label".into(), json!(label));
@@ -65,31 +65,33 @@ pub(super) fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: 
     if let Value::Object(m) = fields {
         f.extend(m);
     }
-    if !stays_legacy(command, &f) {
-        return open_hosted(app, command, label, f);
-    }
-    f.insert("__form".into(), json!(true));
-    // Snapshot user-facing params at open so Alt+Reset can restore them.
-    let orig: Map<String, Value> = f.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
-    f.insert("__formOrig".into(), Value::Object(orig));
-    app.ui.open_dialog(DialogKind::Command, f)
-}
-
-/// The forms the library's `CommandForm` cannot draw yet: a folder field's Browse… button, Batch's
-/// file naming and optional quality, File Info's Camera Data section.
-fn stays_legacy(command: &str, f: &Map<String, Value>) -> bool {
-    command == "file.automate.batch" || f.contains_key("__camera") || f.keys().any(|k| crate::dialogs::is_folder_field(k))
+    open_hosted(app, command, label, f)
 }
 
 /// Opens `fields` as a `CommandForm`: a row per scalar field, in `form_keys` order. The labels are
 /// PhotoCraft's: `__labels` verbatim for data, `label_of` for everything else.
 fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<String, Value>) -> u64 {
-    use craft::ui::dialog::{DialogFields, FieldValue, Param, ParamKind, Width};
+    use craft::ui::dialog::{DialogFields, FieldValue, Param, ParamKind, PathKind, Width};
     let choices = f.get("__choices").cloned().unwrap_or(Value::Null);
     let labels = f.get("__labels").cloned().unwrap_or(Value::Null);
     let label_for = |k: &str| labels.get(k).and_then(Value::as_str).map_or_else(|| label_of(k), str::to_string);
     let (mut params, mut values, mut extra) = (Vec::new(), DialogFields::new(), Map::new());
+    let batch = command == "file.automate.batch";
     for key in form_keys(&f) {
+        // Batch: the file naming row keeps its token hint, and the quality is a number that is
+        // absent from the command's parameters until Custom is checked.
+        if batch && key == "naming" {
+            values.set("naming", FieldValue::Text(f[&key].as_str().unwrap_or_default().to_owned()));
+            params.push(naming_row());
+            continue;
+        }
+        if batch && key == "quality" {
+            params.push(Param::new("quality", label_for("quality"), ParamKind::OptionalNumber { min: 0.0, max: 12.0, default: None, initial: 8.0 }));
+            if let Some(quality) = f[&key].as_f64() {
+                values.set("quality", FieldValue::Number(quality));
+            }
+            continue;
+        }
         let kind = match &f[&key] {
             Value::Bool(b) => Some((ParamKind::Bool { default: *b }, FieldValue::Bool(*b))),
             Value::String(s) => Some(match choices.get(&key).and_then(Value::as_array) {
@@ -111,7 +113,10 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<Strin
         };
         match kind {
             Some((kind, value)) => {
-                params.push(Param::new(key.clone(), label_for(&key), kind));
+                // A folder field gets the system folder picker (#7942, #9357).
+                let browse = matches!(kind, ParamKind::Text { .. }) && crate::dialogs::is_folder_field(&key);
+                let param = Param::new(key.clone(), label_for(&key), kind);
+                params.push(if browse { param.browse(PathKind::Folder) } else { param });
                 values.set(key, value);
             }
             None => {
@@ -122,7 +127,30 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<Strin
     let private: Map<String, Value> = f.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
     // A dialog of a few short fields (Fit Image) is narrower (#4673).
     let width = if f.contains_key("__compact") { Width::Compact } else { Width::Standard };
-    crate::dialogs::hosted::open_form(app, command, label, params, values, extra, private, width)
+    // File Info's read-only Camera Data section (`__camera`, from the document's EXIF/XMP).
+    let below = f
+        .get("__camera")
+        .and_then(Value::as_object)
+        .filter(|c| !c.is_empty())
+        .cloned()
+        .map(|camera| Box::new(move |ui: &mut egui::Ui, _: &DialogFields| camera_data(ui, &camera)) as Box<dyn Fn(&mut egui::Ui, &DialogFields) + Send>);
+    crate::dialogs::hosted::open_form(
+        app,
+        crate::dialogs::hosted::FormSpec { command: command.to_owned(), label: label.to_owned(), params, values, extra, private, width, below },
+    )
+}
+
+/// Batch's File Naming row: a text field with the token hint and the tokens' tooltip.
+fn naming_row() -> craft::ui::dialog::Param {
+    craft::ui::dialog::Param::custom("naming", tl!("File Naming").to_string(), |ui, fields| {
+        let mut naming = fields.text("naming").unwrap_or_default().to_owned();
+        let response =
+            ui.add(egui::TextEdit::singleline(&mut naming).desired_width(260.0).hint_text("{name}")).on_hover_text("{name} · {serial} · {date} (UTC)");
+        if response.changed() {
+            fields.set("naming", craft::ui::dialog::FieldValue::Text(naming));
+        }
+        response
+    })
 }
 
 /// The slider range of a fractional form field: the engine's documented range for the field,
@@ -151,16 +179,6 @@ fn subfolders_label() -> Value {
     json!({"includeSubfolders": tl!("Include All Subfolders")})
 }
 
-/// Alt+Cancel (Reset): restore the `__form` params captured at open.
-pub fn reset_form(f: &mut Map<String, Value>) {
-    if !f.contains_key("__form") {
-        return;
-    }
-    let Some(Value::Object(orig)) = f.get("__formOrig").cloned() else { return };
-    f.retain(|k, _| k.starts_with("__"));
-    f.extend(orig);
-}
-
 pub(super) fn label_of(key: &str) -> String {
     // A name that already reads as text ("iPhone 14 Pro Max", "Web 1920") is not camelCase.
     if key.contains(' ') {
@@ -187,7 +205,7 @@ pub(super) fn label_of(key: &str) -> String {
     if title == crate::filter_dialog::source_label(key) { out } else { title }
 }
 
-/// Display order of a `__form` dialog's field keys. `__order` lists them the way Photoshop
+/// Display order of a form's field keys. `__order` lists them the way Photoshop
 /// shows them (e.g. File Info); keys it omits keep their catalogue order after it.
 pub fn form_keys(f: &Map<String, Value>) -> Vec<String> {
     let mut keys: Vec<String> = f
@@ -204,97 +222,8 @@ pub fn form_keys(f: &Map<String, Value>) -> Vec<String> {
     keys
 }
 
-/// Body of a `__form` dialog: text fields, number fields, checkboxes and `__choices` dropdowns.
-pub fn form_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let choices = f.get("__choices").cloned().unwrap_or(Value::Null);
-    // Data-driven labels (a per-part checkbox shows the part's name, not a catalogue entry)
-    // come from `__labels` verbatim; everything else goes through the catalogue.
-    let labels = f.get("__labels").cloned().unwrap_or(Value::Null);
-    let label = |k: &str| labels.get(k).and_then(Value::as_str).map_or_else(|| label_of(k), str::to_string);
-    let keys = form_keys(f);
-    let mut browse: Option<String> = None;
-    egui::Grid::new("form-dialog").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-        for k in keys {
-            let v = f.get(&k).cloned().unwrap_or(Value::Null);
-            if k == "naming" && f.get("__command").and_then(Value::as_str) == Some("file.automate.batch") {
-                let label = ui.label(tl!("File Naming"));
-                let mut naming = v.as_str().unwrap_or_default().to_owned();
-                ui.add(egui::TextEdit::singleline(&mut naming).desired_width(260.0).hint_text("{name}"))
-                    .labelled_by(label.id)
-                    .on_hover_text("{name} · {serial} · {date} (UTC)");
-                f.insert(k, json!(naming));
-                ui.end_row();
-                continue;
-            }
-            if k == "quality" && f.get("__command").and_then(Value::as_str) == Some("file.automate.batch") {
-                ui.label(label(&k));
-                let mut custom = v.as_f64().is_some();
-                let mut quality = v.as_f64().or_else(|| f.get("__batchQuality").and_then(Value::as_f64)).unwrap_or(8.0).clamp(0.0, 12.0) as f32;
-                ui.horizontal(|ui| {
-                    crate::widgets::checkbox(ui, &mut custom, tl!("Custom"));
-                    ui.add_enabled_ui(custom, |ui| crate::widgets::value_field(ui, &mut quality, 0.0..=12.0, "", 74.0).accessible_name(tl!("Quality")));
-                });
-                // None preserves the command's existing JPEG and lossless WebP defaults.
-                // The inactive custom value is shell state, never a command parameter.
-                f.insert("__batchQuality".into(), json!(quality));
-                f.insert(k, if custom { json!(quality) } else { Value::Null });
-                ui.end_row();
-                continue;
-            }
-            let new = match &v {
-                Value::Array(_) | Value::Object(_) | Value::Null => continue,
-                Value::Bool(b) => {
-                    ui.label("");
-                    let mut b = *b;
-                    ui.checkbox(&mut b, label(&k));
-                    json!(b)
-                }
-                Value::String(s) => {
-                    ui.label(label(&k));
-                    let mut s = s.clone();
-                    match choices.get(&k).and_then(Value::as_array) {
-                        Some(opts) => {
-                            let opts: Vec<(String, String)> = opts.iter().filter_map(Value::as_str).map(|o| (o.to_string(), label(o))).collect();
-                            let refs: Vec<(String, &str)> = opts.iter().map(|(a, b)| (a.clone(), b.as_str())).collect();
-                            crate::widgets::dropdown(ui, &format!("form-{k}"), &label(&k), &mut s, &refs, 200.0);
-                        }
-                        None => {
-                            ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0)).accessible_name(label(&k));
-                                // A folder field gets the system folder picker (#7942, #9357).
-                                if crate::dialogs::is_folder_field(&k) && crate::widgets::secondary_button(ui, tl!("Browse…"), 0.0).clicked() {
-                                    browse = Some(k.clone());
-                                }
-                            });
-                        }
-                    }
-                    json!(s)
-                }
-                Value::Number(n) => {
-                    ui.label(label(&k));
-                    if let Some(mut i) = n.as_i64() {
-                        ui.add(egui::DragValue::new(&mut i).custom_parser(crate::widgets::parse_num)).accessible_name(label(&k));
-                        json!(i)
-                    } else {
-                        let mut x = n.as_f64().unwrap_or(0.0);
-                        ui.add(egui::DragValue::new(&mut x).speed(0.5).custom_parser(crate::widgets::parse_num)).accessible_name(label(&k));
-                        json!(x)
-                    }
-                }
-            };
-            f.insert(k, new);
-            ui.end_row();
-        }
-    });
-    if let Some(key) = browse {
-        f.insert(crate::dialogs::BROWSE_FIELD.into(), json!(key));
-    }
-    camera_data(ui, f);
-}
-
 /// File Info's read-only Camera Data section (`__camera`, from the document's EXIF/XMP).
-fn camera_data(ui: &mut egui::Ui, f: &Map<String, Value>) {
-    let Some(camera) = f.get("__camera").and_then(Value::as_object).filter(|c| !c.is_empty()) else { return };
+fn camera_data(ui: &mut egui::Ui, camera: &Map<String, Value>) {
     ui.add_space(craft::ui::theme::scale::Space::S12.px());
     ui.label(egui::RichText::new(tl!("Camera Data")).font(crate::theme::semibold(13.0)));
     ui.add_space(craft::ui::theme::scale::Space::S4.px());
@@ -544,7 +473,7 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
             let name = action.name.clone();
             dialog(
                 app,
-                json!({"action": name, "steps": steps, "input": dir, "includeSubfolders": false, "__labels": subfolders_label(), "output": format!("{dir}/batch"), "format": "same", "quality": null, "__batchQuality": 8, "naming": "", "startingSerial": 1}),
+                json!({"action": name, "steps": steps, "input": dir, "includeSubfolders": false, "__labels": subfolders_label(), "output": format!("{dir}/batch"), "format": "same", "quality": null, "naming": "", "startingSerial": 1}),
                 json!({"format": ["same", "png", "jpg", "psd", "tiff", "webp"]}),
             )
         }

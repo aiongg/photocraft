@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::panels::{Field, check, number_cell, select_cell};
-use crate::state::{DialogKind, Tool};
+use crate::state::Tool;
 
 /// Slice tool state (serde: readable through the control channel).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -401,31 +401,20 @@ pub fn open_options(app: &mut PhotocraftApp) -> Result<Value, String> {
     let r = slices::resolve(&st.doc).into_iter().find(|r| r.number == n).ok_or("no such slice")?;
     let v = photocraft_engine::slice_cmds::resolved_json(&st.doc, &r);
     let mut f = serde_json::Map::new();
-    f.insert("__command".into(), json!("slice.set"));
-    f.insert("__label".into(), json!("Slice Options"));
-    f.insert("__form".into(), json!(true));
-    f.insert("__choices".into(), json!({"kind": ["image", "noImage"]}));
     f.insert("number".into(), json!(n));
     f.insert("kind".into(), v["kind"].clone());
     for k in ["name", "url", "target", "alt", "message", "cellText"] {
         f.insert(k.into(), v[k].clone());
     }
     f.insert("background".into(), json!(v["background"].as_str().unwrap_or("none")));
-    Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)}))
+    Ok(json!({"dialog": crate::view_cmds::form(app, "slice.set", "Slice Options", Value::Object(f), json!({"kind": ["image", "noImage"]}))}))
 }
 
 /// Divide Slice dialog.
 fn open_divide(app: &mut PhotocraftApp) -> Result<Value, String> {
     let n = app.ui.slices.selected.ok_or("select a slice first")?;
-    let mut f = serde_json::Map::new();
-    f.insert("__command".into(), json!("slice.divide"));
-    f.insert("__label".into(), json!("Divide Slice"));
-    f.insert("__form".into(), json!(true));
-    f.insert("__choices".into(), json!({}));
-    f.insert("number".into(), json!(n));
-    f.insert("horizontal".into(), json!(2));
-    f.insert("vertical".into(), json!(1));
-    Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)}))
+    let fields = json!({"number": n, "horizontal": 2, "vertical": 1});
+    Ok(json!({"dialog": crate::view_cmds::form(app, "slice.divide", "Divide Slice", fields, json!({}))}))
 }
 
 /// Options bars of the Slice and Slice Select tools.

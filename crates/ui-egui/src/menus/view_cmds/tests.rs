@@ -238,7 +238,7 @@ fn batch_menu_requires_a_recorded_action() {
 
     assert!(crate::menus::is_enabled(&app, "file.automate.batch"));
     let dialog = menu(&mut app, &ctx, "file.automate.batch", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialog_mut(dialog).unwrap().fields["action"], "Invert");
+    assert_eq!(app.ui.dialog_fields(dialog).unwrap()["action"], "Invert");
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn engine_commands_open_their_dialogs() {
     crate::dialogs::confirm(&mut app, d).unwrap();
     assert_eq!(app.session.active().unwrap().doc.size.width, 55);
     let d = menu(&mut app, &ctx, "file.fileInfo", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    app.ui.dialog_mut(d).unwrap().fields.insert("title".into(), json!("Wheat Field"));
+    crate::dialogs::hosted::set_field(&mut app, d, "title", json!("Wheat Field")).unwrap();
     crate::dialogs::confirm(&mut app, d).unwrap();
     assert_eq!(app.run("file.fileInfo", json!({})).unwrap()["title"], "Wheat Field");
     let d = menu(&mut app, &ctx, "view.newGuideLayout", json!({})).unwrap()["dialog"].as_u64().unwrap();
@@ -405,12 +405,12 @@ fn batch_dialogs_include_all_subfolders() {
     app.session.actions.list.push(photocraft_engine::actions_cmds::Action::new("Invert", vec![("image.adjustments.invert".into(), json!({}))]));
     for (id, out) in [("file.automate.batch", "batch"), ("file.scripts.imageProcessor", "processed")] {
         let d = menu(&mut app, &ctx, id, json!({})).unwrap()["dialog"].as_u64().unwrap();
-        let fields = &mut app.ui.dialog_mut(d).unwrap().fields;
+        let fields = app.ui.dialog_fields(d).unwrap();
         assert_eq!(fields["includeSubfolders"], json!(false), "{id}");
         assert_eq!(fields["__labels"]["includeSubfolders"], json!("Include All Subfolders"), "{id}");
-        fields.insert("input".into(), json!(input));
-        fields.insert("output".into(), json!(dir.join(out).to_string_lossy()));
-        fields.insert("includeSubfolders".into(), json!(true));
+        crate::dialogs::hosted::set_field(&mut app, d, "input", json!(input)).unwrap();
+        crate::dialogs::hosted::set_field(&mut app, d, "output", json!(dir.join(out).to_string_lossy())).unwrap();
+        crate::dialogs::hosted::set_field(&mut app, d, "includeSubfolders", json!(true)).unwrap();
         let r = crate::dialogs::confirm(&mut app, d).unwrap();
         assert_eq!(r["files"].as_array().map(Vec::len), Some(1), "{id}: {r}");
         assert!(dir.join(out).join("sub").is_dir(), "{id} keeps the subfolder: {r}");
@@ -730,7 +730,7 @@ fn file_info_dialog_matches_photoshop_field_order_and_labels() {
     crate::i18n::with_language(crate::i18n::Lang::EN, || {
         let (mut app, ctx) = app_with(1);
         let d = menu(&mut app, &ctx, "file.fileInfo", json!({})).unwrap()["dialog"].as_u64().unwrap();
-        let fields = app.ui.dialog_mut(d).unwrap().fields.clone();
+        let fields = app.ui.dialog_fields(d).unwrap();
         assert_eq!(
             form_keys(&fields).iter().map(String::as_str).collect::<Vec<_>>(),
             ["title", "author", "authorTitle", "description", "keywords", "copyrightStatus", "copyright", "copyrightUrl"]

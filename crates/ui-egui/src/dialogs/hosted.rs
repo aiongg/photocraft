@@ -2,10 +2,10 @@
 //!
 //! The host and the legacy loop in [`super::show`] draw against one `DialogStack`, so modality and
 //! top-ness are common. Each hosted dialog has a [`Hosted`] record under the u64 id automation
-//! uses; the library host knows dialogs only by type, so the record is how `ui.dialog.*` and the
-//! cancel cleanup find one.
+//! uses; the record's key gives the library's dialog id, which finds the dialog in the host. The
+//! record also holds what the library dialog does not: the `__` keys, the cancel cleanup's input.
 
-use craft::ui::dialog::{CommandForm, DialogFields, DialogHost, DialogResult, FieldValue, Param, ParamDialog, ParamKind, Width};
+use craft::ui::dialog::{CommandForm, DialogFields, DialogHost, DialogResult, FieldValue, Param, ParamKind, PathKind, PathRequest, Width, dialog_id};
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
@@ -13,21 +13,13 @@ use crate::PhotocraftApp;
 
 type Fields = serde_json::Map<String, Value>;
 
-/// Which library dialog type a record points at.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HostedKind {
-    Param,
-    Form,
-}
-
 /// One open hosted dialog.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hosted {
     /// The id automation addresses the dialog by (`UiState::alloc_id`).
     pub id: u64,
-    pub kind: HostedKind,
-    /// The library dialog's own key (`ParamDialog::key`, `CommandForm::key`): the host finds the
-    /// dialog by type, so a lookup checks the key before it trusts the type.
+    /// The library dialog's own key (`CommandForm::key`). The host knows a dialog by
+    /// `dialog_id(key)`, so this is also how a record finds its dialog.
     pub key: String,
     pub params: Vec<Param>,
     /// The dialog's title as `dialogs::title` gives it (untranslated, no trailing "…").
@@ -76,13 +68,19 @@ impl crate::state::UiState {
         self.hosted.iter().find(|h| h.id == id)
     }
 
+    /// The library form of hosted dialog `id`, found in the host by its dialog id.
+    pub fn hosted_form(&self, id: u64) -> Option<&CommandForm> {
+        self.host.get_by_id::<CommandForm>(dialog_id(self.hosted(id)?.key.as_str()))
+    }
+
+    fn hosted_form_mut(&mut self, id: u64) -> Option<&mut CommandForm> {
+        let key = self.hosted(id)?.key.clone();
+        self.host.get_dyn_mut(dialog_id(key.as_str()))?.downcast_mut()
+    }
+
     /// The library fields of hosted dialog `id`, read from the host.
     pub fn hosted_fields(&self, id: u64) -> Option<&DialogFields> {
-        let record = self.hosted(id)?;
-        match record.kind {
-            HostedKind::Param => self.host.get::<craft::ui::dialog::ParamDialog>().filter(|d| d.key() == record.key).map(|d| d.fields()),
-            HostedKind::Form => self.host.get::<craft::ui::dialog::CommandForm>().filter(|d| d.key() == record.key).map(|d| d.fields()),
-        }
+        self.hosted_form(id).map(CommandForm::fields)
     }
 
     /// The JSON fields of dialog `id`: the legacy list first, then the hosted registry.
@@ -135,6 +133,8 @@ pub fn field_from_json(kind: &ParamKind, value: &Value) -> Result<FieldValue, St
         ParamKind::Int { .. } => {
             value.as_i64().or_else(|| value.as_f64().filter(|n| n.fract() == 0.0 && n.abs() < 9.0e15).map(|n| n as i64)).map(FieldValue::Int)
         }
+        // The host's own row decides what it keeps under its key.
+        ParamKind::Custom(_) => serde_json::from_value::<FieldValue>(value.clone()).ok(),
         _ => serde_json::from_value::<FieldValue>(value.clone()).ok().filter(|v| kind.fits(v)),
     };
     parsed.ok_or_else(|| format!("{value} is not a value this field takes"))
@@ -160,38 +160,46 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
         return Ok(());
     };
     let value = field_from_json(&param.kind, &value).map_err(|e| format!("`{field}`: {e}"))?;
-    let (kind, key) = (record.kind, record.key.clone());
-    let fields = match kind {
-        HostedKind::Param => app.ui.host.get_mut::<ParamDialog>().filter(|d| d.key() == key).map(|d| d.fields_mut()),
-        HostedKind::Form => app.ui.host.get_mut::<CommandForm>().filter(|d| d.key() == key).map(|d| d.fields_mut()),
-    };
-    fields.ok_or_else(|| format!("no dialog {id}"))?.set(field, value);
+    app.ui.hosted_form_mut(id).ok_or_else(|| format!("no dialog {id}"))?.fields_mut().set(field, value);
     Ok(())
 }
 
-/// Opens a form for `command`: the command runs with the fields at OK. A form already open is
+/// What a form needs beyond its rows.
+pub struct FormSpec {
+    pub command: String,
+    pub label: String,
+    pub params: Vec<Param>,
+    pub values: DialogFields,
+    pub extra: Fields,
+    pub private: Fields,
+    pub width: Width,
+    /// A read-only section under the rows (File Info's Camera Data).
+    pub below: Option<Box<dyn Fn(&mut egui::Ui, &DialogFields) + Send>>,
+}
+
+/// Opens a form for its command: the command runs with the fields at OK. A form already open is
 /// replaced (the host holds one `CommandForm`), with its cancel cleanup.
-#[allow(clippy::too_many_arguments)]
-pub fn open_form(
-    app: &mut PhotocraftApp,
-    command: &str,
-    label: &str,
-    params: Vec<Param>,
-    values: DialogFields,
-    extra: Fields,
-    private: Fields,
-    width: Width,
-) -> u64 {
-    if let Some(old) = app.ui.hosted.iter().find(|h| h.kind == HostedKind::Form).map(|h| h.id) {
-        app.ui.host.cancel::<CommandForm>();
-        app.ui.host.take::<CommandForm>();
-        cancelled(app, old);
-    }
+pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
+    let FormSpec { command, label, params, values, extra, private, width, below } = spec;
     let id = app.ui.alloc_id();
     let title = label.trim_end_matches('…').to_owned();
-    let form = CommandForm::new(command, crate::dialogs::display_label(label), params.clone()).values(values).width(width);
-    app.ui.hosted.push(Hosted { id, kind: HostedKind::Form, key: command.to_owned(), params, title, extra, private });
+    let mut form = CommandForm::new(command.as_str(), crate::dialogs::display_label(&label), params.clone())
+        .values(values)
+        .width(width)
+        // Cmd/Ctrl+Z steps the form's own settings (#4697), and the close box follows the platform.
+        .history(true)
+        .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()));
+    if let Some(below) = below {
+        form = form.below(below);
+    }
+    // Opening over a form replaces it: its Cancel waits in the host with its key.
     app.ui.host.open(form);
+    if let Some((_, Some(old))) = app.ui.host.take_keyed::<CommandForm>()
+        && let Some(old) = app.ui.hosted.iter().find(|h| h.key == old).map(|h| h.id)
+    {
+        cancelled(app, old);
+    }
+    app.ui.hosted.push(Hosted { id, key: command, params, title, extra, private });
     id
 }
 
@@ -209,40 +217,74 @@ fn run_form(app: &mut PhotocraftApp, record: Hosted, mut params: Fields) -> Resu
     result
 }
 
-/// `ui.dialog.confirm` for a hosted dialog. The library has no programmatic OK, so this closes the
-/// dialog as a cancel and runs its command with the fields it holds.
-pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    let params = fields_json(app.ui.hosted_fields(id).ok_or_else(|| format!("no dialog {id}"))?);
-    let at = app.ui.hosted.iter().position(|h| h.id == id).ok_or_else(|| format!("no dialog {id}"))?;
-    let record = app.ui.hosted.remove(at);
-    match record.kind {
-        HostedKind::Param => {
-            app.ui.host.cancel::<ParamDialog>();
-            app.ui.host.take::<ParamDialog>();
-        }
-        HostedKind::Form => {
-            app.ui.host.cancel::<CommandForm>();
-            app.ui.host.take::<CommandForm>();
-        }
+/// `ui.dialog.confirm` for a hosted dialog: OK as the default button answers it (refused while OK
+/// is disabled), then the same path a click takes.
+pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
+    if app.ui.hosted_form(id).is_none() {
+        return Err(format!("no dialog {id}"));
     }
-    run_form(app, record, params)
+    if !app.ui.host.confirm::<CommandForm>(ctx) {
+        return Err("OK is disabled: the dialog's values are not complete".into());
+    }
+    settle(app).unwrap_or_else(|| Err(format!("no dialog {id}")))
 }
 
 /// The form's answer, after `DialogHost::show`: OK runs the command, Cancel runs the cleanup.
 pub fn collect(app: &mut PhotocraftApp) {
-    let Some(result) = app.ui.host.take::<CommandForm>() else { return };
-    let Some(record) = app.ui.hosted.iter().find(|h| h.kind == HostedKind::Form).cloned() else { return };
+    browse(app);
+    if let Some(Err(error)) = settle(app) {
+        app.ui.status = error;
+    }
+}
+
+/// Takes the form's stored answer. OK runs the command and returns its result; Cancel runs the
+/// cleanup of the record the answer's key names.
+fn settle(app: &mut PhotocraftApp) -> Option<Result<Value, String>> {
+    let (result, key) = app.ui.host.take_keyed::<CommandForm>()?;
+    let record = app.ui.hosted.iter().find(|h| Some(&h.key) == key.as_ref()).cloned()?;
     match result {
-        DialogResult::Ok(answer) if answer.key == record.key => {
+        DialogResult::Ok(answer) => {
             app.ui.hosted.retain(|h| h.id != record.id);
-            if let Err(error) = run_form(app, record, fields_json(&answer.fields)) {
-                app.ui.status = error;
-            }
+            Some(run_form(app, record, fields_json(&answer.fields)))
         }
-        _ => {
+        DialogResult::Cancel => {
             cancelled(app, record.id);
+            None
         }
     }
+}
+
+/// The Browse… button of a path row, once pressed: opens the file or folder dialog, and the answer
+/// fills the row.
+fn browse(app: &mut PhotocraftApp) {
+    let Some(form) = app.ui.host.get_mut::<CommandForm>() else { return };
+    let Some(PathRequest { key: field, kind }) = form.pick_path() else { return };
+    let current = form.fields().text(&field).unwrap_or_default().to_owned();
+    let key = form.key().to_owned();
+    let Some(id) = app.ui.hosted.iter().find(|h| h.key == key).map(|h| h.id) else { return };
+    let fill = move |app: &mut PhotocraftApp, path: String| fill_path(app, id, &field, path);
+    let result = match kind {
+        PathKind::Folder => app.ask_folder(fill),
+        PathKind::OpenFile => {
+            let initial_dir = crate::file_dialog::last_used_dir(&app.ui.recent_files);
+            let request = crate::file_dialog::FileDialogRequest::Open { multiple: false, initial_dir, extensions: None };
+            app.ask_file(request, move |app, answer| match answer {
+                crate::file_dialog::FileDialogAnswer::Paths(mut paths) if !paths.is_empty() => fill(app, paths.remove(0)),
+                _ => Err("the file dialog gave an unexpected answer".into()),
+            })
+        }
+        PathKind::SaveFile => app.ask_file(crate::file_dialog::FileDialogRequest::Save { suggested: current }, move |app, answer| match answer {
+            crate::file_dialog::FileDialogAnswer::SaveTo(path) => fill(app, path),
+            _ => Err("the file dialog gave an unexpected answer".into()),
+        }),
+    };
+    crate::dialogs::report_browse(app, result);
+}
+
+fn fill_path(app: &mut PhotocraftApp, id: u64, key: &str, path: String) -> Result<Value, String> {
+    let form = app.ui.hosted_form_mut(id).ok_or("the dialog was closed")?;
+    form.fields_mut().set(key, FieldValue::Text(path));
+    Ok(Value::Null)
 }
 
 /// Runs PC's cancel cleanup for hosted dialog `id` and drops its record: the paused action it
@@ -258,14 +300,11 @@ pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
 
 /// `ui.dialog.cancel` for a hosted dialog: closes the library dialog, then runs the cleanup.
 pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    if app.ui.hosted_fields(id).is_none() {
+    if app.ui.hosted_form(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
-    match app.ui.hosted(id).map(|h| h.kind) {
-        Some(HostedKind::Param) => app.ui.host.cancel::<ParamDialog>() && app.ui.host.take::<ParamDialog>().is_some(),
-        Some(HostedKind::Form) => app.ui.host.cancel::<CommandForm>() && app.ui.host.take::<CommandForm>().is_some(),
-        None => false,
-    };
+    app.ui.host.cancel::<CommandForm>();
+    app.ui.host.take_keyed::<CommandForm>();
     cancelled(app, id);
     Ok(Value::Null)
 }

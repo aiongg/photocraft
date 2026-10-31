@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(h.state().session.documents().len(), 2);
         assert!(!h.state().ui.status_error);
         click(&mut h, "History Options…");
-        assert_eq!(h.state().ui.dialogs.len(), 1, "History Options… opens its dialog");
+        assert_eq!(h.state().ui.hosted.len(), 1, "History Options… opens its dialog");
         assert!(!h.state().ui.status_error, "{}", h.state().ui.status);
     }
 

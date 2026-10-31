@@ -7,7 +7,6 @@
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::DialogKind;
 
 pub const COMMAND: &str = "history.options";
 
@@ -23,10 +22,6 @@ pub fn menu(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Result<
 pub fn open(app: &mut PhotocraftApp) -> u64 {
     let current = photocraft_engine::history_options_cmds::current(&app.session);
     let mut f = Map::new();
-    f.insert("__command".into(), json!(COMMAND));
-    f.insert("__label".into(), json!("History Options…"));
-    f.insert("__form".into(), json!(true));
-    f.insert("__choices".into(), json!({}));
     // Photoshop's capitalised labels, in the UI language (the form would sentence-case the keys).
     f.insert(
         "__labels".into(),
@@ -38,7 +33,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     for key in photocraft_engine::history_options_cmds::OPTIONS {
         f.insert(key.into(), current.get(key).cloned().unwrap_or(Value::Bool(false)));
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    crate::view_cmds::form(app, COMMAND, "History Options…", Value::Object(f), json!({}))
 }
 
 #[cfg(test)]
@@ -55,30 +50,29 @@ mod tests {
         let ctx = egui::Context::default();
         let r = crate::menus::invoke(&mut app, &ctx, COMMAND, json!({})).unwrap();
         let id = r["dialog"].as_u64().unwrap();
-        let d = app.ui.dialogs.iter().find(|d| d.id == id).unwrap();
-        assert_eq!(d.fields["allowNonLinearHistory"], json!(false));
-        assert_eq!(d.fields["makeLayerVisibilityChangesUndoable"], json!(true));
-        assert_eq!(crate::dialogs::title(d), "History Options");
+        let fields = app.ui.dialog_fields(id).unwrap();
+        assert_eq!(fields["allowNonLinearHistory"], json!(false));
+        assert_eq!(fields["makeLayerVisibilityChangesUndoable"], json!(true));
+        assert_eq!(app.ui.hosted(id).unwrap().title, "History Options");
         // Cancel changes nothing.
-        app.ui.dialog_mut(id).unwrap().fields.insert("allowNonLinearHistory".into(), json!(true));
+        crate::dialogs::hosted::set_field(&mut app, id, "allowNonLinearHistory", json!(true)).unwrap();
         crate::dialogs::cancel(&mut app, id).unwrap();
         assert!(!app.session.prefs().history_options.allow_non_linear_history);
         // OK applies both checkboxes.
         let id = open(&mut app);
-        let fields = &mut app.ui.dialog_mut(id).unwrap().fields;
-        fields.insert("allowNonLinearHistory".into(), json!(true));
-        fields.insert("makeLayerVisibilityChangesUndoable".into(), json!(false));
+        crate::dialogs::hosted::set_field(&mut app, id, "allowNonLinearHistory", json!(true)).unwrap();
+        crate::dialogs::hosted::set_field(&mut app, id, "makeLayerVisibilityChangesUndoable", json!(false)).unwrap();
         crate::dialogs::confirm(&mut app, id).unwrap();
         let o = &app.session.prefs().history_options;
         assert!(o.allow_non_linear_history && !o.make_layer_visibility_changes_undoable);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(!app.ui.any_dialog_open());
         // Reopened, it shows what was chosen; with params the command runs without a dialog.
         let id = open(&mut app);
-        assert_eq!(app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields["allowNonLinearHistory"], json!(true));
+        assert_eq!(app.ui.dialog_fields(id).unwrap()["allowNonLinearHistory"], json!(true));
         crate::dialogs::cancel(&mut app, id).unwrap();
         let r = crate::menus::invoke(&mut app, &ctx, COMMAND, json!({"allowNonLinearHistory": false})).unwrap();
         assert_eq!(r["allowNonLinearHistory"], json!(false));
-        assert!(app.ui.dialogs.is_empty());
+        assert!(!app.ui.any_dialog_open());
         assert!(crate::menus::invoke(&mut app, &ctx, COMMAND, json!({"allowNonLinearHistory": "no"})).is_err());
     }
 

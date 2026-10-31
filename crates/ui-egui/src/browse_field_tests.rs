@@ -16,7 +16,9 @@ fn harness(answers: Vec<Option<FileDialogAnswer>>) -> (Harness<'static, Photocra
 }
 
 fn field(h: &Harness<'_, PhotocraftApp>, key: &str) -> Option<Value> {
-    h.state().ui.dialogs.last().and_then(|d| d.fields.get(key).cloned())
+    let ui = &h.state().ui;
+    let id = ui.hosted.last().map(|h| h.id).or_else(|| ui.dialogs.last().map(|d| d.id))?;
+    ui.dialog_fields(id)?.get(key).cloned()
 }
 
 #[test]

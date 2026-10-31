@@ -158,7 +158,7 @@ fn file_info_camera_data_draws_in_the_selected_language_read_only() {
         h.state_mut().run("prefs.set", json!({"path": "interface.language", "value": "de"})).expect("language");
         let ctx = h.ctx.clone();
         let dialog = crate::menus::invoke(h.state_mut(), &ctx, "file.fileInfo", json!({})).expect("file info")["dialog"].as_u64().expect("dialog id");
-        assert_eq!(h.state_mut().ui.dialog_mut(dialog).expect("open").fields["__camera"]["exposure"], "1/250 s");
+        assert_eq!(h.state().ui.dialog_fields(dialog).expect("open")["__camera"]["exposure"], "1/250 s");
         h.run_steps(4);
         let text = drawn_text(&h);
         let de = lang("de");

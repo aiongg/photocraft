@@ -44,7 +44,12 @@ fn browse_field(app: &mut PhotocraftApp, id: u64, fields: &serde_json::Map<Strin
     } else {
         return;
     };
-    if let Err(e) = r.map(|_| ()).or_else(|e| if e == crate::file_dialog::CANCELLED { Ok(()) } else { Err(e) }) {
+    report_browse(app, r);
+}
+
+/// A Browse… that failed shows its error; one the user cancelled shows nothing.
+pub(crate) fn report_browse(app: &mut PhotocraftApp, result: Result<Value, String>) {
+    if let Err(e) = result.map(|_| ()).or_else(|e| if e == crate::file_dialog::CANCELLED { Ok(()) } else { Err(e) }) {
         app.ui.status = e;
     }
 }
@@ -273,7 +278,6 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
         _ if is_filter_route(fields) => filter_body(app, ui, fields, id),
         _ if crate::new_guide_ui::owns(fields) => crate::new_guide_ui::body(ui, fields),
-        _ if fields.contains_key("__form") => crate::view_cmds::form_body(ui, fields),
         _ => {}
     }
     outcome
@@ -677,7 +681,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         match done {
             Some(true) => {
-                if let Err(error) = confirm(app, d.id) {
+                if let Err(error) = confirm_in(app, ctx, d.id) {
                     app.ui.status = error;
                 }
             }
@@ -964,9 +968,15 @@ fn confirm_command_more(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, Str
     }
 }
 
+/// [`confirm_in`] for callers without a frame (tests, the shortcut import): a hosted dialog's OK
+/// needs a context only to open its fields, which a dialog never shown has not done.
 pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
+    confirm_in(app, &egui::Context::default(), id)
+}
+
+pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     if app.ui.hosted(id).is_some() {
-        return hosted::confirm(app, id);
+        return hosted::confirm(app, ctx, id);
     }
     confirm_preflight(app, id)?;
     let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
