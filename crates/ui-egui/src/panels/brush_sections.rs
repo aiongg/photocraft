@@ -11,7 +11,7 @@ use photocraft_engine::paint::{self, BrushPreset, Control, Dynamic, MAX_BRUSH_SI
 
 use crate::brush_preview;
 use crate::state::Tool;
-use crate::theme::{self, Tokens};
+use crate::theme;
 use crate::widgets;
 
 pub const CONTROLS: [(Control, &str); 8] = [

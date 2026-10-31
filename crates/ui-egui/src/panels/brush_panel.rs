@@ -15,7 +15,7 @@
 //! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
 
 use craft::ui::theme::StrokeExt;
-use egui::{Color32, CornerRadius, Sense, Stroke, vec2};
+use egui::{Color32, CornerRadius, Sense, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
 use serde::{Deserialize, Serialize};

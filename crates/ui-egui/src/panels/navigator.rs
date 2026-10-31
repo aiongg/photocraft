@@ -1,4 +1,4 @@
-use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, icons, pos2, vec2, widgets};
+use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, StrokeKind, icons, pos2, vec2, widgets};
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
 

@@ -358,6 +358,8 @@ fn group_open(st: &PresetUi, panel: &str, gi: usize, name: &str) -> bool {
 
 /// The footer's height (gap, size slider and buttons) before it has been measured.
 const FOOTER_GUESS: f32 = 32.0;
+/// The list keeps this much height (egui's own scroll minimum) unless the dock group is shorter.
+const MIN_LIST_HEIGHT: f32 = 64.0;
 
 /// Where a browser sits: the canvas (drop target), its height cap and the New button's tooltip.
 /// `flush` lays the grid out as Photoshop's Swatches panel: the cells touch, square-cornered and
@@ -457,24 +459,20 @@ pub(crate) fn browser(
         .default_open(default_open)
         .reorder(reorder)
         .labels(labels.clone())
-        .max_height(max_h);
+        .max_height(max_h)
+        .shrink_to_content(true)
+        .min_height(max_h.min(MIN_LIST_HEIGHT));
     if size <= MIN_THUMB + 0.5 {
         browser = browser.view_lock(PresetView::List);
     }
     if let Some(key) = rename {
         browser = browser.start_rename(key);
     }
-    // The browser keeps at least egui's 64 pt of scroll height; a shorter dock group clips it so
-    // the footer stays in view.
-    let list = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), max_h));
-    let mut list_ui = ui.new_child(egui::UiBuilder::new().max_rect(list));
-    list_ui.set_clip_rect(list.intersect(ui.clip_rect()));
-    let out = browser.show(&mut list_ui, |painter, rect, info| {
+    let out = browser.show(ui, |painter, rect, info| {
         if let Some(&(gi, ii)) = at.get(info.key.as_str()) {
             thumb(painter, rect, gi, ii);
         }
     });
-    ui.allocate_rect(list, Sense::hover());
 
     for event in out.events {
         match event {

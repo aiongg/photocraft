@@ -1,3 +1,4 @@
+use egui::Stroke;
 use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
