@@ -21,7 +21,6 @@ pub mod field_wheel;
 mod fields;
 pub(super) mod numeric_expression;
 mod panel;
-pub mod point_curve;
 pub mod press_menu;
 mod scrub;
 mod slider;
