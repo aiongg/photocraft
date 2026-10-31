@@ -68,9 +68,9 @@ fn gesture_of<T>(event: &EditEvent<T>) -> Option<u64> {
 /// with (kept in `start`).
 fn edit_value<T: Clone + Send + Sync + 'static>(ui: &egui::Ui, start: egui::Id, event: Option<&EditEvent<T>>, current: &T) -> Option<(T, Option<u64>)> {
     match event? {
-        EditEvent::Begin { .. } => {
+        e @ EditEvent::Begin { value, .. } => {
             ui.data_mut(|d| d.insert_temp(start, current.clone()));
-            None
+            value.clone().map(|v| (v, gesture_of(e)))
         }
         e @ (EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some((value.clone(), gesture_of(e))),
         e @ EditEvent::Commit { value, changed: true, .. } => Some((value.clone(), gesture_of(e))),

@@ -357,8 +357,11 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                 let before = mem.with("before");
                 let edit = CurveEditor::new(mem.with("curve"), tl!("Contour"), &curve, &numbers).percent().corners(true).side(250.0).show(ui);
                 match edit.event {
-                    Some(EditEvent::Begin { .. }) => {
+                    Some(EditEvent::Begin { value, .. }) => {
                         ui.data_mut(|d| d.insert_temp(before, c.clone()));
+                        if let Some(value) = value {
+                            set_curve(f, &value);
+                        }
                     }
                     Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. }) => {
                         set_curve(f, &value);

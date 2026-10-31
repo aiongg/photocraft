@@ -97,8 +97,12 @@ pub(super) fn levels(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         |v: &mut Value, n: &Levels| write_levels(v, chan.key, &[n.in_black as f32, n.gamma as f32, n.in_white as f32, n.out_black as f32, n.out_white as f32]);
     let before_id = cx.mem.with("levels-before");
     match editor.show(ui).event {
-        Some(EditEvent::Begin { .. }) => {
+        Some(EditEvent::Begin { value, .. }) => {
             ui.data_mut(|d| d.insert_temp(before_id, l));
+            if let Some(value) = value {
+                write(v, &value);
+                e.changed = true;
+            }
         }
         Some(EditEvent::Update { value, .. }) => {
             write(v, &value);

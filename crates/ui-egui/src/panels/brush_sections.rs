@@ -56,9 +56,13 @@ fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclus
     let mut changed = false;
     for event in response.edits() {
         match event {
-            EditEvent::Begin { .. } => {
+            EditEvent::Begin { value, .. } => {
                 let start = *v;
                 ui.data_mut(|d| d.insert_temp(before, start));
+                if let Some(value) = value {
+                    *v = value.round().clamp(lo, hi) as f32;
+                    changed = true;
+                }
             }
             EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. } => {
                 *v = value.round().clamp(lo, hi) as f32;

@@ -136,9 +136,12 @@ fn apply(ui: &egui::Ui, id: egui::Id, scale: f64, event: Option<&EditEvent<f64>>
         hasher.finish()
     });
     let changed = match event {
-        Some(EditEvent::Begin { .. }) => {
+        Some(EditEvent::Begin { value: v, .. }) => {
             ui.data_mut(|d| d.insert_temp(start, *value));
-            false
+            if let Some(v) = v {
+                *value = (*v / scale) as f32;
+            }
+            v.is_some()
         }
         Some(EditEvent::Update { value: v, .. } | EditEvent::Set { value: v, .. }) => {
             *value = (*v / scale) as f32;

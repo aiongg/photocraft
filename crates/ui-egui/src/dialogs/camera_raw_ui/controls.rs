@@ -111,8 +111,12 @@ fn slider(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: 
     let SliderRowResponse { response, slider, field } = row.show(ui);
     for event in [field.event, slider.event].into_iter().flatten() {
         match event {
-            EditEvent::Begin { .. } => {
+            EditEvent::Begin { value, .. } => {
                 ui.data_mut(|d| d.insert_temp(before, *v));
+                if let Some(value) = value {
+                    *v = value as f32;
+                    *dirty = true;
+                }
             }
             EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. } => {
                 *v = value as f32;

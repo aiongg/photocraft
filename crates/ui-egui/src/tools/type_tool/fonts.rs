@@ -204,8 +204,12 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
         let response = craft::ui::composites::SliderRow::new(salt, axis_label(&axis.0), f64::from(v), f64::from(min)..=f64::from(max), &numbers).show(ui);
         for event in response.edits() {
             match event {
-                craft::ui::edit::EditEvent::Begin { .. } => {
+                craft::ui::edit::EditEvent::Begin { value, .. } => {
                     ui.data_mut(|d| d.insert_temp(before, v));
+                    if let Some(value) = value {
+                        v = value as f32;
+                        changed = true;
+                    }
                 }
                 craft::ui::edit::EditEvent::Update { value, .. }
                 | craft::ui::edit::EditEvent::Set { value, .. }
