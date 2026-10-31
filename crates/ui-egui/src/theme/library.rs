@@ -123,7 +123,7 @@ impl Tokens {
     /// The tokens of a built-in legacy kind at its own Size, resolved without a theme store.
     pub fn for_kind(kind: ThemeKind) -> Tokens {
         let sel = selection_for(kind);
-        let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size };
+        let defaults = craft_theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
         let base =
             craft_ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft_theme::builtins().iter().find(|t| t.id == *id).cloned());
         let shown = base.shown(kind.mode());

@@ -39,7 +39,7 @@ pub fn pasteboard_color(app: &PhotocraftApp) -> Option<Color32> {
 
 /// What PhotoCraft shows when the user and the suite have chosen nothing: ArtCraft, dark, Compact.
 pub(crate) fn app_defaults() -> AppDefaults {
-    AppDefaults { theme: ThemePair::same(ThemeId::suite_default()), mode: ModeChoice::Dark, size: Size::Compact }
+    AppDefaults { theme: ThemePair::same(ThemeId::suite_default()), mode: ModeChoice::Dark, size: Size::Compact, sizes: Default::default() }
 }
 
 /// The app's own choice from its preferences: the theme pair and Size where set, the mode always
