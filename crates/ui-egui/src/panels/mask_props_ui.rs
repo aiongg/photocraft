@@ -81,11 +81,7 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: u64, document: u64
         ("density", tl!("Density"), f64::from(density) * 100.0, 100.0, "{n} %", None),
         ("feather", tl!("Feather"), f64::from(feather), 1000.0, "{n} px", Some(3.0)),
     ] {
-        // The mask stores single-precision values, so the row shows the gesture's own value until
-        // it ends: a shown value that differs from the reported one would cancel the gesture.
-        let draft = ui.scope_id().with(("draft", prefix, field, layer));
-        let shown = ui.data(|d| d.get_temp::<f64>(draft)).unwrap_or(value);
-        let mut row = SliderRow::new((prefix, field), label, shown, 0.0..=max, &numbers).unit(Unit::new(unit));
+        let mut row = SliderRow::new((prefix, field), label, value, 0.0..=max, &numbers).unit(Unit::new(unit));
         if let Some(k) = curve {
             row = row.curve(k);
         }
@@ -93,22 +89,14 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: u64, document: u64
             // A drag, a scrub or typing is one gesture and one history step; a key or wheel step
             // is its own.
             let (value, gesture) = match event {
-                EditEvent::Update { id, value, .. } => {
-                    ui.data_mut(|d| d.insert_temp(draft, value));
-                    (value, id.to_string())
-                }
+                EditEvent::Update { id, value, .. } => (value, id.to_string()),
                 EditEvent::Commit { id, value, changed, .. } => {
-                    ui.data_mut(|d| d.remove::<f64>(draft));
                     if !changed {
                         continue;
                     }
                     (value, id.to_string())
                 }
                 EditEvent::Set { value, .. } => (value, format!("set{}", ui.ctx().cumulative_pass_nr())),
-                EditEvent::Cancel { .. } => {
-                    ui.data_mut(|d| d.remove::<f64>(draft));
-                    continue;
-                }
                 _ => continue,
             };
             let mut params = json!({"document": document, "layer": layer,
