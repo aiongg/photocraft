@@ -1,4 +1,4 @@
-use super::{PhotocraftApp, RichText, Tokens, Value, empty, json, theme, widgets};
+use super::{PhotocraftApp, RichText, Tokens, Value, json, theme, widgets};
 
 /// The active document's pixel under the pointer, if the pointer is over the image.
 pub(crate) fn hover_pixel(app: &PhotocraftApp) -> Option<(i32, i32)> {
@@ -27,7 +27,7 @@ pub(crate) fn pointer_sample(app: &mut PhotocraftApp, (x, y): (i32, i32)) -> Opt
 pub(super) fn info_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        empty(ui, tl!("No document"));
+        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let (size, origin) = (st.doc.size, st.doc.ruler_origin);

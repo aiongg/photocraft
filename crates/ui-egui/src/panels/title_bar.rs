@@ -10,7 +10,6 @@ use super::{PhotocraftApp, Sense, Tokens, icons, vec2, widgets};
 /// the OS draws its own icon and title, so the in-app bar shows menus and workspace controls
 /// only: no brand mark, no centred title.
 pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    sync_library_direction(ui.ctx());
     let system = system_title_bar(app);
     let custom = app.custom_titlebar;
     let style = crate::titlebar::style(app, ui.ctx());
@@ -35,7 +34,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui,
             |ui, slots| {
                 let mut end = 0.0;
-                centred_on(ui, &slots, crate::direction::row(), |ui| {
+                centred_on(ui, &slots, craft_ui::direction::row(ui), |ui| {
                     // Beside caption buttons the contents keep 4 pt clear of them.
                     if custom && slots.leading_caption > 0.0 {
                         ui.add_space(CAPTION_CLEARANCE);
@@ -55,7 +54,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 end
             },
             |ui, slots| {
-                centred_on(ui, &slots, crate::direction::trailing(), |ui| {
+                centred_on(ui, &slots, craft_ui::direction::trailing(ui), |ui| {
                     if custom && slots.trailing_caption > 0.0 {
                         ui.add_space(CAPTION_CLEARANCE);
                     }
@@ -67,20 +66,6 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if response.is_some_and(|r| r.close_requested) {
         let ctx = ui.ctx().clone();
         let _ = crate::menus::invoke(app, &ctx, "file.exit", serde_json::json!({}));
-    }
-}
-
-/// The library bar mirrors itself from `craft_ui::direction`; PhotoCraft's own direction
-/// (`crate::direction`) picks sides and rows itself and keeps egui's style left to right, so only
-/// the library's record of the direction is set here, not the style flag `apply` also sets.
-// TODO(library): `craft_ui::direction` needs a way to set the direction without the style flag
-// (or PhotoCraft adopts it), so this bridge can go.
-pub(super) fn sync_library_direction(ctx: &egui::Context) {
-    use craft_ui::direction::{Direction, HasDirection as _};
-    let want = if crate::direction::is_rtl() { Direction::Rtl } else { Direction::Ltr };
-    if ctx.direction() != want {
-        craft_ui::direction::apply(ctx, want);
-        ctx.all_styles_mut(|s| s.right_to_left = false);
     }
 }
 

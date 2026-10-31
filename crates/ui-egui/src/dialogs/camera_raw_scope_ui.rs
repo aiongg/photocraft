@@ -691,15 +691,15 @@ pub(crate) fn shortcuts(ctx: &egui::Context, view: &mut CameraRawScopeState) {
     if ctx.text_edit_focused() {
         return;
     }
-    ctx.input_mut(|i| {
-        if i.consume_key(egui::Modifiers::NONE, egui::Key::U) {
-            view.shadows = !view.shadows;
-        }
-        if i.consume_key(egui::Modifiers::NONE, egui::Key::O) {
-            view.highlights = !view.highlights;
-        }
-        if i.consume_key(egui::Modifiers::NONE, egui::Key::S) {
-            view.sampler_tool = !view.sampler_tool;
-        }
+    static KEYS: std::sync::LazyLock<crate::dialog_keys::DialogKeys> = std::sync::LazyLock::new(|| {
+        crate::dialog_keys::DialogKeys::new("Camera Raw scopes", &[("shadows", "U".into()), ("highlights", "O".into()), ("sampler", "S".into())])
     });
+    for command in KEYS.pressed(ctx) {
+        match command.as_str() {
+            "shadows" => view.shadows = !view.shadows,
+            "highlights" => view.highlights = !view.highlights,
+            "sampler" => view.sampler_tool = !view.sampler_tool,
+            _ => {}
+        }
+    }
 }

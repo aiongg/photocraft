@@ -1,4 +1,3 @@
-use super::controls::remember_edit;
 use super::open::RawOpen;
 use super::{CameraRaw, PhotocraftApp, Value, json};
 
@@ -130,7 +129,6 @@ pub(super) fn load_settings(app: &mut PhotocraftApp) -> Result<Value, String> {
             d.curve_state = Default::default();
         }
         if d.params != next {
-            remember_edit(d);
             d.dirty = true;
             d.params = next;
         }

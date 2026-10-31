@@ -13,6 +13,7 @@
 //! The list itself ([`preset_list`]) is shared with the Brush Preset picker (`brush_picker`), so
 //! both show, pick and organise presets the same way; each keeps its own view state.
 
+use craft_ui::edit::EditEvent;
 use craft_ui::theme::StrokeExt;
 use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
 use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
@@ -877,14 +878,22 @@ fn rename_bar(ui: &mut egui::Ui, st: &mut BrushesPanelState, acts: &mut Vec<Acti
     }
     let mut done = false;
     ui.horizontal(|ui| {
-        let name_label = ui.label(RichText::new(if r.group { tl!("Group name") } else { tl!("Brush name") }).color(t.text_dim));
-        let resp = ui
-            .add(egui::TextEdit::singleline(&mut r.text).desired_width((ui.available_width() - 140.0).max(60.0)).id_salt("brush-rename"))
-            .labelled_by(name_label.id);
-        if !resp.has_focus() && !resp.lost_focus() {
-            resp.request_focus();
+        let label = if r.group { tl!("Group name") } else { tl!("Brush name") };
+        ui.label(RichText::new(label).color(t.text_dim));
+        let width = (ui.available_width() - 140.0).max(60.0);
+        let edit = ui
+            .scope(|ui| {
+                ui.set_max_width(width);
+                craft_ui::controls::TextField::new("brush-rename", label, r.text.as_str()).keep_focus(true).show(ui)
+            })
+            .inner;
+        if let Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, .. }) = edit.event.clone() {
+            r.text = value;
         }
-        let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        if !edit.response.has_focus() && !edit.response.lost_focus() {
+            edit.response.request_focus();
+        }
+        let enter = edit.submitted;
         let clicked = widgets::dialog_buttons(
             ui,
             &[

@@ -2,7 +2,7 @@ use super::curvature::curvature_refresh;
 use super::path_ops::{active_type_path, targeted_vector_mask, work_path_shown_in};
 use super::pen::{closing, over_first_anchor, shift_45};
 use craft_ui::theme::StrokeExt;
-use egui::{Color32, Pos2, Rect, Stroke, pos2, vec2};
+use egui::{Color32, Pos2, Rect, pos2, vec2};
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 
@@ -121,32 +121,69 @@ pub(crate) fn selected_saved_path(app: &PhotocraftApp) -> Option<&Path> {
     app.session.active()?.doc.paths.iter().find(|p| p.name == sel).map(|p| &p.path)
 }
 
+/// The key the library's path overlay knows a path of Direct Selection by.
+pub(crate) fn path_key(r: crate::direct_select::PathRef) -> u64 {
+    use crate::direct_select::PathRef;
+    match r {
+        PathRef::Work => 1,
+        PathRef::Layer(id) => 2 + (id << 2),
+        PathRef::TypePath(id) => 3 + (id << 2),
+        PathRef::Pen => 4,
+    }
+}
+
+/// `p` for the library's path overlay under `key`, drawn in `color`.
+fn edit_path(key: u64, p: &Path, color: Color32) -> craft_ui::canvas::EditPath {
+    use craft_ui::canvas::kurbo::Point;
+    use craft_ui::canvas::{EditPath, EditSubpath, Knot};
+    let at = |q: photocraft_geom::Point| Point::new(q.x, q.y);
+    let subpaths = p
+        .subpaths
+        .iter()
+        .map(|s| EditSubpath {
+            knots: s.knots.iter().map(|k| Knot { anchor: at(k.anchor), in_ctrl: at(k.in_ctrl), out_ctrl: at(k.out_ctrl), smooth: false }).collect(),
+            closed: s.closed,
+        })
+        .collect();
+    EditPath { key, subpaths, color: Some(color) }
+}
+
 /// Work path / active shape path / selected saved path outlines, anchors, and the pen path in
-/// progress.
-pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
+/// progress. The paths with anchors go through the library's `BezierOverlay` (it draws, the tools
+/// take the pointer); the others are outlines.
+pub fn draw_overlay(app: &PhotocraftApp, ui: &mut egui::Ui, canvas: &egui::Response, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
     let tool = app.ui.tool;
     let accent = Tokens::get(painter.ctx()).accent;
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
-    let draw_path = |p: &Path, anchors: bool| {
-        draw_outline(painter, p, &to_scr, accent);
+    // Paths drawn with their anchors, under their keys.
+    let mut anchored: Vec<craft_ui::canvas::EditPath> = Vec::new();
+    let mut selection = craft_ui::canvas::PathSelection::default();
+    let draw_path = |anchored: &mut Vec<craft_ui::canvas::EditPath>, p: &Path, anchors: bool| {
         if anchors {
-            for k in p.subpaths.iter().flat_map(|s| &s.knots) {
-                draw_anchor(painter, to_scr([k.anchor.x, k.anchor.y]), false, accent);
-            }
+            let key = 0x100 + anchored.len() as u64;
+            anchored.push(edit_path(key, p, accent));
+        } else {
+            draw_outline(painter, p, &to_scr, accent);
         }
     };
     // View › Show › Target Path (under Extras) hides the paths; the Pen's path in progress stays.
     // Free Transform Path draws the path through its box instead (transform_tool).
     let paths = app.ui.view.shows(app.ui.view.show.target_path) && app.ui.transform.as_ref().is_none_or(|t| t.path.is_none());
-    if app.session.active().is_some_and(|st| st.doc.id == doc.id) && crate::direct_select::shows(app, painter.ctx().input(|i| i.modifiers)) {
+    let mods = painter.ctx().input(|i| i.modifiers);
+    if app.session.active().is_some_and(|st| st.doc.id == doc.id) && crate::direct_select::shows(app, mods) {
         // Direct Selection (or the Pen with ⌘/Ctrl held) draws the paths it edits (#790).
-        crate::direct_select::draw_overlay(app, painter, &to_scr, accent, paths);
+        let (shown, selected) = crate::direct_select::overlay_paths(app, mods, paths);
+        for (r, p) in &shown {
+            anchored.push(edit_path(path_key(*r), p, accent));
+        }
+        selection = selected;
+        crate::direct_select::draw_marquee(app, painter, &to_scr);
         if paths {
             // The selected saved path shows too, though Direct Selection doesn't edit it yet.
             if let Some(p) = selected_saved_path(app) {
-                draw_path(p, true);
+                draw_path(&mut anchored, p, true);
             }
-            crate::anchor_tools::draw_hover(app, painter, &to_scr, accent, painter.ctx().input(|i| i.modifiers));
+            crate::anchor_tools::draw_hover(app, painter, &to_scr, accent, mods);
         }
     } else if paths {
         // The shape's or vector mask's path stays visible as an outline with any tool. Path
@@ -158,27 +195,34 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         if let Some(wp) = doc.work_path.as_ref().filter(|_| work_path_shown_in(app, doc))
             && (anchors || app.ui.selected_path.as_deref() == Some("work"))
         {
-            draw_path(wp, anchors);
+            draw_path(&mut anchored, wp, anchors);
         }
         // The saved path selected in the Paths panel is the target path (#6550).
         if let Some(p) = selected_saved_path(app) {
-            draw_path(p, anchors);
+            draw_path(&mut anchored, p, anchors);
         }
         let st = app.session.active();
         if let Some(l) = st.and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id)))
             && let LayerContent::Shape(sh) = &l.content
         {
-            draw_path(&sh.path, anchors);
+            draw_path(&mut anchored, &sh.path, anchors);
         }
         // A targeted vector mask shows its path with any tool (#196).
         if let Some((_, p)) = targeted_vector_mask(app) {
-            draw_path(&p, anchors);
+            draw_path(&mut anchored, &p, anchors);
         }
         // So does type on a path's Type Path, which the Pen's Auto Add/Delete edits (#9114).
         if let Some((_, p)) = active_type_path(app) {
-            draw_path(&p, anchors);
+            draw_path(&mut anchored, &p, anchors);
         }
         crate::corner_radius::draw(app, painter, &to_scr, accent);
+    }
+    if !anchored.is_empty() {
+        use craft_ui::canvas::{BezierNames, BezierOverlay, BezierTool};
+        use craft_ui::localized::Labels as _;
+        let [ux, uy] = crate::rulers::ruler_units(app, ui, doc);
+        let names = BezierNames::of(ui);
+        let _ = BezierOverlay::new("pc-paths", &anchored, &selection, &ux, &uy, names).tool(BezierTool::Show).show(ui, canvas, &xf.canvas_view());
     }
     // Pen path in progress, with handles of the last knot and a rubber band to the pointer. While
     // ⌘/Ctrl drags it, Direct Selection draws its preview instead.

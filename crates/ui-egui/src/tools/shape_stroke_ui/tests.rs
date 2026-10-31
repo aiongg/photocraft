@@ -311,7 +311,7 @@ fn adding_dash_controls_grows_the_popup_and_solid_shrinks_it_again() {
         click_at(&mut h, pos2(dotted.right() - 16.0, dotted.center().y));
         let dashed_popup = h.state().popup.unwrap();
         assert!(dashed_popup.height() > solid_height + 60.0, "{theme:?}: dash controls must grow the popup beyond its old Solid size");
-        for (role, label) in [(Role::Button, "Add pair"), (Role::Button, "Remove pair"), (Role::Slider, "Dash offset")] {
+        for (role, label) in [(Role::Button, "Add pair"), (Role::Button, "Remove pair"), (Role::SpinButton, "Dash offset")] {
             let control = h.get_by_role_and_label(role, label).rect();
             assert!(dashed_popup.contains_rect(control), "{theme:?}: {label} is outside the grown popup: {control:?} in {dashed_popup:?}");
         }
@@ -450,7 +450,7 @@ fn selected_shape_presets_edit_live_preserve_paint_and_undo_at_all_depths() {
 }
 
 fn opacity_drag(h: &mut Harness<'_, crate::PhotocraftApp>, offsets: &[f32], expected_history: usize) -> f32 {
-    let start = h.get_by_role_and_label(Role::Slider, "Opacity").rect().center();
+    let start = h.get_by_role_and_label(Role::SpinButton, "Opacity").rect().center();
     h.hover_at(start);
     h.run_steps(1);
     h.event(egui::Event::PointerButton { pos: start, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });

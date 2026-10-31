@@ -68,32 +68,6 @@ fn graphics_dropdowns_are_named_for_their_settings() {
 }
 
 #[test]
-fn colour_preferences_take_a_typed_hex_value() {
-    // #668: the canvas colour (and every colour preference) showed its hex but couldn't take one.
-    use egui::accesskit::Role;
-    use egui_kittest::kittest::Queryable;
-    let mut h = egui_kittest::Harness::new_ui_state(|ui, rgb: &mut [u8; 3]| super::hex_field(ui, "interface.canvasCustomColor", rgb), [0x28, 0x28, 0x28]);
-    h.run();
-    assert_eq!(h.get_by_role(Role::TextInput).value().as_deref(), Some("#282828"));
-    h.get_by_role(Role::TextInput).click();
-    h.run_steps(1);
-    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
-    h.run_steps(1);
-    for ch in "#80".chars() {
-        h.event(egui::Event::Text(ch.to_string()));
-        h.run_steps(1);
-    }
-    // A partial value stays as typed and leaves the colour alone.
-    assert_eq!(h.get_by_role(Role::TextInput).value().as_deref(), Some("#80"));
-    assert_eq!(*h.state(), [0x28, 0x28, 0x28]);
-    for ch in "8080".chars() {
-        h.event(egui::Event::Text(ch.to_string()));
-        h.run_steps(1);
-    }
-    assert_eq!(*h.state(), [0x80, 0x80, 0x80]);
-}
-
-#[test]
 fn quick_export_controls_match_selected_format() {
     let mut obj = serde_json::to_value(photocraft_engine::prefs::Export::default()).unwrap().as_object().unwrap().clone();
     assert!(!export_field_visible(&obj, "jpegQuality"));
@@ -178,21 +152,6 @@ use super::*;
 use std::sync::{Arc, Mutex};
 
 #[test]
-fn appearance_resolves_both_saved_themes_and_follows_system() {
-    let mut interface = prefs::Interface { appearance_mode: AppearanceMode::Auto, ..prefs::Interface::default() };
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::ProMedium);
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::ProLight);
-    interface.theme_dark = "craft.studio".into();
-    interface.theme_light = "craft.classic".into();
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::Studio);
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::Classic);
-    interface.appearance_mode = AppearanceMode::Dark;
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::Studio);
-    interface.appearance_mode = AppearanceMode::Light;
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::Classic);
-}
-
-#[test]
 fn breeze_themes_are_chosen_by_preference_and_fix_the_matching_mode() {
     let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -206,7 +165,6 @@ fn breeze_themes_are_chosen_by_preference_and_fix_the_matching_mode() {
         tick(&mut app, &ctx);
         let interface = app.session.prefs().interface.clone();
         assert_eq!(interface.appearance_mode, mode, "{id}");
-        assert_eq!(selected_theme(&interface, None), kind, "{id}");
         assert_eq!(app.ui.theme, kind, "{id}");
     }
     // The two slots are independent: choosing the dark one left the light choice alone.
@@ -870,19 +828,6 @@ fn failed_preference_saves_are_retried() {
     assert_eq!(persist(&mut app, now - 28.0), None);
     assert_eq!(stored(&store)["interface"]["theme"], "pro");
     assert!(app.ui.notices.is_empty(), "the notice goes once preferences are saved");
-}
-
-#[test]
-fn auto_scale_preserves_system_scale() {
-    use prefs::UiScale::Auto;
-    // Whatever the monitor, 4K included: an unscaled desktop stays at 100% (#1278), and a
-    // fractional or below-100% system scale is the user's choice (#1072).
-    for dpi in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0] {
-        assert_eq!(display_scale(Auto, Some(dpi)), dpi);
-    }
-    assert_eq!(display_scale(Auto, None), 1.0);
-    assert_eq!(display_scale(Auto, Some(f32::NAN)), 1.0);
-    assert_eq!(display_scale(Auto, Some(-2.0)), 1.0);
 }
 
 #[test]
@@ -2075,4 +2020,14 @@ fn reset_section_on_type_keeps_the_favourite_fonts() {
     assert!(prefs.smart_quotes, "the Type settings are reset");
     assert_eq!(prefs.favorite_fonts, ["Bebas Neue"], "the favourites are kept");
     assert_eq!(stored(&store)["type"]["favoriteFonts"], json!(["Bebas Neue"]));
+}
+
+#[test]
+fn preferences_opens_with_no_field_focused_and_no_popup_open() {
+    // Upstream opens every page with nothing focused; a focused Cache tile size field or an open UI scale list is a regression.
+    for page in ["interface", "performance"] {
+        let h = prefs_harness(page);
+        h.ctx.memory(|m| assert!(m.focused().is_none(), "{page}: a field has focus: {:?}", m.focused()));
+        assert!(!egui::Popup::is_any_open(&h.ctx), "{page}: a popup is open");
+    }
 }

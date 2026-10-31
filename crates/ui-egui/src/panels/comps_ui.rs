@@ -7,14 +7,15 @@
 
 use std::cell::RefCell;
 
+use craft_ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
 use craft_ui::composites::{PanelFooter, Tone};
 use craft_ui::controls::{ControlSize, IconButton};
 use craft_ui::edit::EditEvent;
 use craft_ui::icons::Icon;
-use craft_ui::list::{ListRow, RowEvent, ToggleColumn};
+use craft_ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, paint_drop_mark};
 use craft_ui::menu::{ContextMenu, MenuItem};
 use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
-use egui::{Rect, pos2, vec2};
+use egui::{Rect, vec2};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -37,12 +38,6 @@ fn run(app: &mut PhotocraftApp, id: &str, p: Value) {
         app.ui.status = e;
         app.ui.status_error = true;
     }
-}
-
-#[derive(Clone, Copy)]
-struct DragComp {
-    document: photocraft_doc::DocId,
-    comp: u32,
 }
 
 fn drop_index(from: usize, target: usize, after: bool) -> usize {
@@ -69,6 +64,9 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let toggle_side = IconButton::style(&tokens, ControlSize::Sm).side;
     let mut action: Option<(&'static str, Value)> = None;
     let mut select: Option<u32> = None;
+    // Comp ids restart in every document, so the list is keyed by the document too.
+    let list = egui::Id::unique(("comp-list", doc.id.0));
+    let order: Vec<RowInfo<u32>> = doc.layer_comps.iter().map(|c| RowInfo { key: c.id, depth: 0, has_children: false, open: false, section: false }).collect();
     egui::ScrollArea::vertical().id_salt("comps-rows").max_height(max_h).auto_shrink([false, true]).show(ui, |ui| {
         // Last Document State.
         let out = ListRow::new("last-document-state", tl!("Last Document State"))
@@ -84,6 +82,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui.add_space(craft_ui::theme::scale::Space::S6.px());
             ui.weak(tl!("Capture the visibility, position and style of every layer with + below, then switch between versions."));
         }
+        let mut rects: Vec<Rect> = Vec::new();
         for (index, c) in doc.layer_comps.iter().enumerate() {
             // Comp ids restart in every document, so the pending name is keyed by the document too.
             let rename_id = egui::Id::unique(("comp-rename", doc.id.0, c.id));
@@ -126,21 +125,10 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             });
             let out = row.show(ui);
             let resp = out.response.clone();
-            resp.dnd_set_drag_payload(DragComp { document: doc.id, comp: c.id });
-            if let Some(source) = resp.dnd_hover_payload::<DragComp>()
-                && source.document == doc.id
-                && let Some(from) = doc.layer_comps.iter().position(|c| c.id == source.comp)
-            {
-                let rect = resp.rect;
-                let after = ui.input(|i| i.pointer.hover_pos().is_some_and(|p| p.y >= rect.center().y));
-                let to = drop_index(from, index, after);
-                let y = if after { rect.bottom() } else { rect.top() };
-                craft_ui::list::drop_line(ui, pos2(rect.left(), y), pos2(rect.right(), y));
-                if resp.dnd_release_payload::<DragComp>().is_some() && from != to {
-                    select = Some(source.comp);
-                    action = Some(("layerComp.reorder", json!({"comp":source.comp, "index":to})));
-                }
+            if resp.drag_started() {
+                egui::DragAndDrop::set_payload(ui.ctx(), ListDrag::new(list, &order[..], &[], c.id, c.name.clone()));
             }
+            rects.push(resp.rect);
             let entries = [
                 MenuItem::new(tl!("Move Up"), -1).enabled(index > 0).into(),
                 MenuItem::new(tl!("Move Down"), 1).enabled(index + 1 < doc.layer_comps.len()).into(),
@@ -190,6 +178,25 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
             }
         }
+        if let Some(drag) = egui::DragAndDrop::payload::<ListDrag<u32>>(ui.ctx())
+            && drag.list == list
+            && let Some(&source) = drag.items.first()
+            && let Some(p) = ui.input(|i| i.pointer.interact_pos()).filter(|p| ui.clip_rect().contains(*p))
+            && let Some(from) = doc.layer_comps.iter().position(|c| c.id == source)
+        {
+            let spans: Vec<std::ops::Range<f32>> = rects.iter().map(|r| r.top()..r.bottom()).collect();
+            if let Some(resolved) = Reorder::new(Axis::Vertical).resolve(&order[..], &spans[..], p.y, &[source], ui.input(|i| i.modifiers))
+                && let Some(target) = doc.layer_comps.iter().position(|c| c.id == resolved.mv.target)
+            {
+                let after = resolved.mv.position != DropPosition::Before;
+                paint_drop_mark(ui, rects[resolved.at], if after { DropMark::After } else { DropMark::Before });
+                let to = drop_index(from, target, after);
+                if ui.input(|i| i.pointer.any_released()) && from != to {
+                    select = Some(source);
+                    action = Some(("layerComp.reorder", json!({"comp":source, "index":to})));
+                }
+            }
+        }
     });
     // Footer: apply previous, apply next | update, new, delete (Photoshop's order). The bar fills
     // from the trailing end, so the previous/next pair is added last, after a spacer.
@@ -232,6 +239,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::pos2;
     use photocraft_engine::Session;
 
     /// The row of the comp named `name`: the list box option, not its label.

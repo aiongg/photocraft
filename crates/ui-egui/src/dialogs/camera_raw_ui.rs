@@ -111,11 +111,9 @@ pub struct CameraRawDialog {
     /// The last frame's develop alone, and where it ran ("gpu" or "cpu").
     develop_ms: f64,
     pub(crate) develop_backend: &'static str,
-    /// Settings before each finished edit, so Ctrl+Z works inside the dialog (#4100).
-    undo: Vec<CameraRaw>,
-    redo: Vec<CameraRaw>,
-    /// Params at pointer-down. One drag is one undo step.
-    edit_origin: Option<CameraRaw>,
+    /// The settings' undo and redo steps, so Ctrl+Z works inside the dialog (#4100). A drag is
+    /// one step.
+    history: craft_ui::dialog::LocalHistory<CameraRaw>,
 }
 
 impl CameraRawDialog {

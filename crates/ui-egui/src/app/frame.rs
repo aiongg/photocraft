@@ -6,6 +6,24 @@ use super::{
 };
 
 impl PhotocraftApp {
+    /// The interface direction: the UI language's, unless [`PhotocraftApp::direction_setting`] or
+    /// `CRAFT_UI_DIRECTION` forces one.
+    pub fn direction(&self) -> craft_ui::direction::Direction {
+        craft_ui::direction::resolve(crate::i18n::current().code(), self.direction_setting)
+    }
+
+    /// Records the direction on the context for the library's bars and rows. PhotoCraft's
+    /// popups and docking still read egui's `Style::right_to_left` as left to right, so the
+    /// style flag `apply` sets is cleared again (the docking style sets it itself).
+    fn sync_direction(&self, ctx: &egui::Context) {
+        use craft_ui::direction::HasDirection as _;
+        let want = self.direction();
+        if ctx.direction() != want {
+            craft_ui::direction::apply(ctx, want);
+            ctx.all_styles_mut(|s| s.right_to_left = false);
+        }
+    }
+
     /// Wait out the rest of [`Self::min_frame_ms`] since the last frame started.
     fn cap_frame_rate(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -133,6 +151,7 @@ impl PhotocraftApp {
     /// including when this body returns early without drawing an editor.
     pub fn ui_frame(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.sync_direction(&ctx);
         // One control owner even when this callback cannot draw the custom editor.
         if !self.fonts_ready
             || !self.ui.dialogs.is_empty()

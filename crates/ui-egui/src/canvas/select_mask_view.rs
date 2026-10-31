@@ -159,21 +159,18 @@ fn keys(ctx: &egui::Context, fields: &mut Map<String, Value>) {
         fields.insert("__hideView".into(), json!(false));
         return;
     }
-    let (pressed, hold_x) = ctx.input(|i| {
-        let plain = !i.modifiers.command && !i.modifiers.ctrl && !i.modifiers.alt;
-        let keys: Vec<egui::Key> = i
-            .events
-            .iter()
-            .filter_map(|e| match e {
-                egui::Event::Key { key, pressed: true, repeat: false, .. } if plain => Some(*key),
-                _ => None,
-            })
-            .collect();
-        (keys, plain && i.key_down(egui::Key::X))
+    static KEYS: std::sync::LazyLock<crate::dialog_keys::DialogKeys> = std::sync::LazyLock::new(|| {
+        let letters = [egui::Key::F, egui::Key::R, egui::Key::OpenBracket, egui::Key::CloseBracket, egui::Key::J, egui::Key::P];
+        let rows: Vec<(String, String)> = Mode::ALL.iter().map(|m| m.key()).chain(letters).map(crate::dialog_keys::key_text).map(|t| (t.clone(), t)).collect();
+        let rows: Vec<(&str, String)> = rows.iter().map(|(id, chord)| (id.as_str(), chord.clone())).collect();
+        crate::dialog_keys::DialogKeys::new("Select and Mask view", &rows).with_repeat(false)
     });
-    for key in pressed {
-        apply_key(fields, key);
+    for command in KEYS.pressed(ctx) {
+        if let Some(key) = craft_keymap::Key::parse(&command).map(craft_keymap::Key::to_egui) {
+            apply_key(fields, key);
+        }
     }
+    let hold_x = ctx.input(|i| i.key_down(egui::Key::X) && !i.modifiers.command && !i.modifiers.ctrl && !i.modifiers.alt);
     fields.insert("__hideView".into(), json!(hold_x));
 }
 

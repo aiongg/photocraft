@@ -1,52 +1,31 @@
 use super::open::{Target, cancel, commit_open_raw, open_raw, raw_stage};
 use super::sidecar::{load_settings, report_file_error, save_settings};
 use super::{
-    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, Stroke, Tokens, ToneZone, Value, Wheel, curve_lut,
-    json, pos2, vec2, widgets,
+    Align2, BANDS, CameraRaw, CameraRawDialog, Color32, ERect, FontId, PANEL_W, PhotocraftApp, Pos2, Sense, ToneZone, Value, Wheel, curve_lut, json, pos2,
+    vec2, widgets,
 };
+use craft_ui::composites::{SectionHeader, SliderRow, SliderRowResponse};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 
-const RAW_UNDO_LIMIT: usize = 40;
-
-pub(super) fn remember_edit(d: &mut CameraRawDialog) {
-    if d.undo.len() == RAW_UNDO_LIMIT {
-        d.undo.remove(0);
+/// Steps the settings back or forward; false when there is nowhere to go.
+pub(super) fn step_edit(d: &mut CameraRawDialog, step: craft_ui::dialog::Step) -> bool {
+    let before = d.params.point_curve.clone();
+    if !d.history.step(&mut d.params, step) {
+        return false;
     }
-    d.undo.push(d.params.clone());
-    d.redo.clear();
-}
-
-pub(super) fn undo_edit(d: &mut CameraRawDialog) -> bool {
-    let Some(prev) = d.undo.pop() else { return false };
-    d.redo.push(d.params.clone());
-    if d.params.point_curve != prev.point_curve {
+    if d.params.point_curve != before {
         d.curve_state = Default::default();
     }
-    d.params = prev;
     d.dirty = true;
-    d.edit_origin = None;
-    true
-}
-
-pub(super) fn redo_edit(d: &mut CameraRawDialog) -> bool {
-    let Some(next) = d.redo.pop() else { return false };
-    d.undo.push(d.params.clone());
-    if d.params.point_curve != next.point_curve {
-        d.curve_state = Default::default();
-    }
-    d.params = next;
-    d.dirty = true;
-    d.edit_origin = None;
     true
 }
 
 fn history_keys(d: &mut CameraRawDialog, ctx: &egui::Context) {
-    let cmd_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
-    if ctx.input_mut(|i| i.consume_key(cmd_shift, egui::Key::Z)) {
-        redo_edit(d);
-    } else if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z)) {
-        undo_edit(d);
+    if let Some(step) = craft_ui::dialog::take_step(ctx) {
+        step_edit(d, step);
     }
 }
 
@@ -105,7 +84,6 @@ fn tint_stops() -> Vec<Color32> {
     vec![Color32::from_rgb(70, 190, 80), Color32::from_rgb(200, 200, 200), Color32::from_rgb(210, 80, 200)]
 }
 
-/// One labelled slider; marks the dialog dirty when it moves.
 /// The track of Color Mixer band `k` on `tab` (0 Hue, 1 Saturation, 2 Luminance). A Hue slider
 /// turns its band towards the neighbouring bands, so its track runs from the previous band's hue
 /// through its own to the next one's (Reds: magenta, red, orange; #9550); Saturation and Luminance
@@ -117,34 +95,56 @@ pub(super) fn mixer_gradient(tab: usize, k: usize) -> Vec<Color32> {
 }
 
 fn row(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, grad: Option<&[Color32]>) {
-    let _ = slider(ui, dirty, label, v, range, grad);
+    slider(ui, dirty, label, v, range, grad);
 }
 
-fn slider(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, grad: Option<&[Color32]>) -> egui::Response {
-    let r = widgets::slider_row(ui, crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", label), v, range, "", grad);
-    if r.changed() {
-        *dirty = true;
+/// One labelled slider row ([`SliderRow`]); a double-click on the slider puts it back to 0.
+/// Returns whether the slider is being dragged.
+fn slider(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, grad: Option<&[Color32]>) -> bool {
+    let label = crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", label);
+    let numbers = LocaleNumbers::of(ui);
+    let before = ui.make_persistent_id((label, "before"));
+    let mut row = SliderRow::new(label, label, f64::from(*v), f64::from(*range.start())..=f64::from(*range.end()), &numbers).default_value(0.0);
+    if let Some(stops) = grad {
+        row = row.track_colors(stops.iter().copied());
     }
-    if r.double_clicked() {
-        *v = 0.0;
-        *dirty = true;
+    let SliderRowResponse { response, slider, field } = row.show(ui);
+    for event in [field.event, slider.event].into_iter().flatten() {
+        match event {
+            EditEvent::Begin { .. } => {
+                ui.data_mut(|d| d.insert_temp(before, *v));
+            }
+            EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. } => {
+                *v = value as f32;
+                *dirty = true;
+            }
+            EditEvent::Cancel { .. } => {
+                if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
+                    *v = old;
+                    *dirty = true;
+                }
+            }
+            _ => {}
+        }
     }
-    r
+    response.dragged()
 }
 
 /// A Light tone slider; Alt-dragging it shows that zone's channel clipping on the preview.
 fn tone_row(ui: &mut egui::Ui, dirty: &mut bool, alt: &mut Option<ToneZone>, zone: ToneZone, v: &mut f32) {
-    let r = slider(ui, dirty, zone.name(), v, -zone.limit()..=zone.limit(), None);
-    if r.dragged() && ui.input(|i| i.modifiers.alt) {
+    let dragged = slider(ui, dirty, zone.name(), v, -zone.limit()..=zone.limit(), None);
+    if dragged && ui.input(|i| i.modifiers.alt) {
         *alt = Some(zone);
     }
 }
 
 fn section(ui: &mut egui::Ui, title: &str, open: bool, body: impl FnOnce(&mut egui::Ui)) {
-    egui::CollapsingHeader::new(egui::RichText::new(crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title)).font(FontId::proportional(13.0)))
-        .id_salt(("camera-raw-section", title))
-        .default_open(open)
-        .show(ui, body);
+    // The header keeps a section open from the start; the closed-at-first ones keep their state here.
+    let key = egui::Id::unique(("camera-raw-section-open", title));
+    let mut shown = ui.data(|d| d.get_temp::<bool>(key)).unwrap_or(open);
+    let title_text = crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", title);
+    SectionHeader::new(("camera-raw-section", title), title_text).open(&mut shown).show(ui, body);
+    ui.data_mut(|d| d.insert_temp(key, shown));
 }
 
 fn wheel(ui: &mut egui::Ui, dirty: &mut bool, title: &str, w: &mut Wheel) {
@@ -252,10 +252,6 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
     egui::Area::new(egui::Id::unique("camera-raw-dialog")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
         let Some(d) = app.camera_raw.as_mut() else { return };
         history_keys(d, ctx);
-        let pointer = ctx.input(|i| i.pointer.primary_down());
-        if pointer && d.edit_origin.is_none() {
-            d.edit_origin = Some(d.params.clone());
-        }
         if let Some(display) = &current_display
             && display.key != d.display.key
         {
@@ -500,14 +496,8 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
         if fu.button(tl!("Load Settings…")).on_hover_text(tl!("Load settings from a Camera Raw .xmp file")).clicked() {
             action = Some("load");
         }
-        if !ctx.input(|i| i.pointer.primary_down())
-            && let Some(origin) = d.edit_origin.take()
-            && origin != d.params
-        {
-            let edited = std::mem::replace(&mut d.params, origin);
-            remember_edit(d);
-            d.params = edited;
-        }
+        let dragging = ctx.input(|i| i.pointer.primary_down());
+        d.history.settle(&d.params, dragging);
     });
     crate::camera_raw_scope_ui::persist(app, ctx);
     if ctx.input(|i| i.key_pressed(egui::Key::Y))

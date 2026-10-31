@@ -9,7 +9,7 @@ use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 use std::hash::{Hash, Hasher};
 
 use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action};
-use super::{BlendMode, Layer, LayerId, PhotocraftApp, Rect, Sense, Tokens, Value, empty, json, label, pos2, theme, vec2, widgets};
+use super::{BlendMode, Layer, LayerId, PhotocraftApp, Rect, Sense, Tokens, Value, json, label, pos2, theme, vec2, widgets};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -247,7 +247,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // A new active layer opens its parent groups and is scrolled into view (#152).
     let reveal = crate::layer_reveal::track(app, ui.ctx());
     let Some(st) = app.session.active() else {
-        empty(ui, tl!("No document"));
+        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let doc = st.doc.clone();

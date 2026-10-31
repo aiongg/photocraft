@@ -98,7 +98,7 @@ pub(crate) use navigator::{last_navigator_controls, last_navigator_preview};
 #[cfg(test)]
 use options_bar::LAYER_PCT_W;
 pub use options_bar::options_bar;
-pub(crate) use options_bar::{FIXED_SIZE_MAX_PX, opt_label, select_cell};
+pub(crate) use options_bar::{CellEdit, FIXED_SIZE_MAX_PX, Field, check, number_cell, number_cell_icon, opt_label, reader, select_cell};
 pub use panel_state::{migrate_panel_state, panel_state_id, remember_panel_state};
 pub use properties::properties_window;
 #[cfg(test)]
@@ -471,13 +471,6 @@ mod navigator_wheel_tests {
         assert!((zoom(&h) - crate::zoom_levels::step(1.0, -1, [200, 100])).abs() < 1e-4, "{}", zoom(&h));
         assert!(!h.state().ui.views[0].fit_pending);
     }
-}
-
-fn empty(ui: &mut egui::Ui, s: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.add_space(6.0);
-    ui.label(RichText::new(s).color(t.text_faint));
-    ui.add_space(6.0);
 }
 
 #[cfg(test)]

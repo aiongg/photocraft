@@ -10,6 +10,9 @@ use serde_json::json;
 use super::*;
 use crate::PhotocraftApp;
 
+/// The height of a section header row.
+const SECTION_H: f32 = 24.0;
+
 /// A document with one layer of each kind; returns the session and the ids by kind.
 fn kinds() -> (photocraft_engine::Session, Vec<(&'static str, u64)>) {
     let mut s = photocraft_engine::Session::new();

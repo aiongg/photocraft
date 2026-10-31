@@ -467,7 +467,7 @@ fn run(app: &mut PhotocraftApp, command: DockCommand<String>) -> Result<Value, S
         ensure(app, &mut workspace, panel)?;
     }
     let space = FloatSpace::new(FLOAT_AREA);
-    let rtl = crate::direction::is_rtl();
+    let rtl = craft_ui::direction::is_rtl(&app.direction());
     let closed = match &command {
         DockCommand::Dock { panel, anchor: None, side: None, zone: None, group: false, column: false, .. } if dock_back(&mut workspace, &returns, panel)? => {
             Vec::new()
@@ -598,7 +598,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     style.inactive_text = t.text_dim;
     style.border = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border);
     style.accent = t.accent;
-    style.right_to_left = crate::direction::is_rtl();
+    style.right_to_left = craft_ui::direction::is_rtl(ui.ctx());
     style.new_dock_zones = true;
     // The panel menu button ends every tab strip; its menu has the panel's items, then the group's
     // (collapse, float, move up and down, close).

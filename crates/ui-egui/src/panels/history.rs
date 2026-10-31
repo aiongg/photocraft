@@ -1,11 +1,11 @@
 use super::layer_drag::dropped_on;
-use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, Tool, Value, empty, icons, json, pos2, vec2, widgets};
+use super::{Align2, Color32, HistorySource, PhotocraftApp, Rect, Sense, StrokeKind, Tokens, Tool, Value, icons, json, pos2, vec2, widgets};
 use craft_ui::theme::StrokeExt;
 
 pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        empty(ui, tl!("No document"));
+        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let entries = st.history.entries();

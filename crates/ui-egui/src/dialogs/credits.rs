@@ -333,7 +333,7 @@ fn table_height(ui: &egui::Ui, rows: usize) -> f32 {
 /// desktop build can't rely on (egui_winit needs its "links" feature, which we don't enable).
 fn link(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &Contributor, names: NameMode) -> egui::Response {
     let url = format!("https://github.com/{}", c.login);
-    let r = ui.add(egui::Link::new(c.name(names))).on_hover_text(c.summary());
+    let r = ui.add(craft_ui::controls::Link::new(c.name(names)).id_salt(&c.login)).on_hover_text(c.summary());
     if r.clicked() {
         crate::links::open(app, ui.ctx(), &url);
     }

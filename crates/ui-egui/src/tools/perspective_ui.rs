@@ -7,6 +7,8 @@
 //! runs `edit.perspectiveWarp` with the planes. The preview is the layer texture on a 40×40 mesh
 //! pushed through the same piecewise-homography map the engine uses.
 
+use craft_ui::controls::{ControlSize, ToggleButton};
+use craft_ui::patterns::OptionsBar;
 use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
@@ -315,13 +317,14 @@ pub fn draw(s: &PerspSession, painter: &egui::Painter, xf: &ViewXform) {
 
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(s) = app.distort.perspective.as_mut() else { return };
-    if crate::widgets::pill_tab(ui, "Layout", s.mode == PerspMode::Layout).clicked() {
+    let (mut layout, mut warp) = (s.mode == PerspMode::Layout, s.mode == PerspMode::Warp);
+    if ui.add(ToggleButton::new(tl!("Layout"), &mut layout).size(ControlSize::Sm)).clicked() {
         set_mode(s, PerspMode::Layout);
     }
-    if crate::widgets::pill_tab(ui, "Warp", s.mode == PerspMode::Warp).clicked() && !s.planes.is_empty() {
+    if ui.add(ToggleButton::new(tl!("Warp"), &mut warp).size(ControlSize::Sm)).clicked() && !s.planes.is_empty() {
         set_mode(s, PerspMode::Warp);
     }
-    crate::widgets::vline(ui, 22.0);
+    OptionsBar::divider(ui);
     if s.mode == PerspMode::Warp {
         for (label, tip, m) in [
             (tl!("Straighten"), tl!("Automatically straighten near-vertical line segments"), Straighten::Vertical),

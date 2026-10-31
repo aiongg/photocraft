@@ -1,8 +1,9 @@
 //! Right-to-left shell layout: the direction rules, and where the mirrored chrome lands in a
-//! running shell. The shell tests force the direction with `direction_scope`, so they don't
-//! depend on a right-to-left language being selected.
+//! running shell. The shell tests force the direction with `PhotocraftApp::direction_setting`, so
+//! they don't depend on a right-to-left language being selected.
 
-use super::*;
+use craft_ui::direction::{Direction as Dir, Setting};
+
 use crate::PhotocraftApp;
 use crate::i18n::{self, Lang};
 use egui_kittest::{Harness, kittest::Queryable};
@@ -11,60 +12,24 @@ use serde_json::json;
 #[test]
 fn right_to_left_scripts_by_language_code() {
     for code in ["ar", "AR", "ar-eg", "fa", "fa_IR", "he", "ur", "ckb", "ps", "yi"] {
-        assert_eq!(i18n::dir_for_code(code), Dir::Rtl, "{code}");
+        assert_eq!(i18n::dir_for_code(code), i18n::Dir::Rtl, "{code}");
     }
     // `ku` alone is Kurmanji, written in Latin script; Sorani is `ckb`.
     for code in ["en", "ja", "zh-hans", "pt-br", "ku", "arn", ""] {
-        assert_eq!(i18n::dir_for_code(code), Dir::Ltr, "{code}");
+        assert_eq!(i18n::dir_for_code(code), i18n::Dir::Ltr, "{code}");
     }
     // Arabic is the one right-to-left catalog; every other registered language stays left to right.
     for lang in Lang::all() {
-        let want = if lang.code() == "ar" { Dir::Rtl } else { Dir::Ltr };
+        let want = if lang.code() == "ar" { i18n::Dir::Rtl } else { i18n::Dir::Ltr };
         assert_eq!(lang.dir(), want, "{}", lang.code());
     }
 }
 
-#[test]
-fn direction_follows_the_language_unless_forced() {
-    let _lang = i18n::language_scope(Lang::EN);
-    let forced = direction_scope(Dir::Rtl);
-    assert!(is_rtl());
-    {
-        let _inner = direction_scope(Dir::Ltr);
-        assert!(!is_rtl());
-    }
-    assert!(is_rtl(), "the inner scope restores the outer one");
-    drop(forced);
-    assert_eq!(FORCED.get(), None);
-}
-
-#[test]
-fn sides_and_rows_mirror() {
-    {
-        let _ltr = direction_scope(Dir::Ltr);
-        assert_eq!(row().main_dir(), egui::Direction::LeftToRight);
-        assert_eq!(trailing().main_dir(), egui::Direction::RightToLeft);
-        assert_eq!(below(), egui::RectAlign::BOTTOM_START);
-    }
-    let _rtl = direction_scope(Dir::Rtl);
-    assert_eq!(row().main_dir(), egui::Direction::RightToLeft);
-    assert_eq!(trailing().main_dir(), egui::Direction::LeftToRight);
-    assert_eq!(below(), egui::RectAlign::BOTTOM_END);
-}
-
-#[test]
-fn env_values_parse_strictly() {
-    assert_eq!(parse_dir("rtl"), Some(Dir::Rtl));
-    assert_eq!(parse_dir(" RTL "), Some(Dir::Rtl));
-    assert_eq!(parse_dir("ltr"), Some(Dir::Ltr));
-    assert_eq!(parse_dir(""), None);
-    assert_eq!(parse_dir("ar"), None);
-}
-
-fn harness() -> Harness<'static, PhotocraftApp> {
+fn harness(dir: Dir) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ProMedium);
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.direction_setting = if dir == Dir::Rtl { Setting::Rtl } else { Setting::Ltr };
         app.run("file.new", json!({"width": 64, "height": 64})).expect("new document");
         app
     });
@@ -97,8 +62,7 @@ fn dock_x(h: &Harness<'static, PhotocraftApp>) -> f32 {
 fn the_shell_mirrors_in_a_right_to_left_ui() {
     let _lang = i18n::language_scope(Lang::EN);
     for dir in [Dir::Ltr, Dir::Rtl] {
-        let _dir = direction_scope(dir);
-        let h = harness();
+        let h = harness(dir);
         let mid = 600.0;
         let (file, help, toolbar, dock, workspace) = (x_of(&h, "File"), x_of(&h, "Help"), x_of(&h, "Toolbar"), dock_x(&h), text_x(&h, "Essentials"));
         if dir == Dir::Rtl {
@@ -117,8 +81,7 @@ fn the_shell_mirrors_in_a_right_to_left_ui() {
 fn arrow_keys_step_through_the_menu_bar_in_screen_order() {
     let _lang = i18n::language_scope(Lang::EN);
     for (dir, towards_edit) in [(Dir::Ltr, egui::Key::ArrowRight), (Dir::Rtl, egui::Key::ArrowLeft)] {
-        let _dir = direction_scope(dir);
-        let mut h = harness();
+        let mut h = harness(dir);
         h.get_by_label("File").click();
         h.run_steps(4);
         assert!(h.query_by_label_contains("Undo").is_none(), "File is open, not Edit");
@@ -132,8 +95,7 @@ fn arrow_keys_step_through_the_menu_bar_in_screen_order() {
 #[test]
 fn menus_open_under_the_title_s_reading_start_edge() {
     let _lang = i18n::language_scope(Lang::EN);
-    let _dir = direction_scope(Dir::Rtl);
-    let mut h = harness();
+    let mut h = harness(Dir::Rtl);
     let edit = h.get_by_label("Edit").rect();
     h.get_by_label("Edit").click();
     h.run_steps(4);

@@ -201,8 +201,8 @@ fn c32(c: [f32; 4]) -> Color32 {
 }
 
 /// A gradient swatch: stops as a horizontal mesh over a checkerboard where it's transparent.
-pub fn paint_gradient(ui: &egui::Ui, rect: Rect, stops: &[(f32, [f32; 4])]) {
-    let p = ui.painter_at(rect);
+pub fn paint_gradient(painter: &egui::Painter, rect: Rect, stops: &[(f32, [f32; 4])]) {
+    let p = painter.with_clip_rect(rect);
     if stops.iter().any(|s| s.1[3] < 0.999) {
         crate::widgets::checker(&p, rect, (rect.height() / 4.0).clamp(3.0, 8.0));
     }
@@ -359,11 +359,10 @@ fn group_open(st: &PresetUi, panel: &str, gi: usize, name: &str) -> bool {
 /// The footer's height (gap, size slider and buttons) before it has been measured.
 const FOOTER_GUESS: f32 = 32.0;
 
-/// Draws the folders and footer; `thumb` paints item `(group, item)` into a rect.
 /// Where a browser sits: the canvas (drop target), its height cap and the New button's tooltip.
 /// `flush` lays the grid out as Photoshop's Swatches panel: the cells touch, square-cornered and
 /// without a border of their own, so no screen is spent on gaps (#5103); gradients, patterns and
-/// the other preset grids keep their [`GRID_GAP`] and card borders.
+/// the other preset grids keep their gaps and card borders.
 pub(crate) struct Place<'a> {
     pub(crate) canvas: Rect,
     pub(crate) max_h: f32,
@@ -371,295 +370,190 @@ pub(crate) struct Place<'a> {
     pub(crate) flush: bool,
 }
 
-/// Space between the cells of a preset grid, and the grid's inset from the panel's left edge.
-const GRID_GAP: f32 = 4.0;
-const GRID_INSET: f32 = 8.0;
+/// The browser's keys name a group `group:<name>` and a preset by its own key.
+const GROUP_KEY: &str = "group:";
 
-struct GroupHeaderContext<'a> {
-    panel: &'a str,
-    open: bool,
-    state: &'a mut PresetUi,
-    tokens: &'a Tokens,
-    events: &'a mut Vec<Ev>,
+fn group_name(key: &str) -> Option<&str> {
+    key.strip_prefix(GROUP_KEY)
 }
 
-fn draw_group_header(ui: &mut egui::Ui, group: &GroupView, context: GroupHeaderContext<'_>) -> (Rect, Option<Pos2>, Option<Pos2>) {
-    let GroupHeaderContext { panel, open, state, tokens, events } = context;
-    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::click_and_drag());
-    if response.hovered() || response.dragged() {
-        ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), tokens.hover.gamma_multiply(0.5));
-    }
-    let triangle = Rect::from_center_size(pos2(rect.left() + 9.0, rect.center().y), vec2(12.0, 12.0));
-    crate::icons::paint(ui, triangle, if open { "chevron-down" } else { "chevron-right" }, 10.0, tokens.text_dim);
-    let folder = Rect::from_center_size(pos2(rect.left() + 25.0, rect.center().y), vec2(14.0, 14.0));
-    crate::icons::paint(ui, folder, if open { "folder-open" } else { "folder" }, 12.0, tokens.icon);
-    ui.painter().text(pos2(rect.left() + 37.0, rect.center().y), Align2::LEFT_CENTER, &group.name, FontId::proportional(11.5), tokens.text);
-    if response.clicked() {
-        let key = format!("{panel}/{}", group.name);
-        if !state.toggled.remove(&key) {
-            state.toggled.insert(key);
-        }
-    }
-    response.context_menu(|ui| {
-        if ui.button(tl!("Rename Group…")).clicked() {
-            state.renaming = Some((panel.to_string(), format!("group:{}", group.name), group.name.clone()));
-            ui.close();
-        }
-        if ui.button(tl!("Delete Group")).clicked() {
-            events.push(Ev::DeleteGroup(group.name.clone()));
-            ui.close();
-        }
-    });
-    let drag = if response.dragged() { ui.ctx().pointer_interact_pos() } else { None };
-    if drag.is_some() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
-    }
-    let released = if response.drag_stopped() { ui.ctx().pointer_interact_pos() } else { None };
-    (rect, drag, released)
+/// The words of the library browser and footer, in the app's language.
+fn labels(new_tip: &str) -> craft_ui::presets::PresetLabels {
+    let mut l = craft_ui::presets::PresetLabels::default();
+    l.name = tl!("Name:").into();
+    l.rename = tl!("Rename…").into();
+    l.rename_group = tl!("Rename Group…").into();
+    l.delete = tl!("Delete").into();
+    l.delete_group = tl!("Delete Group").into();
+    l.move_to = tl!("Move to").into();
+    l.delete_button = tl!("Delete").into();
+    l.new = new_tip.into();
+    l.new_group = tl!("Create new group").into();
+    l.thumb_size = tl!("Thumbnail size (smallest: list)").into();
+    l
 }
 
+/// Draws the folders and footer with the library's preset browser; `thumb` paints item
+/// `(group, item)` into a rect. The panel's state (`PresetUi`: sizes, open folders, folder order)
+/// stays the app's; the library's `PresetState` is built from it and written back each frame.
 pub(crate) fn browser(
     ui: &mut egui::Ui,
     st: &mut PresetUi,
     panel: &str,
     groups: &[GroupView],
     place: Place,
-    thumb: &mut dyn FnMut(&egui::Ui, Rect, usize, usize),
+    thumb: &mut dyn FnMut(&egui::Painter, Rect, usize, usize),
 ) -> Vec<Ev> {
-    let t = Tokens::get(ui.ctx());
+    use craft_ui::behavior::{DropPosition, ListDrag};
+    use craft_ui::edit::EditEvent;
+    use craft_ui::presets::{DefaultOpen, FooterEvent, PresetBrowser, PresetEvent, PresetFooter, PresetReorder, PresetRow, PresetState, PresetView};
     let Place { canvas, max_h, new_tip, flush } = place;
     let mut ev = Vec::new();
     let size = *st.sizes.get(panel).unwrap_or(&40.0);
-    let list = size <= MIN_THUMB + 0.5;
     let selected = st.selected.get(panel).cloned();
-    // Rename field (Photoshop opens a small dialog; inline keeps the panel modeless).
-    if let Some((p, key, mut text)) = st.renaming.clone().filter(|r| r.0 == panel) {
-        let mut done = None;
-        ui.horizontal(|ui| {
-            let name_label = ui.label(egui::RichText::new(tl!("Name:")).color(t.text_dim).size(11.5));
-            let r = ui.add(egui::TextEdit::singleline(&mut text).desired_width(ui.available_width() - 4.0)).labelled_by(name_label.id);
-            if !r.has_focus() && !r.lost_focus() {
-                r.request_focus();
-            }
-            if r.lost_focus() {
-                done = Some(ui.input(|i| i.key_pressed(egui::Key::Enter)));
-            }
-        });
-        st.renaming = Some((p, key.clone(), text.clone()));
-        if let Some(ok) = done {
-            st.renaming = None;
-            if ok && !text.trim().is_empty() {
-                match key.strip_prefix("group:") {
-                    Some(g) => ev.push(Ev::RenameGroup(g.to_string(), text.trim().to_string())),
-                    None => ev.push(Ev::Rename(key, text.trim().to_string())),
-                }
-            }
+    let names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
+    let display = st.display_order(panel, &names);
+
+    let mut rows: Vec<PresetRow<String>> = Vec::new();
+    let mut at: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+    for &gi in &display {
+        let Some(g) = groups.get(gi) else { continue };
+        rows.push(PresetRow::group(format!("{GROUP_KEY}{}", g.name), g.name.as_str(), 0).count(g.items.len()));
+        for (ii, it) in g.items.iter().enumerate() {
+            rows.push(PresetRow::item(it.key.clone(), it.name.as_str(), 1));
+            at.insert(it.key.as_str(), (gi, ii));
         }
     }
-    let mut headers: Vec<(usize, Rect, String)> = Vec::new();
-    let mut dropped: Option<(String, Pos2)> = None;
-    // Folder drag (#3658): the order the folders are drawn in, and what the pointer is doing this
-    // frame (the insertion line and the drop are resolved once every header is known).
-    let mut drag: Option<(usize, Pos2)> = None;
-    let mut released: Option<(usize, Pos2)> = None;
-    let group_names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
-    let display = st.display_order(panel, &group_names);
+    // Swatch groups all start open; other panels open the first in the order shown.
+    let default_open = if panel == crate::swatches_ui::PANEL { DefaultOpen::All } else { DefaultOpen::First };
+    let lib_default = |gi: usize| default_open == DefaultOpen::All || display.first() == Some(&gi);
+    let app_open: Vec<bool> = groups.iter().enumerate().map(|(gi, g)| group_open(st, panel, gi, &g.name)).collect();
+    let mut state = PresetState::<String>::new();
+    state.thumb = size;
+    state.view = PresetView::Grid;
+    for (gi, g) in groups.iter().enumerate() {
+        if app_open[gi] != lib_default(gi) {
+            state.toggled.insert(format!("{GROUP_KEY}{}", g.name));
+        }
+    }
+
     // The footer stays in view: the list gets the height left after it (as measured last frame)
     // and scrolls, rather than pushing the footer out of a short dock group (#4790).
     let footer_id = egui::Id::unique(("preset-footer", panel));
     let footer_h = ui.data(|d| d.get_temp::<f32>(footer_id)).unwrap_or(FOOTER_GUESS);
     let max_h = max_h.min((ui.available_height() - footer_h).max(0.0));
-    egui::ScrollArea::vertical().id_salt(("preset-scroll", panel)).max_height(max_h).min_scrolled_height(max_h.min(64.0)).auto_shrink([false, true]).show(
-        ui,
-        |ui| {
-            ui.spacing_mut().item_spacing = vec2(0.0, 2.0);
-            for &gi in &display {
-                let Some(g) = groups.get(gi) else { continue };
-                let open = group_open(st, panel, gi, &g.name);
-                let (hr, header_drag, header_release) = draw_group_header(ui, g, GroupHeaderContext { panel, open, state: st, tokens: &t, events: &mut ev });
-                if let Some(position) = header_drag {
-                    drag = Some((gi, position));
+    let labels = labels(new_tip);
+    let rename = st.renaming.take_if(|r| r.0 == panel).map(|r| r.1);
+    // Items drop into a folder (to move them); folders drop between folders.
+    let reorder = PresetReorder::<String>::items_and_groups().accepts(|mv, _| {
+        mv.items.iter().all(|k| {
+            if group_name(k).is_some() { mv.position != DropPosition::Into } else { group_name(&mv.target).is_some() && mv.position == DropPosition::Into }
+        })
+    });
+    let mut browser = PresetBrowser::new(("preset-browser", panel), tl!("Presets"), &mut state, &rows)
+        .selected(selected.as_ref())
+        .flush(flush)
+        .thumb_range(MIN_THUMB..=96.0)
+        .default_open(default_open)
+        .reorder(reorder)
+        .labels(labels.clone())
+        .max_height(max_h);
+    if size <= MIN_THUMB + 0.5 {
+        browser = browser.view_lock(PresetView::List);
+    }
+    if let Some(key) = rename {
+        browser = browser.start_rename(key);
+    }
+    // The browser keeps at least egui's 64 pt of scroll height; a shorter dock group clips it so
+    // the footer stays in view.
+    let list = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), max_h));
+    let mut list_ui = ui.new_child(egui::UiBuilder::new().max_rect(list));
+    list_ui.set_clip_rect(list.intersect(ui.clip_rect()));
+    let out = browser.show(&mut list_ui, |painter, rect, info| {
+        if let Some(&(gi, ii)) = at.get(info.key.as_str()) {
+            thumb(painter, rect, gi, ii);
+        }
+    });
+    ui.allocate_rect(list, Sense::hover());
+
+    for event in out.events {
+        match event {
+            PresetEvent::Select { key, .. } if group_name(&key).is_none() => ev.push(Ev::Select(key)),
+            PresetEvent::Activate { key, .. } if group_name(&key).is_none() => ev.push(Ev::Activate(key)),
+            PresetEvent::Rename { key, text } => match group_name(&key) {
+                Some(g) => ev.push(Ev::RenameGroup(g.to_string(), text)),
+                None => ev.push(Ev::Rename(key, text)),
+            },
+            PresetEvent::Delete(key) => match group_name(&key) {
+                Some(g) => ev.push(Ev::DeleteGroup(g.to_string())),
+                None => ev.push(Ev::Delete(key)),
+            },
+            PresetEvent::MoveTo { key, group } => {
+                if let Some(g) = group_name(&group) {
+                    ev.push(Ev::Move(key, g.to_string()));
                 }
-                if let Some(position) = header_release {
-                    released = Some((gi, position));
-                }
-                headers.push((gi, hr, g.name.clone()));
-                if !open {
-                    continue;
-                }
-                let w = ui.available_width();
-                let pad = if list { 0.0 } else { GRID_INSET };
-                let gap = if list || flush { 0.0 } else { GRID_GAP };
-                let (cell, cols) = if list {
-                    (vec2(w, 24.0), 1)
-                } else {
-                    let cols = ((w - pad + gap) / (size + gap)).floor().max(1.0) as usize;
-                    (vec2(size, size), cols)
-                };
-                let rows = g.items.len().div_ceil(cols);
-                let (area, _) = ui.allocate_exact_size(vec2(w, rows as f32 * (cell.y + gap) + 2.0), Sense::hover());
-                for (ii, it) in g.items.iter().enumerate() {
-                    let (cx, cy) = ((ii % cols) as f32, (ii / cols) as f32);
-                    let r = Rect::from_min_size(area.min + vec2(pad + cx * (cell.x + gap), cy * (cell.y + gap)), cell);
-                    let resp = ui.interact(r, ui.scope_id().with((panel, gi, ii)), Sense::click_and_drag());
-                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &it.name));
-                    let is_sel = selected.as_deref() == Some(&it.key);
-                    if list {
-                        if is_sel {
-                            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.row_selected);
-                        } else if resp.hovered() {
-                            ui.painter().rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.5));
-                        }
-                        let tr = Rect::from_min_size(r.min + vec2(24.0, 2.0), vec2(20.0, 20.0));
-                        thumb(ui, tr, gi, ii);
-                        ui.painter().text(pos2(tr.right() + 8.0, r.center().y), Align2::LEFT_CENTER, &it.name, FontId::proportional(11.5), t.text);
-                    } else {
-                        thumb(ui, r, gi, ii);
-                        // Touching cells draw no border of their own: only the selected and the
-                        // hovered one are outlined, over their neighbours, as in Photoshop.
-                        let stroke = if is_sel {
-                            Some((craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), egui::StrokeKind::Outside))
-                        } else if resp.hovered() {
-                            Some((craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_dim), egui::StrokeKind::Outside))
-                        } else if flush {
-                            None
-                        } else {
-                            Some((craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border), egui::StrokeKind::Inside))
+            }
+            PresetEvent::Reorder(EditEvent::Commit { value: mv, .. } | EditEvent::Set { value: mv, .. }) => {
+                let Some(key) = mv.items.first() else { continue };
+                match (group_name(key), group_name(&mv.target)) {
+                    (Some(from), Some(target)) => {
+                        let at_target = display.iter().position(|&gi| names.get(gi).is_some_and(|n| n == target));
+                        let before = match (mv.position, at_target) {
+                            (DropPosition::Before, Some(_)) => Some(target),
+                            (DropPosition::After, Some(i)) => display.get(i + 1).and_then(|&gi| names.get(gi)).map(String::as_str),
+                            _ => continue,
                         };
-                        if let Some((stroke, kind)) = stroke {
-                            ui.painter().rect_stroke(r, CornerRadius::same(if flush { 0 } else { 2 }), stroke, kind);
-                        }
+                        st.move_group(panel, &names, from, before);
                     }
-                    let resp = if list { resp } else { resp.on_hover_text(&it.name) };
-                    if resp.double_clicked() {
-                        ev.push(Ev::Activate(it.key.clone()));
-                    } else if resp.clicked() {
-                        ev.push(Ev::Select(it.key.clone()));
-                    }
-                    if resp.dragged()
-                        && let Some(pp) = ui.ctx().pointer_interact_pos()
-                    {
-                        // A ghost of the swatch follows the pointer.
-                        let lp = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("preset-drag")));
-                        let gr = Rect::from_center_size(pp, vec2(28.0, 28.0));
-                        lp.rect_filled(gr, craft_ui::theme::scale::Radius::R3.px(), t.card.gamma_multiply(0.8));
-                        lp.rect_stroke(
-                            gr,
-                            craft_ui::theme::scale::Radius::R3.px(),
-                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.accent),
-                            egui::StrokeKind::Outside,
-                        );
-                        lp.text(gr.center(), Align2::CENTER_CENTER, "+", FontId::proportional(16.0), t.accent);
-                    }
-                    if resp.drag_stopped()
-                        && let Some(pp) = ui.ctx().pointer_interact_pos()
-                        && !r.contains(pp)
-                    {
-                        dropped = Some((it.key.clone(), pp));
-                    }
-                    resp.context_menu(|ui| {
-                        if ui.button(tl!("Rename…")).clicked() {
-                            st.renaming = Some((panel.to_string(), it.key.clone(), it.name.clone()));
-                            ui.close();
-                        }
-                        if ui.button(tl!("Delete")).clicked() {
-                            ev.push(Ev::Delete(it.key.clone()));
-                            ui.close();
-                        }
-                        ui.menu_button(tl!("Move to"), |ui| {
-                            for gname in group_names.iter().filter(|n| **n != g.name) {
-                                if ui.button(gname).clicked() {
-                                    ev.push(Ev::Move(it.key.clone(), gname.clone()));
-                                    ui.close();
-                                }
-                            }
-                        });
-                    });
+                    (None, Some(target)) => ev.push(Ev::Move(key.clone(), target.to_string())),
+                    _ => {}
                 }
             }
-            // Insertion line while a folder is dragged by its header.
-            if let Some((from, p)) = drag {
-                let before = group_drop_before(&headers, from, p.y);
-                let anchor = match before {
-                    Some(i) => headers.iter().find(|(x, _, _)| *x == i).map(|(_, r, _)| *r),
-                    None => headers.last().map(|(_, r, _)| *r),
-                };
-                if let Some(r) = anchor {
-                    let y = if before.is_some() { r.top() - 1.0 } else { r.bottom() + 1.0 };
-                    ui.painter().line_segment([pos2(r.left(), y), pos2(r.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
-                }
-            }
-        },
-    );
-    // Apply the drop now every header rect is known; the next frame draws the new order.
-    if let Some((from, p)) = released {
-        let before = group_drop_before(&headers, from, p.y);
-        let from_name = groups.get(from).map(|g| g.name.clone());
-        let before_name = before.and_then(|i| groups.get(i).map(|g| g.name.clone()));
-        if let Some(from_name) = from_name {
-            st.move_group(panel, &group_names, &from_name, before_name.as_deref());
+            _ => {}
         }
     }
-    let recorded: Vec<(String, Rect)> = headers.iter().map(|(_, r, n)| (n.clone(), *r)).collect();
-    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::unique(("preset-group-headers", panel)), recorded));
-    if let Some((key, pos)) = dropped {
-        if let Some((_, _, g)) = headers.iter().find(|(_, r, _)| r.contains(pos)) {
-            ev.push(Ev::Move(key, g.clone()));
-        } else if canvas.contains(pos) {
-            ev.push(Ev::Drop(key, pos));
-        }
+    // A preset released over the canvas is a canvas drop; the browser leaves the payload to the
+    // widget under the pointer.
+    if ui.input(|i| i.pointer.any_released())
+        && let Some(pos) = ui.input(|i| i.pointer.latest_pos()).filter(|p| canvas.contains(*p))
+        && let Some(drag) = egui::DragAndDrop::payload::<ListDrag<String>>(ui.ctx())
+        && let Some(key) = drag.items.first().filter(|k| at.contains_key(k.as_str()))
+    {
+        egui::DragAndDrop::clear_payload(ui.ctx());
+        ev.push(Ev::Drop(key.clone(), pos));
     }
+
     // Footer: thumbnail size | New Group, New, Delete.
     let footer_top = ui.min_rect().bottom();
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        let mut s = size;
-        ui.add_sized(vec2(90.0, 18.0), egui::Slider::new(&mut s, MIN_THUMB..=96.0).show_value(false))
-            .accessible_name(tl!("Thumbnail size (smallest: list)"))
-            .on_hover_text(tl!("Thumbnail size (smallest: list)"));
-        if (s - size).abs() > 0.01 {
-            st.sizes.insert(panel.to_string(), s);
+    for event in PresetFooter::new(&mut state, &labels).thumb_range(MIN_THUMB..=96.0).can_delete(selected.is_some()).show(ui) {
+        match event {
+            FooterEvent::Delete => ev.extend(selected.clone().map(Ev::Delete)),
+            FooterEvent::New => ev.push(Ev::New),
+            FooterEvent::NewGroup => ev.push(Ev::NewGroup),
+            _ => {}
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if crate::icons::button(ui, "trash", 24.0, false, tl!("Delete")).clicked()
-                && let Some(k) = selected.clone()
-            {
-                ev.push(Ev::Delete(k));
-            }
-            if crate::icons::button(ui, "plus", 24.0, false, new_tip).clicked() {
-                ev.push(Ev::New);
-            }
-            if crate::icons::button(ui, "folder-plus", 24.0, false, tl!("Create new group")).clicked() {
-                ev.push(Ev::NewGroup);
-            }
-        });
-    });
+    }
     let measured = ui.min_rect().bottom() - footer_top;
     if measured.is_finite() && (measured - footer_h).abs() > 0.5 {
         ui.data_mut(|d| d.insert_temp(footer_id, measured));
         ui.ctx().request_repaint();
     }
-    ev
-}
 
-/// The folder (by library index) a header dragged to `y` lands before (`None` = last). `headers`
-/// is in display order; mirrors `dock::drop_before`.
-fn group_drop_before(headers: &[(usize, Rect, String)], from: usize, y: f32) -> Option<usize> {
-    let hit = headers.iter().find(|(_, r, _)| y < r.center().y).map(|(i, _, _)| *i);
-    match hit {
-        Some(i) if i == from => Some(from),
-        Some(i) => {
-            let after_self = headers.iter().position(|(x, _, _)| *x == from).zip(headers.iter().position(|(x, _, _)| *x == i)).is_some_and(|(a, b)| b == a + 1);
-            if after_self { Some(from) } else { Some(i) }
-        }
-        None => None,
+    // Write the library's state back: the size and the folders opened or closed.
+    if (state.thumb - size).abs() > 0.01 {
+        st.sizes.insert(panel.to_string(), state.thumb);
     }
-}
-
-/// Folder header rects drawn last frame (name → rect), in display order; for tests and automation.
-pub fn last_group_headers(ctx: &egui::Context, panel: &str) -> Vec<(String, Rect)> {
-    ctx.data(|d| d.get_temp(egui::Id::unique(("preset-group-headers", panel)))).unwrap_or_default()
+    for (gi, g) in groups.iter().enumerate() {
+        let open = lib_default(gi) != state.toggled.contains(&format!("{GROUP_KEY}{}", g.name));
+        if open != app_open[gi] {
+            let key = format!("{panel}/{}", g.name);
+            if !st.toggled.remove(&key) {
+                st.toggled.insert(key);
+            }
+        }
+    }
+    ev
 }
 
 /// Shared handling of the generic events through `<prefix>.edit` / `.new`.
@@ -698,11 +592,6 @@ fn generic(app: &mut PhotocraftApp, panel: &str, prefix: &str, e: &Ev, new_param
         _ => return false,
     }
     true
-}
-
-fn empty(ui: &mut egui::Ui, s: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(egui::RichText::new(s).color(t.text_faint).size(11.5));
 }
 
 /// Where drops onto the canvas are accepted: the canvas proper, rulers excluded (a drop on the

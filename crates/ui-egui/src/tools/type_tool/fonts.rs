@@ -194,21 +194,34 @@ pub(super) fn axis_sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, c: &photo
         let faces = engine.lock().unwrap_or_else(PoisonError::into_inner).fonts.faces(&c.font_family);
         slider_axes(&faces, c.italic)
     };
-    let t = craft_ui::theme::current(ui.ctx());
+    let numbers = craft_ui::localized::LocaleNumbers::of(ui);
     for axis in &axes {
         let (min, max) = (axis.1, axis.3);
         let mut v = axis_value(c, axis);
         let mut changed = false;
-        ui.push_id(("type-axis", &axis.0), |ui| {
-            ui.horizontal(|ui| {
-                let axis_name = axis_label(&axis.0);
-                ui.label(egui::RichText::new(&axis_name).color(t.color.text.muted.to_egui()));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    changed |= crate::widgets::value_field(ui, &mut v, min..=max, "", 74.0).accessible_name(axis_name).changed();
-                });
-            });
-            changed |= crate::widgets::slider(ui, &mut v, min..=max, None).changed();
-        });
+        let salt = ("type-axis", &axis.0);
+        let before = ui.scope_id().with(("type-axis-before", &axis.0));
+        let response = craft_ui::composites::SliderRow::new(salt, axis_label(&axis.0), f64::from(v), f64::from(min)..=f64::from(max), &numbers).show(ui);
+        for event in response.edits() {
+            match event {
+                craft_ui::edit::EditEvent::Begin { .. } => {
+                    ui.data_mut(|d| d.insert_temp(before, v));
+                }
+                craft_ui::edit::EditEvent::Update { value, .. }
+                | craft_ui::edit::EditEvent::Set { value, .. }
+                | craft_ui::edit::EditEvent::Commit { value, changed: true, .. } => {
+                    v = value as f32;
+                    changed = true;
+                }
+                craft_ui::edit::EditEvent::Cancel { .. } => {
+                    if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
+                        v = old;
+                        changed = true;
+                    }
+                }
+                _ => {}
+            }
+        }
         ui.add_space(crate::theme::ROW_GAP);
         if changed {
             // Whole units on wide axes (weight 100–900), hundredths on narrow ones (ital 0–1).

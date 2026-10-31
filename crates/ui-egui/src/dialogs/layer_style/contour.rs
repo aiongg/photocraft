@@ -7,6 +7,9 @@
 //! - `contourEditor`: `{effect, key, original}` while the Contour Editor is open; `original` is
 //!   the param Cancel restores.
 
+use craft_ui::composites::{Curve, CurveEditor};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::StrokeExt;
 use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::Contour;
@@ -15,9 +18,9 @@ use photocraft_engine::layer_style::{CONTOURS, contour_from_param, contour_param
 use serde_json::{Map, Value, json};
 
 use super::{entry, set_param};
-use crate::state::{DialogKind, PointCurveState};
+use crate::state::DialogKind;
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, point_curve, widgets};
+use crate::{PhotocraftApp, widgets};
 
 pub(super) const PICKER: &str = "contourPicker";
 pub(super) const EDITOR: &str = "contourEditor";
@@ -289,23 +292,18 @@ fn name_of(c: &Contour) -> &str {
     }
 }
 
-/// Contour Editor › Input/Output: moves point `i` to `input`/`output` percent.
-pub(super) fn set_point(f: &mut Map<String, Value>, i: usize, input: f32, output: f32) -> bool {
-    let Some((effect, key, c)) = editor_curve(f) else { return false };
-    let (mut pts, corners) = levels_of(&c);
-    point_curve::move_to(&mut pts, i, [input * 2.55, output * 2.55]) && store(f, &effect, &key, name_of(&c), &pts, &corners)
+/// The open Contour Editor's points (levels `0..=255`) and corner flags.
+#[cfg(test)]
+pub(super) fn editor_levels(f: &Map<String, Value>) -> Option<(Vec<[f32; 2]>, Vec<bool>)> {
+    editor_curve(f).map(|(_, _, c)| levels_of(&c))
 }
 
-/// Contour Editor › Corner: whether point `i` is a corner.
-pub(super) fn set_corner(f: &mut Map<String, Value>, i: usize, on: bool) -> bool {
+/// Writes the Contour Editor's curve (levels `0..=255`, with its corner flags) to the effect.
+pub(super) fn set_curve(f: &mut Map<String, Value>, curve: &Curve) -> bool {
     let Some((effect, key, c)) = editor_curve(f) else { return false };
-    let (pts, mut corners) = levels_of(&c);
-    let Some(flag) = corners.get_mut(i) else { return false };
-    if *flag == on {
-        return false;
-    }
-    *flag = on;
-    store(f, &effect, &key, name_of(&c), &pts, &corners)
+    let Curve::Points { points, .. } = curve else { return false };
+    let corners: Vec<bool> = (0..points.len()).map(|i| curve.is_corner(i)).collect();
+    store(f, &effect, &key, name_of(&c), points, &corners)
 }
 
 /// Closes the Contour Editor: OK keeps the edited curve, Cancel restores the original.
@@ -317,22 +315,6 @@ pub(super) fn close_editor(f: &mut Map<String, Value>, keep: bool) {
         set_param(f, &effect, &key, original);
     }
     f.remove(EDITOR);
-}
-
-/// Corner flags after the shared point editor added or removed a point: the flags follow their
-/// points; a new point is smooth.
-fn follow_corners(before: &[[f32; 2]], after: &[[f32; 2]], corners: &mut Vec<bool>) {
-    let first_diff = |a: &[[f32; 2]], b: &[[f32; 2]]| (0..a.len()).find(|&i| a.get(i) != b.get(i)).unwrap_or(a.len());
-    if after.len() == before.len() + 1 {
-        let i = first_diff(after, before).min(corners.len());
-        corners.insert(i, false);
-    } else if after.len() + 1 == before.len() {
-        let i = first_diff(before, after);
-        if i < corners.len() {
-            corners.remove(i);
-        }
-    }
-    corners.resize(after.len(), false);
 }
 
 /// The Contour Editor (a modal over the Layer Style dialog), when one is open.
@@ -347,7 +329,6 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
     let mem = egui::Id::unique(("contour-editor", effect.as_str(), key.as_str()));
-    let mut st: PointCurveState = ctx.data(|d| d.get_temp(mem)).unwrap_or_default();
     let (mut pts, mut corners) = levels_of(&c);
     let mut close: Option<bool> = None;
     let mut load = false;
@@ -371,51 +352,23 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     }
                 });
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                let side = 220.0;
-                let (graph, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click_and_drag());
-                let before = pts.clone();
-                let it = point_curve::interact(ui, &resp, graph, &mut pts, &mut st);
-                if it.changed {
-                    follow_corners(&before, &pts, &mut corners);
-                    store(f, &effect, &key, name_of(&c), &pts, &corners);
-                }
-                let p = ui.painter_at(graph.expand(4.0));
-                p.rect_filled(graph, craft_ui::theme::scale::Radius::R0.px(), t.field);
-                for i in 1..4 {
-                    let k = i as f32 / 4.0;
-                    let g = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator);
-                    p.line_segment([pos2(graph.left() + k * graph.width(), graph.top()), pos2(graph.left() + k * graph.width(), graph.bottom())], g);
-                    p.line_segment([pos2(graph.left(), graph.top() + k * graph.height()), pos2(graph.right(), graph.top() + k * graph.height())], g);
-                }
-                let shown = Contour::Custom {
-                    name: String::new(),
-                    points: pts.iter().map(|q| CurvePoint { input: q[0] / 255.0, output: q[1] / 255.0 }).collect(),
-                    corners: corners.clone(),
-                };
-                let l = lut_of(&shown);
-                let line: Vec<Pos2> = (0..=256)
-                    .map(|k| {
-                        let x = k as f32 / 256.0;
-                        pos2(graph.left() + x * graph.width(), graph.bottom() - sample(&l, x) * graph.height())
-                    })
-                    .collect();
-                p.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.text)));
-                p.rect_stroke(
-                    graph,
-                    craft_ui::theme::scale::Radius::R0.px(),
-                    Stroke::new(if resp.has_focus() { 1.5 } else { 1.0 }, if resp.has_focus() { t.accent } else { t.field_border }),
-                    StrokeKind::Outside,
-                );
-                for (i, q) in pts.iter().enumerate() {
-                    let at = pos2(graph.left() + q[0] / 255.0 * graph.width(), graph.bottom() - q[1] / 255.0 * graph.height());
-                    let r = Rect::from_center_size(at, vec2(7.0, 7.0));
-                    let corner = corners.get(i).copied().unwrap_or(false);
-                    if Some(i) == st.selected {
-                        p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.text);
-                    } else {
-                        p.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), t.field);
-                        p.rect_stroke(r, if corner { 0.0 } else { 3.5 }, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text), StrokeKind::Inside);
+                let curve = Curve::from_parts(pts.clone(), corners.clone());
+                let numbers = LocaleNumbers::of(ui);
+                let before = mem.with("before");
+                let edit = CurveEditor::new(mem.with("curve"), tl!("Contour"), &curve, &numbers).percent().corners(true).side(250.0).show(ui);
+                match edit.event {
+                    Some(EditEvent::Begin { .. }) => {
+                        ui.data_mut(|d| d.insert_temp(before, c.clone()));
                     }
+                    Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. }) => {
+                        set_curve(f, &value);
+                    }
+                    Some(EditEvent::Cancel { .. }) => {
+                        if let Some(original) = ui.data(|d| d.get_temp::<Contour>(before)) {
+                            set_param(f, &effect, &key, contour_param(&original));
+                        }
+                    }
+                    _ => {}
                 }
                 ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 if let Some(name) = naming.as_mut() {
@@ -432,28 +385,6 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
                     });
                     ui.add_space(craft_ui::theme::scale::Space::S6.px());
                 }
-                let sel = st.selected.filter(|i| *i < pts.len());
-                ui.horizontal(|ui| {
-                    let (mut vi, mut vo) = sel.and_then(|i| pts.get(i)).map_or((0.0, 0.0), |q| ((q[0] / 2.55).round(), (q[1] / 2.55).round()));
-                    ui.label(RichText::new(tl!("Input:")).color(t.text_dim));
-                    let ri =
-                        ui.add_enabled_ui(sel.is_some(), |ui| widgets::value_field(ui, &mut vi, 0.0..=100.0, "%", 52.0).accessible_name(tl!("Input:"))).inner;
-                    ui.label(RichText::new(tl!("Output:")).color(t.text_dim));
-                    let ro =
-                        ui.add_enabled_ui(sel.is_some(), |ui| widgets::value_field(ui, &mut vo, 0.0..=100.0, "%", 52.0).accessible_name(tl!("Output:"))).inner;
-                    if let Some(i) = sel
-                        && (ri.changed() || ro.changed())
-                    {
-                        set_point(f, i, vi, vo);
-                    }
-                    let mut corner = sel.and_then(|i| corners.get(i)).copied().unwrap_or(false);
-                    let rc = ui.add_enabled_ui(sel.is_some(), |ui| widgets::checkbox(ui, &mut corner, tl!("Corner"))).inner;
-                    if let Some(i) = sel
-                        && rc.changed()
-                    {
-                        set_corner(f, i, corner);
-                    }
-                });
             });
             ui.add_space(craft_ui::theme::scale::Space::S12.px());
             ui.vertical(|ui| {
@@ -473,7 +404,6 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
             });
         });
     });
-    ctx.data_mut(|d| d.insert_temp(mem, st));
     if new_clicked && naming.is_none() {
         // Photoshop asks for the new contour's name; "Contour N" is its suggestion.
         naming = Some(format!("Contour {}", app.session.presets.contours.len() + 1));

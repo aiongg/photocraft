@@ -12,7 +12,7 @@ use std::sync::Arc;
 use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft_ui::composites::{ColorRamp, ColorWarning, ColorWarningChip, ColorWheel};
 use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
-use egui::{Color32, Mesh, Rect, Sense, StrokeKind, UiBuilder, pos2, vec2};
+use egui::{Color32, Rect, Sense, StrokeKind, UiBuilder, pos2, vec2};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -21,6 +21,7 @@ use crate::panels::{color_field_fill_id, field_chips};
 use crate::state::{ColorPanelMode, ColorPanelState, ColorRamp as PanelRamp};
 use crate::theme::Tokens;
 use crate::widgets;
+use craft_ui::controls::{Slider, SliderThumb};
 use photocraft_color::convert;
 
 /// Width of the chips column, as the cube field's.
@@ -209,10 +210,24 @@ fn slider_rows(ui: &mut egui::Ui, model: Model, v: ModelValues, background: bool
             let (lr, _) = ui.allocate_exact_size(vec2(12.0, ROW_H), Sense::hover());
             ui.painter().text(lr.left_center(), egui::Align2::LEFT_CENTER, label, egui::FontId::proportional(12.0), t.text_dim);
             let track_w = (ui.available_width() - FIELD_W - UNIT_W - 8.0).max(24.0);
-            let (tr, resp) = ui.allocate_exact_size(vec2(track_w, ROW_H), Sense::click_and_drag());
+            let web = model == Model::Web;
             let stops = track_stops(model, &stops_from, i, 24);
-            changed |= track(ui, tr, &resp, &mut x, lo, hi, &stops, model == Model::Web);
-            resp.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(x), label));
+            // Web Color tracks snap to the web steps (00, 33, 66, 99, CC, FF).
+            let mut slider = Slider::new(("color-panel-slider", model, background, i), label, f64::from(x), f64::from(lo)..=f64::from(hi))
+                .step(if web { 51.0 } else { 1.0 })
+                .width(track_w)
+                .track_colors(stops)
+                .thumb(SliderThumb::Triangle);
+            if web {
+                slider = slider.ticks(5);
+            }
+            if let Some(v) = slider.show(ui).event.as_ref().and_then(|e| e.value()).copied() {
+                let v = v as f32;
+                if v != x {
+                    x = v;
+                    changed = true;
+                }
+            }
             if model == Model::Web {
                 changed |= hex_pair(ui, ui.scope_id().with(("web-field", i, background)), &mut x);
             } else if widgets::value_field(ui, &mut x, lo..=hi, "", FIELD_W).changed() {
@@ -227,64 +242,6 @@ fn slider_rows(ui: &mut egui::Ui, model: Model, v: ModelValues, background: bool
         }
     }
     out
-}
-
-/// A slider track with Photoshop's triangle thumb under it. Returns true when dragged or clicked
-/// to a new value; Web Color tracks snap to the web steps (00, 33, 66, 99, CC, FF).
-#[allow(clippy::too_many_arguments)]
-fn track(ui: &egui::Ui, r: Rect, resp: &egui::Response, value: &mut f32, lo: f32, hi: f32, stops: &[Color32], web: bool) -> bool {
-    let t = Tokens::get(ui.ctx());
-    let bar = Rect::from_min_max(pos2(r.left() + 4.0, r.center().y - 6.0), pos2(r.right() - 4.0, r.center().y + 1.0));
-    let mut mesh = Mesh::default();
-    let n = stops.len().saturating_sub(1).max(1);
-    for (k, c) in stops.iter().enumerate() {
-        let x = bar.left() + bar.width() * k as f32 / n as f32;
-        mesh.colored_vertex(pos2(x, bar.top()), *c);
-        mesh.colored_vertex(pos2(x, bar.bottom()), *c);
-    }
-    for k in 0..stops.len().saturating_sub(1) as u32 {
-        let a = k * 2;
-        mesh.add_triangle(a, a + 1, a + 3);
-        mesh.add_triangle(a, a + 3, a + 2);
-    }
-    ui.painter().add(mesh);
-    ui.painter().rect_stroke(
-        bar,
-        craft_ui::theme::scale::Radius::R0.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-        StrokeKind::Outside,
-    );
-    if web {
-        // Ticks at the web steps.
-        for k in 0..=5 {
-            let x = bar.left() + bar.width() * k as f32 / 5.0;
-            ui.painter()
-                .line_segment([pos2(x, bar.bottom() + 1.0), pos2(x, bar.bottom() + 3.0)], craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.text_faint));
-        }
-    }
-    let mut changed = false;
-    if (resp.dragged() || resp.clicked())
-        && let Some(p) = resp.interact_pointer_pos()
-        && bar.width() > 0.0
-        && hi > lo
-    {
-        let f = ((p.x - bar.left()) / bar.width()).clamp(0.0, 1.0);
-        let mut v = lo + (hi - lo) * f;
-        if web {
-            v = (v / 51.0).round() * 51.0;
-        }
-        let v = v.round().clamp(lo, hi);
-        if v != *value {
-            *value = v;
-            changed = true;
-        }
-    }
-    let f = if hi > lo { ((*value - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 0.0 };
-    let x = bar.left() + bar.width() * f;
-    let y = bar.bottom() + 1.0;
-    let thumb = vec![pos2(x, y), pos2(x + 5.0, y + 7.0), pos2(x - 5.0, y + 7.0)];
-    ui.painter().add(egui::Shape::convex_polygon(thumb, t.text, craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border)));
-    changed
 }
 
 /// A Web Color slider's field: the channel as two hex digits. Valid input sets `value` (0..255)
