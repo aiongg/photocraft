@@ -166,7 +166,8 @@ fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &
     let points = if p.point_curve.is_empty() { vec![[0.0, 0.0], [255.0, 255.0]] } else { p.point_curve.clone() };
     let curve = Curve::smooth(points);
     let sampler = |points: &[[f32; 2]]| curve_lut(points, 256).into_iter().map(|v| v * 255.0).collect::<Vec<f32>>();
-    let side = ui.available_width().min(CurveEditor::outer_width(ui.ctx(), 260.0));
+    let plain_side = 260.0 + 2.0 * CurveEditor::style(&craft::ui::theme::current(ui.ctx())).pad;
+    let side = ui.available_width().min(plain_side);
     let salt = "camera-raw-curve";
     let id = CurveEditor::id_in(ui, salt);
     let before = id.with("before");
@@ -174,6 +175,7 @@ fn curve_editor(ui: &mut egui::Ui, p: &mut CameraRaw, dirty: &mut bool, state: &
         .max_points(photocraft_algo::camera_raw::MAX_CURVE_POINTS)
         .sampler(&sampler)
         .fields(false)
+        .bars(false)
         .side(side)
         .show(ui);
     match edit.event {
