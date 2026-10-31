@@ -86,6 +86,7 @@ impl PhotocraftApp {
             input_waiters: Vec::new(),
             live_adjust: None,
             frame: 0,
+            direction_setting: craft_ui::direction::Setting::Language,
             styled: false,
             integrated_titlebar: false,
             custom_titlebar: false,

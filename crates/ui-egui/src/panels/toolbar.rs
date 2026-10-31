@@ -120,7 +120,7 @@ fn footer_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, columns: usize) {
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
     color_pair(app, ui, rail_fill);
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    let layout = match (columns > 1, crate::direction::is_rtl()) {
+    let layout = match (columns > 1, craft_ui::direction::is_rtl(&ctx)) {
         (false, _) => egui::Layout::top_down(egui::Align::Min),
         (true, false) => egui::Layout::left_to_right(egui::Align::Min),
         (true, true) => egui::Layout::right_to_left(egui::Align::Min),

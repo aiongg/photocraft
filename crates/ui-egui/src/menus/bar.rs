@@ -32,7 +32,7 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
     for command in commands {
         run(app, &ctx, command);
     }
-    if crate::direction::is_rtl() { titles.left() } else { titles.right() }
+    if craft_ui::direction::is_rtl(&ctx) { titles.left() } else { titles.right() }
 }
 
 /// The cached menu rows, built again when the menus may have changed and someone can see them:
