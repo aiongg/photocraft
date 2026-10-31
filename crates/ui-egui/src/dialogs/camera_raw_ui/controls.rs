@@ -104,7 +104,7 @@ fn slider(ui: &mut egui::Ui, dirty: &mut bool, label: &str, v: &mut f32, range: 
     let label = crate::i18n::tr_ctx(crate::i18n::current(), "cameraRaw", label);
     let numbers = LocaleNumbers::of(ui);
     let before = ui.make_persistent_id((label, "before"));
-    let mut row = SliderRow::new(label, label, f64::from(*v), f64::from(*range.start())..=f64::from(*range.end()), &numbers).default_value(0.0);
+    let mut row = SliderRow::new(label, label, f64::from(*v), f64::from(*range.start())..=f64::from(*range.end()), &numbers).default_value(0.0).fill(false);
     if let Some(stops) = grad {
         row = row.track_colors(stops.iter().copied());
     }
