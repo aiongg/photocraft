@@ -1,5 +1,6 @@
 //! Keyboard shortcuts: Photoshop defaults from the command registry, plus single-key tools.
 
+use craft_keymap::{Chord, Key as CKey, Mods as CMods, Platform};
 use egui::{Key, KeyboardShortcut, Modifiers};
 use serde_json::json;
 
@@ -8,70 +9,28 @@ use crate::state::Tool;
 
 /// Parse `Cmd+Shift+N` style strings. `Cmd` maps to ⌘ on macOS and Ctrl elsewhere.
 pub fn parse(s: &str) -> Option<KeyboardShortcut> {
-    // A trailing '+' names the Plus key (both "Cmd+" and "Cmd++" are accepted).
-    // Split the key off first: otherwise an unrecognised component could be ignored
-    // when a later component overwrites it with a valid key.
-    let (prefix, key_name) = if let Some(without_plus) = s.strip_suffix('+') {
-        (without_plus.strip_suffix('+').unwrap_or(without_plus), "+")
-    } else {
-        s.rsplit_once('+').unwrap_or(("", s))
-    };
-    let mut mods = Modifiers::NONE;
-    if !prefix.is_empty() {
-        for part in prefix.split('+') {
-            match part {
-                "Cmd" if !mods.command => mods |= Modifiers::COMMAND,
-                "Shift" if !mods.shift => mods |= Modifiers::SHIFT,
-                "Alt" if !mods.alt => mods |= Modifiers::ALT,
-                "Ctrl" if !mods.ctrl => mods |= Modifiers::CTRL,
-                // Unknown keys, duplicate modifiers, and extra components must not
-                // silently turn a malformed binding into a different shortcut.
-                _ => return None,
-            }
-        }
-    }
-    let key = match key_name {
-        "+" => Some(Key::Plus),
-        "=" => Some(Key::Equals),
-        "-" => Some(Key::Minus),
-        "[" => Some(Key::OpenBracket),
-        ";" => Some(Key::Semicolon),
-        "'" => Some(Key::Quote),
-        "]" => Some(Key::CloseBracket),
-        // Case-insensitive too: bindings saved as `Shift+Pageup` before #6827 still work.
-        name => Key::from_name(name).or_else(|| Key::ALL.iter().find(|k| k.name().eq_ignore_ascii_case(name)).copied()),
-    }?;
-    Some(KeyboardShortcut::new(mods, key))
+    // Saved files spell Cmd+Plus `Cmd+` as well as `Cmd++`.
+    let chord = Chord::parse(s).or_else(|e| if s.ends_with('+') && !s.ends_with("++") { Chord::parse(&format!("{s}+")) } else { Err(e) });
+    chord.ok().map(|c| c.to_egui_shortcut())
 }
 
 /// Human-readable form for menus, tooltips and inline hints (`Cmd+Shift+N` → `⌘⇧N` on
 /// macOS, `Ctrl+Shift+N` elsewhere). Works for lone keys too: `pretty("Alt")` is `⌥`/`Alt`,
 /// `pretty("Enter")` is `↩`/`Enter`.
 pub fn pretty(s: &str) -> String {
-    let mac = cfg!(target_os = "macos");
-    let mut parts: Vec<&str> = s.split('+').collect();
-    if s.ends_with('+') {
-        // A final '+' is the Plus key, not an empty component. This matters on
-        // macOS, where the modifier separator is hidden ("Cmd++" is "⌘+").
-        parts.pop();
-        if parts.last().copied() == Some("") {
-            parts.pop();
-        }
-        parts.push("+");
+    let platform = Platform::current();
+    match Chord::parse(s) {
+        Ok(chord) => chord.display(platform),
+        // Modifiers alone (`Alt`, `Shift+Alt`) are no chord: show each as the modifier of a probe key.
+        Err(_) => s
+            .split('+')
+            .map(|part| match Chord::parse(&format!("{part}+A")) {
+                Ok(probe) => probe.display(platform).trim_end_matches('A').trim_end_matches('+').to_string(),
+                Err(_) => part.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join(if platform.is_mac() { "" } else { "+" }),
     }
-    parts
-        .into_iter()
-        .map(|p| match (p, mac) {
-            ("Cmd", true) => "⌘".to_string(),
-            ("Cmd", false) => "Ctrl".to_string(),
-            ("Shift", true) => "⇧".to_string(),
-            ("Alt", true) => "⌥".to_string(),
-            ("Enter", true) => "↩".to_string(),
-            ("Delete", true) => "⌫".to_string(),
-            (other, _) => other.to_string(),
-        })
-        .collect::<Vec<_>>()
-        .join(if mac { "" } else { "+" })
 }
 
 /// The command's effective shortcut in the platform's notation (`Ctrl+N`), or `None` when
@@ -119,41 +78,20 @@ pub fn default_shortcut(id: &str) -> Option<String> {
         .or_else(|| crate::tool_shortcuts::tool(id).and_then(crate::tool_shortcuts::default))
 }
 
-/// With ⇧ held the OS reports the shifted character as the logical key (US layout): ⇧; is `:`.
-fn shifted(k: Key) -> Option<Key> {
-    Some(match k {
-        Key::Equals => Key::Plus,
-        Key::Semicolon => Key::Colon,
-        Key::OpenBracket => Key::OpenCurlyBracket,
-        Key::CloseBracket => Key::CloseCurlyBracket,
-        Key::Slash => Key::Questionmark,
-        Key::Backslash => Key::Pipe,
-        Key::Num1 => Key::Exclamationmark,
-        _ => return None,
-    })
-}
-
-/// Does a key press match a shortcut, the way Photoshop matches them?
-///
-/// - Modifiers match exactly (⌘⌥I is not ⌘I), with ⌘ = Ctrl off the Mac.
-/// - `=` also matches `+` (⌘+ with ⇧ on a US layout, the numpad `+`, the `+` key of Nordic and
-///   German layouts): Photoshop zooms in on both.
-/// - Delete also matches Backspace (the Mac's "delete" key), and Backspace matches Delete (⌥⌫
-///   and ⌥Delete both fill on Windows).
-/// - A ⇧ shortcut on a punctuation key matches the shifted character (⌘⇧; arrives as ⌘`:`).
+/// Does a key press match a shortcut, the way Photoshop matches them? The library's rules
+/// (exact modifiers with ⌘ = Ctrl off the Mac, `=` also `+`, a ⇧ shortcut on a punctuation key
+/// also its shifted character), plus Delete and Backspace standing for each other (the Mac's
+/// "delete" key; ⌥⌫ and ⌥Delete both fill on Windows).
 pub fn key_matches(sc: &KeyboardShortcut, key: Key, mods: Modifiers) -> bool {
-    let k = sc.logical_key;
-    let direct = key == k || (k == Key::Delete && key == Key::Backspace) || (k == Key::Backspace && key == Key::Delete);
-    let plus = k == Key::Equals && key == Key::Plus;
-    let via_shift = sc.modifiers.shift && shifted(k) == Some(key);
-    if !(direct || plus || via_shift) {
-        return false;
-    }
-    // Typing `+` (or another shifted symbol) may need ⇧ on this layout: don't require it absent.
-    let shifted_symbol =
-        matches!(key, Key::Plus | Key::Colon | Key::OpenCurlyBracket | Key::CloseCurlyBracket | Key::Questionmark | Key::Pipe | Key::Exclamationmark);
-    let shift_ok = mods.shift == sc.modifiers.shift || (shifted_symbol && !sc.modifiers.shift);
-    mods.alt == sc.modifiers.alt && shift_ok && mods.cmd_ctrl_matches(sc.modifiers)
+    let platform = Platform::current();
+    let Some(k) = CKey::from_egui(sc.logical_key) else { return false };
+    let binding = Chord::new(CMods::from_egui(&sc.modifiers, platform), k);
+    let key = match (sc.logical_key, key) {
+        (Key::Delete, Key::Backspace) => Key::Delete,
+        (Key::Backspace, Key::Delete) => Key::Backspace,
+        _ => key,
+    };
+    craft_keymap::egui::matches(&binding, key, &mods, platform)
 }
 
 /// Consume a press of `sc` (see [`key_matches`]); true when one was found.

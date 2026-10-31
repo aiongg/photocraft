@@ -219,12 +219,12 @@ fn keys_match_like_photoshop() {
 #[test]
 fn pretty_uses_the_platform_notation() {
     let mac = cfg!(target_os = "macos");
-    assert_eq!(pretty("Cmd+Shift+N"), if mac { "⌘⇧N" } else { "Ctrl+Shift+N" });
+    assert_eq!(pretty("Cmd+Shift+N"), if mac { "⇧⌘N" } else { "Ctrl+Shift+N" });
     // Lone keys and inline-hint combos.
     assert_eq!(pretty("Alt"), if mac { "⌥" } else { "Alt" });
     assert_eq!(pretty("Shift+Alt"), if mac { "⇧⌥" } else { "Shift+Alt" });
-    assert_eq!(pretty("Enter"), if mac { "↩" } else { "Enter" });
-    assert_eq!(pretty("Cmd+Enter"), if mac { "⌘↩" } else { "Ctrl+Enter" });
+    assert_eq!(pretty("Enter"), if mac { "⏎" } else { "Enter" });
+    assert_eq!(pretty("Cmd+Enter"), if mac { "⌘⏎" } else { "Ctrl+Enter" });
 }
 
 #[test]

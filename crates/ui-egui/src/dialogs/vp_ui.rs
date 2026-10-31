@@ -1044,23 +1044,32 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) {
 
 /// Keys while the mode is active (↩ and Esc are handled by `distort_ui::keys`).
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    use egui::{Key, Modifiers};
     if ctx.memory(|m| m.focused().is_some()) {
         return;
     }
     let Some(s) = app.distort.vanishing.as_mut() else { return };
-    let key = |k: Key| ctx.input_mut(|i| i.consume_key(Modifiers::NONE, k));
-    if key(Key::V) {
-        s.tool = VpTool::EditPlane;
-        s.pending.clear();
-    } else if key(Key::C) {
-        s.tool = VpTool::CreatePlane;
-    } else if key(Key::S) {
-        s.tool = VpTool::Stamp;
-        s.pending.clear();
-    } else if key(Key::Delete) || key(Key::Backspace) {
-        s.delete_selected();
-        s.settle(false);
+    static KEYS: std::sync::LazyLock<crate::dialog_keys::DialogKeys> = std::sync::LazyLock::new(|| {
+        crate::dialog_keys::DialogKeys::new(
+            "Vanishing Point",
+            &[("edit", "V".into()), ("create", "C".into()), ("stamp", "S".into()), ("back", "Backspace".into()), ("delete", "Delete".into())],
+        )
+    });
+    // One key press does one thing: the first of this frame's presses.
+    match KEYS.pressed(ctx).first().map(String::as_str) {
+        Some("edit") => {
+            s.tool = VpTool::EditPlane;
+            s.pending.clear();
+        }
+        Some("create") => s.tool = VpTool::CreatePlane,
+        Some("stamp") => {
+            s.tool = VpTool::Stamp;
+            s.pending.clear();
+        }
+        Some("back" | "delete") => {
+            s.delete_selected();
+            s.settle(false);
+        }
+        _ => {}
     }
     sync_preview(app);
 }
