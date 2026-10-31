@@ -14,7 +14,7 @@
 use craft::draw::ui::gradient::GradientSwatch;
 use craft::draw::ui::{
     ColorStop, GradientExtent, GradientLine, GradientLineNames, GradientLineStyle, GradientOverlay, GradientStops, LineGradient, LinePart, LinePress,
-    LineRelease, StopRef, StopRows, StopRules,
+    LineRelease, StopRef, StopRows, StopRules, TaggedStop,
 };
 use craft::theme::Srgba;
 use craft::ui::canvas::CanvasView;
@@ -57,7 +57,7 @@ enum Drag {
     Draw { from: [f32; 2], to: [f32; 2], redraw: Option<LayerId> },
     /// Editing the selected gradient: the library overlay's press, the stop or midpoint it
     /// selects, and the command (and params) to commit on release.
-    Edit { layer: LayerId, press: LinePress, selected: Option<StopRef>, commit: Option<(&'static str, Value)> },
+    Edit { layer: LayerId, press: LinePress, selected: Option<TaggedStop>, commit: Option<(&'static str, Value)> },
 }
 
 /// Live-gradient interaction state (not saved).
@@ -135,21 +135,22 @@ fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
 }
 
 /// The library's kit for a gradient fill: the line between its handles and its stops in location
-/// order (each tagged with its index + 1, so an edit's result maps back to the stop it moves; an
-/// added stop has tag 0), as the overlay's value, with the fill's reverse flag and extent.
+/// order, as the overlay's value, with the fill's reverse flag and extent. Each stop's key is its
+/// position in the fill's own list + 1 (an added stop has key 0), so an
+/// edit's result maps back to the stop it moves wherever a drag reorders it.
 fn line_gradient(f: &Fill, frame: Rect32) -> Option<(LineGradient, bool, GradientExtent)> {
     let Fill::Gradient { stops, midpoints, reverse, style, .. } = f else { return None };
     let (start, end) = gf::fill_handles(f, frame)?;
-    let mut sorted: Vec<(f32, [f32; 3])> = stops.iter().map(|(t, c)| (*t, c.to_rgb())).collect();
+    let mut sorted: Vec<(f32, [f32; 3], u64)> = stops.iter().enumerate().map(|(i, (t, c))| (*t, c.to_rgb(), i as u64 + 1)).collect();
     sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
     let color = sorted
         .iter()
         .enumerate()
-        .map(|(i, (t, rgb))| ColorStop {
+        .map(|(i, (t, rgb, key))| ColorStop {
             location: *t,
             color: Srgba { r: rgb[0].clamp(0.0, 1.0), g: rgb[1].clamp(0.0, 1.0), b: rgb[2].clamp(0.0, 1.0), a: 1.0 },
             midpoint: midpoints.get(i).copied().unwrap_or(0.5),
-            tag: i as u64 + 1,
+            tag: *key,
         })
         .collect();
     let point = |p: [f32; 2]| Point::new(f64::from(p[0]), f64::from(p[1]));
@@ -180,7 +181,7 @@ fn reach() -> &'static GradientLineStyle {
 
 /// The command an edit of the line's gradient commits: `after` is what the drag of `press` made
 /// of the gradient at the press.
-fn commit_of(layer: LayerId, press: &LinePress, after: &LineGradient) -> Option<(&'static str, Value)> {
+fn commit_of(layer: LayerId, press: &LinePress, before: &LineGradient, after: &LineGradient) -> Option<(&'static str, Value)> {
     let id = layer.0;
     let xy = |p: Point| [p.x as f32, p.y as f32];
     match press.part() {
@@ -189,7 +190,7 @@ fn commit_of(layer: LayerId, press: &LinePress, after: &LineGradient) -> Option<
         LinePart::Line => Some((cmds::SET, json!({"layer": id, "from": xy(after.line.start), "to": xy(after.line.end)}))),
         LinePart::Stop(i) if press.torn() => Some((cmds::STOP, json!({"layer": id, "action": "delete", "index": i}))),
         LinePart::Stop(i) => {
-            let moved = after.stops.color.iter().find(|s| s.tag == i as u64 + 1)?;
+            let moved = after.stops.color.iter().find(|s| Some(s.tag) == before.tag_of(StopRef::Color(i)))?;
             Some((cmds::STOP, json!({"layer": id, "action": "move", "index": i, "location": moved.location})))
         }
         LinePart::Midpoint(i) => {
@@ -262,7 +263,7 @@ fn drag_to(app: &mut PhotocraftApp, p: [f32; 2], mods: egui::Modifiers) {
             let Some((view, at)) = screen else { return };
             let track = overlay(&value, reverse, extent).track(&view, reach(), press, at, mods);
             if let Some(after) = &track.state {
-                *commit = commit_of(*layer, press, after);
+                *commit = commit_of(*layer, press, &value, after);
             }
             if let Some(now) = track.selected {
                 *selected = now;
@@ -300,7 +301,7 @@ fn finish(app: &mut PhotocraftApp, at: [f32; 2]) {
                     }
                 }
                 // A click on the line adds a colour stop there.
-                LineRelease::Add { value: added, selected: StopRef::Color(i) } => {
+                LineRelease::Add { value: added, selected: TaggedStop { stop: StopRef::Color(i), .. } } => {
                     if let Some(stop) = added.stops.color.get(i) {
                         let _ = app.run(cmds::STOP, json!({"layer": layer.0, "action": "add", "location": stop.location}));
                     }
@@ -324,8 +325,9 @@ fn click(app: &mut PhotocraftApp, layer: LayerId, part: LinePart, at: [f32; 2]) 
     let Some((l, frame, _)) = active_gradient(app) else { return };
     let Some((value, reverse, extent)) = fill_of(&l).and_then(|f| line_gradient(f, frame)) else { return };
     let Some((view, point)) = screen_point(app, at) else { return };
-    if let Some((i, _)) = overlay(&value, reverse, extent).double_click(&view, reach(), point) {
-        edit_stop_color(app, layer, i);
+    if let Some(request) = overlay(&value, reverse, extent).double_click(&view, reach(), point) {
+        // A click reorders nothing: the request's index is the stop's place in the command's order.
+        edit_stop_color(app, layer, request.index);
     }
 }
 
@@ -421,7 +423,7 @@ fn shown_fill(app: &PhotocraftApp) -> Option<(Fill, Rect32, Marks)> {
                 None => fill_of(l)?.clone(),
             };
             let held = matches!(press.part(), LinePart::Start | LinePart::End).then_some(press.part());
-            Some((f, photocraft_compose::fill_frame(l, canvas), (*selected, held)))
+            Some((f, photocraft_compose::fill_frame(l, canvas), (selected.map(|t| t.stop), held)))
         }
         None => {
             let (l, frame, _) = active_gradient(app)?;
