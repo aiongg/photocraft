@@ -9,8 +9,6 @@ mod angle_dial;
 mod color_count;
 pub use angle_dial::angle_dial_row;
 pub use color_count::color_count_row;
-mod type_ahead;
-pub use type_ahead::list_open as dropdown_list_open;
 
 mod buttons;
 mod color;
@@ -37,7 +35,7 @@ pub use dialog_fields::{
     NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units, text as dialog_text,
     text_as as dialog_text_as,
 };
-pub use dropdown::{dropdown, dropdown_hovered, dropdown_literal, dropdown_wheel_hovered, dropdown_with_tooltips, menu_scroll, swatch_popup};
+pub use dropdown::{dropdown, dropdown_hovered, dropdown_list_open, dropdown_literal, dropdown_with_tooltips, menu_scroll, swatch_popup};
 pub(crate) use fields::compact_wrapping_value_field;
 #[cfg(test)]
 use fields::{FieldOpts, NUMERIC_INPUT_LIMIT, value_field_in};

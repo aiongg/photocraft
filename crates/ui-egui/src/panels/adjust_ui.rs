@@ -15,7 +15,6 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::adjust_editors::Row;
-use crate::widgets;
 
 const RANGE_LABELS: [&str; 9] = ["Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas", "Whites", "Neutrals", "Blacks"];
 
@@ -203,29 +202,44 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
     let mut params: Option<Value> = None;
     let mut browse = false;
     let cycle_key = egui::Id::unique(("color-lookup-cycle", id.0));
-    let cycle_input = ui.input(|input| {
-        input.raw.events.iter().any(|event| {
-            matches!(event, egui::Event::MouseWheel { .. })
-                || matches!(event, egui::Event::Key { key: egui::Key::ArrowDown | egui::Key::ArrowUp, pressed: true, .. })
-        })
-    });
     let mut cycling_preview = false;
     ui.horizontal(|ui| {
+        use craft::ui::controls::{ControlSize, Select};
+        use craft::ui::edit::EditEvent;
+        use craft::ui::theme::{Tokens as LibTokens, TokensOf as _};
         ui.add(Text::new(tl!("3D LUT File")).role(TypeRole::Label).content(Content::Muted));
-        let (chosen, _) = widgets::dropdown_wheel_hovered(ui, &format!("clrl-{}", id.0), tl!("Color"), &mut sel, &opts, 170.0);
-        if !chosen.is_empty() {
-            if cycle_input {
+        let height = Select::style(&LibTokens::of(ui), ControlSize::Sm).field.height;
+        let mut event = None;
+        ui.allocate_ui_with_layout(egui::vec2(170.0, height), egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+            let mut select = Select::new(format!("clrl-{}", id.0), tl!("Color"), &mut sel).size(ControlSize::Sm).wheel_steps(true);
+            for (key, label) in &opts {
+                select = select.option(key.clone(), tl!(label));
+            }
+            event = select.show(ui).event;
+        });
+        // Keys in the open list and the wheel over the closed box preview; choosing commits.
+        match event {
+            Some(EditEvent::Update { .. } | EditEvent::Set { .. }) => {
                 // ponytail: wheel previews cover the built-ins only; a folder LUT would be re-read
                 // from disk on every step. Pick it with a click.
                 if sel != "load" && sel != "custom" && !sel.starts_with(FOLDER_LUT) {
                     app.live_adjust = Some((id, json!({"lut": sel})));
                     cycling_preview = true;
                 }
-            } else if sel == "load" {
-                browse = true;
-            } else if sel != current && sel != "custom" {
-                params = Some(lookup_params(&sel));
             }
+            Some(EditEvent::Commit { changed: true, .. }) => {
+                if sel == "load" {
+                    browse = true;
+                } else if sel != current && sel != "custom" {
+                    params = Some(lookup_params(&sel));
+                }
+            }
+            Some(EditEvent::Cancel { .. }) => {
+                if app.live_adjust.as_ref().is_some_and(|(layer, preview)| *layer == id && preview.get("lut").is_some()) {
+                    app.live_adjust = None;
+                }
+            }
+            _ => {}
         }
     });
     if cycling_preview {

@@ -97,7 +97,7 @@ fn single_frame_trackpad_tap_keeps_dialog_dropdown_above_modal_and_selects_optio
     h.run_steps(3);
     let palette_box = blend_box(&h, "Selective").center();
     tap(&mut h, palette_box);
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(craft::ui::popup_list::any_open(&h.ctx));
     crate::dialogs::cancel(h.state_mut(), d1).unwrap();
     h.run_steps(2);
 
@@ -110,7 +110,7 @@ fn single_frame_trackpad_tap_keeps_dialog_dropdown_above_modal_and_selects_optio
 
     // 1-frame trackpad tap on the Palette dropdown: the list must open IN FRONT OF the dialog.
     tap(&mut h, palette_box);
-    assert!(egui::Popup::is_any_open(&h.ctx), "tap opens the dropdown");
+    assert!(craft::ui::popup_list::any_open(&h.ctx), "tap opens the dropdown");
     let perceptual_pos = h.get_by_label("Perceptual").rect().center();
     let top_at_item = h.ctx.layer_id_at(perceptual_pos);
     assert!(
@@ -120,7 +120,7 @@ fn single_frame_trackpad_tap_keeps_dialog_dropdown_above_modal_and_selects_optio
 
     // Second 1-frame trackpad tap on "Perceptual" selects it and closes the list.
     tap(&mut h, perceptual_pos);
-    assert!(!egui::Popup::is_any_open(&h.ctx), "tap on option closes the dropdown");
+    assert!(!craft::ui::popup_list::any_open(&h.ctx), "tap on option closes the dropdown");
     assert_eq!(
         h.state().ui.dialogs.iter().find(|d| d.id == d2).and_then(|d| d.fields.get("palette")).and_then(|v| v.as_str()),
         Some("perceptual"),

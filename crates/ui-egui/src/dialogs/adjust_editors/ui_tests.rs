@@ -186,6 +186,9 @@ fn color_lookup_picker_cycles_luts_with_the_mouse_wheel() {
     h.run_steps(1);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "arrow navigation previews");
     assert!(h.state().live_adjust.is_some(), "arrow navigation selects a preview LUT");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(1);
+    assert!(h.state().live_adjust.is_none(), "Esc closes the list and drops the preview");
     for _ in 0..3 {
         h.event(egui::Event::MouseWheel {
             source: egui::MouseWheelSource::Unknown,
