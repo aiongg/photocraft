@@ -1819,18 +1819,18 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
     let response = ui.allocate_rect(rect, Sense::click_and_drag());
     let stroke_dismissal = primary && crate::shape_stroke_ui::dismiss_from_canvas(app, &response);
-    // A press outside an open canvas menu closes it and does nothing else: the tool gets none of
-    // that press, nor its drag or release.
-    let shown = app.ui.views.get(idx).cloned();
-    let menu_dismissed = primary && (crate::canvas_tool_menu::show_open(app, ui, &response) | crate::layer_pick_ui::show_open(app, ui, &response));
     // A view menu row chosen in the early show changed the camera: it wins over this frame's copy.
+    let shown = app.ui.views.get(idx).cloned();
+    if primary {
+        crate::canvas_tool_menu::show_open(app, ui, &response);
+        crate::layer_pick_ui::show_open(app, ui, &response);
+    }
     if let Some(now) = app.ui.views.get(idx)
         && Some(now) != shown.as_ref()
     {
         view = now.clone();
         ctx.request_repaint();
     }
-    let stroke_dismissal = stroke_dismissal | (primary && crate::canvas_tool_menu::consume_dismissing_press(&ctx, menu_dismissed));
     let painter = ui.painter_at(rect);
 
     match crate::prefs_ui::pasteboard_color(app) {

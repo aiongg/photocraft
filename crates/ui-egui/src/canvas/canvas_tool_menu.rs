@@ -1191,22 +1191,5 @@ fn show_now(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) -> bool {
     shown.dismissed
 }
 
-/// Whether the canvas tool skips this pass: a press outside a canvas menu closed it, and the
-/// widget under that press still gets the press, its drag and its release, which the tool must
-/// not act on. `dismissed` is true on the pass of the press; the gesture is consumed until the
-/// button is up.
-pub(crate) fn consume_dismissing_press(ctx: &egui::Context, dismissed: bool) -> bool {
-    let down = ctx.input(|i| i.pointer.any_down());
-    ctx.data_mut(|d| {
-        let held = d.get_temp_mut_or_default::<bool>(egui::Id::unique("canvas-menu-dismissing-press"));
-        *held |= dismissed;
-        let consumed = *held;
-        if consumed {
-            *held = down;
-        }
-        consumed
-    })
-}
-
 #[cfg(test)]
 mod tests;
