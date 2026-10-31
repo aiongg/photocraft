@@ -5,12 +5,16 @@
 //! The Smart Filters row carries the filter mask thumbnail: click it to paint the filter mask,
 //! ⌥-click to view it, ⇧-click to disable it (FILE-215-3).
 
-use craft_ui::theme::StrokeExt;
-use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use std::cell::Cell;
+
+use craft_ui::edit::EditEvent;
+use craft_ui::list::{ListRow, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, TreeRow};
+use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
+use egui::{Color32, Rect, Sense, StrokeKind, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
-use crate::state::LayerThumbnailSize;
+use super::layer_row_ui::ICON_W;
 use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
 
@@ -84,19 +88,7 @@ pub(crate) fn filter_label(f: &photocraft_doc::SmartFilter) -> String {
         .map_or_else(|| command.rsplit('.').next().unwrap_or(command).to_string(), |c| tl!(c.label).trim_end_matches('…').to_string())
 }
 
-/// Height of a Smart Filter or effect sub-row. As in Photoshop, these stay compact at every
-/// Layers panel thumbnail size; only the layer row itself grows with its thumbnails.
-pub(crate) const SUB_ROW_H: f32 = 22.0;
-
-/// The Smart Filters header row: (row height, shared-mask thumbnail side). The mask follows the
-/// Layers panel thumbnail size (hidden at None) and the row grows just enough to hold it.
-pub(crate) fn smart_filters_header_geometry(size: LayerThumbnailSize, pro: bool) -> (f32, f32) {
-    let (thumb, _) = crate::layers_panel_ui::thumbnail_geometry(size, pro);
-    if thumb == 0.0 { (SUB_ROW_H, 0.0) } else { ((thumb + 6.0).max(SUB_ROW_H), thumb) }
-}
-
-/// Smart Filters header + one row per filter (top filter first, as in Photoshop) under a smart
-/// layer. Edits are queued in `actions` as engine commands.
+/// The layer is a smart object with at least one smart filter.
 pub fn has_filters(l: &Layer) -> bool {
     matches!(&l.content, LayerContent::Smart(sm) if !sm.smart_filters.is_empty())
 }
@@ -109,21 +101,30 @@ pub fn paint_badge(painter: &egui::Painter, center: egui::Pos2, color: Color32) 
 }
 
 /// Paint the Smart Filters header and one row per filter of Smart Object `l` (top filter first), with their drag, drop and click handling; actions go to `actions`.
+///
+/// Library `ListRow`s nested one level under the layer's row: the eye column, the Smart Filters
+/// header's shared mask thumbnail (with the target brackets), the Blending Options icon as a
+/// trailing item.
 pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l: &Layer, depth: usize, actions: &mut Vec<(String, Value)>) {
     let LayerContent::Smart(sm) = &l.content else { return };
     if sm.smart_filters.is_empty() {
         return;
     }
-    let t = Tokens::get(ui.ctx());
-    let (header_height, mask_size) = smart_filters_header_geometry(app.ui.layers_panel_options.thumbnail_size, t.pro);
-    let indent = 30.0 + crate::layer_row_ui::indent(depth, ui.available_width(), 130.0);
+    let tokens = LibTokens::of(ui);
+    let style = ListRow::<FilterKey>::style(&tokens);
+    let colors = craft_ui::theme::current(ui.ctx()).color;
+    let (muted, normal) = (colors.text.muted.to_egui(), colors.text.normal.to_egui());
+    let thumb_size = super::layer_row::thumb_size_of(app.ui.layers_panel_options.thumbnail_size);
     let Some(st) = app.session.active() else { return };
     let active = st.active_layer == Some(l.id);
     let picked = ui.ctx().data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id)));
+    let mask_target = app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted();
     let rows = std::iter::once(None).chain((0..sm.smart_filters.len()).rev().map(Some));
     for index in rows {
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), if index.is_none() { header_height } else { SUB_ROW_H }), Sense::click_and_drag());
-        if let Some((to, action)) = reorder_drop(ui, l, sm.smart_filters.len(), index, rect) {
+        let header = index.is_none();
+        let size = if header { thumb_size } else { ThumbSize::None };
+        let place = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), style.height(size, false)));
+        if let Some((to, action)) = reorder_drop(ui, l, sm.smart_filters.len(), index, place) {
             // The moved filter ends up selected, with its smart object active, as after a click.
             ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, Some(to))));
             actions.push(action);
@@ -133,36 +134,43 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         }
         // Selected as in Photoshop: the row stays highlighted while its smart object is active.
         let selected = active && picked == Some((l.id.0, index));
-        if selected {
-            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), if t.pro { t.row_selected } else { t.hover });
-        } else if resp.contains_pointer() {
-            ui.painter().rect_filled(rect, craft_ui::theme::scale::Radius::R0.px(), t.hover.gamma_multiply(0.35));
-        }
-        if t.pro {
-            ui.painter().line_segment(
-                [pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())],
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.separator),
-            );
-        }
         let (name, on, shown) = filter_row_label(sm, index);
-        let eye = Rect::from_center_size(pos2(rect.left() + indent + if index.is_none() { 9.0 } else { 41.0 }, rect.center().y), vec2(18.0, 18.0));
-        let eye_resp = ui.interact(eye, ui.scope_id().with(("sf-eye", l.id.0, index)), Sense::click());
-        if shown {
-            icons::paint(ui, eye, "eye", 12.0, if on { t.icon } else { t.text_faint });
+        let blend_label = crate::i18n::fmt(tl!("Blending Options ({filter})"), &[("filter", &name)]);
+        let mask_cell = Cell::new(None);
+        let blend_opened = Cell::new(false);
+        let mut row =
+            ListRow::new((l.id.0, index), name.as_str()).toggle(ToggleColumn::eye(tl!("Visibility {row}"), shown)).selected(selected).dimmed(!on).layer(true);
+        if header && thumb_size != ThumbSize::None {
+            row = row.thumb(thumb_size, |_, r| mask_cell.set(Some(r)));
+            if mask_target {
+                row = row.thumb_target(ThumbTarget::First);
+            }
         }
-        eye_resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, shown, format!("{} {name}", tl!("Visibility"))));
-        if eye_resp.clicked() {
-            actions.push(match index {
-                None => ("layer.smartFilter.disableSmartFilters".into(), json!({"layer": l.id.0})),
-                Some(i) => ("layer.smartFilter.setVisible".into(), json!({"layer": l.id.0, "index": i})),
+        if let Some(i) = index {
+            let (layer, label, opened) = (l.id.0, &blend_label, &blend_opened);
+            row = row.trailing_item(ICON_W, move |ui| {
+                let r = ui.max_rect();
+                let resp = ui.interact(r, ui.scope_id().with(("sf-blend", layer, i)), Sense::click());
+                icons::paint(
+                    ui,
+                    Rect::from_center_size(r.center(), vec2(ICON_W, ICON_W)),
+                    "sliders-horizontal",
+                    13.0,
+                    if resp.hovered() { normal } else { muted },
+                );
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
+                if resp.double_clicked() {
+                    opened.set(true);
+                }
+                resp.on_hover_text(label);
             });
         }
-        // The shared mask scales with the thumbnail setting (hidden at None); the header name
-        // follows it, while filter names stay aligned past their eyes.
-        let mask_left = rect.left() + indent + 28.0;
-        let x = filter_label_x(rect.left(), indent, mask_size, index);
-        if index.is_none() && mask_size > 0.0 {
-            let sw = Rect::from_min_size(pos2(mask_left, rect.center().y - mask_size / 2.0), vec2(mask_size, mask_size));
+        let out = TreeRow::new(row, depth + 1 + usize::from(!header), false, false).text(super::layer_row::tree_text()).show(ui);
+        let resp = &out.response;
+
+        // The shared filter mask's content; the library frames it.
+        if let Some(sw) = mask_cell.get() {
+            let t = Tokens::get(ui.ctx());
             if let Some(mask) = &sm.filter_mask {
                 let tex = app.mask_thumb_kind(ui.ctx(), doc, l.id, mask, crate::mask_thumbs_ui::THUMB_SMART_MASK);
                 ui.painter().image(tex, sw, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
@@ -173,68 +181,46 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             } else {
                 ui.painter().rect_filled(sw, craft_ui::theme::scale::Radius::R0.px(), Color32::WHITE);
             }
-            ui.painter().rect_stroke(
-                sw,
-                craft_ui::theme::scale::Radius::R2.px(),
-                craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border),
-                egui::StrokeKind::Inside,
-            );
-            if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
-                crate::mask_thumbs_ui::paint_brackets(ui.painter(), sw, t.text);
-            }
-            let sw_resp = ui.interact(sw.expand(2.0), ui.scope_id().with(("sf-mask", l.id.0)), Sense::click());
-            if sw_resp.clicked() {
-                actions.extend(filter_mask_click(l, sm, ui.input(|i| i.modifiers)));
+        }
+
+        let mut handled = false;
+        for event in &out.events {
+            match event {
+                // A click or a sweep over the eye: the commands toggle, so act only on a change.
+                RowEvent::Toggle(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => {
+                    handled = true;
+                    if value.on != shown {
+                        actions.push(match index {
+                            None => ("layer.smartFilter.disableSmartFilters".into(), json!({"layer": l.id.0})),
+                            Some(i) => ("layer.smartFilter.setVisible".into(), json!({"layer": l.id.0, "index": i})),
+                        });
+                    }
+                }
+                RowEvent::ThumbClicked { .. } => {
+                    handled = true;
+                    actions.extend(filter_mask_click(l, sm, ui.input(|i| i.modifiers)));
+                }
+                _ => {}
             }
         }
-        let blend = index.map(|_| Rect::from_center_size(pos2(rect.right() - crate::layer_row_ui::RIGHT_PAD - 9.0, rect.center().y), vec2(18.0, 18.0)));
-        let right = blend.map_or(rect.right() - crate::layer_row_ui::RIGHT_PAD, |r| r.left() - 4.0);
-        crate::layer_row_ui::label(
-            ui.painter(),
-            x,
-            rect.center().y,
-            right,
-            &name,
-            egui::FontId::proportional(11.5),
-            if on { t.text_dim } else { t.text_faint },
-        );
-        // A filter's name is its own target, apart from the Blending Options icon (#3283): it
-        // selects, drags (#4271) and opens the filter's editor on a double-click. The row around
-        // it does the same, but only the name carries the row's label and selected state.
-        let name_resp = index.map(|i| {
-            let name_rect = Rect::from_min_max(pos2(x.min(right), rect.top()), pos2(right, rect.bottom()));
-            ui.interact(name_rect, ui.scope_id().with(("sf-name", l.id.0, i)), Sense::click_and_drag())
-        });
-        match &name_resp {
-            Some(r) => r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name)),
-            None => resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name)),
-        }
-        let hit = |f: fn(&egui::Response) -> bool| f(&resp) || name_resp.as_ref().is_some_and(f);
-        if hit(egui::Response::drag_started) {
+        if resp.drag_started() {
             ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(drag_key(), (l.id.0, index)));
         }
-        if hit(egui::Response::clicked) {
+        if resp.clicked() && !handled {
             ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, index)));
             if !active {
                 actions.push(("layer.select".into(), json!({"layer": l.id.0})));
             }
         }
-        if let Some(i) = index
-            && hit(egui::Response::double_clicked)
-        {
-            open_editor(app, ui.ctx(), l.id.0, sm, i);
-        }
-        if let (Some(i), Some(r)) = (index, blend) {
-            let blend_resp = ui.interact(r, ui.scope_id().with(("sf-blend", l.id.0, i)), Sense::click());
-            icons::paint(ui, r, "sliders-horizontal", 13.0, if blend_resp.hovered() { t.text } else { t.icon });
-            let label = crate::i18n::fmt(tl!("Blending Options ({filter})"), &[("filter", &name)]);
-            blend_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
-            if blend_resp.double_clicked()
+        if let Some(i) = index {
+            if resp.double_clicked() && !handled {
+                open_editor(app, ui.ctx(), l.id.0, sm, i);
+            }
+            if blend_opened.get()
                 && let Err(e) = crate::smart_filter_dialog::open(app, l.id, i)
             {
                 crate::notices::error(app, e);
             }
-            blend_resp.on_hover_text(label);
         }
     }
     // Every row of `l` is drawn, so a filter of it selected (now, after this pass's clicks) is on
@@ -245,6 +231,9 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
     }
 }
 
+/// A smart filter row's key: its smart object and the filter (`None`: the Smart Filters header).
+type FilterKey = (u64, Option<usize>);
+
 fn filter_row_label(sm: &SmartObject, index: Option<usize>) -> (String, bool, bool) {
     match index {
         None => (tl!("Smart Filters").to_string(), sm.filters_enabled, sm.filters_enabled),
@@ -252,14 +241,6 @@ fn filter_row_label(sm: &SmartObject, index: Option<usize>) -> (String, bool, bo
             let filter = &sm.smart_filters[i];
             (filter_label(filter), filter.visible && sm.filters_enabled, filter.visible)
         }
-    }
-}
-
-fn filter_label_x(left: f32, indent: f32, mask_size: f32, index: Option<usize>) -> f32 {
-    match index {
-        None if mask_size > 0.0 => left + indent + 28.0 + mask_size + 8.0,
-        None => left + indent + 28.0,
-        Some(_) => left + indent + 60.0,
     }
 }
 
@@ -553,10 +534,12 @@ mod editor_tests;
 #[cfg(test)]
 mod layer_thumbnail_scaling_tests {
     use super::*;
+    use crate::state::LayerThumbnailSize;
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
     fn sub_rows_stay_compact_while_the_smart_filter_mask_follows_thumbnail_setting() {
+        let mut plain: Option<f32> = None;
         for setting in [LayerThumbnailSize::None, LayerThumbnailSize::Small, LayerThumbnailSize::Medium, LayerThumbnailSize::Large] {
             let mut session = photocraft_engine::Session::new();
             session.execute("file.new", json!({"width": 50, "height": 38})).unwrap();
@@ -572,17 +555,24 @@ mod layer_thumbnail_scaling_tests {
             });
             h.state_mut().ui.layers_panel_options.thumbnail_size = setting;
             h.run_steps(8);
-            // Filter and effect rows keep Photoshop's compact height at every thumbnail size.
-            for label in ["Gaussian Blur", "Unsharp Mask", "Effects", "Drop Shadow"] {
-                let rect = h.get_by_label(label).rect();
-                assert!((rect.height() - SUB_ROW_H).abs() < 1.0, "{setting:?}: {label} was {rect:?}, expected {SUB_ROW_H}");
+            // Filter rows keep the library's plain row height at every thumbnail size, and the
+            // effect rows their compact height.
+            for label in ["Gaussian Blur", "Unsharp Mask"] {
+                let height = h.get_by_label(label).rect().height();
+                assert!((height - *plain.get_or_insert(height)).abs() < 1.0, "{setting:?}: {label} was {height}, expected {plain:?}");
             }
-            // Only the Smart Filters header grows, just enough for its shared-mask thumbnail.
-            let (header, mask) = smart_filters_header_geometry(setting, true);
-            let rect = h.get_by_label("Smart Filters").rect();
-            assert!((rect.height() - header).abs() < 1.0, "{setting:?}: Smart Filters was {rect:?}, expected {header}");
-            assert!(mask <= header - 6.0 || mask == 0.0, "{setting:?}: a {mask} mask must fit a {header} row");
-            assert_eq!(mask == 0.0, setting == LayerThumbnailSize::None, "{setting:?}: the mask hides only at None");
+            for label in ["Effects", "Drop Shadow"] {
+                let rect = h.get_by_label(label).rect();
+                assert!((rect.height() - 22.0).abs() < 1.0, "{setting:?}: {label} was {rect:?}, expected 22");
+            }
+            // Only the Smart Filters header grows, for its shared-mask thumbnail, which hides at None.
+            let header = h.get_by_label("Smart Filters").rect().height();
+            let plain = plain.unwrap();
+            if setting == LayerThumbnailSize::None {
+                assert!((header - plain).abs() < 1.0, "{setting:?}: Smart Filters was {header}, expected {plain}");
+            } else {
+                assert!(header > plain, "{setting:?}: Smart Filters was {header}, expected more than {plain}");
+            }
             if let Some(dir) = std::env::var_os("PHOTOCRAFT_LAYERS_SNAPSHOTS") {
                 let dir = std::path::PathBuf::from(dir);
                 std::fs::create_dir_all(&dir).unwrap();

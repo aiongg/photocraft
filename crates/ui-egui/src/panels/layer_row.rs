@@ -62,7 +62,7 @@ struct Cells {
 }
 
 /// The words of a group's disclosure triangle.
-fn tree_text() -> TreeText {
+pub(super) fn tree_text() -> TreeText {
     let alt = crate::shortcuts::pretty("Alt");
     let tip = |pattern: &str| crate::i18n::fmt(pattern, &[("key", &alt)]);
     TreeText {
@@ -138,7 +138,7 @@ pub(crate) fn min_panel_width(ui: &egui::Ui, size: LayerThumbnailSize) -> f32 {
 }
 
 /// The Layers panel's thumbnail setting as the library's.
-fn thumb_size_of(size: LayerThumbnailSize) -> ThumbSize {
+pub(super) fn thumb_size_of(size: LayerThumbnailSize) -> ThumbSize {
     match size {
         LayerThumbnailSize::None => ThumbSize::None,
         LayerThumbnailSize::Small => ThumbSize::Small,

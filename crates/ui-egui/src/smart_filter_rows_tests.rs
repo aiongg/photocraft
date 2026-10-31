@@ -55,7 +55,7 @@ fn at(h: &egui_kittest::Harness<'static, PhotocraftApp>, label: &str) -> Pos2 {
 }
 
 fn selected(h: &egui_kittest::Harness<'static, PhotocraftApp>, label: &str) -> bool {
-    h.get_by_role_and_label(Role::Button, label).accesskit_node().toggled() == Some(Toggled::True)
+    h.get_by_role_and_label(Role::TreeItem, label).accesskit_node().is_selected() == Some(true)
 }
 
 /// Press at `from`, move to `to` in steps and release there, with `modifiers` held on release.
@@ -80,7 +80,7 @@ fn drag(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, from: Pos2, to: P
 fn a_click_selects_the_filter_and_its_smart_object() {
     let (mut h, a, _, c) = panel();
     assert_eq!(h.state().session.active().unwrap().active_layer, Some(LayerId(c)));
-    h.get_by_role_and_label(Role::Button, "Gaussian Blur").click();
+    h.get_by_role_and_label(Role::TreeItem, "Gaussian Blur").click();
     h.run_steps(4);
     assert_eq!(h.state().session.active().unwrap().active_layer, Some(LayerId(a)), "the smart object becomes active");
     assert!(selected(&h, "Gaussian Blur"));
@@ -151,7 +151,7 @@ fn a_camera_raw_filter_copies_and_its_copy_opens_on_the_target() {
     // B is above A in the panel, so its copy is the upper of the two Camera Raw rows.
     let copy = h
         .query_all_by_label("Camera Raw Filter")
-        .filter(|n| n.accesskit_node().role() == Role::Button)
+        .filter(|n| n.accesskit_node().role() == Role::TreeItem)
         .map(|n| n.rect().center())
         .min_by(|p, q| p.y.total_cmp(&q.y))
         .unwrap();

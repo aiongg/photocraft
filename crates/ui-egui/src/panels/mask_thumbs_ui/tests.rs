@@ -492,10 +492,9 @@ fn mask_rect(h: &Harness<'_, PhotocraftApp>, id: u64, kind: MaskKind) -> Rect {
     recorded(&h.ctx, id).unwrap().0.into_iter().find(|(k, _)| *k == kind).unwrap().1
 }
 
-/// The layer thumbnail sits left of the first chain (see `paint`).
+/// The layer thumbnail's centre, as the row recorded it.
 fn layer_thumb_center(h: &Harness<'_, PhotocraftApp>, id: u64) -> Pos2 {
-    let first = recorded(&h.ctx, id).unwrap().0[0].1;
-    pos2(first.left() - 4.0 - super::CHAIN_W - first.width() / 2.0, first.center().y)
+    crate::layer_row_ui::recorded(&h.ctx).iter().find(|r| r.layer == id).and_then(|r| r.thumbnail).expect("layer thumbnail drawn").center()
 }
 
 fn mask_view(h: &Harness<'_, PhotocraftApp>) -> serde_json::Value {
