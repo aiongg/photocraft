@@ -9,11 +9,12 @@ use std::cell::Cell;
 
 use craft_ui::edit::EditEvent;
 use craft_ui::list::{ListRow, RowEvent, ThumbSize, ThumbTarget, ToggleColumn, TreeRow};
-use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
-use egui::{Color32, Rect, Sense, StrokeKind, pos2, vec2};
+use craft_ui::theme::{StrokeExt, ToEgui};
+use egui::{Color32, Rect, Sense, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
+use super::layer_drag::{MarkAt, mark_of};
 use super::layer_row_ui::ICON_W;
 use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
@@ -110,8 +111,6 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
     if sm.smart_filters.is_empty() {
         return;
     }
-    let tokens = LibTokens::of(ui);
-    let style = ListRow::<FilterKey>::style(&tokens);
     let colors = craft_ui::theme::current(ui.ctx()).color;
     let (muted, normal) = (colors.text.muted.to_egui(), colors.text.normal.to_egui());
     let thumb_size = super::layer_row::thumb_size_of(app.ui.layers_panel_options.thumbnail_size);
@@ -120,18 +119,9 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
     let picked = ui.ctx().data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id)));
     let mask_target = app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted();
     let rows = std::iter::once(None).chain((0..sm.smart_filters.len()).rev().map(Some));
+    let mut rects: Vec<(Option<usize>, Rect)> = Vec::new();
     for index in rows {
         let header = index.is_none();
-        let size = if header { thumb_size } else { ThumbSize::None };
-        let place = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), style.height(size, false)));
-        if let Some((to, action)) = reorder_drop(ui, l, sm.smart_filters.len(), index, place) {
-            // The moved filter ends up selected, with its smart object active, as after a click.
-            ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, Some(to))));
-            actions.push(action);
-            if !active {
-                actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-            }
-        }
         // Selected as in Photoshop: the row stays highlighted while its smart object is active.
         let selected = active && picked == Some((l.id.0, index));
         let (name, on, shown) = filter_row_label(sm, index);
@@ -140,6 +130,9 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         let blend_opened = Cell::new(false);
         let mut row =
             ListRow::new((l.id.0, index), name.as_str()).toggle(ToggleColumn::eye(tl!("Visibility {row}"), shown)).selected(selected).dimmed(!on).layer(true);
+        if let Some(i) = index {
+            row = row.drop_mark(mark_of(ui.ctx(), MarkAt::Filter(l.id, i)));
+        }
         if header && thumb_size != ThumbSize::None {
             row = row.thumb(thumb_size, |_, r| mask_cell.set(Some(r)));
             if mask_target {
@@ -167,6 +160,7 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         }
         let out = TreeRow::new(row, depth + 1 + usize::from(!header), false, false).text(super::layer_row::tree_text()).show(ui);
         let resp = &out.response;
+        rects.push((index, resp.rect));
 
         // The shared filter mask's content; the library frames it.
         if let Some(sw) = mask_cell.get() {
@@ -204,7 +198,7 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             }
         }
         if resp.drag_started() {
-            ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(drag_key(), (l.id.0, index)));
+            super::layer_drag::start_filter_drag(ui.ctx(), l.id, index, &name);
         }
         if resp.clicked() && !handled {
             ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, index)));
@@ -223,6 +217,14 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             }
         }
     }
+    if let Some((to, action)) = stack_drop(ui, l, sm.smart_filters.len(), &rects) {
+        // The moved filter ends up selected, with its smart object active, as after a click.
+        ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, Some(to))));
+        actions.push(action);
+        if !active {
+            actions.push(("layer.select".into(), json!({"layer": l.id.0})));
+        }
+    }
     // Every row of `l` is drawn, so a filter of it selected (now, after this pass's clicks) is on
     // screen: see [`forget_hidden`].
     if ui.ctx().data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id))).is_some_and(|(layer, _)| layer == l.id.0) {
@@ -230,9 +232,6 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
         ui.ctx().data_mut(|d| d.insert_temp(drawn_key(doc.id), pass));
     }
 }
-
-/// A smart filter row's key: its smart object and the filter (`None`: the Smart Filters header).
-type FilterKey = (u64, Option<usize>);
 
 fn filter_row_label(sm: &SmartObject, index: Option<usize>) -> (String, bool, bool) {
     match index {
@@ -271,11 +270,6 @@ fn filter_mask_click(l: &Layer, sm: &SmartObject, m: egui::Modifiers) -> Vec<(St
 /// Smart filter rows being dragged: the smart object and the filter index (`None` = the Smart
 /// Filters row, all of them). Also what a click selects.
 pub(crate) type FilterDrag = (u64, Option<usize>);
-
-/// Memory key of the smart filter row being dragged.
-pub(crate) fn drag_key() -> egui::Id {
-    egui::Id::unique("smart-filter-drag")
-}
 
 /// The selected smart filter row of a document.
 fn selected_key(doc: photocraft_doc::DocId) -> egui::Id {
@@ -323,20 +317,6 @@ pub(crate) fn forget_hidden(ctx: &egui::Context, doc: photocraft_doc::DocId) {
     }
 }
 
-/// While smart filters are dragged: their name by the pointer, and the copy cursor while ⌥ is held.
-pub(crate) fn drag_feedback(ctx: &egui::Context, doc: &Document) {
-    let Some((from, filter)) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key())) else { return };
-    let Some(p) = ctx.input(|i| i.pointer.interact_pos()) else { return };
-    let label = match (filter, doc.layer(LayerId(from)).map(|l| &l.content)) {
-        (Some(i), Some(LayerContent::Smart(sm))) => sm.smart_filters.get(i).map_or_else(String::new, filter_label),
-        _ => "Smart Filters".to_string(),
-    };
-    crate::layer_transfer::ghost(ctx, p, &label);
-    if ctx.input(|i| i.modifiers.alt) {
-        ctx.set_cursor_icon(egui::CursorIcon::Copy);
-    }
-}
-
 /// The command for dropping the smart filters of `from` on the smart object `target`: they move
 /// there, or with ⌥ held on release are copied (Photoshop).
 pub(crate) fn drop_action(from: u64, filter: Option<usize>, target: LayerId, copy: bool) -> (String, Value) {
@@ -345,21 +325,6 @@ pub(crate) fn drop_action(from: u64, filter: Option<usize>, target: LayerId, cop
         o.insert("filter".into(), json!(i));
     }
     ("layer.smartFilter.transfer".into(), payload)
-}
-
-/// Another smart object's row accepts the smart filters being dragged: outlined while the pointer
-/// is over it, dropped on release. Other layers don't take them, as in Photoshop.
-pub(crate) fn drop_on_row(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect, actions: &mut Vec<(String, Value)>) {
-    let Some((from, filter)) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key())) else { return };
-    let Some(p) = ctx.input(|i| i.pointer.interact_pos()) else { return };
-    if from == l.id.0 || !matches!(l.content, LayerContent::Smart(_)) || !rect.contains(p) {
-        return;
-    }
-    let t = Tokens::get(ctx);
-    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent), StrokeKind::Inside);
-    if ctx.input(|i| i.pointer.any_released()) {
-        actions.push(drop_action(from, filter, l.id, ctx.input(|i| i.modifiers.alt)));
-    }
 }
 
 /// Where `layer.smartFilter.move` puts filter `src` (stack index, 0 = bottom) dropped on the row
@@ -389,23 +354,31 @@ fn reorder_target(src: usize, row: Option<usize>, above: bool, n: usize) -> Opti
     (to < n && to != src).then_some(to)
 }
 
-/// A filter dragged up or down its own smart object's stack (Photoshop): over another row of the
-/// stack a line marks where it lands, above or below that row (the Smart Filters row: on top),
-/// and the release moves it there. The bottom filter is applied first, so the order changes the
-/// result (Unsharp Mask over a blur sharpens the blurred image; under it, the sharpening is
-/// blurred). Returns the filter's new index and the command.
-fn reorder_drop(ui: &egui::Ui, l: &Layer, n: usize, row: Option<usize>, rect: Rect) -> Option<(usize, (String, Value))> {
+/// A filter dragged up or down its own smart object's stack (Photoshop): over a row of the stack
+/// a line marks where it lands, above or below that row (the Smart Filters row: on top), and the
+/// release moves it there. The library's `Reorder` finds the row and side; the Smart Filters row
+/// counts as the space above the top filter. The bottom filter is applied first, so the order
+/// changes the result (Unsharp Mask over a blur sharpens the blurred image; under it, the
+/// sharpening is blurred). `rows` are the stack's rects, the Smart Filters row first and then the
+/// filters top first. Returns the filter's new index and the command.
+fn stack_drop(ui: &egui::Ui, l: &Layer, n: usize, rows: &[(Option<usize>, Rect)]) -> Option<(usize, (String, Value))> {
+    use craft_ui::behavior::{Axis, DropPosition, Reorder, RowInfo};
     let ctx = ui.ctx();
-    let (from, src) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key()))?;
-    let (src, p) = (src?, ctx.input(|i| i.pointer.interact_pos())?);
-    if from != l.id.0 || !rect.contains(p) {
+    let drag = super::layer_drag::current(ctx)?;
+    let &super::layer_drag::RowKey::Filters(from, Some(src)) = drag.items.first()? else { return None };
+    let p = ctx.input(|i| i.pointer.interact_pos())?;
+    let (header, filters) = rows.split_first()?;
+    let stack = filters.last().map_or(header.1, |last| header.1.union(last.1));
+    if from != l.id || !stack.contains(p) {
+        super::layer_drag::set_filter_mark(ctx, None);
         return None;
     }
-    let above = p.y < rect.center().y;
-    let to = reorder_target(src, row, above, n)?;
-    let t = Tokens::get(ctx);
-    let y = if above && row.is_some() { rect.top() } else { rect.bottom() };
-    ui.painter().line_segment([pos2(rect.left() + 30.0, y), pos2(rect.right(), y)], craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.accent));
+    let order: Vec<RowInfo<usize>> = filters.iter().filter_map(|(i, _)| i.map(RowInfo::leaf)).collect();
+    let spans: Vec<std::ops::Range<f32>> = filters.iter().map(|(_, r)| r.top()..r.bottom()).collect();
+    let resolved = Reorder::new(Axis::Vertical).resolve(&order[..], &spans[..], p.y, &[src], ctx.input(|i| i.modifiers));
+    let target = resolved.as_ref().and_then(|r| reorder_target(src, Some(r.mv.target), r.mv.position == DropPosition::Before, n).map(|to| (r, to)));
+    super::layer_drag::set_filter_mark(ctx, target.map(|(r, _)| (l.id, r.mv.target, r.mv.position)));
+    let (_, to) = target?;
     ctx.input(|i| i.pointer.any_released()).then(|| (to, ("layer.smartFilter.move".into(), json!({"layer": l.id.0, "index": src, "to": to}))))
 }
 
@@ -555,15 +528,10 @@ mod layer_thumbnail_scaling_tests {
             });
             h.state_mut().ui.layers_panel_options.thumbnail_size = setting;
             h.run_steps(8);
-            // Filter rows keep the library's plain row height at every thumbnail size, and the
-            // effect rows their compact height.
-            for label in ["Gaussian Blur", "Unsharp Mask"] {
+            // Filter and effect rows keep the library's plain row height at every thumbnail size.
+            for label in ["Gaussian Blur", "Unsharp Mask", "Effects", "Drop Shadow"] {
                 let height = h.get_by_label(label).rect().height();
                 assert!((height - *plain.get_or_insert(height)).abs() < 1.0, "{setting:?}: {label} was {height}, expected {plain:?}");
-            }
-            for label in ["Effects", "Drop Shadow"] {
-                let rect = h.get_by_label(label).rect();
-                assert!((rect.height() - 22.0).abs() < 1.0, "{setting:?}: {label} was {rect:?}, expected 22");
             }
             // Only the Smart Filters header grows, for its shared-mask thumbnail, which hides at None.
             let header = h.get_by_label("Smart Filters").rect().height();
@@ -856,5 +824,57 @@ mod tests {
         ] {
             assert_eq!(app.with_mask_target(cmd, json!({}))["target"], "filterMask", "{cmd}");
         }
+    }
+}
+
+#[cfg(test)]
+mod filter_drag_tests {
+    use super::*;
+    use egui::{Modifiers, PointerButton};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    /// A real press, drag and release of a smart filter row onto a point.
+    fn drag(h: &mut Harness<'_, PhotocraftApp>, from: egui::Pos2, to: egui::Pos2) {
+        h.hover_at(from);
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+        h.run_steps(1);
+        for i in 1..=6 {
+            h.hover_at(from + (to - from) * (i as f32 / 6.0));
+            h.run_steps(1);
+        }
+        h.event(egui::Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+        h.run_steps(4);
+    }
+
+    /// A smart filter dragged over the lower half of another row of its stack lands under it,
+    /// and the drop on its own slot changes nothing.
+    #[test]
+    fn a_filter_dragged_within_its_stack_lands_under_the_row_it_is_dropped_on() {
+        let mut session = photocraft_engine::Session::new();
+        session.execute("file.new", json!({"width": 50, "height": 38})).unwrap();
+        session.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
+        session.execute("filter.blur.gaussianBlur", json!({"radius": 3})).unwrap();
+        session.execute("filter.sharpen.unsharpMask", json!({"amount": 80, "radius": 1, "threshold": 0})).unwrap();
+        let mut h = Harness::builder().with_size(vec2(1440.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            PhotocraftApp::new(session, crate::Services::default())
+        });
+        h.run_steps(8);
+        let order = |h: &Harness<'_, PhotocraftApp>| -> Vec<String> {
+            match &h.state().session.active().unwrap().doc.layers.last().unwrap().content {
+                LayerContent::Smart(sm) => sm.smart_filters.iter().map(filter_label).collect(),
+                _ => unreachable!(),
+            }
+        };
+        let before = order(&h);
+        let (top, bottom) = (h.get_by_label("Unsharp Mask").rect(), h.get_by_label("Gaussian Blur").rect());
+        // Onto its own slot: nothing moves.
+        drag(&mut h, top.center(), pos2(top.center().x, top.bottom() - 1.0));
+        assert_eq!(order(&h), before);
+        // Below the bottom row: the top filter goes to the bottom of the stack.
+        drag(&mut h, top.center(), pos2(bottom.center().x, bottom.bottom() - 2.0));
+        let after = order(&h);
+        assert_eq!(after, before.iter().rev().cloned().collect::<Vec<_>>());
     }
 }

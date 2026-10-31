@@ -12,6 +12,7 @@
 //! A Move-tool drag starting inside a selection or moving a floating piece stays a move: Photoshop
 //! would copy just the selected pixels, which is not supported yet.
 
+use craft_ui::behavior::ListDrag;
 use craft_ui::theme::StrokeExt;
 use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
@@ -23,11 +24,10 @@ use crate::state::Tool;
 #[derive(Clone, Debug)]
 struct Transfer {
     source: DocId,
-    layers: Vec<u64>,
+    /// The layers, and what the ghost by the pointer says.
+    drag: ListDrag<LayerId>,
     /// The document point a Move-tool drag grabbed (`None` for a Layers panel drag).
     grab: Option<[f64; 2]>,
-    /// What the ghost by the pointer says.
-    label: String,
 }
 
 fn key() -> egui::Id {
@@ -42,22 +42,21 @@ fn clear(ctx: &egui::Context) {
     ctx.data_mut(|d| d.remove::<Transfer>(key()));
 }
 
-/// The layers `id` stands for: the selection when it is one of the selected layers, else itself.
-fn begin(app: &PhotocraftApp, ctx: &egui::Context, id: LayerId, grab: Option<[f64; 2]>) -> bool {
+/// Starts a transfer of `layers` from the active document.
+fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: Option<[f64; 2]>) -> bool {
     let Some(st) = app.session.active() else { return false };
-    let layers = if st.is_layer_selected(id) { st.selected_layers() } else { vec![id] };
     let label = match layers.as_slice() {
         [one] => st.doc.layer(*one).map_or_else(String::new, |l| l.name.clone()),
         many => crate::i18n::trn(crate::i18n::current(), many.len() as u64, "{n} layer", "{n} layers"),
     };
-    let t = Transfer { source: st.doc.id, layers: layers.iter().map(|l| l.0).collect(), grab, label };
+    let t = Transfer { source: st.doc.id, drag: ListDrag { list: egui::Id::unique("pc-layers-list"), items: layers, label }, grab };
     ctx.data_mut(|d| d.insert_temp(key(), t));
     true
 }
 
-/// A Layers panel row drag began on `layer`: it can be dropped on another document.
-pub fn begin_from_panel(app: &PhotocraftApp, ctx: &egui::Context, layer: LayerId) {
-    begin(app, ctx, layer, None);
+/// A Layers panel row drag began on `layers`: they can be dropped on another document.
+pub fn begin_from_panel(app: &PhotocraftApp, ctx: &egui::Context, layers: &[LayerId]) {
+    begin(app, ctx, layers.to_vec(), None);
 }
 
 /// A Move-tool drag of whole layers (not a selection or a floating piece) under way.
@@ -92,7 +91,11 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
         app.move_preview = None;
         crate::move_mods::abandon(app);
         let active = app.session.active().and_then(|st| st.active_layer).unwrap_or(active);
-        if !begin(app, ctx, active, Some(grab)) {
+        let layers = match app.session.active() {
+            Some(st) if st.is_layer_selected(active) => st.selected_layers(),
+            _ => vec![active],
+        };
+        if !begin(app, ctx, layers, Some(grab)) {
             return;
         }
     }
@@ -100,7 +103,7 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
         app.session.set_active(index);
         app.jobs.focus = None;
         // The Layers panel now lists the other document: its rows don't take the drag.
-        ctx.data_mut(|d| d.remove::<u64>(egui::Id::unique("layer-drag")));
+        super::layer_drag::cancel(ctx);
     }
     if ctx.input(|i| i.pointer.any_released()) {
         drop(app, ctx, index, None);
@@ -119,7 +122,7 @@ pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
         } else if let Some(p) = pos
             && app.session.active().is_some_and(|st| st.doc.id != t.source)
         {
-            ghost(ctx, p, &t.label);
+            ghost(ctx, p, &t.drag.label);
             if target.is_some() {
                 ctx.set_cursor_icon(egui::CursorIcon::Copy);
             }
@@ -152,7 +155,7 @@ fn drop(app: &mut PhotocraftApp, ctx: &egui::Context, dest: usize, at: Option<[f
     let Some(src) = docs.iter().position(|d| d.doc.id == t.source) else { return };
     let Some(to) = docs.get(dest).filter(|_| dest != src) else { return };
     let same_size = to.doc.size == docs[src].doc.size;
-    let mut p = json!({"document": dest, "source": src, "layers": t.layers});
+    let mut p = json!({"document": dest, "source": src, "layers": t.drag.items.iter().map(|l| l.0).collect::<Vec<_>>()});
     match at.filter(|_| !ctx.input(|i| i.modifiers.shift)) {
         Some(at) => match t.grab {
             Some(g) => p["offset"] = json!([(at[0] - g[0]).round(), (at[1] - g[1]).round()]),

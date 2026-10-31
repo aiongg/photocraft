@@ -6,7 +6,7 @@ use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, Togg
 use craft_ui::menu::{ContextMenu, OpenAt};
 use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 
-use super::layer_drag::{MaskDrag, fx_drop, layer_drag_and_drop, mask_drag_key, start_fx_drag, starts_mask_drag};
+use super::layer_drag::{MarkAt, mark_of, start_fx_drag, start_layer_drag, start_mask_drag, starts_mask_drag};
 use super::layer_row_ui::{ICON_W, Indicator, TRIANGLE_W};
 use super::layers::simple_lock_toggle;
 use super::mask_thumbs_ui::MaskKind;
@@ -93,18 +93,13 @@ fn target_of(app: &PhotocraftApp, l: &Layer, masks: &[(MaskKind, bool, bool)]) -
     Some(ThumbTarget::First)
 }
 
-/// The drag and drop hooks that act on the row's response (layer, mask and effect drags).
-fn drag_hooks(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect, resp: &egui::Response, actions: &mut Vec<(String, Value)>) {
-    // A drag from a mask's thumbnail drags that mask, not the layer (#3113, #3119).
-    let mask_drag = starts_mask_drag(ctx, l, resp);
-    if let Some(kind) = mask_drag {
-        ctx.data_mut(|d| d.insert_temp::<MaskDrag>(mask_drag_key(), (l.id.0, kind)));
-    }
-    layer_drag_and_drop(app, ctx, ui, l, rect, resp, actions);
-    fx_drop(ctx, ui, l, rect, actions);
-    crate::smart_ui::drop_on_row(ctx, ui, l, rect, actions);
-    if resp.drag_started() && mask_drag.is_none() {
-        crate::layer_transfer::begin_from_panel(app, ctx, l.id);
+/// A drag from a mask's thumbnail drags that mask (#3113, #3119), any other drag of the row its
+/// layers, which can be dropped on another document too.
+fn drag_hooks(app: &PhotocraftApp, ctx: &egui::Context, l: &Layer, resp: &egui::Response) {
+    match starts_mask_drag(ctx, l, resp) {
+        Some(kind) => start_mask_drag(ctx, l.id, kind),
+        None if resp.drag_started() => start_layer_drag(app, ctx, l),
+        None => {}
     }
 }
 
@@ -230,7 +225,7 @@ fn indicator_items<'a>(
             // Dragging the fx badge drags all the layer's effects, not the layer (Photoshop). Like
             // the eye, it takes the drag from the row; clicks still reach the row.
             if ui.interact(r, ui.scope_id().with(("fx-badge", id)), Sense::drag()).drag_started() {
-                start_fx_drag(&ctx, l.id, None);
+                start_fx_drag(&ctx, l.id, None, tl!("Effects"));
             }
         });
     }
@@ -283,7 +278,7 @@ pub(super) fn layer_row(
     let menu_open = ctx.data(|d| d.get_temp::<bool>(menu_open_key(l.id.0))).unwrap_or(false);
     if !ui.is_rect_visible(place) && !l.is_group() && !menu_open && !renaming {
         let (rect, resp) = ui.allocate_exact_size(place.size(), Sense::click_and_drag());
-        drag_hooks(app, ctx, ui, l, rect, &resp, actions);
+        drag_hooks(app, ctx, l, &resp);
         return rect;
     }
 
@@ -302,6 +297,7 @@ pub(super) fn layer_row(
         .selected(selected)
         .dimmed(!l.visible)
         .highlight(app.canvas_hover_layer == Some(l.id))
+        .drop_mark(mark_of(ctx, MarkAt::Layer(l.id)))
         .layer(true)
         .renaming(renaming)
         .clipped(l.clipped)
@@ -318,7 +314,7 @@ pub(super) fn layer_row(
     lr = indicator_items(ui, ctx, l, doc, fx_open, lr, &cells);
     let out = TreeRow::new(lr, depth, matches!(&l.content, LayerContent::Group(_)), expanded).text(tree_text()).show(ui);
     let (rect, resp) = (out.response.rect, out.response.clone());
-    drag_hooks(app, ctx, ui, l, rect, &resp, actions);
+    drag_hooks(app, ctx, l, &resp);
     if resp.hovered() {
         app.hover_layer = Some(l.id);
     }

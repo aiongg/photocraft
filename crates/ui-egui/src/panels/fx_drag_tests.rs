@@ -33,8 +33,7 @@ fn row(h: &Harness<'_, PhotocraftApp>, id: LayerId) -> RowRects {
 /// The effect row `name` under layer `id`'s row.
 fn effect_row(h: &Harness<'_, PhotocraftApp>, id: LayerId, name: &str) -> Rect {
     let layer = row(h, id).row;
-    h.query_all_by_role(Role::Button)
-        .filter(|n| n.accesskit_node().label().as_deref() == Some(name))
+    h.query_all_by_label(name)
         .map(|n| n.rect())
         .find(|r| r.top() >= layer.bottom() - 1.0 && r.left() < layer.center().x && r.right() > layer.center().x)
         .unwrap_or_else(|| panic!("no {name} row under the layer"))
