@@ -2,13 +2,13 @@ use super::begin::warps_type;
 use super::drag_modes::{HandleIndicator, handle_indicator};
 use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
-use super::warp::{on_section_edge, quick_split_kind, single_patch};
+use super::warp::{on_section_edge, single_patch, split_guide};
 use super::{
-    BezierMesh, Color32, DocId, HANDLE_PX, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag,
-    WarpStyle, corners, pos2, vec2,
+    BezierMesh, Color32, DocId, Homography, LayerId, PhotocraftApp, Pos2, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag, WarpStyle, corners,
+    pos2,
 };
 use craft_ui::canvas::kurbo::Vec2;
-use craft_ui::canvas::{PointerInk, Readout as LibReadout, TransformBox, WarpGrid, distort_cursor, skew_cursor, turn_cursor};
+use craft_ui::canvas::{PointerInk, Readout as LibReadout, TransformBox, WarpGrid, distort_cursor, paint_pivot, skew_cursor, turn_cursor};
 use craft_ui::primitives::{Handle, HandleShape};
 
 /// The library's distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
@@ -127,16 +127,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         let at = pv.split_pointer.or(over_canvas);
         // The same keys as `cursor`, sticky ones included, so the guide matches the pointer.
         let mods = crate::workspace_ui::sticky_mods(app, painter.ctx().input(|i| i.modifiers));
-        let alt = mods.alt || mods.command;
-        let guide = at.filter(|_| !warps_type(app)).and_then(|p| {
-            let tool = pv.split_tool.or_else(|| {
-                (alt || pv.split_quick).then(|| {
-                    let m = w.to_mesh(1, 1);
-                    quick_split_kind(&m, w.bounds, m.param_at(p))
-                })
-            });
-            tool.map(|tool| (tool, p))
-        });
+        let guide = at.filter(|_| !warps_type(app)).map(|p| split_guide(w, pv, xf, p, mods)).unwrap_or_default();
         draw_warp_overlay(painter, xf, w, pv, guide);
         return;
     }
@@ -167,7 +158,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     paint_pivot(painter, scr(t.pivot), &style);
     if let Some(at) = painter.ctx().pointer_hover_pos().filter(|p| xf.rect.contains(*p)) {
         let p = xf.to_doc(at);
-        let tol = HANDLE_PX / f64::from(xf.zoom.max(0.01));
+        let tol = f64::from(super::pointer::reach().hit) / f64::from(xf.zoom.max(0.01));
         if let Some(k) = rotate_dir(t, Some(pv), p, tol) {
             // Through the view, so the arc bends round the corner as it shows under a turned or
             // flipped view.
@@ -178,17 +169,6 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         if let Some(r) = live_readout(app).filter(|_| app.session.prefs().tools.show_transformation_values) {
             draw_live_readout(app, painter.ctx(), at, r);
         }
-    }
-}
-
-/// The reference point: a circle and a cross, in the library box's look (`TransformBox` paints
-/// the same, privately).
-pub(crate) fn paint_pivot(painter: &egui::Painter, c: Pos2, style: &craft_ui::canvas::TransformStyle) {
-    let (r, arm) = (style.pivot_radius, style.pivot_arm);
-    for stroke in [style.pivot_halo, style.pivot] {
-        painter.circle_stroke(c, r, stroke);
-        painter.line_segment([c - vec2(arm, 0.0), c + vec2(arm, 0.0)], stroke);
-        painter.line_segment([c - vec2(0.0, arm), c + vec2(0.0, arm)], stroke);
     }
 }
 
@@ -302,7 +282,7 @@ pub(crate) enum Readout {
 pub(crate) fn live_readout(app: &PhotocraftApp) -> Option<Readout> {
     let t = app.ui.transform.as_ref().filter(|t| t.warp.is_none())?;
     let g = app.transform_preview.as_ref()?.gesture?;
-    match g.hit {
+    match g.hit() {
         Hit::Outside => Some(Readout::Angle(rotation_degrees(t.quad))),
         Hit::Inside => Some(Readout::Offset([t.quad[0][0] - g.quad0[0][0], t.quad[0][1] - g.quad0[0][1]])),
         Hit::Corner(_) | Hit::Edge(_) if parallelogram(&t.quad) => {
@@ -427,7 +407,10 @@ fn draw_warp_points(painter: &egui::Painter, m: &BezierMesh, scr: impl Fn([f64; 
     let hover = painter.ctx().input(|i| i.pointer.hover_pos());
     let ppp = painter.ctx().pixels_per_point();
     let dragged = match &pv.warp_drag {
-        Some(WarpDrag::Point { index, .. }) => Some(handle_anchor(index % nx, index / nx)),
+        Some(WarpDrag::Point { press, .. }) => match press.target() {
+            craft_ui::canvas::WarpTarget::Point(index) => Some(handle_anchor(index % nx, index / nx)),
+            craft_ui::canvas::WarpTarget::Surface(..) => None,
+        },
         _ => None,
     };
     let near = |p: Pos2| hover.is_some_and(|h| h.distance(p) <= style.reveal);
@@ -483,7 +466,7 @@ fn draw_warp_content(
 }
 
 /// The warp grid, its control points and split guides ([`draw_overlay`] for a warp).
-fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &TransformPreview, guide: Option<(SplitTool, [f64; 2])>) {
+fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &TransformPreview, guide: Vec<Vec<Pos2>>) {
     let scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     let m = w.to_mesh(1, 1);
     let accent = crate::theme::Tokens::get(painter.ctx()).accent;
@@ -538,17 +521,7 @@ fn draw_warp_overlay(painter: &egui::Painter, xf: &ViewXform, w: &Warp, pv: &Tra
     if w.style == WarpStyle::Custom {
         draw_warp_points(painter, &m, scr, pv, &style);
     }
-    if let Some((tool, p)) = guide {
-        let (s, t) = m.param_at(p);
-        let mut strokes = Vec::new();
-        if matches!(tool, SplitTool::Vertical | SplitTool::Cross) {
-            strokes.push(curve(Some(s), None));
-        }
-        if matches!(tool, SplitTool::Horizontal | SplitTool::Cross) {
-            strokes.push(curve(None, Some(t)));
-        }
-        for pts in strokes {
-            painter.add(egui::Shape::line(pts, style.split));
-        }
+    for pts in guide {
+        painter.add(egui::Shape::line(pts, style.split));
     }
 }

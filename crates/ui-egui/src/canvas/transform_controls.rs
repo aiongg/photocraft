@@ -1,6 +1,8 @@
 use super::selection::floating_outline;
 use super::view_xform::ViewXform;
 use super::{Color32, LayerContent, PhotocraftApp, Pos2, Rect, Tool, Vec2, pos2, vec2};
+use craft_ui::canvas::quad::{BoxPart, BoxState};
+use craft_ui::canvas::{RotateZone, TransformBox, TransformNames, kurbo::Point};
 use craft_ui::theme::ToEgui;
 
 /// View › Show › Layer Edges: the colour of the active layer's outline.
@@ -59,28 +61,41 @@ pub(super) fn transform_controls_rect(app: &PhotocraftApp, xf: &ViewXform) -> Op
     Some(Rect::from_two_pos(xf.to_screen(b.x0 as f32, b.y0 as f32), xf.to_screen(b.x1 as f32, b.y1 as f32)))
 }
 
-/// The Move tool shows transform handles even before a Free Transform session exists.
+/// The part of the Move tool's transform controls (the frame `r` on screen) under screen point
+/// `p`: a handle scales, the band `transform.band_inner` to `transform.band_outer` outside a
+/// corner rotates, and the interior stays the ordinary Move drag (#2871). The library's box decides,
+/// so the pointer and the press use the same reach. No modifiers are passed: ⌥ is the Move tool's
+/// duplicate drag, not the reference point.
+fn control_part(r: Rect, p: Pos2) -> Option<BoxPart> {
+    let corner = |q: Pos2| Point::new(f64::from(q.x), f64::from(q.y));
+    let state = BoxState {
+        quad: [corner(r.left_top()), corner(r.right_top()), corner(r.right_bottom()), corner(r.left_bottom())],
+        // The controls have no reference point: far from every handle.
+        pivot: Point::new(1e9, 1e9),
+    };
+    // Screen points are the frame's own, so the view maps them to themselves.
+    let view = crate::transform_tool::point_view(1.0);
+    let part = TransformBox::new("photocraft.move-controls", &state, TransformNames::default()).rotate_zone(RotateZone::Band).inside_moves(false).hit(
+        &view,
+        crate::transform_tool::reach(),
+        p,
+        egui::Modifiers::NONE,
+    )?;
+    (part != BoxPart::Pivot).then_some(part)
+}
+
 /// Use the same hit areas for pointer-down and hover, so a control never behaves like
 /// resize/rotate while showing the ordinary four-arrow Move cursor (#2871).
 pub(super) fn transform_controls_cursor(r: Rect, p: Pos2) -> Option<egui::CursorIcon> {
-    let handles = [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()];
-    let grab = crate::transform_tool::HANDLE_PX as f32;
-    for (i, handle) in handles.into_iter().enumerate() {
-        if handle.distance(p) <= grab {
-            return Some(match i {
-                0 | 4 => egui::CursorIcon::ResizeNwSe,
-                2 | 6 => egui::CursorIcon::ResizeNeSw,
-                1 | 5 => egui::CursorIcon::ResizeVertical,
-                _ => egui::CursorIcon::ResizeHorizontal,
-            });
-        }
-    }
-    // The rotation band: the pointer gives way to the curved rotate arrow (`transform_controls_turn`).
-    in_rotation_band(r, p).then_some(egui::CursorIcon::None)
-}
-
-fn in_rotation_band(r: Rect, p: Pos2) -> bool {
-    r.expand(18.0).contains(p) && !r.expand(5.0).contains(p)
+    Some(match control_part(r, p)? {
+        BoxPart::Corner(0 | 2) => egui::CursorIcon::ResizeNwSe,
+        BoxPart::Corner(_) => egui::CursorIcon::ResizeNeSw,
+        BoxPart::Edge(0 | 2) => egui::CursorIcon::ResizeVertical,
+        BoxPart::Edge(_) => egui::CursorIcon::ResizeHorizontal,
+        // The rotation band: the pointer gives way to the curved rotate arrow (`transform_controls_turn`).
+        BoxPart::Outside => egui::CursorIcon::None,
+        BoxPart::Inside | BoxPart::Pivot => return None,
+    })
 }
 
 /// In the rotation band just outside the Move tool's transform controls, the screen direction the
@@ -88,11 +103,7 @@ fn in_rotation_band(r: Rect, p: Pos2) -> bool {
 /// Transform draws it (#4658). Before, the band showed a plain alias pointer, so nothing said a
 /// drag there rotates.
 pub(super) fn transform_controls_turn(r: Rect, p: Pos2) -> Option<Vec2> {
-    if !in_rotation_band(r, p)
-        || [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()]
-            .into_iter()
-            .any(|h| h.distance(p) <= crate::transform_tool::HANDLE_PX as f32)
-    {
+    if control_part(r, p) != Some(BoxPart::Outside) {
         return None;
     }
     let corner = pos2(if p.x < r.center().x { r.left() } else { r.right() }, if p.y < r.center().y { r.top() } else { r.bottom() });

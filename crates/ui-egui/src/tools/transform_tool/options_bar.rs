@@ -432,7 +432,7 @@ fn warp_mesh_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
             pv.split_tool = if on { None } else { Some(tool) };
             pv.split_placing = false;
             pv.split_pointer = None;
-            pv.split_quick = false;
+            pv.split_press = None;
         }
     }
     crate::widgets::vline(ui, 22.0);
@@ -477,7 +477,7 @@ pub fn reset_warp(app: &mut PhotocraftApp) {
         pv.split_tool = None;
         pv.split_pointer = None;
         pv.split_placing = false;
-        pv.split_quick = false;
+        pv.split_press = None;
     }
 }
 

@@ -1,12 +1,12 @@
-use super::begin::{moving_layers, warps_type};
+use super::begin::moving_layers;
 use super::commit::{commit, committing, moves_type};
-use super::drag_modes::{apply_drag, apply_mode_drag, drag_mods, handle_indicator, mode_allows, mode_mods};
-use super::warp::{quick_split_kind, split_cursor, surface_at, warp_hit, warp_pointer};
-use super::{
-    CursorIcon, HANDLE_PX, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, WarpStyle,
-    handle_tolerance,
-};
-use craft_ui::canvas::{kurbo::Vec2, resize_cursor};
+use super::drag_modes::handle_indicator;
+use super::warp::{warp_cursor, warp_pointer};
+use super::{CursorIcon, Homography, LayerContent, PhotocraftApp, ToolEvent, TransformMode, TransformPreview, TransformSession, ViewXform, handle_tolerance};
+use craft_ui::canvas::quad::{BoxAllow, BoxPart, BoxRules, BoxState, ScaleRule, TransformMode as BoxMode};
+use craft_ui::canvas::{BoxPress, BoxRelease, CanvasView, TransformBox, TransformNames, TransformStyle, kurbo::Point, kurbo::Vec2, resize_cursor};
+use egui::{Modifiers, Pos2, pos2};
+use std::sync::OnceLock;
 
 /// Which part of the box a document point hits.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -18,35 +18,122 @@ pub(crate) enum Hit {
     Outside,
 }
 
-/// The nearest handle within `tol` (on a small box their grab areas overlap), else inside or
-/// outside the box.
-pub(crate) fn hit(t: &TransformSession, p: [f64; 2], tol: f64) -> Hit {
-    let d = |a: [f64; 2]| ((a[0] - p[0]).powi(2) + (a[1] - p[1]).powi(2)).sqrt();
-    let mid = |i: usize| {
-        let (a, b) = (t.quad[i], t.quad[(i + 1) % 4]);
-        [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
-    };
-    let handles = (0..4).map(|i| (t.quad[i], Hit::Corner(i))).chain((0..4).map(|i| (mid(i), Hit::Edge(i)))).chain([(t.pivot, Hit::Pivot)]);
-    let nearest = handles.map(|(q, h)| (d(q), h)).filter(|(dist, _)| *dist < tol).min_by(|a, b| a.0.total_cmp(&b.0));
-    match nearest {
-        Some((_, h)) => h,
-        None if inside(&t.quad, p) => Hit::Inside,
-        None => Hit::Outside,
-    }
-}
-
-fn inside(q: &[[f64; 2]; 4], p: [f64; 2]) -> bool {
-    let mut c = false;
-    for i in 0..4 {
-        let (a, b) = (q[i], q[(i + 3) % 4]);
-        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0] {
-            c = !c;
+impl From<BoxPart> for Hit {
+    fn from(part: BoxPart) -> Self {
+        match part {
+            BoxPart::Corner(i) => Hit::Corner(usize::from(i)),
+            BoxPart::Edge(i) => Hit::Edge(usize::from(i)),
+            BoxPart::Pivot => Hit::Pivot,
+            BoxPart::Inside => Hit::Inside,
+            BoxPart::Outside => Hit::Outside,
         }
     }
-    c
 }
 
-/// Transient drag state (kept in egui memory; not part of the serialised session).
+impl From<Hit> for BoxPart {
+    fn from(hit: Hit) -> Self {
+        match hit {
+            Hit::Corner(i) => BoxPart::Corner(i as u8),
+            Hit::Edge(i) => BoxPart::Edge(i as u8),
+            Hit::Pivot => BoxPart::Pivot,
+            Hit::Inside => BoxPart::Inside,
+            Hit::Outside => BoxPart::Outside,
+        }
+    }
+}
+
+/// The library box's sizes (`transform.*`): the same in every theme, so the pointer reads them
+/// without a context.
+pub(crate) fn reach() -> &'static TransformStyle {
+    static STYLE: OnceLock<TransformStyle> = OnceLock::new();
+    STYLE.get_or_init(|| TransformBox::style(&craft_ui::theme::current(&egui::Context::default())))
+}
+
+/// The library's canvas points for document points: `zoom` canvas points per document pixel, no
+/// turn, flip or stretch (the library's reach is in points, PhotoCraft measures it in document
+/// pixels at the zoom).
+pub(crate) fn point_view(zoom: f64) -> CanvasView {
+    CanvasView::new(egui::Rect::from_center_size(Pos2::ZERO, egui::vec2(1e7, 1e7)), Point::ZERO, zoom)
+}
+
+fn canvas_point(p: [f64; 2], zoom: f64) -> Pos2 {
+    pos2((p[0] * zoom) as f32, (p[1] * zoom) as f32)
+}
+
+pub(super) fn zoom_of(app: &PhotocraftApp) -> f64 {
+    f64::from(app.point_zoom().max(0.01))
+}
+
+/// The library's box state of the session.
+pub(super) fn box_state(t: &TransformSession) -> BoxState {
+    let p = |q: [f64; 2]| Point::new(q[0], q[1]);
+    BoxState { quad: t.quad.map(p), pivot: p(t.pivot) }
+}
+
+fn apply_state(t: &mut TransformSession, s: &BoxState) {
+    t.quad = s.quad.map(|p| [p.x, p.y]);
+    t.pivot = [s.pivot.x, s.pivot.y];
+}
+
+pub(super) fn box_mode(mode: TransformMode) -> BoxMode {
+    match mode {
+        TransformMode::Free => BoxMode::Free,
+        TransformMode::Rotate => BoxMode::Rotate,
+        TransformMode::Skew => BoxMode::Skew,
+        TransformMode::Distort => BoxMode::Distort,
+        TransformMode::Perspective => BoxMode::Perspective,
+    }
+}
+
+/// How drags change the session's box: its Edit › Transform mode, the preferences for legacy
+/// scaling and the aspect link, and what the content allows (editable type refuses distort;
+/// Content-Aware Scale only scales and moves).
+pub(super) fn box_rules(app: &PhotocraftApp, t: &TransformSession) -> BoxRules {
+    let legacy = app.session.prefs().general.use_legacy_free_transform;
+    let scales_only = t.content_aware.is_some();
+    BoxRules {
+        mode: box_mode(t.mode),
+        scale: if legacy { ScaleRule::Free } else { ScaleRule::Proportional },
+        aspect_linked: !app.ui.transform_unlinked,
+        allow: BoxAllow { rotate: !scales_only, skew: !scales_only, distort: !(scales_only || moves_type(app, t)) },
+        rotate_step: 15.0,
+    }
+}
+
+/// Preferences › Tools › Snap Vector Tools and Transforms to Pixel Grid (#5751): while a shape
+/// layer or a path is moved or scaled, its edges stay on whole pixels, whatever the tool. The box
+/// rounds only while still an upright rectangle.
+fn snaps_to_pixels(app: &PhotocraftApp, t: &TransformSession) -> bool {
+    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid
+        || t.selection
+        || t.warp.is_some()
+        || t.content_aware.is_some()
+        || t.target.is_some()
+    {
+        return false;
+    }
+    let shapes =
+        |st: &photocraft_engine::DocState| moving_layers(t).iter().all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, LayerContent::Shape(_))));
+    t.path.is_some() || app.session.active().is_some_and(shapes)
+}
+
+fn library_box<'a>(state: &'a BoxState, rules: BoxRules, pixel_grid: bool) -> TransformBox<'a> {
+    TransformBox::new("photocraft.transform", state, TransformNames::default()).rules(rules).pixel_grid(pixel_grid)
+}
+
+/// The nearest handle within the library's reach at `zoom`, else inside or outside the box:
+/// the geometry alone, whatever the mode refuses.
+fn hit_at(t: &TransformSession, p: [f64; 2], zoom: f64) -> Hit {
+    let state = box_state(t);
+    library_box(&state, BoxRules::default(), false).hit(&point_view(zoom), reach(), canvas_point(p, zoom), Modifiers::NONE).map_or(Hit::Outside, Hit::from)
+}
+
+/// [`hit_at`] for a grab radius of `tol` document pixels.
+pub(crate) fn hit(t: &TransformSession, p: [f64; 2], tol: f64) -> Hit {
+    hit_at(t, p, f64::from(reach().hit) / tol.max(1e-9))
+}
+
+/// The drag the Move, Camera and Type transform boxes keep, which they run through [`apply_drag`].
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Gesture {
     pub(crate) hit: Hit,
@@ -55,11 +142,28 @@ pub(crate) struct Gesture {
     pub(crate) pivot0: [f64; 2],
 }
 
-/// A click outside the box accepts the transform; a drag outside still rotates it.
-/// Decide on release, so the rotation zone keeps working for drags. The screen-sized
-/// click tolerance absorbs pointer jitter without accepting a real rotation gesture.
-pub(super) fn accepts_outside_click(g: Gesture, end: [f64; 2], tol: f64) -> bool {
-    g.hit == Hit::Outside && (end[0] - g.start[0]).hypot(end[1] - g.start[1]) <= 2.0 * tol / HANDLE_PX
+/// `g`'s drag of a box to document point `p` with `mods`, by the library's rules for Free
+/// Transform (no mode, the modifiers already adjusted by the caller).
+pub(crate) fn apply_drag(s: &mut TransformSession, g: Gesture, p: [f64; 2], mods: Modifiers) {
+    let point = |q: [f64; 2]| Point::new(q[0], q[1]);
+    let start = BoxState { quad: g.quad0.map(point), pivot: point(g.pivot0) };
+    let next = craft_ui::canvas::quad::drag(&start, &box_state(s), g.hit.into(), point(g.start), point(p), mods, &BoxRules::default());
+    apply_state(s, &next);
+}
+
+/// Transient drag state of the Free Transform box (kept in egui memory; not part of the serialised
+/// session).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Held {
+    pub(crate) press: BoxPress,
+    pub(crate) quad0: [[f64; 2]; 4],
+    pub(crate) pivot0: [f64; 2],
+}
+
+impl Held {
+    pub(crate) fn hit(&self) -> Hit {
+        self.press.part().into()
+    }
 }
 
 /// Pointer input while transforming. Returns false when no transform is active.
@@ -68,96 +172,70 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
     if committing(app).is_some() {
         return true;
     }
-    let tol = handle_tolerance(app);
+    let zoom = zoom_of(app);
     if t.warp.is_some() {
-        warp_pointer(app, ev, tol, mods);
+        warp_pointer(app, ev, zoom, mods);
         return true;
     }
-    let Some(pv) = app.transform_preview.as_mut() else { return false };
+    if app.transform_preview.is_none() {
+        return false;
+    }
+    let (state, rules, rounds) = (box_state(&t), box_rules(app, &t), snaps_to_pixels(app, &t));
+    let (view, style) = (point_view(zoom), reach());
+    let tool = library_box(&state, rules, rounds);
     match ev {
         ToolEvent::Down { x, y, .. } => {
-            let mut h = hit(&t, [x, y], tol);
-            // ⌥-click away from the handles moves the reference point there (and drags it).
-            if mods.alt
-                && matches!(h, Hit::Inside | Hit::Outside)
+            let at = canvas_point([x, y], zoom);
+            let press = tool.press(&view, style, at, mods);
+            // ⌥-click away from the handles moves the reference point there (and drags it): shown
+            // at the press, not only once the drag begins.
+            if let Some(press) = &press
+                && mods.alt
+                && press.part() == BoxPart::Pivot
+                && tool.hit(&view, style, at, Modifiers { alt: false, ..mods }) != Some(BoxPart::Pivot)
                 && let Some(s) = app.ui.transform.as_mut()
             {
                 s.pivot = [x, y];
-                h = Hit::Pivot;
             }
-            // Distort only moves corners (and the whole box from inside): no rotating, no edges.
-            // Even in Distort mode, remember an outside press so a plain click can
-            // accept the transform. A drag outside remains inert in that mode, in Skew, and in
-            // Content-Aware Scale, which only scales and moves.
-            pv.gesture = (mode_allows(t.mode, h) || h == Hit::Outside).then_some(Gesture { hit: h, start: [x, y], quad0: t.quad, pivot0: t.pivot });
+            if let Some(pv) = app.transform_preview.as_mut() {
+                pv.gesture = press.map(|press| Held { press, quad0: t.quad, pivot0: t.pivot });
+            }
         }
         ToolEvent::Move { x, y, .. } | ToolEvent::Up { x, y } => {
-            let g = pv.gesture;
-            if matches!(ev, ToolEvent::Up { .. }) {
-                pv.gesture = None;
-            }
-            // Clicking an empty spot commits instead of silently arming rotation (#2851).
-            // Dragging the rotation zone and Option-clicking to move the pivot
-            // keep their existing behavior.
-            if matches!(ev, ToolEvent::Up { .. }) && g.is_some_and(|g| accepts_outside_click(g, [x, y], tol)) {
-                commit(app);
+            let up = matches!(ev, ToolEvent::Up { .. });
+            let Some(mut g) = app.transform_preview.as_mut().and_then(|pv| if up { pv.gesture.take() } else { pv.gesture }) else {
+                crate::snap_ui::retain_transform_lines(app, mods);
                 return true;
-            }
-            let type_layer = moves_type(app, &t);
-            let adjusted = g.map(|g| drag_mods(app, &t, g.hit, mods));
-            if let (Some(g), Some((mode, mods)), Some(s)) = (g, adjusted, app.ui.transform.as_mut())
-                && mode_allows(t.mode, g.hit)
-                && (t.content_aware.is_none() || g.hit != Hit::Outside)
+            };
+            let at = canvas_point([x, y], zoom);
+            // The library begins the drag on the first move (outside, past its click slop).
+            if let Some(next) = tool.track(&view, style, &mut g.press, at, mods).state
+                && let Some(s) = app.ui.transform.as_mut()
             {
-                if t.content_aware.is_some() {
-                    let mut mods = mode_mods(mode, g.hit, mods);
-                    // Content-Aware Scale: ⌘ neither skews nor distorts.
-                    mods.command = false;
-                    apply_drag(s, g, [x, y], mods);
-                } else {
-                    apply_mode_drag(s, g, [x, y], mode, type_layer, mods);
+                apply_state(s, &next);
+            }
+            if up {
+                // Clicking an empty spot commits instead of silently arming rotation (#2851);
+                // Option-clicking moves the pivot.
+                match tool.release(style, &g.press, Some(at), false) {
+                    BoxRelease::Apply => {
+                        commit(app);
+                        return true;
+                    }
+                    BoxRelease::Pivot(next) => {
+                        if let Some(s) = app.ui.transform.as_mut() {
+                            apply_state(s, &next);
+                        }
+                    }
+                    BoxRelease::Commit(_) | BoxRelease::Nothing => {}
                 }
-                round_to_pixel_grid(app);
+            } else if let Some(pv) = app.transform_preview.as_mut() {
+                pv.gesture = Some(g);
             }
         }
     }
     crate::snap_ui::retain_transform_lines(app, mods);
     true
-}
-
-/// Preferences › Tools › Snap Vector Tools and Transforms to Pixel Grid (#5751): while a shape
-/// layer or a path is moved or scaled (the box still an upright rectangle), its edges stay on
-/// whole pixels, whatever the tool. Rounding the pointer alone left the edges off by the grab
-/// offset, and a proportional scale off by its ratio: a shape dragged to 540 px came out 539.6.
-/// Rotated, skewed and distorted boxes are left as dragged.
-fn round_to_pixel_grid(app: &mut PhotocraftApp) {
-    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid {
-        return;
-    }
-    let Some(t) = app.ui.transform.as_ref() else { return };
-    if t.selection || t.warp.is_some() || t.content_aware.is_some() || t.target.is_some() {
-        return;
-    }
-    let shapes =
-        |st: &photocraft_engine::DocState| moving_layers(t).iter().all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, LayerContent::Shape(_))));
-    let vector = t.path.is_some() || app.session.active().is_some_and(shapes);
-    if !vector || !upright(&t.quad) {
-        return;
-    }
-    let q = t.quad.map(|p| p.map(f64::round));
-    // A box narrower than a pixel keeps its size rather than collapsing.
-    if (q[1][0] - q[0][0]).abs() < 1.0 || (q[3][1] - q[0][1]).abs() < 1.0 || q.iter().flatten().any(|v| !v.is_finite()) {
-        return;
-    }
-    if let Some(s) = app.ui.transform.as_mut() {
-        s.quad = q;
-    }
-}
-
-/// Whether corners clockwise from top-left form an axis-aligned rectangle (flips included).
-fn upright(q: &[[f64; 2]; 4]) -> bool {
-    let near = |a: f64, b: f64| (a - b).abs() < 1e-6;
-    near(q[0][1], q[1][1]) && near(q[2][1], q[3][1]) && near(q[0][0], q[3][0]) && near(q[1][0], q[2][0])
 }
 
 fn anchor_uv(anchor: usize) -> (f64, f64) {
@@ -197,18 +275,6 @@ pub(super) fn point_on_quad(quad: [[f64; 2]; 4], anchor: usize) -> [f64; 2] {
     }
 }
 
-/// Where the reference point lands when the box goes from `quad0` to `quad`: the same place
-/// within the box, as in Photoshop, where it is attached to the bounding box (#1329). A box
-/// that has collapsed leaves it where it was.
-pub(super) fn carry_pivot(quad0: [[f64; 2]; 4], quad: [[f64; 2]; 4], pivot0: [f64; 2]) -> [f64; 2] {
-    let unit = [0.0, 0.0, 1.0, 1.0];
-    let (Some(h0), Some(h1)) = (Homography::rect_to_quad(unit, quad0), Homography::rect_to_quad(unit, quad)) else { return pivot0 };
-    let Some(inv) = h0.inverse() else { return pivot0 };
-    let (u, v) = inv.apply(pivot0[0], pivot0[1]);
-    let (x, y) = h1.apply(u, v);
-    if x.is_finite() && y.is_finite() { [x, y] } else { pivot0 }
-}
-
 /// True just outside a corner: rotate handle feedback lives here, not over the entire
 /// empty canvas. The actual rotation gesture continues to work farther away.
 pub(super) fn near_rotate_corner(t: &TransformSession, p: [f64; 2], tol: f64) -> bool {
@@ -218,7 +284,7 @@ pub(super) fn near_rotate_corner(t: &TransformSession, p: [f64; 2], tol: f64) ->
             let h = hit(t, p, tol);
             h == Hit::Outside || (t.mode == TransformMode::Rotate && matches!(h, Hit::Corner(_) | Hit::Edge(_)))
         }
-        && t.quad.iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) <= tol * 3.0)
+        && t.quad.iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) <= tol * f64::from(reach().rotate_reach / reach().hit))
 }
 
 /// Clockwise degrees in canvas coordinates (positive Y points down).
@@ -247,7 +313,7 @@ pub(super) fn rotate_dir(t: &TransformSession, pv: Option<&TransformPreview>, p:
     // During a drag the arrow shows only while it rotates: not when a handle that scales, skews
     // or distorts strays past a corner (#5405).
     match pv.and_then(|pv| pv.gesture) {
-        Some(g) if g.hit == Hit::Outside || (t.mode == TransformMode::Rotate && matches!(g.hit, Hit::Corner(_) | Hit::Edge(_))) => {}
+        Some(g) if g.hit() == Hit::Outside || (t.mode == TransformMode::Rotate && matches!(g.hit(), Hit::Corner(_) | Hit::Edge(_))) => {}
         Some(_) => return None,
         None if !near_rotate_corner(t, p, tol) => return None,
         None => {}
@@ -267,7 +333,7 @@ pub(super) fn rotate_dir(t: &TransformSession, pv: Option<&TransformPreview>, p:
 
 /// The handle a drag in progress holds, else the one under document point `p`.
 pub(super) fn handle_at(app: &PhotocraftApp, t: &TransformSession, p: [f64; 2], tol: f64) -> Hit {
-    app.transform_preview.as_ref().and_then(|pv| pv.gesture.map(|g| g.hit)).unwrap_or_else(|| hit(t, p, tol))
+    app.transform_preview.as_ref().and_then(|pv| pv.gesture.map(|g| g.hit())).unwrap_or_else(|| hit(t, p, tol))
 }
 
 /// Cursor for hovering a document point while transforming. `xf` is the canvas's view;
@@ -276,25 +342,10 @@ pub fn cursor(app: &PhotocraftApp, xf: &ViewXform, p: [f64; 2], mods: egui::Modi
     let t = app.ui.transform.as_ref()?;
     let tol = handle_tolerance(app);
     if let Some(w) = &t.warp {
-        if warps_type(app) {
-            return Some(CursorIcon::Default);
-        }
-        let armed = app.transform_preview.as_ref().and_then(|pv| pv.split_tool);
-        let quick_split = mods.alt || mods.command;
-        if armed.is_some() || quick_split {
-            // One search for the grid position under the pointer, for both the kind and the arrow.
-            let m = w.to_mesh(1, 1);
-            let at = m.param_at(p);
-            let tool = armed.unwrap_or_else(|| quick_split_kind(&m, w.bounds, at));
-            return Some(split_cursor(&m, tool, at, xf));
-        }
-        if w.style != WarpStyle::Custom || warp_hit(w, p, tol).is_some() {
-            return Some(CursorIcon::Crosshair);
-        }
-        return Some(if w.mesh.as_ref().and_then(|m| surface_at(m, p)).is_some() { CursorIcon::Grab } else { CursorIcon::Default });
+        return Some(warp_cursor(app, w, xf, p, mods));
     }
     let h = handle_at(app, t, p, tol);
-    if !mode_allows(t.mode, h) || (t.content_aware.is_some() && h == Hit::Outside) {
+    if !box_rules(app, t).allows(h.into()) || (t.content_aware.is_some() && h == Hit::Outside) {
         return Some(CursorIcon::Default);
     }
     // A ⌘-drag outside the box still rotates, so ⌘ keeps the curved arrow there.
