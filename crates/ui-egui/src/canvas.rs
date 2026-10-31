@@ -1082,6 +1082,7 @@ fn handle_canvas_tool_stroke(
         let p = at.map(|p| xf.to_doc(p)).or_else(|| app.drag.as_ref().and_then(|d| d.points.last().map(|q| [q[0], q[1]])));
         if let Some(d) = p {
             tap_at_peak_pressure(app);
+            app.gradient.double_click = response.double_clicked();
             tool_event(app, ToolEvent::Up { x: d[0], y: d[1] }, mods);
         }
     }

@@ -48,8 +48,6 @@ use stops_bar::BarAction;
 pub const PREVIEW_LAYER: LayerId = LayerId(u64::MAX - 78);
 /// Tag of this module's canvas preview keys.
 const TAG: u64 = 1 << 58;
-/// Seconds between two clicks of a double-click.
-const DOUBLE_CLICK: f64 = 0.45;
 
 #[derive(Clone, Debug)]
 enum Drag {
@@ -64,7 +62,8 @@ enum Drag {
 #[derive(Default)]
 pub struct LiveGradient {
     drag: Option<Drag>,
-    last_click: Option<(LinePart, f64)>,
+    /// The release being delivered ends egui's double click (set by the canvas before the event).
+    pub(crate) double_click: bool,
     /// Pending edit from the Properties panel's stops editor (previewed like a canvas drag).
     panel: Option<(LayerId, &'static str, Value)>,
     /// Pending edit from the Gradient Editor window's current-gradient strip
@@ -316,10 +315,7 @@ fn finish(app: &mut PhotocraftApp, at: [f32; 2]) {
 /// A click (no drag) on the widget: a double-click on a stop (or on an end handle, for the stop
 /// there) opens the Color Picker.
 fn click(app: &mut PhotocraftApp, layer: LayerId, part: LinePart, at: [f32; 2]) {
-    let now = app.last_frame_time;
-    let double = app.gradient.last_click.is_some_and(|(g, t)| g == part && now - t <= DOUBLE_CLICK);
-    app.gradient.last_click = Some((part, now));
-    if !double || !matches!(part, LinePart::Stop(_) | LinePart::Start | LinePart::End) {
+    if !std::mem::take(&mut app.gradient.double_click) || !matches!(part, LinePart::Stop(_) | LinePart::Start | LinePart::End) {
         return;
     }
     let Some((l, frame, _)) = active_gradient(app) else { return };
@@ -338,7 +334,6 @@ pub fn edit_stop_color(app: &mut PhotocraftApp, layer: LayerId, i: usize) {
     let mut sorted = stops.clone();
     sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
     let Some((_, c)) = sorted.get(i) else { return };
-    app.gradient.last_click = None;
     crate::color_picker_ui::open_for_command(
         app,
         "Color Picker (Stop Color)",
