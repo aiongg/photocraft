@@ -45,7 +45,7 @@ const PATTERNS: [(PatternStyle, &str); 4] =
 /// (Esc) restores the value the drag began with.
 fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str) -> bool {
     use craft::ui::composites::SliderRow;
-    use craft::ui::edit::EditEvent;
+    use craft::ui::edit::{CancelReason, EditEvent};
     use craft::ui::localized::{LocaleNumbers, Unit};
     let numbers = LocaleNumbers::of(ui);
     // Rows repeat labels ("Minimum" under each dynamic), so the row's own position names it.
@@ -73,7 +73,7 @@ fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclus
                 *v = value.round().clamp(lo, hi) as f32;
                 changed = true;
             }
-            EditEvent::Cancel { .. } => {
+            EditEvent::Cancel { reason, .. } if reason != CancelReason::External => {
                 if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
                     *v = old;
                     changed = true;
