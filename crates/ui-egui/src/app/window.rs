@@ -6,6 +6,6 @@ impl PhotocraftApp {
     /// only with the custom title bar: on macOS the strip under the traffic lights is the window's
     /// title bar too, and an open dialog (Embedded Profile Mismatch…) left it undraggable (#5826).
     pub(crate) fn titlebar_modal_drag(&self, chrome: bool) -> bool {
-        chrome && self.ui.panels.menu_bar && !self.ui.dialogs.is_empty()
+        chrome && self.ui.panels.menu_bar && self.ui.any_dialog_open()
     }
 }

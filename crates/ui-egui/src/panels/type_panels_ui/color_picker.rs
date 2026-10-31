@@ -72,7 +72,7 @@ fn validate(app: &PhotocraftApp, t: &Target) -> Result<(), String> {
 
 /// Validate before changing either the panel state or the dialog stack. Also used by automation.
 pub(crate) fn open(app: &mut PhotocraftApp, kind: Kind, id: u32) -> Result<u64, String> {
-    if !app.ui.dialogs.is_empty() {
+    if app.ui.any_dialog_open() {
         return Err("close the current dialog before opening a text style color picker".into());
     }
     let st = app.session.active().ok_or("no active document")?;

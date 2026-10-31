@@ -435,7 +435,7 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // pick an option rather than a tool (#1481). A command shortcut (⌘D, F7…) takes the keyboard
     // off the bar first and runs, as with a native menu bar (#6573).
     craft::ui::menu::bar::leave_for_shortcut(ctx);
-    if app.ui.dialogs.is_empty() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
+    if !app.ui.any_dialog_open() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
         return false;
     }
     if craft::ui::menu::any_open(ctx) || craft::ui::menu::bar::is_focused(ctx) || (crate::widgets::dropdown_list_open(ctx) && app.ui.stroke_editor.is_none()) {
@@ -498,7 +498,7 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
     // Dialogs (and Liquify's panel while one of its controls has focus) keep canvas zoom; a
     // focused text field keeps its keys.
     let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && focus != Focus::None;
-    if liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() {
+    if liquify_focus || app.ui.any_dialog_open() || app.discard.is_some() {
         // A text field keeps its plain keys, but the ⌘ view shortcuts (zoom) still reach the canvas.
         if focus != Focus::Text || ctx.input(|i| i.modifiers.command) {
             nav_keys(app, ctx);

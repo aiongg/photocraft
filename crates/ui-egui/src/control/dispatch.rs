@@ -77,7 +77,7 @@ fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRe
     let open_modal = if app.camera_raw.is_some() { Some("filter.cameraRaw") } else { crate::distort_ui::modal_workspace(app) };
     let continuation = open_modal == Some(id)
         && params.as_object().is_some_and(|fields| fields.len() == 1 && fields.get("ui").is_some_and(Value::is_object))
-        && app.ui.dialogs.is_empty()
+        && !app.ui.any_dialog_open()
         && app.discard.is_none()
         && !crate::crop_ui::blocks(app, id);
     if req.method == "ui.menu.invoke" && !continuation && !crate::menus::modal_allows(app, id) {
@@ -1198,7 +1198,7 @@ fn pointer_eyedropper_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &Poi
         return true;
     }
     // A Properties Levels/Curves eyedropper owns the primary button the same way.
-    if app.ui.dialogs.is_empty() && !g.secondary && crate::layer_picker::armed(app).is_some() {
+    if !app.ui.any_dialog_open() && !g.secondary && crate::layer_picker::armed(app).is_some() {
         if down {
             crate::layer_picker::sample_at(app, x, y);
         }
@@ -1210,7 +1210,7 @@ fn pointer_eyedropper_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &Poi
 /// The dialog owns all pointer events, including Up: no underlying brush stroke
 /// or context menu may leak through while inspecting a Color Range preview.
 fn color_range_took(app: &mut PhotocraftApp, g: &PointerGesture, s: &PointerSample) -> bool {
-    if !app.ui.dialogs.last().is_some_and(|d| crate::color_range_ui::owns(&d.fields)) {
+    if !app.ui.legacy_top().is_some_and(|d| crate::color_range_ui::owns(&d.fields)) {
         return false;
     }
     let down = matches!(s.ev, ToolEvent::Down { .. });

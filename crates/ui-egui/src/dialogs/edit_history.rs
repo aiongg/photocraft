@@ -14,7 +14,7 @@ pub use craft::ui::dialog::{LocalHistory as EditHistory, Step, take_step};
 /// Angle, Vanishing Point): steps its own history, and the keys never reach the document's
 /// History beneath it. The parameter dialogs step theirs inside `craft::ui::dialog::Dialog`.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if ctx.text_edit_focused() || !app.ui.dialogs.is_empty() {
+    if ctx.text_edit_focused() || app.ui.any_dialog_open() {
         return;
     }
     if let Some(d) = app.distort.gallery.as_mut() {

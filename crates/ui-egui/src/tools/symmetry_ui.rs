@@ -63,7 +63,7 @@ pub fn can_transform(app: &PhotocraftApp) -> bool {
         && preset(app).is_some()
         && app.ui.transform.is_none()
         && app.ui.text_edit.is_none()
-        && app.ui.dialogs.is_empty()
+        && !app.ui.any_dialog_open()
         && app.camera_raw.is_none()
         && app.distort.liquify.is_none()
         && app.distort.puppet.is_none()

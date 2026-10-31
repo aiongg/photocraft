@@ -307,7 +307,7 @@ pub(super) fn reset_route_eligible(app: &PhotocraftApp, ctx: &egui::Context) -> 
     // pre-styled app state and are not an actual UI route.
     (app.fonts_ready || !app.styled)
         && app.ui.text_edit.is_some()
-        && app.ui.dialogs.is_empty()
+        && !app.ui.any_dialog_open()
         && !crate::screen_picker::busy(ctx)
         && ctx.input(|i| i.focused)
         && !ctx.text_edit_focused()
