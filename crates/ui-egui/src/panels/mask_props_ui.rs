@@ -81,7 +81,7 @@ fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: u64, document: u64
         ("density", tl!("Density"), f64::from(density) * 100.0, 100.0, "{n} %", None),
         ("feather", tl!("Feather"), f64::from(feather), 1000.0, "{n} px", Some(3.0)),
     ] {
-        let mut row = SliderRow::new((prefix, field), label, value, 0.0..=max, &numbers).unit(Unit::new(unit));
+        let mut row = SliderRow::new((prefix, field), label, value, 0.0..=max, &numbers).unit(Unit::new(unit)).fill(false).field_width(74.0);
         if let Some(k) = curve {
             row = row.curve(k);
         }

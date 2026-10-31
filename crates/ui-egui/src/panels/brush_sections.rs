@@ -52,7 +52,7 @@ fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclus
     let salt = ui.next_auto_id();
     let before = salt.with("before");
     let (lo, hi) = (f64::from(*range.start()), f64::from(*range.end()));
-    let response = SliderRow::new(salt, tl!(label), f64::from(*v), lo..=hi, &numbers).unit(Unit::new(&format!("{{n}}{unit}"))).step(1.0).show(ui);
+    let response = SliderRow::new(salt, tl!(label), f64::from(*v), lo..=hi, &numbers).unit(Unit::new(&format!("{{n}}{unit}"))).step(1.0).fill(false).field_width(74.0).show(ui);
     let mut changed = false;
     for event in response.edits() {
         match event {

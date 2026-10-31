@@ -30,6 +30,7 @@ pub fn color_count_row(ui: &mut Ui, label: &str, count: &mut u32) -> Response {
     }
     let slider = Slider::new(("color-count-slider", name), name, f64::from(*count), 2.0..=256.0)
         .step(1.0)
+        .fill(false)
         .marks_labelled(STOPS.map(|stop| (f64::from(stop), stop.to_string())))
         .width(ui.available_width())
         .show(ui);
