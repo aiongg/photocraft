@@ -3,7 +3,14 @@ use super::commit::{cancel, commit};
 use super::pointer::point_on_quad;
 use super::warp::edit_session_warp;
 use super::{BezierMesh, Homography, PhotocraftApp, SplitTool, Stroke, TransformSession, Warp, WarpStyle, json, vec2};
-use craft_ui::theme::StrokeExt;
+use craft_ui::canvas::ReferencePoint;
+use craft_ui::canvas::quad::Anchor9;
+use craft_ui::controls::{ControlSize, IconButton, NumberField};
+use craft_ui::edit::EditEvent;
+use craft_ui::icons::Icon;
+use craft_ui::localized::{LocaleNumbers, Unit};
+use craft_ui::patterns::{CellWidth, OptionsBar};
+use std::ops::RangeInclusive;
 
 /// How much the box enlarges its pixels: the longest edge relative to the original (picks the
 /// preview's texture level and filter).
@@ -203,7 +210,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     } else {
         transform_fields(app, &mut row, &t);
     }
-    crate::widgets::vline(&mut row, 22.0);
+    OptionsBar::divider(&mut row);
     let start = row.min_rect().right().min(split);
     let actions = egui::Rect::from_min_max(egui::pos2(start, bar.top()), egui::pos2(start + buttons_w, bar.bottom()));
     let mut btns = ui.new_child(egui::UiBuilder::new().id_salt("transform-actions").max_rect(actions).layout(egui::Layout::right_to_left(egui::Align::Center)));
@@ -211,39 +218,103 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
-    let tk = crate::theme::Tokens::get(ui.ctx());
     let (_, _, angle, skew_h) = readout(t);
-    let lbl = |ui: &mut egui::Ui, s: &str| {
-        ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
-    };
     position_size_fields(app, ui, t);
-    crate::widgets::vline(ui, 22.0);
-    let mut a = angle as f32;
-    let (r, resp) = ui.allocate_exact_size(vec2(18.0, 22.0), egui::Sense::hover());
-    crate::icons::paint(ui, r, "rotate-cw", 13.0, tk.text_dim);
-    resp.on_hover_text(tl!("Rotate"));
-    if crate::widgets::value_field(ui, &mut a, -180.0..=180.0, "°", 60.0).accessible_name(tl!("Rotate")).changed() {
-        rotate_about_pivot(app, (a as f64 - angle).to_radians());
+    OptionsBar::divider(ui);
+    let degrees = Unit::new("{n}°");
+    let turn = Cell {
+        id: "transform-angle",
+        caption: None,
+        name: tl!("Rotate"),
+        range: -180.0..=180.0,
+        unit: degrees.clone(),
+        width: CellWidth::Sm,
+        decimals: 0..=2,
+        icon: Some(Icon::RotateCw),
+    };
+    if let Some(a) = number_cell(ui, &turn, angle as f32) {
+        rotate_about_pivot(app, (f64::from(a) - angle).to_radians());
     }
     // Photoshop's H and V skew fields: the box's sides lean by H, its top and bottom by V.
     let (mut h, mut v) = (skew_h as f32, t.skew_v as f32);
     let lim = -SKEW_LIMIT_DEG..=SKEW_LIMIT_DEG;
-    lbl(ui, "H:");
-    let rh =
-        crate::widgets::value_field(ui, &mut h, lim.clone(), "°", 56.0).accessible_name(tl!("Set horizontal skew")).on_hover_text(tl!("Set horizontal skew"));
-    lbl(ui, "V:");
-    let rv = crate::widgets::value_field(ui, &mut v, lim, "°", 56.0).accessible_name(tl!("Set vertical skew")).on_hover_text(tl!("Set vertical skew"));
-    if rh.changed() || rv.changed() {
+    let skew = |id, caption, name| Cell {
+        id,
+        caption: Some(caption),
+        name,
+        range: lim.clone(),
+        unit: degrees.clone(),
+        width: CellWidth::Sm,
+        decimals: 0..=2,
+        icon: None,
+    };
+    let mut skewed = false;
+    if let Some(x) = number_cell(ui, &skew("transform-skew-h", "H:", tl!("Set horizontal skew")), h) {
+        (h, skewed) = (x, true);
+    }
+    if let Some(x) = number_cell(ui, &skew("transform-skew-v", "V:", tl!("Set vertical skew")), v) {
+        (v, skewed) = (x, true);
+    }
+    if skewed {
         skew_about_pivot(app, f64::from(h), f64::from(v));
     }
-    crate::widgets::vline(ui, 22.0);
-    lbl(ui, tl!("Interpolation:"));
+    OptionsBar::divider(ui);
     let mut interp = t.interpolation.clone();
-    let opts = [("bicubic".to_string(), tl!("Bicubic")), ("bilinear".to_string(), tl!("Bilinear")), ("nearest".to_string(), tl!("Nearest Neighbor"))];
-    if craft_ui::controls::Select::new("transform-interp", tl!("Interpolation"), &mut interp).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
+    let opts = [("bicubic".to_string(), "Bicubic"), ("bilinear".to_string(), "Bilinear"), ("nearest".to_string(), "Nearest Neighbor")];
+    if crate::panels::select_cell(ui, Some("Interpolation:"), "transform-interp", "Interpolation", &mut interp, &opts, false)
         && let Some(s) = app.ui.transform.as_mut()
     {
         s.interpolation = interp;
+    }
+}
+
+/// One number cell of the strip: its caption (or a scrub icon), accessible name and limits.
+struct Cell<'a> {
+    id: &'a str,
+    caption: Option<&'a str>,
+    name: &'a str,
+    range: RangeInclusive<f32>,
+    unit: Unit,
+    width: CellWidth,
+    decimals: RangeInclusive<usize>,
+    /// Scrubs the field instead of a caption.
+    icon: Option<Icon>,
+}
+
+/// A caption and its number field. Returns the value this frame's edit gave: a typed, scrubbed or
+/// stepped value, or the value a cancelled gesture began with.
+fn number_cell(ui: &mut egui::Ui, cell: &Cell<'_>, value: f32) -> Option<f32> {
+    let icon = cell.icon;
+    let numbers = LocaleNumbers::of(ui);
+    let start = egui::Id::NULL.with(("transform-cell-start", cell.id));
+    let show = |ui: &mut egui::Ui, caption: Option<&egui::Response>| {
+        let mut field = NumberField::new(cell.id, cell.name, f64::from(value), &numbers)
+            .range(cell.range.clone())
+            .decimals(cell.decimals.clone())
+            .unit(cell.unit.clone())
+            .or_parse(|text| crate::numeric_expression::parse(&text.split_whitespace().collect::<String>()))
+            .size(ControlSize::Sm);
+        if let Some(c) = caption {
+            field = field.scrub_by(c);
+        }
+        if let Some(icon) = icon {
+            field = field.scrub_icon(icon);
+        }
+        field.show(ui)
+    };
+    let edit = match cell.caption {
+        Some(caption) => OptionsBar::cell(ui, &format!("{}", tl!(caption)), cell.width, |ui, c| show(ui, Some(c))),
+        None => OptionsBar::cell(ui, "", cell.width, |ui, _| show(ui, None)),
+    };
+    match edit.event {
+        Some(EditEvent::Begin { .. }) => {
+            ui.data_mut(|d| d.insert_temp(start, value));
+            None
+        }
+        Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some(value as f32),
+        Some(EditEvent::Commit { value, changed: true, .. }) => Some(value as f32),
+        Some(EditEvent::Cancel { .. }) => ui.data(|d| d.get_temp::<f32>(start)),
+        _ => None,
     }
 }
 
@@ -254,70 +325,43 @@ pub(super) fn matching_anchor(quad: [[f64; 2]; 4], pivot: [f64; 2]) -> Option<us
     })
 }
 
-fn anchor_grid_widget(ui: &mut egui::Ui, current_anchor: Option<usize>) -> Option<usize> {
-    let size = egui::vec2(16.0, 16.0);
-    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
-    let tk = crate::theme::Tokens::get(ui.ctx());
-    let painter = ui.painter();
-    painter.rect_stroke(
-        rect,
-        craft_ui::theme::scale::Radius::R2.px(),
-        craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), tk.card_border),
-        egui::StrokeKind::Inside,
-    );
-    let mut clicked = None;
-    let pointer = resp.interact_pointer_pos();
-    for row in 0..3 {
-        for col in 0..3 {
-            let idx = row * 3 + col;
-            let cx = rect.min.x + (col as f32 + 0.5) * (rect.width() / 3.0);
-            let cy = rect.min.y + (row as f32 + 0.5) * (rect.height() / 3.0);
-            let pt_rect = egui::Rect::from_center_size(egui::pos2(cx, cy), egui::vec2(3.5, 3.5));
-            if resp.clicked() && pointer.is_some_and(|p| (p.x - cx).abs() <= 3.0 && (p.y - cy).abs() <= 3.0) {
-                clicked = Some(idx);
-            }
-            if current_anchor == Some(idx) {
-                painter.rect_filled(pt_rect, 0.5, tk.accent);
-            } else {
-                painter.rect_filled(pt_rect, 0.5, tk.text_dim);
-            }
-        }
-    }
-    resp.on_hover_text(tl!("Reference point location"));
-    clicked
-}
-
 /// The reference point's X/Y and the W/H scale fields (with the aspect link) of the options bar.
 pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
-    let tk = crate::theme::Tokens::get(ui.ctx());
     let (sx, sy, _, _) = readout(t);
-    let lbl = |ui: &mut egui::Ui, s: &str| {
-        ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
-    };
-    let current_anchor = matching_anchor(t.quad, t.pivot);
     let mut pivot = t.pivot;
-    if let Some(new_anchor) = anchor_grid_widget(ui, current_anchor) {
-        let new_p = point_on_quad(t.quad, new_anchor);
+    let picked = matching_anchor(t.quad, t.pivot).map(|i| Anchor9::ALL[i]);
+    let pick = ReferencePoint::new("transform-reference-point", picked).label(tl!("Reference point location")).show(ui);
+    if let Some(EditEvent::Set { value: Some(anchor), .. }) = pick.event {
+        pivot = point_on_quad(t.quad, anchor as usize);
         if let Some(s) = app.ui.transform.as_mut() {
-            s.pivot = new_p;
+            s.pivot = pivot;
         }
-        pivot = new_p;
     }
-    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-    let mut px = pivot[0] as f32;
-    let mut py = pivot[1] as f32;
-    lbl(ui, "X:");
-    let rx = crate::widgets::value_field(ui, &mut px, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 72.0).accessible_name("X");
-    lbl(ui, "Y:");
-    let ry = crate::widgets::value_field(ui, &mut py, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 72.0).accessible_name("Y");
-    if (rx.changed() || ry.changed())
-        && let Some(s) = app.ui.transform.as_mut()
-    {
+    let px_unit = Unit::new("{n} px");
+    let position = |id, caption, name| Cell {
+        id,
+        caption: Some(caption),
+        name,
+        range: -POSITION_LIMIT_PX..=POSITION_LIMIT_PX,
+        unit: px_unit.clone(),
+        width: CellWidth::Md,
+        decimals: 0..=2,
+        icon: None,
+    };
+    let (mut px, mut py) = (pivot[0] as f32, pivot[1] as f32);
+    let (mut moved, edited_x) = (false, number_cell(ui, &position("transform-x", "X:", "X"), px));
+    if let Some(x) = edited_x {
+        (px, moved) = (x, true);
+    }
+    if let Some(y) = number_cell(ui, &position("transform-y", "Y:", "Y"), py) {
+        (py, moved) = (y, true);
+    }
+    if moved && let Some(s) = app.ui.transform.as_mut() {
         let (dx, dy) = (px as f64 - s.pivot[0], py as f64 - s.pivot[1]);
         s.quad = s.quad.map(|q| [q[0] + dx, q[1] + dy]);
         s.pivot = [px as f64, py as f64];
     }
-    crate::widgets::vline(ui, 22.0);
+    OptionsBar::divider(ui);
     // W and H in the unit picked from their right-click menu: the scale in percent, or the box's
     // length (Photoshop's units, at the document's resolution).
     let u = size_unit(app);
@@ -331,13 +375,13 @@ pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t
     // Whatever their unit, W and H take any other typed in (`500 px` or `2 in` in percent, `50%`
     // in a length), converted at the document's resolution against the box's original side (#6284).
     let units = crate::widgets::FieldUnits { unit: u.unit, dpi: u.dpi, ppi: u.ppi };
-    lbl(ui, "W:");
+    crate::panels::opt_label(ui, "W");
     let rw = crate::widgets::value_field_extent(ui, &mut w, -wlim_u..=wlim_u, suffix, size_w, places, units, side_w).accessible_name(tl!("Width"));
     let link = !app.ui.transform_unlinked;
-    if crate::icons::button(ui, if link { "link" } else { "unlink" }, 22.0, link, tl!("Maintain aspect ratio")).clicked() {
-        app.ui.transform_unlinked = link;
-    }
-    lbl(ui, "H:");
+    let mut linked = link;
+    ui.add(IconButton::new(if link { Icon::Link } else { Icon::Unlink }, tl!("Maintain aspect ratio")).size(ControlSize::Sm).toggle(&mut linked));
+    app.ui.transform_unlinked = !linked;
+    crate::panels::opt_label(ui, "H");
     let rh = crate::widgets::value_field_extent(ui, &mut h, -hlim_u..=hlim_u, suffix, size_w, places, units, side_h).accessible_name(tl!("Height"));
     for r in [&rw, &rh] {
         r.context_menu(|ui| {
@@ -362,19 +406,14 @@ pub(crate) fn position_size_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t
 
 /// Options bar fields in Warp mode: style, bend, the split icons and the grid menu.
 fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
-    let tk = crate::theme::Tokens::get(ui.ctx());
-    let lbl = |ui: &mut egui::Ui, s: &str| {
-        ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
-    };
     // Type takes only the styles (#3004): Split and Grid are greyed, and there is no Custom.
     let on_type = warps_type(app);
     // Split, Grid, then the warp style with its bend fields.
-    ui.add_enabled_ui(!on_type, |ui| warp_mesh_fields(app, ui, w));
-    crate::widgets::vline(ui, 22.0);
-    lbl(ui, tl!("Warp:"));
+    OptionsBar::group(ui, !on_type, |ui| warp_mesh_fields(app, ui, w));
+    OptionsBar::divider(ui);
     let mut style = w.style;
     let opts: Vec<(WarpStyle, &str)> = WarpStyle::all().filter(|s| !(on_type && *s == WarpStyle::Custom)).map(|s| (s, s.label())).collect();
-    if craft_ui::controls::Select::new("warp-style", tl!("Warp"), &mut style).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
+    if crate::panels::select_cell(ui, Some("Warp:"), "warp-style", "Warp", &mut style, &opts, false)
         && let Some(t) = app.ui.transform.as_mut()
     {
         let b = t.rect;
@@ -387,19 +426,27 @@ fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
     }
     // Orientation and the bend fields are always there, and only act on a preset style.
     let preset = w.style.is_preset();
-    ui.add_enabled_ui(preset, |ui| {
-        let orient = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::SwapHorizontal, tl!("Vertical")).size(craft_ui::controls::ControlSize::Md).selected(w.vertical));
+    OptionsBar::group(ui, preset, |ui| {
+        let orient = ui.add(IconButton::new(Icon::SwapHorizontal, tl!("Vertical")).size(ControlSize::Md).selected(w.vertical));
         orient.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, preset, "Change warp orientation"));
         if orient.clicked()
             && let Some(Some(cur)) = app.ui.transform.as_mut().map(|t| t.warp.as_mut())
         {
             cur.vertical = !cur.vertical;
         }
-        let fields: [(&str, f64); 3] = [(tl!("Bend:"), w.bend), ("H:", w.h_distort), ("V:", w.v_distort)];
-        for (k, (name, v)) in fields.iter().enumerate() {
-            lbl(ui, name);
-            let mut f = *v as f32;
-            if crate::widgets::value_field(ui, &mut f, -100.0..=100.0, "%", 58.0).accessible_name(*name).changed()
+        let fields: [(&str, &str, f64); 3] = [("warp-bend", "Bend:", w.bend), ("warp-h", "H:", w.h_distort), ("warp-v", "V:", w.v_distort)];
+        for (k, (id, label, v)) in fields.iter().enumerate() {
+            let cell = Cell {
+                id,
+                caption: Some(label),
+                name: tl!(label),
+                range: -100.0..=100.0,
+                unit: Unit::new("{n}%"),
+                width: CellWidth::Md,
+                decimals: 0..=1,
+                icon: None,
+            };
+            if let Some(f) = number_cell(ui, &cell, *v as f32)
                 && let Some(Some(cur)) = app.ui.transform.as_mut().map(|t| t.warp.as_mut())
             {
                 match k {
@@ -414,11 +461,7 @@ fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
 
 /// The Split icons and the Grid menu of the Warp options bar.
 fn warp_mesh_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
-    let tk = crate::theme::Tokens::get(ui.ctx());
-    let lbl = |ui: &mut egui::Ui, s: &str| {
-        ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
-    };
-    lbl(ui, tl!("Split:"));
+    crate::panels::opt_label(ui, "Split");
     let armed = app.transform_preview.as_ref().and_then(|p| p.split_tool);
     for (tool, tip) in [
         (SplitTool::Cross, tl!("Split Warp Crosswise")),
@@ -435,18 +478,17 @@ fn warp_mesh_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
             pv.split_press = None;
         }
     }
-    crate::widgets::vline(ui, 22.0);
-    lbl(ui, tl!("Grid:"));
+    OptionsBar::divider(ui);
     let mesh = w.mesh.clone().unwrap_or_else(|| BezierMesh::identity(w.bounds, 1, 1));
     let mut grid = warp_grid_id(&mesh).to_string();
     let opts = [
-        ("custom".to_string(), tl!("Custom")),
-        ("default".to_string(), tl!("Default")),
-        ("3".to_string(), tl!("3 x 3")),
-        ("4".to_string(), tl!("4 x 4")),
-        ("5".to_string(), tl!("5 x 5")),
+        ("custom".to_string(), "Custom"),
+        ("default".to_string(), "Default"),
+        ("3".to_string(), "3 x 3"),
+        ("4".to_string(), "4 x 4"),
+        ("5".to_string(), "5 x 5"),
     ];
-    if craft_ui::controls::Select::new("warp-grid", tl!("Grid"), &mut grid).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed()
+    if crate::panels::select_cell(ui, Some("Grid:"), "warp-grid", "Grid", &mut grid, &opts, false)
         && let Some(n) = match grid.as_str() {
             "default" => Some(1),
             "3" => Some(3),
@@ -537,26 +579,20 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
 /// `mode_switch`: the Free Transform / Warp switch (not for Content-Aware Scale, which only scales).
 fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, mode_switch: bool) {
     ui.add_space(craft_ui::theme::scale::Space::S8.px());
-    let commit_tip = if warping {
-        crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
-    } else {
-        crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
-    };
-    let commit_btn = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Check, &commit_tip).size(craft_ui::controls::ControlSize::Md));
-    let label = "Commit transform";
-    commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
-    if commit_btn.clicked() {
+    // Cancel and Commit keep the library order at the end of the bar; Reset, the divider and the mode switch follow them.
+    let done = ui
+        .scope_builder(egui::UiBuilder::new().layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
+            OptionsBar::commit_cancel(ui, tl!("Commit transform"), tl!("Cancel transform"))
+        })
+        .inner;
+    if done.commit {
         commit(app);
     }
-    let cancel_tip = if warping { tl!("Cancel warp (Esc)") } else { tl!("Cancel transform (Esc)") };
-    let cancel_btn = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Ban, cancel_tip).size(craft_ui::controls::ControlSize::Md));
-    let label = "Cancel transform";
-    cancel_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(label)));
-    if cancel_btn.clicked() {
+    if done.cancel {
         cancel(app);
     }
     if warping {
-        let reset = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Undo, tl!("Reset")).size(craft_ui::controls::ControlSize::Md));
+        let reset = ui.add(IconButton::new(Icon::Undo, tl!("Reset")).size(ControlSize::Md));
         reset.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Reset warp"));
         if reset.clicked() {
             reset_warp(app);
@@ -565,8 +601,8 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool, 
     if !mode_switch {
         return;
     }
-    crate::widgets::vline(ui, 22.0);
-    let mode = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Grid, tl!("Switch between free transform and warp modes")).size(craft_ui::controls::ControlSize::Md).selected(warping));
+    OptionsBar::divider(ui);
+    let mode = ui.add(IconButton::new(Icon::Grid, tl!("Switch between free transform and warp modes")).size(ControlSize::Md).selected(warping));
     mode.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Switch between free transform and warp modes"));
     if mode.clicked() {
         if warping {

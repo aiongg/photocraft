@@ -198,7 +198,7 @@ pub(crate) fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform)
         });
         painter.ctx().request_repaint_after(std::time::Duration::from_millis(100));
     }
-    crate::type_transform::draw_box(painter, xf, &t.frame);
+    crate::transform_tool::paint_box(painter, xf, &t.frame);
 }
 
 /// The Free Transform box's cursors over the box's handles.
@@ -217,7 +217,7 @@ pub(crate) fn cursor(app: &PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, p
             crate::tool_cursor::resize([a[0] - b[0], a[1] - b[1]], xf)
         }
         Hit::Outside => {
-            crate::type_transform::rotation_cursor(ctx, p);
+            crate::type_transform::rotation_cursor(ctx, xf, &q, p);
             CursorIcon::None
         }
         Hit::Pivot => CursorIcon::Crosshair,

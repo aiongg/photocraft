@@ -2,11 +2,10 @@
 //! The existing Free Transform geometry is reused with Type's modifier rules (Ctrl exposes the
 //! frame; it must never distort a corner). Only release dispatches `type.edit`.
 
-use craft_ui::theme::StrokeExt;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use egui::{CursorIcon, Modifiers, Pos2, Stroke, vec2};
+use egui::{CursorIcon, Modifiers, Pos2};
 use photocraft_doc::{DocId, Document, LayerContent, LayerId, text::TextShape};
 use photocraft_geom::{Affine, Point, Rect};
 use serde_json::json;
@@ -398,60 +397,16 @@ pub(crate) fn draw(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXf
         return false;
     }
     let Some(t) = frame(app) else { return false };
-    draw_box(painter, xf, &t);
+    crate::transform_tool::paint_box(painter, xf, &t);
     true
 }
 
-/// A transform box: its outline, corner and edge handles and reference point. Shared with
-/// Content-Aware Move's Transform On Drop.
-pub(crate) fn draw_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSession) {
-    let tokens = crate::theme::Tokens::get(painter.ctx());
-    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(painter.ctx()).color.accent.text);
-    let pts = t.quad.map(|p| xf.to_screen(p[0] as f32, p[1] as f32));
-    painter.add(egui::Shape::closed_line(pts.to_vec(), Stroke::new(3.0, tokens.shadow)));
-    painter.add(egui::Shape::closed_line(pts.to_vec(), craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent)));
-    let mids = [pts[0].lerp(pts[1], 0.5), pts[1].lerp(pts[2], 0.5), pts[2].lerp(pts[3], 0.5), pts[3].lerp(pts[0], 0.5)];
-    for p in pts.iter().chain(mids.iter()) {
-        let r = egui::Rect::from_center_size(*p, vec2(7.0, 7.0));
-        painter.rect_filled(r, craft_ui::theme::scale::Radius::R0.px(), accent_text);
-        painter.rect_stroke(
-            r,
-            craft_ui::theme::scale::Radius::R0.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent),
-            egui::StrokeKind::Inside,
-        );
-    }
-    let c = xf.to_screen(t.pivot[0] as f32, t.pivot[1] as f32);
-    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W2.egui(painter.ctx(), tokens.shadow));
-    painter.circle_stroke(c, 4.0, craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), accent_text));
-    for axis in [vec2(6.0, 0.0), vec2(0.0, 6.0)] {
-        painter.line_segment([c - axis, c + axis], craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), tokens.accent));
-    }
-}
-
-pub(crate) fn rotation_cursor(ctx: &egui::Context, p: Pos2) {
-    let tokens = crate::theme::Tokens::get(ctx);
-    let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-rotate-cursor")));
-    let first = -std::f32::consts::FRAC_PI_4;
-    let last = std::f32::consts::PI + std::f32::consts::FRAC_PI_4;
-    let points: Vec<Pos2> = (0..=24)
-        .map(|i| {
-            let angle = first + (last - first) * i as f32 / 24.0;
-            p + vec2(angle.cos(), angle.sin()) * 7.0
-        })
-        .collect();
-    painter.add(egui::Shape::line(points.clone(), Stroke::new(3.0, tokens.shadow)));
-    painter.add(egui::Shape::line(points, Stroke::new(1.25, accent_text)));
-    for (angle, sign) in [(first, -1.0), (last, 1.0)] {
-        let tip = p + vec2(angle.cos(), angle.sin()) * 7.0;
-        let tangent = vec2(-angle.sin(), angle.cos()) * sign;
-        let normal = vec2(angle.cos(), angle.sin());
-        painter.add(egui::Shape::convex_polygon(
-            vec![tip + tangent * 3.0, tip - tangent * 3.0 + normal * 3.0, tip - tangent * 3.0 - normal * 3.0],
-            accent_text,
-            craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
-        ));
+/// The library's turn cursor at screen point `at`, bending into the box at the corner nearest `at`.
+pub(crate) fn rotation_cursor(ctx: &egui::Context, xf: &ViewXform, quad: &[[f64; 2]; 4], at: Pos2) {
+    let p = xf.to_doc(at);
+    if let Some(k) = crate::transform_tool::corner_bisector(quad, p) {
+        let toward = xf.to_screen((p[0] + k[0] * 16.0) as f32, (p[1] + k[1] * 16.0) as f32) - at;
+        craft_ui::canvas::turn_cursor(ctx, at, toward);
     }
 }
 
@@ -475,20 +430,15 @@ pub(crate) fn cursor(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXfor
     let h = app.ui.type_transform.as_ref().map(|t| t.gesture.hit).or_else(|| hit(app, &t, xf.to_doc(p)));
     Some(match h {
         Some(Hit::Corner(i)) => crate::tool_cursor::corner_resize(&t.quad, i, xf),
-        Some(Hit::Edge(_)) => {
-            // Original arrowhead indicator, above the canvas, without a proprietary cursor asset.
-            let tokens = crate::theme::Tokens::get(ctx);
-            let accent_text = craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ctx).color.accent.text);
-            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("type-skew-cursor")));
-            painter.add(egui::Shape::convex_polygon(
-                vec![p, p + vec2(14.0, 6.0), p + vec2(6.0, 14.0)],
-                accent_text,
-                craft_ui::theme::scale::Stroke::W1.egui(ctx, tokens.shadow),
-            ));
+        Some(Hit::Edge(i)) => {
+            if let (Some(a), Some(b)) = (t.quad.get(i), t.quad.get((i + 1) % 4)) {
+                let dir = craft_ui::canvas::kurbo::Vec2::new(b[0] - a[0], b[1] - a[1]);
+                craft_ui::canvas::skew_cursor(ctx, p, &xf.canvas_view(), dir, craft_ui::canvas::PointerInk::Painted);
+            }
             CursorIcon::None
         }
         Some(Hit::Outside) => {
-            rotation_cursor(ctx, p);
+            rotation_cursor(ctx, xf, &t.quad, p);
             CursorIcon::None
         }
         Some(Hit::Pivot) => CursorIcon::Crosshair,

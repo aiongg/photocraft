@@ -318,14 +318,20 @@ pub(super) fn rotate_dir(t: &TransformSession, pv: Option<&TransformPreview>, p:
         None if !near_rotate_corner(t, p, tol) => return None,
         None => {}
     }
+    corner_bisector(&t.quad, p)
+}
+
+/// The unit direction into the box along the bisector of the corner nearest document point `p`:
+/// where the library's turn cursor bends at `p`.
+pub(crate) fn corner_bisector(quad: &[[f64; 2]; 4], p: [f64; 2]) -> Option<[f64; 2]> {
     let dist = |q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]);
-    let i = (0..4).min_by(|&a, &b| dist(t.quad[a]).total_cmp(&dist(t.quad[b])))?;
+    let i = (0..4).min_by(|&a, &b| dist(quad[a]).total_cmp(&dist(quad[b])))?;
     let unit = |to: [f64; 2]| {
-        let d = [to[0] - t.quad[i][0], to[1] - t.quad[i][1]];
+        let d = [to[0] - quad[i][0], to[1] - quad[i][1]];
         let l = d[0].hypot(d[1]);
         (l.is_finite() && l > 1e-9).then(|| [d[0] / l, d[1] / l])
     };
-    let (a, b) = (unit(t.quad[(i + 1) % 4])?, unit(t.quad[(i + 3) % 4])?);
+    let (a, b) = (unit(quad[(i + 1) % 4])?, unit(quad[(i + 3) % 4])?);
     let s = [a[0] + b[0], a[1] + b[1]];
     let l = s[0].hypot(s[1]);
     (l.is_finite() && l > 1e-9).then(|| [s[0] / l, s[1] / l])

@@ -31,7 +31,7 @@ pub(super) enum HandleIndicator {
 }
 
 /// What dragging handle `h` with `mods` does, worked out by the same rules as the drag itself
-/// ([`drag_mods`], [`mode_mods`], [`apply_mode_drag`]): ⌘ on a corner distorts (⌘⌥⇧ adds
+/// ([`drag_mods`], [`mode_mods`]): ⌘ on a corner distorts (⌘⌥⇧ adds
 /// perspective) and on an edge skews, Distort and Perspective modes distort from the corners,
 /// Skew mode skews from the edges. Rotate mode turns the box whatever the keys, a Skew-mode corner
 /// slides along an edge, editable type refuses Distort and Content-Aware Scale only scales: `None`.
@@ -92,7 +92,7 @@ pub(crate) fn unlinked_mods(unlinked: bool, legacy: bool, hit: Hit, mut mods: eg
 }
 
 /// Distort / Perspective modes: a corner drag acts as if that gesture's keys were held (⌘-drag a
-/// corner distorts, ⌘⌥⇧-drag a corner adds perspective). Skew has its own ([`apply_mode_drag`]).
+/// corner distorts, ⌘⌥⇧-drag a corner adds perspective). The library's Skew mode skews from the edges.
 pub(super) fn mode_mods(mode: TransformMode, hit: Hit, mut mods: egui::Modifiers) -> egui::Modifiers {
     match (mode, hit) {
         (TransformMode::Distort, Hit::Corner(_)) => mods.command = true,

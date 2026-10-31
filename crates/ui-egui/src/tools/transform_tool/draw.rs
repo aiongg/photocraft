@@ -121,7 +121,6 @@ pub(super) fn texture_quad(t: &TransformSession, pv: &TransformPreview) -> [[f64
 /// drew; the warp grid and its split guides for a warp.
 pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return };
-    let scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     if let Some(w) = &t.warp {
         let over_canvas = painter.ctx().input(|i| i.pointer.hover_pos()).filter(|p| xf.rect.contains(*p)).map(|p| xf.to_doc(p));
         let at = pv.split_pointer.or(over_canvas);
@@ -146,16 +145,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             accent,
         );
     }
-    let tokens = craft_ui::theme::current(painter.ctx());
-    let style = TransformBox::style(&tokens);
-    let ppp = painter.ctx().pixels_per_point();
-    let pts: Vec<Pos2> = t.quad.iter().map(|q| scr(*q)).collect();
-    painter.add(egui::Shape::closed_line(pts.clone(), style.line));
-    let mids: Vec<Pos2> = (0..4).map(|i| pts[i].lerp(pts[(i + 1) % 4], 0.5)).collect();
-    for p in pts.iter().chain(mids.iter()) {
-        painter.extend(Handle::shapes_with(&style.handle, HandleShape::Square, *p, ppp));
-    }
-    paint_pivot(painter, scr(t.pivot), &style);
+    paint_box(painter, xf, t);
     if let Some(at) = painter.ctx().pointer_hover_pos().filter(|p| xf.rect.contains(*p)) {
         let p = xf.to_doc(at);
         let tol = f64::from(super::pointer::reach().hit) / f64::from(xf.zoom.max(0.01));
@@ -170,6 +160,20 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             draw_live_readout(app, painter.ctx(), at, r);
         }
     }
+}
+
+/// The box's outline, its eight handles and its reference point, as the library draws them. Shared
+/// with the Type and Camera Raw transform boxes.
+pub(crate) fn paint_box(painter: &egui::Painter, xf: &ViewXform, t: &TransformSession) {
+    let style = TransformBox::style(&craft_ui::theme::current(painter.ctx()));
+    let ppp = painter.ctx().pixels_per_point();
+    let pts: Vec<Pos2> = t.quad.iter().map(|q| xf.to_screen(q[0] as f32, q[1] as f32)).collect();
+    painter.add(egui::Shape::closed_line(pts.clone(), style.line));
+    let mids: Vec<Pos2> = (0..4).map(|i| pts[i].lerp(pts[(i + 1) % 4], 0.5)).collect();
+    for p in pts.iter().chain(mids.iter()) {
+        painter.extend(Handle::shapes_with(&style.handle, HandleShape::Square, *p, ppp));
+    }
+    paint_pivot(painter, xf.to_screen(t.pivot[0] as f32, t.pivot[1] as f32), &style);
 }
 
 /// Applying the open box moves the selection outline with it: `edit.transform` and
