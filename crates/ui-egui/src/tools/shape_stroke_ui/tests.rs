@@ -26,7 +26,7 @@ fn sized_harness(size: Vec2, scale: f32, theme: crate::theme::ThemeKind) -> Harn
     let mut h = Harness::builder().with_size(size).with_pixels_per_point(scale).build_ui_state(
         |ui, s: &mut State| {
             let _language = crate::i18n::language_scope(crate::i18n::Lang::EN);
-            let popup_id = ui.next_auto_id().with("popup");
+            let popup_id = ui.make_persistent_id(egui::IdSalt::new(("stroke-editor", "test")));
             if let Some(change) = button(ui, "test", &s.current, &mut s.editor, s.closed, s.corners, None, s.stroke_enabled) {
                 s.current = change.options;
                 s.stroke_enabled = true;
@@ -67,6 +67,12 @@ fn combo(h: &mut Harness<'_, State>, label: &str) {
     click_at(h, rect.center());
 }
 
+/// Whether one of the editor's Selects has its list open (the editor's own popover is open too, so
+/// the library's `any_open` cannot tell).
+pub(super) fn child_list_open<S>(h: &Harness<'_, S>) -> bool {
+    ["Alignment", "Caps", "Corners"].iter().any(|name| h.query_by_role_and_label(Role::ComboBox, name).is_some_and(|n| n.accesskit_node().data().is_expanded() == Some(true)))
+}
+
 #[test]
 fn line_samples_and_row_edges_apply_immediately_and_survive_dismissal() {
     let mut h = harness();
@@ -99,17 +105,17 @@ fn child_dropdown_open_selection_and_escape_leave_the_parent_alive() {
     open(&mut h);
     combo(&mut h, "Alignment");
     assert!(h.state().editor.is_some(), "opening a ComboBox must not replace the parent popup");
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(child_list_open(&h));
     let inside = h.get_by_label("Inside").rect();
     click_at(&mut h, inside.center());
     assert_eq!(h.state().current.align, StrokeAlign::Inside);
     assert_eq!(h.state().changes.len(), 1);
     assert!(h.state().editor.is_some(), "selecting a child item must not dismiss its parent");
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!child_list_open(&h));
     combo(&mut h, "Alignment");
     h.key_press(Key::Escape);
     h.run_steps(3);
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!child_list_open(&h));
     assert!(h.state().editor.is_some(), "the first Escape belongs to the child");
     h.key_press(Key::Escape);
     h.run_steps(3);
@@ -143,7 +149,7 @@ fn reopened_child_stays_above_a_parent_with_restored_area_order() {
     click_at(&mut h, outside);
     assert_eq!(h.state().current.align, StrokeAlign::Outside);
     assert!(h.state().editor.is_some());
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!child_list_open(&h));
 }
 
 /// Layer ids and orders of the editor popup and an open list, and which one takes a click on a row.
@@ -179,13 +185,13 @@ fn click_outside_parent_and_child_closes_both_without_changing_the_style() {
     let mut h = harness();
     open(&mut h);
     combo(&mut h, "Corners");
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(child_list_open(&h));
     click_at(&mut h, pos2(620.0, 780.0));
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!craft::ui::popup_list::any_open(&h.ctx));
     assert!(h.state().editor.is_none());
     assert!(h.state().changes.is_empty());
     open(&mut h);
-    assert!(!egui::Popup::is_any_open(&h.ctx), "reopening does not restore an abandoned child");
+    assert!(!child_list_open(&h), "reopening does not restore an abandoned child");
 }
 
 #[test]
@@ -193,7 +199,7 @@ fn closing_the_opener_cleans_up_its_child_in_the_same_frame() {
     let mut h = harness();
     open(&mut h);
     combo(&mut h, "Alignment");
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(child_list_open(&h));
     let pos = h.get_by_role_and_label(Role::Button, "Stroke Options").rect().center();
     h.hover_at(pos);
     h.run_steps(1);
@@ -202,7 +208,7 @@ fn closing_the_opener_cleans_up_its_child_in_the_same_frame() {
         h.run_steps(1);
     }
     assert!(h.state().editor.is_none());
-    assert!(!egui::Popup::is_any_open(&h.ctx), "a hidden parent must not leave a child owning popup state");
+    assert!(!craft::ui::popup_list::any_open(&h.ctx), "a hidden parent must not leave a child owning popup state");
     assert!(h.state().changes.is_empty());
 }
 
@@ -641,7 +647,7 @@ fn hidden_controls_and_collapsed_appearance_release_popup_and_keyboard_ownership
         scene_open(&mut h);
         h.get_by_role_and_label(Role::ComboBox, "Alignment").click();
         h.run_steps(3);
-        assert!(egui::Popup::is_any_open(&h.ctx));
+        assert!(child_list_open(&h));
         if collapsed {
             h.ctx.data_mut(|d| d.insert_temp(egui::Id::unique(("props-section", "appearance")), false));
         } else {
@@ -649,7 +655,7 @@ fn hidden_controls_and_collapsed_appearance_release_popup_and_keyboard_ownership
         }
         h.run_steps(1);
         assert!(h.state().app.ui.stroke_editor.is_none(), "controls that were not drawn no longer own the keyboard");
-        assert!(!egui::Popup::is_any_open(&h.ctx), "their child popup must be cleaned up too");
+        assert!(!craft::ui::popup_list::any_open(&h.ctx), "their child popup must be cleaned up too");
         assert_eq!(h.state().app.session.active().unwrap().doc, original);
         h.key_press(Key::B);
         h.run_steps(3);

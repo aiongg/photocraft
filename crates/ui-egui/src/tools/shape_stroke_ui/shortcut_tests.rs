@@ -58,10 +58,10 @@ fn escape_dismisses_stroke_child_then_parent_without_deselecting_the_document() 
     open(&mut h);
     h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Alignment").click();
     h.run_steps(3);
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(super::tests::child_list_open(&h));
     h.key_press(Key::Escape);
     h.run_steps(3);
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!super::tests::child_list_open(&h));
     assert!(h.state().ui.stroke_editor.is_some(), "the first Escape closes only the child");
     assert_eq!(h.state().session.active().unwrap().doc, original);
     h.key_press(Key::Escape);
@@ -91,10 +91,10 @@ fn enter_selects_a_stroke_style_and_escape_closes_its_popups_without_committing_
     assert_eq!(h.state().ui.pen, pen, "Enter belongs to the focused style target");
     h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Caps").click();
     h.run_steps(3);
-    assert!(egui::Popup::is_any_open(&h.ctx));
+    assert!(super::tests::child_list_open(&h));
     h.key_press(Key::Escape);
     h.run_steps(3);
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!super::tests::child_list_open(&h));
     assert!(h.state().ui.stroke_editor.is_some());
     assert_eq!(h.state().ui.pen, pen);
     h.key_press(Key::Escape);
@@ -122,5 +122,5 @@ fn undo_shortcut_remains_available_and_invalidates_the_open_stroke_editor() {
     assert_eq!(h.state().session.active().unwrap().doc, original);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), history);
     assert!(h.state().ui.stroke_editor.is_none(), "Undo invalidates the editor's last applied style");
-    assert!(!egui::Popup::is_any_open(&h.ctx));
+    assert!(!craft::ui::popup_list::any_open(&h.ctx));
 }

@@ -1,5 +1,7 @@
-//! A live, locally owned popup: egui's memory popup slot belongs to its child ComboBoxes.
-use craft::ui::theme::StrokeExt;
+//! A live stroke editor on a library `Popover` with its own close rule (the Selects' lists are its children).
+use craft::ui::controls::{ControlSize, Select};
+use craft::ui::popover::{Popover, PopoverAnchor, PopoverClose, PopoverSize};
+use craft::ui::theme::{StrokeExt, Tokens as LibTokens, TokensOf as _};
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::{LineCap, LineJoin, StrokeAlign};
 use serde::{Deserialize, Serialize};
@@ -23,8 +25,6 @@ pub struct StrokeChange {
 
 #[derive(Default)]
 struct Children {
-    shown: bool,
-    clicked: bool,
     ids: Vec<egui::Id>,
 }
 
@@ -145,119 +145,125 @@ pub fn button(
         }
         g.0
     });
-    // A memory-backed parent is replaced as soon as a ComboBox opens. Explicit ownership
-    // keeps the parent alive; dismissal below considers both parent and child hit regions.
-    let popup = egui::Popup::from_response(&response).open(true).close_behavior(egui::PopupCloseBehavior::IgnoreClicks).show(|ui| {
-        ui.spacing_mut().item_spacing = vec2(8.0, theme::ROW_GAP);
-        let width = 272.0_f32.min((ui.ctx().content_rect().width() - 24.0).max(160.0));
-        ui.set_width(width);
-        let height = (ui.ctx().content_rect().height() - 40.0).max(80.0);
-        // An Area remembers its previous size. Let a newly selected dashed style grow the
-        // body before the ScrollArea measures it, then shrink back to the actual content.
-        ui.set_max_height(height);
-        egui::ScrollArea::vertical().max_height(height).auto_shrink([false, true]).show(ui, |ui| {
-            ui.label(egui::RichText::new(tl!("Stroke Options")).strong());
-            let s = &mut e.draft;
-            for name in ["Solid", "Dashed", "Dotted"] {
-                let mut sample = s.clone();
-                sample.preset(name);
-                // Presets illustrate their pattern even when current opacity is zero.
-                sample.opacity = 1.0;
-                if style_button(ui, &sample, name, s.label() == name, width, false, true).clicked() {
-                    s.preset(name);
-                    selected_preset = true;
+    // The editor stays open by its own rule: it closes on a press outside the popover, its anchor
+    // and every child list (`pressed_outside`), or on Escape when no child list is open.
+    let mut open = true;
+    let popup = Popover::new(("stroke-editor", key), PopoverAnchor::Control(response.clone()))
+        .size(PopoverSize::Fit)
+        .close(PopoverClose::default().outside(false).focus_left(false))
+        .label(tl!("Stroke Options"))
+        .show(ui, &mut open, |ui, pop| {
+            ui.spacing_mut().item_spacing = vec2(8.0, theme::ROW_GAP);
+            let width = 272.0_f32.min((ui.ctx().content_rect().width() - 24.0).max(160.0));
+            ui.set_width(width);
+            let height = (ui.ctx().content_rect().height() - 40.0).max(80.0);
+            // An Area remembers its previous size. Let a newly selected dashed style grow the
+            // body before the ScrollArea measures it, then shrink back to the actual content.
+            ui.set_max_height(height);
+            egui::ScrollArea::vertical().max_height(height).auto_shrink([false, true]).show(ui, |ui| {
+                ui.label(egui::RichText::new(tl!("Stroke Options")).strong());
+                let s = &mut e.draft;
+                for name in ["Solid", "Dashed", "Dotted"] {
+                    let mut sample = s.clone();
+                    sample.preset(name);
+                    // Presets illustrate their pattern even when current opacity is zero.
+                    sample.opacity = 1.0;
+                    if style_button(ui, &sample, name, s.label() == name, width, false, true).clicked() {
+                        s.preset(name);
+                        selected_preset = true;
+                    }
                 }
-            }
-            ui.add_space(theme::ROW_GAP);
-            ui.separator();
-            egui::Grid::new("stroke-geometry").num_columns(2).spacing(vec2(12.0, theme::ROW_GAP)).show(ui, |ui| {
-                ui.add_enabled_ui(closed, |ui| {
-                    ui.label(tl!("Alignment"));
+                ui.add_space(theme::ROW_GAP);
+                ui.separator();
+                egui::Grid::new("stroke-geometry").num_columns(2).spacing(vec2(12.0, theme::ROW_GAP)).show(ui, |ui| {
+                    ui.add_enabled_ui(closed, |ui| {
+                        ui.label(tl!("Alignment"));
+                    });
+                    ui.add_enabled_ui(closed, |ui| {
+                        choice(
+                            ui,
+                            "Alignment",
+                            &mut s.align,
+                            &[(StrokeAlign::Inside, "Inside"), (StrokeAlign::Center, "Center"), (StrokeAlign::Outside, "Outside")],
+                            &mut children,
+                        )
+                    });
+                    ui.end_row();
+                    ui.add_enabled_ui(!closed || !s.dashes.is_empty(), |ui| {
+                        ui.label(tl!("Caps"));
+                    });
+                    ui.add_enabled_ui(!closed || !s.dashes.is_empty(), |ui| {
+                        choice(ui, "Caps", &mut s.cap, &[(LineCap::Butt, "Butt / Flat"), (LineCap::Round, "Round"), (LineCap::Square, "Square")], &mut children)
+                    });
+                    ui.end_row();
+                    ui.add_enabled_ui(corners, |ui| {
+                        ui.label(tl!("Corners"));
+                    });
+                    ui.add_enabled_ui(corners, |ui| {
+                        choice(ui, "Corners", &mut s.join, &[(LineJoin::Miter, "Miter"), (LineJoin::Round, "Round"), (LineJoin::Bevel, "Bevel")], &mut children)
+                    });
+                    ui.end_row();
+                    ui.add_enabled_ui(corners && s.join == LineJoin::Miter, |ui| {
+                        ui.label(tl!("Miter limit"));
+                    });
+                    ui.add_enabled_ui(corners && s.join == LineJoin::Miter, |ui| number(ui, "Miter limit", &mut s.miter_limit, 1.0..=500.0, "×"));
+                    ui.end_row();
+                    ui.label(tl!("Opacity"));
+                    let mut opacity = s.opacity * 100.0;
+                    if number(ui, "Opacity", &mut opacity, 0.0..=100.0, "%") {
+                        s.opacity = opacity / 100.0;
+                    }
+                    ui.end_row();
                 });
-                ui.add_enabled_ui(closed, |ui| {
-                    choice(
-                        ui,
-                        "Alignment",
-                        &mut s.align,
-                        &[(StrokeAlign::Inside, "Inside"), (StrokeAlign::Center, "Center"), (StrokeAlign::Outside, "Outside")],
-                        &mut children,
-                    )
-                });
-                ui.end_row();
-                ui.add_enabled_ui(!closed || !s.dashes.is_empty(), |ui| {
-                    ui.label(tl!("Caps"));
-                });
-                ui.add_enabled_ui(!closed || !s.dashes.is_empty(), |ui| {
-                    choice(ui, "Caps", &mut s.cap, &[(LineCap::Butt, "Butt / Flat"), (LineCap::Round, "Round"), (LineCap::Square, "Square")], &mut children)
-                });
-                ui.end_row();
-                ui.add_enabled_ui(corners, |ui| {
-                    ui.label(tl!("Corners"));
-                });
-                ui.add_enabled_ui(corners, |ui| {
-                    choice(ui, "Corners", &mut s.join, &[(LineJoin::Miter, "Miter"), (LineJoin::Round, "Round"), (LineJoin::Bevel, "Bevel")], &mut children)
-                });
-                ui.end_row();
-                ui.add_enabled_ui(corners && s.join == LineJoin::Miter, |ui| {
-                    ui.label(tl!("Miter limit"));
-                });
-                ui.add_enabled_ui(corners && s.join == LineJoin::Miter, |ui| number(ui, "Miter limit", &mut s.miter_limit, 1.0..=500.0, "×"));
-                ui.end_row();
-                ui.label(tl!("Opacity"));
-                let mut opacity = s.opacity * 100.0;
-                if number(ui, "Opacity", &mut opacity, 0.0..=100.0, "%") {
-                    s.opacity = opacity / 100.0;
+                if !closed {
+                    ui.label(egui::RichText::new(tl!("Open paths use centered strokes")).small());
                 }
-                ui.end_row();
-            });
-            if !closed {
-                ui.label(egui::RichText::new(tl!("Open paths use centered strokes")).small());
-            }
-            ui.separator();
-            let mut dashed = !s.dashes.is_empty();
-            if crate::widgets::checkbox(ui, &mut dashed, "Dashed line").changed() {
-                s.preset(if dashed { "Dashed" } else { "Solid" });
-            }
-            if dashed {
-                ui.label(egui::RichText::new(tl!("Dash / gap lengths × stroke width")).small());
-                for (i, pair) in s.dashes.chunks_mut(2).enumerate() {
-                    ui.push_id(i, |ui| {
-                        ui.horizontal(|ui| {
-                            for (j, value) in pair.iter_mut().enumerate() {
-                                let name = if j == 0 { "Dash" } else { "Gap" };
-                                ui.label(tl!(name));
-                                number(ui, name, value, 0.0..=10000.0, "×");
-                            }
+                ui.separator();
+                let mut dashed = !s.dashes.is_empty();
+                if crate::widgets::checkbox(ui, &mut dashed, "Dashed line").changed() {
+                    s.preset(if dashed { "Dashed" } else { "Solid" });
+                }
+                if dashed {
+                    ui.label(egui::RichText::new(tl!("Dash / gap lengths × stroke width")).small());
+                    for (i, pair) in s.dashes.chunks_mut(2).enumerate() {
+                        ui.push_id(i, |ui| {
+                            ui.horizontal(|ui| {
+                                for (j, value) in pair.iter_mut().enumerate() {
+                                    let name = if j == 0 { "Dash" } else { "Gap" };
+                                    ui.label(tl!(name));
+                                    number(ui, name, value, 0.0..=10000.0, "×");
+                                }
+                            });
                         });
+                    }
+                    ui.horizontal(|ui| {
+                        if ui.add_enabled(s.dashes.len() < 32, egui::Button::new(tl!("Add pair"))).clicked() {
+                            if s.dashes.len() % 2 == 1 {
+                                s.dashes.push(2.0);
+                            } else {
+                                s.dashes.extend([4.0, 2.0]);
+                            }
+                        }
+                        if ui.add_enabled(s.dashes.len() > 2, egui::Button::new(tl!("Remove pair"))).clicked() {
+                            s.dashes.truncate(s.dashes.len().saturating_sub(2));
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(tl!("Dash offset"));
+                        number(ui, "Dash offset", &mut s.dash_offset, -1_000_000.0..=1_000_000.0, "×");
                     });
                 }
-                ui.horizontal(|ui| {
-                    if ui.add_enabled(s.dashes.len() < 32, egui::Button::new(tl!("Add pair"))).clicked() {
-                        if s.dashes.len() % 2 == 1 {
-                            s.dashes.push(2.0);
-                        } else {
-                            s.dashes.extend([4.0, 2.0]);
-                        }
-                    }
-                    if ui.add_enabled(s.dashes.len() > 2, egui::Button::new(tl!("Remove pair"))).clicked() {
-                        s.dashes.truncate(s.dashes.len().saturating_sub(2));
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label(tl!("Dash offset"));
-                    number(ui, "Dash offset", &mut s.dash_offset, -1_000_000.0..=1_000_000.0, "×");
-                });
-            }
-            let t = Tokens::get(ui.ctx());
-            let (rect, sample_response) = ui.allocate_exact_size(vec2(width, 58.0), Sense::hover());
-            ui.painter().rect_filled(rect, t.radius_sm, t.field);
-            paint_sample(ui, rect, sample_response.id, s, true, t.text);
-            ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
-            if !s.valid() {
-                ui.colored_label(t.danger, tl!("Use finite lengths and a positive pattern total"));
-            }
+                let t = Tokens::get(ui.ctx());
+                let (rect, sample_response) = ui.allocate_exact_size(vec2(width, 58.0), Sense::hover());
+                ui.painter().rect_filled(rect, t.radius_sm, t.field);
+                paint_sample(ui, rect, sample_response.id, s, true, t.text);
+                ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), egui::StrokeKind::Inside);
+                if !s.valid() {
+                    ui.colored_label(t.danger, tl!("Use finite lengths and a positive pattern total"));
+                }
+            });
+            pop.pressed_outside()
         });
-    });
     let changed = e.draft != before || selected_preset && !stroke_enabled;
     let result = if changed && e.draft.valid() {
         e.original = e.draft.clone();
@@ -268,44 +274,32 @@ pub fn button(
     } else {
         None
     };
-    let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
-    let outside = popup.is_some_and(|p| p.response.clicked_elsewhere()) && !children.clicked && !response.clicked();
+    let outside = popup.is_some_and(|p| p.inner) && !response.clicked();
     ui.data_mut(|d| d.insert_temp(egui::Id::unique(("stroke-children", key)), children.ids));
-    if outside || escape && !children.shown {
+    if outside || !open {
         close_children(ui.ctx(), key);
         *editor = None;
-        if escape {
-            response.request_focus();
-        }
     }
     result
 }
 
 fn choice<T: Copy + PartialEq>(ui: &mut egui::Ui, label: &str, value: &mut T, choices: &[(T, &str)], children: &mut Children) {
-    let parent_layer = ui.layer_id();
-    let (press, close) = crate::press_menu::PressCombo::before(ui, label);
-    let response = craft::ui::ComboBox::from_id_salt(label)
-        .width(152.0)
-        .selected_text(choices.iter().find(|(v, _)| v == value).map_or("", |(_, n)| tl!(*n)))
-        .close_behavior(close)
-        .show_ui(ui, |ui| {
-            // Restored Area order can place a previously used child behind its parent.
-            // Both request the top on opening, so explicitly preserve their relationship.
-            ui.ctx().set_sublayer(parent_layer, ui.layer_id());
-            for (v, name) in choices {
-                let item = ui.selectable_label(*value == *v, tl!(*name));
-                if press.chosen(ui, &item) {
-                    *value = *v;
-                }
-            }
-        });
-    press.after(&response.response);
-    response.response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, ui.is_enabled(), tl!(label)));
-    let id = egui::Popup::default_response_id(&response.response);
-    children.ids.push(id);
-    if response.inner.is_some() {
-        children.shown = true;
-        children.clicked |= ui.ctx().read_response(id).is_some_and(|r| !r.clicked_elsewhere());
+    let size = ControlSize::Sm;
+    let height = Select::style(&LibTokens::of(ui), size).field.height;
+    // `usize::MAX` is none of the choices: the box shows the placeholder.
+    let mut index = choices.iter().position(|(v, _)| v == value).unwrap_or(usize::MAX);
+    let mut response = None;
+    ui.allocate_ui_with_layout(vec2(152.0, height), egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+        let mut select = Select::new(label, tl!(label), &mut index).size(size).placeholder("—");
+        for (i, (_, name)) in choices.iter().enumerate() {
+            select = select.option(i, tl!(*name));
+        }
+        response = Some(select.show(ui).response);
+    });
+    let Some(response) = response else { return };
+    children.ids.push(egui::Popup::default_response_id(&response));
+    if let Some((v, _)) = choices.get(index) {
+        *value = *v;
     }
 }
 
