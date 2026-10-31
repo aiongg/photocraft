@@ -112,6 +112,17 @@ impl ColorRamp {
         }
     }
 
+    /// What the library ramp draws for this choice; the CMYK Spectrum is the spectrum through the
+    /// CMYK gamut (`ColorRamp::gamut`).
+    pub fn kind(self) -> craft_ui::composites::RampKind {
+        use craft_ui::composites::RampKind;
+        match self {
+            ColorRamp::RgbSpectrum | ColorRamp::CmykSpectrum => RampKind::Spectrum,
+            ColorRamp::GrayscaleRamp => RampKind::Grayscale,
+            ColorRamp::CurrentColors => RampKind::Between,
+        }
+    }
+
     /// The next ramp in the Shift-click cycle.
     pub fn next(self) -> ColorRamp {
         let i = ColorRamp::ALL.iter().position(|r| *r == self).unwrap_or(0);

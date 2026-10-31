@@ -2,6 +2,8 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 
+use egui::{Rect, pos2, vec2};
+
 use super::*;
 
 fn picker(color: &str) -> Harness<'static, Map<String, Value>> {

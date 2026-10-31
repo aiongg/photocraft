@@ -10,7 +10,7 @@ use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarnin
 use craft_ui::controls::{Button, ButtonVariant};
 use craft_ui::localized::LocaleNumbers;
 use craft_ui::theme::scale::Space;
-use egui::{Color32, Rect, Stroke, UiBuilder, pos2, vec2};
+use egui::{Rect, UiBuilder, pos2};
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
@@ -33,7 +33,7 @@ pub fn out_of_gamut(rgb: [f32; 3]) -> Option<[f32; 3]> {
 
 /// The nearest web colour (channels in steps of 51), when `rgb` isn't one.
 pub fn not_web_safe(rgb: [f32; 3]) -> Option<[f32; 3]> {
-    let web = rgb.map(|v| (v.clamp(0.0, 1.0) * 5.0).round() / 5.0);
+    let web = web_safe(rgb);
     (hex(web) != hex(rgb)).then_some(web)
 }
 
@@ -284,7 +284,6 @@ fn web_safe(c: [f32; 3]) -> [f32; 3] {
 /// Room for both component columns, including units, without overflowing the title's width; with
 /// the frame and title the window fits Photoshop's (about 534 x 376 points).
 pub(crate) const CONTENT_WIDTH: f32 = 488.0;
-/// Side of the colour field (Photoshop's is about 256 points).
 /// Draw the picker and its top-right actions. `Some(true)` confirms, `Some(false)` cancels.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
     ui.set_width(CONTENT_WIDTH);
@@ -304,9 +303,9 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         .mode(&mut mode)
         .web_colors(&mut web)
         .compare(srgba(orig))
-        .focus_on_open(false)
         .eyedropper(tl!("Pick screen color"))
         .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
+        .focus_on_open(false)
         .text(word);
     // Photoshop's warnings beside the swatch, each over a chip of the nearest colour that passes
     // (a click takes it): out of gamut for printing on top, not a web colour below.
@@ -382,7 +381,7 @@ fn apply_picked(f: &mut Map<String, Value>, picked: &PickedColor) {
     }
 }
 
-fn srgba(c: [f32; 3]) -> Srgba {
+pub(crate) fn srgba(c: [f32; 3]) -> Srgba {
     Srgba::rgb(c[0], c[1], c[2])
 }
 
@@ -441,7 +440,7 @@ const CMYK_CHANNELS: [Channel; 4] = [
 
 /// CMYK through PhotoCraft's profile conversion, in percent. The inks the colour was picked as
 /// (#4196) are the model's values for that colour while they still give it.
-struct CmykModel(Option<[f32; 4]>);
+pub(crate) struct CmykModel(pub(crate) Option<[f32; 4]>);
 
 impl ColorModel for CmykModel {
     fn id(&self) -> &'static str {
@@ -465,30 +464,6 @@ impl ColorModel for CmykModel {
     }
     fn default_on(&self) -> DefaultOn {
         DefaultOn { full: true, compact: false }
-    }
-}
-
-/// ⚠: a filled triangle with an exclamation mark cut out of it.
-pub(crate) fn warning_triangle(p: &egui::Painter, r: Rect, ink: Color32, cut: Color32) {
-    let tri = vec![pos2(r.center().x, r.top()), pos2(r.right(), r.bottom()), pos2(r.left(), r.bottom())];
-    p.add(egui::Shape::convex_polygon(tri, ink, Stroke::NONE));
-    let x = r.center().x;
-    p.line_segment([pos2(x, r.top() + 4.5), pos2(x, r.bottom() - 4.0)], Stroke::new(1.5, cut));
-    p.circle_filled(pos2(x, r.bottom() - 2.0), 0.9, cut);
-}
-
-/// A cube seen corner-on: a hexagon with three edges meeting in the middle.
-pub(crate) fn web_cube(p: &egui::Painter, r: Rect, ink: Color32) {
-    let (c, rad) = (r.center(), r.width() / 2.0);
-    let corner = |k: f32| {
-        let a = std::f32::consts::FRAC_PI_3 * k - std::f32::consts::FRAC_PI_2;
-        c + vec2(rad * a.cos(), rad * a.sin())
-    };
-    let hex: Vec<_> = (0..6).map(|k| corner(k as f32)).collect();
-    let stroke = Stroke::new(1.2, ink);
-    p.add(egui::Shape::closed_line(hex, stroke));
-    for k in [1.0, 3.0, 5.0] {
-        p.line_segment([c, corner(k)], stroke);
     }
 }
 
@@ -563,6 +538,8 @@ mod tests;
 mod screen_integration_tests {
     use super::*;
     use crate::screen_picker::{Capture, Pending};
+    use craft_ui::theme::scale::Space;
+    use egui::{Rect, UiBuilder, pos2, vec2};
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]
     fn text_swatch_opens_full_dialog_and_screen_pick_waits_for_ok() {
