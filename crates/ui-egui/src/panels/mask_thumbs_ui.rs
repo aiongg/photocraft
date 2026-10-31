@@ -9,16 +9,12 @@
 //! #196: ⌥-click a layer-mask thumbnail to view the mask (⇧⌥: as an overlay), ⌘-click either
 //! mask to load it as a selection, and click the vector mask to target it (brackets).
 
-use craft_ui::theme::StrokeExt;
-use egui::{Color32, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{Color32, Pos2, Rect};
 use photocraft_doc::{Document, Layer, LayerId, VectorMask};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
-/// Width of the link-chain slot in front of a mask thumbnail.
-pub const CHAIN_W: f32 = 12.0;
 /// Thumbnail cache kinds (the second half of `PhotocraftApp::thumbs` keys).
 pub const THUMB_LAYER: u8 = 0;
 pub const THUMB_MASK: u8 = 1;
@@ -60,20 +56,6 @@ pub fn masks(l: &Layer) -> Vec<(MaskKind, bool, bool)> {
     v
 }
 
-/// Width `l`'s masks take in a row with `ts`-point thumbnails (chain + thumbnail + gap each).
-pub fn width(l: &Layer, ts: f32) -> f32 {
-    masks(l).len() as f32 * (CHAIN_W + ts + 6.0)
-}
-
-/// Thumbnail size for `l`'s row: `ts`, shrunk (down to 14 pt) when the layer and mask
-/// thumbnails would leave the name less than its minimum of the `room` they share.
-pub fn thumb_size(l: &Layer, ts: f32, room: f32) -> f32 {
-    let n = masks(l).len() as f32;
-    let need = ts + 6.0 + width(l, ts) + crate::layer_row_ui::MIN_NAME_W;
-    let short = need - room;
-    if short <= 0.0 { ts } else { (ts - short / (1.0 + n)).clamp(14.0_f32.min(ts), ts) }
-}
-
 /// Where a row's mask thumbnails and chains went.
 #[derive(Clone, Debug, Default)]
 pub struct MaskRects {
@@ -91,81 +73,6 @@ impl MaskRects {
     pub fn hit(&self, p: Pos2) -> Option<MaskKind> {
         self.thumbs.iter().find(|(_, r)| r.expand(2.0).contains(p)).map(|(k, _)| *k)
     }
-}
-
-/// Paint `l`'s chains and mask thumbnails from `*x` (just right of the layer thumbnail plus its
-/// gap), advancing `*x` past them, and push chain clicks as commands.
-#[allow(clippy::too_many_arguments)]
-pub fn paint(
-    app: &mut PhotocraftApp,
-    ctx: &egui::Context,
-    ui: &egui::Ui,
-    painter: &Painter,
-    doc: &Document,
-    l: &Layer,
-    x: &mut f32,
-    cy: f32,
-    ts: f32,
-    actions: &mut Vec<(String, Value)>,
-) -> MaskRects {
-    let t = Tokens::get(ctx);
-    let mut out = MaskRects::default();
-    for (kind, enabled, linked) in masks(l) {
-        // The chain sits in the gap before the thumbnail, centred between the two.
-        let chain = Rect::from_min_max(pos2(*x - 4.0, cy - ts / 2.0), pos2(*x - 4.0 + CHAIN_W, cy + ts / 2.0));
-        let resp = ui.interact(chain, ui.scope_id().with(("mask-chain", l.id.0, kind == MaskKind::Vector)), Sense::click());
-        if linked {
-            paint_chain(painter, chain.center(), if resp.hovered() { t.text } else { t.icon });
-        } else if resp.hovered() {
-            paint_chain(painter, chain.center(), t.text_faint);
-        }
-        let (verb, what, name) = (if linked { "Unlink" } else { "Link" }, kind.label(), l.name.clone());
-        let resp = resp.on_hover_text(if linked { tl!("Unlink the mask from the layer") } else { tl!("Link the mask to the layer") });
-        let template = "{verb} {mask} {layer}";
-        resp.widget_info(|| {
-            egui::WidgetInfo::labeled(egui::Role::Button, true, crate::i18n::fmt(tl!(template), &[("verb", tl!(verb)), ("mask", tl!(what)), ("layer", &name)]))
-        });
-        if resp.clicked() {
-            out.clicked = true;
-            actions.push((format!("{}.linked", kind.command()), json!({"layer": l.id.0, "linked": !linked})));
-        }
-        out.chains.push((kind, chain));
-        *x += CHAIN_W - 2.0;
-        let r = Rect::from_min_size(pos2(*x, cy - ts / 2.0), vec2(ts, ts));
-        if ui.is_rect_visible(r) {
-            let tex = match kind {
-                MaskKind::Pixel => l.mask.as_ref().map(|m| app.mask_thumb(ctx, doc, l.id, m)),
-                MaskKind::Vector => l.vector_mask.as_ref().map(|m| app.vector_mask_thumb(ctx, doc, l.id, m)),
-            };
-            if let Some(tex) = tex {
-                painter.image(tex, r, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-            }
-            if !enabled {
-                // Photoshop's red X over a disabled mask.
-                let st = craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.danger);
-                let k = r.shrink(1.0);
-                painter.line_segment([k.left_top(), k.right_bottom()], st);
-                painter.line_segment([k.right_top(), k.left_bottom()], st);
-            }
-        }
-        if app.ui.layers_panel_options.show_layer_mask_badges {
-            // Distinguish pixel and vector masks without altering their thumbnails.
-            let badge = Rect::from_min_size(pos2(r.right() - 9.0, r.bottom() - 9.0), vec2(9.0, 9.0));
-            painter.rect_filled(badge, craft_ui::theme::scale::Radius::R2.px(), t.card);
-            crate::icons::paint(ui, badge, if kind == MaskKind::Vector { "pen-tool" } else { "circle-dot" }, 8.0, t.text);
-        }
-        painter.rect_stroke(
-            r,
-            if t.pro { 0.0 } else { 4.0 },
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), if t.pro { Color32::from_gray(20) } else { t.field_border }),
-            StrokeKind::Outside,
-        );
-        out.thumbs.push((kind, r));
-        *x += ts + 6.0 + 2.0;
-    }
-    let rects = (out.thumbs.clone(), out.chains.clone());
-    ctx.data_mut(|d| d.get_temp_mut_or_default::<std::collections::HashMap<u64, Rects>>(rects_id()).insert(l.id.0, rects));
-    out
 }
 
 type Rects = (Vec<(MaskKind, Rect)>, Vec<(MaskKind, Rect)>);
@@ -189,14 +96,6 @@ pub fn recorded(ctx: &egui::Context, id: u64) -> Option<Rects> {
 /// None) can't be hit through rects from an earlier frame.
 pub fn forget(ctx: &egui::Context, id: u64) {
     ctx.data_mut(|d| d.get_temp_mut_or_default::<std::collections::HashMap<u64, Rects>>(rects_id()).remove(&id));
-}
-
-/// A small vertical chain: two interlocking links.
-fn paint_chain(painter: &Painter, c: Pos2, color: Color32) {
-    let st = Stroke::new(1.2, color);
-    let link = vec2(5.0, 7.0);
-    painter.rect_stroke(Rect::from_center_size(c - vec2(0.0, 2.5), link), craft_ui::theme::scale::Radius::R2.px(), st, StrokeKind::Middle);
-    painter.rect_stroke(Rect::from_center_size(c + vec2(0.0, 2.5), link), craft_ui::theme::scale::Radius::R2.px(), st, StrokeKind::Middle);
 }
 
 /// The command a click on mask thumbnail `kind` issues with modifiers `m`, if it is one that
@@ -242,27 +141,6 @@ pub fn double_click_command(app: &PhotocraftApp, kind: MaskKind) -> Option<(&'st
 /// The active layer of `st` has a vector mask (shape layers' paths are content, not masks).
 pub fn has_vector_mask(st: &photocraft_engine::DocState) -> bool {
     st.active_layer.and_then(|id| st.doc.layer(id)).is_some_and(|l| l.vector_mask.is_some() && !matches!(l.content, photocraft_doc::LayerContent::Shape(_)))
-}
-
-/// Photoshop's target brackets: corner marks just outside thumbnail `r`.
-pub fn paint_brackets(painter: &Painter, r: Rect, color: Color32) {
-    let r = r.expand(3.0);
-    let k = 6.0;
-    let st = craft_ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), color);
-    for (c, dx, dy) in [(r.left_top(), 1.0, 1.0), (r.right_top(), -1.0, 1.0), (r.right_bottom(), -1.0, -1.0), (r.left_bottom(), 1.0, -1.0)] {
-        painter.line_segment([c, c + vec2(k * dx, 0.0)], st);
-        painter.line_segment([c, c + vec2(0.0, k * dy)], st);
-    }
-    painter.ctx().data_mut(|d| d.insert_temp(bracket_id(), r));
-}
-
-fn bracket_id() -> egui::Id {
-    egui::Id::unique("layer-target-brackets")
-}
-
-/// Where the target brackets were last drawn (for tests and automation).
-pub fn brackets(ctx: &egui::Context) -> Option<Rect> {
-    ctx.data(|d| d.get_temp(bracket_id()))
 }
 
 /// Cheap identity of a vector mask's geometry and state.

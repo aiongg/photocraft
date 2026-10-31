@@ -1,12 +1,15 @@
 //! Non-destructive layer-mask controls (pixel and vector), shared by docked and floating Properties.
 
+use craft_ui::composites::SliderRow;
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::{LocaleNumbers, Unit};
 use craft_ui::theme::ToEgui;
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::json;
 
+use crate::PhotocraftApp;
 use crate::props_layout::COL_GAP;
-use crate::theme::{self, Tokens};
-use crate::{PhotocraftApp, widgets};
+use crate::theme;
 
 /// Image › Adjustments › Invert, which inverts a targeted layer mask in place (#780).
 const INVERT: &str = "image.adjustments.invert";
@@ -67,43 +70,36 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Laye
     });
 }
 
-/// Density (%) and Feather (px) sliders writing one undoable edit per drag: the value lives on the
-/// mask, not in its pixels. `command` is the mask's edit command and `prefix` keys its coalescing.
+/// Density (%) and Feather (px) slider rows writing one undoable edit per gesture: the value lives
+/// on the mask, not in its pixels. `command` is the mask's edit command and `prefix` keys its
+/// coalescing.
 #[allow(clippy::too_many_arguments)]
 fn sliders(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: u64, document: u64, command: &str, prefix: &str, density: f32, feather: f32) {
-    // Like brush settings, track pointer presses even on frames without a value change.
-    // slider_row also merges numeric scrubbing, whose drag flags are not in its Response.
-    let key = ui.scope_id().with("gesture");
-    let pass = ui.ctx().cumulative_pass_nr();
-    let pressed = ui.input(|i| i.pointer.any_pressed());
-    let gesture = ui.data_mut(|d| {
-        let g = d.get_temp_mut_or_default::<(u64, u64)>(key);
-        if pressed && g.1 != pass {
-            g.0 = g.0.wrapping_add(1);
-            g.1 = pass;
-        }
-        g.0
-    });
+    let numbers = LocaleNumbers::of(ui);
     // Feather's track is curved like Photoshop's, so a few px can be dragged to (#6545).
-    for (field, label, mut value, max, unit, curve) in
-        [("density", tl!("Density"), density * 100.0, 100.0, "%", None), ("feather", tl!("Feather"), feather, 1000.0, "px", Some(3.0))]
-    {
-        let gestures = widgets::RowGestures { curve, ..Default::default() };
-        let response = widgets::slider_row_with(ui, label, &mut value, 0.0..=max, unit, None, gestures);
-        response.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(value), label));
-        if response.changed() {
+    for (field, label, value, max, unit, curve) in [
+        ("density", tl!("Density"), f64::from(density) * 100.0, 100.0, "{n} %", None),
+        ("feather", tl!("Feather"), f64::from(feather), 1000.0, "{n} px", Some(3.0)),
+    ] {
+        let mut row = SliderRow::new((prefix, field), label, value, 0.0..=max, &numbers).unit(Unit::new(unit));
+        if let Some(k) = curve {
+            row = row.curve(k);
+        }
+        for event in row.show(ui).edits() {
+            // A drag, a scrub or typing is one gesture and one history step; a key or wheel step
+            // is its own.
+            let (value, gesture) = match event {
+                EditEvent::Update { id, value, .. } => (value, id.to_string()),
+                EditEvent::Commit { id, value, changed: true, .. } => (value, id.to_string()),
+                EditEvent::Set { value, .. } => (value, format!("set{}", ui.ctx().cumulative_pass_nr())),
+                _ => continue,
+            };
             let mut params = json!({"document": document, "layer": layer,
                 "coalesce": format!("{prefix}:{document}:{layer}:{field}:{gesture}")});
             params[field] = json!(value);
             if let Err(error) = app.run(command, params) {
                 app.ui.status = error;
                 app.ui.status_error = true;
-            }
-            if !ui.input(|i| i.pointer.any_down()) {
-                ui.data_mut(|d| {
-                    let g = d.get_temp_mut_or_default::<(u64, u64)>(key);
-                    g.0 = g.0.wrapping_add(1);
-                });
             }
         }
     }
@@ -129,7 +125,12 @@ fn refine_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             for &(label, id) in row {
                 // Greyed when its command can't run, by the same rule as the menu item.
                 let enabled = crate::menus::is_enabled(app, id);
-                if ui.add_enabled_ui(enabled, |ui| ui.add(craft_ui::controls::Button::new(tl!(label)).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(w)).clicked()).inner {
+                if ui
+                    .add_enabled_ui(enabled, |ui| {
+                        ui.add(craft_ui::controls::Button::new(label).variant(craft_ui::controls::ButtonVariant::Secondary).min_width(w)).clicked()
+                    })
+                    .inner
+                {
                     let params = if id == INVERT { json!({"target": "mask"}) } else { json!({}) };
                     if let Err(error) = crate::menus::invoke(app, ui.ctx(), id, params) {
                         app.ui.status = error;
