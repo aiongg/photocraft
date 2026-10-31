@@ -105,8 +105,6 @@ pub fn table(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         f.insert("__selectedColor".into(), json!(i));
     }
     if let Some(i) = shown.open {
-        // The table reports Enter without taking it, so the dialog would also answer it with OK.
-        ui.input_mut(|input| input.events.retain(|e| !matches!(e, egui::Event::Key { key: egui::Key::Enter, pressed: true, .. })));
         f.insert("__selectedColor".into(), json!(i));
         // The Color Picker dialog edits an existing field, so the entry's current colour is
         // written to its edit first.
