@@ -28,7 +28,7 @@ pub fn number_field(
     unit: &str,
     decimals: usize,
 ) -> NumberEdit {
-    number_field_parsed(ui, id_salt, label, value, range, unit, decimals, decimals, |text| super::numeric_expression::parse(text))
+    number_field_parsed(ui, id_salt, label, value, range, unit, decimals, decimals, false, |text| super::numeric_expression::parse(text))
 }
 
 /// A size field in `units.unit` with no suffix of its own (a unit menu sits beside it): typed
@@ -52,7 +52,7 @@ pub fn number_field_in_units(
         )
     };
     let before = *value;
-    let mut edit = number_field_parsed(ui, id_salt, label, value, range, "", decimals, decimals + if decimals > 0 { 2 } else { 0 }, read);
+    let mut edit = number_field_parsed(ui, id_salt, label, value, range, "", decimals, decimals + if decimals > 0 { 2 } else { 0 }, true, read);
     edit.changed = *value != before;
     edit
 }
@@ -67,9 +67,11 @@ fn number_field_parsed(
     unit: &str,
     decimals: usize,
     commit_decimals: usize,
+    ungrouped: bool,
     parse: impl Fn(&str) -> Option<f64>,
 ) -> NumberEdit {
-    let numbers = LocaleNumbers::of(ui);
+    // Pixel sizes and the sizes of a unit menu's field read `1920`, not `1,920`.
+    let numbers = if unit.contains("px") || ungrouped { (*LocaleNumbers::of(ui)).clone().ungrouped() } else { (*LocaleNumbers::of(ui)).clone() };
     let edit = NumberField::new(id_salt, label, *value, &numbers)
         .range(f64::from(*range.start())..=f64::from(*range.end()))
         .decimals(0..=decimals)

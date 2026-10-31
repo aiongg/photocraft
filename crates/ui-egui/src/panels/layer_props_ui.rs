@@ -57,7 +57,9 @@ fn edit_tolerance(layer: &Layer, u: LenUnit, extent: f64) -> f32 {
 /// percent); `name` is the field's accessible name; `key` holds the value of a gesture under way.
 pub(crate) fn number(ui: &mut egui::Ui, id: &str, key: egui::Id, name: &str, current: f32, len: (LenUnit, f64)) -> EditResponse<f64> {
     let (u, extent) = len;
-    let numbers = LocaleNumbers::of(ui);
+    // Sizes and positions read `1200`, not `1,200`; percentages keep the locale's grouping.
+    let numbers =
+        if u.unit == photocraft_engine::prefs::Unit::Percent { (*LocaleNumbers::of(ui)).clone() } else { (*LocaleNumbers::of(ui)).clone().ungrouped() };
     let shown = ui.data(|d| d.get_temp::<f32>(key)).unwrap_or_else(|| u.shown(f64::from(current), extent));
     // The field compares what it is given with what it sent, so a stored f32 must not come back as 53.000004.
     let shown = (f64::from(shown) * 1e4).round() / 1e4;

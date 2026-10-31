@@ -102,7 +102,7 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let link_key = egui::Id::unique("doc-props-link");
         let linked = ui.data(|d| d.get_temp::<bool>(link_key)).unwrap_or(false);
         let keys = ["w", "h"].map(|id| ui.make_persistent_id(("doc-props-field", id)));
-        let numbers = LocaleNumbers::of(ui);
+        let numbers = (*LocaleNumbers::of(ui)).clone().ungrouped();
         // W and H with the link toggle between them; X and Y under them are greyed out
         // (Photoshop greys them for documents without artboards).
         let size = PropertyGroup::new("doc-props-canvas")
@@ -258,12 +258,33 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui_kittest::kittest::{NodeT, Queryable};
     use photocraft_doc::Document;
 
     fn doc_with_background() -> photocraft_engine::Session {
         let mut s = photocraft_engine::Session::new();
         s.execute("file.new", json!({"width": 40, "height": 20, "background": "white"})).unwrap();
         s
+    }
+
+    #[test]
+    fn properties_canvas_size_shows_pixels_ungrouped() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 1200, "height": 800})).unwrap();
+        let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if ui.ctx().cumulative_pass_nr() == 0 {
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    return;
+                }
+                properties(app, ui);
+            },
+            app,
+        );
+        h.run_steps(3);
+        let shown: Vec<String> = h.query_all_by_role(egui::accesskit::Role::SpinButton).filter_map(|n| n.value()).collect();
+        assert!(shown.iter().any(|v| v.contains("1200") && !v.contains(',')), "{shown:?}");
+        assert!(shown.iter().all(|v| !v.contains("1,200")), "{shown:?}");
     }
 
     #[test]
