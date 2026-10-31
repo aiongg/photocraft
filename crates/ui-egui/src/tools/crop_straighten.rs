@@ -293,6 +293,31 @@ mod tests {
         assert!(near(got, (4.0f64 / 40.0).atan().to_degrees()), "{got}");
     }
 
+    // Upstream's `Gesture::CropImage` snaps through `crop_image`, which reads the drag as a
+    // `CropDrag::MoveImage`; a Straighten line is not one, so the pointer goes through unchanged.
+    #[test]
+    fn straighten_line_inside_an_edited_image_mode_frame_does_not_snap() {
+        let mut app = app(SampleType::U8);
+        app.ui.tool_options.crop_shield.classic_mode = false;
+        app.ui.extras.snap = true;
+        app.ui.crop_rect = Some([20.0, 20.0, 120.0, 60.0]);
+        app.crop.default_frame = false;
+        toggle(&mut app);
+        drag(&mut app, &[[60.0, 52.0], [100.0, 48.0]], NONE);
+        assert!(near(app.ui.crop_angle.abs(), (4.0f64 / 40.0).atan().to_degrees()), "{}", app.ui.crop_angle);
+    }
+
+    // With no frame yet upstream's `begin` finds no frame to hit and takes no gesture: no snap.
+    #[test]
+    fn straighten_line_with_no_frame_does_not_snap() {
+        let mut app = app(SampleType::U8);
+        app.ui.extras.snap = true;
+        app.ui.crop_rect = None;
+        toggle(&mut app);
+        drag(&mut app, &[[10.0, 52.0], [190.0, 48.0]], NONE);
+        assert!(app.ui.crop_angle.abs() > 0.1, "{}", app.ui.crop_angle);
+    }
+
     #[test]
     fn straighten_line_inside_the_default_frame_snaps_its_points() {
         // Both ends are within 8 of y = 50 and snap onto it (x stays: 10 and 190 are 10 from the edges).

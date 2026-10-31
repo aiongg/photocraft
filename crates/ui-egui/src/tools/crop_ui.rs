@@ -733,21 +733,26 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
 fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     // A Straighten line whose release went elsewhere (Space's Hand took it) never continues here.
     let had_drag = app.crop.drag.take().is_some_and(|d| d.press.kind() != CropPressKind::Straighten);
+    // A ⌘-drag in the middle of a crop gesture doesn't hijack it.
+    let straight = !had_drag && (app.crop.straighten.armed || mods.command);
+    if straight {
+        // The Straighten line's snapping is decided from the frame as it was before this press
+        // touched it, as the pointer's snapping is.
+        let inside = crop_box(app)
+            .zip(view_and_screen(app, p))
+            .is_some_and(|(b, (view, at))| library_frame(app, Some(&b), mods, false).hit(&view, reach(), at) == Some(BoxPart::Inside));
+        app.crop.line_snap = crate::snap_ui::line_snap(app, p, inside);
+    }
     claim(app);
     app.crop.editing = app.ui.crop_rect.is_some();
     app.crop.press_step = Some(step_of(app));
     // Default mode: the view stays upright for the frame, about the pressed point.
     crate::crop_mode::sync(app, Some(p));
-    // A ⌘-drag in the middle of a crop gesture doesn't hijack it.
-    let straight = !had_drag && (app.crop.straighten.armed || mods.command);
     let Some((view, at)) = view_and_screen(app, p) else { return };
     // No frame yet: the press draws one.
     let b = crop_box(app);
     if b.is_none() {
         app.ui.crop_angle = 0.0;
-    }
-    if straight {
-        app.crop.line_snap = crate::snap_ui::line_snap(app, p, library_frame(app, b.as_ref(), mods, false).hit(&view, reach(), at) == Some(BoxPart::Inside));
     }
     let snap = crate::snap_ui::crop_snap(app);
     let lines = std::cell::RefCell::new(Vec::new());
