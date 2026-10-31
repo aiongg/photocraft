@@ -2,32 +2,20 @@
 //! collapsible section header every section uses (separator, disclosure chevron, title), column
 //! widths that make field rows fill the panel, and the Quick Actions each layer kind offers.
 
+use craft_ui::composites::SectionHeader;
 use craft_ui::theme::ToEgui;
 use egui::{Rect, Sense, pos2, vec2};
 use photocraft_doc::{Layer, LayerContent};
 
-use crate::theme::{self, Tokens};
+use crate::theme;
 use crate::{PhotocraftApp, widgets};
 
-/// Height of a section header row.
-pub const SECTION_H: f32 = 24.0;
 /// Width of the short label (or glyph) column in front of a field: "W", "tT", "VA"…
 pub const LABEL_W: f32 = 22.0;
 /// Horizontal gap between a label and its field.
 pub const LABEL_GAP: f32 = 4.0;
 /// Horizontal gap between two label+field columns.
 pub const COL_GAP: f32 = 8.0;
-
-/// A one-letter field label ("W", "H", "X", "Y") in a `w`-wide column, ending `pad` before its field. The letters
-/// stacked in one column share a centre (#7314): the widest of `column` stays flush right, and the narrower ones
-/// are centred on it rather than pushed against its right edge.
-pub fn stacked_label(ui: &mut egui::Ui, s: &str, column: &[&str], w: f32, pad: f32) {
-    let t = craft_ui::theme::current(ui.ctx());
-    let font = egui::FontId::proportional(12.0);
-    let widest = column.iter().map(|c| ui.painter().layout_no_wrap((*c).to_owned(), font.clone(), t.color.text.muted.to_egui()).size().x).fold(0.0, f32::max);
-    let (r, _) = ui.allocate_exact_size(vec2(w, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - pad - widest / 2.0, r.center().y), egui::Align2::CENTER_CENTER, s, font, t.color.text.muted.to_egui());
-}
 
 /// Icon for a layer kind (the same glyphs as the Layers panel's kind filter).
 pub fn kind_icon(content: &LayerContent) -> &'static str {
@@ -77,33 +65,11 @@ pub fn header(ui: &mut egui::Ui, layer: &Layer) {
 /// A collapsible section: a separator, then a chevron + title row. Returns whether it's open.
 /// Every Properties section uses this, so headers look and behave alike.
 pub fn section(ui: &mut egui::Ui, id: &str, title: &str) -> bool {
-    let t = craft_ui::theme::current(ui.ctx());
     let key = egui::Id::unique(("props-section", id));
     let mut open = ui.data(|d| d.get_temp::<bool>(key)).unwrap_or(true);
-    ui.add_space(theme::ROW_GAP);
-    widgets::hairline(ui);
-    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), SECTION_H), Sense::click());
-    if resp.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-    crate::icons::paint(
-        ui,
-        Rect::from_center_size(pos2(r.left() + 7.0, r.center().y), vec2(12.0, 12.0)),
-        if open { "chevron-down" } else { "chevron-right" },
-        11.0,
-        t.color.text.muted.to_egui(),
-    );
-    ui.painter().text(pos2(r.left() + 18.0, r.center().y), egui::Align2::LEFT_CENTER, tl!(title), theme::semibold(12.0), t.color.text.normal.to_egui());
-    if resp.clicked() {
-        open = !open;
-        ui.data_mut(|d| d.insert_temp(key, open));
-    }
-    let label = title.to_string();
-    resp.widget_info(move || egui::WidgetInfo::selected(egui::Role::DisclosureTriangle, true, open, &label));
-    record(ui.ctx(), title, r);
-    if open {
-        ui.add_space(theme::ROW_GAP / 2.0);
-    }
+    let response = SectionHeader::new(("props-section", id), tl!(title)).open(&mut open).show(ui, |_| {}).response;
+    ui.data_mut(|d| d.insert_temp(key, open));
+    record(ui.ctx(), title, response.rect);
     open
 }
 

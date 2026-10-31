@@ -55,7 +55,7 @@ fn edit_tolerance(layer: &Layer, u: LenUnit, extent: f64) -> f32 {
 
 /// A number field of the Transform section. `len` is the unit shown and its 100% extent (for
 /// percent); `name` is the field's accessible name; `key` holds the value of a gesture under way.
-fn number(ui: &mut egui::Ui, id: &str, key: egui::Id, name: &str, current: f32, len: (LenUnit, f64)) -> EditResponse<f64> {
+pub(crate) fn number(ui: &mut egui::Ui, id: &str, key: egui::Id, name: &str, current: f32, len: (LenUnit, f64)) -> EditResponse<f64> {
     let (u, extent) = len;
     let numbers = LocaleNumbers::of(ui);
     let shown = ui.data(|d| d.get_temp::<f32>(key)).unwrap_or_else(|| u.shown(f64::from(current), extent));
@@ -77,7 +77,7 @@ fn number(ui: &mut egui::Ui, id: &str, key: egui::Id, name: &str, current: f32, 
 /// The value a field commits (drag released, Enter, focus lost), in document px: scrubbing and
 /// typing show their value until the gesture ends, then one edit is reported. `tol` is the
 /// smallest change, in px, that counts as an edit.
-fn committed(ui: &egui::Ui, key: egui::Id, edit: &EditResponse<f64>, current: f32, len: (LenUnit, f64), tol: f32) -> Option<f32> {
+pub(crate) fn committed(ui: &egui::Ui, key: egui::Id, edit: &EditResponse<f64>, current: f32, len: (LenUnit, f64), tol: f32) -> Option<f32> {
     let (u, extent) = len;
     let value = match edit.event {
         Some(EditEvent::Update { value, .. }) => {

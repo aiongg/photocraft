@@ -10,7 +10,7 @@ use craft_ui::theme::StrokeExt;
 use std::f32::consts::TAU;
 use std::sync::Arc;
 
-use egui::{Color32, Mesh, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{Color32, Mesh, Pos2, Rect, Sense, StrokeKind, pos2, vec2};
 use serde_json::json;
 
 use crate::PhotocraftApp;
