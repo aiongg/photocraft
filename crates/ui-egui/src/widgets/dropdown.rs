@@ -75,10 +75,10 @@ fn select_box<T: PartialEq + Clone>(
     if let Some(tip) = tip {
         response.on_hover_text(tip);
     }
+    // A value that is none of the options stays as it is until an option is chosen.
+    let Some((v, _, _)) = entries.get(index) else { return (false, hovered) };
     let changed = Some(index) != at;
-    if let Some((v, _, _)) = entries.get(index) {
-        *current = v.clone();
-    }
+    *current = v.clone();
     (changed, hovered)
 }
 
