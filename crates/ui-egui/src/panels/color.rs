@@ -127,8 +127,7 @@ pub(crate) fn color_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     crate::apply_color::track_focus(ui.ctx());
 }
 
-/// Tool colours are sRGB-encoded floats; egui's Hsva works on sRGB bytes via these helpers
-/// (its `from_rgba_unmultiplied` expects *linear* RGB, which gave wrong readouts).
+/// Tool colours are sRGB-encoded floats; these are their 8-bit channels.
 pub(crate) fn srgb_bytes(c: [f32; 4]) -> [u8; 3] {
     let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
     [q(c[0]), q(c[1]), q(c[2])]

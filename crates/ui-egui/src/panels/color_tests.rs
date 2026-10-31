@@ -504,7 +504,8 @@ fn dragging_to_the_bottom_right_keeps_the_knob_there() {
     assert_eq!(srgb_bytes(h.state().session.tools.foreground), [0, 0, 0], "both corners are black");
     // What the knob is drawn from on the very next frame: the field kept the saturation the
     // drag ended at (not the zero black reads back as), together with the hue.
-    let remembered: craft_theme::ModelValues = h.ctx.data(|d| d.get_temp(egui::Id::unique(("color-panel-values", "hsb", false)))).expect("the field remembers what it showed");
+    let remembered: craft_theme::ModelValues =
+        h.ctx.data(|d| d.get_temp(egui::Id::unique(("color-panel-values", "hsb", false)))).expect("the field remembers what it showed");
     assert!(remembered.values[1] > 90.0, "the saturation the corner was dragged to: {remembered:?}");
     assert!(remembered.values[2] < 1.0, "still black: {remembered:?}");
 }

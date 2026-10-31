@@ -88,6 +88,7 @@ impl Model {
     }
 
     /// Slider values of `rgb`, rounded to whole numbers as Photoshop's fields show them.
+    #[cfg(test)]
     pub(crate) fn values_of(self, rgb: [f32; 3]) -> ModelValues {
         let mut v = self.color_model().from_srgb(srgba(rgb));
         round_values(&mut v);
