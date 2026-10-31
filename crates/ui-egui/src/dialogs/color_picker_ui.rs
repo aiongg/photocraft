@@ -7,13 +7,16 @@
 
 use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNELS, ModelValues, RgbModel, Srgba};
 use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
-use craft_ui::dialog::{ButtonRole, FooterButton};
+use craft_ui::controls::{Button, ButtonVariant};
 use craft_ui::localized::LocaleNumbers;
+use craft_ui::theme::scale::Space;
+use egui::{Rect, UiBuilder, pos2};
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::DialogKind;
+use crate::widgets;
 
 /// Colour differences the CMYK round trip leaves inside the printable gamut (ΔE ≤ 0.4, black ≈ 1.4
 /// with black-point compensation) stay below this; out-of-gamut colours move far more.
@@ -281,8 +284,9 @@ fn web_safe(c: [f32; 3]) -> [f32; 3] {
 /// Room for both component columns, including units, without overflowing the title's width; with
 /// the frame and title the window fits Photoshop's (about 534 x 376 points).
 pub(crate) const CONTENT_WIDTH: f32 = 488.0;
-/// Draw the picker and its side actions. `Some(true)` confirms, `Some(false)` cancels.
+/// Draw the picker and its top-right actions. `Some(true)` confirms, `Some(false)` cancels.
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
+    ui.set_width(CONTENT_WIDTH);
     let now = current(f);
     let orig = f.get("__orig").and_then(Value::as_str).and_then(parse_hex).unwrap_or(now.rgb);
     let mut mode = area_mode(f.get("__mode").and_then(Value::as_str).unwrap_or("h"));
@@ -302,12 +306,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         .eyedropper(tl!("Pick screen color"))
         .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
         .focus_on_open(false)
-        .text(word)
-        .side_actions([
-            FooterButton::new(ButtonRole::Default, tl!("OK")),
-            FooterButton::new(ButtonRole::Cancel, tl!("Cancel")),
-            FooterButton::new(ButtonRole::Apply, tl!("Add to Swatches")),
-        ]);
+        .text(word);
     // Photoshop's warnings beside the swatch, each over a chip of the nearest colour that passes
     // (a click takes it): out of gamut for printing on top, not a web colour below.
     if let Some(near) = out_of_gamut(now.rgb) {
@@ -338,16 +337,32 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
     if let Some(picked) = shown.edit.event.as_ref().and_then(|e| e.value()) {
         apply_picked(f, picked);
     }
-    match shown.side_clicked.map(|c| c.role) {
-        Some(ButtonRole::Default) => Some(true),
-        Some(ButtonRole::Cancel) => Some(false),
-        // Handled by the dialog host, which has the app (`take_add_swatch`).
-        Some(_) => {
-            f.insert("__addSwatch".into(), json!(true));
-            None
-        }
-        None => None,
+    actions(ui, f, shown.edit.response.rect.top())
+}
+
+/// OK, Cancel and Add to Swatches in a column at the picker's top-right corner, beside the
+/// compare swatch and above the channel fields, as Photoshop's are. `top` is the picker's top.
+fn actions(ui: &mut egui::Ui, f: &mut Map<String, Value>, top: f32) -> Option<bool> {
+    let mut outcome = None;
+    // As wide as the longest label, at the right edge like Photoshop's.
+    let width = widgets::button_width(ui, &[tl!("OK"), tl!("Cancel"), tl!("Add to Swatches")]).max(96.0);
+    let right = ui.max_rect().right();
+    let rect = Rect::from_min_max(pos2(right - width, top), pos2(right, top + 120.0));
+    let mut column = ui.new_child(UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Max)));
+    let ui = &mut column;
+    if ui.add(Button::new(tl!("OK")).variant(ButtonVariant::Primary).min_width(width)).clicked() {
+        outcome = Some(true);
     }
+    ui.add_space(Space::S4.px());
+    if ui.add(Button::new(tl!("Cancel")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
+        outcome = Some(false);
+    }
+    ui.add_space(Space::S4.px());
+    // Handled by the dialog host, which has the app (`take_add_swatch`).
+    if ui.add(Button::new(tl!("Add to Swatches")).variant(ButtonVariant::Secondary).min_width(width)).clicked() {
+        f.insert("__addSwatch".into(), json!(true));
+    }
+    outcome
 }
 
 /// Stores what the picker reported: the colour, and the values of the model it was edited in
@@ -523,7 +538,8 @@ mod tests;
 mod screen_integration_tests {
     use super::*;
     use crate::screen_picker::{Capture, Pending};
-    use egui::vec2;
+    use craft_ui::theme::scale::Space;
+    use egui::{Rect, UiBuilder, pos2, vec2};
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]
     fn text_swatch_opens_full_dialog_and_screen_pick_waits_for_ok() {
