@@ -41,6 +41,41 @@ pub const MASK_MODES: [(MaskMode, &str); 10] = [
 const PATTERNS: [(PatternStyle, &str); 4] =
     [(PatternStyle::Paper, "Paper"), (PatternStyle::Canvas, "Canvas"), (PatternStyle::Noise, "Noise"), (PatternStyle::Dots, "Dots")];
 
+/// The library's labelled slider row over `*v`; returns whether it changed. A cancelled drag
+/// (Esc) restores the value the drag began with.
+fn row(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, unit: &str) -> bool {
+    use craft_ui::composites::SliderRow;
+    use craft_ui::edit::EditEvent;
+    use craft_ui::localized::{LocaleNumbers, Unit};
+    let numbers = LocaleNumbers::of(ui);
+    // Rows repeat labels ("Minimum" under each dynamic), so the row's own position names it.
+    let salt = ui.next_auto_id();
+    let before = salt.with("before");
+    let (lo, hi) = (f64::from(*range.start()), f64::from(*range.end()));
+    let response = SliderRow::new(salt, tl!(label), f64::from(*v), lo..=hi, &numbers).unit(Unit::new(&format!("{{n}}{unit}"))).step(1.0).show(ui);
+    let mut changed = false;
+    for event in response.edits() {
+        match event {
+            EditEvent::Begin { .. } => {
+                let start = *v;
+                ui.data_mut(|d| d.insert_temp(before, start));
+            }
+            EditEvent::Update { value, .. } | EditEvent::Set { value, .. } | EditEvent::Commit { value, changed: true, .. } => {
+                *v = value.round().clamp(lo, hi) as f32;
+                changed = true;
+            }
+            EditEvent::Cancel { .. } => {
+                if let Some(old) = ui.data(|d| d.get_temp::<f32>(before)) {
+                    *v = old;
+                    changed = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    changed
+}
+
 /// Percent slider over a 0..`max` fraction.
 fn pct(ui: &mut egui::Ui, label: &str, v: &mut f32, max: f32) -> bool {
     signed_pct(ui, label, v, 0.0, max)
@@ -49,7 +84,7 @@ fn pct(ui: &mut egui::Ui, label: &str, v: &mut f32, max: f32) -> bool {
 /// Percent slider over a `min..max` fraction.
 fn signed_pct(ui: &mut egui::Ui, label: &str, v: &mut f32, min: f32, max: f32) -> bool {
     let mut p = (*v * 100.0).round();
-    let changed = widgets::slider_row(ui, label, &mut p, min * 100.0..=max * 100.0, "%", None).changed();
+    let changed = row(ui, label, &mut p, min * 100.0..=max * 100.0, "%");
     if changed {
         *v = (p.round() / 100.0).clamp(min, max);
     }
@@ -57,12 +92,7 @@ fn signed_pct(ui: &mut egui::Ui, label: &str, v: &mut f32, min: f32, max: f32) -
 }
 
 fn num(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str) -> bool {
-    let mut x = *v;
-    let changed = widgets::slider_row(ui, label, &mut x, range.clone(), suffix, None).changed();
-    if changed {
-        *v = x.round().clamp(*range.start(), *range.end());
-    }
-    changed
+    row(ui, label, v, range, suffix)
 }
 
 fn dim(ui: &mut egui::Ui, s: &str) {
@@ -263,55 +293,33 @@ pub fn thumb_scale(size: f32) -> f32 {
 }
 
 /// Photoshop's scrolling grid of preset tips with their sizes; `highlight` is the selected
-/// preset (by identity: look-alike duplicates must stay distinct). Returns the clicked index.
+/// preset (by identity: look-alike duplicates must stay distinct, so rows are keyed by index).
+/// Returns the clicked index.
 fn tip_grid(ui: &mut egui::Ui, id: &str, presets: &[BrushPreset], highlight: Option<usize>) -> Option<usize> {
-    let t = craft_ui::theme::current(ui.ctx());
-    let mut clicked = None;
-    let frame = egui::Frame::NONE
-        .fill(t.color.surface.sunken.to_egui())
-        .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()))
-        .corner_radius(t.shape.radius.control as u8)
-        .inner_margin(egui::Margin::same(3));
-    frame.show(ui, |ui| {
-        egui::ScrollArea::vertical().id_salt(id).max_height(104.0).auto_shrink([false, true]).show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-                for (i, p) in presets.iter().enumerate() {
-                    let (cell, resp) = ui.allocate_exact_size(vec2(44.0, 50.0), Sense::click());
-                    if !ui.is_rect_visible(cell) {
-                        continue;
-                    }
-                    if highlight == Some(i) {
-                        ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R3.px(), t.color.accent.soft.to_egui());
-                        ui.painter().rect_stroke(
-                            cell,
-                            craft_ui::theme::scale::Radius::R3.px(),
-                            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.accent.solid.to_egui()),
-                            egui::StrokeKind::Inside,
-                        );
-                    } else if resp.hovered() {
-                        ui.painter().rect_filled(cell, craft_ui::theme::scale::Radius::R3.px(), t.color.state.hover.to_egui());
-                    }
-                    let (tip, size, hard, angle, round, _) = preset_tip(p);
-                    let tex = brush_preview::tip_texture(ui.ctx(), &format!("{id}:{}", p.name), tip, (hard, angle, round), 34, t.color.text.normal.to_egui());
-                    let ir = egui::Rect::from_center_size(pos2(cell.center().x, cell.top() + 20.0), vec2(34.0, 34.0) * thumb_scale(size));
-                    ui.painter().image(tex.id(), ir, egui::Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-                    ui.painter().text(
-                        pos2(cell.center().x, cell.bottom() - 6.0),
-                        egui::Align2::CENTER_CENTER,
-                        format!("{}", size.round() as i64),
-                        egui::FontId::proportional(9.5),
-                        t.color.text.muted.to_egui(),
-                    );
-                    if resp.on_hover_text(&p.name).clicked() {
-                        clicked = Some(i);
-                    }
-                }
-            });
+    use craft_ui::presets::{PresetBrowser, PresetEvent, PresetRow, PresetState, PresetView};
+    const CELL: f32 = 44.0;
+    let rows: Vec<PresetRow<usize>> =
+        presets.iter().enumerate().map(|(i, p)| PresetRow::item(i, p.name.as_str(), 0).caption(format!("{}", p.brush.size.round() as i64))).collect();
+    let mut state = PresetState::<usize>::new();
+    state.thumb = CELL;
+    let out = PresetBrowser::new(id, tl!("Brush tips"), &mut state, &rows)
+        .selected(highlight.as_ref())
+        .thumb_range(CELL..=CELL)
+        .view_lock(PresetView::Grid)
+        .max_height(104.0)
+        .show(ui, |painter, rect, info| {
+            let Some(p) = presets.get(*info.key) else { return };
+            let t = craft_ui::theme::current(painter.ctx());
+            let (tip, size, hard, angle, round, _) = preset_tip(p);
+            let tex = brush_preview::tip_texture(painter.ctx(), &format!("{id}:{}", p.name), tip, (hard, angle, round), 34, t.color.text.normal.to_egui());
+            let ir = egui::Rect::from_center_size(rect.center(), rect.size() * thumb_scale(size));
+            painter.image(tex.id(), ir, egui::Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
         });
-    });
     ui.add_space(craft_ui::theme::scale::Space::S6.px());
-    clicked
+    out.events.iter().find_map(|e| match e {
+        PresetEvent::Select { key, .. } => Some(*key),
+        _ => None,
+    })
 }
 
 /// The Brush Tip Shape section: the tip grid and the tip's own controls. Picking a tip copies the
