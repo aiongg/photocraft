@@ -1232,7 +1232,7 @@ fn secondary_transform_or_crop_took(app: &mut PhotocraftApp, ctx: &egui::Context
     // Right-click while transforming: the box's menu, as on the canvas.
     if app.ui.transform.as_ref().is_some_and(|t| t.warp.is_none()) {
         if down {
-            crate::canvas_tool_menu::open_transform(app, ctx, screen_point(app, x, y));
+            crate::canvas_tool_menu::open_transform(app, screen_point(app, x, y));
         }
         return true;
     }
@@ -1240,7 +1240,7 @@ fn secondary_transform_or_crop_took(app: &mut PhotocraftApp, ctx: &egui::Context
     if crate::layer_pick_ui::is_gesture(app.ui.tool, g.mods) {
         if down {
             app.ui.canvas_tool_menu = None;
-            crate::layer_pick_ui::open(app, ctx, screen_point(app, x, y), x, y);
+            crate::layer_pick_ui::open(app, screen_point(app, x, y), x, y);
         }
         return true;
     }
@@ -1254,7 +1254,7 @@ fn secondary_transform_or_crop_took(app: &mut PhotocraftApp, ctx: &egui::Context
     }
     if crate::crop_ui::pending(app) {
         if down {
-            crate::canvas_tool_menu::open_crop(app, ctx, app.ui.tool, screen_point(app, x, y));
+            crate::canvas_tool_menu::open_crop(app, app.ui.tool, screen_point(app, x, y));
         }
         return true;
     }
@@ -1266,13 +1266,13 @@ fn secondary_canvas_menu_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &
     let down = matches!(s.ev, ToolEvent::Down { .. });
     if crate::canvas_tool_menu::pasteboard_at(app, app.ui.tool, [x, y]) {
         if down {
-            crate::canvas_tool_menu::open_pasteboard(app, ctx, app.ui.tool, screen_point(app, x, y));
+            crate::canvas_tool_menu::open_pasteboard(app, app.ui.tool, screen_point(app, x, y));
         }
         return true;
     }
     if crate::canvas_tool_menu::is_view_tool(app.ui.tool) {
         if down {
-            crate::canvas_tool_menu::open_view(app, ctx, app.ui.tool, screen_point(app, x, y), [x, y]);
+            crate::canvas_tool_menu::open_view(app, app.ui.tool, screen_point(app, x, y), [x, y]);
         }
         return true;
     }
@@ -1281,7 +1281,7 @@ fn secondary_canvas_menu_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &
         || crate::canvas_tool_menu::type_layer_at(app, app.ui.tool, [x, y]).is_some()
     {
         if down {
-            crate::canvas_tool_menu::open_at(app, ctx, app.ui.tool, screen_point(app, x, y), Some([x, y]));
+            crate::canvas_tool_menu::open_at(app, app.ui.tool, screen_point(app, x, y), Some([x, y]));
         }
         return true;
     }

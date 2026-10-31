@@ -2,7 +2,8 @@
 //! Transform box, text being edited with a Type tool, committed type under a Type tool, the
 //! pasteboard (outside the image), a guide and a pending crop.
 
-use egui::Context;
+use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use egui::{Context, Response, Ui};
 use photocraft_doc::LayerContent;
 use photocraft_engine::prefs::{self, CanvasColor};
 use serde::{Deserialize, Serialize};
@@ -282,7 +283,7 @@ fn crop_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bo
 
 /// Right-click with `tool` on a pending crop: the crop menu at screen point `pos`. Only the Crop
 /// tool itself, not one held over it (Space's Hand).
-pub fn open_crop(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2]) -> bool {
+pub fn open_crop(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
     if tool != Tool::Crop || !crate::crop_ui::pending(app) || !pos.iter().all(|v| v.is_finite()) {
         return false;
     }
@@ -304,7 +305,6 @@ pub fn open_crop(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 
         spelling: None,
         crop: Some(users),
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
@@ -619,7 +619,7 @@ pub fn spelling_label_is_ui(id: &str) -> bool {
 }
 
 /// Right-click over a Free Transform box: its modes.
-pub fn open_transform(app: &mut PhotocraftApp, ctx: &Context, pos: [f32; 2]) -> bool {
+pub fn open_transform(app: &mut PhotocraftApp, pos: [f32; 2]) -> bool {
     if !pos.iter().all(|v| v.is_finite()) {
         return false;
     }
@@ -640,7 +640,6 @@ pub fn open_transform(app: &mut PhotocraftApp, ctx: &Context, pos: [f32; 2]) -> 
         spelling: None,
         crop: None,
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
@@ -697,7 +696,7 @@ pub fn pasteboard_at(app: &PhotocraftApp, tool: Tool, doc: [f64; 2]) -> bool {
 }
 
 /// Right-click on the pasteboard: its colour menu at screen point `pos`.
-pub fn open_pasteboard(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2]) -> bool {
+pub fn open_pasteboard(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
     if !pos.iter().all(|v| v.is_finite()) {
         return false;
     }
@@ -718,14 +717,13 @@ pub fn open_pasteboard(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: 
         spelling: None,
         crop: None,
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
 /// Right-click at document point `doc` on a guide that `tool` could drag (the Move tool, or ⌘ with
 /// a tool on which ⌘ moves guides, `canvas::command_guide_at`): select the guide and open the guide
 /// menu at screen point `pos`.
-pub fn open_guide(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, mods: egui::Modifiers, pos: [f32; 2], doc: [f64; 2]) -> bool {
+pub fn open_guide(app: &mut PhotocraftApp, tool: Tool, mods: egui::Modifiers, pos: [f32; 2], doc: [f64; 2]) -> bool {
     if !pos.iter().all(|v| v.is_finite()) || !doc.iter().all(|v| v.is_finite()) {
         return false;
     }
@@ -749,7 +747,6 @@ pub fn open_guide(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, mods: egui
         spelling: None,
         crop: None,
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
@@ -843,14 +840,14 @@ pub fn entry_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) 
     }
 }
 
-pub fn open(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2]) -> bool {
-    open_at(app, ctx, tool, pos, None)
+pub fn open(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2]) -> bool {
+    open_at(app, tool, pos, None)
 }
 
 /// [`open`] for a right-click at document point `doc`: over a misspelled word of the text being
 /// edited, the menu starts with its spelling suggestions; over committed type with a Type tool, the
 /// type layer menu.
-pub fn open_at(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2], doc: Option<[f64; 2]>) -> bool {
+pub fn open_at(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2], doc: Option<[f64; 2]>) -> bool {
     let text = editing_text(app, tool);
     if !pos.iter().all(|v| v.is_finite()) {
         return false;
@@ -880,13 +877,12 @@ pub fn open_at(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2]
         spelling,
         crop: None,
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
 /// Right-click with the Zoom or Hand tool at screen point `pos`, over document point `doc`: the
 /// view menu.
-pub fn open_view(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2], doc: [f64; 2]) -> bool {
+pub fn open_view(app: &mut PhotocraftApp, tool: Tool, pos: [f32; 2], doc: [f64; 2]) -> bool {
     if !is_view_tool(tool) || !pos.iter().all(|v| v.is_finite()) || !doc.iter().all(|v| v.is_finite()) {
         return false;
     }
@@ -907,7 +903,6 @@ pub fn open_view(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 
         spelling: None,
         crop: None,
     });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
@@ -1103,14 +1098,50 @@ fn choose_pen(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, com
     Ok(())
 }
 
-fn menu_id() -> egui::Id {
-    egui::Id::unique("canvas-selection-menu")
+/// The widget the menu hangs from: the canvas, under an id of its own so that this menu and the
+/// layer menu never share a popup.
+fn menu_widget(canvas: &Response) -> Response {
+    let mut widget = canvas.clone();
+    widget.id = canvas.id.with("canvas-selection-menu");
+    widget
 }
 
-pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
+/// The menu's entries, each carrying its command id. Menus with a checked row show check marks
+/// on all their rows.
+fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<MenuEntry<String>> {
+    let marked = menu.crop.is_some() || menu.guide || menu.pasteboard || menu.text || menu.type_layer || menu.transform;
+    let item = |label: String, command: &str| {
+        let item = MenuItem::new(label, command.to_string()).enabled(entry_enabled(app, menu, command));
+        MenuEntry::from(if marked { item.check(mode_checked(app, menu, command)) } else { item })
+    };
+    let mut out = Vec::new();
+    let spelling = spelling_rows(menu);
+    for (label, command) in &spelling {
+        let text = if spelling_label_is_ui(command) { tl!(label).to_string() } else { label.clone() };
+        out.push(MenuEntry::from(MenuItem::new(text, command.clone()).enabled(entry_enabled(app, menu, command))));
+    }
+    if !spelling.is_empty() {
+        out.push(MenuEntry::Separator);
+    }
+    for row in crop_rows(menu) {
+        out.push(match row {
+            None => MenuEntry::Separator,
+            Some((label, command)) => item(if crop_label_is_ui(&command) { tl!(&label).to_string() } else { label }, &command),
+        });
+    }
+    for row in rows(menu) {
+        out.push(match *row {
+            None => MenuEntry::Separator,
+            Some((label, command)) => item(tl!(label).to_string(), command),
+        });
+    }
+    out
+}
+
+pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
     let Some(menu) = app.ui.canvas_tool_menu.clone() else { return };
-    if ctx.input(|i| i.key_pressed(egui::Key::Escape))
-        || app.ui.tool != menu.tool
+    let ctx = ui.ctx();
+    if app.ui.tool != menu.tool
         || (menu.transform && app.ui.transform.is_none())
         || (menu.text && app.ui.text_edit.is_none())
         || (menu.type_layer && app.ui.text_edit.is_some())
@@ -1119,63 +1150,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
         app.ui.canvas_tool_menu = None;
         return;
     }
-    let id = menu_id();
-    let screen = ctx.content_rect();
-    let size = ctx.memory(|m| m.area_rect(id)).map_or(egui::vec2(210.0, 140.0), |r| r.size());
-    let pos = egui::pos2(menu.pos[0].min(screen.right() - size.x).max(screen.left()), menu.pos[1].min(screen.bottom() - size.y).max(screen.top()));
-    let mut selected = None;
-    let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
-        egui::Frame::menu(ui.style()).show(ui, |ui| {
-            let t = crate::theme::Tokens::get(ui.ctx());
-            let v = &mut ui.style_mut().visuals;
-            v.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
-            v.widgets.inactive.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.weak_bg_fill = t.accent;
-            v.widgets.hovered.bg_fill = t.accent;
-            v.widgets.hovered.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
-            v.widgets.hovered.corner_radius = egui::CornerRadius::same(3);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            ui.set_width(200.0);
-            crate::widgets::menu_scroll(ui, |ui| {
-                let spelling = spelling_rows(&menu);
-                for (label, command) in &spelling {
-                    let text = if spelling_label_is_ui(command) { tl!(label).to_string() } else { label.clone() };
-                    let item = egui::Button::new(text).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
-                        selected = Some(command.clone());
-                    }
-                }
-                if !spelling.is_empty() {
-                    ui.separator();
-                }
-                for row in crop_rows(&menu) {
-                    let Some((label, command)) = row else {
-                        ui.separator();
-                        continue;
-                    };
-                    let text = if crop_label_is_ui(&command) { tl!(&label).to_string() } else { label };
-                    let item = egui::Button::selectable(mode_checked(app, &menu, &command), text).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, &command), item).clicked() {
-                        selected = Some(command);
-                    }
-                }
-                for row in rows(&menu) {
-                    let Some((label, command)) = *row else {
-                        ui.separator();
-                        continue;
-                    };
-                    let item = egui::Button::selectable(mode_checked(app, &menu, command), tl!(label)).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
-                        selected = Some((*command).to_string());
-                    }
-                }
-            });
-        });
-    });
-    if let Some(command) = selected {
+    let widget = menu_widget(canvas);
+    let was_open = ContextMenu::<()>::is_open(ctx, &widget);
+    let at = (!was_open).then_some(OpenAt::Pointer(egui::pos2(menu.pos[0], menu.pos[1])));
+    let items = entries(app, &menu);
+    let shown = ContextMenu::new(&items).own_gestures(false).open_at(at).show(ui, &widget);
+    if let Some(command) = shown.chosen {
         choose(app, ctx, &command);
-    } else if crate::canvas_popup::outside_pressed(ctx, id, area.response.rect) {
+    } else if was_open && !shown.open {
         app.ui.canvas_tool_menu = None;
     }
 }

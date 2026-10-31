@@ -7,7 +7,8 @@
 //! two commands an agent would run. Painting tools keep their plain right-click (the Brush
 //! Preset picker, #268); the ⌘/Ctrl variant reaches the layer list from them too.
 
-use egui::{Color32, Context, Modifiers};
+use craft_ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use egui::{Modifiers, Response, Ui};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -41,7 +42,7 @@ pub fn layers_at(app: &mut PhotocraftApp, x: f64, y: f64) -> Vec<(u64, String)> 
 
 /// Open the menu at screen point `at` for document point (x, y). False (and nothing opens) when
 /// no layer has pixels there.
-pub fn open(app: &mut PhotocraftApp, ctx: &Context, at: [f32; 2], x: f64, y: f64) -> bool {
+pub fn open(app: &mut PhotocraftApp, at: [f32; 2], x: f64, y: f64) -> bool {
     let layers = layers_at(app, x, y);
     if layers.is_empty() {
         app.ui.layer_menu = None;
@@ -49,7 +50,6 @@ pub fn open(app: &mut PhotocraftApp, ctx: &Context, at: [f32; 2], x: f64, y: f64
     }
     app.ui.brush_picker = None;
     app.ui.layer_menu = Some(LayerMenu { pos: at, layers });
-    crate::canvas_popup::mark_open(ctx, menu_id());
     true
 }
 
@@ -61,48 +61,28 @@ pub fn choose(app: &mut PhotocraftApp, layer: u64) {
     }
 }
 
-fn menu_id() -> egui::Id {
-    egui::Id::unique("canvas-layer-menu")
+/// The widget the menu hangs from: the canvas, under an id of its own so that this menu and the
+/// canvas tool menu never share a popup.
+fn menu_widget(canvas: &Response) -> Response {
+    let mut widget = canvas.clone();
+    widget.id = canvas.id.with("canvas-layer-menu");
+    widget
 }
 
 /// Show the open menu. Escape or a click outside closes it.
-pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
+pub fn show(app: &mut PhotocraftApp, ui: &Ui, canvas: &Response) {
     let Some(menu) = app.ui.layer_menu.clone() else { return };
-    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-        app.ui.layer_menu = None;
-        return;
-    }
+    let ctx = ui.ctx();
     let active = app.session.active().and_then(|st| st.active_layer).map(|l| l.0);
-    let id = menu_id();
-    let screen = ctx.content_rect();
-    let size = ctx.memory(|m| m.area_rect(id)).map_or(egui::vec2(200.0, 24.0 * menu.layers.len() as f32 + 12.0), |r| r.size());
-    let pos = egui::pos2(menu.pos[0].min(screen.right() - size.x).max(screen.left()), menu.pos[1].min(screen.bottom() - size.y).max(screen.top()));
-    let mut chosen = None;
-    let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
-        egui::Frame::menu(ui.style()).show(ui, |ui| {
-            // As wide as the longest name (long names are cut short), like a menu.
-            let font = egui::TextStyle::Button.resolve(ui.style());
-            let widest = menu.layers.iter().map(|(_, n)| ui.painter().layout_no_wrap(n.clone(), font.clone(), Color32::WHITE).size().x).fold(0.0, f32::max);
-            let w = (widest + 2.0 * ui.spacing().button_padding.x + 8.0).clamp(140.0, 360.0);
-            ui.set_width(w);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            // A long list scrolls instead of running off the screen.
-            egui::ScrollArea::vertical().max_height((screen.height() - 24.0).max(48.0)).show(ui, |ui| {
-                ui.set_width(w);
-                for (layer, name) in &menu.layers {
-                    let b = egui::Button::selectable(Some(*layer) == active, name.as_str()).truncate().min_size(egui::vec2(w, 22.0));
-                    if ui.add(b).clicked() {
-                        chosen = Some(*layer);
-                    }
-                }
-            });
-        });
-    });
-    if let Some(layer) = chosen {
+    let widget = menu_widget(canvas);
+    let was_open = ContextMenu::<()>::is_open(ctx, &widget);
+    let at = (!was_open).then_some(OpenAt::Pointer(egui::pos2(menu.pos[0], menu.pos[1])));
+    let items: Vec<MenuEntry<u64>> =
+        menu.layers.iter().map(|(layer, name)| MenuItem::new(name.as_str(), *layer).radio(Some(*layer) == active).into()).collect();
+    let shown = ContextMenu::new(&items).own_gestures(false).open_at(at).show(ui, &widget);
+    if let Some(layer) = shown.chosen {
         choose(app, layer);
-        return;
-    }
-    if crate::canvas_popup::outside_pressed(ctx, id, area.response.rect) {
+    } else if was_open && !shown.open {
         app.ui.layer_menu = None;
     }
 }
@@ -141,9 +121,9 @@ mod tests {
     #[test]
     fn lists_visible_layers_with_pixels_topmost_first() {
         let (mut a, bg, red, _) = app();
-        assert!(open(&mut a, &Context::default(), [10.0, 10.0], 100.0, 100.0));
+        assert!(open(&mut a, [10.0, 10.0], 100.0, 100.0));
         assert_eq!(a.ui.layer_menu.as_ref().unwrap().layers.iter().map(|l| l.0).collect::<Vec<_>>(), [red, bg]);
-        assert!(open(&mut a, &Context::default(), [10.0, 10.0], 10.0, 10.0));
+        assert!(open(&mut a, [10.0, 10.0], 10.0, 10.0));
         assert_eq!(names(&a), ["Background"]);
         choose(&mut a, red);
         assert_eq!(a.session.active().unwrap().active_layer.unwrap().0, red);
@@ -154,14 +134,14 @@ mod tests {
     fn nothing_there_or_bad_input_opens_nothing() {
         let (mut a, _, _, _) = app();
         for (x, y) in [(-5.0, 10.0), (500.0, 500.0), (f64::NAN, 1.0), (1.0, f64::INFINITY), (1e300, -1e300)] {
-            assert!(!open(&mut a, &Context::default(), [0.0, 0.0], x, y), "({x}, {y})");
+            assert!(!open(&mut a, [0.0, 0.0], x, y), "({x}, {y})");
             assert!(a.ui.layer_menu.is_none());
         }
         // A transparent document: nothing to list.
         let mut b = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        assert!(!open(&mut b, &Context::default(), [0.0, 0.0], 1.0, 1.0), "no document");
+        assert!(!open(&mut b, [0.0, 0.0], 1.0, 1.0), "no document");
         b.run("file.new", json!({"width": 20, "height": 20, "background": "transparent"})).unwrap();
-        assert!(!open(&mut b, &Context::default(), [0.0, 0.0], 1.0, 1.0));
+        assert!(!open(&mut b, [0.0, 0.0], 1.0, 1.0));
         // Choosing a layer that no longer exists reports it and keeps the app running.
         choose(&mut a, 987_654);
         assert!(!a.ui.status.is_empty());

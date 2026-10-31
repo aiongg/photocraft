@@ -69,7 +69,7 @@ pub(crate) use display::GPU_OUTPUT;
 use display::texture_key;
 pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
 use display::{checker, hdr_preview, sync_display_lut};
-pub use drag::{Drag, fixed_size_px, marquee_corners, marquee_px, marquee_readout, readout_in, size_readout, square_px};
+pub use drag::{Drag, marquee_corners, marquee_readout, readout_in, size_readout};
 pub(crate) use drag::{angle_readout, draw_readout, draw_value_readout};
 #[cfg(test)]
 pub(crate) use drag::{marquee_drag_ants, marquee_preview_px};
@@ -836,7 +836,7 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
         && transforming
         && let Some(p) = response.interact_pointer_pos()
     {
-        crate::canvas_tool_menu::open_transform(app, ctx, [p.x, p.y]);
+        crate::canvas_tool_menu::open_transform(app, [p.x, p.y]);
     }
     let lasso_retracted = response.secondary_clicked()
         && match tool {
@@ -856,7 +856,7 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
     let guide_menu = response.secondary_clicked()
         && !lasso_retracted
         && !transforming
-        && response.interact_pointer_pos().is_some_and(|p| crate::canvas_tool_menu::open_guide(app, ctx, tool, mods, [p.x, p.y], xf.to_doc(p)));
+        && response.interact_pointer_pos().is_some_and(|p| crate::canvas_tool_menu::open_guide(app, tool, mods, [p.x, p.y], xf.to_doc(p)));
     // Right-click with the Move tool, or ⌘/Ctrl+right-click: the layers under the pointer.
     if response.secondary_clicked()
         && !lasso_retracted
@@ -868,8 +868,8 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
         let d = xf.to_doc(p);
         app.ui.canvas_tool_menu = None;
         // No layers there (the pasteboard, with the Move tool): its colour menu instead.
-        if !crate::layer_pick_ui::open(app, ctx, [p.x, p.y], d[0], d[1]) && !mods.command && crate::canvas_tool_menu::pasteboard_at(app, tool, d) {
-            crate::canvas_tool_menu::open_pasteboard(app, ctx, tool, [p.x, p.y]);
+        if !crate::layer_pick_ui::open(app, [p.x, p.y], d[0], d[1]) && !mods.command && crate::canvas_tool_menu::pasteboard_at(app, tool, d) {
+            crate::canvas_tool_menu::open_pasteboard(app, tool, [p.x, p.y]);
         }
     }
     if response.secondary_clicked()
@@ -889,15 +889,15 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
             && !response.long_touched()
             && (app.crop.drag.is_some() || app.crop.straighten.line.is_some())
             && ctx.input(|i| i.pointer.primary_down());
-        if crop_gesture || crate::canvas_tool_menu::open_crop(app, ctx, tool, [p.x, p.y]) {
+        if crop_gesture || crate::canvas_tool_menu::open_crop(app, tool, [p.x, p.y]) {
         } else if crate::canvas_tool_menu::pasteboard_at(app, tool, xf.to_doc(p)) {
-            crate::canvas_tool_menu::open_pasteboard(app, ctx, tool, [p.x, p.y]);
+            crate::canvas_tool_menu::open_pasteboard(app, tool, [p.x, p.y]);
         } else if crate::canvas_tool_menu::is_view_tool(tool) {
             if tool == app.ui.tool {
-                crate::canvas_tool_menu::open_view(app, ctx, tool, [p.x, p.y], xf.to_doc(p));
+                crate::canvas_tool_menu::open_view(app, tool, [p.x, p.y], xf.to_doc(p));
             }
         } else {
-            crate::canvas_tool_menu::open_at(app, ctx, tool, [p.x, p.y], Some(xf.to_doc(p)));
+            crate::canvas_tool_menu::open_at(app, tool, [p.x, p.y], Some(xf.to_doc(p)));
         }
     }
 }
@@ -1277,9 +1277,9 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     draw_transform_controls(app, painter, xf);
     crate::move_hover::draw(app, painter, xf, idx, response.hover_pos());
     crate::object_finder::draw(app, painter, xf, idx, response.hover_pos());
-    crate::layer_pick_ui::show(app, ctx);
+    crate::layer_pick_ui::show(app, ui, response);
     let shown = app.ui.views.get(idx).cloned();
-    crate::canvas_tool_menu::show(app, ctx);
+    crate::canvas_tool_menu::show(app, ui, response);
     // A view menu row (Zoom In, Fit on Screen…) changed the camera: it wins over this
     // frame's copy, which is written back at the end.
     if let Some(now) = app.ui.views.get(idx)
