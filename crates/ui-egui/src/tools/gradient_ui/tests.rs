@@ -105,6 +105,26 @@ fn live_drag_creates_a_fill_layer_and_handles_edit_it() {
     assert!((get(&mut app)["from"][1].as_f64().unwrap() - 10.0).abs() < 1e-3);
 }
 
+/// A click at `at`; `double` marks its release as the one that ends egui's double click.
+fn click_at(app: &mut PhotocraftApp, at: [f64; 2], double: bool) {
+    crate::canvas::tool_event(app, ToolEvent::Down { x: at[0], y: at[1], pressure: 1.0 }, mods());
+    app.gradient.double_click = double;
+    crate::canvas::tool_event(app, ToolEvent::Up { x: at[0], y: at[1] }, mods());
+}
+
+#[test]
+fn a_double_click_asks_a_colour_only_when_both_clicks_hit_the_same_part() {
+    let mut app = app_with_gradient("linear");
+    drag(&mut app, [20.0, 60.0], [180.0, 60.0]);
+    app.ui.dialogs.clear();
+    click_at(&mut app, [20.0, 60.0], false);
+    click_at(&mut app, [180.0, 60.0], true);
+    assert!(app.ui.dialogs.is_empty(), "the clicks hit the start and the end handle");
+    click_at(&mut app, [180.0, 60.0], false);
+    click_at(&mut app, [180.0, 60.0], true);
+    assert_eq!(app.ui.dialogs.len(), 1, "both clicks hit the end handle");
+}
+
 #[test]
 fn dragging_the_midpoint_diamond_moves_it() {
     let mut app = app_with_gradient("linear");

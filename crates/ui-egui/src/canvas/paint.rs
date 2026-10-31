@@ -1,7 +1,5 @@
 use super::display::{canvas_display, checker, display_doc, display_image};
-use super::drag::{
-    draw_marquee_readout, draw_value_readout, marquee_ants, marquee_drag_ants, marquee_preview_px, single_line_drag_px, size_readout,
-};
+use super::drag::{draw_marquee_readout, draw_value_readout, marquee_ants, marquee_drag_ants, marquee_preview_px, single_line_drag_px, size_readout};
 use super::gesture::constrained_polygon_point;
 use super::strokes::{EngineStroke, SPOT_HEALING_TRAIL, draw_smoothing_string, strokes_live};
 use super::textures::texture_side;
@@ -369,7 +367,10 @@ pub(super) fn draw_tool_state(app: &PhotocraftApp, painter: &egui::Painter, xf: 
         // frame's W × H while it is drawn or resized (#1919), its angle while it turns (#1792) and
         // the Straighten line's angle.
         if let Some(press) = app.crop.drag.map(|d| d.press) {
-            let units = app.session.active().map(|s| crate::rulers::ruler_units_with(app, (*craft::ui::localized::LocaleNumbers::of_ctx(painter.ctx())).clone(), &s.doc));
+            let units = app
+                .session
+                .active()
+                .map(|s| crate::rulers::ruler_units_with(app, (*craft::ui::localized::LocaleNumbers::of_ctx(painter.ctx())).clone(), &s.doc));
             let labels = CropLabels::of_ctx(painter.ctx());
             let readout = units.as_ref().filter(|_| app.session.prefs().tools.show_transformation_values).map(|[x, y]| CropReadout { labels: &labels, x, y });
             frame.paint_gesture(painter, &style, &press, hover.unwrap_or_default(), readout);

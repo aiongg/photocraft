@@ -64,6 +64,9 @@ pub struct LiveGradient {
     drag: Option<Drag>,
     /// The release being delivered ends egui's double click (set by the canvas before the event).
     pub(crate) double_click: bool,
+    /// The parts the last two presses hit (newest last): a double click asks a colour only when
+    /// both of its clicks hit the same part.
+    pressed: [Option<LinePart>; 2],
     /// Pending edit from the Properties panel's stops editor (previewed like a canvas drag).
     panel: Option<(LayerId, &'static str, Value)>,
     /// Pending edit from the Gradient Editor window's current-gradient strip
@@ -219,6 +222,8 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
                 let (view, at) = screen_point(app, p)?;
                 overlay(&value, reverse, extent).press(&view, reach(), at, mods)
             });
+            let [_, last] = app.gradient.pressed;
+            app.gradient.pressed = [last, press.as_ref().map(LinePress::part)];
             app.gradient.drag = Some(match (press, active) {
                 (Some(press), Some((l, ..))) => Drag::Edit { layer: l.id, selected: press.selects(), press, commit: None },
                 (_, active) => Drag::Draw { from: p, to: p, redraw: active.map(|a| a.0.id) },
@@ -315,7 +320,12 @@ fn finish(app: &mut PhotocraftApp, at: [f32; 2]) {
 /// A click (no drag) on the widget: a double-click on a stop (or on an end handle, for the stop
 /// there) opens the Color Picker.
 fn click(app: &mut PhotocraftApp, layer: LayerId, part: LinePart, at: [f32; 2]) {
-    if !std::mem::take(&mut app.gradient.double_click) || !matches!(part, LinePart::Stop(_) | LinePart::Start | LinePart::End) {
+    let [first, second] = app.gradient.pressed;
+    if !std::mem::take(&mut app.gradient.double_click)
+        || first != second
+        || second != Some(part)
+        || !matches!(part, LinePart::Stop(_) | LinePart::Start | LinePart::End)
+    {
         return;
     }
     let Some((l, frame, _)) = active_gradient(app) else { return };
