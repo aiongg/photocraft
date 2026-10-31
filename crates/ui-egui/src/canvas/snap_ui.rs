@@ -349,16 +349,67 @@ pub(crate) struct CropSnap {
     tol: f64,
     /// The default mode moves the image under the box.
     image: bool,
+    line: LineSnap,
+}
+
+/// How a Straighten line's end points snap, decided at the press from the frame state, as the
+/// pointer's snapping of the Crop tool is: inside the default frame the point snaps; inside an
+/// edited Classic frame the frame's rect, moved as far as the pointer, snaps and shifts the
+/// pointer; anywhere else nothing snaps.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) enum LineSnap {
+    #[default]
+    Off,
+    Point,
+    Move {
+        rect: [f64; 4],
+        start: [f64; 2],
+    },
+}
+
+/// The [`LineSnap`] of a Straighten press at `p`; `inside` says the press is inside the frame.
+pub(crate) fn line_snap(app: &PhotocraftApp, p: [f64; 2], inside: bool) -> LineSnap {
+    let rect = app.ui.crop_rect.filter(|_| inside && crate::crop_ui::angle(app) == 0.0);
+    match rect {
+        Some(_) if app.crop.default_frame => LineSnap::Point,
+        Some(rect) if crate::crop_mode::classic(app) => LineSnap::Move { rect, start: p },
+        _ => LineSnap::Off,
+    }
 }
 
 /// The snapping of the Crop drag in progress: None when View › Snap is off, Ctrl turned it off for
 /// this gesture, or the drag isn't a crop's.
 pub(crate) fn crop_snap(app: &PhotocraftApp) -> Option<CropSnap> {
     let snap = app.prefs_rt.snap.as_ref().filter(|s| s.gesture == Gesture::Crop && !s.disabled)?;
-    snap_on(app).then(|| CropSnap { targets: snap.targets.clone(), smart: snap.smart.clone(), tol: tolerance(app), image: crate::crop_mode::moves_image(app) })
+    snap_on(app).then(|| CropSnap {
+        targets: snap.targets.clone(),
+        smart: snap.smart.clone(),
+        tol: tolerance(app),
+        image: crate::crop_mode::moves_image(app),
+        line: app.crop.line_snap,
+    })
 }
 
 impl CropSnap {
+    /// The document vector that moves a Straighten end point `q` (what the pointer gives now) onto
+    /// its snap target, and the alignment lines it reaches.
+    pub(crate) fn line_vector(&self, q: [f64; 2]) -> (Vec2, Vec<SnapLine>) {
+        match self.line {
+            LineSnap::Off => (Vec2::ZERO, Vec::new()),
+            LineSnap::Point => {
+                let (snapped, lines) = self.targets.snap_point(q, self.tol);
+                (Vec2::new(snapped[0] - q[0], snapped[1] - q[1]), lines)
+            }
+            LineSnap::Move { rect, start } => {
+                let d = [q[0] - start[0], q[1] - start[1]];
+                let moved = [rect[0] + d[0], rect[1] + d[1], rect[2] + d[0], rect[3] + d[1]];
+                let set = if self.targets.is_empty() { &self.smart } else { &self.targets };
+                let (adj, lines) = set.snap_rect(moved, self.tol);
+                (Vec2::new(adj[0], adj[1]), lines)
+            }
+        }
+    }
+
     /// The document vector that moves the part `part` of `frame` (what the pointer gives now) onto
     /// its snap target, and the alignment lines it reaches. The frame's edges and centre snap when
     /// it moves (or the image moves under it), so content can be centred in it (#8580); a handle or

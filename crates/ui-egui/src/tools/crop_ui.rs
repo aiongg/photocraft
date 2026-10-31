@@ -70,6 +70,8 @@ pub struct CropState {
     /// What the last pointer position snapped to: the release has no snapping of its own (the
     /// canvas ends it before the tools see the release), so it ends the drag where the last move did.
     snap: Option<crate::snap_ui::CropSnap>,
+    /// How the Straighten line in progress snaps, decided at its press from the frame state.
+    pub(crate) line_snap: crate::snap_ui::LineSnap,
 }
 
 /// One frame state of the crop box's own Undo/Redo.
@@ -691,10 +693,15 @@ fn follow_view(app: &mut PhotocraftApp, before: &CanvasView, view: &CanvasView) 
 
 /// The frame with the host's snapping: what its closure reaches goes to `lines`. The library snaps
 /// a Straighten line's end points through it too, as point gestures.
-fn snapping<'a>(frame: CropFrame<'a>, snap: Option<&'a crate::snap_ui::CropSnap>, lines: &'a std::cell::RefCell<Vec<SnapLine>>) -> CropFrame<'a> {
+fn snapping<'a>(
+    frame: CropFrame<'a>,
+    snap: Option<&'a crate::snap_ui::CropSnap>,
+    straighten: bool,
+    lines: &'a std::cell::RefCell<Vec<SnapLine>>,
+) -> CropFrame<'a> {
     match snap {
         Some(snap) => frame.snap(move |part, state, _| {
-            let (d, found) = snap.vector(part, state);
+            let (d, found) = if straighten { snap.line_vector([state.rect.x0, state.rect.y0]) } else { snap.vector(part, state) };
             *lines.borrow_mut() = found;
             d
         }),
@@ -739,9 +746,12 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     if b.is_none() {
         app.ui.crop_angle = 0.0;
     }
+    if straight {
+        app.crop.line_snap = crate::snap_ui::line_snap(app, p, library_frame(app, b.as_ref(), mods, false).hit(&view, reach(), at) == Some(BoxPart::Inside));
+    }
     let snap = crate::snap_ui::crop_snap(app);
     let lines = std::cell::RefCell::new(Vec::new());
-    let frame = snapping(library_frame(app, b.as_ref(), mods, straight).default_frame(app.crop.default_frame), snap.as_ref(), &lines);
+    let frame = snapping(library_frame(app, b.as_ref(), mods, straight).default_frame(app.crop.default_frame), snap.as_ref(), straight, &lines);
     let Some(press) = frame.press(&view, reach(), at) else { return };
     drop(frame);
     if snap.is_some() && press.kind() == CropPressKind::Straighten {
@@ -762,7 +772,7 @@ fn track_to(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, release: bool
     let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
     let before = view;
     let lines = std::cell::RefCell::new(Vec::new());
-    let frame = snapping(library_frame(app, Some(&b), mods, false), snap.as_ref(), &lines);
+    let frame = snapping(library_frame(app, Some(&b), mods, false), snap.as_ref(), drag.press.kind() == CropPressKind::Straighten, &lines);
     let track = frame.track(&mut view, &mut drag.press, at, mods, app.crop.space);
     drop(frame);
     if let Some(next) = track.state {
@@ -786,7 +796,7 @@ fn release_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
     let (Some(b), Some((mut view, at))) = (crop_box(app).or_else(|| Some(*drag.press.last())), view_and_screen(app, p)) else { return };
     let before = view;
     let lines = std::cell::RefCell::new(Vec::new());
-    let frame = snapping(library_frame(app, Some(&b), mods, false), app.crop.snap.as_ref(), &lines);
+    let frame = snapping(library_frame(app, Some(&b), mods, false), app.crop.snap.as_ref(), drag.press.kind() == CropPressKind::Straighten, &lines);
     let release = frame.release(&mut view, reach(), &drag.press, Some(at));
     drop(frame);
     if crate::crop_mode::moves_image(app) {
