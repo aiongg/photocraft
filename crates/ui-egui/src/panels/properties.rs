@@ -1,4 +1,6 @@
 use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Tokens, icons, json, pos2, theme, vec2, widgets};
+use craft::ui::menu::{ContextMenu, MenuEntry, MenuItem, OpenAt};
+use craft::ui::tab_strip::{Tab, TabEvent, TabKind, TabStrip, TabStripText};
 use craft::ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- properties
@@ -53,17 +55,34 @@ pub fn properties_window(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
             }
             drag = grip.drag_delta();
-            let context = crate::tab_strip::pill_tabs(ui, card_id.with("tabs"), bar, &tabs, &mut sel);
+            let strip_tabs: Vec<Tab<usize>> = tabs.iter().enumerate().map(|(i, name)| Tab::new(i, tl!(name))).collect();
+            let text = TabStripText { more: tl!("More panels").to_owned(), ..TabStripText::default() };
+            let mut strip_ui = ui.new_child(egui::UiBuilder::new().max_rect(bar));
+            let mut out = TabStrip::new(card_id.with("tabs"), tl!("Panel tabs"), TabKind::Panel).selected(&sel).text(text).show(&mut strip_ui, &strip_tabs);
+            let menu_id = card_id.with("tab-menu");
+            let mut open_menu = None;
+            for event in std::mem::take(&mut out.events) {
+                match event {
+                    TabEvent::Activate(i) => sel = i,
+                    TabEvent::ContextMenu(request) => {
+                        ui.data_mut(|d| d.insert_temp(menu_id, request.tab));
+                        open_menu = Some(request.pointer.map_or(OpenAt::Rect(request.anchor), OpenAt::Pointer));
+                    }
+                    _ => {}
+                }
+            }
             if let Some(&picked) = indices.get(sel) {
                 app.ui.dock_tabs.properties = picked;
             }
-            match context {
-                Some(crate::tab_strip::TabContextAction::Close(i)) => {
-                    if let Some(&tab) = indices.get(i) {
+            let entries: Vec<MenuEntry<usize>> =
+                [tl!("Close"), tl!("Close Tab Group")].iter().enumerate().map(|(n, label)| MenuItem::new(label.to_string(), n).into()).collect();
+            match ContextMenu::new(&entries).own_gestures(false).open_at(open_menu).show(ui, &out.response).chosen {
+                Some(0) => {
+                    if let Some(&tab) = ui.data(|d| d.get_temp::<Option<usize>>(menu_id)).flatten().and_then(|i| indices.get(i)) {
                         crate::dock::close_tab(app, group, tab, false);
                     }
                 }
-                Some(crate::tab_strip::TabContextAction::CloseGroup) => app.ui.panels.properties = false,
+                Some(_) => app.ui.panels.properties = false,
                 None => {}
             }
             ui.add_space(craft::ui::theme::scale::Space::S6.px());

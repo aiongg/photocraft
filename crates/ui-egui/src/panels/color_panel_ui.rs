@@ -247,12 +247,8 @@ fn slider_rows(ui: &mut egui::Ui, model: Model, v: ModelValues, background: bool
 /// A Web Color slider's field: the channel as two hex digits. Valid input sets `value` (0..255)
 /// and returns true; while focused it shows what is typed, and an invalid entry snaps back.
 fn hex_pair(ui: &mut egui::Ui, id: egui::Id, value: &mut f32) -> bool {
-    let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(vec2(FIELD_W, ROW_H), Sense::hover());
-    widgets::surface(ui, rect, t.field, false);
-    if !t.bevel {
-        ui.painter().rect_stroke(rect, t.radius_sm, craft::ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.field_border), StrokeKind::Inside);
-    }
+    craft::ui::primitives::Surface::paint(ui.painter(), rect, craft::ui::primitives::SurfaceKind::Sunken, &craft::ui::theme::current(ui.ctx()));
     let byte = value.clamp(0.0, 255.0).round() as u8;
     let typing = if ui.memory(|m| m.has_focus(id)) { ui.data(|d| d.get_temp::<String>(id)) } else { None };
     let mut text = typing.unwrap_or_else(|| format!("{byte:02X}"));

@@ -34,8 +34,6 @@ mod units;
 pub use buttons::{ButtonRole, DialogButton, button_width, check_box, check_box_fill, checkbox, dialog_buttons, primary_button, secondary_button, toggle};
 pub(crate) use color::color_swatch;
 pub use color::{checker, checker_rounded, color_edit_button_rgb, color_edit_button_srgb, color_swatch_button, hue_color, hue_stops, pick_pos, rgb_histogram};
-#[cfg(test)]
-use color::{checker_tile_id, checker_uv};
 pub use dialog_fields::{
     NumberEdit, TextEdit, number as dialog_number, number_field as dialog_number_field, number_field_in_units as dialog_number_in_units, text as dialog_text,
     text_as as dialog_text_as,
@@ -48,10 +46,7 @@ pub use fields::{
     POPUP_ARROW_W, PopupFieldResponse, VALUE_FIELD_H, compact_value_field, elided_label, elided_label_sensed, popup_value_field, value_field, value_field_named,
 };
 pub(crate) use panel::body_margin;
-pub use panel::{
-    FOOTER_BAR, chevron_icon, drop_line, footer_height, hairline, panel_footer, panel_menu_button, pill_tab, section_label, style_spectrum_popup_menu, surface,
-    vline,
-};
+pub use panel::{chevron_icon, drop_line, hairline, panel_menu_button, pill_tab, style_spectrum_popup_menu, surface, vline};
 pub use scrub::{scrub_label, scrub_option_icon, scrub_option_label};
 #[cfg(test)]
 use slider::DOUBLE_CLICK_S;

@@ -8,6 +8,7 @@
 //! recorded exactly as the engine replays them (`stroke_begin` + `stroke_segment` per point), so
 //! OK runs `filter.liquify` with the same strokes and gets the same field.
 
+use craft::ui::composites::SectionLabel;
 use craft::ui::theme::StrokeExt;
 use egui::{Align2, Color32, FontId, Pos2, Rect as ERect, Sense, Stroke, TextureHandle, pos2, vec2};
 use photocraft_algo::liquify::{LiquifyField, LiquifyStroke, LiquifyTool, ProxyImage, auto_cell};
@@ -995,13 +996,13 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let mut props = ui.new_child(egui::UiBuilder::new().max_rect(right.shrink2(vec2(14.0, 12.0))));
         egui::ScrollArea::vertical().id_salt("liquify-props").show(&mut props, |ui| {
             ui.spacing_mut().item_spacing.y = 6.0;
-            widgets::section_label(ui, tl!("Brush Tool Options"));
+            SectionLabel::new(tl!("Brush Tool Options")).show(ui);
             widgets::slider_row(ui, tl!("Size"), &mut d.opts.size, 1.0..=3000.0, "", None);
             widgets::slider_row(ui, tl!("Density"), &mut d.opts.density, 0.0..=100.0, "", None);
             widgets::slider_row(ui, tl!("Pressure"), &mut d.opts.pressure, 0.0..=100.0, "", None);
             widgets::slider_row(ui, tl!("Rate"), &mut d.opts.rate, 0.0..=100.0, "", None);
             widgets::hairline(ui);
-            widgets::section_label(ui, tl!("Brush Reconstruct Options"));
+            SectionLabel::new(tl!("Brush Reconstruct Options")).show(ui);
             widgets::slider_row(ui, tl!("Amount"), &mut d.opts.reconstruct_amount, 0.0..=100.0, "%", None);
             ui.horizontal(|ui| {
                 if widgets::secondary_button(ui, tl!("Reconstruct"), 110.0).clicked() {
@@ -1013,7 +1014,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 }
             });
             widgets::hairline(ui);
-            widgets::section_label(ui, tl!("Mask Options"));
+            SectionLabel::new(tl!("Mask Options")).show(ui);
             ui.horizontal(|ui| {
                 if widgets::secondary_button(ui, tl!("None"), 70.0).clicked() {
                     d.global(LiquifyTool::ThawAll, None);
@@ -1026,7 +1027,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 }
             });
             widgets::hairline(ui);
-            widgets::section_label(ui, tl!("View Options"));
+            SectionLabel::new(tl!("View Options")).show(ui);
             widgets::checkbox(ui, &mut d.opts.show_mesh, tl!("Show Mesh"));
             ui.horizontal(|ui| {
                 ui.label(tl!("Mesh Size"));

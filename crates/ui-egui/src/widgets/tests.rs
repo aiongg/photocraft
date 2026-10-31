@@ -44,32 +44,6 @@ fn checkbox_label_is_a_button_target_not_selectable_text() {
     assert!(!*h.state(), "the same named checkbox supports Space");
 }
 
-/// #3208: a rounded swatch's checker is one shared, repeating, unblurred two-by-two tile on
-/// the rounded rect, scaled so a cell stays `cell` points, so nothing shows past the corners.
-#[test]
-fn rounded_swatches_clip_their_checker_to_the_corners() {
-    use egui::{Pos2, Rect, pos2, vec2};
-    let mut h = egui_kittest::Harness::builder().with_size(vec2(200.0, 100.0)).build_ui(|ui| {
-        super::color_swatch(ui, egui::Color32::RED);
-        super::color_swatch_button(ui, egui::Color32::from_rgba_unmultiplied(0, 0, 255, 128), "Blue");
-    });
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
-    h.run_steps(2);
-    let tile = h.ctx.data(|d| d.get_temp::<egui::TextureHandle>(super::checker_tile_id())).expect("the tile is loaded once");
-    let manager = h.ctx.tex_manager();
-    let manager = manager.read();
-    let meta = manager.meta(tile.id()).expect("the tile is in the texture manager");
-    assert_eq!(meta.size, [2, 2]);
-    assert_eq!(meta.options.wrap_mode, egui::TextureWrapMode::Repeat);
-    assert_eq!(meta.options.magnification, egui::TextureFilter::Nearest);
-    assert_eq!(super::checker_uv(Rect::from_min_size(Pos2::ZERO, vec2(40.0, 18.0)), 4.0), Rect::from_min_max(Pos2::ZERO, pos2(5.0, 2.25)));
-    assert_eq!(
-        super::checker_uv(Rect::from_min_size(Pos2::ZERO, vec2(8.0, 8.0)), 0.0),
-        Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
-        "a bad cell falls back to 4 pt"
-    );
-}
-
 /// #3580: the shared eliding label never lays out wider than the room it is given, so a longer
 /// translation shrinks with '…' instead of overrunning its row; a short label is untouched.
 #[test]
@@ -183,32 +157,6 @@ fn second_click_respects_the_half_second_window() {
 }
 
 use egui_kittest::{Harness, kittest::Queryable};
-
-/// A panel footer's buttons are drawn whole. The bar runs on over the body's bottom margin, so a
-/// body that clips where its content ends (as the panels do) cut the bottom off every button:
-/// the hover highlight of a 26 px button was about 21 px tall in the Paths, Layers and Channels
-/// panels (#6238).
-#[test]
-fn panel_footer_buttons_are_not_clipped_by_the_body() {
-    let mut h = Harness::new_ui_state(
-        |ui, s: &mut Option<(egui::Rect, egui::Rect, egui::Rect)>| {
-            // A body exactly as tall as the footer takes, clipped there.
-            let body = egui::Rect::from_min_size(ui.max_rect().min, egui::vec2(220.0, super::footer_height(ui)));
-            let mut body_ui = ui.new_child(egui::UiBuilder::new().max_rect(body));
-            body_ui.set_clip_rect(body);
-            super::panel_footer(&mut body_ui, |bar| {
-                let b = crate::icons::button(bar, "square", 26.0, false, "Button");
-                *s = Some((b.rect, bar.clip_rect(), body));
-            });
-        },
-        None,
-    );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
-    h.run();
-    let (button, clip, body) = h.state().expect("the footer drew its button");
-    assert!(button.bottom() > body.bottom(), "the bar really overruns the body, or this test proves nothing: {button:?} vs {body:?}");
-    assert!(clip.contains_rect(button), "the whole button is inside the clip: {button:?} not in {clip:?}");
-}
 
 /// #3789: a plain text field is one boxed, outline-free input whose text-selection colour stays
 /// local, so it isn't recoloured for the rest of the frame (selected rows, slider trails).

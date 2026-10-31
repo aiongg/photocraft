@@ -13,6 +13,7 @@
 //!   opacity, fill opacity, channels, knockout, the Advanced Blending switches, Blend If) plus
 //!   the page-only `blendIfChannel`; `channelNames`: the document's colour channels.
 
+use craft::ui::composites::SectionLabel;
 use craft::ui::theme::StrokeExt;
 use egui::{Color32, RichText, Sense, Stroke, StrokeKind, vec2};
 use photocraft_doc::effects::{FxPaint, GlowSource, GlowTechnique, StrokePosition};
@@ -1253,7 +1254,7 @@ fn channel_names_of(f: &Map<String, Value>) -> Vec<String> {
 fn blending_page(ui: &mut egui::Ui, p: &mut Value, names: &[String]) {
     let t = Tokens::get(ui.ctx());
     let num = |p: &Value, k: &str, d: f64| p.get(k).and_then(Value::as_f64).unwrap_or(d) as f32;
-    widgets::section_label(ui, "General Blending");
+    SectionLabel::new(tl!("General Blending")).show(ui);
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Blend Mode")).color(t.text_dim));
         let mut cur = p.get("blend").and_then(Value::as_str).unwrap_or("Normal").to_string();
@@ -1269,7 +1270,7 @@ fn blending_page(ui: &mut egui::Ui, p: &mut Value, names: &[String]) {
         p["opacity"] = json!(v.round());
     }
     widgets::hairline(ui);
-    widgets::section_label(ui, "Advanced Blending");
+    SectionLabel::new(tl!("Advanced Blending")).show(ui);
     let mut v = num(p, "fillOpacity", 100.0);
     if widgets::slider_row(ui, "Fill Opacity", &mut v, 0.0..=100.0, "%", None).changed() {
         p["fillOpacity"] = json!(v.round());

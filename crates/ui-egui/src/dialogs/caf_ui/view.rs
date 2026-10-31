@@ -5,6 +5,7 @@ use super::{
     Align2, BAR_H, CafTool, CafWorkspace, Color32, ERect, FontId, LEFT_W, PANEL_W, PREVIEW_W, PhotocraftApp, Pos2, Rect, Sense, Stroke, Tokens, ToolEvent,
     Value, json, pos2, vec2, widgets,
 };
+use craft::ui::composites::SectionLabel;
 use craft::ui::theme::StrokeExt;
 
 /// A view: screen px per document px and the document point at the centre of `area`.
@@ -145,7 +146,7 @@ fn caf_props_panel(
     });
     widgets::hairline(ui);
     ui.horizontal(|ui| {
-        widgets::section_label(ui, tl!("Sampling Area Options"));
+        SectionLabel::new(tl!("Sampling Area Options")).show(ui);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if crate::icons::button(ui, "undo-2", 22.0, false, tl!("Reset")).clicked() {
                 *reset_what = Some("sampling");
@@ -164,7 +165,7 @@ fn caf_props_panel(
     }
     widgets::hairline(ui);
     ui.horizontal(|ui| {
-        widgets::section_label(ui, tl!("Fill Settings"));
+        SectionLabel::new(tl!("Fill Settings")).show(ui);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if crate::icons::button(ui, "undo-2", 22.0, false, tl!("Reset")).clicked() {
                 *reset_what = Some("fill");
@@ -197,7 +198,7 @@ fn caf_props_panel(
         widgets::checkbox(ui, &mut w.opts.mirror, tl!("Mirror"));
     });
     widgets::hairline(ui);
-    widgets::section_label(ui, tl!("Output Settings"));
+    SectionLabel::new(tl!("Output Settings")).show(ui);
     ui.horizontal(|ui| {
         ui.label(tl!("Output To"));
         let o = [("current".to_string(), tl!("Current Layer")), ("new".to_string(), tl!("New Layer")), ("duplicate".to_string(), tl!("Duplicate Layer"))];

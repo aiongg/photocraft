@@ -10,6 +10,7 @@
 //! `ui.dialog.set` and `ui.dialog.confirm` work as for every schema dialog. The units are view
 //! state (`__resUnit`, `__freqUnit`).
 
+use craft::ui::composites::SectionLabel;
 use craft::ui::theme::ToEgui;
 use serde_json::{Map, Value, json};
 
@@ -94,7 +95,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     ui.spacing_mut().item_spacing.y = t.space.gap.stack;
     let res_units = [("ppi", tl!("Pixels/Inch")), ("ppcm", tl!("Pixels/Centimeter"))];
 
-    crate::widgets::section_label(ui, tl!("Resolution"));
+    SectionLabel::new(tl!("Resolution")).show(ui);
     crate::widgets::hairline(ui);
     ui.horizontal(|ui| {
         label(ui, tl!("Input:"));
@@ -109,7 +110,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
     });
 
     ui.add_space(craft::ui::theme::scale::Space::S4.px());
-    crate::widgets::section_label(ui, tl!("Method"));
+    SectionLabel::new(tl!("Method")).show(ui);
     crate::widgets::hairline(ui);
     let mut method = text(f, "method", "diffusion");
     ui.horizontal(|ui| {
@@ -134,7 +135,7 @@ pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, V
 
     if method == "halftone" {
         ui.add_space(craft::ui::theme::scale::Space::S4.px());
-        crate::widgets::section_label(ui, tl!("Halftone Screen"));
+        SectionLabel::new(tl!("Halftone Screen")).show(ui);
         crate::widgets::hairline(ui);
         ui.horizontal(|ui| {
             label(ui, tl!("Frequency:"));
