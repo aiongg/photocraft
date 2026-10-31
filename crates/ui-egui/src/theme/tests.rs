@@ -207,7 +207,7 @@ fn studio_text_contrast_is_high() {
 /// The library `accent.text` of `kind`, the colour accent-coloured text and lines draw in.
 fn accent_text(kind: ThemeKind) -> Color32 {
     let sel = selection_for(kind);
-    let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: Default::default() };
+    let defaults = craft::theme::AppDefaults { theme: sel.theme.clone(), mode: sel.mode, size: sel.size, sizes: crate::theme::app_sizes() };
     let base =
         craft::ui::theme::Base::resolve(&sel, Default::default(), &defaults, None, &mut |id| craft::theme::builtins().iter().find(|t| t.id == *id).cloned());
     craft::ui::theme::ToEgui::to_egui(base.shown(kind.mode()).resolved.tokens.color.accent.text)

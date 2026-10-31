@@ -31,6 +31,7 @@ fn numeric_text(h: &Harness<'_, Fields>) -> String {
         .expect("numeric editor")
         .value()
         .expect("numeric text")
+        // The AccessKit value carries the unit; the edited text does not.
         .trim_end_matches('%')
         .to_owned()
 }
@@ -156,7 +157,7 @@ fn numeric_event_limit_counts_unicode_characters_and_rejects_without_truncating(
 }
 
 #[test]
-#[ignore = "NumberField has no cap on parsed text length (S1 gap A, library row pending)"]
+#[ignore = "library row 127 (128-char parse cap)"]
 fn numeric_parser_rejects_oversized_accumulated_text_before_normalizing() {
     let mut h = focused();
     select_all(&mut h);

@@ -64,12 +64,11 @@ pub(super) struct FieldOpts {
 /// A right-click menu of units: its rows and where a pick goes (the library's `unit_menu`).
 pub(super) type UnitMenu<'a> = Option<(&'a [MenuEntry<usize>], &'a mut Option<usize>)>;
 
-/// The unit template a suffix stands for: `{n}%`, `{n}°`, `{n} px`.
+/// The unit template a suffix stands for: `{n}%`, `{n}°`, `{n}px`.
 fn unit_of(suffix: &str) -> Unit {
     match suffix.trim() {
         "" => Unit::default(),
-        s @ ("%" | "°") => Unit::new(&format!("{{n}}{s}")),
-        s => Unit::new(&format!("{{n}} {s}")),
+        s => Unit::new(&format!("{{n}}{s}")),
     }
 }
 
