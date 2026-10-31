@@ -676,6 +676,7 @@ fn size_applies_at_layer_and_selection_scope() {
 /// Scrubbing the options bar's size field previews live (the size changes every frame) and is
 /// one undo step per drag; each step only damages the type layer's area, not the whole canvas.
 #[test]
+#[ignore = "waits on library: NumberField scrub changes on its first move (gap row 52)"]
 fn size_drag_is_live_and_one_history_step_per_drag() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text": "Hello", "size": 20, "x": 300, "y": 420})).unwrap()["layer"].as_u64().unwrap());
@@ -694,11 +695,8 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
         h.hover_at(field);
         h.run_steps(1);
         press(&mut h, field, true);
-        // The number field begins its scrub on the first move past the click threshold and changes the value from the next.
-        h.hover_at(field + vec2(14.0, 0.0));
-        h.run_steps(1);
         for k in 1..=5 {
-            h.hover_at(field + vec2(14.0 + 8.0 * k as f32, 0.0));
+            h.hover_at(field + vec2(8.0 * k as f32, 0.0));
             h.run_steps(1);
             let now = size_at(h.state(), id, 0);
             assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
@@ -706,7 +704,7 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
             let dmg = h.state().session.active().unwrap().last_damage.expect("damage rect, not a full refresh");
             assert!(!dmg.is_empty() && dmg.width() * dmg.height() <= 512 * 512, "{dmg:?}");
         }
-        press(&mut h, field + vec2(54.0, 0.0), false);
+        press(&mut h, field + vec2(40.0, 0.0), false);
         h.run_steps(2);
         assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps + d + 1, "one step per drag");
     }
