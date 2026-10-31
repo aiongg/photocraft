@@ -7,7 +7,7 @@ use craft::draw::ui::{BarGroups, FieldLabel, SizeUnit, TransformField, Transform
 use craft::ui::canvas::quad::SKEW_LIMIT;
 use craft::ui::canvas::{RulerUnits, Ticks};
 use craft::ui::controls::{ControlSize, IconButton, NumberField};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::icons::Icon;
 use craft::ui::localized::{LocaleNumbers, Unit};
 use craft::ui::patterns::{CellWidth, OptionsBar};
@@ -176,7 +176,7 @@ pub(crate) fn bar_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Transfo
         }
         Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => apply_row(app, &value),
         Some(EditEvent::Commit { value, changed: true, .. }) => apply_row(app, &value),
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
             if let (Some((quad, pivot, skew_v)), Some(s)) = (ui.data(|d| d.get_temp::<([[f64; 2]; 4], [f64; 2], f64)>(start)), app.ui.transform.as_mut()) {
                 (s.quad, s.pivot, s.skew_v) = (quad, pivot, skew_v);
             }
@@ -216,7 +216,7 @@ fn warp_cell(ui: &mut egui::Ui, id: &str, caption: &str, name: &str, value: f32)
         }
         Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => Some(value as f32),
         Some(EditEvent::Commit { value, changed: true, .. }) => Some(value as f32),
-        Some(EditEvent::Cancel { .. }) => ui.data(|d| d.get_temp::<f32>(start)),
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => ui.data(|d| d.get_temp::<f32>(start)),
         _ => None,
     }
 }

@@ -1,6 +1,6 @@
 use super::{Edit, EditorCx, ToneSpace, Value, adjust_params, json, label, space_of};
 use craft::ui::composites::{ChannelColor, Curve, CurveChannel, CurveEditor, HistogramData};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 
 // ---------------------------------------------------------------------------------------------
@@ -322,7 +322,7 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
             e.changed = true;
             e.commit = true;
         }
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
             if let Some(before) = ui.data(|d| d.get_temp::<Curve>(before_id)) {
                 write_shape(v, key, space, &before);
                 e.changed = true;

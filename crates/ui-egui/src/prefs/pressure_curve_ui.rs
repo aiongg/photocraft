@@ -5,7 +5,7 @@
 
 use craft::ui::composites::{Curve, CurveEditor, CurveLabels};
 use craft::ui::controls::{Button, ButtonVariant, ControlSize};
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 use photocraft_engine::prefs::PressureCurve;
 use serde_json::{Value, json};
@@ -100,7 +100,7 @@ pub(crate) fn edit_points(ui: &mut egui::Ui, id: egui::Id, points: &mut Vec<[f32
             }
             Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => changed |= take(points, &value),
             Some(EditEvent::Commit { value, changed: true, .. }) => changed |= take(points, &value),
-            Some(EditEvent::Cancel { .. }) => {
+            Some(EditEvent::Cancel { reason, .. }) if reason != CancelReason::External => {
                 if let Some(was) = ui.data(|d| d.get_temp::<Vec<[f32; 2]>>(before)) {
                     changed |= *points != was;
                     *points = was;

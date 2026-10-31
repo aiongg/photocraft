@@ -7,7 +7,7 @@
 
 use craft::draw::ui::gradient::{ColorStop, GradientEditor, GradientLabels, GradientStops, OpacityStop, StopRow, StopRows};
 use craft::theme::Srgba;
-use craft::ui::edit::EditEvent;
+use craft::ui::edit::{CancelReason, EditEvent};
 use craft::ui::localized::LocaleNumbers;
 use egui::Ui;
 use photocraft_doc::Fill;
@@ -155,7 +155,7 @@ pub(crate) enum StopsEvent {
     Preview { base: GradientStops, value: GradientStops },
     Commit { base: GradientStops, value: GradientStops, changed: bool },
     Set { base: GradientStops, value: GradientStops },
-    Cancel { base: GradientStops },
+    Cancel { base: GradientStops, external: bool },
     Color(usize),
 }
 
@@ -193,9 +193,9 @@ pub(crate) fn edit_stops(ui: &mut Ui, key: egui::Id, base: &GradientStops, optio
             ui.data_mut(|d| d.remove::<Draft>(draft_key));
             Some(StopsEvent::Set { base: from, value })
         }
-        Some(EditEvent::Cancel { .. }) => {
+        Some(EditEvent::Cancel { reason, .. }) => {
             ui.data_mut(|d| d.remove::<Draft>(draft_key));
-            Some(StopsEvent::Cancel { base: from })
+            Some(StopsEvent::Cancel { base: from, external: reason == CancelReason::External })
         }
         _ => None,
     };
