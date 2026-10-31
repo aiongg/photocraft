@@ -38,9 +38,8 @@ fn color_tab(kind: ThemeKind, fill: Option<f32>) -> egui_kittest::Harness<'stati
 
 /// Drag on the saturation/brightness field at `y` below its top, on its left edge (no saturation).
 fn pick_at(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, y: f32) -> [f32; 4] {
-    let origin = h.ctx.data(|d| d.get_temp::<Rect>(left_top())).unwrap().min;
-    // After the 38 pt chips and the 8 pt gap.
-    let p = pos2(origin.x + 38.0 + 8.0 + 1.0, origin.y + y);
+    let field = h.get_by_label("Color field").rect();
+    let p = pos2(field.left() + 1.0, field.top() + y);
     h.hover_at(p);
     h.run_steps(1);
     h.drag_at(p);

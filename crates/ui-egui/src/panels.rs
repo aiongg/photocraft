@@ -65,9 +65,9 @@ pub(super) mod variables_ui;
 
 #[cfg(test)]
 use color::color_field_height;
-pub(crate) use color::{color_field, color_field_fill_id, field_chips, field_hsva, offer_color_field_fill, srgb_hsva};
+pub(crate) use color::{color_field, color_field_fill_id, field_chips, kept_values, offer_color_field_fill, remember_values};
 #[cfg(test)]
-pub(crate) use color::{hsva_color32, hsva_srgb, srgb_bytes};
+pub(crate) use color::srgb_bytes;
 #[cfg(test)]
 pub(crate) use dock::DOCK_MIN_WIDTH;
 pub(crate) use dock::{canvas_panel, dock_body, dock_width_id, dock_width_range};

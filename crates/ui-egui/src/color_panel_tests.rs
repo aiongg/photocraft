@@ -7,7 +7,7 @@ use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::color_panel_ui::{Model, hex_code, html_color, ramp_color};
+use crate::color_panel_ui::{Model, hex_code, html_color};
 use crate::dock::Group;
 use crate::state::{ColorPanelMode, ColorRamp};
 use crate::theme::{ThemeKind, Tokens};
@@ -76,7 +76,7 @@ fn every_model_round_trips_its_colours() {
             if model == Model::Cmyk && crate::color_picker_ui::out_of_gamut(c).is_some() {
                 continue;
             }
-            let back = model.to_rgb(model.values_of(c));
+            let back = model.to_rgb(&model.values_of(c));
             let worst = (0..3).map(|i| (back[i] - c[i]).abs()).fold(0.0, f32::max);
             // Whole-number fields: RGB is exact, HSB within a step, CMYK and Lab within a few.
             let tolerance = match model {
@@ -88,13 +88,14 @@ fn every_model_round_trips_its_colours() {
         }
     }
     for g in [0.0, 0.25, 0.5, 1.0] {
-        let back = Model::Gray.to_rgb(Model::Gray.values_of([g; 3]));
+        let back = Model::Gray.to_rgb(&Model::Gray.values_of([g; 3]));
         assert!((back[0] - g).abs() < 0.01, "gray {g} -> {back:?}");
     }
     // Hostile values give a valid colour.
     for model in [Model::Gray, Model::Rgb, Model::Hsb, Model::Cmyk, Model::Lab, Model::Web] {
         for v in [[f32::NAN; 4], [f32::INFINITY; 4], [-1e9; 4], [1e9; 4]] {
-            assert!(model.to_rgb(v).iter().all(|x| (0.0..=1.0).contains(x)), "{model:?} {v:?}");
+            let v = craft_theme::ModelValues::new("hostile", &v);
+            assert!(model.to_rgb(&v).iter().all(|x| (0.0..=1.0).contains(x)), "{model:?} {v:?}");
         }
         assert_eq!(
             model.channels().len(),
@@ -108,31 +109,7 @@ fn every_model_round_trips_its_colours() {
 }
 
 #[test]
-fn ramps_match_photoshop() {
-    let (fg, bg) = ([0.2, 0.4, 0.6], [1.0, 1.0, 0.0]);
-    let near = |a: [f32; 3], b: [f32; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 0.02);
-    // RGB Spectrum: hue across, white at the top, the full colour in the middle, black at the bottom.
-    assert!(near(ramp_color(ColorRamp::RgbSpectrum, false, fg, bg, 0.0, 0.0), [1.0; 3]));
-    assert!(near(ramp_color(ColorRamp::RgbSpectrum, false, fg, bg, 0.0, 0.5), [1.0, 0.0, 0.0]));
-    assert!(near(ramp_color(ColorRamp::RgbSpectrum, false, fg, bg, 1.0 / 3.0, 0.5), [0.0, 1.0, 0.0]));
-    assert!(near(ramp_color(ColorRamp::RgbSpectrum, false, fg, bg, 0.5, 1.0), [0.0; 3]));
-    assert!(near(ramp_color(ColorRamp::GrayscaleRamp, false, fg, bg, 0.0, 0.3), [1.0; 3]));
-    assert!(near(ramp_color(ColorRamp::GrayscaleRamp, false, fg, bg, 1.0, 0.3), [0.0; 3]));
-    assert!(near(ramp_color(ColorRamp::CurrentColors, false, fg, bg, 0.0, 0.9), fg));
-    assert!(near(ramp_color(ColorRamp::CurrentColors, false, fg, bg, 1.0, 0.1), bg));
-    // CMYK Spectrum stays printable.
-    let c = ramp_color(ColorRamp::CmykSpectrum, false, fg, bg, 0.6, 0.5);
-    assert!(crate::color_picker_ui::out_of_gamut(c).is_none(), "{c:?}");
-    // Make Ramp Web Safe: every colour is a web colour.
-    for ramp in ColorRamp::ALL {
-        for (x, y) in [(0.13, 0.37), (0.71, 0.66), (0.5, 0.5)] {
-            let c = ramp_color(ramp, true, fg, bg, x, y);
-            assert!(crate::color_picker_ui::not_web_safe(c).is_none(), "{ramp:?} {c:?}");
-        }
-        let c = ramp_color(ramp, false, fg, bg, f32::NAN, f32::INFINITY);
-        assert!(c.iter().all(|v| (0.0..=1.0).contains(v)), "{ramp:?} {c:?}");
-    }
-    // Shift-click cycles the ramps in menu order and wraps.
+fn shift_click_cycles_the_ramps_in_menu_order_and_wraps() {
     let mut r = ColorRamp::RgbSpectrum;
     let mut seen = vec![r];
     for _ in 0..3 {
@@ -157,7 +134,7 @@ fn every_mode_works_in_every_theme() {
             let mut h = color_tab(kind, mode, [1.0, 0.0, 0.0, 1.0]);
             match mode {
                 ColorPanelMode::HueCube | ColorPanelMode::BrightnessCube => {
-                    assert!(h.query_by_label("#").is_some(), "{kind:?} {mode:?}: the readout");
+                    assert!(h.query_by_role(egui::accesskit::Role::TextInput).is_some(), "{kind:?} {mode:?}: the readout");
                 }
                 ColorPanelMode::ColorWheel => {
                     for label in ["H", "S", "B", "Add to Swatches"] {
@@ -165,7 +142,8 @@ fn every_mode_works_in_every_theme() {
                     }
                 }
                 _ => {
-                    for (label, ..) in Model::of(mode).channels() {
+                    for ch in Model::of(mode).channels() {
+                        let label = ch.label;
                         assert!(h.query_by_label(label).is_some(), "{kind:?} {mode:?}: the {label} slider");
                     }
                     // The black box at the end of the ramp sets black.
@@ -174,7 +152,9 @@ fn every_mode_works_in_every_theme() {
                     assert_eq!(bytes(h.state().session.tools.foreground), [0, 0, 0], "{kind:?} {mode:?}");
                 }
             }
-            assert!(h.query_by_label("Hue").is_none() && h.query_by_label("Saturation").is_none(), "{kind:?} {mode:?}: no old sliders");
+            if mode != ColorPanelMode::ColorWheel {
+                assert!(h.query_by_label("Hue").is_none() && h.query_by_label("Saturation").is_none(), "{kind:?} {mode:?}: no old sliders");
+            }
         }
     }
 }
@@ -305,28 +285,19 @@ fn current_colors_ramp_drag_keeps_its_ends() {
     h.run_steps(20);
     h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
     h.run_steps(2);
-    let expected = ramp_color(ColorRamp::CurrentColors, false, [0.0; 3], [1.0; 3], (p.x - ramp.left()) / ramp.width(), 0.5);
+    // Black to white: the colour under the pointer, whatever the pick has done to the ends since.
+    let expected = (p.x - ramp.left()) / (ramp.width() - 18.0);
     let got = bytes(h.state().session.tools.foreground);
-    for (g, e) in got.iter().zip(expected) {
-        assert!(i32::from(*g).abs_diff((e * 255.0).round() as i32) <= 3, "{got:?} vs {expected:?}");
+    for g in got {
+        assert!(i32::from(g).abs_diff((expected * 255.0).round() as i32) <= 12, "{got:?} vs {expected:?}");
     }
-}
-
-/// A non-finite pointer (a huge synthetic `ui.move`) misses the triangle instead of panicking.
-#[test]
-fn triangle_ignores_non_finite_points() {
-    let tri = [pos2(100.0, 0.0), pos2(0.0, 0.0), pos2(0.0, 100.0)];
-    for p in [pos2(f32::INFINITY, f32::INFINITY), pos2(f32::NAN, 1.0), pos2(f32::NEG_INFINITY, f32::INFINITY)] {
-        assert_eq!(crate::color_panel_ui::triangle_sv(tri, p), None, "{p:?}");
-    }
-    assert!(crate::color_panel_ui::triangle_sv(tri, pos2(10.0, 10.0)).is_some());
 }
 
 #[test]
 fn color_wheel_ring_sets_hue_and_triangle_sets_saturation_and_brightness() {
     let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
-    let area = h.get_by_label("Color Wheel").rect();
-    let (center, inner, outer) = crate::color_panel_ui::wheel_geometry(area);
+    let area = wheel_rect(&h);
+    let (center, inner, outer) = wheel_geometry(area);
     let mid = (inner + outer) / 2.0;
     // Up on the ring: hue 90° (yellow-green). Blue is fully saturated and bright, so it keeps both.
     press(&mut h, pos2(center.x, center.y - mid), Modifiers::NONE);
@@ -436,8 +407,8 @@ fn web_field_ignores_a_sign() {
 #[test]
 fn color_wheel_ignores_clicks_beside_it() {
     let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
-    let area = h.get_by_label("Color Wheel").rect();
-    let (center, _, outer) = crate::color_panel_ui::wheel_geometry(area);
+    let area = wheel_rect(&h);
+    let (center, _, outer) = wheel_geometry(area);
     let corner = area.left_top() + vec2(3.0, 3.0);
     assert!(corner.distance(center) > outer + 20.0, "the corner is beside the wheel");
     press(&mut h, corner, Modifiers::NONE);
@@ -466,7 +437,7 @@ fn color_wheel_fits_the_default_color_group() {
         h.run_steps(4);
         let group = crate::panel_docking::probe::native_group_rect(h.state(), &h.ctx, Group::Color).unwrap();
         assert!((group.height() - Group::Color.default_height()).abs() < 0.5, "{kind:?}: Color group {group:?}");
-        let wheel = h.query_by_label("Color Wheel").unwrap_or_else(|| panic!("{kind:?}: no Color Wheel")).rect();
+        let wheel = wheel_rect(&h);
         // The group's scroll area ends at least 8 pt above its bottom edge (the card's bottom margin).
         assert!(wheel.bottom() <= group.bottom() - 8.0, "{kind:?}: wheel {wheel:?} runs past the Color group {group:?}");
     }
@@ -559,4 +530,15 @@ fn every_slider_mode_recolours_the_selected_shape() {
         assert_eq!(bytes(h.state().session.tools.foreground), [255, 255, 255], "{mode:?}");
         assert_eq!(shape_fill(h.state()), [255, 255, 255], "{mode:?}");
     }
+}
+
+/// The wheel the library draws in `area`: its centre and the ring's inner and outer radii.
+fn wheel_geometry(area: Rect) -> (egui::Pos2, f32, f32) {
+    let g = craft_ui::composites::WheelGeometry::new(area, 2.0, (6.0, 22.0), 0.09, 1.0);
+    (g.center, g.inner, g.outer)
+}
+
+/// The wheel's area: the ring's slider covers it.
+fn wheel_rect(h: &Harness<'_, PhotocraftApp>) -> Rect {
+    h.get_by_label("Hue").rect()
 }

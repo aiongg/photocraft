@@ -1,30 +1,10 @@
 use super::*;
 
-#[test]
-/// #3323: the Color panel's HSB is Photoshop's (and the Color Picker's), on sRGB values, not
-/// egui's linear-light HSV: a 50% grey has Brightness 50%, and the field's left edge halfway
-/// down is that grey (128), not 188.
-fn color_panel_hsb_is_srgb_like_photoshop() {
-    let grey = srgb_hsva([128.0 / 255.0, 128.0 / 255.0, 128.0 / 255.0, 1.0]);
-    assert!((grey.v - 128.0 / 255.0).abs() < 1e-3 && grey.s < 1e-3, "{grey:?}");
-    let mid = hsva_srgb(egui::ecolor::Hsva::new(0.3, 0.0, 0.5, 1.0));
-    assert!(mid[..3].iter().all(|v| (v - 0.5).abs() <= 1.0 / 255.0), "{mid:?}");
-    // What the field paints there.
-    assert_eq!(hsva_color32(egui::ecolor::Hsva::new(0.3, 0.0, 0.5, 1.0)), Color32::from_gray(128));
-    // The same numbers as the Color Picker dialog for a saturated colour.
-    let c = [0.847, 0.271, 0.180];
-    let (ours, dialog) = (srgb_hsva([c[0], c[1], c[2], 1.0]), photocraft_color::convert::rgb_to_hsb(c));
-    assert!((ours.h * 360.0 - dialog[0]).abs() < 0.5 && (ours.s - dialog[1]).abs() < 1e-3 && (ours.v - dialog[2]).abs() < 1e-3, "{ours:?} vs {dialog:?}");
-}
-
-#[test]
-fn srgb_hsva_roundtrip() {
-    for c in [[0.847, 0.271, 0.180, 1.0], [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0], [0.2, 0.6, 0.4, 1.0]] {
-        let back = hsva_srgb(srgb_hsva(c));
-        for i in 0..3 {
-            assert!((back[i] - c[i]).abs() <= 1.0 / 255.0, "{c:?} -> {back:?}");
-        }
-    }
+/// The Color panel's HSB, as Photoshop's and the Color Picker's, on the sRGB-encoded values:
+/// the numbers the picks below are read back in.
+fn srgb_hsva(c: [f32; 4]) -> egui::ecolor::Hsva {
+    let [h, s, v] = photocraft_color::convert::rgb_to_hsb([c[0], c[1], c[2]]);
+    egui::ecolor::Hsva::new(h / 360.0, s, v, 1.0)
 }
 
 /// #7793: the Color panel's field and hue strip pick on the frame the button goes down (no
@@ -43,15 +23,19 @@ fn color_panel_field_and_hue_strip_pick_on_press() {
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
     h.run_steps(2);
-    let (o, w) = h.ctx.data(|d| d.get_temp::<(Pos2, f32)>(egui::Id::unique("test-origin"))).unwrap();
-    let field_w = w - 38.0 - 14.0 - 16.0;
+    let (field_rect, strip_rect) = {
+        use egui_kittest::kittest::Queryable;
+        (h.get_by_label("Color field").rect(), h.get_by_label("Color strip").rect())
+    };
     let press = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>, at: Pos2, pressed: bool| {
         h.event(egui::Event::PointerMoved(at));
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
         h.run_steps(1);
     };
-    let at = o + vec2(38.0 + 8.0 + field_w * 0.5, 60.0);
+    let at = pos2(field_rect.center().x, field_rect.top() + 60.0);
     press(&mut h, at, true);
+    // The press is the gesture's first value, drawn at once and reported in the next frame.
+    h.run_steps(1);
     let picked = h.state().session.tools.foreground;
     assert_ne!(picked, [0.2, 0.4, 0.6, 1.0], "the press itself picks");
     let hsva = srgb_hsva(picked);
@@ -63,7 +47,8 @@ fn color_panel_field_and_hue_strip_pick_on_press() {
     h.run_steps(1);
     // Hue strip: a press a third of the way down is a hue of about 240° at once.
     let before = h.state().session.tools.foreground;
-    press(&mut h, o + vec2(38.0 + 8.0 + field_w + 8.0 + 7.0, 40.0), true);
+    press(&mut h, pos2(strip_rect.center().x, strip_rect.top() + 40.0), true);
+    h.run_steps(1);
     let now = h.state().session.tools.foreground;
     assert_ne!(now, before, "the strip picks on press");
     assert!((srgb_hsva(now).h * 360.0 - 240.0).abs() < 8.0, "{:?}", srgb_hsva(now));
@@ -85,10 +70,12 @@ fn color_panel_ignores_secondary_and_middle_presses() {
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
     h.run_steps(2);
-    let (o, w) = h.ctx.data(|d| d.get_temp::<(Pos2, f32)>(egui::Id::unique("test-origin"))).unwrap();
-    let field_w = w - 38.0 - 14.0 - 16.0;
-    let field = o + vec2(38.0 + 8.0 + field_w * 0.5, 60.0);
-    let strip = o + vec2(38.0 + 8.0 + field_w + 8.0 + 7.0, 40.0);
+    let (field_rect, strip_rect) = {
+        use egui_kittest::kittest::Queryable;
+        (h.get_by_label("Color field").rect(), h.get_by_label("Color strip").rect())
+    };
+    let field = pos2(field_rect.center().x, field_rect.top() + 60.0);
+    let strip = pos2(strip_rect.center().x, strip_rect.top() + 40.0);
     for at in [field, strip] {
         for button in [egui::PointerButton::Secondary, egui::PointerButton::Middle] {
             for pressed in [true, false] {
@@ -404,8 +391,8 @@ fn double_clicking_a_chip_opens_its_color_picker() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = field_harness(app);
     let min = h.ctx.input(|i| i.viewport_rect()).min;
-    // The foreground point is where the chips overlap: the foreground is on top there.
-    for (p, target) in [(vec2(40.0, 40.0), "background"), (vec2(30.0, 30.0), "foreground")] {
+    // Each point is on one chip only (the chips overlap, the active one in front).
+    for (p, target) in [(vec2(40.0, 40.0), "background"), (vec2(12.0, 12.0), "foreground")] {
         h.state_mut().ui.dialogs.clear();
         // Past the last double-click, so this one isn't counted as a triple-click.
         h.run_steps(40);
@@ -500,23 +487,6 @@ fn drag(h: &mut egui_kittest::Harness<'_, PhotocraftApp>, from: egui::Pos2, to: 
     h.run_steps(3);
 }
 
-/// Black carries neither hue nor saturation, a grey only the saturation it really has, and any
-/// other colour nothing at all: the knob keeps where it was dragged instead of round-tripping
-/// through RGB to the left edge (#3228).
-#[test]
-fn field_hsva_keeps_black_where_it_was_and_leaves_a_real_colour_alone() {
-    // Read back from black, as every frame does: nothing of the drag survives the RGB trip.
-    let black = field_hsva(egui::ecolor::Hsva::new(0.0, 0.0, 0.0, 1.0), (0.6, 1.0));
-    assert_eq!((black.h, black.s), (0.6, 1.0), "the corner the drag ended in");
-    // A grey: the saturation is genuinely zero — that is where the knob belongs — only the
-    // hue was undefined.
-    let grey = field_hsva(egui::ecolor::Hsva::new(0.0, 0.0, 0.5, 1.0), (0.6, 1.0));
-    assert_eq!((grey.h, grey.s), (0.6, 0.0), "the grey stays on the left edge");
-    // An ordinary colour is left as it is.
-    let red = field_hsva(egui::ecolor::Hsva::new(0.1, 0.8, 0.9, 1.0), (0.6, 1.0));
-    assert_eq!((red.h, red.s), (0.1, 0.8));
-}
-
 /// Dragging the selector into the bottom-right corner picks black there and leaves the knob
 /// in that corner: black has no saturation of its own, so it used to be read back as `s = 0`
 /// and drawn at the bottom-left instead, one frame after the drag that put it on the right
@@ -534,11 +504,9 @@ fn dragging_to_the_bottom_right_keeps_the_knob_there() {
     assert_eq!(srgb_bytes(h.state().session.tools.foreground), [0, 0, 0], "both corners are black");
     // What the knob is drawn from on the very next frame: the field kept the saturation the
     // drag ended at (not the zero black reads back as), together with the hue.
-    let remembered: (f32, f32) = h.ctx.data(|d| d.get_temp(egui::Id::unique(("color-field-hue", false)))).expect("the field remembers what it showed");
-    assert!(remembered.1 > 0.9, "the saturation the corner was dragged to: {remembered:?}");
-    let shown = field_hsva(egui::ecolor::Hsva::new(0.0, 0.0, 0.0, 1.0), remembered);
-    assert!(shown.s > 0.9, "the knob stays at the right edge, not the left: {remembered:?}");
-    assert!(shown.v < 0.01, "still black: {shown:?}");
+    let remembered: craft_theme::ModelValues = h.ctx.data(|d| d.get_temp(egui::Id::unique(("color-panel-values", "hsb", false)))).expect("the field remembers what it showed");
+    assert!(remembered.values[1] > 90.0, "the saturation the corner was dragged to: {remembered:?}");
+    assert!(remembered.values[2] < 1.0, "still black: {remembered:?}");
 }
 
 /// Black has no hue of its own, so each chip remembers the hue last picked for it.
@@ -550,13 +518,13 @@ fn each_chip_keeps_its_own_hue_on_black() {
     let mut h = field_harness(app);
     let min = h.ctx.input(|i| i.viewport_rect()).min;
     // The hue strip runs from red at the top through blue (a third down) and green (two thirds).
-    let (strip_x, green, blue) = (285.0, 88.0, 48.0);
+    let (strip_x, green, blue) = (275.0, 88.0, 48.0);
     click(&mut h, min + vec2(strip_x, green));
     click(&mut h, min + vec2(40.0, 40.0));
     click(&mut h, min + vec2(strip_x, blue));
-    click(&mut h, min + vec2(16.0, 16.0));
+    click(&mut h, min + vec2(12.0, 12.0));
     // Near the field's top-right: high saturation and brightness.
-    click(&mut h, min + vec2(265.0, 10.0));
+    click(&mut h, min + vec2(240.0, 10.0));
     let [r, g, b] = srgb_bytes(h.state().session.tools.foreground);
     assert!(g > 200 && r < 64 && b < 64, "the foreground's green, not the background's blue: {:?}", [r, g, b]);
 }

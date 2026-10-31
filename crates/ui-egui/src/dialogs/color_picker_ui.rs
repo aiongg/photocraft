@@ -9,7 +9,6 @@ use craft_theme::{Channel, ColorModel, DefaultOn, HsbModel, LabModel, MAX_CHANNE
 use craft_ui::composites::{AreaMode, ColorPicker, ColorPickerLayout, ColorWarning, PickedColor};
 use craft_ui::dialog::{ButtonRole, FooterButton};
 use craft_ui::localized::LocaleNumbers;
-use egui::vec2;
 use photocraft_color::convert::{hsb_to_rgb, rgb_to_hsb};
 use serde_json::{Map, Value, json};
 
@@ -302,6 +301,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         .compare(srgba(orig))
         .eyedropper(tl!("Pick screen color"))
         .eyedropper_busy(!crate::screen_picker::available(ui.ctx()) || crate::screen_picker::busy(ui.ctx()))
+        .focus_on_open(false)
         .text(word)
         .side_actions([
             FooterButton::new(ButtonRole::Default, tl!("OK")),
@@ -317,6 +317,12 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) -> Option<bool> {
         picker = picker.warning(ColorWarning::web_colors(tl!("Not a web colour: click for the nearest web colour"), srgba(near)));
     }
     let shown = picker.show(ui);
+    // The hex field takes the focus, its text selected, once the dialog is on show: the library
+    // asks on the first pass, which a window's hidden sizing pass spends.
+    if ui.is_visible() && !f.contains_key("__focused") {
+        f.insert("__focused".into(), json!(true));
+        ColorPicker::focus_hex(ui.ctx(), shown.edit.response.id);
+    }
     if shown.eyedropper_requested {
         crate::screen_picker::request(ui.ctx(), screen_id);
     }
@@ -419,7 +425,7 @@ const CMYK_CHANNELS: [Channel; 4] = [
 
 /// CMYK through PhotoCraft's profile conversion, in percent. The inks the colour was picked as
 /// (#4196) are the model's values for that colour while they still give it.
-struct CmykModel(Option<[f32; 4]>);
+pub(crate) struct CmykModel(pub(crate) Option<[f32; 4]>);
 
 impl ColorModel for CmykModel {
     fn id(&self) -> &'static str {
@@ -517,6 +523,7 @@ mod tests;
 mod screen_integration_tests {
     use super::*;
     use crate::screen_picker::{Capture, Pending};
+    use egui::vec2;
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]
     fn text_swatch_opens_full_dialog_and_screen_pick_waits_for_ok() {
