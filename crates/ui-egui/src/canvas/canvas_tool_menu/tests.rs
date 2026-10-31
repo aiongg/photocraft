@@ -21,7 +21,7 @@ fn work_path(app: &mut PhotocraftApp) {
 }
 
 fn choose_open(app: &mut PhotocraftApp, command: &str) {
-    assert!(open(app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(app, Tool::Pen, [10.0, 10.0]));
     choose(app, &Context::default(), command);
 }
 
@@ -123,7 +123,7 @@ fn type_edit_menu_rows_act_on_the_text_and_the_layer() {
     let mut app = app();
     let id = editing_type(&mut app);
     let ctx = Context::default();
-    let reopen = |app: &mut PhotocraftApp| assert!(open(app, &Context::default(), Tool::Type, [10.0, 10.0]));
+    let reopen = |app: &mut PhotocraftApp| assert!(open(app, Tool::Type, [10.0, 10.0]));
     // Faux Bold toggles the style of the selected characters, and shows checked.
     reopen(&mut app);
     let menu = app.ui.canvas_tool_menu.clone().unwrap();
@@ -432,25 +432,25 @@ fn selection_menu_routes_actions_through_commands() {
     let mut app = app();
     app.ui.tool = Tool::RectMarquee;
     app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
-    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::RectMarquee, [10.0, 10.0]));
     assert_eq!(rows(app.ui.canvas_tool_menu.as_ref().unwrap()), SELECTION_MENU);
     let before = app.session.journal.len();
     choose(&mut app, &Context::default(), "select.inverse");
     assert!(app.ui.canvas_tool_menu.is_none());
     assert!(app.session.journal[before..].iter().any(|(id, _)| id == "select.inverse"));
     let before = app.session.journal.len();
-    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::RectMarquee, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.deselect");
     assert!(app.session.active().unwrap().doc.selection.is_none());
     assert!(app.session.journal[before..].iter().any(|(id, _)| id == "select.deselect"));
     // Nothing selected: the menu that makes a selection.
-    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::RectMarquee, [10.0, 10.0]));
     assert_eq!(rows(app.ui.canvas_tool_menu.as_ref().unwrap()), NO_SELECTION_MENU);
     choose(&mut app, &Context::default(), "select.reselect");
     assert!(app.session.active().unwrap().doc.selection.is_some());
     assert!(app.session.journal.iter().any(|(id, _)| id == "select.reselect"));
     app.run("select.deselect", json!({})).unwrap();
-    assert!(open(&mut app, &Context::default(), Tool::Lasso, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Lasso, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.all");
     assert!(app.session.active().unwrap().doc.selection.is_some());
 }
@@ -463,13 +463,13 @@ fn selection_menu_layer_and_path_actions() {
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
     app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
     let layers = app.session.active().unwrap().doc.layers.len();
-    assert!(open(&mut app, &Context::default(), Tool::EllipseMarquee, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::EllipseMarquee, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "layer.new.layerViaCopy");
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1, "Layer via Copy adds a layer");
     assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("layer.new.layerViaCopy"));
     // Make Work Path… asks for the tolerance, then traces the selection.
     app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
-    assert!(open(&mut app, &Context::default(), Tool::EllipseMarquee, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::EllipseMarquee, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.toWorkPath");
     let dialog = app.ui.dialogs.last().map(|d| d.id).expect("tolerance dialog");
     assert!(app.session.active().unwrap().doc.work_path.is_none(), "nothing happens before OK");
@@ -483,7 +483,7 @@ fn disabled_selection_rows_do_nothing() {
     let mut app = app();
     app.ui.tool = Tool::MagicWand;
     app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
-    assert!(open(&mut app, &Context::default(), Tool::MagicWand, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::MagicWand, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.clone().unwrap();
     // No filter has run and nothing can be faded yet.
     for id in ["filter.lastFilter", "edit.fade"] {
@@ -494,7 +494,7 @@ fn disabled_selection_rows_do_nothing() {
     assert_eq!(app.session.journal.len(), before);
     assert!(app.ui.dialogs.is_empty());
     // Rows of the other variant are not part of this menu.
-    assert!(open(&mut app, &Context::default(), Tool::MagicWand, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::MagicWand, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.all");
     assert_eq!(app.session.journal.len(), before);
 }
@@ -683,10 +683,10 @@ fn view_menu_needs_finite_points_and_a_view_tool() {
 #[test]
 fn unsupported_tools_and_nonfinite_positions_do_not_open_menu() {
     let mut app = app();
-    assert!(!open(&mut app, &Context::default(), Tool::Brush, [1.0, 1.0]));
-    assert!(!open(&mut app, &Context::default(), Tool::Lasso, [f32::NAN, 1.0]));
+    assert!(!open(&mut app, Tool::Brush, [1.0, 1.0]));
+    assert!(!open(&mut app, Tool::Lasso, [f32::NAN, 1.0]));
     assert!(app.ui.canvas_tool_menu.is_none());
-    assert!(open(&mut app, &Context::default(), Tool::MagicWand, [1.0, 1.0]));
+    assert!(open(&mut app, Tool::MagicWand, [1.0, 1.0]));
     let before = app.session.journal.len();
     choose(&mut app, &Context::default(), "file.new");
     assert_eq!(app.session.journal.len(), before, "context menu cannot invoke an unrelated command");
@@ -733,7 +733,7 @@ fn pen_menu_finishes_in_progress_path_before_selection() {
         crate::vector_ui::pen_up(&mut app);
     }
     assert!(app.session.active().unwrap().doc.work_path.is_none());
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
     assert!(entry_enabled(&app, menu, "path.toSelection"));
     choose(&mut app, &Context::default(), "path.toSelection");
@@ -848,7 +848,7 @@ fn pen_menu_has_all_reference_rows_in_order_and_guards_unavailable_actions() {
     );
     let mut app = app();
     app.ui.tool = Tool::Pen;
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
     assert!(!entry_enabled(&app, menu, "path.toSelection"));
     let before = app.session.journal.len();
@@ -891,7 +891,7 @@ fn pen_menu_saved_path_clipping_and_numeric_transform() {
     work_path(&mut app);
     app.run("path.rename", json!({"name": "work", "to": "Cutout"})).unwrap();
     app.ui.selected_path = Some("Cutout".into());
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     assert!(entry_enabled(&app, app.ui.canvas_tool_menu.as_ref().unwrap(), "path.clippingPath.set"));
     choose(&mut app, &Context::default(), "path.clippingPath.set");
     let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
@@ -917,7 +917,7 @@ fn pen_shape_menu_enables_shape_ops_and_style_copy_only_when_applicable() {
     ]}, "fill":"#ff0000", "stroke":{"width":2,"color":"#000000"}}),
     )
     .unwrap();
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
     assert!(entry_enabled(&app, menu, "layer.combineShapes.unite"));
     assert!(entry_enabled(&app, menu, "path.style.copyFill"));
@@ -925,7 +925,7 @@ fn pen_shape_menu_enables_shape_ops_and_style_copy_only_when_applicable() {
     assert!(!entry_enabled(&app, menu, "path.fill"));
     choose(&mut app, &Context::default(), "path.style.copyFill");
     assert!(app.session.path_fill_clipboard.is_some());
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     assert!(entry_enabled(&app, app.ui.canvas_tool_menu.as_ref().unwrap(), "path.style.pasteFill"));
 }
 
@@ -938,7 +938,7 @@ fn unfinished_shape_path_disables_actions_that_would_target_the_previous_layer()
         crate::vector_ui::pen_down(&mut app, x, y, false);
         crate::vector_ui::pen_up(&mut app);
     }
-    assert!(open(&mut app, &Context::default(), Tool::Pen, [10.0, 10.0]));
+    assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
     for id in ["layer.vectorMask.fromPath", "path.delete", "path.fill", "path.stroke", "path.clippingPath.set", "view.newGuidesFromShape"] {
         assert!(!entry_enabled(&app, menu, id), "{id} must not act on the layer replaced by the pending shape");

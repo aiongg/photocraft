@@ -76,9 +76,9 @@ fn dismiss_outside(h: &mut Harness<'_, PhotocraftApp>, popup: Popup) {
     h.run_steps(2);
     press(h, at, PointerButton::Primary, true, Modifiers::NONE);
     h.run_steps(1);
-    assert!(!is_open(h, popup), "a later outside press closes immediately");
     press(h, at, PointerButton::Primary, false, Modifiers::NONE);
     h.run_steps(2);
+    assert!(!is_open(h, popup), "a later outside click closes it");
 }
 
 fn check_reopening(tool: Tool, modifiers: Modifiers, popup: Popup) {
@@ -185,8 +185,7 @@ fn reopened_canvas_menus_still_choose_their_actions() {
     dismiss_outside(&mut h, Popup::Layers);
     tap(&mut h, at, Modifiers::NONE, true);
     assert!(is_open(&h, Popup::Layers));
-    let menu_rect = h.ctx.memory(|m| m.area_rect(egui::Id::unique("canvas-layer-menu"))).unwrap();
-    h.query_all_by_label("Background").find(|node| menu_rect.contains(node.rect().center())).expect("Background in the layer menu").click();
+    h.get_by_role_and_label(egui::accesskit::Role::MenuItemRadio, "Background").click();
     h.run_steps(3);
     assert!(!is_open(&h, Popup::Layers));
     let state = h.state().session.active().unwrap();

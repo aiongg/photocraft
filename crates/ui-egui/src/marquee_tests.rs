@@ -97,12 +97,9 @@ fn selection(h: &Harness<'static, PhotocraftApp>) -> Rect {
     h.state().session.active().unwrap().doc.selection.as_ref().map_or(Rect::EMPTY, |s| s.content_bounds())
 }
 
-/// The two-row readout shows `W: {w} px` and `H: {ht} px` (Photoshop's format).
+/// The two-row readout shows `W: {w} px` and `H: {ht} px` (Photoshop's format), as one node.
 fn readout(h: &Harness<'static, PhotocraftApp>, w: i32, ht: i32) -> bool {
-    let labels = h.query_by_label("W:").is_some() && h.query_by_label("H:").is_some();
-    let count = |v: i32| h.query_all_by_label(&format!("{v} px")).count();
-    let values = if w == ht { count(w) == 2 } else { count(w) == 1 && count(ht) == 1 };
-    labels && values && h.query_all_by_label_contains(" px").count() == 2
+    h.query_by_label(&format!("W: {w} px\nH: {ht} px")).is_some()
 }
 
 #[test]
@@ -148,7 +145,7 @@ fn shift_during_the_drag_draws_a_square_and_the_readout_follows() {
     release_at(&mut h, 150.0, 91.0, Modifiers::SHIFT);
     mods(&mut h, Modifiers::NONE);
     assert_eq!(selection(&h), Rect::new(50, 50, 150, 150));
-    assert!(h.query_by_label("W:").is_none() && h.query_by_label_contains(" px").is_none(), "the readout goes away with the drag");
+    assert!(h.query_by_label_contains("W:").is_none() && h.query_by_label_contains(" px").is_none(), "the readout goes away with the drag");
 }
 
 #[test]
@@ -330,7 +327,7 @@ fn show_transformation_values_off_hides_the_readout() {
         move_to(&mut h, 150.0, 90.0);
         assert_eq!(readout(&h, 100, 40), shown, "shown: {shown}");
         if !shown {
-            assert!(h.query_by_label("W:").is_none() && h.query_by_label_contains(" px").is_none());
+            assert!(h.query_by_label_contains("W:").is_none() && h.query_by_label_contains(" px").is_none());
         }
         release_at(&mut h, 150.0, 90.0, Modifiers::NONE);
         assert_eq!(selection(&h), Rect::new(50, 50, 150, 90), "the marquee still selects");
@@ -497,7 +494,7 @@ fn a_one_pixel_column_or_row_is_kept_on_release() {
                 button(&mut h, p, false, Modifiers::NONE);
                 h.run_steps(2);
                 assert_eq!(selection(&h), want, "{tool:?} {name} (existing {existing}): the release keeps what was shown");
-                assert!(h.query_by_label("W:").is_none(), "the readout goes away with the drag");
+                assert!(h.query_by_label_contains("W:").is_none(), "the readout goes away with the drag");
             }
         }
         // A plain click outside the selection deselects.
@@ -612,7 +609,7 @@ fn marquee_drag_bench() {
     }
     let ms = t0.elapsed().as_secs_f64() * 1e3 / f64::from(n);
     eprintln!("marquee drag on 6000x4000 (shift+alt, readout): {ms:.2} ms per frame");
-    assert!(h.query_by_label("W:").is_some());
+    assert!(h.query_by_label_contains("W:").is_some());
 }
 
 /// An 80×60 transparent document, red over (10..30)², that square selected, Rectangular Marquee.
