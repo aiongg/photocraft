@@ -167,8 +167,9 @@ pub(crate) fn number_cell(ui: &mut egui::Ui, field: &Field<'_>, value: &mut f32)
 }
 
 /// [`number_cell`] whose caption is `icon`: the glyph scrubs the field beside it.
-pub(crate) fn number_cell_icon(ui: &mut egui::Ui, icon: craft_ui::icons::Icon, field: &Field<'_>, value: &mut f32) -> CellEdit {
-    let glyph = ui.add(craft_ui::primitives::Icon::new(icon).size(craft_ui::icons::IconSize::Sm).content(craft_ui::primitives::Content::Muted).label(tl!(field.label)));
+pub(crate) fn number_cell_icon(ui: &mut egui::Ui, icon: craft_ui::icons::Icon, tip: &str, field: &Field<'_>, value: &mut f32) -> CellEdit {
+    let glyph = ui.add(craft_ui::primitives::Icon::new(icon).size(craft_ui::icons::IconSize::Sm).content(craft_ui::primitives::Content::Muted).label(tl!(tip)));
+    let glyph = glyph.on_hover_text(tl!(tip));
     number_cell_in(ui, field, value, None, None, None, Some(&glyph))
 }
 

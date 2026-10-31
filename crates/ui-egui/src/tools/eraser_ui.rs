@@ -5,9 +5,9 @@ use craft_ui::patterns::{CellWidth, OptionsBar};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::Tool;
 use crate::icons;
 use crate::panels::{Field, check, number_cell, select_cell};
+use crate::state::Tool;
 
 fn report(app: &mut PhotocraftApp, r: Result<Value, String>) {
     if let Err(e) = r {
@@ -115,7 +115,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 ("contiguous".to_string(), tl!("Contiguous")),
                 ("findEdges".to_string(), tl!("Find Edges")),
             ];
-            select_cell(ui, Some("Limits"), "bg-eraser-limits", "Limits:", &mut o.bg_limits, &limits, false);
+            select_cell(ui, Some("Limits"), "bg-eraser-limits", "Limits", &mut o.bg_limits, &limits, false);
             number_cell(ui, &Field::new("Tolerance", 0.0..=100.0, "%", CellWidth::Md), &mut o.bg_tolerance);
             check(ui, "Protect Foreground Color", &mut o.bg_protect_fg);
         }

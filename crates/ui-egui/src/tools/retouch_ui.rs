@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::ViewXform;
-use crate::state::Tool;
 use crate::panels::{Field, check, number_cell, select_cell};
+use crate::state::Tool;
 
 /// The tool a stroke uses with ⌥ held: Dodge and Burn swap, as do Blur and Sharpen.
 pub(crate) fn alt_flipped(tool: Tool, alt: bool) -> Tool {
@@ -538,8 +538,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             select_cell(ui, Some("Patch:"), "patch-kind", tl!("Type"), &mut kind, &kinds, false);
             o.patch_content_aware = kind == "contentAware";
             if o.patch_content_aware {
-                number_cell(ui, &Field::new("Structure:", 1.0..=7.0, "", CellWidth::Sm), &mut o.patch_structure);
-                number_cell(ui, &Field::new("Color:", 0.0..=10.0, "", CellWidth::Sm), &mut o.patch_color);
+                number_cell(ui, &Field::new("Structure", 1.0..=7.0, "", CellWidth::Sm), &mut o.patch_structure);
+                number_cell(ui, &Field::new("Color", 0.0..=10.0, "", CellWidth::Sm), &mut o.patch_color);
                 check(ui, "Sample All Layers", &mut o.sample_all.patch);
             } else {
                 for (k, l) in [("source", tl!("Source")), ("destination", tl!("Destination"))] {
@@ -555,8 +555,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         Tool::ContentAwareMove => {
             let modes = [("move".to_string(), tl!("Move")), ("extend".to_string(), tl!("Extend"))];
             select_cell(ui, Some("Mode:"), "cam-mode", tl!("Mode"), &mut o.cam_mode, &modes, false);
-            number_cell(ui, &Field::new("Structure:", 1.0..=7.0, "", CellWidth::Sm), &mut o.cam_structure);
-            number_cell(ui, &Field::new("Color:", 0.0..=10.0, "", CellWidth::Sm), &mut o.cam_color);
+            number_cell(ui, &Field::new("Structure", 1.0..=7.0, "", CellWidth::Sm), &mut o.cam_structure);
+            number_cell(ui, &Field::new("Color", 0.0..=10.0, "", CellWidth::Sm), &mut o.cam_color);
             check(ui, "Sample All Layers", &mut o.sample_all.content_aware_move);
             check(ui, "Transform On Drop", &mut o.cam_transform_on_drop);
             OptionsBar::divider(ui);
@@ -643,8 +643,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 ("contiguous".to_string(), tl!("Contiguous")),
                 ("findEdges".to_string(), tl!("Find Edges")),
             ];
-            select_cell(ui, Some("Limits:"), "color-replacement-limits", tl!("Limits:"), &mut o.cr_limits, &limits, false);
-            number_cell(ui, &Field::new("Tolerance:", 0.0..=100.0, "%", CellWidth::Md), &mut o.cr_tolerance);
+            select_cell(ui, Some("Limits:"), "color-replacement-limits", tl!("Limits"), &mut o.cr_limits, &limits, false);
+            number_cell(ui, &Field::new("Tolerance", 0.0..=100.0, "%", CellWidth::Md), &mut o.cr_tolerance);
             check(ui, "Anti-alias", &mut o.cr_anti_alias);
         }
         Tool::HistoryBrush => {
@@ -713,7 +713,7 @@ fn pattern_stamp_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         select_cell(ui, Some("Pattern"), "pattern-stamp-pat", tl!("Pattern"), &mut pat, &opts_ref, false)
     };
     number_cell(ui, &Field::new("Scale", 1.0..=1000.0, "%", CellWidth::Md), &mut o.pattern_stamp_scale);
-    number_cell(ui, &Field::new("Angle:", -180.0..=180.0, "°", CellWidth::Md), &mut o.pattern_stamp_angle);
+    number_cell(ui, &Field::new("Angle", -180.0..=180.0, "°", CellWidth::Md), &mut o.pattern_stamp_angle);
     if picked {
         let _ = app.run("pattern.presets.select", json!({"pattern": pat}));
     }

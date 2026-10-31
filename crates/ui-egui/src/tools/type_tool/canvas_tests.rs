@@ -694,8 +694,11 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
         h.hover_at(field);
         h.run_steps(1);
         press(&mut h, field, true);
+        // The number field begins its scrub on the first move past the click threshold and changes the value from the next.
+        h.hover_at(field + vec2(14.0, 0.0));
+        h.run_steps(1);
         for k in 1..=5 {
-            h.hover_at(field + vec2(8.0 * k as f32, 0.0));
+            h.hover_at(field + vec2(14.0 + 8.0 * k as f32, 0.0));
             h.run_steps(1);
             let now = size_at(h.state(), id, 0);
             assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
@@ -703,7 +706,7 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
             let dmg = h.state().session.active().unwrap().last_damage.expect("damage rect, not a full refresh");
             assert!(!dmg.is_empty() && dmg.width() * dmg.height() <= 512 * 512, "{dmg:?}");
         }
-        press(&mut h, field + vec2(40.0, 0.0), false);
+        press(&mut h, field + vec2(54.0, 0.0), false);
         h.run_steps(2);
         assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps + d + 1, "one step per drag");
     }
@@ -726,7 +729,7 @@ fn options_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 
 /// Drags the options bar's "T" icon `dx` points to the right with `mods` held.
 fn scrub_size_icon(h: &mut Harness<'static, PhotocraftApp>, dx: f32, mods: Modifiers) {
-    let icon = h.get_by_role_and_label(egui::accesskit::Role::Label, "Font size").rect().center();
+    let icon = h.get_by_role_and_label(egui::accesskit::Role::Image, "Font size").rect().center();
     h.hover_at(icon);
     h.run_steps(1);
     press(h, icon, true);
@@ -813,7 +816,7 @@ fn options_bar_t_icon_shows_its_tooltip() {
     assert!(tooltip_shows(&mut h, egui::accesskit::Role::Button, "Set the text color"), "the probe sees an ordinary tooltip");
     h.hover_at(egui::pos2(890.0, 55.0));
     h.run_steps(4);
-    assert!(tooltip_shows(&mut h, egui::accesskit::Role::Label, "Font size"), "hovering the \"T\" icon shows \"Font size\"");
+    assert!(tooltip_shows(&mut h, egui::accesskit::Role::Image, "Font size"), "hovering the \"T\" icon shows \"Font size\"");
 }
 
 /// A point inside glyph `i` of vertical type: `f` of the way down its advance, right of the

@@ -21,8 +21,8 @@ use photocraft_raster::Surface;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::panels::{Field, check, number_cell, select_cell};
 use crate::canvas::{ToolEvent, ViewXform};
+use crate::panels::{Field, check, number_cell, select_cell};
 
 pub struct PuppetSession {
     pub key: u64,
@@ -407,7 +407,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui,
         Some("Mode:"),
         "puppet-mode",
-        "Mode:",
+        "Mode",
         &mut s.warp.mode,
         &[(PuppetMode::Rigid, tl!("Rigid")), (PuppetMode::Normal, tl!("Normal")), (PuppetMode::Distort, tl!("Distort"))],
         false,
@@ -418,7 +418,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui,
         Some("Density:"),
         "puppet-density",
-        "Density:",
+        "Density",
         &mut s.warp.density,
         &[(PuppetDensity::Fewer, tl!("Fewer Points")), (PuppetDensity::Normal, tl!("Normal")), (PuppetDensity::More, tl!("More Points"))],
         false,

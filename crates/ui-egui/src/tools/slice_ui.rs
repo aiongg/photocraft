@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::panels::{Field, check, number_cell, select_cell};
 use crate::canvas::{ToolEvent, ViewXform};
+use crate::panels::{Field, check, number_cell, select_cell};
 use crate::state::{DialogKind, Tool};
 
 /// Slice tool state (serde: readable through the control channel).

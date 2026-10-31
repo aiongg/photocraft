@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::panels::{Field, check, number_cell, select_cell};
 use crate::canvas::{ToolEvent, ViewXform};
+use crate::panels::{Field, check, number_cell, select_cell};
 use crate::state::Tool;
 use crate::theme::Tokens;
 

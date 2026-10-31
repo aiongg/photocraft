@@ -59,8 +59,10 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Photoshop's "T" scrubs the size field beside it, like the Character panel's icons (#6437).
     let (unit, label) = type_unit(app);
     let mut display = size * unit;
-    let field = Field::new("Font size", unit..=1296.0 * unit, label, CellWidth::Md).scale(1.0);
-    if number_cell_icon(ui, craft_ui::icons::Icon::Text, &field, &mut display).changed {
+    let field = Field::new("Size", unit..=1296.0 * unit, label, CellWidth::Md).scale(1.0);
+    let edit = number_cell_icon(ui, craft_ui::icons::Icon::Text, "Font size", &field, &mut display);
+    super::defaults::note_gesture(ui.ctx(), edit.gesture);
+    if edit.changed {
         let size = display / unit;
         app.ui.tool_options.type_size = size;
         apply(app, ui.ctx(), json!({"size": size, "metricsAsShown": true}));
@@ -336,6 +338,15 @@ pub(super) fn num_field(ui: &mut egui::Ui, label: &str, tip: &str, v: f32, range
                 field = field.unit(Unit::new(&format!("{{n}} {unit}")));
             }
             let edit = field.show(ui);
+            super::defaults::note_gesture(
+                ui.ctx(),
+                edit.event.as_ref().and_then(craft_ui::edit::EditEvent::id).map(|g| {
+                    use std::hash::{Hash, Hasher};
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    g.hash(&mut hasher);
+                    hasher.finish()
+                }),
+            );
             if let Some(next) = edit.event.as_ref().and_then(|e| e.value()).copied() {
                 let next = next as f32;
                 if next != v {

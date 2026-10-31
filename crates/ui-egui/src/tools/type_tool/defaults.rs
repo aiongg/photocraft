@@ -71,9 +71,26 @@ pub(crate) fn type_unit(app: &PhotocraftApp) -> (f32, &'static str) {
 /// Coalesce key while a field is being scrubbed: every step of one drag shares one history step
 /// (Photoshop's single step per scrub, #124). Unique per press, so two drags are two steps.
 fn drag_key(ctx: &egui::Context) -> Option<String> {
+    let now = ctx.cumulative_pass_nr();
+    if let Some((_, gesture)) = ctx.data(|d| d.get_temp::<(u64, u64)>(gesture_slot())).filter(|(pass, _)| *pass == now) {
+        return Some(format!("type-gesture-{gesture}"));
+    }
     let id = ctx.dragged_id()?;
     let t = ctx.input(|i| i.pointer.press_start_time())?;
     Some(format!("type-drag-{}-{}", id.value(), t.to_bits()))
+}
+
+fn gesture_slot() -> egui::Id {
+    egui::Id::NULL.with("type-field-gesture")
+}
+
+/// Records, for this pass, the number field gesture an edit belongs to, so [`apply`] coalesces
+/// the gesture's steps into one history step.
+pub(crate) fn note_gesture(ctx: &egui::Context, gesture: Option<u64>) {
+    if let Some(gesture) = gesture {
+        let now = ctx.cumulative_pass_nr();
+        ctx.data_mut(|d| d.insert_temp(gesture_slot(), (now, gesture)));
+    }
 }
 
 /// The styles a new Type-tool layer will receive. Use the same command parameters for the
