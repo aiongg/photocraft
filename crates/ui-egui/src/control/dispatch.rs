@@ -1252,7 +1252,7 @@ fn secondary_transform_or_crop_took(app: &mut PhotocraftApp, ctx: &egui::Context
     }
     // No menu over the agent's own crop frame or Straighten line still being
     // dragged, also the first one on the default frame (nothing pending yet).
-    if app.crop.drag.is_some() || app.crop.straighten.line.is_some() {
+    if app.crop.drag.is_some() {
         return true;
     }
     if crate::crop_ui::pending(app) {

@@ -885,10 +885,7 @@ fn handle_canvas_tool_menus(app: &mut PhotocraftApp, input: &CanvasToolInput<'_>
         // frame or Straighten line still dragged by the left button gets no menu over it: the
         // gesture and the held button both, as either alone can outlive a lost release. A
         // finger held still (egui's press-and-hold right-click) is down too, but drags nothing.
-        let crop_gesture = tool == Tool::Crop
-            && !response.long_touched()
-            && (app.crop.drag.is_some() || app.crop.straighten.line.is_some())
-            && ctx.input(|i| i.pointer.primary_down());
+        let crop_gesture = tool == Tool::Crop && !response.long_touched() && app.crop.drag.is_some() && ctx.input(|i| i.pointer.primary_down());
         if crop_gesture || crate::canvas_tool_menu::open_crop(app, tool, [p.x, p.y]) {
         } else if crate::canvas_tool_menu::pasteboard_at(app, tool, xf.to_doc(p)) {
             crate::canvas_tool_menu::open_pasteboard(app, tool, [p.x, p.y]);

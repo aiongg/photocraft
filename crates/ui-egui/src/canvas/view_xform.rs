@@ -71,6 +71,22 @@ impl ViewXform {
         self
     }
 
+    /// The active document's view for the library's canvas kit, or a plain view at the current zoom
+    /// (document points are canvas points) when none has been laid out yet, as with the control
+    /// channel before the first frame.
+    pub fn library_view(app: &PhotocraftApp) -> craft::ui::canvas::CanvasView {
+        ViewXform::active(app).map_or_else(
+            || {
+                craft::ui::canvas::CanvasView::new(
+                    Rect::from_center_size(Pos2::ZERO, vec2(1e7, 1e7)),
+                    craft::ui::canvas::kurbo::Point::ZERO,
+                    f64::from(app.point_zoom().max(0.01)),
+                )
+            },
+            |xf| xf.canvas_view(),
+        )
+    }
+
     /// The same view for the library's canvas kit (`craft::ui::canvas`), whose document points are
     /// `kurbo` points: it maps every point and vector as [`Self::to_screen`] and [`Self::map_vec`].
     pub fn canvas_view(&self) -> craft::ui::canvas::CanvasView {

@@ -12,13 +12,19 @@
 //! through the same path.
 
 use craft::draw::ui::gradient::GradientSwatch;
+use craft::draw::ui::{
+    ColorStop, GradientExtent, GradientLine, GradientLineNames, GradientLineStyle, GradientOverlay, GradientStops, LineGradient, LinePart, LinePress,
+    LineRelease, StopRef, StopRows, StopRules,
+};
+use craft::theme::Srgba;
+use craft::ui::canvas::CanvasView;
+use craft::ui::canvas::kurbo::Point;
 use craft::ui::controls::{Button, ButtonVariant, ControlSize};
 use craft::ui::primitives::{Content, Text};
-use craft::ui::theme::StrokeExt;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
-use egui::emath::GuiRounding;
-use egui::{Color32, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use egui::{Color32, Pos2, Rect, pos2, vec2};
 use photocraft_compose::gradient_fill as gf;
 use photocraft_doc::{Document, Fill, GradientStyle, Layer, LayerContent, LayerId};
 use photocraft_engine::gradient_fill_cmds as cmds;
@@ -28,7 +34,6 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::Tool;
-use crate::theme::Tokens;
 use crate::widgets;
 
 #[cfg(test)]
@@ -43,39 +48,23 @@ use stops_bar::BarAction;
 pub const PREVIEW_LAYER: LayerId = LayerId(u64::MAX - 78);
 /// Tag of this module's canvas preview keys.
 const TAG: u64 = 1 << 58;
-/// Screen distance (points) within which a handle, stop or the line is grabbed.
-const GRAB: f32 = 8.0;
-/// Screen distance from the line past which a dragged stop is deleted.
-const TEAR_OFF: f32 = 36.0;
 /// Seconds between two clicks of a double-click.
 const DOUBLE_CLICK: f64 = 0.45;
-
-/// What a pointer press grabbed on the widget.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Grab {
-    Start,
-    End,
-    /// A colour stop (index in sorted order).
-    Stop(usize),
-    /// The midpoint of the segment after colour stop `i`.
-    Mid(usize),
-    /// The line at gradient location `t`.
-    Line(f32),
-}
 
 #[derive(Clone, Debug)]
 enum Drag {
     /// Drawing a new gradient, or redrawing the selected one.
     Draw { from: [f32; 2], to: [f32; 2], redraw: Option<LayerId> },
-    /// Editing the selected gradient: the command (and params) to commit on release.
-    Edit { layer: LayerId, grab: Grab, down: [f32; 2], moved: bool, commit: Option<(&'static str, Value)> },
+    /// Editing the selected gradient: the library overlay's press, the stop or midpoint it
+    /// selects, and the command (and params) to commit on release.
+    Edit { layer: LayerId, press: LinePress, selected: Option<StopRef>, commit: Option<(&'static str, Value)> },
 }
 
 /// Live-gradient interaction state (not saved).
 #[derive(Default)]
 pub struct LiveGradient {
     drag: Option<Drag>,
-    last_click: Option<(Grab, f64)>,
+    last_click: Option<(LinePart, f64)>,
     /// Pending edit from the Properties panel's stops editor (previewed like a canvas drag).
     panel: Option<(LayerId, &'static str, Value)>,
     /// Pending edit from the Gradient Editor window's current-gradient strip
@@ -145,79 +134,68 @@ fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
     (a[0] - b[0]).hypot(a[1] - b[1])
 }
 
-/// Position on the segment `s`→`e` at fraction `u`.
-fn lerp(s: [f32; 2], e: [f32; 2], u: f32) -> [f32; 2] {
-    [s[0] + (e[0] - s[0]) * u, s[1] + (e[1] - s[1]) * u]
+/// The library's kit for a gradient fill: the line between its handles and its stops in location
+/// order (each tagged with its index + 1, so an edit's result maps back to the stop it moves; an
+/// added stop has tag 0), as the overlay's value, with the fill's reverse flag and extent.
+fn line_gradient(f: &Fill, frame: Rect32) -> Option<(LineGradient, bool, GradientExtent)> {
+    let Fill::Gradient { stops, midpoints, reverse, style, .. } = f else { return None };
+    let (start, end) = gf::fill_handles(f, frame)?;
+    let mut sorted: Vec<(f32, [f32; 3])> = stops.iter().map(|(t, c)| (*t, c.to_rgb())).collect();
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let color = sorted
+        .iter()
+        .enumerate()
+        .map(|(i, (t, rgb))| ColorStop {
+            location: *t,
+            color: Srgba { r: rgb[0].clamp(0.0, 1.0), g: rgb[1].clamp(0.0, 1.0), b: rgb[2].clamp(0.0, 1.0), a: 1.0 },
+            midpoint: midpoints.get(i).copied().unwrap_or(0.5),
+            tag: i as u64 + 1,
+        })
+        .collect();
+    let point = |p: [f32; 2]| Point::new(f64::from(p[0]), f64::from(p[1]));
+    let extent = match style {
+        GradientStyle::Radial | GradientStyle::Angle => GradientExtent::Circle,
+        GradientStyle::Diamond => GradientExtent::Square,
+        GradientStyle::Reflected => GradientExtent::Mirror,
+        GradientStyle::Linear => GradientExtent::None,
+    };
+    Some((LineGradient { line: GradientLine { start: point(start), end: point(end) }, stops: GradientStops::new(color) }, *reverse, extent))
 }
 
-/// Fraction along `s`→`e` of `p`'s projection (clamped) and `p`'s distance from the line.
-fn project(s: [f32; 2], e: [f32; 2], p: [f32; 2]) -> (f32, f32) {
-    let (dx, dy) = (e[0] - s[0], e[1] - s[1]);
-    let l2 = dx * dx + dy * dy;
-    if l2 <= 1e-9 {
-        return (0.0, dist(s, p));
-    }
-    let u = (((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / l2).clamp(0.0, 1.0);
-    (u, dist(lerp(s, e, u), p))
+/// The library's overlay over a gradient's `value`: colour stops only, as PhotoCraft's fills have no
+/// opacity stops.
+fn overlay<'a>(value: &'a LineGradient, reverse: bool, extent: GradientExtent) -> GradientOverlay<'a> {
+    GradientOverlay::new("gradient-tool", &value.line, &value.stops, GradientLineNames::default())
+        .rules(StopRules { rows: StopRows::ColorOnly, ..StopRules::default() })
+        .reverse(reverse)
+        .extent(extent)
 }
 
-/// The widget's geometry for a gradient fill: handles, stop positions, midpoint positions.
-struct Widget {
-    style: GradientStyle,
-    start: [f32; 2],
-    end: [f32; 2],
-    reverse: bool,
-    /// Sorted colour stops: (location, rgba).
-    stops: Vec<(f32, [f32; 4])>,
-    mids: Vec<f32>,
+/// The library's sizes (`gradient_line.*`): the same in every theme, so the pointer reads them
+/// without a context.
+fn reach() -> &'static GradientLineStyle {
+    static STYLE: OnceLock<GradientLineStyle> = OnceLock::new();
+    STYLE.get_or_init(|| GradientOverlay::style(&craft::ui::theme::current(&egui::Context::default())))
 }
 
-impl Widget {
-    fn new(f: &Fill, frame: Rect32) -> Option<Widget> {
-        let Fill::Gradient { stops, midpoints, reverse, style, .. } = f else { return None };
-        let (start, end) = gf::fill_handles(f, frame)?;
-        let mut st: Vec<(f32, [f32; 4])> = stops
-            .iter()
-            .map(|(t, c)| {
-                let rgb = c.to_rgb();
-                (*t, [rgb[0], rgb[1], rgb[2], c.alpha])
-            })
-            .collect();
-        st.sort_by(|a, b| a.0.total_cmp(&b.0));
-        Some(Widget { style: *style, start, end, reverse: *reverse, stops: st, mids: midpoints.clone() })
-    }
-
-    /// Fraction along the line of gradient location `t`.
-    fn u_of(&self, t: f32) -> f32 {
-        if self.reverse { 1.0 - t } else { t }
-    }
-
-    fn at(&self, t: f32) -> [f32; 2] {
-        lerp(self.start, self.end, self.u_of(t))
-    }
-
-    fn mid_location(&self, i: usize) -> Option<f32> {
-        let (a, b) = (self.stops.get(i)?.0, self.stops.get(i + 1)?.0);
-        (b - a > 1e-4).then(|| a + (b - a) * self.mids.get(i).copied().unwrap_or(0.5))
-    }
-
-    /// What `p` (document pixels) grabs, with `tol` the grab distance in document pixels.
-    fn hit(&self, p: [f32; 2], tol: f32) -> Option<Grab> {
-        if dist(p, self.end) <= tol {
-            return Some(Grab::End);
+/// The command an edit of the line's gradient commits: `after` is what the drag of `press` made
+/// of the gradient at the press.
+fn commit_of(layer: LayerId, press: &LinePress, after: &LineGradient) -> Option<(&'static str, Value)> {
+    let id = layer.0;
+    let xy = |p: Point| [p.x as f32, p.y as f32];
+    match press.part() {
+        LinePart::Start => Some((cmds::SET, json!({"layer": id, "from": xy(after.line.start)}))),
+        LinePart::End => Some((cmds::SET, json!({"layer": id, "to": xy(after.line.end)}))),
+        LinePart::Line => Some((cmds::SET, json!({"layer": id, "from": xy(after.line.start), "to": xy(after.line.end)}))),
+        LinePart::Stop(i) if press.torn() => Some((cmds::STOP, json!({"layer": id, "action": "delete", "index": i}))),
+        LinePart::Stop(i) => {
+            let moved = after.stops.color.iter().find(|s| s.tag == i as u64 + 1)?;
+            Some((cmds::STOP, json!({"layer": id, "action": "move", "index": i, "location": moved.location})))
         }
-        if dist(p, self.start) <= tol {
-            return Some(Grab::Start);
+        LinePart::Midpoint(i) => {
+            let mid = after.stops.color.get(i)?.midpoint;
+            Some((cmds::STOP, json!({"layer": id, "action": "midpoint", "index": i, "location": mid})))
         }
-        let near = |q: [f32; 2]| dist(p, q) <= tol;
-        if let Some(i) = self.stops.iter().position(|s| near(self.at(s.0))) {
-            return Some(Grab::Stop(i));
-        }
-        if let Some(i) = (0..self.stops.len().saturating_sub(1)).find(|i| self.mid_location(*i).is_some_and(|t| near(self.at(t)))) {
-            return Some(Grab::Mid(i));
-        }
-        let (u, d) = project(self.start, self.end, p);
-        (d <= tol).then_some(Grab::Line(if self.reverse { 1.0 - u } else { u }))
     }
 }
 
@@ -232,79 +210,68 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
     if app.gradient.drag.is_none() && crate::canvas::event_tool(app, mods) != Tool::Gradient {
         return false;
     }
-    let zoom = app.point_zoom().max(0.01);
     match ev {
         ToolEvent::Down { x, y, .. } => {
             let p = [x as f32, y as f32];
             let active = active_gradient(app);
-            let grab = active.as_ref().and_then(|(l, frame, _)| Widget::new(fill_of(l)?, *frame)?.hit(p, GRAB / zoom));
-            app.gradient.drag = Some(match (grab, active) {
-                (Some(grab), Some((l, ..))) => Drag::Edit { layer: l.id, grab, down: p, moved: false, commit: None },
+            let press = active.as_ref().and_then(|(l, frame, _)| {
+                let (value, reverse, extent) = line_gradient(fill_of(l)?, *frame)?;
+                let (view, at) = screen_point(app, p)?;
+                overlay(&value, reverse, extent).press(&view, reach(), at, mods)
+            });
+            app.gradient.drag = Some(match (press, active) {
+                (Some(press), Some((l, ..))) => Drag::Edit { layer: l.id, selected: press.selects(), press, commit: None },
                 (_, active) => Drag::Draw { from: p, to: p, redraw: active.map(|a| a.0.id) },
             });
         }
         ToolEvent::Move { x, y, .. } => drag_to(app, [x as f32, y as f32], mods),
         ToolEvent::Up { x, y } => {
             drag_to(app, [x as f32, y as f32], mods);
-            finish(app);
+            finish(app, [x as f32, y as f32]);
         }
     }
     true
 }
 
+/// Document point `p` in the library's view, and where it is on screen.
+fn screen_point(app: &PhotocraftApp, p: [f32; 2]) -> Option<(CanvasView, Pos2)> {
+    let view = ViewXform::library_view(app);
+    let at = view.to_screen(Point::new(f64::from(p[0]), f64::from(p[1])));
+    (at.x.is_finite() && at.y.is_finite()).then_some((view, at))
+}
+
 fn drag_to(app: &mut PhotocraftApp, p: [f32; 2], mods: egui::Modifiers) {
-    let zoom = app.point_zoom().max(0.01);
     let active = active_gradient(app);
+    let screen = screen_point(app, p);
     let Some(drag) = app.gradient.drag.as_mut() else { return };
-    // ⇧: 45° gradient angles, the same snap as the classic drag (stroke_constraint.rs).
-    let snap = |from: [f32; 2], to: [f32; 2]| -> [f32; 2] {
-        if !mods.shift {
-            return to;
-        }
-        let c = crate::stroke_constraint::snap45([f64::from(from[0]), f64::from(from[1])], [f64::from(to[0]), f64::from(to[1])]);
-        [c[0] as f32, c[1] as f32]
-    };
     match drag {
-        Drag::Draw { from, to, .. } => *to = snap(*from, p),
-        Drag::Edit { layer, grab, down, moved, commit } => {
-            if dist(*down, p) * zoom >= 2.0 {
-                *moved = true;
+        // ⇧: 45° gradient angles, the same snap as the classic drag (stroke_constraint.rs).
+        Drag::Draw { from, to, .. } => {
+            *to = if mods.shift {
+                let c = crate::stroke_constraint::snap45([f64::from(from[0]), f64::from(from[1])], [f64::from(p[0]), f64::from(p[1])]);
+                [c[0] as f32, c[1] as f32]
+            } else {
+                p
             }
-            if !*moved {
+        }
+        Drag::Edit { layer, press, selected, commit } => {
+            let Some((value, reverse, extent)) = active.as_ref().filter(|a| a.0.id == *layer).and_then(|(l, frame, _)| line_gradient(fill_of(l)?, *frame))
+            else {
                 return;
-            }
-            let Some(w) = active.as_ref().filter(|a| a.0.id == *layer).and_then(|(l, frame, _)| Widget::new(fill_of(l)?, *frame)) else { return };
-            let id = layer.0;
-            *commit = match *grab {
-                Grab::Start => Some((cmds::SET, json!({"layer": id, "from": snap(w.end, p)}))),
-                Grab::End => Some((cmds::SET, json!({"layer": id, "to": snap(w.start, p)}))),
-                Grab::Line(_) => {
-                    let (dx, dy) = (p[0] - down[0], p[1] - down[1]);
-                    Some((cmds::SET, json!({"layer": id, "from": [w.start[0] + dx, w.start[1] + dy], "to": [w.end[0] + dx, w.end[1] + dy]})))
-                }
-                Grab::Stop(i) => {
-                    let (u, d) = project(w.start, w.end, p);
-                    if d * zoom > TEAR_OFF && w.stops.len() > 2 {
-                        Some((cmds::STOP, json!({"layer": id, "action": "delete", "index": i})))
-                    } else {
-                        Some((cmds::STOP, json!({"layer": id, "action": "move", "index": i, "location": w.u_of(u)})))
-                    }
-                }
-                Grab::Mid(i) => {
-                    let t = w.u_of(project(w.start, w.end, p).0);
-                    match (w.stops.get(i), w.stops.get(i + 1)) {
-                        (Some(a), Some(b)) if b.0 - a.0 > 1e-4 => {
-                            Some((cmds::STOP, json!({"layer": id, "action": "midpoint", "index": i, "location": ((t - a.0) / (b.0 - a.0)).clamp(0.05, 0.95)})))
-                        }
-                        _ => None,
-                    }
-                }
             };
+            let Some((view, at)) = screen else { return };
+            let track = overlay(&value, reverse, extent).track(&view, reach(), press, at, mods);
+            if let Some(after) = &track.state {
+                *commit = commit_of(*layer, press, after);
+            }
+            if let Some(now) = track.selected {
+                *selected = now;
+            }
         }
     }
 }
 
-fn finish(app: &mut PhotocraftApp) {
+fn finish(app: &mut PhotocraftApp, at: [f32; 2]) {
     let Some(drag) = app.gradient.drag.take() else { return };
     let zoom = app.point_zoom().max(0.01);
     match drag {
@@ -320,34 +287,45 @@ fn finish(app: &mut PhotocraftApp) {
                 }
             };
         }
-        Drag::Edit { commit: Some((cmd, p)), moved: true, .. } => {
-            let _ = app.run(cmd, p);
+        Drag::Edit { layer, press, commit, .. } => {
+            let Some((value, reverse, extent)) = active_gradient(app).filter(|a| a.0.id == layer).and_then(|(l, frame, _)| line_gradient(fill_of(&l)?, frame))
+            else {
+                return;
+            };
+            let Some((view, _)) = screen_point(app, at) else { return };
+            match overlay(&value, reverse, extent).release(&view, &press) {
+                LineRelease::Commit(_) => {
+                    if let Some((cmd, p)) = commit {
+                        let _ = app.run(cmd, p);
+                    }
+                }
+                // A click on the line adds a colour stop there.
+                LineRelease::Add { value: added, selected: StopRef::Color(i) } => {
+                    if let Some(stop) = added.stops.color.get(i) {
+                        let _ = app.run(cmds::STOP, json!({"layer": layer.0, "action": "add", "location": stop.location}));
+                    }
+                }
+                LineRelease::Add { .. } => {}
+                LineRelease::Nothing => click(app, layer, press.part(), at),
+            }
         }
-        Drag::Edit { layer, grab, moved: false, .. } => click(app, layer, grab),
-        Drag::Edit { .. } => {}
     }
 }
 
-/// A click (no drag) on the widget: the line adds a stop; a double-click on a stop (or on an end
-/// handle, for the stop there) opens the Color Picker.
-fn click(app: &mut PhotocraftApp, layer: LayerId, grab: Grab) {
+/// A click (no drag) on the widget: a double-click on a stop (or on an end handle, for the stop
+/// there) opens the Color Picker.
+fn click(app: &mut PhotocraftApp, layer: LayerId, part: LinePart, at: [f32; 2]) {
     let now = app.last_frame_time;
-    let double = app.gradient.last_click.is_some_and(|(g, t)| g == grab && now - t <= DOUBLE_CLICK);
-    app.gradient.last_click = Some((grab, now));
-    match grab {
-        Grab::Line(t) => {
-            let _ = app.run(cmds::STOP, json!({"layer": layer.0, "action": "add", "location": t}));
-        }
-        Grab::Stop(i) if double => edit_stop_color(app, layer, i),
-        Grab::Start | Grab::End if double => {
-            let Some((l, frame, _)) = active_gradient(app) else { return };
-            let Some(w) = fill_of(&l).and_then(|f| Widget::new(f, frame)) else { return };
-            // The stop at that end of the line.
-            let at_start = (grab == Grab::Start) != w.reverse;
-            let i = if at_start { 0 } else { w.stops.len().saturating_sub(1) };
-            edit_stop_color(app, layer, i);
-        }
-        _ => {}
+    let double = app.gradient.last_click.is_some_and(|(g, t)| g == part && now - t <= DOUBLE_CLICK);
+    app.gradient.last_click = Some((part, now));
+    if !double || !matches!(part, LinePart::Stop(_) | LinePart::Start | LinePart::End) {
+        return;
+    }
+    let Some((l, frame, _)) = active_gradient(app) else { return };
+    let Some((value, reverse, extent)) = fill_of(&l).and_then(|f| line_gradient(f, frame)) else { return };
+    let Some((view, point)) = screen_point(app, at) else { return };
+    if let Some((i, _)) = overlay(&value, reverse, extent).double_click(&view, reach(), point) {
+        edit_stop_color(app, layer, i);
     }
 }
 
@@ -385,7 +363,7 @@ pub fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>
             Some(id) => Some((*id, cmds::SET, json!({"from": from, "to": to}))),
             None => Some((PREVIEW_LAYER, cmds::CREATE, create_params(app, *from, *to))),
         },
-        Some(Drag::Edit { layer, commit: Some((cmd, p)), moved: true, .. }) if live_mode(app) => Some((*layer, *cmd, p.clone())),
+        Some(Drag::Edit { layer, commit: Some((cmd, p)), .. }) if live_mode(app) => Some((*layer, *cmd, p.clone())),
         _ => app.gradient.panel.clone(),
     };
     let Some((layer, cmd, p)) = edit else {
@@ -415,22 +393,25 @@ pub fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>
     Some((shown, key))
 }
 
+/// The stop or midpoint a drag selects and the end it holds, as the overlay draws them.
+type Marks = (Option<StopRef>, Option<LinePart>);
+
 /// The fill and frame the widget shows: the one being drawn or edited, else the selected one.
-fn shown_fill(app: &PhotocraftApp) -> Option<(Fill, Rect32, Option<Grab>)> {
+fn shown_fill(app: &PhotocraftApp) -> Option<(Fill, Rect32, Marks)> {
     let st = app.session.active()?;
     let canvas = st.doc.bounds();
     match &app.gradient.drag {
         Some(Drag::Draw { from, to, redraw: None }) => {
             let l = cmds::new_layer(&app.session, &st.doc, &create_params(app, *from, *to)).ok()?;
             let f = fill_of(&l)?.clone();
-            Some((f, photocraft_compose::fill_frame(&l, canvas), Some(Grab::End)))
+            Some((f, photocraft_compose::fill_frame(&l, canvas), (None, Some(LinePart::End))))
         }
         Some(Drag::Draw { from, to, redraw: Some(id) }) => {
             let l = st.doc.layer(*id)?;
             let f = edited_fill(app, l, canvas, cmds::SET, &json!({"from": from, "to": to}))?;
-            Some((f, photocraft_compose::fill_frame(l, canvas), Some(Grab::End)))
+            Some((f, photocraft_compose::fill_frame(l, canvas), (None, Some(LinePart::End))))
         }
-        Some(Drag::Edit { layer, grab, commit, .. }) => {
+        Some(Drag::Edit { layer, press, selected, commit }) => {
             let l = st.doc.layer(*layer)?;
             let f = match commit {
                 Some((cmd, p)) => match edited_fill(app, l, canvas, cmd, p) {
@@ -439,30 +420,14 @@ fn shown_fill(app: &PhotocraftApp) -> Option<(Fill, Rect32, Option<Grab>)> {
                 },
                 None => fill_of(l)?.clone(),
             };
-            // A torn-off stop no longer exists: highlight nothing.
-            let deleting = commit.as_ref().is_some_and(|(_, p)| p["action"] == "delete");
-            Some((f, photocraft_compose::fill_frame(l, canvas), (!deleting).then_some(*grab)))
+            let held = matches!(press.part(), LinePart::Start | LinePart::End).then_some(press.part());
+            Some((f, photocraft_compose::fill_frame(l, canvas), (*selected, held)))
         }
         None => {
             let (l, frame, _) = active_gradient(app)?;
-            Some((fill_of(&l)?.clone(), frame, None))
+            Some((fill_of(&l)?.clone(), frame, (None, None)))
         }
     }
-}
-
-fn c32(c: [f32; 4]) -> Color32 {
-    let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    Color32::from_rgb(q(c[0]), q(c[1]), q(c[2]))
-}
-
-fn line(painter: &egui::Painter, a: Pos2, b: Pos2) {
-    painter.line_segment([a, b], Stroke::new(3.0, Color32::from_black_alpha(90)));
-    painter.line_segment([a, b], craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE));
-}
-
-fn diamond(painter: &egui::Painter, c: Pos2, r: f32, fill: Color32, outline: Color32) {
-    let pts = vec![pos2(c.x, c.y - r), pos2(c.x + r, c.y), pos2(c.x, c.y + r), pos2(c.x - r, c.y)];
-    painter.add(egui::Shape::convex_polygon(pts, fill, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), outline)));
 }
 
 /// Draws the live gradient widget over the canvas.
@@ -470,53 +435,10 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     if !live_mode(app) {
         return;
     }
-    let Some((fill, frame, grabbed)) = shown_fill(app) else { return };
-    let Some(w) = Widget::new(&fill, frame) else { return };
-    let accent = Tokens::get(painter.ctx()).accent;
-    let sp = |p: [f32; 2]| xf.to_screen(p[0], p[1]);
-    let (s, e) = (sp(w.start), sp(w.end));
-    let r = s.distance(e);
-    let shadow = Stroke::new(3.0, Color32::from_black_alpha(90));
-    let white = craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE);
-    match w.style {
-        GradientStyle::Radial | GradientStyle::Angle => {
-            painter.circle_stroke(s, r, shadow);
-            painter.circle_stroke(s, r, white);
-        }
-        GradientStyle::Diamond => {
-            let d = e - s;
-            let n = vec2(-d.y, d.x);
-            let pts = vec![s + d, s + n, s - d, s - n, s + d];
-            painter.add(egui::Shape::line(pts.clone(), shadow));
-            painter.add(egui::Shape::line(pts, white));
-        }
-        GradientStyle::Reflected => {
-            let m = s - (e - s);
-            painter.add(egui::Shape::dashed_line(&[s, m], craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), Color32::WHITE), 5.0, 4.0));
-        }
-        GradientStyle::Linear => {}
-    }
-    line(painter, s, e);
-    // Midpoints.
-    for i in 0..w.stops.len().saturating_sub(1) {
-        if let Some(t) = w.mid_location(i) {
-            let sel = grabbed == Some(Grab::Mid(i));
-            diamond(painter, sp(w.at(t)), 4.5, if sel { accent } else { Color32::WHITE }, Color32::from_black_alpha(160));
-        }
-    }
-    // End handles, then the colour stops (a stop at an end sits inside its handle).
-    for (p, g) in [(s, Grab::Start), (e, Grab::End)] {
-        let ring = if grabbed == Some(g) { accent } else { Color32::WHITE };
-        painter.circle_stroke(p, 8.0, Stroke::new(3.5, Color32::from_black_alpha(90)));
-        painter.circle_stroke(p, 8.0, craft::ui::theme::scale::Stroke::W2.egui(painter.ctx(), ring));
-    }
-    for (i, (t, c)) in w.stops.iter().enumerate() {
-        let p = sp(w.at(*t));
-        let sel = grabbed == Some(Grab::Stop(i));
-        painter.circle_filled(p, 5.0, c32(*c));
-        painter.circle_stroke(p, 5.5, craft::ui::theme::scale::Stroke::W1_5.egui(painter.ctx(), if sel { accent } else { Color32::WHITE }));
-        painter.circle_stroke(p, 6.8, craft::ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_black_alpha(110)));
-    }
+    let Some((fill, frame, (selected, marked))) = shown_fill(app) else { return };
+    let Some((value, reverse, extent)) = line_gradient(&fill, frame) else { return };
+    let style = GradientOverlay::style(&craft::ui::theme::current(painter.ctx()));
+    overlay(&value, reverse, extent).paint(painter, &style, &xf.canvas_view(), &value, selected, marked);
 }
 
 // ---------------------------------------------------------------- options bar
