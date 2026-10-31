@@ -238,7 +238,8 @@ pub fn draw_guides(app: &mut PhotocraftApp, ui: &mut egui::Ui, response: &egui::
                 app.guide_drag = Some(GuideDrag { vertical, index: None, pos, press: pos, over_ruler: false });
             }
         }
-        Some((None, EditEvent::Commit { value, .. })) => {
+        // A drag released in the pass it begins arrives as one `Set`.
+        Some((None, EditEvent::Commit { value, .. } | EditEvent::Set { value, .. })) => {
             app.guide_drag = None;
             if let Some(pos) = value.position {
                 let vertical = value.orientation == Orientation::Vertical;

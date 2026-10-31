@@ -249,7 +249,7 @@ fn moving_a_guide_on_the_canvas_shows_its_y() {
 /// after that frame's pointer move (the ruler handles the drag after the canvas is drawn), and
 /// the frame that drops it shows none.
 #[test]
-#[ignore = "waits on craft-ui ruler-to-guide hand-off fix"]
+#[ignore = "craft-ui Guides::track begins a ruler drag with Gesture::begin(), so Begin carries no position and the first Update comes a pass later; it needs begin_with_value()"]
 fn ruler_drag_readout_is_current_every_frame() {
     use egui_kittest::kittest::Queryable;
     let mut h = canvas_harness(true);
@@ -485,7 +485,6 @@ fn alt_drags_a_guide_of_the_other_orientation_out_of_a_ruler() {
 /// document x and the left one y, so a horizontal guide released on the left ruler is still
 /// inside the document on its own axis, and used to be placed instead of discarded.
 #[test]
-#[ignore = "waits on craft-ui ruler-to-guide hand-off fix"]
 fn a_guide_dropped_on_either_ruler_is_removed() {
     let new_app = || {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
