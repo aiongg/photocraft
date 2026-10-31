@@ -11,7 +11,7 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 # craft-libs, one pin; members turn on the features they use. craft::egui_fork::{GIT, REV} must equal the [patch] egui family below.
-craft = { git = "https://github.com/aiongg/craft-libs", rev = "9c9e5b4dd519f31fdd16263f97b91f0e04e754ec" }
+craft = { git = "https://github.com/aiongg/craft-libs", rev = "2c5e9157c75c9c3c1eb220db9e7762175b7286c8" }
 
 # internal
 photocraft-geom = { path = "crates/geom" }
