@@ -1,53 +1,15 @@
-//! ⌘F command palette: fuzzy search over every menu command and tool.
+//! ⌘F command palette: search over every menu command and tool, on craft-ui's `CommandPalette`.
 
-use craft_ui::theme::StrokeExt;
-use egui::{Align2, Color32, CornerRadius, RichText, Sense, Stroke, vec2};
+use craft_ui::behavior::PaletteEntry;
+use craft_ui::controls::Kbd;
+use craft_ui::patterns::{CommandPalette, PaletteLabels};
 
-use crate::theme::{self, Tokens};
-use crate::{PhotocraftApp, icons};
-
-/// Case-insensitive subsequence match score (higher is better); None = no match.
-pub fn fuzzy_score(query: &str, text: &str) -> Option<i32> {
-    if query.is_empty() {
-        return Some(0);
-    }
-    let t: Vec<char> = text.to_lowercase().chars().collect();
-    let mut score = 0;
-    let mut ti = 0;
-    let mut last = None;
-    for qc in query.to_lowercase().chars() {
-        let mut found = false;
-        while ti < t.len() {
-            if t[ti] == qc {
-                score += if last == Some(ti.wrapping_sub(1)) { 8 } else { 1 };
-                if ti == 0 || t[ti - 1] == ' ' {
-                    score += 5;
-                }
-                last = Some(ti);
-                ti += 1;
-                found = true;
-                break;
-            }
-            ti += 1;
-        }
-        if !found {
-            return None;
-        }
-    }
-    Some(score - (t.len() as i32 / 8))
-}
-
-/// Bonus that puts a command or tool whose name is exactly the query ahead of every fuzzy match
-/// ("settings" finds Settings before Color Settings).
-fn exact_bonus(query: &str, names: &[&str]) -> i32 {
-    let q = query.trim();
-    if !q.is_empty() && names.iter().any(|n| n.trim_end_matches('…').trim().to_lowercase() == q.to_lowercase()) { 1000 } else { 0 }
-}
+use crate::PhotocraftApp;
 
 /// How many recently run commands the palette remembers.
 const RECENT_CAP: usize = 8;
 
-/// The id of the palette's recently-run list (egui temp data: session-scoped, like the query).
+/// The id of the palette's recently-run list (egui temp data: session-scoped).
 fn recent_id() -> egui::Id {
     egui::Id::unique("palette-recent")
 }
@@ -74,188 +36,64 @@ fn push_recent(list: &mut Vec<String>, id: &str, cap: usize) {
     list.truncate(cap);
 }
 
-/// The empty-query hits: the recent commands as rows, newest first (UI-217-7). Ids that are
-/// no longer menu commands are skipped.
-fn recent_hits(recents: &[String], menus: &[crate::menus::MenuItem], lang: crate::i18n::Lang) -> Vec<(i32, String, String, Option<String>, bool)> {
-    recents
-        .iter()
-        .enumerate()
-        .filter_map(|(i, id)| {
-            let m = menus.iter().find(|m| &m.id == id)?;
-            let path = m.path.iter().map(|p| crate::i18n::tr(lang, p)).collect::<Vec<_>>().join(" › ");
-            let label = crate::i18n::tr_id(lang, &m.id, &m.label);
-            Some((
-                1000 - i as i32,
-                m.id.clone(),
-                label.trim_end_matches('…').to_string(),
-                Some(path + &m.shortcut.as_ref().map(|s| format!("   {}", crate::shortcuts::pretty(s))).unwrap_or_default()),
-                m.enabled,
-            ))
-        })
-        .collect()
-}
-
-/// The menu commands matching `q`, as palette rows. Separators are not commands: they would
-/// match on their menu path and list as blank "---" rows (#2479).
-fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lang) -> Vec<(i32, String, String, Option<String>, bool)> {
-    menus
+/// The palette's entries: every menu command (separators are not commands: they would match on
+/// their menu path and list as blank rows, #2479) and every tool. The command is the menu id, or
+/// `tool:<Tool>`.
+fn entries(app: &PhotocraftApp, lang: crate::i18n::Lang) -> Vec<PaletteEntry<String>> {
+    let mut out: Vec<PaletteEntry<String>> = crate::menus::menu_items(app)
         .into_iter()
         .filter(|m| m.label != "---")
-        .filter_map(|m| {
-            let path_en = m.path.join(" › ");
-            let path = m.path.iter().map(|p| crate::i18n::tr(lang, p)).collect::<Vec<_>>().join(" › ");
-            let label = crate::i18n::tr_id(lang, &m.id, &m.label);
-            // Match what is shown and the English name (commands are documented in English).
-            let s = fuzzy_score(q, &format!("{label} {path} {} {path_en}", m.label))? + exact_bonus(q, &[label, &m.label]);
-            Some((
-                s,
-                m.id,
-                label.trim_end_matches('…').to_string(),
-                Some(path + &m.shortcut.map(|s| format!("   {}", crate::shortcuts::pretty(&s))).unwrap_or_default()),
-                m.enabled,
-            ))
+        .map(|m| {
+            let label = crate::i18n::tr_id(lang, &m.id, &m.label).trim_end_matches('…').to_string();
+            let mut e = PaletteEntry::new(m.id.clone(), label)
+                .english(m.label.clone())
+                .path(m.path.iter().map(|p| crate::i18n::tr(lang, p)))
+                .path_english(m.path.iter().cloned())
+                .enabled(m.enabled);
+            if let Some(k) = m.shortcut.as_deref().and_then(crate::shortcuts::parse) {
+                e = e.shortcut(Kbd::new(&k));
+            }
+            e
         })
-        .collect()
+        .collect();
+    for tool in crate::state::Tool::ALL {
+        out.push(
+            PaletteEntry::new(format!("tool:{tool:?}"), tl!(tool.label()))
+                .english(tool.label())
+                .kind(crate::i18n::tr(lang, "Tool"))
+                .shortcut(Kbd::keys(&[tool.key().to_string()])),
+        );
+    }
+    out
+}
+
+/// The palette's texts in the UI language.
+fn labels() -> PaletteLabels {
+    let mut l = PaletteLabels::default();
+    l.placeholder = tl!("Search commands, tools and panels…").into();
+    l.empty = tl!("No matching commands").into();
+    l.hint = crate::i18n::fmt(tl!("↑↓ navigate   {key} run   esc close"), &[("key", &crate::shortcuts::pretty("Enter"))]);
+    l
 }
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !app.ui.palette_open {
         return;
     }
-    let t = Tokens::get(ctx);
-    let screen = ctx.content_rect();
-    // Scrim.
-    egui::Area::new(egui::Id::unique("palette-scrim")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
-        let r = ui.allocate_exact_size(screen.size(), Sense::click()).1;
-        ui.painter().rect_filled(screen, craft_ui::theme::scale::Radius::R0.px(), Color32::from_black_alpha(110));
-        if r.clicked() {
-            app.ui.palette_open = false;
+    let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
+    let entries = entries(app, lang);
+    let mut recents: Vec<String> = ctx.data(|d| d.get_temp(recent_id()).unwrap_or_default());
+    let mut open = true;
+    let chosen = CommandPalette::new("palette", &entries).labels(labels()).recents(&mut recents).show(ctx, &mut open).map(|e| e.command().clone());
+    ctx.data_mut(|d| d.insert_temp(recent_id(), recents));
+    app.ui.palette_open = open;
+    let Some(id) = chosen else { return };
+    if let Some(tool) = id.strip_prefix("tool:") {
+        if let Some(t) = crate::state::Tool::from_name(tool) {
+            app.ui.tool = t;
         }
-    });
-    let width = 560.0;
-    let mut run: Option<String> = None;
-    egui::Area::new(egui::Id::unique("palette"))
-        .order(egui::Order::Tooltip)
-        .pivot(Align2::CENTER_TOP)
-        .fixed_pos(egui::pos2(screen.center().x, screen.top() + 110.0))
-        .show(ctx, |ui| {
-            egui::Frame::NONE
-                .fill(t.card)
-                .stroke(craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.card_border))
-                .corner_radius(CornerRadius::same(t.radius_lg as u8))
-                .shadow(egui::Shadow { offset: [0, 18], blur: 48, spread: 0, color: t.shadow })
-                .inner_margin(egui::Margin::same(10))
-                .show(ui, |ui| {
-                    ui.set_width(width);
-                    let qid = egui::Id::unique("palette-query");
-                    let mut q: String = ui.data_mut(|d| d.get_temp(qid).unwrap_or_default());
-                    ui.horizontal(|ui| {
-                        let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-                        icons::paint(ui, r, "search", 16.0, t.text_dim);
-                        let te = egui::TextEdit::singleline(&mut q)
-                            .hint_text(tl!("Search commands, tools and panels…"))
-                            .frame(egui::Frame::NONE)
-                            .font(egui::FontId::proportional(15.0))
-                            .desired_width(width - 40.0);
-                        let resp = ui.add(te);
-                        // Only when focus is missing: every request_focus interrupts the IME, and
-                        // doing that each frame makes Wayland input methods drop key releases (#585).
-                        if !resp.has_focus() {
-                            resp.request_focus();
-                        }
-                    });
-                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                    crate::widgets::hairline(ui);
-                    ui.add_space(craft_ui::theme::scale::Space::S6.px());
-                    let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
-                    let menus = crate::menus::menu_items(app);
-                    let recents: Vec<String> = ui.data(|d| d.get_temp(recent_id()).unwrap_or_default());
-                    let empty = q.trim().is_empty();
-                    // An empty query lists the recently run commands (UI-217-7); with none (or a
-                    // fresh session) it falls back to the full fuzzy list, as before.
-                    let mut hits: Vec<(i32, String, String, Option<String>, bool)> = if empty { recent_hits(&recents, &menus, lang) } else { Vec::new() };
-                    if !empty || hits.is_empty() {
-                        hits.extend(menu_hits(menus, &q, lang));
-                        for tool in crate::state::Tool::ALL {
-                            if let Some(s) = fuzzy_score(&q, &format!("{} {}", tl!(tool.label()), tool.label())) {
-                                let s = s + exact_bonus(&q, &[tl!(tool.label()).as_ref(), tool.label()]);
-                                hits.push((
-                                    s + 2,
-                                    format!("tool:{tool:?}"),
-                                    tl!(tool.label()).into(),
-                                    Some(format!("{}   {}", crate::i18n::tr(lang, "Tool"), tool.key())),
-                                    true,
-                                ));
-                            }
-                        }
-                    }
-                    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.2.cmp(&b.2)));
-                    hits.truncate(12);
-                    let sel_id = egui::Id::unique("palette-sel");
-                    let mut sel: usize = ui.data_mut(|d| d.get_temp(sel_id).unwrap_or(0));
-                    let (down, up, enter, esc) = ui.input(|i| {
-                        (
-                            i.key_pressed(egui::Key::ArrowDown),
-                            i.key_pressed(egui::Key::ArrowUp),
-                            i.key_pressed(egui::Key::Enter),
-                            i.key_pressed(egui::Key::Escape),
-                        )
-                    });
-                    if down {
-                        sel = (sel + 1).min(hits.len().saturating_sub(1));
-                    }
-                    if up {
-                        sel = sel.saturating_sub(1);
-                    }
-                    sel = sel.min(hits.len().saturating_sub(1));
-                    if hits.is_empty() {
-                        ui.label(RichText::new(tl!("No matching commands")).color(t.text_faint));
-                    }
-                    for (i, (_, id, label, detail, enabled)) in hits.iter().enumerate() {
-                        let (rect, resp) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
-                        if i == sel || resp.hovered() {
-                            ui.painter().rect_filled(rect, t.radius_sm, if i == sel { t.accent_soft } else { t.hover });
-                        }
-                        let color = if *enabled { t.text } else { t.text_faint };
-                        ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(13.0), color);
-                        if let Some(d) = detail {
-                            ui.painter().text(rect.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, d, egui::FontId::proportional(11.5), t.text_faint);
-                        }
-                        if resp.clicked() && *enabled {
-                            run = Some(id.clone());
-                        }
-                    }
-                    if enter && let Some(h) = hits.get(sel).filter(|h| h.4) {
-                        run = Some(h.1.clone());
-                        // dialogs::show runs later in the same frame and would read this Enter as
-                        // its OK button, instantly closing the dialog we are about to open (#536).
-                        ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
-                    }
-                    if esc {
-                        app.ui.palette_open = false;
-                    }
-                    ui.add_space(craft_ui::theme::scale::Space::S4.px());
-                    ui.label(
-                        RichText::new(crate::i18n::fmt(tl!("↑↓ navigate   {key} run   esc close"), &[("key", &crate::shortcuts::pretty("Enter"))]))
-                            .small()
-                            .color(t.text_faint),
-                    );
-                    ui.data_mut(|d| {
-                        d.insert_temp(qid, q);
-                        d.insert_temp(sel_id, sel);
-                    });
-                });
-        });
-    if let Some(id) = run {
-        app.ui.palette_open = false;
-        ctx.data_mut(|d| d.insert_temp(egui::Id::unique("palette-query"), String::new()));
-        if let Some(tool) = id.strip_prefix("tool:") {
-            if let Some(t) = crate::state::Tool::from_name(tool) {
-                app.ui.tool = t;
-            }
-        } else if let Err(e) = crate::menus::invoke(app, ctx, &id, serde_json::json!({})) {
-            app.ui.status = e;
-        }
+    } else if let Err(e) = crate::menus::invoke(app, ctx, &id, serde_json::json!({})) {
+        app.ui.status = e;
     }
 }
 
@@ -265,7 +103,7 @@ mod tests {
     use egui_kittest::Harness;
     use serde_json::json;
 
-    use super::{exact_bonus, fuzzy_score, push_recent};
+    use super::push_recent;
     use crate::PhotocraftApp;
 
     #[test]
@@ -343,34 +181,12 @@ mod tests {
     /// #2479: menu separators matched on their menu path ("f" → File, Filter) and filled the
     /// palette with blank "---" rows.
     #[test]
-    fn separators_are_not_palette_hits() {
+    fn separators_are_not_palette_entries() {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let menus = crate::menus::menu_items(&app);
-        assert!(menus.iter().any(|m| m.label == "---"), "the menus have separators to filter");
-        for q in ["f", "file", "filter", "", "-"] {
-            let hits = super::menu_hits(menus.clone(), q, crate::i18n::Lang::EN);
-            assert!(!hits.is_empty(), "{q:?} still matches commands");
-            assert!(hits.iter().all(|h| h.1 != "---" && h.2 != "---"), "{q:?} lists a separator");
-        }
-    }
-
-    #[test]
-    fn fuzzy_ranks_prefix_and_contiguous_higher() {
-        assert!(fuzzy_score("hue", "Hue/Saturation…").unwrap() > fuzzy_score("hue", "Channel Mixer Hue").unwrap_or(-99));
-        assert!(fuzzy_score("gblur", "Gaussian Blur").is_some());
-        assert!(fuzzy_score("xyz", "Gaussian Blur").is_none());
-        assert_eq!(fuzzy_score("", "anything"), Some(0));
-    }
-
-    /// Typing a command's exact name ranks it first, even when a longer name scores the same.
-    #[test]
-    fn exact_name_ranks_first() {
-        let settings = fuzzy_score("settings", "Settings Edit › Preferences Settings Edit › Preferences").unwrap() + exact_bonus("settings", &["Settings"]);
-        let color = fuzzy_score("settings", "Color Settings… Edit Color Settings… Edit").unwrap() + exact_bonus("settings", &["Color Settings…"]);
-        assert!(settings > color);
-        assert_eq!(exact_bonus("Color settings", &["Color Settings…"]), 1000);
-        assert_eq!(exact_bonus(" ", &[""]), 0);
-        assert_eq!(exact_bonus("set", &["Settings"]), 0);
+        assert!(crate::menus::menu_items(&app).iter().any(|m| m.label == "---"), "the menus have separators to filter");
+        let entries = super::entries(&app, crate::i18n::Lang::EN);
+        assert!(!entries.is_empty());
+        assert!(entries.iter().all(|e| e.command() != "---" && e.label() != "---"));
     }
 
     /// #536: Edit › Search → "Keyboard Shortcuts" must open the dialog, with and without a document.
