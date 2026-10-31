@@ -1160,7 +1160,7 @@ fn a_finger_held_on_a_pending_crop_opens_the_crop_menu() {
 
 #[test]
 fn crop_menu_rows_act_like_the_options_bar() {
-    use crate::crop_overlay::{CropOverlay, OverlayShow};
+    use craft_ui::canvas::{CropGuide, GuideShow};
     let ctx = Context::default();
     let mut app = crop_app();
     draw_crop(&mut app);
@@ -1184,14 +1184,14 @@ fn crop_menu_rows_act_like_the_options_bar() {
     choose(&mut app, &ctx, CROP_CLEAR);
     assert_eq!(app.ui.tool_options.crop_width, "");
     // Overlays: another overlay starts at its first orientation; when it shows.
-    app.ui.tool_options.crop_overlay = CropOverlay::GoldenSpiral;
+    app.ui.tool_options.crop_overlay = CropGuide::GoldenSpiral;
     app.ui.tool_options.crop_overlay_orientation = 2;
     reopen(&mut app);
     choose(&mut app, &ctx, "crop.overlay.triangle");
-    assert_eq!((app.ui.tool_options.crop_overlay, app.ui.tool_options.crop_overlay_orientation), (CropOverlay::Triangle, 0));
+    assert_eq!((app.ui.tool_options.crop_overlay, app.ui.tool_options.crop_overlay_orientation), (CropGuide::Triangle, 0));
     reopen(&mut app);
     choose(&mut app, &ctx, "crop.overlayShow.never");
-    assert_eq!(app.ui.tool_options.crop_overlay_show, OverlayShow::Never);
+    assert_eq!(app.ui.tool_options.crop_overlay_show, GuideShow::Never);
     let menu = reopen(&mut app);
     assert!(mode_checked(&app, &menu, "crop.overlay.triangle") && mode_checked(&app, &menu, "crop.overlayShow.never"));
     // A saved preset is listed by name; picking it refits the frame to its W x H, though the

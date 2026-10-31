@@ -21,16 +21,7 @@ pub const DEFAULT_OPACITY: f32 = 75.0;
 /// Auto Adjust Opacity: the share of the opacity the shield keeps while the box is dragged.
 pub const EDITING_FACTOR: f32 = 0.5;
 
-/// The shield's colour.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ShieldColor {
-    /// The pasteboard's colour (Preferences › Interface, or the theme's canvas).
-    #[default]
-    MatchCanvas,
-    /// [`CropShield::custom_color`].
-    Custom,
-}
+pub use craft_ui::canvas::ShieldColor;
 
 /// The gear menu's options. Every field defaults on its own, so older settings load.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

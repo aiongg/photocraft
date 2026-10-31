@@ -181,7 +181,7 @@ pub(crate) fn marching_ants_lines(painter: &egui::Painter, lines: impl Iterator<
 /// Photoshop crop overlay: the `shield` outside (`crop_shield::fill`; none when disabled), bright
 /// frame, the composition `guides` (unit-square polylines, `crop_overlay::guides`), corner and
 /// edge handles.
-fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guides: &[crate::crop_overlay::Polyline]) {
+fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guides: &[craft_ui::canvas::Polyline]) {
     let clip = painter.clip_rect();
     if let Some(dim) = shield {
         for band in [
@@ -216,7 +216,7 @@ fn crop_overlay(painter: &egui::Painter, r: Rect, shield: Option<Color32>, guide
 
 /// [`crop_overlay`] for a turned frame (or a rotated view): `q` is the frame's top-left, top-right,
 /// bottom-right and bottom-left corner on screen, a parallelogram.
-fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Color32>, guides: &[crate::crop_overlay::Polyline]) {
+fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Color32>, guides: &[craft_ui::canvas::Polyline]) {
     let (u, v) = (q[1] - q[0], q[3] - q[0]);
     let (lu, lv) = (u.length(), v.length());
     if !(lu.is_finite() && lv.is_finite()) || lu < 1e-3 || lv < 1e-3 {
@@ -257,7 +257,7 @@ fn crop_overlay_turned(painter: &egui::Painter, q: [Pos2; 4], shield: Option<Col
 }
 
 /// The crop overlay's guides, each unit-square point placed on screen by `at`.
-fn draw_crop_guides(painter: &egui::Painter, guides: &[crate::crop_overlay::Polyline], at: impl Fn(f32, f32) -> Pos2) {
+fn draw_crop_guides(painter: &egui::Painter, guides: &[craft_ui::canvas::Polyline], at: impl Fn(f32, f32) -> Pos2) {
     let thin = craft_ui::theme::scale::Stroke::W1.egui(painter.ctx(), Color32::from_white_alpha(90));
     for l in guides {
         painter.add(egui::Shape::line(l.iter().map(|p| at(p[0], p[1])).collect(), thin));
