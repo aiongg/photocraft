@@ -547,7 +547,8 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
     ui.add_space(craft_ui::theme::scale::Space::S4.px());
     let view = s(f, "__view", "selection").to_string();
     let mut shown = view;
-    let mut set = craft_ui::controls::RadioSet::new("color-range-view", tl!("Preview"), &mut shown).item("selection".to_string()).item("image".to_string()).begin(ui);
+    let mut set =
+        craft_ui::controls::RadioSet::new("color-range-view", tl!("Preview"), &mut shown).item("selection".to_string()).item("image".to_string()).begin(ui);
     ui.horizontal(|ui| {
         set.radio(ui, 0, tl!("Selection"));
         ui.add_space(craft_ui::theme::scale::Space::S8.px());

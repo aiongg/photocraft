@@ -536,9 +536,13 @@ fn contour_picker_and_editor_edit_the_effect_curve() {
     // The Contour Editor: drag the second point to 10 % / 30 % (between its neighbours on
     // the measured Cone), make the first point a corner.
     contour::open_editor(&mut f, "fx1", "contour");
-    assert!(contour::set_point(&mut f, 1, 10.0, 30.0));
-    assert!(contour::set_corner(&mut f, 0, true));
-    assert!(!contour::set_point(&mut f, 99, 10.0, 10.0), "no such point");
+    let edited = |f: &Map<String, Value>, corner: bool, input: f32, output: f32| {
+        let (mut points, mut corners) = contour::editor_levels(f).unwrap();
+        points[1] = [input * 2.55, output * 2.55];
+        corners[0] = corner;
+        craft_ui::composites::Curve::from_parts(points, corners)
+    };
+    assert!(contour::set_curve(&mut f, &edited(&f, true, 10.0, 30.0)));
     contour::close_editor(&mut f, true);
     apply(&f, |cmd, p| s.execute(cmd, p).map_err(|e| e.to_string())).unwrap();
     let photocraft_doc::Contour::Custom { name, points, corners } = shadow(&s) else { panic!() };
@@ -550,7 +554,7 @@ fn contour_picker_and_editor_edit_the_effect_curve() {
     // Cancel restores the curve the editor opened with.
     let before = f.clone();
     contour::open_editor(&mut f, "fx1", "contour");
-    contour::set_point(&mut f, 1, 10.0, 10.0);
+    contour::set_curve(&mut f, &edited(&f, false, 10.0, 10.0));
     contour::close_editor(&mut f, false);
     assert_eq!(f, before);
 }

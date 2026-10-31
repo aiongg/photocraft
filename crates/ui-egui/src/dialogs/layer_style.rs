@@ -1460,7 +1460,7 @@ fn blend_if_bar(ui: &mut egui::Ui, id: egui::Id, q: &mut [u8; 4]) -> bool {
 }
 
 fn parse_hex(s: &str) -> Color32 {
-    let [r, g, b] = color_picker_ui::parse_hex(s).unwrap_or([0.0; 3]);
+    let [r, g, b] = crate::dialogs::color_picker_ui::parse_hex(s).unwrap_or([0.0; 3]);
     let byte = |x: f32| (x * 255.0).round() as u8;
     Color32::from_rgb(byte(r), byte(g), byte(b))
 }
