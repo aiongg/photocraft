@@ -1,6 +1,6 @@
 use super::{Arc, DialogKind, Map, PhotocraftApp, Value, b, check_row, json, n, number_row, params, s, select_row};
 use craft_theme::TypeRole;
-use craft_ui::composites::{Form, FormGrid, Notice, SectionLabel, Tone};
+use craft_ui::composites::{FieldControl, Form, FormGrid, Notice, SectionLabel, Tone};
 use craft_ui::controls::{Button, ButtonVariant, Segmented, Select, TextField};
 use craft_ui::primitives::{Content, Text};
 
@@ -207,10 +207,18 @@ fn print_paper_controls(form: &mut Form<'_>, f: &mut Map<String, Value>) {
     let mut selected = if previous.as_ref().is_some_and(Value::is_array) { "custom".to_string() } else { s(f, "paper", "letter") };
     let mut papers: Vec<_> = photocraft_engine::print_cmds::PAPERS.iter().map(|p| (p.0.to_string(), p.0)).collect();
     papers.push(("custom".to_string(), tl!("Custom")));
+    let mut orientation = s(f, "orientation", "portrait");
+    let orientations = [("portrait", tl!("Portrait")), ("landscape", tl!("Landscape"))];
     let edit = form.row(tl!("Paper"), |ui, _| {
-        Select::new("print-paper", tl!("Paper"), &mut selected).rows(papers.len(), |i| papers[i].0.clone(), |i| tl!(papers[i].1)).show(ui)
+        (
+            Select::new("print-paper", tl!("Paper"), &mut selected).rows(papers.len(), |i| papers[i].0.clone(), |i| tl!(papers[i].1)).show(ui),
+            Select::new("print-orient", tl!("Orientation"), &mut orientation).rows(2, |i| orientations[i].0.to_string(), |i| orientations[i].1).show(ui),
+        )
     });
-    if edit.inner.response.changed() {
+    if edit.inner.1.response.changed() {
+        f.insert("orientation".into(), json!(orientation));
+    }
+    if edit.inner.0.response.changed() {
         if selected == "custom" {
             let (w, h) = print_paper_size(f.get("__customPaper").or(previous.as_ref()));
             f.insert("paper".into(), json!([w, h]));
@@ -221,12 +229,27 @@ fn print_paper_controls(form: &mut Form<'_>, f: &mut Map<String, Value>) {
             f.insert("paper".into(), json!(selected));
         }
     }
-    select_row(form, "print-orient", tl!("Orientation"), f, "orientation", &[("portrait", tl!("Portrait")), ("landscape", tl!("Landscape"))]);
     if f.get("paper").is_some_and(Value::is_array) {
         let (mut w, mut h) = print_paper_size(f.get("paper"));
         let units = s(f, "units", "cm");
-        let wc = length_row_range(form, "print-paper-width", tl!("Paper Width"), &mut w, &units, 2, 0.0..=10000.0);
-        let hc = length_row_range(form, "print-paper-height", tl!("Paper Height"), &mut h, &units, 2, 0.0..=10000.0);
+        let k = unit_pt(&units);
+        let (mut wv, mut hv) = ((w / k) as f32, (h / k) as f32);
+        let (w0, h0) = (wv, hv);
+        form.row(tl!("Paper Size"), |ui, _| {
+            let range = 0.0..=10000.0;
+            (
+                crate::widgets::dialog_number_field(ui, "print-paper-width", tl!("Paper Width"), &mut wv, range.clone(), &units, 2).response.own_name(),
+                crate::widgets::dialog_number_field(ui, "print-paper-height", tl!("Paper Height"), &mut hv, range, &units, 2).response,
+            )
+        });
+        let wc = (wv - w0).abs() > 1e-4 && wv.is_finite();
+        let hc = (hv - h0).abs() > 1e-4 && hv.is_finite();
+        if wc {
+            w = f64::from(wv) * k;
+        }
+        if hc {
+            h = f64::from(hv) * k;
+        }
         if wc || hc {
             // Keep points in the command, and let the engine apply orientation and validation.
             f.insert("paper".into(), json!([w, h]));
