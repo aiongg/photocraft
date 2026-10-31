@@ -6,7 +6,7 @@ use craft_ui::list::{ListRow, OpenChange, RowEvent, ThumbSize, ThumbTarget, Togg
 use craft_ui::menu::{ContextMenu, OpenAt};
 use craft_ui::theme::{StrokeExt, ToEgui, Tokens as LibTokens, TokensOf as _};
 
-use super::layer_drag::{MarkAt, mark_of, start_fx_drag, start_layer_drag, start_mask_drag, starts_mask_drag};
+use super::layer_drag::{start_fx_drag, start_layer_drag, start_mask_drag, starts_mask_drag};
 use super::layer_row_ui::{ICON_W, Indicator, TRIANGLE_W};
 use super::layers::simple_lock_toggle;
 use super::mask_thumbs_ui::MaskKind;
@@ -297,7 +297,6 @@ pub(super) fn layer_row(
         .selected(selected)
         .dimmed(!l.visible)
         .highlight(app.canvas_hover_layer == Some(l.id))
-        .drop_mark(mark_of(ctx, MarkAt::Layer(l.id)))
         .layer(true)
         .renaming(renaming)
         .clipped(l.clipped)

@@ -13,7 +13,8 @@
 //! would copy just the selected pixels, which is not supported yet.
 
 use craft_ui::behavior::ListDrag;
-use craft_ui::theme::StrokeExt;
+use craft_ui::list::ListRow;
+use craft_ui::theme::{Tokens as LibTokens, TokensOf as _};
 use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
 
@@ -125,7 +126,8 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
 
 /// Every frame after the document area: a release over another document's canvas drops the
 /// layers there; while the button is held a ghost follows the pointer.
-pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn finish(app: &mut PhotocraftApp, ui: &egui::Ui) {
+    let ctx = ui.ctx();
     if cancelled(ctx) {
         return;
     }
@@ -138,7 +140,7 @@ pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
         } else if let Some(p) = pos
             && app.session.active().is_some_and(|st| st.doc.id != t.source)
         {
-            ghost(ctx, p, &t.drag.label);
+            show_ghost(ui, p, &t.drag.label);
             if target.is_some() {
                 ctx.set_cursor_icon(egui::CursorIcon::Copy);
             }
@@ -185,15 +187,11 @@ fn drop(app: &mut PhotocraftApp, ctx: &egui::Context, dest: usize, at: Option<[f
     }
 }
 
-/// The dragged layers' name next to the pointer (also the Layers panel's reorder drag).
-pub fn ghost(ctx: &egui::Context, p: egui::Pos2, label: &str) {
-    let t = crate::theme::Tokens::get(ctx);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("layer-transfer-ghost")));
-    let g = painter.layout_no_wrap(label.to_string(), egui::FontId::proportional(12.0), t.text);
-    let r = egui::Rect::from_min_size(p + egui::vec2(12.0, -10.0), g.size() + egui::vec2(16.0, 8.0));
-    painter.rect_filled(r, t.radius_sm, t.card.gamma_multiply(0.95));
-    painter.rect_stroke(r, t.radius_sm, craft_ui::theme::scale::Stroke::W1.egui(ctx, t.accent), egui::StrokeKind::Inside);
-    painter.galley(r.min + egui::vec2(8.0, 4.0), g, t.text);
+/// The dragged row's name next to the pointer, once per pass while a row drag is under way
+/// (layers, effects, filters, masks, history states, channels, paths).
+pub fn show_ghost(ui: &egui::Ui, p: egui::Pos2, label: &str) {
+    let style = ListRow::<u8>::style(&LibTokens::of(ui));
+    craft_ui::list::paint_ghost(ui, egui::Id::unique("pc-row-drag"), &style, label, p, 320.0, None);
 }
 
 #[cfg(test)]

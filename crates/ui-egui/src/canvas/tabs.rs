@@ -8,7 +8,7 @@ use craft_ui::theme::StrokeExt;
 pub fn document_area(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     crate::distort_ui::drop_foreign(app);
     documents(app, ui);
-    crate::layer_transfer::finish(app, ui.ctx());
+    crate::layer_transfer::finish(app, ui);
     // Once a frame, not per document view: the right-click or options-bar Brush Preset picker.
     crate::paint_mouse::show_picker(app, ui.ctx());
 }

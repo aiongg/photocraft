@@ -14,7 +14,6 @@ use egui::{Color32, Rect, Sense, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
-use super::layer_drag::{MarkAt, mark_of};
 use super::layer_row_ui::ICON_W;
 use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
@@ -134,9 +133,6 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l
             .dimmed(!on)
             .layer(true)
             .indented_toggles(true);
-        if let Some(i) = index {
-            row = row.drop_mark(mark_of(ui.ctx(), MarkAt::Filter(l.id, i)));
-        }
         if header && thumb_size != ThumbSize::None {
             row = row.thumb(thumb_size, |_, r| mask_cell.set(Some(r)));
             if mask_target {
@@ -374,15 +370,16 @@ fn stack_drop(ui: &egui::Ui, l: &Layer, n: usize, rows: &[(Option<usize>, Rect)]
     let (header, filters) = rows.split_first()?;
     let stack = filters.last().map_or(header.1, |last| header.1.union(last.1));
     if from != l.id || !stack.contains(p) {
-        super::layer_drag::set_filter_mark(ctx, None);
         return None;
     }
     let order: Vec<RowInfo<usize>> = filters.iter().filter_map(|(i, _)| i.map(RowInfo::leaf)).collect();
     let spans: Vec<std::ops::Range<f32>> = filters.iter().map(|(_, r)| r.top()..r.bottom()).collect();
     let resolved = Reorder::new(Axis::Vertical).resolve(&order[..], &spans[..], p.y, &[src], ctx.input(|i| i.modifiers));
     let target = resolved.as_ref().and_then(|r| reorder_target(src, Some(r.mv.target), r.mv.position == DropPosition::Before, n).map(|to| (r, to)));
-    super::layer_drag::set_filter_mark(ctx, target.map(|(r, _)| (l.id, r.mv.target, r.mv.position)));
-    let (_, to) = target?;
+    let (r, to) = target?;
+    if let Some((_, rect)) = filters.iter().find(|(i, _)| *i == Some(r.mv.target)) {
+        super::layer_drag::mark_filter_row(ui, *rect, r.mv.position);
+    }
     ctx.input(|i| i.pointer.any_released()).then(|| (to, ("layer.smartFilter.move".into(), json!({"layer": l.id.0, "index": src, "to": to}))))
 }
 

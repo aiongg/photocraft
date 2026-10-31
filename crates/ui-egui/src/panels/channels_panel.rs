@@ -458,7 +458,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some((_, name)) = &dragged
         && let Some(p) = ctx.input(|i| i.pointer.interact_pos())
     {
-        crate::layer_transfer::ghost(&ctx, p, name);
+        crate::layer_transfer::show_ghost(ui, p, name);
     }
     let mask_layer = masked.as_ref().map(|l| l.id.0);
     let drop = |ui: &egui::Ui, button: &egui::Response, on: Footer| {

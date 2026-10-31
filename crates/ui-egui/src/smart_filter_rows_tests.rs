@@ -195,6 +195,46 @@ fn dragging_a_filter_up_or_down_its_stack_reorders_it() {
     assert_eq!(filters(&h, a), [blur, offset]);
 }
 
+/// Filled rects at most 6 px high and at least 50 px wide painted this pass: a drop line is one.
+fn thin_bars(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> Vec<egui::Rect> {
+    fn walk(s: &egui::Shape, out: &mut Vec<egui::Rect>) {
+        match s {
+            egui::Shape::Vec(v) => v.iter().for_each(|s| walk(s, out)),
+            egui::Shape::Rect(r) if r.fill != egui::Color32::TRANSPARENT && r.rect.height() <= 6.0 && r.rect.width() >= 50.0 => out.push(r.rect),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    h.output().shapes.iter().for_each(|c| walk(&c.shape, &mut out));
+    out
+}
+
+/// The drop line of a filter drag is painted on the row under the pointer in the pass that moved
+/// the pointer there, not the pass after.
+#[test]
+fn the_filter_drop_line_is_on_the_row_under_the_pointer_in_the_same_pass() {
+    let (mut h, _, _, _) = panel();
+    let from = at(&h, "Gaussian Blur");
+    h.hover_at(from);
+    h.run_steps(1);
+    h.drag_at(from);
+    h.run_steps(1);
+    // Far enough to be a drag, still on the grabbed row.
+    h.hover_at(from + egui::vec2(0.0, -1.0));
+    h.run_steps(1);
+    let offset = h.get_by_role_and_label(Role::TreeItem, "Offset").rect();
+    // The upper half of Offset's row: the line is on its top edge, after one step.
+    h.hover_at(offset.center() - egui::vec2(0.0, 6.0));
+    h.run_steps(1);
+    let bars = thin_bars(&h);
+    assert!(bars.iter().any(|b| (b.center().y - offset.top()).abs() < 4.0 && b.width() >= offset.width() * 0.5), "a line on Offset's top edge: {bars:?}");
+    // The lower half would leave the blur where it is: the same step has no line, not the old one.
+    h.hover_at(offset.center() + egui::vec2(0.0, 6.0));
+    h.run_steps(1);
+    let bars = thin_bars(&h);
+    assert!(!bars.iter().any(|b| (b.center().y - offset.top()).abs() < 4.0), "no stale line on Offset's top edge: {bars:?}");
+}
+
 fn click_at(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, p: Pos2) {
     h.hover_at(p);
     h.run_steps(1);

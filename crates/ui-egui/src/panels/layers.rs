@@ -412,7 +412,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // buttons (#736), an effect row on Delete (#3102), a mask's thumbnail (#3113, #3119) and a
     // smart filter's row (#4271); read the drag before it ends.
     let held = held(&ctx, &selection);
-    drag_feedback(&ctx);
+    drag_feedback(ui);
     PanelFooter::show(ui, |ui| {
         let active_layer = active.and_then(|id| doc.layer(id));
         let (delete, label) = if app.ui.vector_mask_target && active_layer.is_some_and(|l| l.vector_mask.is_some()) {

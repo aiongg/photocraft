@@ -111,7 +111,7 @@ pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             // Rows number the past states, then the later (dimmed) ones a non-linear drag can lift.
             HistoryDrag::State(i) => entries.get(i).or_else(|| i.checked_sub(entries.len()).and_then(|j| redo.get(j))).cloned(),
         };
-        crate::layer_transfer::ghost(&ctx, p, &label.unwrap_or_default());
+        crate::layer_transfer::show_ghost(ui, p, &label.unwrap_or_default());
     }
     let mut footer_cmd: Option<(&str, Value)> = None;
     let mut snapshot_dialog = false;

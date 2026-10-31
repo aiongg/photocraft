@@ -323,7 +323,7 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(drag) = &drag
         && let Some(p) = ctx.input(|i| i.pointer.interact_pos())
     {
-        crate::layer_transfer::ghost(&ctx, p, &drag.name);
+        crate::layer_transfer::show_ghost(ui, p, &drag.name);
     }
     let sel = app.ui.selected_path.clone().filter(|s| s != "layer" || has_layer_path).unwrap_or_else(|| "work".into());
     let buttons = crate::widgets::panel_footer(ui, |ui| {

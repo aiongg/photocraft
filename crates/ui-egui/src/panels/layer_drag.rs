@@ -3,7 +3,7 @@ use super::{Layer, LayerId, MaskKind, PhotocraftApp, Rect, StrokeKind, Tokens, V
 use craft_ui::behavior::{Axis, DropPosition, ListDrag, Reorder, RowInfo};
 use craft_ui::edit::EditEvent;
 use craft_ui::icons::Icon;
-use craft_ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, TreeRow};
+use craft_ui::list::{DropMark, ListRow, RowEvent, ToggleColumn, TreeRow, paint_drop_mark};
 use craft_ui::theme::StrokeExt;
 use photocraft_doc::LayerContent;
 use std::ops::Range;
@@ -90,50 +90,14 @@ pub(super) fn edge_scroll(ctx: &egui::Context, viewport: Rect) -> f32 {
 
 /// While a row is dragged: its name by the pointer, and the copy cursor while ⌥ is held for the
 /// rows that copy (layers, effects, filters; not masks).
-pub(super) fn drag_feedback(ctx: &egui::Context) {
+pub(super) fn drag_feedback(ui: &egui::Ui) {
+    let ctx = ui.ctx();
     let Some(drag) = current(ctx) else { return };
     let Some(p) = ctx.input(|i| i.pointer.interact_pos()) else { return };
-    crate::layer_transfer::ghost(ctx, p, &drag.label);
+    crate::layer_transfer::show_ghost(ui, p, &drag.label);
     if !matches!(drag.items.first(), Some(RowKey::Mask(..))) && ctx.input(|i| i.modifiers.alt) {
         ctx.set_cursor_icon(egui::CursorIcon::Copy);
     }
-}
-
-/// Where the drop marker is, from the pass before: a layer row, or a row of a smart object's
-/// filter stack.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MarkAt {
-    Layer(LayerId),
-    Filter(LayerId, usize),
-}
-
-fn mark_key(at: MarkAt) -> egui::Id {
-    egui::Id::unique(match at {
-        MarkAt::Layer(_) => "pc-layers-drop-mark",
-        MarkAt::Filter(..) => "pc-filters-drop-mark",
-    })
-}
-
-type Mark = Option<(MarkAt, DropMark)>;
-
-/// Sets the marker of the layer rows (`at` a layer) or the filter rows (a filter) for the next pass.
-fn set_mark(ctx: &egui::Context, slot: MarkAt, mark: Mark) {
-    if ctx.data(|d| d.get_temp::<Mark>(mark_key(slot))) != Some(mark) {
-        ctx.data_mut(|d| d.insert_temp(mark_key(slot), mark));
-        ctx.request_repaint();
-    }
-}
-
-/// The marker of the filter rows of a smart object's stack: the filter `target` and the side.
-pub(crate) fn set_filter_mark(ctx: &egui::Context, mark: Option<(LayerId, usize, DropPosition)>) {
-    set_mark(ctx, MarkAt::Filter(LayerId(0), 0), mark.map(|(l, i, p)| (MarkAt::Filter(l, i), mark_of_position(p))));
-}
-
-/// The drop marker row `at` shows: the pass before found where the drag lands, so the marker
-/// follows the pointer by one pass.
-pub(crate) fn mark_of(ctx: &egui::Context, at: MarkAt) -> Option<DropMark> {
-    current(ctx)?;
-    ctx.data(|d| d.get_temp::<Mark>(mark_key(at))).flatten().filter(|(m, _)| *m == at).map(|(_, mark)| mark)
 }
 
 fn mark_of_position(position: DropPosition) -> DropMark {
@@ -155,6 +119,18 @@ fn position_name(position: DropPosition) -> &'static str {
 /// The pointer, while it is over the visible part of the panel's rows.
 fn pointer_in(ui: &egui::Ui) -> Option<egui::Pos2> {
     ui.ctx().input(|i| i.pointer.interact_pos()).filter(|p| ui.clip_rect().contains(*p))
+}
+
+/// Marks layer `target`'s row as this pass's drop target.
+fn mark_row(ui: &egui::Ui, drawn: &[DrawnRow], target: LayerId, mark: DropMark) {
+    if let Some(d) = drawn.iter().find(|d| d.layer.id == target) {
+        paint_drop_mark(ui, d.rect, mark);
+    }
+}
+
+/// The marker of filter row `rect` of a smart object's stack for the drop `position`.
+pub(crate) fn mark_filter_row(ui: &egui::Ui, rect: Rect, position: DropPosition) {
+    paint_drop_mark(ui, rect, mark_of_position(position));
 }
 
 /// A layer row dragged onto a Layers panel footer button, as in Photoshop: onto Delete deletes it,
@@ -240,10 +216,7 @@ pub(super) fn start_layer_drag(app: &PhotocraftApp, ctx: &egui::Context, l: &Lay
 pub(super) fn layer_drop(app: &mut PhotocraftApp, ui: &egui::Ui, drawn: &[DrawnRow], actions: &mut Vec<(String, Value)>) {
     let ctx = ui.ctx();
     let Some(drag) = current(ctx) else { return };
-    let Some(p) = pointer_in(ui) else {
-        set_mark(ctx, MarkAt::Layer(LayerId(0)), None);
-        return;
-    };
+    let Some(p) = pointer_in(ui) else { return };
     let released = ctx.input(|i| i.pointer.any_released());
     let alt = ctx.input(|i| i.modifiers.alt);
     match drag.items.first() {
@@ -262,8 +235,8 @@ pub(super) fn layer_drop(app: &mut PhotocraftApp, ui: &egui::Ui, drawn: &[DrawnR
                 });
                 rules.resolve(&rows[..], &spans[..], p.y, &items, ctx.input(|i| i.modifiers))
             };
-            set_mark(ctx, MarkAt::Layer(LayerId(0)), resolved.as_ref().map(|r| (MarkAt::Layer(r.mv.target), mark_of_position(r.mv.position))));
             let Some(r) = resolved else { return };
+            mark_row(ui, drawn, r.mv.target, mark_of_position(r.mv.position));
             let mut payload = layer_drop_payload(items[0].0, r.mv.target, position_name(r.mv.position), &items);
             if r.mv.copy
                 && let Some(o) = payload.as_object_mut()
@@ -283,7 +256,9 @@ pub(super) fn layer_drop(app: &mut PhotocraftApp, ui: &egui::Ui, drawn: &[DrawnR
                 .iter()
                 .find(|d| d.rect.contains(p))
                 .filter(|d| d.layer.id != from && (matches!(drag.items[0], RowKey::Effects(..)) || matches!(d.layer.content, LayerContent::Smart(_))));
-            set_mark(ctx, MarkAt::Layer(LayerId(0)), over.map(|d| (MarkAt::Layer(d.layer.id), DropMark::Into)));
+            if let Some(d) = over {
+                paint_drop_mark(ui, d.rect, DropMark::Into);
+            }
             if let Some(d) = over.filter(|_| released) {
                 actions.push(match drag.items[0] {
                     RowKey::Effects(_, effect) => fx_drop_action(from.0, effect, d.layer.id, alt),
@@ -292,7 +267,7 @@ pub(super) fn layer_drop(app: &mut PhotocraftApp, ui: &egui::Ui, drawn: &[DrawnR
                 });
             }
         }
-        _ => set_mark(ctx, MarkAt::Layer(LayerId(0)), None),
+        _ => {}
     }
 }
 
