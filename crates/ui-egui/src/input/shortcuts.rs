@@ -438,7 +438,7 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     if app.ui.dialogs.is_empty() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
         return false;
     }
-    if craft::ui::menu::any_open(ctx) || craft::ui::menu::bar::is_focused(ctx) || crate::widgets::dropdown_list_open(ctx) || craft::ui::popover::any_open(ctx) {
+    if craft::ui::menu::any_open(ctx) || craft::ui::menu::bar::is_focused(ctx) || (crate::widgets::dropdown_list_open(ctx) && app.ui.stroke_editor.is_none()) {
         return false;
     }
     // ⌘Z in a filter or adjustment dialog steps the dialog's settings, not the document (#4697).
