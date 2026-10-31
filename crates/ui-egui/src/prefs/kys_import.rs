@@ -220,26 +220,13 @@ pub fn show_offer(app: &mut PhotocraftApp, ctx: &egui::Context) {
         ),
         &[("set", &offer.set), ("n", &n)],
     );
-    let mut answer = None;
-    egui::Window::new(tl!("Import keyboard shortcuts?"))
-        .id(egui::Id::unique("kys-offer"))
-        .collapsible(false)
-        .resizable(false)
-        .default_width(440.0)
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(ctx, |ui| {
-            ui.label(line);
-            ui.label(tl!("Edit › Keyboard Shortcuts › Reset All to Defaults undoes an import."));
-            ui.add_space(craft_ui::theme::scale::Space::S8.px());
-            ui.horizontal(|ui| {
-                use crate::widgets::{ButtonRole, DialogButton};
-                let buttons =
-                    [DialogButton::new(ButtonRole::Default, tl!("Import"), 100.0), DialogButton::new(ButtonRole::Alternate, tl!("Don't Import"), 120.0)];
-                if let Some(role) = crate::widgets::dialog_buttons(ui, &buttons) {
-                    answer = Some(role == ButtonRole::Default);
-                }
-            });
-        });
+    let message = format!("{line}\n\n{}", tl!("Edit › Keyboard Shortcuts › Reset All to Defaults undoes an import."));
+    use craft_ui::dialog::ButtonRole;
+    let answer = craft_ui::dialog::Prompt::new("kys-offer", tl!("Import keyboard shortcuts?"), message)
+        .answer(ButtonRole::Default, tl!("Import"), None)
+        .answer(ButtonRole::Alternate, tl!("Don't Import"), None)
+        .show(ctx)
+        .map(|role| role == ButtonRole::Default);
     if let Some(import) = answer {
         answer_offer(app, import);
     }

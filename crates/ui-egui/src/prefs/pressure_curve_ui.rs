@@ -1,22 +1,21 @@
 //! Preferences › Tools › Pressure Curve: the pen's pressure response, edited as points on a curve
 //! (`tools.pressureCurve`, read by the stylus through `photocraft_engine::prefs::PressureCurve`).
 //! Brush Settings uses the same editor for each dynamic's own curve ([`edit_points`]).
-//! Drag a point to move it, click empty space to add one, right-click a point to remove it.
+//! The graph is the library's `CurveEditor`; the presets sit beside it.
 
-use craft_ui::theme::StrokeExt;
-use craft_ui::theme::ToEgui;
-use egui::{Pos2, Sense, Stroke, Vec2, pos2};
+use craft_ui::composites::{Curve, CurveEditor, CurveLabels};
+use craft_ui::controls::{Button, ButtonVariant, ControlSize};
+use craft_ui::edit::EditEvent;
+use craft_ui::localized::LocaleNumbers;
 use photocraft_engine::prefs::PressureCurve;
 use serde_json::{Value, json};
 
-use crate::theme::Tokens;
-
-/// Side of the editing square, in points.
-const SIZE: f32 = 140.0;
-/// egui memory key holding the editing square's rectangle.
-pub(crate) const RECT_KEY: &str = "pressure-curve-rect";
-/// How close (in points) a press must land to grab a point.
-const GRAB: f32 = 8.0;
+/// The editor's top level of input and output: whole percent.
+const LEVELS: f32 = 100.0;
+/// Salt of the Preferences page's editor.
+const SALT: &str = "pressure-curve";
+/// Side of the graph, in points.
+const SIDE: f32 = 150.0;
 
 /// Preset curves: Linear, Soft (light pressure already gives a lot) and Hard (it takes a firm
 /// press to reach full pressure).
@@ -50,102 +49,65 @@ fn round2(x: f32) -> f64 {
 /// The editor. Returns the new value when the curve changed.
 pub(crate) fn editor(ui: &mut egui::Ui, value: &Value) -> Option<Value> {
     let mut points = points_of(value);
-    let changed = edit_points(ui, egui::Id::unique(RECT_KEY), &mut points);
+    let changed = edit_points(ui, egui::Id::unique(SALT), &mut points);
     changed.then(|| value_of(&points))
 }
 
-/// The editor over a list of points (fewer than two reads as linear). `rect_key` is the egui
-/// memory key the editing square's rectangle is stored under, for tests and automation. Returns
+/// The editor over a list of points (fewer than two reads as linear), as the library's
+/// [`CurveEditor`] over 0..=100 levels, with the presets beside it. `id` salts its state. Returns
 /// whether the points changed; they are rounded to two decimals then.
-pub(crate) fn edit_points(ui: &mut egui::Ui, rect_key: egui::Id, points: &mut Vec<[f32; 2]>) -> bool {
-    let t = craft_ui::theme::current(ui.ctx());
+pub(crate) fn edit_points(ui: &mut egui::Ui, id: egui::Id, points: &mut Vec<[f32; 2]>) -> bool {
     if points.len() < 2 {
         *points = vec![[0.0, 0.0], [1.0, 1.0]];
     }
     let mut changed = false;
+    let numbers = LocaleNumbers::of(ui);
+    let sampler = |pts: &[[f32; 2]]| -> Vec<f32> {
+        let unit: Vec<[f32; 2]> = pts.iter().map(|p| [p[0] / LEVELS, p[1] / LEVELS]).collect();
+        let curve = PressureCurve::new(&unit);
+        (0..=LEVELS as u32).map(|i| curve.eval(i as f32 / LEVELS) * LEVELS).collect()
+    };
     // The square with the presets beside it, so the control fits the preferences page's height.
     ui.horizontal_top(|ui| {
-        let (rect, resp) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::click_and_drag());
-        // Where the square is this frame (tests and automation point at curve coordinates).
-        ui.data_mut(|d| d.insert_temp(rect_key, rect));
-        let to_screen = |p: [f32; 2]| pos2(rect.left() + p[0] * rect.width(), rect.bottom() - p[1] * rect.height());
-        let to_curve = |s: Pos2| [((s.x - rect.left()) / rect.width()).clamp(0.0, 1.0), ((rect.bottom() - s.y) / rect.height()).clamp(0.0, 1.0)];
-        let painter = ui.painter_at(rect.expand(4.0));
-        painter.rect_filled(rect, craft_ui::theme::scale::Radius::R2.px(), t.color.surface.sunken.to_egui());
-        for i in 1..4 {
-            let f = i as f32 / 4.0;
-            let grid = craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui());
-            painter.line_segment([pos2(rect.left() + f * rect.width(), rect.top()), pos2(rect.left() + f * rect.width(), rect.bottom())], grid);
-            painter.line_segment([pos2(rect.left(), rect.top() + f * rect.height()), pos2(rect.right(), rect.top() + f * rect.height())], grid);
+        let curve = Curve::Points { points: points.iter().map(|p| [p[0] * LEVELS, p[1] * LEVELS]).collect(), corners: Vec::new() };
+        let shown = CurveEditor::new(id, tl!("Pressure curve"), &curve, &numbers)
+            .levels(LEVELS as u32)
+            .max_points(PressureCurve::MAX_POINTS)
+            .sampler(&sampler)
+            .side(SIDE)
+            .fields(false)
+            .labels(CurveLabels {
+                input: tl!("Input").into(),
+                output: tl!("Output").into(),
+                point: tl!("Point {i} of {n}").into(),
+                point_value: tl!("Input {x}, Output {y}").into(),
+                corner: tl!("Corner").into(),
+                corner_value: tl!("Input {x}, Output {y}, corner").into(),
+                graph_value: tl!("{channel}, {n} points").into(),
+                graph_points: tl!("{n} points").into(),
+                graph_drawn: tl!("{channel}, drawn").into(),
+                drawn: tl!("Drawn").into(),
+                percent: tl!("{n}%").into(),
+            })
+            .show(ui);
+        let before = id.with("before");
+        match shown.event {
+            Some(EditEvent::Begin { .. }) => {
+                ui.data_mut(|d| d.insert_temp(before, points.clone()));
+            }
+            Some(EditEvent::Update { value, .. } | EditEvent::Set { value, .. }) => changed |= take(points, &value),
+            Some(EditEvent::Commit { value, changed: true, .. }) => changed |= take(points, &value),
+            Some(EditEvent::Cancel { .. }) => {
+                if let Some(was) = ui.data(|d| d.get_temp::<Vec<[f32; 2]>>(before)) {
+                    changed |= *points != was;
+                    *points = was;
+                }
+            }
+            _ => {}
         }
-        painter.rect_stroke(
-            rect,
-            craft_ui::theme::scale::Radius::R2.px(),
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.line.control_edge.to_egui()),
-            egui::StrokeKind::Inside,
-        );
-        painter.line_segment(
-            [rect.left_bottom(), rect.right_top()],
-            craft_ui::theme::scale::Stroke::W1.egui(ui.ctx(), t.color.text.muted.to_egui().gamma_multiply(0.35)),
-        );
-
-        // The point under a press is dragged until release (kept in the egui memory).
-        let drag_id = resp.id.with("dragging");
-        let nearest = |at: Pos2, pts: &[[f32; 2]]| {
-            pts.iter().enumerate().map(|(i, p)| (i, to_screen(*p).distance(at))).filter(|(_, d)| *d <= GRAB).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
-        };
-        // The point under the press, not under the pointer when the drag is recognised (by then
-        // it has moved past egui's drag threshold, off the point).
-        if resp.drag_started()
-            && let Some(at) = ui.input(|i| i.pointer.press_origin()).or(resp.interact_pointer_pos())
-        {
-            let grabbed = nearest(at, points);
-            ui.data_mut(|d| d.insert_temp(drag_id, grabbed));
-        }
-        let dragging: Option<usize> = ui.data(|d| d.get_temp(drag_id)).flatten();
-        if let (Some(i), Some(at)) = (dragging, resp.interact_pointer_pos().filter(|_| resp.dragged()))
-            && let Some(p) = points.get_mut(i)
-        {
-            *p = to_curve(at);
-            changed = true;
-        }
-        if resp.drag_stopped() {
-            ui.data_mut(|d| d.insert_temp::<Option<usize>>(drag_id, None));
-        }
-        if resp.clicked()
-            && let Some(at) = resp.interact_pointer_pos()
-            && nearest(at, points).is_none()
-            && points.len() < PressureCurve::MAX_POINTS
-        {
-            points.push(to_curve(at));
-            changed = true;
-        }
-        if resp.secondary_clicked()
-            && let Some(at) = resp.interact_pointer_pos()
-            && let Some(i) = nearest(at, points)
-            && points.len() > 2
-        {
-            points.remove(i);
-            changed = true;
-        }
-
-        let curve = PressureCurve::new(points);
-        let line: Vec<Pos2> = (0..=64).map(|i| i as f32 / 64.0).map(|x| to_screen([x, curve.eval(x)])).collect();
-        painter.add(egui::Shape::line(line, craft_ui::theme::scale::Stroke::W2.egui(ui.ctx(), t.color.accent.solid.to_egui())));
-        for (i, p) in points.iter().enumerate() {
-            let active = dragging == Some(i);
-            painter.circle(
-                to_screen(*p),
-                if active { 5.0 } else { 4.0 },
-                if active { t.color.accent.solid.to_egui() } else { t.color.surface.sunken.to_egui() },
-                craft_ui::theme::scale::Stroke::W1_5.egui(ui.ctx(), t.color.accent.solid.to_egui()),
-            );
-        }
-        resp.on_hover_text(tl!("Click to add a point, right-click to remove"));
-
         ui.vertical(|ui| {
             for (name, preset) in PRESETS {
-                if ui.small_button(tl!(name)).clicked() {
+                if ui.add(Button::new(tl!(name)).variant(ButtonVariant::Secondary).size(ControlSize::Sm)).clicked() {
                     *points = preset.to_vec();
                     changed = true;
                 }
@@ -159,6 +121,15 @@ pub(crate) fn edit_points(ui: &mut egui::Ui, rect_key: egui::Id, points: &mut Ve
         }
     }
     changed
+}
+
+/// Sets `points` from the library's curve (levels back to 0..1); whether they differ.
+fn take(points: &mut Vec<[f32; 2]>, curve: &Curve) -> bool {
+    let Curve::Points { points: levels, .. } = curve else { return false };
+    let next: Vec<[f32; 2]> = levels.iter().map(|p| [p[0] / LEVELS, p[1] / LEVELS]).collect();
+    let differs = next != *points;
+    *points = next;
+    differs
 }
 
 #[cfg(test)]
@@ -180,49 +151,9 @@ mod tests {
         h
     }
 
-    /// The screen position of curve point `p` (the editor's square starts at the panel's origin).
-    fn at(h: &Harness<'static, Value>, p: [f32; 2]) -> Pos2 {
-        let r: egui::Rect = h.ctx.data(|d| d.get_temp(egui::Id::unique(RECT_KEY))).expect("the editor ran");
-        pos2(r.left() + p[0] * r.width(), r.bottom() - p[1] * r.height())
-    }
-
-    fn press(h: &mut Harness<'static, Value>, p: Pos2, button: egui::PointerButton, release: Pos2) {
-        h.event(egui::Event::PointerMoved(p));
-        h.run_steps(1);
-        h.event(egui::Event::PointerButton { pos: p, button, pressed: true, modifiers: Default::default() });
-        h.run_steps(1);
-        if release != p {
-            h.event(egui::Event::PointerMoved(pos2((p.x + release.x) / 2.0, (p.y + release.y) / 2.0)));
-            h.run_steps(1);
-            h.event(egui::Event::PointerMoved(release));
-            h.run_steps(1);
-        }
-        h.event(egui::Event::PointerButton { pos: release, button, pressed: false, modifiers: Default::default() });
-        h.run_steps(2);
-    }
-
     #[test]
-    fn click_adds_right_click_removes_drag_moves_and_presets_replace() {
+    fn presets_replace_the_curve() {
         let mut h = harness(json!([[0.0, 0.0], [1.0, 1.0]]));
-        // A click on empty space adds a point there.
-        let p = at(&h, [0.5, 0.2]);
-        press(&mut h, p, egui::PointerButton::Primary, p);
-        let pts = points_of(h.state());
-        assert_eq!(pts.len(), 3, "{pts:?}");
-        assert!(pts.iter().any(|q| (q[0] - 0.5).abs() < 0.03 && (q[1] - 0.2).abs() < 0.03), "{pts:?}");
-        // Dragging it moves it.
-        let (from, to) = (at(&h, [0.5, 0.2]), at(&h, [0.4, 0.7]));
-        press(&mut h, from, egui::PointerButton::Primary, to);
-        let pts = points_of(h.state());
-        assert!(pts.iter().any(|q| (q[0] - 0.4).abs() < 0.03 && (q[1] - 0.7).abs() < 0.03), "{pts:?}");
-        // A right-click on it removes it; the last two points can't be removed.
-        let p = at(&h, [0.4, 0.7]);
-        press(&mut h, p, egui::PointerButton::Secondary, p);
-        assert_eq!(points_of(h.state()).len(), 2);
-        let p = at(&h, [1.0, 1.0]);
-        press(&mut h, p, egui::PointerButton::Secondary, p);
-        assert_eq!(points_of(h.state()).len(), 2, "a curve keeps at least two points");
-        // A preset replaces the curve.
         h.get_by_label("Soft").click();
         h.run_steps(2);
         assert_eq!(points_of(h.state()), vec![[0.0, 0.0], [0.3, 0.6], [1.0, 1.0]]);

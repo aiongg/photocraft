@@ -1,12 +1,11 @@
 use super::dialogs::open_preferences;
-use super::fields::{choice_label, color_of, preference_matches};
+use super::fields::color_of;
 use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
 use craft_theme::{
     AppChoice, AppDefaults, AppId, Appearance, Mode, ModeChoice, MotionChoice, Selection, Size, SystemAppearance, ThemeDef, ThemeId, ThemePair, Variants,
 };
 use craft_theme_store::{Accepted, StoreOptions, SuiteClient, SuiteDir, SuiteWatch};
 use craft_ui::theme::StrokeExt;
-use std::sync::Arc;
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
@@ -400,102 +399,35 @@ fn theme_swatch(ui: &mut egui::Ui, choice: &ThemeChoice, mode: Mode, selected: &
     }
 }
 
-/// A grid row of theme swatches, marked Active when the appearance mode shows this family.
-fn theme_row(ui: &mut egui::Ui, title: &str, active: bool, mode: Mode, selected: &mut String, favorites: &mut Vec<String>, options: &[ThemeChoice]) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tl!(title)).color(t.text_dim));
+/// The swatches of one theme slot (`themeLight` or `themeDark`), marked Active when the
+/// appearance mode shows this family. A built-in theme picked here brings the Size that keeps its
+/// geometry; an empty slot follows the suite.
+pub(super) fn theme_slot(ui: &mut egui::Ui, obj: &mut Map<String, Value>, choices: &[ThemeChoice], system: Option<egui::Theme>, dark: bool) {
+    let text = |obj: &Map<String, Value>, k: &str| obj.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+    let mode = obj.get("appearanceMode").and_then(Value::as_str).unwrap_or("dark");
+    let light_active = mode == "light" || (mode == "auto" && system == Some(egui::Theme::Light));
+    let active = light_active != dark;
+    let key = if dark { "themeDark" } else { "themeLight" };
+    let mut selected = text(obj, key);
+    let was = selected.clone();
+    let mut favorites: Vec<String> = obj.get("favoriteThemes").cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
     ui.horizontal_wrapped(|ui| {
         // Room for the favourite star badges on the swatch corners.
         ui.spacing_mut().item_spacing.x = 6.0;
-        for choice in options {
-            theme_swatch(ui, choice, mode, selected, favorites);
+        let offered = choices.iter().filter(|c| c.variants != if dark { Variants::LightOnly } else { Variants::DarkOnly });
+        for choice in offered {
+            theme_swatch(ui, choice, if dark { Mode::Dark } else { Mode::Light }, &mut selected, &mut favorites);
         }
         if active {
             ui.add_space(craft_ui::theme::scale::Space::S6.px());
             ui.label(RichText::new(tl!("Active")).color(craft_ui::theme::ToEgui::to_egui(craft_ui::theme::current(ui.ctx()).color.accent.text)).small());
         }
     });
-    ui.end_row();
-}
-
-/// Which of the Appearance rows drawn by `appearance_rows` a search shows.
-#[derive(Clone, Copy)]
-pub(super) struct AppearanceRows {
-    mode: bool,
-    light: bool,
-    dark: bool,
-    size: bool,
-}
-
-impl AppearanceRows {
-    /// `query` is lowercased; empty shows every row.
-    pub(super) fn matching(query: &str) -> Self {
-        let shown = |key: &str| query.is_empty() || preference_matches("interface", key, query);
-        Self { mode: shown("appearanceMode"), light: shown("lightTheme"), dark: shown("darkTheme"), size: shown("size") }
-    }
-
-    pub(super) fn any(self) -> bool {
-        self.mode || self.light || self.dark || self.size
-    }
-}
-
-/// The themes the Appearance rows offer, set by the dialog body each frame.
-pub(crate) fn offer_themes(ctx: &egui::Context, themes: Vec<ThemeChoice>) {
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new("appearance-theme-choices"), Arc::new(themes)));
-}
-
-/// Appearance Mode, the light and dark Color Theme swatches and Size, as rows of the Appearance
-/// grid. The swatches write `themeLight`/`themeDark`; an empty slot follows the suite.
-pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, system: Option<egui::Theme>, rows: AppearanceRows) {
-    let t = Tokens::get(ui.ctx());
-    let choices: Arc<Vec<ThemeChoice>> = ui.ctx().data(|d| d.get_temp(egui::Id::new("appearance-theme-choices"))).unwrap_or_default();
-    let mut mode = obj.get("appearanceMode").and_then(Value::as_str).unwrap_or("dark").to_string();
-    if rows.mode {
-        ui.label(RichText::new(tl!("Appearance Mode")).color(t.text_dim));
-        let modes: [(String, &str); 3] = [("auto".into(), tl!("Sync with system")), ("dark".into(), tl!("Dark")), ("light".into(), tl!("Light"))];
-        let pairs: Vec<(String, &str)> = modes.iter().map(|(id, label)| (id.clone(), *label)).collect();
-        crate::widgets::dropdown(ui, "appearance-mode", tl!("Appearance Mode"), &mut mode, &pairs, 220.0);
-        ui.end_row();
-    }
-    let light_active = mode == "light" || (mode == "auto" && system == Some(egui::Theme::Light));
-    obj.insert("appearanceMode".into(), json!(mode));
-    let text = |obj: &Map<String, Value>, k: &str| obj.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-    let (mut light, mut dark) = (text(obj, "themeLight"), text(obj, "themeDark"));
-    let (was_light, was_dark) = (light.clone(), dark.clone());
-    let mut favorites: Vec<String> = obj.get("favoriteThemes").cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-    if rows.light {
-        let options: Vec<ThemeChoice> = choices.iter().filter(|c| c.variants != Variants::DarkOnly).cloned().collect();
-        theme_row(ui, "Light Theme", light_active, Mode::Light, &mut light, &mut favorites, &options);
-    }
-    if rows.dark {
-        let options: Vec<ThemeChoice> = choices.iter().filter(|c| c.variants != Variants::LightOnly).cloned().collect();
-        theme_row(ui, "Dark Theme", !light_active, Mode::Dark, &mut dark, &mut favorites, &options);
-    }
-    obj.insert("themeLight".into(), json!(light));
-    obj.insert("themeDark".into(), json!(dark));
+    obj.insert(key.into(), json!(selected));
     obj.insert("favoriteThemes".into(), json!(favorites));
-    // A built-in theme picked here brings the Size that keeps its geometry.
-    let picked = if light != was_light {
-        Some(&light)
-    } else if dark != was_dark {
-        Some(&dark)
-    } else {
-        None
-    };
-    if let Some(size) = picked.and_then(|id| default_size(id)) {
+    if selected != was
+        && let Some(size) = default_size(&selected)
+    {
         obj.insert("size".into(), json!(size));
-    }
-    if rows.size {
-        let mut size = text(obj, "size");
-        if size.is_empty() {
-            size = "suite".into();
-        }
-        ui.label(RichText::new(tl!("Size")).color(t.text_dim));
-        let sizes: [(String, &str); 3] =
-            [("suite".into(), tl!("Suite default")), ("compact".into(), tl!("Compact")), ("comfortable".into(), tl!("Comfortable"))];
-        let pairs: Vec<(String, &str)> = sizes.iter().map(|(id, label)| (id.clone(), *label)).collect();
-        crate::widgets::dropdown(ui, "appearance-size", tl!("Size"), &mut size, &pairs, 220.0);
-        obj.insert("size".into(), json!(size));
-        ui.end_row();
     }
 }

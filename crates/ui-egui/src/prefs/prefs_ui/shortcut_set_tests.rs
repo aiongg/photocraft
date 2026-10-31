@@ -160,7 +160,7 @@ fn pick_set(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
     // combo that just opened, not the last match in the whole dialog.
     let option = h
         .query_all_by_label(label)
-        .filter(|n| n.accesskit_node().role() == egui::accesskit::Role::Button)
+        .filter(|n| matches!(n.accesskit_node().role(), egui::accesskit::Role::Button | egui::accesskit::Role::ListBoxOption))
         .min_by(|a, b| a.rect().center().distance(at).total_cmp(&b.rect().center().distance(at)));
     option.expect("the set in the open list").click();
     h.run_steps(3);

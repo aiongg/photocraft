@@ -1,6 +1,8 @@
 /// Whether the page of `section` has a setting the window shows.
 fn has_visible_fields(values: &Value, section: &str) -> bool {
-    super::window::pages(values, &Value::Null, None).iter().any(|p| p.id == section && p.has_content())
+    super::window::pages(values, &Value::Null, None, &craft_ui::interface_scale::InterfaceScaleLabels::default())
+        .iter()
+        .any(|p| p.id == section && p.has_content())
 }
 
 /// The Preferences dialog of `section`, drawn by the dialog host.
@@ -148,7 +150,7 @@ fn preferences_search_matches_editable_fields_across_sections() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let id = open_preferences(&mut app, "general");
     let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
-    let host = super::window::Host::new(&mut app, &mut fields, None);
+    let host = super::window::Host::new(&mut app, &mut fields, None, &craft_ui::interface_scale::InterfaceScaleLabels::default());
     let specs = craft_ui::preferences::PreferencesHost::pages(&host);
     let contains = |needle: &str, section: &str| craft_ui::preferences::list_pages(&specs, needle).iter().any(|l| specs[l.index].id == section);
     assert!(contains("UI Scale", "interface"));
@@ -446,7 +448,10 @@ fn system_theme_menu_choice_stays_checked_as_the_appearance_changes() {
 
 #[test]
 fn preferences_interface_offers_and_applies_sync_with_system() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, store) = app_with_store();
     app.run("prefs.set", json!({"values": {"interface.language": "en", "interface.darkTheme": "solarizedDark", "interface.lightTheme": "adwaita"}})).unwrap();
     let interface = app.session.prefs().interface.clone();
@@ -487,7 +492,10 @@ fn preferences_interface_offers_and_applies_sync_with_system() {
 
 #[test]
 fn theme_star_saves_favorite_and_menu_groups_it() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, _) = app_with_store();
     open_preferences(&mut app, "interface");
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
@@ -518,7 +526,10 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
 /// after it, or the row would shift under the pointer.
 #[test]
 fn theme_star_badge_on_hover_does_not_move_the_next_swatch() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, _) = app_with_store();
     open_preferences(&mut app, "interface");
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
@@ -539,7 +550,10 @@ fn theme_star_badge_on_hover_does_not_move_the_next_swatch() {
 fn preferences_interface_shows_language_without_scrolling() {
     // #2532: in a small window the theme cards filled the page and Language sat out of view
     // below them. Like Photoshop, Presentation follows Appearance and both fit.
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, _) = app_with_store();
     app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
     open_preferences(&mut app, "interface");
@@ -548,8 +562,8 @@ fn preferences_interface_shows_language_without_scrolling() {
         app
     });
     h.run_steps(4);
-    let language = h.query_all_by_label("Language").next().expect("the Language row").rect();
-    let dark = h.query_all_by_label("Dark Theme").next().expect("the dark theme row").rect();
+    let language = h.query_all_by_label("Language").find(|n| n.accesskit_node().bounding_box().is_some()).expect("the Language row").rect();
+    let dark = h.query_all_by_label("Size").find(|n| n.accesskit_node().bounding_box().is_some()).expect("the Size row, below the theme rows").rect();
     let ok = h.get_by_label("OK").rect();
     assert!(dark.bottom() < language.top(), "Presentation {language:?} follows the theme swatches {dark:?}");
     assert!(language.bottom() < ok.top() - 20.0, "Language {language:?} must show above the buttons {ok:?} without scrolling");
@@ -561,7 +575,10 @@ fn preferences_interface_shows_language_without_scrolling() {
 
 #[test]
 fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let render = |search: &str| {
         let (mut app, _) = app_with_store();
         app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
@@ -1520,7 +1537,10 @@ fn preferences_persist_through_services_and_theme_follows() {
 
 #[test]
 fn preset_export_dialog_offers_tool_presets() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     let opened = crate::menus::invoke(&mut app, &ctx, "edit.presets.exportImportPresets", json!({})).unwrap();
@@ -1647,7 +1667,10 @@ fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_value
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
 #[test]
 fn system_title_bar_explains_next_launch_and_preserves_apply_and_cancel() {
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
 
     let (mut app, store) = app_with_store();
     app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
@@ -2031,7 +2054,10 @@ fn edit_dialogs_open() {
 #[test]
 fn reset_section_on_type_keeps_the_favourite_fonts() {
     // The favourites are the font menu's library, not a Type setting.
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
     let (mut app, store) = app_with_store();
     app.run("prefs.set", json!({"values": {"interface.language": "en", "type.smartQuotes": false}})).unwrap();
     app.run("type.font.favorite", json!({"family": "Bebas Neue"})).unwrap();
