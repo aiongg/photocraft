@@ -40,7 +40,7 @@ pub fn mode(app: &PhotocraftApp) -> bool {
     let s = &app.crop.straighten;
     app.ui.tool == Tool::Crop
         && match app.crop.drag {
-            Some(d) => d.kind == crate::crop_ui::DragKind::Line,
+            Some(d) => d.press.kind() == craft::draw::ui::CropPressKind::Straighten,
             None => s.armed || s.held,
         }
 }
@@ -92,7 +92,8 @@ pub fn options_button(s: &mut Straighten, ui: &mut egui::Ui) {
 mod tests {
     use super::*;
     use crate::canvas::{ToolEvent, tool_event};
-    use crate::crop_ui::{DragKind, ensure_frame, test_drag};
+    use crate::crop_ui::{ensure_frame, test_drag};
+    use craft::draw::ui::CropPressKind;
     use egui::Modifiers;
     use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 
@@ -235,14 +236,14 @@ mod tests {
         // A ⌘-drag whose release went to the temporary Hand (Space pressed mid-line).
         tool_event(&mut app, ToolEvent::Down { x: 0.0, y: 0.0, pressure: 1.0 }, CMD);
         tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 17.6, pressure: 1.0 }, CMD);
-        assert!(app.crop.drag.is_some_and(|d| d.kind == DragKind::Line));
+        assert!(app.crop.drag.is_some_and(|d| d.press.kind() == CropPressKind::Straighten));
         // The next plain drag inside the frame moves it, and ends.
         drag(&mut app, &[[50.0, 40.0], [60.0, 40.0]], NONE);
         assert_eq!((app.ui.crop_rect, app.ui.crop_angle), (Some([30.0, 20.0, 130.0, 70.0]), 0.0));
         assert!(app.crop.drag.is_none());
     }
 
-    /// A Straighten line's end points snap as point gestures (until craft-ui row 100): a line a
+    /// A Straighten line's end points snap as point gestures: a line a
     /// few pixels off level on both ends snaps onto the document's centre line, so it is level.
     #[test]
     fn straighten_line_end_points_snap() {
@@ -269,7 +270,7 @@ mod tests {
         // A ⌘-drag outside the frame draws the line instead of turning the frame about the pointer.
         tool_event(&mut app, ToolEvent::Down { x: 250.0, y: 60.0, pressure: 1.0 }, CMD);
         tool_event(&mut app, ToolEvent::Move { x: 150.0, y: 0.0, pressure: 1.0 }, CMD);
-        assert!(app.crop.drag.is_some_and(|d| d.kind == DragKind::Line));
+        assert!(app.crop.drag.is_some_and(|d| d.press.kind() == CropPressKind::Straighten));
         tool_event(&mut app, ToolEvent::Up { x: 0.0, y: 0.0 }, CMD);
         // From (250, 60) to (0, 0): nearer horizontal, rising to the left.
         let want = (60.0f64 / 250.0).atan().to_degrees();
@@ -282,6 +283,6 @@ mod tests {
         // And a ⌘-drag in the middle of a crop gesture doesn't hijack it.
         app.crop.drag = Some(test_drag());
         crate::crop_ui::pointer(&mut app, ToolEvent::Down { x: 100.0, y: 50.0, pressure: 1.0 }, CMD);
-        assert!(app.crop.drag.is_some_and(|d| d.kind != DragKind::Line));
+        assert!(app.crop.drag.is_some_and(|d| d.press.kind() != CropPressKind::Straighten));
     }
 }

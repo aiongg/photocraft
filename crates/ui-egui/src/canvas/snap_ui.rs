@@ -359,12 +359,6 @@ pub(crate) fn crop_snap(app: &PhotocraftApp) -> Option<CropSnap> {
 }
 
 impl CropSnap {
-    /// The Straighten line's end point `p` snapped as a point gesture, until craft-ui row 100, and
-    /// the lines it reaches.
-    pub(crate) fn line_point(&self, p: [f64; 2]) -> ([f64; 2], Vec<SnapLine>) {
-        self.targets.snap_point(p, self.tol)
-    }
-
     /// The document vector that moves the part `part` of `frame` (what the pointer gives now) onto
     /// its snap target, and the alignment lines it reaches. The frame's edges and centre snap when
     /// it moves (or the image moves under it), so content can be centred in it (#8580); a handle or

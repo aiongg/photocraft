@@ -608,7 +608,7 @@ fn agent_right_click_during_its_crop_drag_opens_no_menu() {
     app.ui.canvas_tool_menu = None;
     crate::crop_straighten::toggle(&mut app);
     pointer(&mut app, "left", json!([{"kind":"down","x":6,"y":6},{"kind":"move","x":20,"y":8}]));
-    assert!(app.crop.drag.is_some_and(|d| d.kind == crate::crop_ui::DragKind::Line), "the Straighten line is still down");
+    assert!(app.crop.drag.is_some_and(|d| d.press.kind() == craft::draw::ui::CropPressKind::Straighten), "the Straighten line is still down");
     pointer(&mut app, "secondary", right_click);
     assert!(app.ui.canvas_tool_menu.is_none(), "no menu over the Straighten line");
 }

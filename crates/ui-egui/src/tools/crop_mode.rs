@@ -161,11 +161,14 @@ fn remap(p: [f64; 2], from: PressView, to: PressView, flip: bool) -> [f64; 2] {
 /// point the canvas would report for the same screen position now.
 pub fn control_point(app: &PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
     let press = match app.crop.drag {
-        Some(crate::crop_ui::CropDrag {
-            kind: crate::crop_ui::DragKind::Move | crate::crop_ui::DragKind::Turn | crate::crop_ui::DragKind::Resize(..),
-            view,
-            ..
-        }) => view,
+        Some(crate::crop_ui::CropDrag { press, view })
+            if matches!(
+                press.kind(),
+                craft::draw::ui::CropPressKind::Move | craft::draw::ui::CropPressKind::Turn | craft::draw::ui::CropPressKind::Resize(_)
+            ) =>
+        {
+            view
+        }
         _ => None,
     };
     match (press, press_view(app)) {

@@ -206,7 +206,7 @@ fn moving_the_image_centres_a_larger_box_on_a_layer() {
     sync(&mut app, None);
     let p = xf(&app).to_doc(mid_of(screen_box(&app)));
     tool_event(&mut app, ToolEvent::Down { x: p[0], y: p[1], pressure: 1.0 }, NONE);
-    assert!(app.crop.drag.is_some_and(|d| d.kind == crate::crop_ui::DragKind::Move));
+    assert!(app.crop.drag.is_some_and(|d| d.press.kind() == craft::draw::ui::CropPressKind::Move));
     assert!(app.prefs_rt.snap_lines.is_empty(), "a turned box doesn't snap");
     tool_event(&mut app, ToolEvent::Up { x: p[0], y: p[1] }, NONE);
 }

@@ -358,29 +358,41 @@ pub(super) fn draw_tool_state(app: &PhotocraftApp, painter: &egui::Painter, xf: 
     }
     crate::blur_pins::draw(app, painter, xf);
     if let (Some(b), view) = (crate::crop_ui::crop_box(app), xf.canvas_view()) {
-        use craft::draw::ui::{CropFrame, CropNames};
+        use craft::draw::ui::{CropFrame, CropLabels, CropNames};
+        use craft::ui::localized::Labels as _;
+        // The numbers of the interface language: the library's own lookup by context is not public.
+        let numbers =
+            |app: &PhotocraftApp| craft::ui::localized::LocaleNumbers::from_tag(crate::i18n::Lang::from_pref(&app.session.prefs().interface.language).code());
         let style = CropFrame::style(&craft::ui::theme::current(painter.ctx()));
         let frame = CropFrame::new("crop-tool", &b, CropNames::default())
             .shield(crate::crop_shield::current(app, painter.ctx()))
             .guide(crate::crop_overlay::current_guide(app));
         frame.paint(painter, &view, &style, &b, None);
-        // Straighten's line over its halo, and its angle beside the pointer.
-        if let Some(press) = app.crop.drag.map(|d| d.press).filter(|p| p.line().is_some()) {
-            frame.paint_gesture(painter, &style, &press, hover.unwrap_or_default(), None);
-            if let (Some([from, to]), Some(h)) = (press.line(), hover) {
-                let (a, b) = (xf.to_doc(from), xf.to_doc(to));
-                let deg = (-(b[1] - a[1])).atan2(b[0] - a[0]).to_degrees();
-                if deg.is_finite() && a != b {
-                    draw_value_readout(app, painter.ctx(), "crop-straighten-readout", h, ["Angle:"], [angle_readout(deg)]);
+        // Straighten's line over its halo and the gesture's readout beside the pointer: the
+        // frame's W × H while it is drawn or resized (#1919), its angle while it turns (#1792) and
+        // the Straighten line's angle.
+        if let Some(press) = app.crop.drag.map(|d| d.press) {
+            // The library writes W and H in document pixels, so a document whose rulers show
+            // another unit keeps PhotoCraft's readouts (they convert to the ruler unit).
+            let px = app.session.prefs().units_and_rulers.rulers == photocraft_engine::prefs::Unit::Pixels;
+            let units = app.session.active().filter(|_| px).map(|s| crate::rulers::ruler_units_with(app, numbers(app), &s.doc)[0].clone());
+            let readout = units.map(|u| (CropLabels::of_ctx(painter.ctx()), u));
+            let shown = readout.as_ref().filter(|_| app.session.prefs().tools.show_transformation_values).map(|(l, u)| (l, u));
+            frame.paint_gesture(painter, &style, &press, hover.unwrap_or_default(), shown);
+            if readout.is_none() {
+                if let (Some([from, to]), Some(h)) = (press.line(), hover) {
+                    let (a, b) = (xf.to_doc(from), xf.to_doc(to));
+                    let deg = (-(b[1] - a[1])).atan2(b[0] - a[0]).to_degrees();
+                    if deg.is_finite() && a != b {
+                        draw_value_readout(app, painter.ctx(), "crop-straighten-readout", h, ["Angle:"], [angle_readout(deg)]);
+                    }
+                }
+                if let (Some(a), Some(h)) = (crate::crop_ui::turning(app), hover) {
+                    draw_value_readout(app, painter.ctx(), "crop-angle-readout", h, ["Angle:"], [angle_readout(a)]);
+                } else if let (Some([w, h]), Some(at)) = (crate::crop_ui::sizing(app), hover) {
+                    draw_marquee_readout(app, painter.ctx(), at, size_readout(app, [0.0, 0.0, w, h]));
                 }
             }
-        }
-        // The frame's angle beside the pointer while it turns (#1792).
-        if let (Some(a), Some(h)) = (crate::crop_ui::turning(app), hover) {
-            draw_value_readout(app, painter.ctx(), "crop-angle-readout", h, ["Angle:"], [angle_readout(a)]);
-        } else if let (Some([w, h]), Some(at)) = (crate::crop_ui::sizing(app), hover) {
-            // Its W × H while it is drawn or resized (#1919), like the marquee's.
-            draw_marquee_readout(app, painter.ctx(), at, size_readout(app, [0.0, 0.0, w, h]));
         }
     }
 }

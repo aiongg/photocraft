@@ -176,10 +176,15 @@ fn guide_key(vertical: bool, index: usize) -> u64 {
 
 /// The ruler unit of each axis (x, y) for `doc` from Preferences › Units & Rulers.
 pub(crate) fn ruler_units(app: &PhotocraftApp, ui: &egui::Ui, doc: &Document) -> [RulerUnits; 2] {
+    ruler_units_with(app, (*LocaleNumbers::of(ui)).clone(), doc)
+}
+
+/// [`ruler_units`] for code with no `Ui`, given the locale's numbers.
+pub(crate) fn ruler_units_with(app: &PhotocraftApp, numbers: LocaleNumbers, doc: &Document) -> [RulerUnits; 2] {
     let ur = &app.session.prefs().units_and_rulers;
     let (unit, ppi) = (ur.rulers, ur.point_size.per_inch());
     let dpi = f64::from(doc.resolution_dpi.max(1.0));
-    let numbers = (*LocaleNumbers::of(ui)).clone().ungrouped();
+    let numbers = numbers.ungrouped();
     [f64::from(doc.size.width), f64::from(doc.size.height)].map(|extent| RulerUnits {
         per_doc: 1.0 / unit.to_px(1.0, dpi, extent, ppi).max(1e-9),
         ticks: Ticks::Decimal { whole: unit == Unit::Pixels },

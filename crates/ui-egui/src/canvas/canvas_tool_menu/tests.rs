@@ -1128,7 +1128,7 @@ fn no_crop_menu_while_the_left_button_draws_a_straighten_line() {
         h.event(egui::Event::PointerMoved(center + vec2(8.0 * k as f32, 4.0)));
         h.run_steps(1);
     }
-    assert!(h.state().crop.drag.is_some_and(|d| d.kind == crate::crop_ui::DragKind::Line), "the left button draws a Straighten line");
+    assert!(h.state().crop.drag.is_some_and(|d| d.press.kind() == craft::draw::ui::CropPressKind::Straighten), "the left button draws a Straighten line");
     right_click(&mut h, center + vec2(32.0, 4.0), Modifiers::NONE);
     assert!(h.state().ui.canvas_tool_menu.is_none(), "no menu over the line");
 }

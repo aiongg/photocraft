@@ -163,19 +163,6 @@ fn the_frame_is_edited_from_a_press_until_commit_cancel_or_another_tool() {
 }
 
 #[test]
-fn hit_test_finds_handles_inside_and_outside() {
-    let r = [10.0, 10.0, 110.0, 60.0];
-    assert_eq!(hit(r, [10.0, 10.0], 4.0), Hit::Handle(-1, -1));
-    assert_eq!(hit(r, [112.0, 61.0], 4.0), Hit::Handle(1, 1));
-    assert_eq!(hit(r, [60.0, 8.0], 4.0), Hit::Handle(0, -1));
-    assert_eq!(hit(r, [108.0, 30.0], 4.0), Hit::Handle(1, 0));
-    assert_eq!(hit(r, [60.0, 30.0], 4.0), Hit::Inside);
-    assert_eq!(hit(r, [150.0, 30.0], 4.0), Hit::Outside);
-    // A tiny frame keeps a movable middle.
-    assert_eq!(hit([0.0, 0.0, 4.0, 4.0], [2.0, 2.0], 8.0), Hit::Inside);
-}
-
-#[test]
 fn dragging_inside_moves_the_frame() {
     let mut app = app(SampleType::U8);
     drag(&mut app, &[[20.0, 20.0], [80.0, 60.0]], NONE);
@@ -1146,13 +1133,13 @@ fn readout_shows_the_frame_size_while_drawing_or_resizing() {
     let to = [grab[0] + 10.0 * 30f64.to_radians().cos(), grab[1] + 10.0 * 30f64.to_radians().sin()];
     ev(&mut app, ToolEvent::Down { x: grab[0], y: grab[1], pressure: 1.0 });
     ev(&mut app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 });
-    assert!(matches!(app.crop.drag, Some(CropDrag { kind: DragKind::Resize(..), .. })));
+    assert!(matches!(app.crop.drag.map(|d| d.press.kind()), Some(CropPressKind::Resize(_))));
     assert_eq!(sizing(&app), Some([90.0, 40.0]));
     ev(&mut app, ToolEvent::Up { x: to[0], y: to[1] });
     // Moving shows no size.
     ev(&mut app, ToolEvent::Down { x: 60.0, y: 40.0, pressure: 1.0 });
     ev(&mut app, ToolEvent::Move { x: 62.0, y: 40.0, pressure: 1.0 });
-    assert!(matches!(app.crop.drag, Some(CropDrag { kind: DragKind::Move, .. })));
+    assert!(matches!(app.crop.drag.map(|d| d.press.kind()), Some(CropPressKind::Move)));
     assert_eq!(sizing(&app), None);
     ev(&mut app, ToolEvent::Up { x: 62.0, y: 40.0 });
     assert_eq!(frame_size([0.0, 0.0, 0.2, 0.4]), Some([1.0, 1.0]));

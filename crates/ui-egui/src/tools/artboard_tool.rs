@@ -7,6 +7,8 @@
 //! engine command (`layer.new.artboard`, `layer.artboard.set`, `layer.artboard.addBeside`), so each
 //! gesture is one undo step; this module only turns pointer gestures into them.
 
+use craft::draw::ui::crop::hit_rect;
+use craft::ui::canvas::kurbo::{Point, Rect as KRect};
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
 use egui::{CursorIcon, Pos2, Rect, Stroke, vec2};
@@ -16,7 +18,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
-use crate::crop_ui::{Hit, hit};
+use crate::crop_ui::part_handle;
 use crate::state::Tool;
 use crate::theme::Tokens;
 
@@ -85,10 +87,9 @@ fn tolerance(app: &PhotocraftApp) -> f64 {
 /// The selected board's handle under a document point.
 fn handle_at(app: &PhotocraftApp, p: [f64; 2]) -> Option<(LayerId, [i64; 4], i8, i8)> {
     let (id, r) = active_board(app)?;
-    match hit(as_f64(r), p, tolerance(app)) {
-        Hit::Handle(hx, hy) => Some((id, r, hx, hy)),
-        _ => None,
-    }
+    let [x0, y0, x1, y1] = as_f64(r);
+    let (hx, hy) = part_handle(hit_rect(KRect::new(x0, y0, x1, y1), Point::new(p[0], p[1]), tolerance(app)))?;
+    Some((id, r, hx, hy))
 }
 
 /// Each side's name and "+" button centre.
