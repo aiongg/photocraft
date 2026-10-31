@@ -467,7 +467,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         crate::panels::dropped_on(ui, button).then_some(action)
     };
     // Photoshop's order from the left: Load as selection, Save selection, New, Delete.
-    widgets::panel_footer(ui, |ui| {
+    craft_ui::composites::PanelFooter::show(ui, |ui| {
         let target_ref = match view.target {
             ChannelTarget::Alpha(i) => json!(i),
             ChannelTarget::Color(k) => json!({ "color": k }),
@@ -475,20 +475,20 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ChannelTarget::LayerMask => json!("mask"),
             ChannelTarget::VectorMask => json!("vectorMask"),
         };
-        let trash = icons::button(ui, "trash", 26.0, false, tl!("Delete current channel"));
+        let trash = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Trash, tl!("Delete current channel")).size(craft_ui::controls::ControlSize::Md));
         if trash.clicked() {
             actions.push(("channel.delete".into(), json!({})));
         }
         actions.extend(drop(ui, &trash, Footer::Delete));
-        let new = icons::button(ui, "plus", 26.0, false, tl!("Create new channel"));
+        let new = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::Plus, tl!("Create new channel")).size(craft_ui::controls::ControlSize::Md));
         if new.clicked() {
             actions.push(("channel.new".into(), json!({})));
         }
         actions.extend(drop(ui, &new, Footer::New));
-        if icons::button(ui, "square-dashed", 26.0, false, tl!("Save selection as channel")).clicked() {
+        if ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::MarqueeRect, tl!("Save selection as channel")).size(craft_ui::controls::ControlSize::Md)).clicked() {
             actions.push(("select.saveSelection".into(), json!({})));
         }
-        let load = icons::button(ui, "circle-dashed", 26.0, false, tl!("Load channel as selection"));
+        let load = ui.add(craft_ui::controls::IconButton::new(craft_ui::icons::Icon::MarqueeEllipse, tl!("Load channel as selection")).size(craft_ui::controls::ControlSize::Md));
         if load.clicked() {
             // The selected mask row can coexist with a Composite engine target while mask
             // painting is active. The footer follows the row the user sees as targeted.
