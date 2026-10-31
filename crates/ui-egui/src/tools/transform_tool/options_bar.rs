@@ -107,7 +107,8 @@ pub(crate) fn bar_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Transfo
     } else {
         let unit = Unit::new(&format!("{{n}} {}", u.unit.suffix()));
         let per_doc = u.unit.from_px(1.0, u.dpi, 1.0, u.ppi);
-        let units = || RulerUnits { per_doc, ticks: Ticks::Decimal { whole: false }, numbers: numbers.clone(), unit: unit.clone(), decimals: u.unit.decimals() };
+        let units =
+            || RulerUnits { per_doc, ticks: Ticks::Decimal { whole: false }, numbers: numbers.clone(), unit: unit.clone(), decimals: u.unit.decimals() };
         SizeUnit::Length { x: units(), y: units() }
     };
     let labels = TransformFieldLabels {
