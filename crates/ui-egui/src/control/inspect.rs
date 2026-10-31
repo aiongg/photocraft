@@ -151,8 +151,8 @@ fn appearance(app: &PhotocraftApp) -> Value {
         "theme": rt.shown_id(),
         "legacyTheme": app.ui.theme.id(),
         "mode": if app.ui.theme.is_dark() { "dark" } else { "light" },
-        "modeSetting": sel.map(|s| format!("{:?}", s.mode).to_lowercase()),
-        "size": sel.map(|s| format!("{:?}", s.size).to_lowercase()),
-        "textSize": sel.map(|s| format!("{:?}", s.text_size).to_lowercase()),
+        "modeSetting": sel.map(|s| json!(s.mode)),
+        "size": sel.map(|s| json!(s.size)),
+        "textSize": sel.map(|s| json!(s.text_size)),
     })
 }

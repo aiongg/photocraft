@@ -8,8 +8,6 @@ use craft_ui::patterns::StatusBar;
 /// trailing group.
 pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let pro = crate::theme::Tokens::get(ui.ctx()).pro;
-    // The bar mirrors itself from the library's direction, which the title bar normally sets.
-    super::title_bar::sync_library_direction(ui.ctx());
     let shared = std::cell::RefCell::new(&mut *app);
     StatusBar::new("status_bar").label(tl!("Status bar")).show(ui, |bar| {
         bar.leading(|ui| {

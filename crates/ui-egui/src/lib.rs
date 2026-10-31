@@ -245,7 +245,6 @@ pub use services::{
 };
 pub use text::bidi_text;
 pub use text::cjk_fonts;
-pub use text::direction;
 pub use text::egui_fonts;
 use text::font_filters;
 use text::font_preview;
@@ -426,10 +425,9 @@ pub struct PhotocraftApp {
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).
     pub frame: u64,
-    /// The pointer rested on the notice stack last frame. Used to give a fresh auto-hide delay in
-    /// the frame the pointer leaves, so a long stationary hover never counts as elapsed time
-    /// (#2022); set by `notices::show`.
-    pub(crate) notices_hovered: bool,
+    /// Where the interface direction comes from: the UI language, or forced (tests, the
+    /// `CRAFT_UI_DIRECTION` environment variable).
+    pub direction_setting: craft_ui::direction::Setting,
     /// Apply theme on first frame.
     styled: bool,
     /// Whether the window uses an integrated (transparent) macOS title bar.
@@ -705,6 +703,9 @@ impl SyntheticTarget {
             }
     }
 }
+
+#[cfg(test)]
+mod rtl_shell_tests;
 
 #[cfg(test)]
 mod lifecycle_tests;

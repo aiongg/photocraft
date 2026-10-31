@@ -106,7 +106,7 @@ file-resource hot reload are not implemented.
 Arabic, Hebrew, Persian, Urdu and the other right-to-left languages listed in
 `i18n::dir_for_code` mirror the window's chrome when chosen: the menu bar starts at the right
 with File, the toolbox docks on the right and the panel dock and its rail on the left, and the
-title, options and status bars read from the right (`crates/ui-egui/src/direction.rs`). The
+title, options and status bars read from the right (`craft_ui::direction`). The
 direction follows the language code, so a catalog needs no extra setting.
 
 Not mirrored yet: panel interiors, dialogs, menu rows (shortcuts stay on the right), submenus
@@ -119,11 +119,11 @@ its logical end. Document text is laid out by the text engine.
 
 Arabic (`ar`) is the first right-to-left catalog: Modern Standard Arabic, Western digits, the six
 CLDR plural forms (zero|one|two|few|many|other). To check the mirrored layout with any language, launch with
-`PHOTOCRAFT_UI_DIRECTION=rtl` (or `ltr` to force left-to-right); it is read once per process
+`CRAFT_UI_DIRECTION=rtl` (or `ltr` to force left-to-right); it is read once per process
 and has no effect on the web build:
 
 ```sh
-PHOTOCRAFT_UI_DIRECTION=rtl cargo run -p photocraft-ui-egui --example snapshot -- --out rtl.png
+CRAFT_UI_DIRECTION=rtl cargo run -p photocraft-ui-egui --example snapshot -- --out rtl.png
 ```
 
 ## Fonts
