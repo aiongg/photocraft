@@ -5,7 +5,7 @@
 
 use craft::theme::TypeRole;
 use craft::ui::composites::{Field, SectionHeader};
-use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch};
+use craft::ui::controls::{Button, ButtonVariant, Checkbox, ControlSize, IconButton, Select, Swatch, TextField};
 use craft::ui::icons::Icon;
 use craft::ui::list::ListRow;
 use craft::ui::primitives::{Content, Interactive, SurfaceKind, Text};
@@ -599,7 +599,7 @@ fn preset_grid(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<St
     let chosen = get_s(f, "__preset", "");
     let mut create = false;
     let caption = crate::i18n::fmt(tl!("BLANK DOCUMENT PRESETS ({n})"), &[("n", &presets.len().to_string())]);
-    SectionHeader::new("new-document-presets-caption", caption).collapsible(false).show(ui, |ui| {
+    SectionHeader::new("new-document-presets-caption", caption).collapsible(false).caption(true).show(ui, |ui| {
         ui.add_space(craft::ui::theme::scale::Space::S6.px());
         let card = vec2(164.0, 112.0);
         // Up to 20 recent documents: scroll past three rows rather than grow the dialog.
@@ -661,7 +661,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
         // Right: Preset Details.
         ui.vertical(|ui| {
             ui.set_width(260.0);
-            SectionHeader::new("new-document-details", tl!("PRESET DETAILS")).collapsible(false).show(ui, |ui| details(app, ui, f));
+            SectionHeader::new("new-document-details", tl!("PRESET DETAILS")).collapsible(false).caption(true).show(ui, |ui| details(app, ui, f));
         });
     });
     create
@@ -676,9 +676,12 @@ fn details(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String
     let raw = get_s(f, "name", "Untitled-1");
     let mut name = if raw == "Untitled-1" { tl!("Untitled-1").to_string() } else { raw };
     Field::unlabelled().show(ui, |ui, _| {
-        let edit = widgets::dialog_text(ui, "new-document-name", tl!("Name"), &mut name);
-        if edit.changed {
-            f.insert("name".into(), json!(name));
+        let edit = TextField::new("new-document-name", tl!("Name"), &name).role(craft::theme::TypeRole::BodyLarge).show(ui);
+        if let Some(v) = edit.event.as_ref().and_then(|e| e.value()) {
+            if *v != name {
+                name = v.clone();
+                f.insert("name".into(), json!(name));
+            }
         }
         edit.response
     });
