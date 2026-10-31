@@ -1,4 +1,4 @@
-use super::controls::{commit, redo_edit, remember_edit, undo_edit};
+use super::controls::{commit, step_edit};
 use super::open::{cancel, open, open_smart_filter};
 use super::sidecar::{load_settings, save_settings};
 use super::{CameraRaw, LayerId, PhotocraftApp, Value, json};
@@ -131,7 +131,6 @@ fn menu_update(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &Value) -> Opti
         d.curve_state = Default::default();
     }
     if d.params != next_params {
-        remember_edit(d);
         d.dirty = true;
         d.params = next_params;
     }
@@ -142,10 +141,10 @@ fn menu_update(app: &mut PhotocraftApp, ctx: &egui::Context, ui: &Value) -> Opti
         update.apply(d, &mut app.ui.camera_raw_scope);
     }
     if ui.get("undo").and_then(Value::as_bool) == Some(true) {
-        undo_edit(d);
+        step_edit(d, craft_ui::dialog::Step::Undo);
     }
     if ui.get("redo").and_then(Value::as_bool) == Some(true) {
-        redo_edit(d);
+        step_edit(d, craft_ui::dialog::Step::Redo);
     }
     if d.dirty {
         d.render(ctx);

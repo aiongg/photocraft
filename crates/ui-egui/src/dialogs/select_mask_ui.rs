@@ -1376,14 +1376,16 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) {
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
     use egui::{Key, Modifiers};
     let Some(w) = app.distort.select_mask.as_mut() else { return };
-    let cmd_shift = Modifiers::COMMAND | Modifiers::SHIFT;
-    if ctx.input_mut(|i| i.consume_key(cmd_shift, Key::Z)) {
-        redo(w);
-        return;
-    }
-    if ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Z)) {
-        undo(w);
-        return;
+    match craft_ui::dialog::take_step(ctx) {
+        Some(craft_ui::dialog::Step::Redo) => {
+            redo(w);
+            return;
+        }
+        Some(craft_ui::dialog::Step::Undo) => {
+            undo(w);
+            return;
+        }
+        None => {}
     }
     if egui::Popup::is_any_open(ctx) {
         w.hide_view = false;
@@ -1491,7 +1493,7 @@ fn upload(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// A section of the Properties panel: a bold title that folds it, open by default.
 fn section(ui: &mut egui::Ui, id: &str, title: &str, body: impl FnOnce(&mut egui::Ui)) {
-    egui::CollapsingHeader::new(egui::RichText::new(title).strong()).id_salt(id).default_open(true).show(ui, body);
+    craft_ui::composites::SectionHeader::new(id, title).show(ui, body);
 }
 
 /// The options bar of the current tool.

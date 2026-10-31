@@ -555,7 +555,8 @@ fn renders_photoshops_layout() {
         "OK",
         "Cancel",
     ] {
-        assert!(h.query_by_label_contains(label).is_some(), "{label} is shown");
+        // A section title is both the header and its label, so more than one node may match.
+        assert!(h.query_all_by_label_contains(label).next().is_some(), "{label} is shown");
     }
     assert!(h.get_by_label("Refine Hair").accesskit_node().is_disabled(), "Refine Hair is greyed out");
     h.get_by_label("Brush Tool (B)").click();

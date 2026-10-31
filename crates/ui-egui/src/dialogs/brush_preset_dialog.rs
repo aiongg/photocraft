@@ -67,7 +67,7 @@ fn problem(app: &PhotocraftApp, f: &Map<String, Value>) -> Option<&'static str> 
 
 fn check(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str) {
     let mut v = on(f, key);
-    if widgets::checkbox(ui, &mut v, label).changed() {
+    if craft_ui::controls::Checkbox::bool(label, &mut v).show(ui).response.changed() {
         f.insert(key.into(), json!(v));
     }
 }
