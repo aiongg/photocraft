@@ -8,6 +8,8 @@
 //! Sampler points themselves live in the engine (`DocState.color_samplers`) so every front end
 //! shares them; this module only maps pointer input and draws the numbered markers.
 
+use craft_ui::controls::{ControlSize, Select};
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use craft_ui::theme::StrokeExt;
 use egui::{Align2, Color32, CornerRadius, FontId, Pos2, RichText, Stroke, pos2, vec2};
 use photocraft_doc::{Document, Ruler};
@@ -16,6 +18,7 @@ use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
+use crate::panels::{Field, check, number_cell, select_cell};
 use crate::state::Tool;
 use crate::theme::Tokens;
 
@@ -513,8 +516,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             readout(ui, "A:", g("angle"));
             readout(ui, "L1:", g("l1").map(|v| v * f));
             readout(ui, "L2:", g("l2").map(|v| v * f));
-            crate::widgets::vline(ui, 22.0);
-            crate::widgets::checkbox(ui, &mut app.ui.analysis.use_measurement_scale, tl!("Use Measurement Scale"));
+            OptionsBar::divider(ui);
+            check(ui, "Use Measurement Scale", &mut app.ui.analysis.use_measurement_scale);
             let has = doc.measurement.ruler.is_some();
             if ui.add_enabled_ui(has, |ui| crate::widgets::secondary_button(ui, tl!("Straighten Layer"), 0.0)).inner.clicked() {
                 let _ = app.run("image.analysis.straightenLayer", json!({}));
@@ -528,11 +531,11 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             let t = Tokens::get(ui.ctx());
             let m = &doc.measurement;
             ui.label(RichText::new(crate::i18n::fmt(tl!("Count: {n}"), &[("n", &m.count_total().to_string())])).color(t.text).size(11.0));
-            crate::widgets::vline(ui, 22.0);
+            OptionsBar::divider(ui);
             if !m.count_groups.is_empty() {
                 let mut gi = m.active_count_group.min(m.count_groups.len() - 1);
                 let opts: Vec<(usize, &str)> = m.count_groups.iter().enumerate().map(|(i, g)| (i, g.name.as_str())).collect();
-                if crate::widgets::dropdown(ui, "count-group", tl!("Group"), &mut gi, &opts, 140.0) {
+                if select_cell(ui, None, "count-group", "Group", &mut gi, &opts, false) {
                     let _ = app.run("count.setGroup", json!({"group": gi, "active": true}));
                 }
                 let g = &m.count_groups[gi];
@@ -562,12 +565,10 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 let _ = app.run("count.clear", json!({}));
             }
             if let Some(g) = m.count_groups.get(m.active_count_group) {
-                crate::widgets::vline(ui, 22.0);
+                OptionsBar::divider(ui);
                 let (mut ms, mut ls) = (g.marker_size as f32, g.label_size as f32);
-                ui.label(RichText::new(tl!("Marker Size")).color(t.text_dim).size(11.0));
-                let a = crate::widgets::value_field(ui, &mut ms, 1.0..=10.0, "", 40.0).accessible_name(tl!("Marker Size")).changed();
-                ui.label(RichText::new(tl!("Label Size")).color(t.text_dim).size(11.0));
-                let b = crate::widgets::value_field(ui, &mut ls, 8.0..=72.0, "", 44.0).accessible_name(tl!("Label Size")).changed();
+                let a = number_cell(ui, &Field::new("Marker Size", 1.0..=10.0, "", CellWidth::Sm), &mut ms).changed;
+                let b = number_cell(ui, &Field::new("Label Size", 8.0..=72.0, "", CellWidth::Sm), &mut ls).changed;
                 if a || b {
                     let _ = app.run("count.setGroup", count_size_params(ms, ls));
                 }
@@ -603,11 +604,11 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 .color(t.text)
                 .size(11.0),
             );
-            crate::widgets::vline(ui, 22.0);
+            OptionsBar::divider(ui);
             if ui.add_enabled_ui(n > 0, |ui| crate::widgets::secondary_button(ui, tl!("Clear All"), 0.0)).inner.clicked() {
                 let _ = app.run("view.colorSamplers.clear", json!({}));
             }
-            crate::widgets::vline(ui, 22.0);
+            OptionsBar::divider(ui);
             ui.label(RichText::new(tl!("Click to place · Alt-click or drag off-canvas to remove")).color(t.text_dim).size(11.0));
             true
         }
@@ -843,7 +844,7 @@ fn num_field(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &s
     ui.horizontal(|ui| {
         ui.add_sized(vec2(110.0, 18.0), egui::Label::new(RichText::new(tl!(&label)).color(t.text_dim).size(11.0)));
         let mut v = f.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-        if crate::widgets::value_field(ui, &mut v, range, suffix, 80.0).accessible_name(tl!(label)).changed() {
+        if crate::widgets::dialog_number(ui, key, tl!(label), &mut v, range, suffix, 2) {
             f.insert(key.into(), json!(v));
         }
     });
@@ -855,7 +856,11 @@ fn choice(ui: &mut egui::Ui, f: &mut Map<String, Value>, key: &str, label: &str,
         ui.add_sized(vec2(110.0, 18.0), egui::Label::new(RichText::new(tl!(&label)).color(t.text_dim).size(11.0)));
         let mut cur = f.get(key).and_then(Value::as_str).unwrap_or(opts[0].0).to_string();
         let list: Vec<(String, &str)> = opts.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-        if crate::widgets::dropdown(ui, &format!("an-{key}"), tl!(label), &mut cur, &list, 120.0) {
+        let mut select = Select::new(format!("an-{key}"), tl!(label), &mut cur).size(ControlSize::Sm).fit(true);
+        for (k, l) in &list {
+            select = select.option(k.clone(), tl!(*l));
+        }
+        if select.show(ui).response.changed() {
             f.insert(key.into(), json!(cur));
         }
     });

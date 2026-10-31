@@ -9,6 +9,7 @@
 //! initialization, reusing the cached solver factorization. Warm-starting from earlier drag
 //! previews made the result depend on pointer history and snap to a different shape on release.
 
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use craft_ui::theme::StrokeExt;
 use std::sync::Arc;
 
@@ -21,6 +22,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, ViewXform};
+use crate::panels::{Field, check, number_cell, select_cell};
 
 pub struct PuppetSession {
     pub key: u64,
@@ -400,63 +402,62 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut remesh = false;
     let mut resolve = false;
     let mut rebind = false;
-    ui.label(tl!("Mode:"));
     let mode = s.warp.mode;
-    crate::widgets::dropdown(
+    select_cell(
         ui,
+        Some("Mode:"),
         "puppet-mode",
-        tl!("Mode:"),
+        "Mode",
         &mut s.warp.mode,
         &[(PuppetMode::Rigid, tl!("Rigid")), (PuppetMode::Normal, tl!("Normal")), (PuppetMode::Distort, tl!("Distort"))],
-        90.0,
+        false,
     );
     resolve |= mode != s.warp.mode;
-    ui.label(tl!("Density:"));
     let density = s.warp.density;
-    crate::widgets::dropdown(
+    select_cell(
         ui,
+        Some("Density:"),
         "puppet-density",
-        tl!("Density:"),
+        "Density",
         &mut s.warp.density,
         &[(PuppetDensity::Fewer, tl!("Fewer Points")), (PuppetDensity::Normal, tl!("Normal")), (PuppetDensity::More, tl!("More Points"))],
-        110.0,
+        false,
     );
     remesh |= density != s.warp.density;
-    ui.label(tl!("Expansion:"));
     let expansion = s.warp.expansion;
     let mut e = s.warp.expansion as f32;
-    if crate::widgets::value_field(ui, &mut e, -50.0..=100.0, "px", 56.0).accessible_name(tl!("Expansion:")).changed() {
+    if number_cell(ui, &Field::new("Expansion", -50.0..=100.0, "px", CellWidth::Md), &mut e).changed {
         s.warp.expansion = f64::from(e);
         remesh = true;
     }
-    crate::widgets::checkbox(ui, &mut s.show_mesh, tl!("Show Mesh"));
-    crate::widgets::vline(ui, 22.0);
+    check(ui, "Show Mesh", &mut s.show_mesh);
+    OptionsBar::divider(ui);
     if let Some(i) = s.selected.filter(|i| *i < s.warp.pins.len()) {
-        ui.label(tl!("Pin Depth:"));
-        if ui.small_button("+").on_hover_text(tl!("Bring the selected pin forward")).clicked() {
-            s.warp.pins[i].depth += 1;
-            resolve = true;
-        }
-        if ui.small_button("−").on_hover_text(tl!("Send the selected pin backward")).clicked() {
-            s.warp.pins[i].depth -= 1;
-            resolve = true;
-        }
-        ui.label(tl!("Rotate:"));
+        OptionsBar::cell(ui, tl!("Pin Depth:"), CellWidth::Content, |ui, _| {
+            if ui.small_button("+").on_hover_text(tl!("Bring the selected pin forward")).clicked() {
+                s.warp.pins[i].depth += 1;
+                resolve = true;
+            }
+            if ui.small_button("−").on_hover_text(tl!("Send the selected pin backward")).clicked() {
+                s.warp.pins[i].depth -= 1;
+                resolve = true;
+            }
+        });
         let mut fixed = s.warp.pins[i].rotate.is_some();
         let was = fixed;
-        crate::widgets::dropdown(ui, "puppet-rotate", tl!("Rotation"), &mut fixed, &[(false, tl!("Auto")), (true, tl!("Fixed"))], 70.0);
+        select_cell(ui, Some("Rotate:"), "puppet-rotate", "Rotation", &mut fixed, &[(false, tl!("Auto")), (true, tl!("Fixed"))], false);
         if fixed != was {
             s.warp.pins[i].rotate = fixed.then_some(0.0);
             rebind = true;
         }
         if let Some(r) = s.warp.pins[i].rotate {
             let mut a = r as f32;
-            if crate::widgets::value_field(ui, &mut a, -360.0..=360.0, "°", 52.0).accessible_name(tl!("Rotation")).changed() {
+            if number_cell(ui, &Field::new("Rotation", -360.0..=360.0, "°", CellWidth::Md), &mut a).changed {
                 s.warp.pins[i].rotate = Some(f64::from(a));
                 resolve = true;
             }
         }
-        crate::widgets::vline(ui, 22.0);
+        OptionsBar::divider(ui);
     }
     if ui.button(tl!("Remove All Pins")).clicked() {
         s.warp.pins.clear();
