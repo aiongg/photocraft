@@ -407,4 +407,19 @@ mod tests {
         assert!(app.ui.notices.is_empty());
         assert!(ctx.has_requested_repaint(), "the frame that drops a notice asks for another");
     }
+
+    /// The stack's bottom edge is 36 pt above the window bottom (24 status bar + 12 inset), as
+    /// upstream; the close button of a one-line card is at the card's top right.
+    #[test]
+    fn the_toast_close_button_sits_above_the_status_bar() {
+        use egui_kittest::kittest::Queryable;
+        let mut app = PhotocraftApp::new(Session::new(), Services::default());
+        post(&mut app, "Transient", Vec::new(), false, None);
+        let size = egui::vec2(1280.0, 800.0);
+        let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
+        h.run_steps(2);
+        let c = h.get_by_label("Dismiss").rect().center();
+        assert!((c.x - (size.x - 31.0)).abs() <= 6.0, "close button at {c:?}");
+        assert!(c.y < size.y - 36.0 && c.y > size.y - 36.0 - 60.0, "close button at {c:?}");
+    }
 }
