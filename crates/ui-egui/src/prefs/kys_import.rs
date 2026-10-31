@@ -234,8 +234,8 @@ pub fn show_offer(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 use crate::widgets::{ButtonRole, DialogButton};
                 let buttons =
-                    [DialogButton::new(ButtonRole::Default, tl!("Import"), 100.0), DialogButton::new(ButtonRole::Alternate, tl!("Don't Import"), 120.0)];
-                if let Some(role) = crate::widgets::dialog_buttons(ui, &buttons) {
+                    [craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Default, tl!("Import")).min_width(100.0), craft_ui::dialog::FooterButton::new(craft_ui::dialog::ButtonRole::Alternate, tl!("Don't Import")).min_width(120.0)];
+                if let Some(role) = craft_ui::dialog::FooterButtons::new("dialog_buttons", buttons.to_vec()).show(ui).clicked.map(|c| c.role) {
                     answer = Some(role == ButtonRole::Default);
                 }
             });

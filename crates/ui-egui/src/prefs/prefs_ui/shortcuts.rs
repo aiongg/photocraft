@@ -412,7 +412,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
                     let hideable = photocraft_engine::prefs::MenuCustomization::hideable(id);
                     let mut visible = !hideable || !hidden.contains(id);
-                    ui.add_enabled_ui(hideable, |ui| crate::widgets::checkbox(ui, &mut visible, tl!("Visible")));
+                    ui.add_enabled_ui(hideable, |ui| craft_ui::controls::Checkbox::bool(tl!("Visible"), &mut visible).show(ui).response);
                     if visible {
                         hidden.retain(|h| h != id);
                     } else if !hidden.contains(id) {
@@ -421,7 +421,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     let mut col = colors.get(id).cloned().unwrap_or_else(|| "none".into());
                     let opts: Vec<(String, &str)> =
                         ["none", "red", "orange", "yellow", "green", "blue", "violet", "gray"].iter().map(|c| (c.to_string(), *c)).collect();
-                    crate::widgets::dropdown(ui, &format!("menu-color-{id}"), tl!("Color"), &mut col, &opts, 90.0);
+                    craft_ui::controls::Select::new(&format!("menu-color-{id}"), tl!("Color"), &mut col).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
                     if col == "none" {
                         colors.remove(id);
                     } else {
@@ -602,7 +602,7 @@ fn set_row(
         ui.label(tl!("Set:"));
         let mut chosen = active.clone();
         let pairs: Vec<(String, &str)> = names.iter().map(|(n, l)| (n.clone(), l.as_str())).collect();
-        if crate::widgets::dropdown(ui, "shortcut-set", tl!("Set:"), &mut chosen, &pairs, 220.0) && chosen != active {
+        if craft_ui::controls::Select::new("shortcut-set", tl!("Set:"), &mut chosen).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed() && chosen != active {
             // As `useSet`: the set's bindings, keeping the actions' F-keys.
             sets.get(&chosen).cloned().unwrap_or_default().apply(overrides, alternates);
             active = chosen;

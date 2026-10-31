@@ -193,7 +193,7 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             for tool in crate::state::Tool::ALL {
                 let name = format!("{tool:?}");
                 let mut on = !hidden.contains(&name);
-                crate::widgets::checkbox(ui, &mut on, tl!(tool.label()));
+                craft_ui::controls::Checkbox::bool(tl!(tool.label()), &mut on).show(ui).response;
                 if on {
                     hidden.retain(|h| *h != name);
                 } else if !hidden.contains(&name) {
@@ -217,7 +217,7 @@ pub(super) fn presets_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut M
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Preset Type")).color(t.color.text.muted.to_egui()));
         let opts = [("brushes".to_string(), tl!("Brushes")), ("customShapes".to_string(), tl!("Custom Shapes")), ("patterns".to_string(), tl!("Patterns"))];
-        crate::widgets::dropdown(ui, "preset-kind", tl!("Type"), &mut kind, &opts, 180.0);
+        craft_ui::controls::Select::new("preset-kind", tl!("Type"), &mut kind).rows(opts.len(), |i| opts[i].0.clone(), |i| tl!(opts[i].1)).show(ui).response.changed();
     });
     let list = app
         .session
@@ -262,18 +262,11 @@ pub(super) fn presets_io_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut action = f.get("action").and_then(Value::as_str).unwrap_or("export").to_string();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Action")).color(t.color.text.muted.to_egui()));
-        crate::widgets::dropdown(
-            ui,
-            "presets-io",
-            tl!("Action"),
-            &mut action,
-            &[("export".to_string(), tl!("Export Presets")), ("import".to_string(), tl!("Import Presets"))],
-            180.0,
-        );
+        craft_ui::controls::Select::new("presets-io", tl!("Action"), &mut action).fit(true).option("export".to_string(), tl!("Export Presets")).option("import".to_string(), tl!("Import Presets")).show(ui).response.changed();
     });
     for (k, label) in [("brushes", tl!("Brushes")), ("customShapes", tl!("Custom Shapes")), ("tools", tl!("Tool Presets"))] {
         let mut on = f.get(k).and_then(Value::as_bool).unwrap_or(true);
-        crate::widgets::checkbox(ui, &mut on, label);
+        craft_ui::controls::Checkbox::bool(tl!(label), &mut on).show(ui).response;
         f.insert(k.into(), json!(on));
     }
     f.insert("action".into(), json!(action));
@@ -303,7 +296,7 @@ pub(super) fn mismatch_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     if !missing && f.get("policyKey").is_some_and(Value::is_string) {
         ui.add_space(craft_ui::theme::scale::Space::S8.px());
         let mut remember = f.get("remember").and_then(Value::as_bool).unwrap_or(false);
-        crate::widgets::checkbox(ui, &mut remember, tl!("Remember this choice for future images"))
+        craft_ui::controls::Checkbox::bool(tl!("Remember this choice for future images"), &mut remember).show(ui).response
             .on_hover_text(tl!("Turn the prompt back on with Ask On Mismatch in Edit › Color Settings."));
         f.insert("remember".into(), json!(remember));
     }

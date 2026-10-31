@@ -454,7 +454,7 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
         ui.label(RichText::new(tl!("Appearance Mode")).color(t.text_dim));
         let modes: [(String, &str); 3] = [("auto".into(), tl!("Sync with system")), ("dark".into(), tl!("Dark")), ("light".into(), tl!("Light"))];
         let pairs: Vec<(String, &str)> = modes.iter().map(|(id, label)| (id.clone(), *label)).collect();
-        crate::widgets::dropdown(ui, "appearance-mode", tl!("Appearance Mode"), &mut mode, &pairs, 220.0);
+        craft_ui::controls::Select::new("appearance-mode", tl!("Appearance Mode"), &mut mode).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
         ui.end_row();
     }
     let light_active = mode == "light" || (mode == "auto" && system == Some(egui::Theme::Light));
@@ -494,7 +494,7 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
         let sizes: [(String, &str); 3] =
             [("suite".into(), tl!("Suite default")), ("compact".into(), tl!("Compact")), ("comfortable".into(), tl!("Comfortable"))];
         let pairs: Vec<(String, &str)> = sizes.iter().map(|(id, label)| (id.clone(), *label)).collect();
-        crate::widgets::dropdown(ui, "appearance-size", tl!("Size"), &mut size, &pairs, 220.0);
+        craft_ui::controls::Select::new("appearance-size", tl!("Size"), &mut size).rows(pairs.len(), |i| pairs[i].0.clone(), |i| tl!(pairs[i].1)).show(ui).response.changed();
         obj.insert("size".into(), json!(size));
         ui.end_row();
     }
