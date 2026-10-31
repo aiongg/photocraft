@@ -473,13 +473,6 @@ mod navigator_wheel_tests {
     }
 }
 
-fn empty(ui: &mut egui::Ui, s: &str) {
-    let t = Tokens::get(ui.ctx());
-    ui.add_space(6.0);
-    ui.label(RichText::new(s).color(t.text_faint));
-    ui.add_space(6.0);
-}
-
 #[cfg(test)]
 mod symmetry_theme_tests {
     use super::*;

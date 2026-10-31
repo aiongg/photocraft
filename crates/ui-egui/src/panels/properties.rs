@@ -1,4 +1,4 @@
-use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Tokens, empty, icons, json, pos2, theme, vec2, widgets};
+use super::{CornerRadius, Layer, LayerContent, LayerId, PhotocraftApp, Rect, RichText, Sense, Tokens, icons, json, pos2, theme, vec2, widgets};
 use craft_ui::theme::StrokeExt;
 
 // ----------------------------------------------------------------------------- properties
@@ -144,7 +144,7 @@ pub(super) fn properties_body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 fn properties_body_inner(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
-        empty(ui, tl!("No properties"));
+        craft_ui::composites::EmptyState::new(tl!("No properties")).show(ui);
         return;
     };
     let doc = st.doc.clone();

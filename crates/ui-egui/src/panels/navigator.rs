@@ -1,11 +1,11 @@
-use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, empty, icons, pos2, vec2, widgets};
+use super::{Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, icons, pos2, vec2, widgets};
 use craft_ui::theme::StrokeExt;
 use craft_ui::theme::ToEgui;
 
 pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = craft_ui::theme::current(ui.ctx());
     let Some(idx) = app.session.active_index() else {
-        empty(ui, tl!("No document"));
+        craft_ui::composites::EmptyState::new(tl!("No document")).show(ui);
         return;
     };
     let ctx = ui.ctx().clone();
