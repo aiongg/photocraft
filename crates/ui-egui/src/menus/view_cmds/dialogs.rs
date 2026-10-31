@@ -105,8 +105,7 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<Strin
                 Some(i) => (ParamKind::Int { min: None, max: None, default: i }, FieldValue::Int(i)),
                 None => {
                     let x = n.as_f64().unwrap_or(0.0);
-                    let (min, max, scale) = float_bounds(&key, x);
-                    (ParamKind::Range { min, max, default: x, scale }, FieldValue::Number(x))
+                    (float_kind(&key, x), FieldValue::Number(x))
                 }
             }),
             Value::Array(_) | Value::Object(_) | Value::Null => None,
@@ -153,24 +152,24 @@ fn naming_row() -> craft::ui::dialog::Param {
     })
 }
 
-/// The slider range of a fractional form field: the engine's documented range for the field,
-/// else a wide one. `CommandForm` has no plain number field, so these rows are sliders.
-fn float_bounds(key: &str, value: f64) -> (f64, f64, craft::ui::controls::SliderScale) {
-    use craft::ui::controls::SliderScale::{Linear, Log};
+/// A fractional form field. Merge to HDR Pro's tone settings are sliders, as in Photoshop; the
+/// others are plain number fields, bounded where the engine documents a range.
+fn float_kind(key: &str, value: f64) -> craft::ui::dialog::ParamKind {
+    use craft::ui::controls::SliderScale::Linear;
+    use craft::ui::dialog::ParamKind;
+    let slider = |min, max| ParamKind::Range { min, max, default: value, scale: Linear };
+    let number = |min, max, step, decimals| ParamKind::Number { min, max, default: value, step, decimals };
     match key {
-        "fps" => (0.01, 1000.0, Log),
-        "radius" => (1.0, 500.0, Linear),
-        "strength" => (0.1, 4.0, Linear),
-        "gamma" => (0.1, 2.0, Linear),
-        "exposure" => (-5.0, 5.0, Linear),
-        "detail" => (-100.0, 300.0, Linear),
-        "saturation" => (-100.0, 100.0, Linear),
-        "opacity" => (0.0, 100.0, Linear),
-        "scale" => (1.0, 2.0, Linear),
-        _ => {
-            let reach = 1000.0 * value.abs().max(1.0);
-            (-reach, reach, Linear)
-        }
+        "radius" => slider(1.0, 500.0),
+        "strength" => slider(0.1, 4.0),
+        "gamma" => slider(0.1, 2.0),
+        "exposure" => slider(-5.0, 5.0),
+        "detail" => slider(-100.0, 300.0),
+        "saturation" => slider(-100.0, 100.0),
+        "fps" => number(Some(0.01), Some(1000.0), 1.0, 3),
+        "opacity" => number(Some(0.0), Some(100.0), 1.0, 1),
+        "scale" => number(Some(1.0), Some(2.0), 0.01, 2),
+        _ => number(None, None, 1.0, 2),
     }
 }
 

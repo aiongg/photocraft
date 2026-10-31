@@ -129,7 +129,7 @@ pub fn fields_json(fields: &DialogFields) -> Fields {
 pub fn field_from_json(kind: &ParamKind, value: &Value) -> Result<FieldValue, String> {
     let parsed = match kind {
         // The engine clamps a slider's value, so a number outside the slider's range is kept.
-        ParamKind::Range { .. } | ParamKind::Angle { .. } => value.as_f64().filter(|n| n.is_finite()).map(FieldValue::Number),
+        ParamKind::Range { .. } | ParamKind::Number { .. } | ParamKind::Angle { .. } => value.as_f64().filter(|n| n.is_finite()).map(FieldValue::Number),
         ParamKind::Int { .. } => {
             value.as_i64().or_else(|| value.as_f64().filter(|n| n.fract() == 0.0 && n.abs() < 9.0e15).map(|n| n as i64)).map(FieldValue::Int)
         }
