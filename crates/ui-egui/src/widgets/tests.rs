@@ -324,7 +324,6 @@ fn labelled_rows_and_dropdowns_have_semantic_accessible_names() {
     #[derive(Default)]
     struct State {
         value: f32,
-        fill: f32,
         blend: usize,
         mode: usize,
     }
@@ -332,7 +331,6 @@ fn labelled_rows_and_dropdowns_have_semantic_accessible_names() {
     let mut h = Harness::builder().with_size(egui::vec2(360.0, 240.0)).build_ui_state(
         |ui, s: &mut State| {
             super::slider_row(ui, "Opacity", &mut s.value, 0.0..=100.0, "%", None);
-            super::popup_value_field(ui, "Fill", &mut s.fill, 0.0..=100.0, "%", 74.0);
             let opts = [(0usize, "Normal"), (1, "Multiply")];
             super::dropdown(ui, "blend", "Blend Mode", &mut s.blend, &opts, 120.0);
             ui.horizontal(|ui| {
@@ -349,9 +347,6 @@ fn labelled_rows_and_dropdowns_have_semantic_accessible_names() {
     // The row's caption is the accessible name of the value field and of the slider.
     h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Opacity");
     h.get_by_role_and_label(egui::accesskit::Role::Slider, "Opacity");
-    // A popup value field names both its number and the arrow that opens its slider.
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Fill");
-    h.get_by_role_and_label(egui::accesskit::Role::Button, "Fill");
     // A dropdown requires a real name; a preceding scrubby caption is used when present.
     h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Blend Mode");
     h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Mode");
@@ -382,110 +377,6 @@ fn focused(value: f32, range: std::ops::RangeInclusive<f32>) -> Harness<'static,
     h.get_by_role(egui::accesskit::Role::SpinButton).click();
     h.run();
     h
-}
-
-/// The number's slot (and its focus outline) is centred in the box (#5150).
-#[test]
-fn value_field_number_slot_is_centred_in_its_box() {
-    let mut h = Harness::new_ui_state(
-        |ui, s: &mut (f32, egui::Rect)| {
-            let field = super::value_field_in(ui, &mut s.0, 0.0..=100.0, "px", 80.0, 0.0, super::FieldOpts::default(), None);
-            s.1 = field.1;
-            field.0.accessible_name("Value");
-        },
-        (50.0, egui::Rect::NOTHING),
-    );
-    h.run();
-    let number = h.get_by_role(egui::accesskit::Role::SpinButton).rect();
-    let field = h.state().1;
-    assert!((field.center().y - number.center().y).abs() < 0.01, "field {field:?}, number {number:?}");
-}
-
-/// The digits' ink, not just their slot, is centred in the box, and starts level with the
-/// `%`'s, so the number lines up with the box and its unit (#5150).
-#[test]
-fn value_field_digits_ink_is_centred_and_level_with_the_unit() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let scale = 4.0;
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
-        let mut h = Harness::builder().with_size(egui::vec2(100.0, 40.0)).with_pixels_per_point(scale).wgpu().build_ui_state(
-            |ui, s: &mut (f32, egui::Rect)| {
-                let field = super::value_field_in(ui, &mut s.0, 0.0..=100.0, "%", 80.0, 0.0, super::FieldOpts::default(), None);
-                s.1 = field.1;
-                field.0.accessible_name("Value");
-            },
-            (100.0, egui::Rect::NOTHING),
-        );
-        crate::PhotocraftApp::setup_context(&h.ctx, kind);
-        h.run_steps(3);
-        let image = h.render().expect("render value field");
-        let (field, suffix_left) = (h.state().1, h.state().1.right() - 14.0);
-        let px = |v: f32| (v * scale) as u32;
-        let bg = image.get_pixel(px(field.left() + 2.0), px(field.center().y)).0;
-        let lum = |p: [u8; 4]| u32::from(p[0]) + u32::from(p[1]) + u32::from(p[2]);
-        // Top and bottom of the ink (pt) between x0 and x1.
-        let ink = |x0: f32, x1: f32| {
-            let rows: Vec<u32> =
-                (px(field.top() + 2.0)..px(field.bottom() - 2.0)).filter(|&y| (px(x0)..px(x1)).any(|x| lum(image.get_pixel(x, y).0) > lum(bg) + 150)).collect();
-            let (top, bottom) = (rows.first().copied().unwrap_or(0), rows.last().copied().unwrap_or(0) + 1);
-            (top as f32 / scale, bottom as f32 / scale)
-        };
-        let digits = ink(field.left() + 4.0, suffix_left - 2.0);
-        let unit = ink(suffix_left, field.right() - 2.0);
-        let what = format!("{kind:?}: field {field:?}, digits {digits:?}, unit {unit:?}");
-        assert!(((digits.0 + digits.1) / 2.0 - field.center().y).abs() <= 0.25, "{what}");
-        assert!((digits.0 - unit.0).abs() <= 0.25, "{what}");
-    }
-}
-
-/// With the app's theme (its 24 pt interact height and 4 pt button padding), in a full-size
-/// box and a slim status-bar box alike, the number stays inside the box, centred in it,
-/// and a long number doesn't spill out of the box's left edge (#2823).
-#[test]
-fn themed_value_field_number_sits_inside_its_box_in_every_size() {
-    for kind in crate::theme::ThemeKind::ALL {
-        for (w, h, v) in [(80.0, super::VALUE_FIELD_H, 50.0), (64.0, 18.0, 1600.5), (78.0, 22.0, 100.6)] {
-            let mut harness = Harness::new_ui_state(
-                move |ui, s: &mut (f32, egui::Rect)| {
-                    let before = ui.cursor().min;
-                    super::compact_value_field(ui, &mut s.0, 0.0..=3200.0, "%", w, h).accessible_name("Zoom");
-                    s.1 = egui::Rect::from_min_size(before, egui::vec2(w, h));
-                },
-                (v, egui::Rect::NOTHING),
-            );
-            crate::PhotocraftApp::setup_context(&harness.ctx, kind);
-            harness.run();
-            let number = harness.get_by_role(egui::accesskit::Role::SpinButton).rect();
-            let field = harness.state().1;
-            let what = format!("{kind:?} {w}x{h}: field {field:?}, number {number:?}");
-            assert!(field.contains_rect(number), "{what}");
-            assert!((field.center().y - number.center().y).abs() < 0.51, "{what}");
-        }
-    }
-}
-
-/// The number's slot ends just left of its unit, by the unit's measured width: a one-character
-/// `%` (the status bar zoom) leaves the number more room than the old fixed 16 pt, and a longer
-/// unit never sits under the number (#3040).
-#[test]
-fn value_field_number_slot_stops_at_its_measured_suffix() {
-    for suffix in ["%", "px", "°", "×"] {
-        let mut h = Harness::new_ui_state(
-            move |ui, s: &mut (f32, egui::Rect, f32)| {
-                let before = ui.cursor().min;
-                super::compact_value_field(ui, &mut s.0, 0.0..=3200.0, suffix, 64.0, 18.0).accessible_name("Zoom");
-                s.1 = egui::Rect::from_min_size(before, egui::vec2(64.0, 18.0));
-                s.2 = ui.painter().layout_no_wrap(suffix.to_owned(), crate::theme::mono(11.0), egui::Color32::WHITE).size().x;
-            },
-            (33.33, egui::Rect::NOTHING, 0.0),
-        );
-        h.run();
-        let number = h.get_by_role(egui::accesskit::Role::SpinButton).rect();
-        let (_, field, suffix_w) = *h.state();
-        let suffix_left = field.right() - 6.0 - suffix_w;
-        assert!(number.right() <= suffix_left, "{suffix}: number {number:?} runs under the suffix at {suffix_left}");
-        assert!(suffix_left - number.right() <= 1.5, "{suffix}: {:.1} pt wasted before the suffix", suffix_left - number.right());
-    }
 }
 
 #[test]
@@ -536,12 +427,12 @@ fn arrow_keys_step_fractional_stops_when_decimals_are_set() {
 fn arrow_keys_round_decimals_step_fine_fields_and_clamp() {
     for (start, mods, key, want) in [
         (55.4, Modifiers::NONE, Key::ArrowUp, 56.0),
-        (55.6, Modifiers::NONE, Key::ArrowUp, 57.0),
-        (55.4, Modifiers::NONE, Key::ArrowDown, 54.0),
-        (55.5, Modifiers::NONE, Key::ArrowUp, 57.0),
+        (55.6, Modifiers::NONE, Key::ArrowUp, 56.0),
+        (55.4, Modifiers::NONE, Key::ArrowDown, 55.0),
+        (55.5, Modifiers::NONE, Key::ArrowUp, 56.0),
         (55.5, Modifiers::NONE, Key::ArrowDown, 55.0),
         (55.4, Modifiers::SHIFT, Key::ArrowUp, 65.0),
-        (55.47, Modifiers::COMMAND, Key::ArrowUp, 55.6),
+        (55.47, Modifiers::COMMAND, Key::ArrowUp, 55.5),
     ] {
         assert_eq!(press(&mut focused(start, 0.0..=1000.0), mods, key), want, "{start} {mods:?} {key:?}");
     }

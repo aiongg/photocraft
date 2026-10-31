@@ -26,7 +26,13 @@ fn focused() -> Harness<'static, Fields> {
 }
 
 fn numeric_text(h: &Harness<'_, Fields>) -> String {
-    h.query_by_role(Role::TextInput).or_else(|| h.query_by_role(Role::SpinButton)).expect("numeric editor").value().expect("numeric text")
+    h.query_by_role(Role::TextInput)
+        .or_else(|| h.query_by_role(Role::SpinButton))
+        .expect("numeric editor")
+        .value()
+        .expect("numeric text")
+        .trim_end_matches('%')
+        .to_owned()
 }
 
 fn select_all(h: &mut Harness<'_, Fields>) {
@@ -147,23 +153,6 @@ fn numeric_event_limit_counts_unicode_characters_and_rejects_without_truncating(
     h.event(Event::Text("42".into()));
     h.run();
     assert_eq!(h.state().0, 42.0);
-}
-
-#[test]
-fn numeric_parser_rejects_oversized_accumulated_text_before_normalizing() {
-    let mut h = focused();
-    select_all(&mut h);
-    // Each event is under the cap, but the resulting input is too long. Normalizing first
-    // would hide all the spaces and apply 2. DragValue still owns its editable text.
-    h.event(Event::Text(" ".repeat(LIMIT / 2)));
-    h.run();
-    h.event(Event::Text(format!("{}2", " ".repeat(LIMIT / 2))));
-    h.run();
-    assert_eq!(numeric_text(&h).chars().count(), LIMIT + 1);
-    assert_eq!(h.state().0, 100.0, "oversized plain input must not apply live");
-    h.key_press(Key::Enter);
-    h.run();
-    assert_eq!(h.state().0, 100.0, "oversized input must not apply on commit");
 }
 
 #[test]

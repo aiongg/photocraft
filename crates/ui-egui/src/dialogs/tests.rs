@@ -387,7 +387,7 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     assert_eq!(radius(&h), Some(1.0), "the default the first time");
     assert!(h.get_by_role(egui::accesskit::Role::SpinButton).is_focused(), "the Radius field has focus");
     h.event(egui::Event::Text("5".into()));
-    h.run_steps(1);
+    h.run();
     assert_eq!(radius(&h), Some(5.0), "typing replaced the selected 1");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);

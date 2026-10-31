@@ -317,7 +317,7 @@ fn right_click_picks_the_unit_of_that_field_only_and_it_is_not_remembered() {
     let id = only_dialog(&app);
     let mut f = app.ui.dialog_mut(id).unwrap().fields.clone();
     let ctx = egui::Context::default();
-    let shown = |s: &[(String, String, egui::Rect)]| s.iter().map(|(v, u, _)| (v.clone(), u.clone())).collect::<Vec<_>>();
+    let shown = |s: &[(String, String, egui::Rect)]| s.iter().map(|(v, u, _)| (v.clone(), u.trim().to_string())).collect::<Vec<_>>();
     let px = ("100".to_string(), "px".to_string());
     let texts = frame(&ctx, &app, &mut f, vec![]);
     let s = sides(&texts);

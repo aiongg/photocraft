@@ -1,5 +1,5 @@
-use super::fields::{FieldOpts, value_field_in};
-use super::{Response, Ui};
+use super::fields::{FieldOpts, field_height, value_field_in};
+use super::{Response, Ui, vec2};
 
 /// A size dialog's unit key (`px`, `in`, `cm`, `mm`, `pt`, `pica`, `percent`) as a unit.
 pub fn unit_of_key(key: &str) -> photocraft_engine::prefs::Unit {
@@ -25,7 +25,7 @@ pub fn unit_decimals(key: &str) -> u32 {
 /// A [`value_field`] showing `decimals` decimal places instead of the one (or two, for a small
 /// range) it picks itself: the ruler units need their own precision (#2434).
 pub fn value_field_prec(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, width: f32, decimals: u32) -> Response {
-    value_field_in(ui, value, range, suffix, width, 0.0, FieldOpts { decimals: Some(decimals), ..Default::default() }, None).0
+    value_field_in(ui, value, range, suffix, vec2(width, field_height(ui)), FieldOpts { decimals: Some(decimals), ..Default::default() })
 }
 
 /// A field's unit and the resolution a typed unit converts at (`1in` in a px field).
@@ -36,31 +36,6 @@ pub struct FieldUnits {
     pub dpi: f64,
     /// Points per inch (72 PostScript, 72.27 traditional).
     pub ppi: f64,
-}
-
-/// A [`value_field_prec`] without a suffix, whose unit is chosen beside it (Image Size and New
-/// Document's unit menus) and converts typed units at that dialog's own resolution.
-pub fn value_field_units(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, width: f32, decimals: u32, units: FieldUnits) -> Response {
-    value_field_in(ui, value, range, "", width, 0.0, FieldOpts { decimals: Some(decimals), units: Some(units), ..Default::default() }, None).0
-}
-
-/// A [`value_field_prec`] in `units` whose 100 % is a length of `extent` px (Free Transform's W
-/// and H): a length typed while it shows percent becomes that share of `extent` (`40px`, `2in`),
-/// and a percentage typed while it shows a length becomes that share of `extent` (`50%`), at
-/// `units`' resolution (#6284). The field keeps its own unit.
-#[allow(clippy::too_many_arguments)]
-pub fn value_field_extent(
-    ui: &mut Ui,
-    value: &mut f32,
-    range: std::ops::RangeInclusive<f32>,
-    suffix: &str,
-    width: f32,
-    decimals: u32,
-    units: FieldUnits,
-    extent: f64,
-) -> Response {
-    let opts = FieldOpts { decimals: Some(decimals), units: Some(units), extent: Some(extent), ..Default::default() };
-    value_field_in(ui, value, range, suffix, width, 0.0, opts, None).0
 }
 
 pub(super) fn field_resolution_id() -> egui::Id {
@@ -121,11 +96,6 @@ pub(crate) fn parse_num_in(text: &str, units: crate::numeric_expression::Units) 
         return None;
     }
     crate::numeric_expression::parse_with_units(&clean(text), Some(units))
-}
-
-/// A plain typed number, no arithmetic.
-pub(super) fn plain(text: &str) -> Option<f64> {
-    clean(text).parse().ok()
 }
 
 fn clean(text: &str) -> String {
