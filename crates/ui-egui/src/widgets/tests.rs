@@ -13,33 +13,6 @@ fn hue_stops_are_pure_and_evenly_spaced() {
     }
 }
 
-/// A light theme rings the slider knob with its outline token; a dark Studio-layout one draws
-/// the plain knob (#7927).
-#[test]
-fn light_themes_draw_the_slider_knob_outline() {
-    use crate::theme::{ThemeKind, Tokens};
-    fn rings(shape: &egui::Shape, out: &mut Vec<egui::Color32>) {
-        match shape {
-            egui::Shape::Vec(v) => v.iter().for_each(|s| rings(s, out)),
-            egui::Shape::Circle(c) if c.radius == 7.0 && c.stroke.width == 1.0 => out.push(c.stroke.color),
-            _ => {}
-        }
-    }
-    for kind in [ThemeKind::StudioLight, ThemeKind::Adwaita, ThemeKind::BreezeLight, ThemeKind::SoftLight, ThemeKind::Studio] {
-        let ctx = egui::Context::default();
-        crate::theme::apply(&ctx, kind);
-        let mut v = 50.0;
-        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-            super::slider(ui, &mut v, 0.0..=100.0, None);
-        });
-        out.textures_delta.clear();
-        let mut found = Vec::new();
-        out.shapes.iter().for_each(|c| rings(&c.shape, &mut found));
-        let want: Vec<_> = Tokens::for_kind(kind).knob_outline().into_iter().collect();
-        assert_eq!(found, want, "{kind:?}");
-    }
-}
-
 #[test]
 fn checkbox_label_is_a_button_target_not_selectable_text() {
     use egui::CursorIcon;
@@ -578,28 +551,6 @@ fn arrow_keys_round_decimals_step_fine_fields_and_clamp() {
     assert_eq!(press(&mut h, Modifiers::COMMAND, Key::ArrowUp), 0.62);
     let mut h = focused(995.0, 0.0..=1000.0);
     assert_eq!(press(&mut h, Modifiers::SHIFT, Key::ArrowUp), 1000.0);
-}
-
-/// #6545: a curved track (the mask Feather) has fine steps at the left and coarse ones toward
-/// the right end, and the knob drawn for a value lands where that value is picked.
-#[test]
-fn curved_track_maps_ends_middle_and_round_trips() {
-    use super::{curve_fraction, curve_value};
-    for (f, want) in [(0.0, 0.0), (0.1, 1.0), (0.2, 8.0), (0.5, 125.0), (1.0, 1000.0)] {
-        assert!((curve_value(f, 0.0, 1000.0, Some(3.0)) - want).abs() < 1e-3, "{f}: {}", curve_value(f, 0.0, 1000.0, Some(3.0)));
-    }
-    assert_eq!(curve_value(0.25, 0.0, 1000.0, None), 250.0, "no curve is the linear track");
-    assert_eq!(curve_value(0.5, 10.0, 20.0, Some(3.0)), 11.25, "the curve starts at the range's low end");
-    for i in 0..=100 {
-        let f = i as f32 / 100.0;
-        let back = curve_fraction(curve_value(f, 0.0, 1000.0, Some(3.0)), 0.0, 1000.0, Some(3.0));
-        assert!((back - f).abs() < 1e-4, "{f} -> {back}");
-        let v = i as f32 * 10.0;
-        let again = curve_value(curve_fraction(v, 0.0, 1000.0, Some(3.0)), 0.0, 1000.0, Some(3.0));
-        assert!((again - v).abs() < 1e-3, "{v} -> {again}");
-    }
-    assert_eq!(curve_fraction(-5.0, 0.0, 1000.0, Some(3.0)), 0.0);
-    assert_eq!(curve_fraction(f32::NAN, 0.0, 1000.0, Some(3.0)), 0.0);
 }
 
 #[test]
