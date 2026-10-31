@@ -199,7 +199,8 @@ fn number_cell_in(
     menu: Option<(&[MenuEntry<usize>], &mut Option<usize>)>,
     glyph: Option<&Response>,
 ) -> CellEdit {
-    let numbers = LocaleNumbers::of(ui);
+    // Pixel sizes read `1920`, not `1,920`.
+    let numbers = if field.suffix == "px" { (*LocaleNumbers::of(ui)).clone().ungrouped() } else { (*LocaleNumbers::of(ui)).clone() };
     let salt = format!("options-{}", field.label);
     let name = tl!(field.label);
     let mut out = None;
