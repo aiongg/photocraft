@@ -3,6 +3,10 @@ use super::editing::{cancel, commit_with};
 use super::fonts::{font_picker, fonts_ready, selected_style, style_label, styles};
 use super::keys::is_vertical;
 use super::{Color32, LayerId, PhotocraftApp, Stroke, byte_of, insertion_style, json, selected_styles, text_layer};
+use crate::panels::{Field, number_cell_icon, select_cell};
+use craft_ui::controls::{ControlSize, NumberField};
+use craft_ui::localized::{LocaleNumbers, Unit};
+use craft_ui::patterns::{CellWidth, OptionsBar};
 use craft_ui::theme::StrokeExt;
 
 /// Photoshop's Type options bar.
@@ -47,19 +51,16 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let style_family = if fam.is_empty() { styles_at(app).map(|(c, _)| c.font_family).unwrap_or_default() } else { fam.clone() };
         let opts: Vec<(String, String)> = styles(&style_family).into_iter().map(|s| (s.clone(), style_label(&s))).collect();
         let opts_ref: Vec<(String, &str)> = opts.iter().map(|(a, b)| (a.clone(), b.as_str())).collect();
-        if crate::widgets::dropdown(ui, "type-style", tl!("Style"), &mut style, &opts_ref, 110.0) {
+        if select_cell(ui, None, "type-style", "Style", &mut style, &opts_ref, false) {
             app.ui.tool_options.type_style = style.clone();
             apply(app, ui.ctx(), json!({"fontStyle": style}));
         }
     }
-    let (r, icon) = ui.allocate_exact_size(egui::vec2(18.0, 22.0), egui::Sense::hover());
-    crate::icons::paint(ui, r, "type", 13.0, t.icon);
-    icon.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, tl!("Font size")));
     // Photoshop's "T" scrubs the size field beside it, like the Character panel's icons (#6437).
-    crate::widgets::scrub_option_icon(ui, &icon, tl!("Font size"));
     let (unit, label) = type_unit(app);
     let mut display = size * unit;
-    if crate::widgets::value_field(ui, &mut display, unit..=1296.0 * unit, label, 66.0).changed() {
+    let field = Field::new("Font size", unit..=1296.0 * unit, label, CellWidth::Md).scale(1.0);
+    if number_cell_icon(ui, craft_ui::icons::Icon::Text, &field, &mut display).changed {
         let size = display / unit;
         app.ui.tool_options.type_size = size;
         apply(app, ui.ctx(), json!({"size": size, "metricsAsShown": true}));
@@ -75,13 +76,13 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ("strong".to_string(), tl!("Strong")),
         ("smooth".to_string(), tl!("Smooth")),
     ];
-    if crate::widgets::dropdown(ui, "type-aa", tl!("Anti-aliasing method"), &mut aa, &aa_opts, 80.0) {
+    if select_cell(ui, None, "type-aa", "Anti-aliasing method", &mut aa, &aa_opts, false) {
         app.ui.tool_options.type_aa = aa.clone();
         if let Some(params) = formatting_params(app) {
             let _ = app.run(&format!("type.antiAlias.{aa}"), params);
         }
     }
-    crate::widgets::vline(ui, 22.0);
+    OptionsBar::divider(ui);
     ui.spacing_mut().item_spacing.x = 2.0;
     // Alignment and direction show the target paragraph's, as Photoshop's bar follows the text
     // being edited or the selected type layer; the tool defaults otherwise. A justified paragraph
@@ -105,7 +106,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     }
     ui.spacing_mut().item_spacing.x = 8.0;
-    crate::widgets::vline(ui, 22.0);
+    OptionsBar::divider(ui);
     ui.spacing_mut().item_spacing.x = 2.0;
     for (key, tip, d) in direction_items() {
         let on = para.as_ref().map_or(o.type_direction == key, |p| p.direction == d);
@@ -115,7 +116,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     }
     ui.spacing_mut().item_spacing.x = 8.0;
-    crate::widgets::vline(ui, 22.0);
+    OptionsBar::divider(ui);
     // Text colour swatch with a picker popup.
     let c = shown
         .as_ref()
@@ -318,19 +319,31 @@ pub(super) fn num_field(ui: &mut egui::Ui, label: &str, tip: &str, v: f32, range
     let mut out = None;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        let (r, resp) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
+        let (r, caption) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
         ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, label, crate::theme::semibold(10.0), t.text_dim);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, ui.is_enabled(), tl!(tip)));
-        crate::widgets::scrub_label(ui, &resp.on_hover_text(tl!(tip)));
-        let response = crate::widgets::value_field(ui, &mut v, range, unit, width);
-        response.widget_info(|| {
-            let mut info = egui::WidgetInfo::drag_value(ui.is_enabled(), f64::from(v));
-            info.label = Some(tl!(tip).to_owned());
-            info
+        caption.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, ui.is_enabled(), tl!(tip)));
+        let numbers = LocaleNumbers::of(ui);
+        let size = egui::vec2(width, ui.available_height().min(22.0).max(20.0));
+        ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Center).with_main_justify(true), |ui| {
+            ui.set_width(width);
+            let mut field = NumberField::new(("type-field", tip), tl!(tip), v, &numbers)
+                .range(f64::from(*range.start())..=f64::from(*range.end()))
+                .decimals(0..=2)
+                .or_parse(crate::panels::reader(unit, None))
+                .scrub_by(&caption.on_hover_text(tl!(tip)))
+                .size(ControlSize::Sm);
+            if !unit.is_empty() {
+                field = field.unit(Unit::new(&format!("{{n}} {unit}")));
+            }
+            let edit = field.show(ui);
+            if let Some(next) = edit.event.as_ref().and_then(|e| e.value()).copied() {
+                let next = next as f32;
+                if next != v {
+                    v = next;
+                    out = Some(v);
+                }
+            }
         });
-        if response.changed() {
-            out = Some(v);
-        }
     });
     out
 }

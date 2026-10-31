@@ -70,6 +70,12 @@ impl<'a> Field<'a> {
         self
     }
 
+    /// How many field units one stored unit is.
+    pub(crate) fn scale(mut self, scale: f64) -> Self {
+        self.scale = scale;
+        self
+    }
+
     /// The stored value is a fraction shown as a percentage.
     pub(crate) fn percent(mut self) -> Self {
         self.scale = 100.0;
@@ -99,7 +105,7 @@ fn unit_of(suffix: &str) -> Option<Unit> {
 
 /// Reads typed arithmetic (`1920/2`) and, in a length or percentage field, a number with a unit
 /// (`1in`), as PhotoCraft's fields do.
-pub(super) fn reader(suffix: &str, units: Option<widgets::FieldUnits>) -> impl Fn(&str) -> Option<f64> + 'static {
+pub(crate) fn reader(suffix: &str, units: Option<widgets::FieldUnits>) -> impl Fn(&str) -> Option<f64> + 'static {
     let unit = units.map(|u| u.unit).or(match suffix {
         "%" => Some(photocraft_engine::prefs::Unit::Percent),
         "px" => Some(photocraft_engine::prefs::Unit::Pixels),
@@ -160,6 +166,12 @@ pub(crate) fn number_cell(ui: &mut egui::Ui, field: &Field<'_>, value: &mut f32)
     number_cell_with(ui, field, value, None, None, None)
 }
 
+/// [`number_cell`] whose caption is `icon`: the glyph scrubs the field beside it.
+pub(crate) fn number_cell_icon(ui: &mut egui::Ui, icon: craft_ui::icons::Icon, field: &Field<'_>, value: &mut f32) -> CellEdit {
+    let glyph = ui.add(craft_ui::primitives::Icon::new(icon).size(craft_ui::icons::IconSize::Sm).content(craft_ui::primitives::Content::Muted).label(tl!(field.label)));
+    number_cell_in(ui, field, value, None, None, None, Some(&glyph))
+}
+
 /// [`number_cell`] whose typed units convert at `units` and whose secondary click lists `menu`.
 fn number_cell_with(
     ui: &mut egui::Ui,
@@ -169,11 +181,26 @@ fn number_cell_with(
     template: Option<Unit>,
     menu: Option<(&[MenuEntry<usize>], &mut Option<usize>)>,
 ) -> CellEdit {
+    number_cell_in(ui, field, value, units, template, menu, None)
+}
+
+/// [`number_cell_with`]; `glyph`, an icon already drawn, replaces the text caption.
+fn number_cell_in(
+    ui: &mut egui::Ui,
+    field: &Field<'_>,
+    value: &mut f32,
+    units: Option<widgets::FieldUnits>,
+    template: Option<Unit>,
+    menu: Option<(&[MenuEntry<usize>], &mut Option<usize>)>,
+    glyph: Option<&Response>,
+) -> CellEdit {
     let numbers = LocaleNumbers::of(ui);
     let salt = format!("options-{}", field.label);
     let name = tl!(field.label);
     let mut out = None;
-    OptionsBar::cell(ui, &caption(field.label), field.width, |ui, caption| {
+    let text = if glyph.is_some() { String::new() } else { caption(field.label) };
+    OptionsBar::cell(ui, &text, field.width, |ui, caption| {
+        let caption = glyph.unwrap_or(caption);
         let mut number = NumberField::new(salt.as_str(), name, shown(*value, field.scale), &numbers)
             .range(field.range.clone())
             .decimals(field.decimals.clone())
