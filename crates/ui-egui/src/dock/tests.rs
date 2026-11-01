@@ -353,7 +353,7 @@ fn right_click_tab(h: &mut Harness<'static, PhotocraftApp>, panel: &str) {
 /// Closing the last tab hides its group; Window restores a hidden tab. (Studio floats
 /// Properties outside the dock, so it closes Layers tabs instead.)
 #[test]
-#[ignore = "library gap: dock menu rows read only the Host catalog, so PhotoCraft's English \"Close Panel\" doesn't reach them"]
+#[ignore = "library row 146: dock menu rows read only the Host catalog, so PhotoCraft's English \"Close Panel\" doesn't reach them"]
 fn panel_tab_context_menu_closes_one_tab_or_its_group() {
     use egui_kittest::kittest::Queryable;
 
