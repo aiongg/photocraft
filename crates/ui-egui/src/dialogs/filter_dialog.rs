@@ -10,12 +10,17 @@ use std::sync::Arc;
 use photocraft_doc::Document;
 use photocraft_engine::color_cmds::ColorSettings;
 use photocraft_engine::installed_profiles::InstalledProfile;
+use craft::ui::dialog::DialogFields;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::theme::Tokens;
 
+mod hosted;
 mod zoom_center;
+
+pub(crate) use hosted::{Wire, open_hosted, push_state, requests};
+pub(crate) use hosted::{eyedropper_armed as hosted_eyedropper, eyedropper_sample as hosted_eyedropper_sample};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
@@ -506,6 +511,13 @@ pub fn reset_fields(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
 }
 
 pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
+    let fields = opening_fields(app, command)?;
+    Some(app.ui.open_dialog(crate::state::DialogKind::Command, fields))
+}
+
+/// The fields a filter dialog of `command` opens with: schema defaults, remembered values and the
+/// command's own hooks, with the private `__` keys.
+fn opening_fields(app: &mut PhotocraftApp, command: &str) -> Option<Map<String, Value>> {
     let spec = photocraft_engine::commands::find(command)?;
     let mut fields = Map::new();
     fields.insert("__command".into(), json!(command));
@@ -533,8 +545,7 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
         let names: Vec<String> = app.session.documents().iter().map(|d| d.doc.name.clone()).collect();
         fields.insert("__docs".into(), json!(names));
     }
-    let id = app.ui.open_dialog(crate::state::DialogKind::Command, fields);
-    Some(id)
+    Some(fields)
 }
 
 /// Arbitrary rotation starts at the angle that straightens the ruler line, when there is one.
@@ -654,7 +665,8 @@ fn uses_logarithmic_slider(min: f32, max: f32) -> bool {
     min > 0.0 && max / min > 500.0
 }
 
-const LENS_BLUR: &str = "filter.blur.lensBlur";
+pub(crate) const LENS_BLUR: &str = "filter.blur.lensBlur";
+const RADIAL_BLUR: &str = "filter.blur.radialBlur";
 
 /// Lens Blur's Depth Map Source lists the document's alpha channels after None, Transparency
 /// and Layer Mask, as in Photoshop (#7400): their names go to `__channels`. A `channel` source
@@ -744,7 +756,7 @@ fn color_eyedropper_owns(f: &Map<String, Value>) -> bool {
 
 /// Whether the top dialog is a Replace Color with its canvas eyedropper armed.
 pub(crate) fn color_eyedropper_armed(app: &PhotocraftApp) -> bool {
-    app.ui.dialogs.last().is_some_and(|d| color_eyedropper_owns(&d.fields))
+    app.ui.dialogs.last().is_some_and(|d| color_eyedropper_owns(&d.fields)) || hosted_eyedropper(app).is_some()
 }
 
 /// Sample the merged image at document point (x, y) into the armed dialog's "From" colour.
@@ -752,7 +764,11 @@ pub(crate) fn color_eyedropper_armed(app: &PhotocraftApp) -> bool {
 /// changes and the eyedropper stays armed (like the Curves picker).
 pub(crate) fn color_eyedropper_sample(app: &mut PhotocraftApp, x: f64, y: f64) -> bool {
     let Some(id) = app.ui.dialogs.last().filter(|d| color_eyedropper_owns(&d.fields)).map(|d| d.id) else {
-        return false;
+        let Some(id) = hosted_eyedropper(app) else { return false };
+        if let Some(rgb) = crate::canvas::composite_color(app, x, y) {
+            hosted_eyedropper_sample(app, id, rgb, x, y);
+        }
+        return true;
     };
     if let Some(rgb) = crate::canvas::composite_color(app, x, y)
         && let Some(d) = app.ui.dialog_mut(id)
@@ -841,9 +857,19 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         crate::select_mask_view::controls(ui, f);
     }
     for p in parse_spec(&spec) {
-        if zoom_center::owns(&cmd, f) && matches!(p.key.as_str(), "centerX" | "centerY") {
+        if cmd == RADIAL_BLUR && f.get("method").and_then(Value::as_str) == Some("zoom") && matches!(p.key.as_str(), "centerX" | "centerY") {
             if p.key == "centerX" {
-                zoom_center::row(ui, f);
+                let mut shared = DialogFields::new();
+                shared.set("method", "zoom");
+                for key in ["centerX", "centerY", "amount"] {
+                    if let Some(n) = f.get(key).and_then(Value::as_f64) {
+                        shared.set(key, n);
+                    }
+                }
+                zoom_center::row(ui, &mut shared);
+                for key in ["centerX", "centerY"] {
+                    f.insert(key.into(), json!(shared.number(key)));
+                }
             }
             continue;
         }
