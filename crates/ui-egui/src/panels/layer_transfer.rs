@@ -56,11 +56,12 @@ fn cancelled(ctx: &egui::Context) -> bool {
 /// Starts a transfer of `layers` from the active document.
 fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: Option<[f64; 2]>) -> bool {
     let Some(st) = app.session.active() else { return false };
+    let Some(&grabbed) = layers.first() else { return false };
     let label = match layers.as_slice() {
         [one] => st.doc.layer(*one).map_or_else(String::new, |l| l.name.clone()),
         many => crate::i18n::trn(crate::i18n::current(), many.len() as u64, "{n} layer", "{n} layers"),
     };
-    let t = Transfer { source: st.doc.id, drag: ListDrag { list: egui::Id::unique("pc-layers-list"), items: layers, label }, grab };
+    let t = Transfer { source: st.doc.id, drag: ListDrag { list: egui::Id::unique("pc-layers-list"), items: layers, grabbed, label }, grab };
     ctx.data_mut(|d| d.insert_temp(key(), t));
     true
 }

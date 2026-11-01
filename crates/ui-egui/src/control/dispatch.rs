@@ -853,7 +853,7 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
             None => err("missing `dialog`"),
         },
         "ui.dialog.cancel" => match u("dialog") {
-            Some(id) => match crate::dialogs::cancel(app, id) {
+            Some(id) => match crate::dialogs::cancel_in(app, ctx, id) {
                 Ok(value) => ok(value),
                 Err(error) => err(error),
             },

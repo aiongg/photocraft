@@ -29,7 +29,21 @@ pub fn out_of_gamut(rgb: [f32; 3]) -> Option<[f32; 3]> {
     (de > GAMUT_DE).then_some(back)
 }
 
-pub use craft::color::{format_hex as hex, not_web_safe, parse_hex, web_safe};
+pub use craft::color::{not_web_safe, web_safe};
+
+/// The colour of `text`: six hex digits after an optional `#`. PhotoCraft's hex fields take
+/// exactly six; the shorthand and alpha forms `Srgba::from_hex` also reads are refused.
+pub fn parse_hex(text: &str) -> Option<[f32; 3]> {
+    if text.trim().trim_start_matches('#').len() != 6 {
+        return None;
+    }
+    craft::theme::Srgba::from_hex(text).map(|c| [c.r, c.g, c.b])
+}
+
+/// `color` as lowercase `#rrggbb`.
+pub fn hex(color: [f32; 3]) -> String {
+    craft::theme::Srgba { r: color[0], g: color[1], b: color[2], a: 1.0 }.to_hex()
+}
 
 /// Open the picker for the foreground or background colour.
 pub fn open(app: &mut PhotocraftApp, target: &str) -> u64 {
@@ -377,8 +391,8 @@ fn word(key: &str) -> String {
         "Magenta" => tl!("M:"),
         "Yellow" => tl!("Y:"),
         "Black" => tl!("K:"),
-        "Hex colour" => tl!("Color"),
-        "Restore current colour" => tl!("Click to restore the current colour"),
+        "Hex color" => tl!("Color"),
+        "Restore current color" => tl!("Click to restore the current colour"),
         other => tl!(other),
     };
     text.to_string()

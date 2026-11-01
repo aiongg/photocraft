@@ -406,7 +406,7 @@ pub(crate) fn browser(
 ) -> Vec<Ev> {
     use craft::ui::behavior::{DropPosition, ListDrag};
     use craft::ui::edit::EditEvent;
-    use craft::ui::presets::{DefaultOpen, FooterEvent, PresetBrowser, PresetEvent, PresetFooter, PresetReorder, PresetRow, PresetState, PresetView};
+    use craft::ui::presets::{DefaultOpen, PresetBrowser, PresetEvent, PresetFooter, PresetFooterEvent, PresetReorder, PresetRow, PresetState, PresetView};
     let Place { canvas, max_h, new_tip, flush } = place;
     let mut ev = Vec::new();
     let size = *st.sizes.get(panel).unwrap_or(&40.0);
@@ -523,11 +523,11 @@ pub(crate) fn browser(
     // Footer: thumbnail size | New Group, New, Delete.
     let footer_top = ui.min_rect().bottom();
     ui.add_space(craft::ui::theme::scale::Space::S4.px());
-    for event in PresetFooter::new(&mut state, &labels).thumb_range(MIN_THUMB..=96.0).can_delete(selected.is_some()).show(ui) {
+    for event in PresetFooter::new(("preset-footer", panel), &mut state).labels(&labels).thumb_range(MIN_THUMB..=96.0).can_delete(selected.is_some()).show(ui) {
         match event {
-            FooterEvent::Delete => ev.extend(selected.clone().map(Ev::Delete)),
-            FooterEvent::New => ev.push(Ev::New),
-            FooterEvent::NewGroup => ev.push(Ev::NewGroup),
+            PresetFooterEvent::Delete => ev.extend(selected.clone().map(Ev::Delete)),
+            PresetFooterEvent::New => ev.push(Ev::New),
+            PresetFooterEvent::NewGroup => ev.push(Ev::NewGroup),
             _ => {}
         }
     }

@@ -45,18 +45,18 @@ const PANELS: &[(&str, &str, Group)] = &[
 /// PhotoCraft's wording of craft-ui's docking labels, translated through `tl!`. The others keep
 /// craft-ui's English.
 const DOCK_LABELS: &[(&str, &str)] = &[
-    ("dock.float", "Float Panel"),
-    ("dock.close", "Close Panel"),
-    ("dock.movePanelTo", "Group with"),
+    ("dock.panelMenu.float", "Float Panel"),
+    ("dock.panelMenu.close", "Close Panel"),
+    ("dock.panelMenu.moveTo", "Group with"),
     ("dock.panels", "Panels"),
     ("dock.resize", "Resize panels"),
     ("dock.resizeWindow", "Resize panel window"),
-    ("dock.closeGroup", "Close Tab Group"),
-    ("dock.floatGroup", "Float Tab Group"),
-    ("dock.minimize", "Collapse Panel Group"),
-    ("dock.expand", "Expand Panel Group"),
-    ("dock.moveGroupUp", "Move Group Up"),
-    ("dock.moveGroupDown", "Move Group Down"),
+    ("dock.panelMenu.closeGroup", "Close Tab Group"),
+    ("dock.panelMenu.floatGroup", "Float Tab Group"),
+    ("dock.panelMenu.minimize", "Collapse Panel Group"),
+    ("dock.panelMenu.expand", "Expand Panel Group"),
+    ("dock.panelMenu.moveGroupUp", "Move Group Up"),
+    ("dock.panelMenu.moveGroupDown", "Move Group Down"),
     ("dock.panelMenu", "Panel menu"),
 ];
 

@@ -1001,7 +1001,11 @@ pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resu
 
 /// Cancel a dialog and its dependent Layer Style picker, without applying edits.
 pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    let Some(closed) = app.ui.close_dialog(id) else { return hosted::cancel(app, id) };
+    cancel_in(app, &egui::Context::default(), id)
+}
+
+pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
+    let Some(closed) = app.ui.close_dialog(id) else { return hosted::cancel(app, ctx, id) };
     crate::actions::stopped(app, &closed.fields);
     if crate::guide_layout_ui::owns(&closed.fields) {
         app.ui.dialogs.retain(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));

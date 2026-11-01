@@ -206,7 +206,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, body, toasts);
     for (id, end) in ended {
         match end {
-            ToastEnd::Closed => dismiss(app, id),
+            ToastEnd::Closed | ToastEnd::Acted => dismiss(app, id),
             ToastEnd::Expired | ToastEnd::Dropped => app.ui.notices.retain(|n| n.id != id),
         }
     }

@@ -43,8 +43,8 @@ pub(super) fn current(ctx: &egui::Context) -> Option<Arc<PanelDrag>> {
     egui::DragAndDrop::payload::<PanelDrag>(ctx)
 }
 
-fn start(ctx: &egui::Context, items: Vec<RowKey>, label: impl Into<String>) {
-    egui::DragAndDrop::set_payload(ctx, PanelDrag { list: list_id(), items, label: label.into() });
+fn start(ctx: &egui::Context, items: Vec<RowKey>, grabbed: RowKey, label: impl Into<String>) {
+    egui::DragAndDrop::set_payload(ctx, PanelDrag { list: list_id(), items, grabbed, label: label.into() });
 }
 
 /// Ends the Layers panel row drag (the pointer went to another document).
@@ -200,7 +200,7 @@ pub(super) struct DrawnRow<'a> {
 pub(super) fn start_layer_drag(app: &PhotocraftApp, ctx: &egui::Context, l: &Layer) {
     let Some(st) = app.session.active() else { return };
     let layers = if st.is_layer_selected(l.id) { st.selected_layers() } else { vec![l.id] };
-    start(ctx, layers.iter().map(|id| RowKey::Layer(*id)).collect(), l.name.as_str());
+    start(ctx, layers.iter().map(|id| RowKey::Layer(*id)).collect(), RowKey::Layer(l.id), l.name.as_str());
     crate::layer_transfer::begin_from_panel(app, ctx, &layers);
 }
 
@@ -289,17 +289,17 @@ pub(super) fn starts_mask_drag(ctx: &egui::Context, l: &Layer, resp: &egui::Resp
 /// A drag begins on `layer`'s `kind` mask thumbnail.
 pub(super) fn start_mask_drag(ctx: &egui::Context, layer: LayerId, kind: MaskKind) {
     let label = if kind == MaskKind::Vector { tl!("Vector Mask") } else { tl!("Layer Mask") };
-    start(ctx, vec![RowKey::Mask(layer, kind)], label);
+    start(ctx, vec![RowKey::Mask(layer, kind)], RowKey::Mask(layer, kind), label);
 }
 
 /// Start dragging the effects of `layer`: one (`effect`) or all of them, named `label`.
 pub(super) fn start_fx_drag(ctx: &egui::Context, layer: LayerId, effect: Option<usize>, label: &str) {
-    start(ctx, vec![RowKey::Effects(layer, effect)], label);
+    start(ctx, vec![RowKey::Effects(layer, effect)], RowKey::Effects(layer, effect), label);
 }
 
 /// Start dragging the smart filters of `layer`: one (`filter`) or all of them, named `label`.
 pub(crate) fn start_filter_drag(ctx: &egui::Context, layer: LayerId, filter: Option<usize>, label: &str) {
-    start(ctx, vec![RowKey::Filters(layer, filter)], label);
+    start(ctx, vec![RowKey::Filters(layer, filter)], RowKey::Filters(layer, filter), label);
 }
 
 /// The command for dropping effects of layer `from` on `target`: they move there, or with ⌥ held

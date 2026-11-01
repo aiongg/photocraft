@@ -78,15 +78,23 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<Strin
     let (mut params, mut values, mut extra) = (Vec::new(), DialogFields::new(), Map::new());
     let batch = command == "file.automate.batch";
     for key in form_keys(&f) {
-        // Batch: the file naming row keeps its token hint, and the quality is a number that is
+        // Batch: the file naming row shows its tokens, and the quality is a number that is
         // absent from the command's parameters until Custom is checked.
         if batch && key == "naming" {
             values.set("naming", FieldValue::Text(f[&key].as_str().unwrap_or_default().to_owned()));
-            params.push(naming_row());
+            params.push(
+                Param::new("naming", tl!("File Naming").to_string(), ParamKind::Text { default: String::new() })
+                    .hint("{name}")
+                    .tooltip("{name} · {serial} · {date} (UTC)"),
+            );
             continue;
         }
         if batch && key == "quality" {
-            params.push(Param::new("quality", label_for("quality"), ParamKind::OptionalNumber { min: 0.0, max: 12.0, default: None, initial: 8.0 }));
+            params.push(Param::new(
+                "quality",
+                label_for("quality"),
+                ParamKind::OptionalNumber { min: 0.0, max: 12.0, default: None, initial: 8.0, decimals: 0 },
+            ));
             if let Some(quality) = f[&key].as_f64() {
                 values.set("quality", FieldValue::Number(quality));
             }
@@ -137,19 +145,6 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, label: &str, f: Map<Strin
         app,
         crate::dialogs::hosted::FormSpec { command: command.to_owned(), label: label.to_owned(), params, values, extra, private, width, below },
     )
-}
-
-/// Batch's File Naming row: a text field with the token hint and the tokens' tooltip.
-fn naming_row() -> craft::ui::dialog::Param {
-    craft::ui::dialog::Param::custom("naming", tl!("File Naming").to_string(), |ui, fields| {
-        let mut naming = fields.text("naming").unwrap_or_default().to_owned();
-        let response =
-            ui.add(egui::TextEdit::singleline(&mut naming).desired_width(260.0).hint_text("{name}")).on_hover_text("{name} · {serial} · {date} (UTC)");
-        if response.changed() {
-            fields.set("naming", craft::ui::dialog::FieldValue::Text(naming));
-        }
-        response
-    })
 }
 
 /// A fractional form field. Merge to HDR Pro's tone settings are sliders, as in Photoshop; the

@@ -63,7 +63,7 @@ pub fn selection_for(kind: ThemeKind) -> Selection {
         contrast: craft::theme::ContrastChoice::Standard,
         motion: craft::theme::MotionChoice::Full,
         size: kind.size(),
-        text_size: craft::theme::TextSize::Default,
+        text_size: craft::theme::TextSize::Small,
     }
 }
 

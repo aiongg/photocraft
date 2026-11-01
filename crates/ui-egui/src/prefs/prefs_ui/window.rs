@@ -525,7 +525,8 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
     let state = PreferencesBody::state(ui.ctx(), body_id);
     f_sync(host.fields, &state.search, out.page.as_deref());
     // A colour swatch was clicked: open the Color Picker on that value (#2144).
-    let picked = out.pick_color.map(|key| {
+    let picked = out.pick_color.map(|request| {
+        let key = request.key;
         let human = humanize(key.split_once('.').map_or(key.as_str(), |(_, k)| k));
         (key, human)
     });

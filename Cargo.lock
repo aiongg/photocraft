@@ -650,7 +650,7 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -859,6 +859,16 @@ name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
+
+[[package]]
+name = "calendrical_calculations"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5abbd6eeda6885048d357edc66748eea6e0268e3dd11f326fff5bd248d779c26"
+dependencies = [
+ "core_maths",
+ "displaydoc",
+]
 
 [[package]]
 name = "calloop"
@@ -1350,9 +1360,11 @@ dependencies = [
 [[package]]
 name = "craft"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "craft-browse",
  "craft-color",
+ "craft-dialogs",
  "craft-docpath",
  "craft-draw",
  "craft-font-manager",
@@ -1365,6 +1377,8 @@ dependencies = [
  "craft-platform",
  "craft-print",
  "craft-quit",
+ "craft-settings",
+ "craft-text",
  "craft-theme",
  "craft-theme-store",
  "craft-ui",
@@ -1377,17 +1391,46 @@ dependencies = [
 [[package]]
 name = "craft-atomic"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "rustix 1.1.5",
 ]
 
 [[package]]
+name = "craft-browse"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "craft-docpath",
+ "craft-host",
+ "craft-i18n",
+ "craft-platform",
+ "craft-settings",
+ "craft-theme",
+ "craft-ui",
+ "egui",
+ "kurbo 0.13.1",
+ "serde",
+]
+
+[[package]]
+name = "craft-cms"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "rayon",
+]
+
+[[package]]
 name = "craft-color"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "craft-cms",
+ "craft-host",
  "craft-i18n",
+ "craft-platform",
+ "craft-settings",
  "craft-theme",
  "craft-ui",
  "egui",
@@ -1395,14 +1438,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-dialogs"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "block2 0.6.2",
+ "craft-atomic",
+ "craft-host",
+ "craft-i18n",
+ "craft-platform",
+ "craft-ui",
+ "egui",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "raw-window-handle",
+ "rfd",
+]
+
+[[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "craft-draw"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-color",
  "craft-i18n",
@@ -1416,7 +1481,7 @@ dependencies = [
 [[package]]
 name = "craft-font-catalog"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "fontique",
  "skrifa 0.47.0",
@@ -1427,7 +1492,7 @@ dependencies = [
 [[package]]
 name = "craft-font-manager"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-font-catalog",
  "craft-font-store",
@@ -1438,12 +1503,13 @@ dependencies = [
  "epaint_default_fonts",
  "log",
  "serde",
+ "skrifa 0.44.0",
 ]
 
 [[package]]
 name = "craft-font-store"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-atomic",
  "craft-font-catalog",
@@ -1459,12 +1525,12 @@ dependencies = [
 [[package]]
 name = "craft-fonts-build"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 
 [[package]]
 name = "craft-host"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-i18n",
  "egui",
@@ -1475,9 +1541,13 @@ dependencies = [
 [[package]]
 name = "craft-i18n"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "chrono",
  "fixed_decimal",
+ "icu_calendar",
+ "icu_collator",
+ "icu_datetime",
  "icu_decimal",
  "icu_locale_core",
  "icu_locale_fallback",
@@ -1487,6 +1557,7 @@ dependencies = [
  "icu_provider",
  "icu_provider_adapters",
  "icu_provider_blob",
+ "icu_time",
  "log",
  "objc2-foundation 0.3.2",
  "sys-locale",
@@ -1498,19 +1569,21 @@ dependencies = [
 [[package]]
 name = "craft-imaging"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "craft-host",
  "craft-i18n",
  "craft-theme",
  "craft-ui",
  "egui",
  "kurbo 0.13.1",
+ "serde",
 ]
 
 [[package]]
 name = "craft-jpeg"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "thiserror 2.0.21",
 ]
@@ -1518,12 +1591,13 @@ dependencies = [
 [[package]]
 name = "craft-keymap"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-host",
  "craft-i18n",
  "craft-ui",
  "egui",
+ "roxmltree 0.21.1",
  "serde",
  "serde_json",
 ]
@@ -1531,8 +1605,9 @@ dependencies = [
 [[package]]
 name = "craft-menu"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "craft-i18n",
  "craft-keymap",
  "craft-quit",
  "craft-theme",
@@ -1542,26 +1617,46 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "serde_json",
+]
+
+[[package]]
+name = "craft-pdf"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
 name = "craft-platform"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "async-channel",
  "async-io",
  "async-process",
+ "core-graphics2",
+ "craft-atomic",
+ "craft-docpath",
+ "craft-host",
+ "craft-theme",
  "egui",
  "futures-lite",
+ "log",
+ "serde",
+ "serde_json",
  "web-sys",
+ "web-time",
+ "x11rb",
+ "xcap",
  "zbus",
 ]
 
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-ui",
  "craft-winprint-gdi",
@@ -1577,7 +1672,7 @@ dependencies = [
 [[package]]
 name = "craft-quit"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "dispatch2",
  "egui",
@@ -1588,20 +1683,39 @@ dependencies = [
 [[package]]
 name = "craft-settings"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-atomic",
  "craft-host",
  "dirs",
  "serde",
+ "serde_json",
  "toml",
  "toml_edit",
 ]
 
 [[package]]
+name = "craft-text"
+version = "0.1.0"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
+dependencies = [
+ "craft-host",
+ "craft-ui",
+ "egui",
+ "hypher",
+ "miniz_oxide 0.8.9",
+ "serde",
+ "unicode-bidi",
+ "unicode-bidi-mirroring",
+ "unicode-general-category",
+ "unicode-linebreak",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "craft-theme"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "ecolor",
  "log",
@@ -1612,11 +1726,13 @@ dependencies = [
 [[package]]
 name = "craft-theme-store"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-atomic",
  "craft-theme",
+ "craft-ui",
  "dirs",
+ "egui",
  "serde",
  "serde_json",
 ]
@@ -1624,11 +1740,13 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
+ "craft-font-catalog",
  "craft-fonts-build",
  "craft-host",
  "craft-i18n",
+ "craft-pdf",
  "craft-quit",
  "craft-settings",
  "craft-theme",
@@ -1636,6 +1754,8 @@ dependencies = [
  "craft-window",
  "egui",
  "epaint",
+ "epaint_default_fonts",
+ "flate2",
  "js-sys",
  "kurbo 0.13.1",
  "log",
@@ -1645,8 +1765,11 @@ dependencies = [
  "resvg",
  "roxmltree 0.20.0",
  "serde",
+ "serde_json",
  "skrifa 0.44.0",
  "toml",
+ "toml_edit",
+ "unicode-bidi",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1655,7 +1778,7 @@ dependencies = [
 [[package]]
 name = "craft-ui-macros"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1665,7 +1788,7 @@ dependencies = [
 [[package]]
 name = "craft-update"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "chrono",
  "craft-host",
@@ -1693,7 +1816,7 @@ dependencies = [
 [[package]]
 name = "craft-window"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=96770d4de62d0ac46d261807a2cea46557c98d6a#96770d4de62d0ac46d261807a2cea46557c98d6a"
+source = "git+https://github.com/aiongg/craft-libs?rev=7ca77f6ab11f82fe7546ca5da253af48b065241c#7ca77f6ab11f82fe7546ca5da253af48b065241c"
 dependencies = [
  "craft-atomic",
  "craft-settings",
@@ -2240,6 +2363,18 @@ dependencies = [
  "bytemuck",
  "serde",
 ]
+
+[[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
+
+[[package]]
+name = "embedded-io"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "encoding_rs"
@@ -3257,6 +3392,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hypher"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45f2b4f6b5da34d400d4c112eadcc14512cc5d04307a8eee182586d9bebd7ce6"
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3281,6 +3422,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu_calendar"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58655df2f728e46e4eee80bddebefacf52ec3e77cdb925014b47c5a5905eb55c"
+dependencies = [
+ "calendrical_calculations",
+ "displaydoc",
+ "icu_locale_core",
+ "icu_provider",
+ "serde",
+ "tinystr",
+ "zerovec",
+]
+
+[[package]]
+name = "icu_collator"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08984ed58ac439ebf3e13d2cf26b0c46a60afcd21721c1d14087c0b240344dda"
+dependencies = [
+ "icu_collections",
+ "icu_locale_core",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider",
+ "serde",
+ "smallvec",
+ "utf16_iter",
+ "utf8_iter",
+ "zerovec",
+]
+
+[[package]]
 name = "icu_collections"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3288,9 +3462,34 @@ checksum = "fa68d21081c4a05d5a901a1c62add574c77048b6a1c67be3b50ce0b60d4ca513"
 dependencies = [
  "displaydoc",
  "potential_utf",
+ "serde",
  "utf8_iter",
  "yoke",
  "zerofrom",
+ "zerovec",
+]
+
+[[package]]
+name = "icu_datetime"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c44df99c4c5297b05653d1a1629f13bdc9fd4044acfbbaf30b15194a1eed4cd6"
+dependencies = [
+ "displaydoc",
+ "fixed_decimal",
+ "icu_calendar",
+ "icu_decimal",
+ "icu_locale_core",
+ "icu_pattern",
+ "icu_plurals",
+ "icu_provider",
+ "icu_time",
+ "potential_utf",
+ "serde",
+ "smallvec",
+ "tinystr",
+ "writeable",
+ "zerotrie",
  "zerovec",
 ]
 
@@ -3355,6 +3554,7 @@ dependencies = [
  "icu_normalizer_data",
  "icu_properties",
  "icu_provider",
+ "serde",
  "smallvec",
  "utf16_iter",
  "utf8_iter",
@@ -3405,6 +3605,7 @@ dependencies = [
  "icu_locale_core",
  "icu_properties_data",
  "icu_provider",
+ "serde",
  "zerotrie",
  "zerovec",
 ]
@@ -3478,6 +3679,22 @@ name = "icu_segmenter_data"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae293c039020f9ec10710af98d29ce6aa2051486638b49c9a6409f3b4a9e98ad"
+
+[[package]]
+name = "icu_time"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af37e1c3b9f3ab564b619fdf4b22de169f6381eb0f7048e3ca454290c438126b"
+dependencies = [
+ "calendrical_calculations",
+ "displaydoc",
+ "icu_calendar",
+ "icu_locale_core",
+ "icu_provider",
+ "serde",
+ "zerotrie",
+ "zerovec",
+]
 
 [[package]]
 name = "ident_case"
@@ -3624,15 +3841,6 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
-
-[[package]]
-name = "itertools"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -5937,6 +6145,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
 dependencies = [
  "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
  "serde",
 ]
 
@@ -8177,6 +8387,12 @@ name = "unicode-ident"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+
+[[package]]
+name = "unicode-linebreak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
 
 [[package]]
 name = "unicode-properties"

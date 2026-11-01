@@ -5,7 +5,7 @@
 //! uses; the record's key gives the library's dialog id, which finds the dialog in the host. The
 //! record also holds what the library dialog does not: the `__` keys, the cancel cleanup's input.
 
-use craft::ui::dialog::{CommandForm, DialogFields, DialogHost, DialogResult, FieldValue, Param, ParamKind, PathKind, PathRequest, Width, dialog_id};
+use craft::ui::dialog::{Body, CommandForm, DialogFields, DialogHost, DialogResult, FieldValue, Param, ParamKind, PathKind, PathRequest, Width, dialog_id};
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
@@ -186,6 +186,7 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
     let mut form = CommandForm::new(command.as_str(), crate::dialogs::display_label(&label), params.clone())
         .values(values)
         .width(width)
+        .body(Body::Fit)
         // Cmd/Ctrl+Z steps the form's own settings (#4697), and the close box follows the platform.
         .history(true)
         .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()));
@@ -299,11 +300,11 @@ pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
 }
 
 /// `ui.dialog.cancel` for a hosted dialog: closes the library dialog, then runs the cleanup.
-pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
+pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     if app.ui.hosted_form(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
-    app.ui.host.cancel::<CommandForm>();
+    app.ui.host.cancel::<CommandForm>(ctx);
     app.ui.host.take_keyed::<CommandForm>();
     cancelled(app, id);
     Ok(Value::Null)
