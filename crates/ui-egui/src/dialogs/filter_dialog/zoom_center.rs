@@ -1,51 +1,62 @@
 //! Radial Blur's Zoom centre: a schematic of the streaks beside the two coordinate sliders.
 //! The diagram and sliders edit the same dialog fields used by preview, OK and automation.
 
+use craft::ui::dialog::DialogFields;
 use craft::ui::theme::StrokeExt;
 use craft::ui::theme::ToEgui;
 use egui::{Rect, Response, Sense, Stroke, Ui, Vec2, pos2, vec2};
-use serde_json::{Map, Value, json};
 
 use crate::theme::Tokens;
 
-pub(super) fn owns(command: &str, fields: &Map<String, Value>) -> bool {
-    command == "filter.blur.radialBlur" && fields.get("method").and_then(Value::as_str) == Some("zoom")
+/// Whether the dialog's Method is Zoom: the Center is then a diagram with its two sliders; for Spin
+/// it is the two sliders alone.
+pub(super) fn zooms(fields: &DialogFields) -> bool {
+    fields.text("method") == Some("zoom")
 }
 
-fn number(fields: &Map<String, Value>, key: &str, default: f64, min: f64, max: f64) -> f32 {
-    fields.get(key).and_then(Value::as_f64).filter(|n| n.is_finite()).unwrap_or(default).clamp(min, max) as f32
+fn number(fields: &DialogFields, key: &str, default: f64, min: f64, max: f64) -> f32 {
+    fields.number(key).filter(|n| n.is_finite()).unwrap_or(default).clamp(min, max) as f32
 }
 
 fn rounded(value: f32) -> f32 {
     (value.clamp(0.0, 1.0) * 100.0).round() / 100.0
 }
 
-pub(super) fn row(ui: &mut Ui, fields: &mut Map<String, Value>) {
+pub(super) fn row(ui: &mut Ui, fields: &mut DialogFields) -> Response {
+    let zoom = zooms(fields);
     let mut center = vec2(number(fields, "centerX", 0.5, 0.0, 1.0), number(fields, "centerY", 0.5, 0.0, 1.0));
     let amount = number(fields, "amount", 10.0, 1.0, 100.0);
-    ui.horizontal(|ui| {
-        let (rect, mut response) = ui.allocate_exact_size(vec2(112.0, 112.0), Sense::click_and_drag());
-        // Leave room for the centre marker at 0 and 1, including all four corners.
-        let plot = rect.shrink(4.0);
-        interact(ui, &mut response, plot, &mut center);
-        ui.add_space(craft::ui::theme::scale::Space::S4.px());
-        ui.vertical(|ui| {
-            ui.set_width(ui.available_width());
-            for (key, value) in [("centerX", &mut center.x), ("centerY", &mut center.y)] {
-                let label = super::label(key);
-                let gestures = crate::widgets::RowGestures { reset: Some(0.5), wheel_step: None, ..Default::default() };
-                crate::widgets::slider_row_with(ui, &label, value, 0.0..=1.0, "", None, gestures);
-                *value = rounded(*value);
+    let row_response = ui
+        .horizontal(|ui| {
+            let (rect, mut response) = ui.allocate_exact_size(if zoom { vec2(112.0, 112.0) } else { Vec2::ZERO }, Sense::click_and_drag());
+            // Leave room for the centre marker at 0 and 1, including all four corners.
+            let plot = rect.shrink(4.0);
+            if zoom {
+                interact(ui, &mut response, plot, &mut center);
+                ui.add_space(craft::ui::theme::scale::Space::S4.px());
             }
-        });
-        // Paint after both sliders so their edits move the marker in this very frame.
-        paint(ui, rect, plot, center, amount, response.has_focus());
-        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Slider, ui.is_enabled(), tl!("Center")));
-        response.on_hover_cursor(egui::CursorIcon::Crosshair);
-    });
+            ui.vertical(|ui| {
+                ui.set_width(ui.available_width());
+                for (key, value) in [("centerX", &mut center.x), ("centerY", &mut center.y)] {
+                    let label = super::label(key);
+                    let gestures = crate::widgets::RowGestures { reset: Some(0.5), wheel_step: None, ..Default::default() };
+                    crate::widgets::slider_row_with(ui, &label, value, 0.0..=1.0, "", None, gestures);
+                    *value = rounded(*value);
+                }
+            });
+            // Paint after both sliders so their edits move the marker in this very frame.
+            if zoom {
+                paint(ui, rect, plot, center, amount, response.has_focus());
+                response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Slider, ui.is_enabled(), tl!("Center")));
+                response = response.on_hover_cursor(egui::CursorIcon::Crosshair);
+            }
+            response
+        })
+        .inner;
     for (key, value) in [("centerX", center.x), ("centerY", center.y)] {
-        fields.insert(key.into(), json!((f64::from(value) * 100.0).round() / 100.0));
+        fields.set(key, (f64::from(value) * 100.0).round() / 100.0);
     }
+    row_response
 }
 
 fn interact(ui: &Ui, response: &mut Response, plot: Rect, center: &mut Vec2) {
@@ -127,9 +138,10 @@ mod tests {
     /// slider node carrying the row's caption and the current value.
     #[test]
     fn center_sliders_are_named_and_report_their_value() {
-        let mut fields = Map::new();
-        fields.insert("centerX".into(), json!(0.25));
-        let mut h = Harness::builder().with_size(vec2(400.0, 200.0)).build_ui_state(|ui, fields: &mut Map<String, Value>| row(ui, fields), fields);
+        let mut fields = DialogFields::new();
+        fields.set("centerX", 0.25_f64);
+        fields.set("method", "zoom");
+        let mut h = Harness::builder().with_size(vec2(400.0, 200.0)).build_ui_state(|ui, fields: &mut DialogFields| _ = row(ui, fields), fields);
         crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
         h.run_steps(3);
         let sliders: Vec<_> = h.get_all_by_role(egui::accesskit::Role::Slider).collect();

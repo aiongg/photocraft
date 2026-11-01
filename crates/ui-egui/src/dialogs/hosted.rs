@@ -5,17 +5,39 @@
 //! uses; the record's key gives the library's dialog id, which finds the dialog in the host. The
 //! record also holds what the library dialog does not: the `__` keys, the cancel cleanup's input.
 
-use craft::ui::dialog::{Body, CommandForm, DialogFields, DialogHost, DialogResult, FieldValue, Param, ParamKind, PathKind, PathRequest, Width, dialog_id};
-use serde_json::Value;
+use craft::ui::dialog::{Body, CommandForm, DialogFields, DialogHost, FieldValue, Param, ParamDialog, ParamKind, PathKind, PathRequest, Width, dialog_id};
+use serde_json::{Value, json};
 use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex};
 
 use crate::PhotocraftApp;
 
 type Fields = serde_json::Map<String, Value>;
 
+/// Which library dialog type a record's dialog is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostedKind {
+    /// A [`CommandForm`] (`dialogs::hosted::open_form`).
+    Form,
+    /// A [`ParamDialog`] (`filter_dialog::open_hosted`).
+    Params,
+}
+
+/// State the footer hook sets and the app reads after the dialog drew (the hook cannot reach the
+/// app). Equal to every other, like [`HostCell`].
+#[derive(Clone, Debug, Default)]
+pub struct Pending<T>(pub Arc<Mutex<T>>);
+
+impl<T> PartialEq for Pending<T> {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 /// One open hosted dialog.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hosted {
+    pub kind: HostedKind,
     /// The id automation addresses the dialog by (`UiState::alloc_id`).
     pub id: u64,
     /// The library dialog's own key (`CommandForm::key`). The host knows a dialog by
@@ -30,6 +52,10 @@ pub struct Hosted {
     /// The `__` keys of the legacy fields (`__command`, `__label`, `__spec`, `__docs`, the
     /// paused-action RESUME token).
     pub private: Fields,
+    /// Parameters that hold an open document's index (shown as a menu of the documents' names).
+    pub documents: Vec<String>,
+    /// The Color Table footer's pressed button.
+    pub table: Pending<Option<crate::color_table_ui::Action>>,
 }
 
 /// `DialogHost` as a `UiState` field: not saved, and a clone starts empty (open dialogs belong to
@@ -70,17 +96,32 @@ impl crate::state::UiState {
 
     /// The library form of hosted dialog `id`, found in the host by its dialog id.
     pub fn hosted_form(&self, id: u64) -> Option<&CommandForm> {
-        self.host.get_by_id::<CommandForm>(dialog_id(self.hosted(id)?.key.as_str()))
+        let record = self.hosted(id).filter(|h| h.kind == HostedKind::Form)?;
+        self.host.get_by_id::<CommandForm>(dialog_id(record.key.as_str()))
     }
 
-    fn hosted_form_mut(&mut self, id: u64) -> Option<&mut CommandForm> {
-        let key = self.hosted(id)?.key.clone();
-        self.host.get_dyn_mut(dialog_id(key.as_str()))?.downcast_mut()
+    /// The library parameter dialog of hosted dialog `id`.
+    pub fn hosted_params(&self, id: u64) -> Option<&ParamDialog> {
+        let record = self.hosted(id).filter(|h| h.kind == HostedKind::Params)?;
+        self.host.get_by_id::<ParamDialog>(dialog_id(record.key.as_str()))
     }
 
     /// The library fields of hosted dialog `id`, read from the host.
     pub fn hosted_fields(&self, id: u64) -> Option<&DialogFields> {
-        self.hosted_form(id).map(CommandForm::fields)
+        match self.hosted(id)?.kind {
+            HostedKind::Form => self.hosted_form(id).map(CommandForm::fields),
+            HostedKind::Params => self.hosted_params(id).map(ParamDialog::fields),
+        }
+    }
+
+    pub(crate) fn hosted_fields_mut(&mut self, id: u64) -> Option<&mut DialogFields> {
+        let record = self.hosted(id)?;
+        let (kind, did) = (record.kind, dialog_id(record.key.as_str()));
+        let dialog = self.host.get_dyn_mut(did)?;
+        match kind {
+            HostedKind::Form => dialog.downcast_mut::<CommandForm>().map(CommandForm::fields_mut),
+            HostedKind::Params => dialog.downcast_mut::<ParamDialog>().map(ParamDialog::fields_mut),
+        }
     }
 
     /// The JSON fields of dialog `id`: the legacy list first, then the hosted registry.
@@ -89,7 +130,11 @@ impl crate::state::UiState {
             return Some(d.fields.clone());
         }
         let record = self.hosted(id)?;
-        let mut fields = fields_json(self.hosted_fields(id)?);
+        let library = self.hosted_fields(id)?;
+        let mut fields = match record.kind {
+            HostedKind::Form => fields_json(library),
+            HostedKind::Params => crate::filter_dialog::Wire::of(record).json(library),
+        };
         fields.extend(record.extra.clone());
         fields.extend(record.private.clone());
         Some(fields)
@@ -155,12 +200,28 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
         record.private.insert(field.to_owned(), value);
         return Ok(());
     }
+    let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
+    if kind == HostedKind::Params {
+        // Rows the host draws keep their values under keys of their own (`centerY`): any key the
+        // dialog already holds is a field.
+        let known = drawn || app.ui.hosted_fields(id).is_some_and(|f| f.contains(field));
+        if known {
+            let wire = crate::filter_dialog::Wire::of(&app.ui.hosted[at]);
+            let fields = app.ui.hosted_fields(id).cloned().ok_or_else(|| format!("no dialog {id}"))?;
+            let mut next = fields;
+            wire.set(&mut next, field, &value).map_err(|e| format!("`{field}`: {e}"))?;
+            *app.ui.hosted_fields_mut(id).ok_or_else(|| format!("no dialog {id}"))? = next;
+            return Ok(());
+        }
+        app.ui.hosted[at].extra.insert(field.to_owned(), value);
+        return Ok(());
+    }
     let Some(param) = record.params.iter().find(|p| p.key == field) else {
         record.extra.insert(field.to_owned(), value);
         return Ok(());
     };
     let value = field_from_json(&param.kind, &value).map_err(|e| format!("`{field}`: {e}"))?;
-    app.ui.hosted_form_mut(id).ok_or_else(|| format!("no dialog {id}"))?.fields_mut().set(field, value);
+    app.ui.hosted_fields_mut(id).ok_or_else(|| format!("no dialog {id}"))?.set(field, value);
     Ok(())
 }
 
@@ -195,13 +256,31 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
     }
     // Opening over a form replaces it: its Cancel waits in the host with its key.
     app.ui.host.open(form);
-    if let Some((_, Some(old))) = app.ui.host.take_keyed::<CommandForm>()
+    cancel_replaced::<CommandForm>(app);
+    let record = Hosted { kind: HostedKind::Form, id, key: command, params, title, extra, private, documents: Vec::new(), table: Pending::default() };
+    app.ui.hosted.push(record);
+    id
+}
+
+/// Opens a parameter dialog, replacing the one open (the host holds one `ParamDialog`) with its
+/// cancel cleanup. The caller has built the dialog and the record's fields.
+pub fn open_params(app: &mut PhotocraftApp, dialog: ParamDialog, mut record: Hosted) -> u64 {
+    let id = app.ui.alloc_id();
+    record.id = id;
+    record.kind = HostedKind::Params;
+    app.ui.host.open(dialog);
+    cancel_replaced::<ParamDialog>(app);
+    app.ui.hosted.push(record);
+    id
+}
+
+/// A dialog an `open` of the same type replaced says `Cancel` with its key: run its cleanup.
+fn cancel_replaced<D: craft::ui::dialog::StackDialog>(app: &mut PhotocraftApp) {
+    if let Some((_, Some(old))) = app.ui.host.take_keyed::<D>()
         && let Some(old) = app.ui.hosted.iter().find(|h| h.key == old).map(|h| h.id)
     {
         cancelled(app, old);
     }
-    app.ui.hosted.push(Hosted { id, key: command, params, title, extra, private });
-    id
 }
 
 /// The command a closed form runs: the dialog is gone, so the preview and the paused action settle
@@ -218,37 +297,67 @@ fn run_form(app: &mut PhotocraftApp, record: Hosted, mut params: Fields) -> Resu
     result
 }
 
+/// The command a closed parameter dialog runs, as a legacy filter dialog's OK does (the displace
+/// map question, smart filter edits, remembered values, the paused action).
+fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) -> Result<Value, String> {
+    let mut fields = crate::filter_dialog::Wire::of(&record).json(answer);
+    fields.extend(record.extra);
+    fields.extend(record.private);
+    let dialog = crate::state::Dialog { id: record.id, kind: crate::state::DialogKind::Command, fields };
+    crate::dialogs::confirm_generic_command(app, dialog)
+}
+
 /// `ui.dialog.confirm` for a hosted dialog: OK as the default button answers it (refused while OK
 /// is disabled), then the same path a click takes.
 pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
-    if app.ui.hosted_form(id).is_none() {
+    let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
+    if app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
-    if !app.ui.host.confirm::<CommandForm>(ctx) {
+    let confirmed = match kind {
+        HostedKind::Form => app.ui.host.confirm::<CommandForm>(ctx),
+        HostedKind::Params => app.ui.host.confirm::<ParamDialog>(ctx),
+    };
+    if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
     }
-    settle(app).unwrap_or_else(|| Err(format!("no dialog {id}")))
+    settle(app, kind).unwrap_or_else(|| Err(format!("no dialog {id}")))
 }
 
-/// The form's answer, after `DialogHost::show`: OK runs the command, Cancel runs the cleanup.
+/// The dialogs' answers, after `DialogHost::show`: OK runs the command, Cancel runs the cleanup.
 pub fn collect(app: &mut PhotocraftApp) {
     browse(app);
-    if let Some(Err(error)) = settle(app) {
-        app.ui.status = error;
+    crate::filter_dialog::requests(app);
+    for kind in [HostedKind::Form, HostedKind::Params] {
+        if let Some(Err(error)) = settle(app, kind) {
+            app.ui.status = error;
+        }
     }
 }
 
-/// Takes the form's stored answer. OK runs the command and returns its result; Cancel runs the
+/// Takes the dialog's stored answer. OK runs the command and returns its result; Cancel runs the
 /// cleanup of the record the answer's key names.
-fn settle(app: &mut PhotocraftApp) -> Option<Result<Value, String>> {
-    let (result, key) = app.ui.host.take_keyed::<CommandForm>()?;
-    let record = app.ui.hosted.iter().find(|h| Some(&h.key) == key.as_ref()).cloned()?;
-    match result {
-        DialogResult::Ok(answer) => {
-            app.ui.hosted.retain(|h| h.id != record.id);
-            Some(run_form(app, record, fields_json(&answer.fields)))
+fn settle(app: &mut PhotocraftApp, kind: HostedKind) -> Option<Result<Value, String>> {
+    let (result, key) = match kind {
+        HostedKind::Form => {
+            let (result, key) = app.ui.host.take_keyed::<CommandForm>()?;
+            (result.ok().map(|answer| answer.fields), key)
         }
-        DialogResult::Cancel => {
+        HostedKind::Params => {
+            let (result, key) = app.ui.host.take_keyed::<ParamDialog>()?;
+            (result.ok().map(|answer| answer.fields), key)
+        }
+    };
+    let record = app.ui.hosted.iter().find(|h| Some(&h.key) == key.as_ref() && h.kind == kind).cloned()?;
+    match result {
+        Some(answer) => {
+            app.ui.hosted.retain(|h| h.id != record.id);
+            Some(match kind {
+                HostedKind::Form => run_form(app, record, fields_json(&answer)),
+                HostedKind::Params => run_params(app, record, &answer),
+            })
+        }
+        None => {
             cancelled(app, record.id);
             None
         }
@@ -258,10 +367,14 @@ fn settle(app: &mut PhotocraftApp) -> Option<Result<Value, String>> {
 /// The Browse… button of a path row, once pressed: opens the file or folder dialog, and the answer
 /// fills the row.
 fn browse(app: &mut PhotocraftApp) {
-    let Some(form) = app.ui.host.get_mut::<CommandForm>() else { return };
-    let Some(PathRequest { key: field, kind }) = form.pick_path() else { return };
-    let current = form.fields().text(&field).unwrap_or_default().to_owned();
-    let key = form.key().to_owned();
+    let pressed =
+        if let Some(form) = app.ui.host.get_mut::<CommandForm>() { form.pick_path().map(|r| (r, form.fields().clone(), form.key().to_owned())) } else { None };
+    let pressed = pressed.or_else(|| {
+        let dialog = app.ui.host.get_mut::<ParamDialog>()?;
+        dialog.pick_path().map(|r| (r, dialog.fields().clone(), dialog.key().to_owned()))
+    });
+    let Some((PathRequest { key: field, kind }, fields, key)) = pressed else { return };
+    let current = fields.text(&field).unwrap_or_default().to_owned();
     let Some(id) = app.ui.hosted.iter().find(|h| h.key == key).map(|h| h.id) else { return };
     let fill = move |app: &mut PhotocraftApp, path: String| fill_path(app, id, &field, path);
     let result = match kind {
@@ -283,9 +396,21 @@ fn browse(app: &mut PhotocraftApp) {
 }
 
 fn fill_path(app: &mut PhotocraftApp, id: u64, key: &str, path: String) -> Result<Value, String> {
-    let form = app.ui.hosted_form_mut(id).ok_or("the dialog was closed")?;
-    form.fields_mut().set(key, FieldValue::Text(path));
+    let fields = app.ui.hosted_fields_mut(id).ok_or("the dialog was closed")?;
+    fields.set(key, FieldValue::Text(path));
     Ok(Value::Null)
+}
+
+/// The colour a Color Picker child answers with, for the colour parameter or private key `key` of
+/// hosted dialog `id` (`color_picker_ui::confirm`'s `field` target).
+pub fn set_color(app: &mut PhotocraftApp, id: u64, key: &str, hex: &str) -> Result<(), String> {
+    let rgb = crate::color_picker_ui::parse_hex(hex).ok_or("not a colour")?;
+    if key.starts_with("__") {
+        app.ui.hosted.iter_mut().find(|h| h.id == id).ok_or("the dialog this colour was for is closed")?.private.insert(key.to_owned(), json!(hex));
+        return Ok(());
+    }
+    app.ui.hosted_fields_mut(id).ok_or("the dialog this colour was for is closed")?.set(key, FieldValue::Color(rgb));
+    Ok(())
 }
 
 /// Runs PC's cancel cleanup for hosted dialog `id` and drops its record: the paused action it
@@ -301,11 +426,20 @@ pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
 
 /// `ui.dialog.cancel` for a hosted dialog: closes the library dialog, then runs the cleanup.
 pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
-    if app.ui.hosted_form(id).is_none() {
+    let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
+    if app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
-    app.ui.host.cancel::<CommandForm>(ctx);
-    app.ui.host.take_keyed::<CommandForm>();
+    match kind {
+        HostedKind::Form => {
+            app.ui.host.cancel::<CommandForm>(ctx);
+            app.ui.host.take_keyed::<CommandForm>();
+        }
+        HostedKind::Params => {
+            app.ui.host.cancel::<ParamDialog>(ctx);
+            app.ui.host.take_keyed::<ParamDialog>();
+        }
+    }
     cancelled(app, id);
     Ok(Value::Null)
 }

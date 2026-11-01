@@ -89,7 +89,10 @@ pub(crate) fn push_modal_rect(ctx: &egui::Context, key: impl std::hash::Hash + s
 /// Where the open dialogs are on screen.
 #[cfg(test)]
 pub(crate) fn rects(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Vec<egui::Rect> {
-    h.state().ui.dialogs.iter().filter_map(|d| h.ctx.memory(|m| m.area_rect(area_id(d.id)))).collect()
+    let legacy = h.state().ui.dialogs.iter().filter_map(|d| h.ctx.memory(|m| m.area_rect(area_id(d.id))));
+    let legacy_ids: Vec<_> = h.state().ui.dialogs.iter().map(|d| craft::ui::dialog::dialog_id(d.id)).collect();
+    let hosted = h.state().ui.host.stack().ids().filter(|id| !legacy_ids.contains(id)).filter_map(|id| h.ctx.memory(|m| m.area_rect(id)));
+    legacy.chain(hosted).collect()
 }
 
 /// Draw a dialog body that opens on its first number, selected, as Photoshop's value dialogs do:
@@ -700,6 +703,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
     }
     // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
+    crate::filter_dialog::push_state(app);
     app.ui.host.show(ctx);
     hosted::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
@@ -1031,6 +1035,17 @@ pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resul
 /// schema dialog for filters, the Color Range dialog for `select.colorRange`, otherwise a bare
 /// confirm dialog.
 pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
+    open_command_dialog_with(app, command, label, false)
+}
+
+/// [`open_command_dialog`] with the filter routes on the host (`ParamDialog`) instead of the legacy
+/// list. The callers that fill a filter dialog's `Dialog::fields` after opening it
+/// (`dialog_mut`) still need the legacy route until they read the hosted fields.
+pub fn open_command_dialog_hosted(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
+    open_command_dialog_with(app, command, label, true)
+}
+
+fn open_command_dialog_with(app: &mut PhotocraftApp, command: &str, label: &str, hosted: bool) -> u64 {
     if command == "view.newGuideLayout" {
         return crate::guide_layout_ui::open(app);
     }
@@ -1047,7 +1062,7 @@ pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) 
         return id;
     }
     if crate::filter_dialog::has_dialog(command)
-        && let Some(id) = crate::filter_dialog::open(app, command)
+        && let Some(id) = if hosted { crate::filter_dialog::open_hosted(app, command) } else { crate::filter_dialog::open(app, command) }
     {
         return id;
     }
