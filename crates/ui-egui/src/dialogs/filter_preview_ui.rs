@@ -362,7 +362,7 @@ mod tests {
         app.run("channel.new", json!({"name": "Black", "fill": "black"})).unwrap();
         app.session.active_mut().unwrap().channel_view.target = ChannelTarget::Alpha(0);
         let revision = app.session.active().unwrap().revision;
-        let id = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        let id = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
         let mut fields = app.ui.dialogs.last().unwrap().fields.clone();
         let ctx = egui::Context::default();
         let cache_id = egui::Id::unique(("filter-preview-ui", id));
@@ -497,7 +497,7 @@ mod tests {
     fn the_window_defaults_its_view_and_never_panics() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-        let id = crate::filter_dialog::open(&mut app, "filter.stylize.emboss").expect("Emboss opens a dialog");
+        let id = crate::filter_dialog::open_legacy(&mut app, "filter.stylize.emboss").expect("Emboss opens a dialog");
         let mut f = app.ui.dialogs.iter().find(|d| d.id == id).expect("the dialog is open").fields.clone();
         assert!(f.contains_key("__preview"), "Emboss previews");
         egui::Context::default().run_ui(Default::default(), |ui| window(&app, id, ui, &mut f)).textures_delta.clear();

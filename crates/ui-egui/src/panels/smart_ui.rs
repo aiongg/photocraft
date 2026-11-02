@@ -457,27 +457,24 @@ pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm:
             return;
         }
     };
+    // Legacy list: the edit's live preview (`layer.smartFilter.setParams`) reads it until the hosted
+    // dialog drives the preview (task 3b).
     let Some(id) = crate::adjust_dialog::open(app, &f.command).or_else(|| {
-        let id = crate::filter_dialog::has_dialog(&f.command).then(|| crate::filter_dialog::open(app, &f.command)).flatten()?;
+        let id = crate::filter_dialog::has_dialog(&f.command).then(|| crate::filter_dialog::open_legacy(app, &f.command)).flatten()?;
         // The filter dialog opens on the user's last-used values; a recorded filter that lacks a
         // key must show (and save) the schema default instead.
-        let mut fields = app.ui.dialog_mut(id)?.fields.clone();
+        let mut fields = app.ui.dialog_fields(id)?;
         crate::filter_dialog::reset_fields(app, &mut fields);
-        app.ui.dialog_mut(id)?.fields = fields;
+        crate::dialogs::hosted::seed(app, id, fields.into_iter().filter(|(k, _)| !k.starts_with("__")));
         Some(id)
     }) else {
         return;
     };
-    if let Some(d) = app.ui.dialog_mut(id) {
-        d.fields.insert("__smartFilter".into(), target);
-        if let Value::Object(p) = &f.params {
-            for (k, v) in p {
-                if !k.starts_with("__") {
-                    d.fields.insert(k.clone(), v.clone());
-                }
-            }
-        }
+    let mut values = vec![("__smartFilter".to_owned(), target)];
+    if let Value::Object(p) = &f.params {
+        values.extend(p.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())));
     }
+    crate::dialogs::hosted::seed(app, id, values);
 }
 
 /// The command a filter dialog's live preview runs ([`confirm_command`]'s): the Smart Filter blending

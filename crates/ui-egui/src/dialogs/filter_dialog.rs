@@ -7,10 +7,10 @@
 use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 
+use craft::ui::dialog::DialogFields;
 use photocraft_doc::Document;
 use photocraft_engine::color_cmds::ColorSettings;
 use photocraft_engine::installed_profiles::InstalledProfile;
-use craft::ui::dialog::DialogFields;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -19,8 +19,9 @@ use crate::theme::Tokens;
 mod hosted;
 mod zoom_center;
 
-pub(crate) use hosted::{Wire, open_hosted, push_state, requests};
+pub(crate) use hosted::{Wire, push_state, requests};
 pub(crate) use hosted::{eyedropper_armed as hosted_eyedropper, eyedropper_sample as hosted_eyedropper_sample};
+pub use hosted::{open, open_with_spec};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
@@ -510,7 +511,10 @@ pub fn reset_fields(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
     }
 }
 
-pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
+/// The filter dialog of `command` on the legacy dialog list. [`open`] picks it for the commands the
+/// host does not show. The live preview (filter_preview_ui, canvas) still reads this list, so the
+/// preview tests open dialogs with it until the hosted dialog drives the preview.
+pub fn open_legacy(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
     let fields = opening_fields(app, command)?;
     Some(app.ui.open_dialog(crate::state::DialogKind::Command, fields))
 }
@@ -601,7 +605,13 @@ fn proof_setup_defaults(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
 
 /// A filter dialog with live preview for `command` whose parameters follow `spec` (registry
 /// notation) instead of the command's own; `fixed` params (e.g. a plug-in id) are passed through.
-pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> u64 {
+pub fn open_with_spec_legacy(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> u64 {
+    let fields = spec_fields(command, label, spec, fixed);
+    app.ui.open_dialog(crate::state::DialogKind::Command, fields)
+}
+
+/// The opening fields of a filter dialog that follows `spec`.
+pub(crate) fn spec_fields(command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> Map<String, Value> {
     let mut fields = fixed;
     fields.insert("__command".into(), json!(command));
     fields.insert("__label".into(), json!(label));
@@ -622,7 +632,7 @@ pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec:
         };
         fields.insert(p.key, v);
     }
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields)
+    fields
 }
 
 pub(crate) fn label(key: &str) -> String {
@@ -666,7 +676,7 @@ fn uses_logarithmic_slider(min: f32, max: f32) -> bool {
 }
 
 pub(crate) const LENS_BLUR: &str = "filter.blur.lensBlur";
-const RADIAL_BLUR: &str = "filter.blur.radialBlur";
+pub(crate) const RADIAL_BLUR: &str = "filter.blur.radialBlur";
 
 /// Lens Blur's Depth Map Source lists the document's alpha channels after None, Transparency
 /// and Layer Mask, as in Photoshop (#7400): their names go to `__channels`. A `channel` source

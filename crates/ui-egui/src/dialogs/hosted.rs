@@ -225,6 +225,42 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
     Ok(())
 }
 
+/// Sets `values` in dialog `id`, hosted or legacy, as a script's `ui.dialog.set` would, except that
+/// a `__` key is written to the dialog's private fields whatever it is. A value the dialog's row
+/// cannot hold leaves the row as it was.
+pub fn seed(app: &mut PhotocraftApp, id: u64, values: impl IntoIterator<Item = (String, Value)>) {
+    if let Some(at) = app.ui.hosted.iter().position(|h| h.id == id) {
+        for (key, value) in values {
+            if key.starts_with("__") {
+                app.ui.hosted[at].private.insert(key, value);
+            } else {
+                let _ = set_field(app, id, &key, value);
+            }
+        }
+    } else if let Some(d) = app.ui.dialog_mut(id) {
+        d.fields.extend(values);
+    }
+}
+
+/// Removes the fields `keys` from dialog `id`, hosted or legacy: the command keeps its own
+/// defaults for them.
+pub fn remove_fields(app: &mut PhotocraftApp, id: u64, keys: &[&str]) {
+    if let Some(record) = app.ui.hosted.iter_mut().find(|h| h.id == id) {
+        for key in keys {
+            record.extra.remove(*key);
+        }
+    }
+    if let Some(fields) = app.ui.hosted_fields_mut(id) {
+        for key in keys {
+            fields.remove(key);
+        }
+    } else if let Some(d) = app.ui.dialog_mut(id) {
+        for key in keys {
+            d.fields.remove(*key);
+        }
+    }
+}
+
 /// What a form needs beyond its rows.
 pub struct FormSpec {
     pub command: String,
@@ -376,12 +412,15 @@ fn browse(app: &mut PhotocraftApp) {
     let Some((PathRequest { key: field, kind }, fields, key)) = pressed else { return };
     let current = fields.text(&field).unwrap_or_default().to_owned();
     let Some(id) = app.ui.hosted.iter().find(|h| h.key == key).map(|h| h.id) else { return };
+    let field_for_ext = field.clone();
     let fill = move |app: &mut PhotocraftApp, path: String| fill_path(app, id, &field, path);
     let result = match kind {
         PathKind::Folder => app.ask_folder(fill),
         PathKind::OpenFile => {
             let initial_dir = crate::file_dialog::last_used_dir(&app.ui.recent_files);
-            let request = crate::file_dialog::FileDialogRequest::Open { multiple: false, initial_dir, extensions: None };
+            // The library's path request carries no file types (gap S): Install Plug-in… takes `.wasm`.
+            let extensions = (key == "plugin.install" && field_for_ext == "path").then(|| vec!["wasm".to_string()]);
+            let request = crate::file_dialog::FileDialogRequest::Open { multiple: false, initial_dir, extensions };
             app.ask_file(request, move |app, answer| match answer {
                 crate::file_dialog::FileDialogAnswer::Paths(mut paths) if !paths.is_empty() => fill(app, paths.remove(0)),
                 _ => Err("the file dialog gave an unexpected answer".into()),

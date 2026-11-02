@@ -17,10 +17,22 @@ use crate::dialogs::hosted::{Hosted, HostedKind, Pending, open_params};
 
 type LibParam = craft::ui::dialog::Param;
 
-/// The commands whose dialog is a `ParamDialog`. Blur Gallery workspaces, Bitmap and Select and
-/// Mask keep their own bodies on the legacy list.
-pub(crate) fn hosts(command: &str) -> bool {
-    !(crate::blur_pins::handles(command) || command == crate::bitmap_dialog::COMMAND || command == crate::select_mask_view::COMMAND)
+/// Whether the filter dialog of `command`, with parameters `spec`, is a `ParamDialog`. The rest
+/// stays on the legacy list, each blocked by a library row:
+/// - a seed row with a Random button (row 148);
+/// - Replace Color: the pipette toggle (148), the Result picker (151), the points list (152);
+/// - Indexed Color and Radial Blur: `Param::full_width` (149);
+/// - Color Settings: `ParamDialog::below` (150);
+/// - Color Table: the colour list (152);
+/// - Bitmap: its pattern picker reads the app (`preset_panels::pattern_picker` takes `&PhotocraftApp`);
+/// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (rechecked in 3b).
+pub(crate) fn hosts(command: &str, spec: &str) -> bool {
+    const LEGACY: [&str; 6] =
+        [REPLACE_COLOR, "image.mode.indexedColor", super::RADIAL_BLUR, "edit.colorSettings", "image.mode.colorTable", crate::bitmap_dialog::COMMAND];
+    !(LEGACY.contains(&command)
+        || command == crate::select_mask_view::COMMAND
+        || crate::blur_pins::handles(command)
+        || parse_spec(spec).iter().any(|p| p.key == "seed"))
 }
 
 /// How automation's JSON and the library's fields correspond for one hosted filter dialog.
@@ -297,14 +309,34 @@ fn replace_color_result(ui: &mut Ui, fields: &mut DialogFields) -> Response {
     response
 }
 
-/// Opens the filter dialog of `command` on the host, with the legacy dialog's values.
-pub fn open_hosted(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
-    if !hosts(command) {
-        return super::open(app, command);
+/// Opens the filter dialog of `command`: on the host, or on the legacy list for the commands
+/// [`hosts`] leaves there.
+pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
+    let spec = photocraft_engine::commands::find(command)?;
+    if !hosts(command, spec.params) {
+        return super::open_legacy(app, command);
     }
+    let map = super::opening_fields(app, command)?;
+    Some(host(app, command, spec.label, spec.params, map))
+}
+
+/// The hosted dialog of `command` whatever [`hosts`] says: the tests of rows the legacy route still
+/// serves in the app.
+#[cfg(test)]
+pub(crate) fn open_forced(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
     let spec = photocraft_engine::commands::find(command)?;
     let map = super::opening_fields(app, command)?;
     Some(host(app, command, spec.label, spec.params, map))
+}
+
+/// [`open`] for a filter whose parameters follow `spec` (a plug-in's) instead of the command's own;
+/// `fixed` params (the plug-in id) ride along to the command.
+pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> u64 {
+    if !hosts(command, spec) {
+        return super::open_with_spec_legacy(app, command, label, spec, fixed);
+    }
+    let map = super::spec_fields(command, label, spec, fixed);
+    host(app, command, label, spec, map)
 }
 
 fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Map<String, Value>) -> u64 {
@@ -322,20 +354,8 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
     };
     let wire = Wire::of(&record);
     let (values, extra) = wire.fields(&map);
-    // Alt+Reset: the schema defaults and the command's hooks, not the remembered values (gap A).
-    let mut defaults = map.clone();
-    super::reset_fields(app, &mut defaults);
-    let (mut target, _) = wire.fields(&defaults);
-    for p in &params {
-        if !target.contains(&p.key)
-            && let Some(value) = p.kind.default_value()
-        {
-            target.set(p.key.as_str(), value);
-        }
-    }
     let mut dialog = ParamDialog::new(command, crate::dialogs::display_label(label), params)
         .values(values)
-        .reset_to(target)
         // Cmd/Ctrl+Z steps the dialog's own settings (#4697), and the close box follows the platform.
         .history(true)
         .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()));
@@ -471,7 +491,7 @@ mod tests {
     }
 
     fn open(h: &mut Harness<'static, PhotocraftApp>, command: &str) -> u64 {
-        let id = open_hosted(h.state_mut(), command).unwrap();
+        let id = open_forced(h.state_mut(), command).unwrap();
         h.run_steps(3);
         id
     }
@@ -571,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn alt_reset_restores_the_schema_defaults_not_the_remembered_values() {
+    fn alt_reset_restores_the_values_the_dialog_opened_with() {
         let mut h = harness();
         h.state_mut().session.prefs.edit(|p| p.dialogs.insert("filter.blur.gaussianBlur".into(), json!({"radius": 9.0})));
         let id = open(&mut h, "filter.blur.gaussianBlur");
@@ -580,8 +600,7 @@ mod tests {
         h.run_steps(2);
         h.get_by_label("Cancel").click_modifiers(egui::Modifiers::ALT);
         h.run_steps(3);
-        let radius = h.state().ui.dialog_fields(id).unwrap()["radius"].as_f64().unwrap();
         assert!(h.state().ui.hosted(id).is_some(), "Reset keeps the dialog open");
-        assert!(radius != 9.0 && radius != 20.0, "Reset gave {radius}");
+        assert_eq!(h.state().ui.dialog_fields(id).unwrap()["radius"], 9.0);
     }
 }

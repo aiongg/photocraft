@@ -87,13 +87,13 @@ pub(crate) mod tests {
         for _ in 0..3 {
             frame(&mut app, &ctx, vec![]);
         }
-        let field = |app: &PhotocraftApp, k: &str| app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.get(k).cloned();
+        let field = |app: &PhotocraftApp, k: &str| app.ui.dialog_fields(id).unwrap().get(k).cloned();
         let vertical = field(&app, "vertical");
-        let private: Vec<String> = app.ui.dialog_mut(id).unwrap().fields.keys().filter(|k| k.starts_with("__")).cloned().collect();
+        let private: Vec<String> = app.ui.dialog_fields(id).unwrap().keys().filter(|k| k.starts_with("__")).cloned().collect();
         assert!(!private.is_empty());
-        app.ui.dialog_mut(id).unwrap().fields.insert("vertical".into(), json!(-50.0));
+        crate::dialogs::hosted::set_field(&mut app, id, "vertical", json!(-50.0)).unwrap();
         frame(&mut app, &ctx, vec![]);
-        app.ui.dialog_mut(id).unwrap().fields.insert("horizontal".into(), json!(30.0));
+        crate::dialogs::hosted::set_field(&mut app, id, "horizontal", json!(30.0)).unwrap();
         frame(&mut app, &ctx, vec![]);
         // The filter dialog opens with its first number field focused, which keeps ⌘Z for typing.
         ctx.memory_mut(|m| {

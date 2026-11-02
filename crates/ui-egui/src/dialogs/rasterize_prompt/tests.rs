@@ -183,7 +183,8 @@ fn answer(app: &mut PhotocraftApp, id: u64) {
 }
 
 fn filter_dialog(app: &PhotocraftApp) -> Option<u64> {
-    app.ui.dialogs.iter().find(|d| d.fields.get("__command") == Some(&json!(BLUR)) && !owns(&d.fields)).map(|d| d.id)
+    let legacy = app.ui.dialogs.iter().find(|d| d.fields.get("__command") == Some(&json!(BLUR)) && !owns(&d.fields)).map(|d| d.id);
+    legacy.or_else(|| app.ui.hosted.iter().find(|h| h.key == BLUR).map(|h| h.id))
 }
 
 /// #4303: Filter › Gaussian Blur… on a type layer is live and asks to rasterize first.

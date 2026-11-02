@@ -122,12 +122,12 @@ fn the_close_box_and_the_title_drag_keep_apart() {
         h.run_steps(3);
     };
     drag(&mut h, x.center(), x.center() + egui::vec2(-80.0, 60.0));
-    assert_eq!(h.state().ui.dialogs.len(), 1, "a drag from the × doesn't close the dialog");
+    assert_eq!(h.state().ui.hosted.len(), 1, "a drag from the × doesn't close the dialog");
     assert!((h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect().min - title.min).length() < 1.0, "nor move it");
     let x = h.get_by_label("Close").rect();
     let beside = x.left_center() - egui::vec2(4.0, 0.0);
     drag(&mut h, beside, beside + egui::vec2(-120.0, 40.0));
-    assert_eq!(h.state().ui.dialogs.len(), 1, "a title drag doesn't close the dialog");
+    assert_eq!(h.state().ui.hosted.len(), 1, "a title drag doesn't close the dialog");
     let moved = h.get_by_role_and_label(egui::accesskit::Role::Heading, "Gaussian Blur").rect().min - title.min;
     assert!((moved - egui::vec2(-120.0, 40.0)).length() < 2.0, "the band beside the × moved the dialog: {moved:?}");
 }
@@ -272,6 +272,12 @@ fn an_alert_reports_where_it_is_to_the_title_bar() {
     assert_eq!(seen.borrow().len(), 1, "the alert pushes its rect");
 }
 
+/// The number field `key` of the newest hosted filter dialog.
+fn top_number(app: &PhotocraftApp, key: &str) -> Option<f64> {
+    let id = app.ui.hosted.last()?.id;
+    app.ui.dialog_fields(id)?.get(key)?.as_f64()
+}
+
 fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -288,15 +294,15 @@ fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'sta
 fn motion_blur_angle_dial_sets_the_angle_by_click_and_drag() {
     use egui_kittest::kittest::Queryable;
     let mut h = dialog_harness(egui::vec2(1280.0, 800.0), "filter.blur.motionBlur");
-    let angle = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.state().ui.dialogs.last().and_then(|d| d.fields["angle"].as_f64());
-    let centre = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.get_by_role_and_label(egui::accesskit::Role::Slider, "Angle").rect().center();
+    let angle = |h: &egui_kittest::Harness<'static, PhotocraftApp>| top_number(h.state(), "angle");
+    let centre = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.get_by_role_and_label(egui::accesskit::Role::Slider, "Angle:").rect().center();
     let press = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>, pos: egui::Pos2, pressed: bool| {
         h.event(egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
     };
     assert_eq!(angle(&h), Some(0.0));
     // The dial's field is the dialog's first number, so it opens focused (#1757).
     let first = h.get_all_by_role(egui::accesskit::Role::SpinButton).next().unwrap();
-    let distance = h.query_all_by_label("Distance").next().expect("the Distance field").rect();
+    let distance = h.query_all_by_label_contains("Distance").next().expect("the Distance field").rect();
     assert!(first.is_focused() && first.rect().center().y < distance.center().y, "the Angle field has focus");
     // Click above the centre: straight up is 90°.
     let up = centre(&h) + egui::vec2(0.0, -15.0);
@@ -321,9 +327,8 @@ fn motion_blur_angle_dial_sets_the_angle_by_click_and_drag() {
     h.run_steps(3);
     assert_eq!(angle(&h), Some(-135.0));
     // A remembered or typed angle past half a turn is kept, not clamped to the dial's ±180°.
-    if let Some(d) = h.state_mut().ui.dialogs.last_mut() {
-        d.fields.insert("angle".into(), json!(270.0));
-    }
+    let id = h.state().ui.hosted.last().unwrap().id;
+    crate::dialogs::hosted::set_field(h.state_mut(), id, "angle", json!(270.0)).unwrap();
     h.run_steps(3);
     assert_eq!(angle(&h), Some(270.0));
 }
@@ -360,7 +365,7 @@ fn a_moved_dialog_reopens_where_it_was_left() {
     assert!((moved.min - (centred.min + by)).length() < 2.0, "dragged: {centred:?} → {moved:?}");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
-    assert!(h.state().ui.dialogs.is_empty());
+    assert!(!h.state().ui.any_dialog_open());
     // Reopened: where it was left.
     crate::filter_dialog::open(h.state_mut(), "filter.blur.gaussianBlur").unwrap();
     h.run_steps(4);
@@ -383,7 +388,7 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     use egui_kittest::kittest::Queryable;
     const BLUR: &str = "filter.blur.gaussianBlur";
     let mut h = dialog_harness(egui::vec2(1280.0, 800.0), BLUR);
-    let radius = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.state().ui.dialogs.last().and_then(|d| d.fields["radius"].as_f64());
+    let radius = |h: &egui_kittest::Harness<'static, PhotocraftApp>| top_number(h.state(), "radius");
     assert_eq!(radius(&h), Some(1.0), "the default the first time");
     assert!(h.get_by_role(egui::accesskit::Role::SpinButton).is_focused(), "the Radius field has focus");
     h.event(egui::Event::Text("5".into()));
@@ -391,7 +396,7 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     assert_eq!(radius(&h), Some(5.0), "typing replaced the selected 1");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
-    assert!(h.state().ui.dialogs.is_empty(), "Enter is OK");
+    assert!(!h.state().ui.any_dialog_open(), "Enter is OK");
     assert_eq!(h.state().session.journal.last(), Some(&(BLUR.to_string(), json!({"radius": 5.0}))));
 
     crate::filter_dialog::open(h.state_mut(), BLUR).unwrap();
@@ -402,7 +407,7 @@ fn a_value_dialog_opens_on_its_first_number_selected_and_remembers_it() {
     h.run_steps(1);
     h.key_press(egui::Key::Escape);
     h.run_steps(3);
-    assert!(h.state().ui.dialogs.is_empty(), "Esc is Cancel");
+    assert!(!h.state().ui.any_dialog_open(), "Esc is Cancel");
     crate::filter_dialog::open(h.state_mut(), BLUR).unwrap();
     h.run_steps(2);
     assert_eq!(radius(&h), Some(5.0), "a cancelled 9 is not remembered");
@@ -417,7 +422,7 @@ fn a_value_dialog_takes_the_first_typed_digit_in_one_frame() {
     assert!(h.get_by_role(egui::accesskit::Role::SpinButton).is_focused(), "the Radius field has focus");
     h.event(egui::Event::Text("5".into()));
     h.run_steps(1);
-    assert_eq!(h.state().ui.dialogs.last().and_then(|d| d.fields["radius"].as_f64()), Some(5.0), "typing replaced the selected 1");
+    assert_eq!(top_number(h.state(), "radius"), Some(5.0), "typing replaced the selected 1");
 }
 
 /// #4673: File › Automate › Fit Image holds two numbers and a check box, so its window is as

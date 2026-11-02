@@ -183,5 +183,5 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
 
     // A plain Filter menu dialog still starts from the remembered values.
     let id = crate::filter_dialog::open(&mut app, command).unwrap();
-    assert_eq!(app.ui.dialog_mut(id).unwrap().fields["reduceNoise"].as_f64(), Some(60.0));
+    assert_eq!(app.ui.dialog_fields(id).unwrap()["reduceNoise"].as_f64(), Some(60.0));
 }

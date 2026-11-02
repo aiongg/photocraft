@@ -146,13 +146,12 @@ fn play_owned(app: &mut PhotocraftApp, params: &Value, suspended: Option<Value>)
             let label = label_of(id);
             let dialog = crate::dialogs::open_command_dialog(app, id, &label);
             let token = app.paused_playbacks.pause(action.name.clone(), i + 1, app.session.authorize);
-            if let Some(d) = app.ui.dialog_mut(dialog) {
-                if let Some(o) = p.as_object() {
-                    // `__` keys are the dialog's own markers (`params_of` drops them), not step values.
-                    d.fields.extend(o.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())));
-                }
-                d.fields.insert(RESUME.into(), json!(token));
-            }
+            // `__` keys are the dialog's own markers (`params_of` drops them), not step values.
+            let recorded: Vec<(String, Value)> =
+                p.as_object().into_iter().flatten().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let mut values = recorded;
+            values.push((RESUME.into(), json!(token)));
+            crate::dialogs::hosted::seed(app, dialog, values);
             paused = Some(json!({"step": i, "id": id, "dialog": dialog}));
             break;
         }
@@ -192,10 +191,10 @@ fn play_owned(app: &mut PhotocraftApp, params: &Value, suspended: Option<Value>)
         }
     }
     actions_cmds::finish_playback(&mut app.session, None, &action, from);
-    match paused.as_ref().and_then(|p| p.get("dialog")).and_then(Value::as_u64).and_then(|d| app.ui.dialog_mut(d)) {
+    match paused.as_ref().and_then(|p| p.get("dialog")).and_then(Value::as_u64).and_then(|d| app.ui.dialog_fields(d)) {
         // Paused for a dialog: the call goes on after it, so recording stays suspended.
         Some(d) if failed.is_none() => {
-            let entry = d.fields.get(RESUME).and_then(Value::as_u64).and_then(|t| app.paused_playbacks.paused.get_mut(&t));
+            let entry = d.get(RESUME).and_then(Value::as_u64).and_then(|t| app.paused_playbacks.paused.get_mut(&t));
             match (owner, entry) {
                 (Some(owner), Some(p)) => p.record = Some(owner),
                 // No continuation to carry the recording: the call ends here.

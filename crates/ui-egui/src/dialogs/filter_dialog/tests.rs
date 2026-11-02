@@ -150,8 +150,8 @@ fn restores_only_valid_previous_filter_choices() {
     app.session.prefs.edit(|prefs| {
         prefs.dialogs.insert("filter.blur.gaussianBlur".into(), json!({"radius": 11.0, "bogus": 42}));
     });
-    open(&mut app, "filter.blur.gaussianBlur").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["radius"], json!(11.0));
     assert!(!fields.contains_key("bogus"));
 
@@ -163,21 +163,19 @@ fn restores_only_valid_previous_filter_choices() {
 }
 
 #[test]
-fn alt_reset_restores_schema_defaults_not_remembered() {
+fn reset_fields_gives_schema_defaults_not_remembered() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.session.prefs.edit(|prefs| {
         prefs.dialogs.insert("filter.blur.gaussianBlur".into(), json!({"radius": 11.0}));
     });
     let id = open(&mut app, "filter.blur.gaussianBlur").unwrap();
-    assert_eq!(app.ui.dialog_mut(id).unwrap().fields["radius"], json!(11.0));
-    let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
+    let mut fields = app.ui.dialog_fields(id).unwrap();
+    assert_eq!(fields["radius"], json!(11.0));
     reset_fields(&app, &mut fields);
-    app.ui.dialog_mut(id).unwrap().fields = fields;
-    let f = &app.ui.dialog_mut(id).unwrap().fields;
     // Registry default for gaussian blur radius is 1.
-    assert_eq!(f["radius"], json!(1.0));
-    assert!(f.contains_key("__filter"));
-    assert!(app.ui.dialogs.iter().any(|d| d.id == id));
+    assert_eq!(fields["radius"], json!(1.0));
+    assert!(fields.contains_key("__filter"));
+    assert!(app.ui.dialog_open(id));
 }
 
 /// #5806: OK in Displace with no map asks for the map file, as Photoshop does, and displaces
@@ -282,8 +280,8 @@ fn global_light_dialog_reflects_active_document_light() {
 
     // 0. Default-document control: fresh document starts at angle 120 and altitude 30.
     let d_default = crate::menus::invoke(&mut app, &ctx, "layer.layerStyle.globalLight", Value::Null).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialog_mut(d_default).unwrap().fields["angle"], json!(120.0));
-    assert_eq!(app.ui.dialog_mut(d_default).unwrap().fields["altitude"], json!(30.0));
+    assert_eq!(app.ui.dialog_fields(d_default).unwrap()["angle"], json!(120.0));
+    assert_eq!(app.ui.dialog_fields(d_default).unwrap()["altitude"], json!(30.0));
     crate::dialogs::confirm(&mut app, d_default).unwrap();
     assert_eq!(app.session.active().unwrap().doc.global_light.angle, 120.0);
     assert_eq!(app.session.active().unwrap().doc.global_light.altitude, 30.0);
@@ -295,7 +293,7 @@ fn global_light_dialog_reflects_active_document_light() {
 
     // 2. Open Global Light dialog: opens with the active document's light (30 / 45).
     let d_id = crate::menus::invoke(&mut app, &ctx, "layer.layerStyle.globalLight", Value::Null).unwrap()["dialog"].as_u64().unwrap();
-    let fields = &app.ui.dialog_mut(d_id).unwrap().fields;
+    let fields = &app.ui.dialog_fields(d_id).unwrap();
     assert_eq!(fields["angle"], json!(30.0));
     assert_eq!(fields["altitude"], json!(45.0));
 
@@ -316,7 +314,7 @@ fn global_light_dialog_reflects_active_document_light() {
         );
     });
     let d_id = open(&mut app, "layer.layerStyle.globalLight").unwrap();
-    let fields = &app.ui.dialog_mut(d_id).unwrap().fields;
+    let fields = &app.ui.dialog_fields(d_id).unwrap();
     assert_eq!(fields["angle"], json!(30.0), "reads active document, not remembered");
     assert_eq!(fields["altitude"], json!(45.0));
 
@@ -335,7 +333,7 @@ fn global_light_dialog_reflects_active_document_light() {
     assert_eq!(app.session.active().unwrap().doc.global_light.altitude, 15.0);
 
     let d_id2 = open(&mut app, "layer.layerStyle.globalLight").unwrap();
-    let fields2 = &app.ui.dialog_mut(d_id2).unwrap().fields;
+    let fields2 = &app.ui.dialog_fields(d_id2).unwrap();
     assert_eq!(fields2["angle"], json!(-45.0));
     assert_eq!(fields2["altitude"], json!(15.0));
     app.ui.close_dialog(d_id2);
@@ -343,12 +341,12 @@ fn global_light_dialog_reflects_active_document_light() {
     // Switch back to doc1: dialog still reflects doc1's light (30 / 45).
     assert!(app.session.set_active(0));
     let d_id1 = open(&mut app, "layer.layerStyle.globalLight").unwrap();
-    assert_eq!(app.ui.dialog_mut(d_id1).unwrap().fields["angle"], json!(30.0));
-    assert_eq!(app.ui.dialog_mut(d_id1).unwrap().fields["altitude"], json!(45.0));
+    assert_eq!(app.ui.dialog_fields(d_id1).unwrap()["angle"], json!(30.0));
+    assert_eq!(app.ui.dialog_fields(d_id1).unwrap()["altitude"], json!(45.0));
 
     // 7. Modifying the dialog updates the active document.
-    app.ui.dialog_mut(d_id1).unwrap().fields.insert("angle".into(), json!(-60.0));
-    app.ui.dialog_mut(d_id1).unwrap().fields.insert("altitude".into(), json!(20.0));
+    crate::dialogs::hosted::set_field(&mut app, d_id1, "angle", json!(-60.0)).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, d_id1, "altitude", json!(20.0)).unwrap();
     crate::dialogs::confirm(&mut app, d_id1).unwrap();
     assert_eq!(app.session.active().unwrap().doc.global_light.angle, -60.0);
     assert_eq!(app.session.active().unwrap().doc.global_light.altitude, 20.0);
@@ -371,7 +369,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
 
     // 0. A fresh document defaults to working-cmyk.
     let d_fresh = crate::menus::invoke(&mut app, &ctx, "view.proofSetup.custom", Value::Null).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialog_mut(d_fresh).unwrap().fields["profile"], json!("working-cmyk"));
+    assert_eq!(app.ui.dialog_fields(d_fresh).unwrap()["profile"], json!("working-cmyk"));
     crate::dialogs::confirm(&mut app, d_fresh).unwrap();
     assert_eq!(app.session.color.proof(doc1_id).setup.name, "working-cmyk");
 
@@ -382,7 +380,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
 
     // 2. Open Custom Proof Setup: starts with the active document's condition (sRGB).
     let d_id = crate::menus::invoke(&mut app, &ctx, "view.proofSetup.custom", Value::Null).unwrap()["dialog"].as_u64().unwrap();
-    let fields = &app.ui.dialog_mut(d_id).unwrap().fields;
+    let fields = &app.ui.dialog_fields(d_id).unwrap();
     assert_eq!(fields["profile"], json!("srgb"));
     assert_eq!(fields["intent"], json!("relative"));
     assert_eq!(fields["bpc"], json!(true));
@@ -407,7 +405,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
         );
     });
     let d_id = open(&mut app, "view.proofSetup").unwrap();
-    let fields = &app.ui.dialog_mut(d_id).unwrap().fields;
+    let fields = &app.ui.dialog_fields(d_id).unwrap();
     assert_eq!(fields["profile"], json!("srgb"), "reads active document, not remembered");
     assert_eq!(fields["intent"], json!("relative"));
     assert_eq!(fields["bpc"], json!(true));
@@ -425,7 +423,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
     assert_eq!(app.session.color.proof(doc2_id).setup.name, "display-p3");
 
     let d_id2 = open(&mut app, "view.proofSetup").unwrap();
-    let fields2 = &app.ui.dialog_mut(d_id2).unwrap().fields;
+    let fields2 = &app.ui.dialog_fields(d_id2).unwrap();
     assert_eq!(fields2["profile"], json!("display-p3"));
     assert_eq!(fields2["intent"], json!("perceptual"));
     assert_eq!(fields2["bpc"], json!(false));
@@ -435,10 +433,10 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
     // Switch back to doc1: dialog still reflects doc1's sRGB.
     assert!(app.session.set_active(0));
     let d_id1 = open(&mut app, "view.proofSetup").unwrap();
-    assert_eq!(app.ui.dialog_mut(d_id1).unwrap().fields["profile"], json!("srgb"));
+    assert_eq!(app.ui.dialog_fields(d_id1).unwrap()["profile"], json!("srgb"));
 
     // 7. Modifying the dialog updates the active document.
-    app.ui.dialog_mut(d_id1).unwrap().fields.insert("profile".into(), json!("adobe-rgb-compat"));
+    crate::dialogs::hosted::set_field(&mut app, d_id1, "profile", json!("adobe-rgb-compat")).unwrap();
     crate::dialogs::confirm(&mut app, d_id1).unwrap();
     assert_eq!(app.session.color.proof(doc1_id).setup.name, "adobe-rgb-compat");
     // doc2 is untouched
@@ -476,11 +474,11 @@ fn lens_blur_source_lists_the_alpha_channels() {
     app.run("file.new", json!({"width": 20, "height": 10})).unwrap();
     app.run("channel.new", json!({"name": "Depth Map", "fill": "white"})).unwrap();
     let id = open(&mut app, LENS_BLUR).unwrap();
-    assert_eq!(app.ui.dialog_mut(id).unwrap().fields["__channels"], json!(["Depth Map"]));
+    assert_eq!(app.ui.dialog_fields(id).unwrap()["__channels"], json!(["Depth Map"]));
     // The menu's values are channel indices, so two channels with one name are both choosable.
     app.run("channel.new", json!({"name": "Depth Map", "fill": "black"})).unwrap();
     let id = open(&mut app, LENS_BLUR).unwrap();
-    let names: Vec<String> = serde_json::from_value(app.ui.dialog_mut(id).unwrap().fields["__channels"].clone()).unwrap();
+    let names: Vec<String> = serde_json::from_value(app.ui.dialog_fields(id).unwrap()["__channels"].clone()).unwrap();
     assert_eq!(names, ["Depth Map", "Depth Map"]);
     assert_eq!((channel_choice(0), channel_choice(1)), ("channel:0".to_string(), "channel:1".to_string()));
     assert_eq!(channel_index(&json!(1), &names), Some(1), "the second one by its index");
@@ -491,7 +489,7 @@ fn lens_blur_source_lists_the_alpha_channels() {
         p.dialogs.insert(LENS_BLUR.into(), json!({"depthMap": "channel", "depthChannel": "Depth Map"}));
     });
     let id = open(&mut app, LENS_BLUR).unwrap();
-    let f = &app.ui.dialog_mut(id).unwrap().fields;
+    let f = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(f["depthMap"], "none", "no channel was remembered with it");
     assert!(f.get("depthChannel").is_none());
 }
@@ -541,7 +539,7 @@ fn select_and_mask_remembers_settings_only_when_asked() {
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.run("select.all", json!({})).unwrap();
     let cmd = crate::select_mask_view::COMMAND;
-    let fields = |app: &PhotocraftApp, id: u64| app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone();
+    let fields = |app: &PhotocraftApp, id: u64| app.ui.dialog_fields(id).unwrap();
     let opened = |app: &mut PhotocraftApp| {
         let id = open(app, cmd).unwrap();
         let f = fields(app, id);
@@ -758,7 +756,7 @@ fn every_dialog_default_runs_without_float_type_errors() {
         app.run("file.new", json!({"width": 24, "height": 24})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         let Some(dialog) = open(&mut app, id) else { continue };
-        let mut f = app.ui.dialogs.iter().find(|d| d.id == dialog).unwrap().fields.clone();
+        let mut f = app.ui.dialog_fields(dialog).unwrap();
         egui::Context::default().run_ui(Default::default(), |ui| body(ui, &mut f)).textures_delta.clear();
         let params = params_of(&f);
         let st = app.session.active().unwrap();
@@ -802,7 +800,7 @@ fn color_to_alpha_dialog_defaults_draw_and_preview() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     let id = open(&mut app, ID).unwrap();
-    let mut f = app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone();
+    let mut f = app.ui.dialog_fields(id).unwrap();
     assert_eq!(f.get("__preview"), Some(&json!(true)));
     let want = json!({"color": "#ffffff", "transparencyThreshold": 0.0, "opacityThreshold": 1.0});
     assert_eq!(params_of(&f), want);
@@ -858,13 +856,12 @@ fn define_pattern_asks_for_a_name() {
     app.run("file.new", json!({"width": 8, "height": 8, "name": "ask.jpg"})).unwrap();
     let ctx = egui::Context::default();
     let define = |app: &mut PhotocraftApp, name: Option<&str>| {
-        crate::menus::invoke(app, &ctx, "edit.definePattern", Value::Null).unwrap();
-        let d = app.ui.dialogs.last().expect("Define Pattern opens a dialog").clone();
-        let shown = d.fields["name"].as_str().unwrap().to_string();
+        let id = crate::menus::invoke(app, &ctx, "edit.definePattern", Value::Null).unwrap()["dialog"].as_u64().expect("Define Pattern opens a dialog");
+        let shown = app.ui.dialog_fields(id).unwrap()["name"].as_str().unwrap().to_string();
         if let Some(n) = name {
-            app.ui.dialog_mut(d.id).unwrap().fields.insert("name".into(), json!(n));
+            crate::dialogs::hosted::set_field(app, id, "name", json!(n)).unwrap();
         }
-        crate::dialogs::confirm(app, d.id).unwrap();
+        crate::dialogs::confirm(app, id).unwrap();
         shown
     };
     assert_eq!(define(&mut app, Some("Bricks")), "ask", "prefilled with the document's name");
@@ -897,10 +894,10 @@ fn selective_color_dialog_ok_applies() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     let id = open(&mut app, "image.adjustments.selectiveColor").unwrap();
-    let fields = app.ui.dialogs.last().unwrap().fields.clone();
+    let fields = app.ui.dialog_fields(id).unwrap();
     assert!(fields.keys().all(|k| k.starts_with("__") || k.chars().all(|ch| ch.is_ascii_alphanumeric())), "{fields:?}");
     assert!(!fields.contains_key("reds"), "the per-range arrays are not dialog fields");
-    app.ui.dialog_mut(id).unwrap().fields.insert("black".into(), json!(40.0));
+    crate::dialogs::hosted::set_field(&mut app, id, "black", json!(40.0)).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.journal.last().map(|j| j.0.as_str()), Some("image.adjustments.selectiveColor"));
 }
@@ -1241,7 +1238,7 @@ fn preview_error(doc: &Document, command: &str, p: &Value, k: u32) -> Option<Pre
 /// Frame read some ranges as `u32`).
 fn sweep_params(app: &mut PhotocraftApp, command: &str) -> Vec<(String, Value)> {
     let Some(id) = open(app, command) else { return Vec::new() };
-    let base = params_of(&app.ui.dialog_mut(id).unwrap().fields);
+    let base = params_of(&app.ui.dialog_fields(id).unwrap());
     let mut out = vec![("default".to_string(), base.clone())];
     for p in parse_spec(photocraft_engine::commands::find(command).unwrap().params) {
         if !is_pixel_param_of(command, &p.key) {
@@ -1377,9 +1374,9 @@ fn assign_profile_offers(mode: Option<&str>) -> (Vec<String>, Vec<String>) {
     if let Some(mode) = mode {
         app.run(mode, json!({})).unwrap();
     }
-    open(&mut app, "edit.assignProfile").unwrap();
+    let id = open(&mut app, "edit.assignProfile").unwrap();
     let offered: Vec<String> =
-        app.ui.dialogs.last().unwrap().fields["__profiles"].as_array().unwrap().iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
+        app.ui.dialog_fields(id).unwrap()["__profiles"].as_array().unwrap().iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
     let spec = photocraft_engine::commands::find("edit.assignProfile").unwrap();
     let builtin = parse_spec(spec.params).into_iter().find(|p| p.key == "profile").unwrap();
     let Kind::Choice { options, .. } = builtin.kind else { panic!("profile is a menu") };
@@ -1421,7 +1418,7 @@ fn artboard_from_layers_opens_at_the_selected_layers_size() {
         prefs.dialogs.insert("layer.new.artboardFromLayers".into(), json!({"width": 1080, "height": 1350}));
     });
     let id = open(&mut app, "layer.new.artboardFromLayers").unwrap();
-    let fields = &app.ui.dialog_mut(id).unwrap().fields;
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!((&fields["width"], &fields["height"]), (&json!(20), &json!(30)), "not the remembered 1080 x 1350");
     assert_eq!(fields["name"], json!("Artboard 1"));
     crate::dialogs::confirm(&mut app, id).unwrap();
@@ -1439,13 +1436,13 @@ fn assign_profile_drops_a_remembered_profile_that_does_not_fit() {
     app.session.prefs.edit(|prefs| {
         prefs.dialogs.insert("edit.assignProfile".into(), json!({"profile": "coated-cmyk"}));
     });
-    open(&mut app, "edit.assignProfile").unwrap();
-    assert_eq!(app.ui.dialogs.last().unwrap().fields["profile"], json!("working"));
+    let id = open(&mut app, "edit.assignProfile").unwrap();
+    assert_eq!(app.ui.dialog_fields(id).unwrap()["profile"], json!("working"));
     app.session.prefs.edit(|prefs| {
         prefs.dialogs.insert("edit.assignProfile".into(), json!({"profile": "display-p3"}));
     });
-    open(&mut app, "edit.assignProfile").unwrap();
-    assert_eq!(app.ui.dialogs.last().unwrap().fields["profile"], json!("display-p3"), "one that fits is kept");
+    let id = open(&mut app, "edit.assignProfile").unwrap();
+    assert_eq!(app.ui.dialog_fields(id).unwrap()["profile"], json!("display-p3"), "one that fits is kept");
 }
 
 #[test]
@@ -1453,23 +1450,23 @@ fn schema_dialogs_respect_explicit_dropdown_defaults() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
 
     // 1. Radial Blur has explicit default "good", not the first option ("draft").
-    open(&mut app, "filter.blur.radialBlur").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "filter.blur.radialBlur").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["quality"], json!("good"), "Radial Blur must select explicit default 'good'");
     assert_eq!(fields["method"], json!("spin"), "Radial Blur method has no explicit default, retains first option");
     let params = params_of(fields);
     assert_eq!(params["quality"], json!("good"));
 
     // 2. Convert to Profile has explicit default "relative", not first option ("perceptual").
-    open(&mut app, "edit.convertToProfile").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "edit.convertToProfile").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["intent"], json!("relative"), "Convert to Profile must select explicit default 'relative'");
     let params = params_of(fields);
     assert_eq!(params["intent"], json!("relative"));
 
     // 3. Proof Setup has explicit default "relative".
-    open(&mut app, "view.proofSetup").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "view.proofSetup").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["intent"], json!("relative"), "Proof Setup must select explicit default 'relative'");
     let params = params_of(fields);
     assert_eq!(params["intent"], json!("relative"));
@@ -1479,14 +1476,14 @@ fn schema_dialogs_respect_explicit_dropdown_defaults() {
     app.session.prefs.edit(|prefs| {
         prefs.dialogs.insert("filter.blur.radialBlur".into(), json!({"quality": "best"}));
     });
-    open(&mut app, "filter.blur.radialBlur").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "filter.blur.radialBlur").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["quality"], json!("best"), "Remembered choice must override explicit default");
 
     // 5. Explicit default that is the first option (e.g. "cw" in arbitrary rotation).
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    open(&mut app, "image.rotation.arbitrary").unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = open(&mut app, "image.rotation.arbitrary").unwrap();
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields["direction"], json!("cw"), "Explicit default matching first option is preserved");
 }
 

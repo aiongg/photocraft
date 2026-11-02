@@ -1035,17 +1035,6 @@ pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resul
 /// schema dialog for filters, the Color Range dialog for `select.colorRange`, otherwise a bare
 /// confirm dialog.
 pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
-    open_command_dialog_with(app, command, label, false)
-}
-
-/// [`open_command_dialog`] with the filter routes on the host (`ParamDialog`) instead of the legacy
-/// list. The callers that fill a filter dialog's `Dialog::fields` after opening it
-/// (`dialog_mut`) still need the legacy route until they read the hosted fields.
-pub fn open_command_dialog_hosted(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
-    open_command_dialog_with(app, command, label, true)
-}
-
-fn open_command_dialog_with(app: &mut PhotocraftApp, command: &str, label: &str, hosted: bool) -> u64 {
     if command == "view.newGuideLayout" {
         return crate::guide_layout_ui::open(app);
     }
@@ -1062,7 +1051,7 @@ fn open_command_dialog_with(app: &mut PhotocraftApp, command: &str, label: &str,
         return id;
     }
     if crate::filter_dialog::has_dialog(command)
-        && let Some(id) = if hosted { crate::filter_dialog::open_hosted(app, command) } else { crate::filter_dialog::open(app, command) }
+        && let Some(id) = crate::filter_dialog::open(app, command)
     {
         return id;
     }

@@ -361,7 +361,12 @@ fn a_dialog_blocks_the_panel_windows() {
         assert!(!desktop.host.borrow().windows[&viewport].hidden, "{name}: the panel window stays shown while the app is in the background");
         desktop.host.borrow_mut().focus = Some(viewport);
 
-        desktop.h.state_mut().ui.dialogs.clear();
+        let ctx = desktop.h.ctx.clone();
+        let ui = &desktop.h.state().ui;
+        let ids: Vec<u64> = ui.dialogs.iter().map(|d| d.id).chain(ui.hosted.iter().map(|h| h.id)).collect();
+        for id in ids {
+            crate::dialogs::cancel_in(desktop.h.state_mut(), &ctx, id).unwrap();
+        }
         desktop.steps(3);
         assert!(!modal_open(desktop.h.state(), &desktop.h.ctx), "{name}");
         desktop.click(viewport, close);

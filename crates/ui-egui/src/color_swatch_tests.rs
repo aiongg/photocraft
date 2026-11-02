@@ -58,14 +58,17 @@ fn close(a: [f32; 3], b: [f32; 3]) -> bool {
 #[test]
 fn filter_dialog_colours_open_the_color_picker() {
     for (cmd, key, label) in [("filter.other.colorToAlpha", "color", "Color"), ("filter.render.pictureFrame", "vineColor", "Vine Color")] {
+        // Colour to Alpha is a hosted dialog, whose rows name their swatch with the row's colon;
+        // Picture Frame (a seed row) is on the legacy list.
+        let swatch = if cmd == "filter.other.colorToAlpha" { format!("{label}:") } else { label.to_string() };
         let mut h = harness(|_| {});
         let ctx = h.ctx.clone();
         let id = crate::menus::invoke(h.state_mut(), &ctx, cmd, json!({})).unwrap()["dialog"].as_u64().unwrap();
         h.run_steps(4);
-        let title = pick(&mut h, label);
+        let title = pick(&mut h, &swatch);
         assert_eq!(title, format!("Color Picker ({label})"), "{cmd}");
-        let d = h.state().ui.dialogs.iter().find(|d| d.id == id).expect("the filter dialog stays open");
-        assert_eq!(d.fields.get(key), Some(&json!(PICKED)), "{cmd}: {key}");
+        let fields = h.state().ui.dialog_fields(id).expect("the filter dialog stays open");
+        assert_eq!(fields.get(key), Some(&json!(PICKED)), "{cmd}: {key}");
     }
 }
 

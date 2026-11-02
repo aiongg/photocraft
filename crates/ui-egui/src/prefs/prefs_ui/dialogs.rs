@@ -28,7 +28,8 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
         "edit.menus" => Some(Ok(json!({"dialog": open_shortcuts(app, 1)}))),
         "edit.toolbar" => Some(Ok(json!({"dialog": open_shortcuts(app, 2)}))),
         "edit.colorSettings" => {
-            let d = crate::filter_dialog::open(app, "edit.colorSettings");
+            // Stays on the legacy list: `ParamDialog::below` is library row 150.
+            let d = crate::filter_dialog::open_legacy(app, "edit.colorSettings");
             let cur = serde_json::to_value(&app.session.color.settings).unwrap_or_default();
             // What Monitor Profile resolves to, so a fallback to sRGB is visible (#569): read the
             // displays again now, and the dialog refreshes this line as it draws.
@@ -50,11 +51,9 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
                     .map_or("not available".into(), |c| format!("{} is not available right now", c.label.trim_end_matches('…')))));
             }
             let d = crate::filter_dialog::open(app, id);
-            if let Some(dm) = d.and_then(|d| app.ui.dialog_mut(d)) {
+            if let Some(d) = d {
                 // Optional parameters the generic dialog can't express keep their defaults.
-                for k in ["reference", "path"] {
-                    dm.fields.remove(k);
-                }
+                crate::dialogs::hosted::remove_fields(app, d, &["reference", "path"]);
             }
             dialog(d)
         }

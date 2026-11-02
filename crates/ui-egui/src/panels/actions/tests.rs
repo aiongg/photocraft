@@ -737,16 +737,16 @@ fn a_dialog_toggled_step_pauses_playback_and_resumes_on_ok() {
     assert_eq!(v["ran"], 1, "{v}");
     assert_eq!(v["paused"]["step"], 1);
     let id = v["paused"]["dialog"].as_u64().unwrap();
-    let d = app.ui.dialog_mut(id).unwrap();
-    assert_eq!(d.fields["radius"], 3, "the dialog opens on the recorded values");
-    assert!(d.fields[RESUME].is_u64(), "the dialog carries only the pause's token: {}", d.fields[RESUME]);
+    let fields = app.ui.dialog_fields(id).unwrap();
+    assert_eq!(fields["radius"].as_f64(), Some(3.0), "the dialog opens on the recorded values");
+    assert!(fields[RESUME].is_u64(), "the dialog carries only the pause's token: {}", fields[RESUME]);
     assert!(app.session.active().unwrap().doc.selection.is_none(), "nothing after the dialog ran yet");
     report_play(&mut app, &v);
     assert!(app.ui.status.contains("dialog"), "{}", app.ui.status);
     // OK runs the blur with the dialog's values and plays the rest.
-    app.ui.dialog_mut(id).unwrap().fields.insert("radius".into(), json!(5));
+    crate::dialogs::hosted::set_field(&mut app, id, "radius", json!(5)).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     assert!(app.session.active().unwrap().doc.selection.is_some(), "the step after the dialog ran");
     assert!(app.ui.status.starts_with("Played"), "{}", app.ui.status);
     // Cancel stops the action there.
@@ -849,7 +849,8 @@ fn a_failing_step_dialog_command_ends_the_recorded_call_once() {
     let mut app = recording_with_dialog_child();
     let id = pause_child(&mut app);
     assert!(app.session.actions.recording.is_none(), "recording stays suspended while the step dialog is open");
-    app.ui.dialog_mut(id).unwrap().fields.insert("radius".into(), json!("not a radius"));
+    // The dialog's row refuses a text radius, so the bad value rides along to the command.
+    app.ui.hosted.iter_mut().find(|h| h.id == id).unwrap().extra.insert("radius".into(), json!("not a radius"));
     assert!(crate::dialogs::confirm(&mut app, id).is_err(), "the dialog command fails");
     assert!(app.session.actions.recording.is_some(), "recording comes back when the dialog command fails");
     assert_eq!(suffixes(&app), 0, "the action stops at the failed step");
@@ -861,7 +862,8 @@ fn a_failing_step_dialog_command_ends_the_recorded_call_once() {
 fn an_abandoned_step_dialog_leaves_no_paused_playback() {
     let mut app = recording_with_dialog_child();
     let id = pause_child(&mut app);
-    app.ui.dialog_mut(id).unwrap().fields.insert("radius".into(), json!("not a radius"));
+    // The dialog's row refuses a text radius, so the bad value rides along to the command.
+    app.ui.hosted.iter_mut().find(|h| h.id == id).unwrap().extra.insert("radius".into(), json!("not a radius"));
     assert!(crate::dialogs::confirm(&mut app, id).is_err(), "the dialog command fails");
     assert!(app.paused_playbacks.paused.is_empty(), "the failed dialog ends its pause");
     app.run("actions.stop", json!({})).unwrap();
@@ -905,7 +907,7 @@ fn escape_on_a_step_dialog_ends_the_recorded_call_once() {
     assert!(h.state().session.actions.recording.is_none(), "recording stays suspended while the step dialog is open");
     h.key_press(egui::Key::Escape);
     h.run_steps(2);
-    assert!(h.state().ui.dialogs.is_empty(), "Esc closes the step dialog");
+    assert!(!h.state().ui.any_dialog_open(), "Esc closes the step dialog");
     assert!(h.state().session.actions.recording.is_some(), "Esc restores recording");
     let app = h.state_mut();
     app.run("actions.stop", json!({})).unwrap();
@@ -919,7 +921,9 @@ fn a_step_dialog_keeps_its_continuation_token() {
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     for (name, steps) in [
         ("First", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]),
-        ("Second", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1})), ("select.all".into(), json!({}))]),
+        // The host holds one parameter dialog, so the second pause is a dialog on the legacy list
+        // (Clouds has a seed row).
+        ("Second", vec![("filter.render.clouds".into(), json!({})), ("select.all".into(), json!({}))]),
     ] {
         let mut action = Action::new(name, steps);
         action.dialogs.insert(0);
@@ -927,14 +931,14 @@ fn a_step_dialog_keeps_its_continuation_token() {
     }
     let first = play(&mut app, &json!({"action": "First"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
     let second = play(&mut app, &json!({"action": "Second"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
-    let first_token = app.ui.dialog_mut(first).unwrap().fields[RESUME].clone();
-    let second_token = app.ui.dialog_mut(second).unwrap().fields[RESUME].clone();
+    let first_token = app.ui.dialog_fields(first).unwrap()[RESUME].clone();
+    let second_token = app.ui.dialog_fields(second).unwrap()[RESUME].clone();
     for token in [second_token.clone(), Value::Null, json!("invalid"), json!({"action": "Second", "from": 1})] {
         let (request, _) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": first, "field": RESUME, "value": token}));
         let response = crate::control::handle(&mut app, &egui::Context::default(), &request);
         assert!(matches!(response, crate::control::Outcome::Done(ref v) if v["error"].as_str().is_some_and(|e| e.contains("read-only"))));
-        assert_eq!(app.ui.dialog_mut(first).unwrap().fields[RESUME], first_token);
-        assert_eq!(app.ui.dialog_mut(second).unwrap().fields[RESUME], second_token);
+        assert_eq!(app.ui.dialog_fields(first).unwrap()[RESUME], first_token);
+        assert_eq!(app.ui.dialog_fields(second).unwrap()[RESUME], second_token);
         assert_eq!(app.paused_playbacks.paused.len(), 2);
     }
     crate::dialogs::confirm(&mut app, first).unwrap();
@@ -953,7 +957,7 @@ fn recording_with_displace_child() -> PhotocraftApp {
 
 fn assert_displace_call_finished(app: &mut PhotocraftApp, suffix_count: usize) {
     assert!(!app.file_dialog_open());
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     assert!(app.paused_playbacks.paused.is_empty());
     assert!(app.session.actions.recording.is_some());
     assert_eq!(suffixes(app), suffix_count);
@@ -1017,10 +1021,10 @@ fn a_step_dialog_takes_only_the_steps_values() {
     a.dialogs.insert(0);
     app.session.actions.list.push(a);
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
-    let d = app.ui.dialog_mut(v["paused"]["dialog"].as_u64().unwrap()).unwrap();
-    assert_eq!(d.fields["radius"], 2);
-    assert_eq!(d.fields["__command"], "filter.blur.gaussianBlur");
-    assert_ne!(d.fields["__label"], "Other");
+    let fields = app.ui.dialog_fields(v["paused"]["dialog"].as_u64().unwrap()).unwrap();
+    assert_eq!(fields["radius"].as_f64(), Some(2.0));
+    assert_eq!(fields["__command"], "filter.blur.gaussianBlur");
+    assert_ne!(fields["__label"], "Other");
 }
 
 fn deny_blur(id: &str, _: &Value) -> photocraft_engine::Result<()> {
@@ -1038,7 +1042,7 @@ fn a_step_the_gate_denies_opens_no_dialog() {
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     app.session.authorize = None;
     assert!(v["failed"]["error"].as_str().is_some_and(|e| e.contains("blur denied")), "{v}");
-    assert!(app.ui.dialogs.is_empty(), "no step dialog opened");
+    assert!(!app.ui.any_dialog_open(), "no step dialog opened");
     assert!(app.paused_playbacks.paused.is_empty());
 }
 
@@ -1078,7 +1082,7 @@ fn a_step_dialog_resumes_only_the_playback_that_paused_it() {
     app.session.actions.list.push(Action::new("Seeded", vec![("select.all".into(), json!({}))]));
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     let id = v["paused"]["dialog"].as_u64().unwrap();
-    app.ui.dialog_mut(id).unwrap().fields.insert(RESUME.into(), json!({"action": "Seeded", "from": 0}));
+    app.ui.hosted.iter_mut().find(|h| h.id == id).unwrap().private.insert(RESUME.into(), json!({"action": "Seeded", "from": 0}));
     let r = crate::dialogs::confirm(&mut app, id);
     assert!(app.session.active().unwrap().doc.selection.is_none(), "the other action did not play");
     assert!(r.is_err_and(|e| e.contains("paused action")));

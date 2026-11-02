@@ -2105,7 +2105,7 @@ mod rotation_preview_isolation_tests {
         let ctx = egui::Context::default();
         let texture = crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
         ctx.tex_manager().write().take_delta().clear();
-        let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
         app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
         ensure_filter_preview(&mut app, 0, &ctx).unwrap();
         crate::channel_view::ensure(&mut app, &ctx, 0);
@@ -2161,7 +2161,7 @@ mod rotation_preview_isolation_tests {
             session.active_mut().unwrap().channel_view.target = target;
             let mut app = PhotocraftApp::new(session, crate::Services::default());
             app.background_jobs = false;
-            let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+            let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
             app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
             ensure_filter_preview(&mut app, 0, &egui::Context::default()).unwrap();
             let preview = app.filter_preview.as_ref().unwrap().result.as_ref().unwrap().clone();
@@ -2218,7 +2218,7 @@ mod rotation_preview_isolation_tests {
             .unwrap();
         app.session.active_mut().unwrap().channel_view.target = ChannelTarget::Alpha(0);
         let revision = app.session.active().unwrap().revision;
-        let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
         app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
         let ctx = egui::Context::default();
         let (first, first_key) = filter_channel_preview(&mut app, 0, &ctx).unwrap();
@@ -2267,7 +2267,7 @@ mod rotation_preview_isolation_tests {
             let ctx = egui::Context::default();
             let texture = crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
             ctx.tex_manager().write().take_delta().clear();
-            let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+            let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
             app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
             crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
             let mut delta = ctx.tex_manager().write().take_delta();
@@ -2311,7 +2311,7 @@ mod rotation_preview_isolation_tests {
         let original = app.session.active().unwrap().doc.clone();
         let before = shown_pixels(&app, &original);
         let preview = |app: &mut PhotocraftApp, command: &str, profile: &str| {
-            crate::filter_dialog::open(app, command).unwrap();
+            crate::filter_dialog::open_legacy(app, command).unwrap();
             let fields = &mut app.ui.dialogs.last_mut().unwrap().fields;
             assert_eq!(fields.get("__preview"), Some(&json!(true)), "{command} has a Preview checkbox, on");
             fields.insert("profile".into(), json!(profile));
@@ -2347,7 +2347,7 @@ mod rotation_preview_isolation_tests {
         session.execute("file.new", json!({"width": 96, "height": 48})).unwrap();
         let mut app = PhotocraftApp::new(session, crate::Services::default());
         assert!(app.gpu.is_none());
-        crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+        crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
         let dialog = app.ui.dialogs.last_mut().unwrap();
         dialog.fields.insert("angle".into(), json!(90.0));
         dialog.fields.insert("direction".into(), json!("cw"));
@@ -2370,7 +2370,7 @@ mod rotation_preview_isolation_tests {
         let mut session = photocraft_engine::Session::new();
         session.execute("file.new", json!({"width": 96, "height": 48})).unwrap();
         let mut app = PhotocraftApp::new(session, crate::Services::default());
-        crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+        crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
         app.ui.dialogs.last_mut().unwrap().fields.insert("angle".into(), json!(90.0));
         assert!(ensure_filter_preview(&mut app, 0, &egui::Context::default()).is_some());
 

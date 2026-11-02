@@ -471,6 +471,10 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
         let (Some(dialog), Some(field)) = (f.get("__dialog").and_then(Value::as_u64), f.get("__field").and_then(Value::as_str)) else {
             return Err("the Color Picker has no field to set".into());
         };
+        if app.ui.hosted(dialog).is_some() {
+            crate::dialogs::hosted::set_color(app, dialog, field, color)?;
+            return Ok(json!({ "color": color }));
+        }
         let d = app.ui.dialog_mut(dialog).ok_or("the dialog this colour was for is closed")?;
         set_field(&mut d.fields, field, json!(color))?;
         return Ok(json!({ "color": color }));

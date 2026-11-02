@@ -894,7 +894,7 @@ fn open_named_dialog(app: &mut PhotocraftApp, p: &Value, kind: &str) -> Outcome 
         "command" | "Command" => {
             let Some(cmd) = str_param(p, "command") else { return err("command dialogs need `command`") };
             let label = photocraft_engine::commands::find(cmd).map(|c| c.label).unwrap_or(cmd);
-            ok(json!({"dialog": crate::dialogs::open_command_dialog_hosted(app, cmd, label)}))
+            ok(json!({"dialog": crate::dialogs::open_command_dialog(app, cmd, label)}))
         }
         other => err(format!("unknown dialog kind `{other}`")),
     }
