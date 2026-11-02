@@ -69,10 +69,9 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         let bytes = photocraft_format::save_to_bytes(&doc, &photocraft_format::SaveOptions::default()).expect("save native document");
         drop(doc);
         let observer = observer.lock().expect("GPU observer lock").clone().expect("GPU observer");
-        let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id":"filter.blur.gaussianBlur"}));
         let ctx = harness.ctx.clone();
-        let response = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request);
-        assert!(matches!(response, photocraft_ui_egui::control::Outcome::Done(_)));
+        // The live preview reads the legacy dialog list until 3b.
+        photocraft_ui_egui::dialogs::filter_dialog::open_legacy(harness.state_mut(), "filter.blur.gaussianBlur").expect("Gaussian Blur opens a dialog");
         harness.run_steps(6);
         let preview = id.0 ^ (1u64 << 61);
         assert!(observer.has(preview, [512, 512]), "filter preview uploaded");

@@ -25,10 +25,19 @@ type LibParam = craft::ui::dialog::Param;
 /// - Color Settings: `ParamDialog::below` (150);
 /// - Color Table: the colour list (152);
 /// - Bitmap: its pattern picker reads the app (`preset_panels::pattern_picker` takes `&PhotocraftApp`);
-/// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (rechecked in 3b).
+/// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (rechecked in 3b);
+/// - Warp Text and Arbitrary Rotation: live preview reads the legacy Vec until 3b.
 pub(crate) fn hosts(command: &str, spec: &str) -> bool {
-    const LEGACY: [&str; 6] =
-        [REPLACE_COLOR, "image.mode.indexedColor", super::RADIAL_BLUR, "edit.colorSettings", "image.mode.colorTable", crate::bitmap_dialog::COMMAND];
+    const LEGACY: [&str; 8] = [
+        REPLACE_COLOR,
+        "image.mode.indexedColor",
+        super::RADIAL_BLUR,
+        "edit.colorSettings",
+        "image.mode.colorTable",
+        crate::bitmap_dialog::COMMAND,
+        "type.warpText",
+        "image.rotation.arbitrary",
+    ];
     !(LEGACY.contains(&command)
         || command == crate::select_mask_view::COMMAND
         || crate::blur_pins::handles(command)
