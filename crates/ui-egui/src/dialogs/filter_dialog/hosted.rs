@@ -49,11 +49,12 @@ pub(crate) struct Wire<'a> {
     command: &'a str,
     params: &'a [LibParam],
     documents: &'a [String],
+    whole: &'a [String],
 }
 
 impl<'a> Wire<'a> {
     pub(crate) fn of(record: &'a Hosted) -> Self {
-        Self { command: &record.key, params: &record.params, documents: &record.documents }
+        Self { command: &record.key, params: &record.params, documents: &record.documents, whole: &record.whole }
     }
 
     fn param(&self, key: &str) -> Option<&LibParam> {
@@ -142,7 +143,7 @@ impl<'a> Wire<'a> {
     }
 
     /// The command's JSON for the dialog's fields: a colour as `#rrggbb`, a document by its index,
-    /// a text left empty absent.
+    /// a text left empty absent, a slider value that opened whole as an integer.
     pub(crate) fn json(&self, fields: &DialogFields) -> Map<String, Value> {
         let mut out = Map::new();
         let lens = self.command == super::LENS_BLUR;
@@ -157,6 +158,8 @@ impl<'a> Wire<'a> {
                 }
                 _ if lens && key == "depthChannel" => continue,
                 _ if key == RESULT_PICK => continue,
+                // A slider holds an f64; a value that opened as an integer reads back as one.
+                FieldValue::Number(n) if self.whole.iter().any(|w| w == key) && n.fract() == 0.0 && n.abs() < 9.0e15 => json!(*n as i64),
                 other => match serde_json::to_value(other) {
                     Ok(v) => v,
                     Err(_) => continue,
@@ -359,6 +362,7 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         extra: Map::new(),
         private: map.iter().filter(|(k, _)| k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect(),
         documents,
+        whole: map.iter().filter(|(_, v)| v.is_i64() || v.is_u64()).map(|(k, _)| k.clone()).collect(),
         table: Pending::default(),
     };
     let wire = Wire::of(&record);

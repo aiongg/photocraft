@@ -54,6 +54,8 @@ pub struct Hosted {
     pub private: Fields,
     /// Parameters that hold an open document's index (shown as a menu of the documents' names).
     pub documents: Vec<String>,
+    /// Parameters whose opening value was a JSON integer: a slider's f64 reads back as one.
+    pub whole: Vec<String>,
     /// The Color Table footer's pressed button.
     pub table: Pending<Option<crate::color_table_ui::Action>>,
 }
@@ -211,6 +213,11 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
             let mut next = fields;
             wire.set(&mut next, field, &value).map_err(|e| format!("`{field}`: {e}"))?;
             *app.ui.hosted_fields_mut(id).ok_or_else(|| format!("no dialog {id}"))? = next;
+            let whole = &mut app.ui.hosted[at].whole;
+            whole.retain(|w| w != field);
+            if value.is_i64() || value.is_u64() {
+                whole.push(field.to_owned());
+            }
             return Ok(());
         }
         app.ui.hosted[at].extra.insert(field.to_owned(), value);
@@ -293,7 +300,8 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
     // Opening over a form replaces it: its Cancel waits in the host with its key.
     app.ui.host.open(form);
     cancel_replaced::<CommandForm>(app);
-    let record = Hosted { kind: HostedKind::Form, id, key: command, params, title, extra, private, documents: Vec::new(), table: Pending::default() };
+    let record =
+        Hosted { kind: HostedKind::Form, id, key: command, params, title, extra, private, documents: Vec::new(), whole: Vec::new(), table: Pending::default() };
     app.ui.hosted.push(record);
     id
 }

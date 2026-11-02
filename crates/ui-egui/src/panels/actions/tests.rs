@@ -738,7 +738,7 @@ fn a_dialog_toggled_step_pauses_playback_and_resumes_on_ok() {
     assert_eq!(v["paused"]["step"], 1);
     let id = v["paused"]["dialog"].as_u64().unwrap();
     let fields = app.ui.dialog_fields(id).unwrap();
-    assert_eq!(fields["radius"].as_f64(), Some(3.0), "the dialog opens on the recorded values");
+    assert_eq!(fields["radius"], 3, "the dialog opens on the recorded values");
     assert!(fields[RESUME].is_u64(), "the dialog carries only the pause's token: {}", fields[RESUME]);
     assert!(app.session.active().unwrap().doc.selection.is_none(), "nothing after the dialog ran yet");
     report_play(&mut app, &v);
@@ -948,6 +948,39 @@ fn a_step_dialog_keeps_its_continuation_token() {
     assert!(app.paused_playbacks.paused.is_empty());
 }
 
+#[test]
+#[ignore = "library gap row 154: two ParamDialogs of one type"]
+fn a_step_dialog_keeps_its_continuation_token_across_two_filter_dialogs() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.background_jobs = false;
+    app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+    for (name, steps) in [
+        ("First", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]),
+        ("Second", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1})), ("select.all".into(), json!({}))]),
+    ] {
+        let mut action = Action::new(name, steps);
+        action.dialogs.insert(0);
+        app.session.actions.list.push(action);
+    }
+    let first = play(&mut app, &json!({"action": "First"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
+    let second = play(&mut app, &json!({"action": "Second"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
+    let first_token = app.ui.dialog_fields(first).unwrap()[RESUME].clone();
+    let second_token = app.ui.dialog_fields(second).unwrap()[RESUME].clone();
+    for token in [second_token.clone(), Value::Null, json!("invalid"), json!({"action": "Second", "from": 1})] {
+        let (request, _) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": first, "field": RESUME, "value": token}));
+        let response = crate::control::handle(&mut app, &egui::Context::default(), &request);
+        assert!(matches!(response, crate::control::Outcome::Done(ref v) if v["error"].as_str().is_some_and(|e| e.contains("read-only"))));
+        assert_eq!(app.ui.dialog_fields(first).unwrap()[RESUME], first_token);
+        assert_eq!(app.ui.dialog_fields(second).unwrap()[RESUME], second_token);
+        assert_eq!(app.paused_playbacks.paused.len(), 2);
+    }
+    crate::dialogs::confirm(&mut app, first).unwrap();
+    assert!(app.session.active().unwrap().doc.selection.is_none(), "First must not run Second's remaining step");
+    crate::dialogs::confirm(&mut app, second).unwrap();
+    assert!(app.session.active().unwrap().doc.selection.is_some());
+    assert!(app.paused_playbacks.paused.is_empty());
+}
+
 fn recording_with_displace_child() -> PhotocraftApp {
     let mut app = recording_with_dialog_child();
     app.background_jobs = false;
@@ -1022,7 +1055,7 @@ fn a_step_dialog_takes_only_the_steps_values() {
     app.session.actions.list.push(a);
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     let fields = app.ui.dialog_fields(v["paused"]["dialog"].as_u64().unwrap()).unwrap();
-    assert_eq!(fields["radius"].as_f64(), Some(2.0));
+    assert_eq!(fields["radius"], 2);
     assert_eq!(fields["__command"], "filter.blur.gaussianBlur");
     assert_ne!(fields["__label"], "Other");
 }
