@@ -59,6 +59,7 @@ impl PhotocraftApp {
             remove_trail: None,
             menu_cache: None,
             keymap: Default::default(),
+            key_router: craft::keymap::ui::KeyRouter::new(craft::keymap::egui::Dispatcher::new().with_repeat(true).with_clipboard_events(true)),
             move_preview: None,
             move_hover: None,
             move_distance: None,

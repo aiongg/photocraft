@@ -11,6 +11,9 @@ use egui::{Key, KeyboardShortcut};
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use craft::keymap::Active;
+
+use crate::input::shortcut_keymap::ShortcutKeymap;
 use crate::shortcuts::{key_matches, parse};
 
 /// What a dispatched shortcut did (kept for tests and `ui.inspect`-style debugging).
@@ -39,34 +42,9 @@ pub fn take_log(ctx: &egui::Context) -> Vec<(String, Outcome)> {
     ctx.data_mut(|d| d.remove_temp::<Vec<(String, Outcome)>>(log_id())).unwrap_or_default()
 }
 
-/// Every key binding, most modifiers first (so ⇧⌘Z wins over ⌘Z), each key owned by one command:
-/// command and shell shortcuts, then the menu catalogue's for live items without their own,
-/// then Edit › Keyboard Shortcuts assignments to any other menu item, then the commands'
-/// alternate keys (#3665: F3 is Copy as well as ⌘C, see
-/// [`photocraft_engine::prefs::ALTERNATE_SHORTCUTS`]), which a main key of another command wins. D and X
-/// (`tools.defaultColors` / `tools.swapColors`) and the fill keys are commands like any other, so
-/// their overrides apply. Held temporary tools (Space…) are not here: see [`crate::hold_keys`].
+/// Every key binding the dispatch runs: [`crate::shortcut_keymap::ShortcutKeymap::table`].
 pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
-    let keymap = app.keymap();
-    let km = &*keymap;
-    // Mains in catalog order, then every command's alternates, the user's ahead of the defaults.
-    // A key the user assigned in Edit › Keyboard Shortcuts belongs to that command, ahead of any
-    // default that still names it (#1272): OK clears the old owner's row, but that row can be
-    // another id for the same item, or a default the dialog doesn't list.
-    let ids: Vec<&str> = km.ids().filter(|id| km.fires(id)).collect();
-    let mains = ids.iter().filter_map(|id| Some((*id, km.main(id)?, km.main_overridden(id))));
-    let alternates = ids.iter().flat_map(|id| km.alternates(id).into_iter().map(move |k| (*id, k, km.alternates_overridden(id))));
-    let mut candidates: Vec<(&str, String, bool)> = mains.chain(alternates).collect();
-    candidates.sort_by_key(|(_, _, user)| !user);
-    let mut all: Vec<(String, KeyboardShortcut)> = Vec::new();
-    for (id, sc, _) in candidates {
-        let Some(sc) = parse(&sc) else { continue };
-        if !all.iter().any(|(_, b)| *b == sc) {
-            all.push((id.to_string(), sc));
-        }
-    }
-    all.sort_by_key(|(_, sc)| std::cmp::Reverse(sc.modifiers.shift as u8 + sc.modifiers.alt as u8 + sc.modifiers.command as u8));
-    all
+    app.keymap().table().iter().filter_map(|(id, text)| Some((id.clone(), parse(text)?))).collect()
 }
 
 pub use craft::keymap::ui::KeyOwner;
@@ -83,90 +61,100 @@ pub fn key_gate(app: &PhotocraftApp) -> KeyGate<'static> {
     }
 }
 
-/// Who has the keyboard now: [`KeyRouter::owner`] with the app's gate. A layer rename keeps its
-/// keys even in the frame egui drops its focus (Esc, Tab), so it counts as a text field.
+/// Who has the keyboard now: [`KeyRouter::owner`] with the app's gate.
 pub fn owner(app: &PhotocraftApp, ctx: &egui::Context) -> KeyOwner {
-    match KeyRouter::owner(ctx, &key_gate(app)) {
-        KeyOwner::App | KeyOwner::Widget | KeyOwner::Popover if crate::layer_row_ui::rename_active(ctx) => KeyOwner::Text,
-        owner => owner,
-    }
+    KeyRouter::owner(ctx, &key_gate(app))
 }
 
-/// Whether ⌫ / Delete belong to the shortcuts: no text field has them and no focused control
-/// claimed them (the Curves graph deletes its selected point).
-pub fn delete_keys_free(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+/// Whether a focused control claimed ⌫ / Delete (the Curves graph deletes its selected point), so
+/// the shortcuts and the object keys leave them alone.
+pub fn delete_claimed(ctx: &egui::Context) -> bool {
     let claimed = |key| craft::ui::behavior::KeyClaim::claimed(ctx, &KeyboardShortcut::new(egui::Modifiers::NONE, key));
-    app.ui.text_edit.is_none() && owner(app, ctx) != KeyOwner::Text && !claimed(Key::Delete) && !claimed(Key::Backspace)
+    claimed(Key::Delete) || claimed(Key::Backspace)
 }
 
-/// May `sc`, bound to command `id`, fire under `owner`: [`KeyRouter::allows`].
+/// [`KeyRouter::allows`] for the shortcut `sc` bound to command `id`, for tests that ask what an
+/// owner leaves to the shortcuts.
+#[cfg(test)]
 pub(crate) fn allows(app: &PhotocraftApp, ctx: &egui::Context, owner: KeyOwner, id: &str, sc: &KeyboardShortcut) -> bool {
-    use craft::keymap::{Chord, CommandRef, egui::platform};
-    let Some(key) = craft::keymap::Key::from_egui(sc.logical_key) else { return false };
-    let mods = craft::keymap::Mods::from_egui(&sc.modifiers, platform(ctx));
-    KeyRouter::allows(ctx, owner, &key_gate(app), &Chord { mods, key }, &CommandRef::new(id))
+    use craft::keymap::{Chord, CommandRef, Key, Mods, egui::platform};
+    let Some(key) = Key::from_egui(sc.logical_key) else { return false };
+    let chord = Chord { mods: Mods::from_egui(&sc.modifiers, platform(ctx)), key };
+    KeyRouter::allows(ctx, owner, &key_gate(app), &chord, &CommandRef::new(id))
 }
 
-/// Keys whose shortcuts follow the key's position, as in Photoshop: ⇧⌘. is ⇧⌘> on a US layout,
-/// but types `:` on Nordic and German ones, so its character would never match. Only ⌘ shortcuts
-/// follow the position: a plain `,` or `;` binding (brush hardness on AZERTY, where `;` sits on the
-/// US comma key) must match the character typed.
-const POSITIONAL: [Key; 2] = [Key::Period, Key::Comma];
+/// The shortcut presses the dispatch hands to [`KeyRouter::route`] while inline type is being
+/// edited: the clipboard and select-all commands belong to the text.
+const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
 
 /// Dispatch this frame's shortcut presses in the order they arrived (⌘Z then ⌘S undoes, then
-/// saves the undone state; #440), consuming each. A press matching several bindings goes to the
-/// first in table order (⇧⌘Z before ⌘Z). Stops after a shortcut that hands the keyboard to
-/// someone else (opens a dialog, a prompt, a menu or inline type), leaving the later presses to
-/// it. While typing (inline type), clipboard and select-all shortcuts belong to the text.
-/// Returns true when a shortcut was dispatched.
+/// saves the undone state; #440): [`KeyRouter::route`] over [`ShortcutKeymap::dispatch`], which
+/// removes each press it runs and stops after a shortcut that hands the keyboard to someone else
+/// (opens a dialog, a prompt, a menu or inline type), leaving the later presses to it. While
+/// typing (inline type), clipboard and select-all shortcuts belong to the text. Returns true when
+/// a shortcut was dispatched.
 pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, editing: bool) -> bool {
     // Building the table walks the registry: only do it when a key went down.
-    if !ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. }))) {
+    let pressed = |e: &egui::Event| matches!(e, egui::Event::Key { pressed: true, .. } | egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_));
+    if !ctx.input(|i| i.events.iter().any(pressed)) {
         return false;
     }
-    const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
-    let key_owner = owner(app, ctx);
-    let table: Vec<(String, KeyboardShortcut)> =
-        bindings(app).into_iter().filter(|(id, sc)| allows(app, ctx, key_owner, id, sc) && !(editing && TEXT_OWNED.contains(&id.as_str()))).collect();
-    let command = |e: &egui::Event| match e {
-        egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
-            let by_position = physical_key
-                .filter(|p| POSITIONAL.contains(p))
-                .and_then(|p| table.iter().find(|(_, sc)| sc.modifiers.command && sc.logical_key == p && key_matches(sc, p, *modifiers)));
-            let bound =
-                by_position.or_else(|| table.iter().find(|(_, sc)| key_matches(sc, *key, *modifiers))).map(|(id, _)| (id.clone(), *key == Key::Tab, false));
-            // Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L,
-            // ⌥⌘M, #8900), unless that key is bound to something else.
-            bound.or_else(|| {
-                let plain = egui::Modifiers { alt: false, ..*modifiers };
-                let last = modifiers.alt.then(|| table.iter().find(|(id, sc)| crate::adjust_dialog::has_dialog(id) && key_matches(sc, *key, plain))).flatten();
-                last.map(|(id, _)| (id.clone(), false, true))
-            })
+    let keymap = app.keymap();
+    let mut router = std::mem::take(&mut app.key_router);
+    let ran = std::cell::Cell::new(false);
+    let cell = std::cell::RefCell::new(&mut *app);
+    let active = Active { typing: editing, ..Active::NONE };
+    router.route(ctx, keymap.dispatch(), &active, || key_gate(&cell.borrow()), |hit| {
+        let id = hit.command.id;
+        if editing && TEXT_OWNED.contains(&id.as_str()) {
+            return;
         }
-        _ => None,
-    };
-    let mut ran = false;
-    loop {
-        let next = ctx.input_mut(|i| {
-            let (at, hit) = i.events.iter().enumerate().find_map(|(at, e)| Some((at, command(e)?)))?;
-            i.events.remove(at);
-            Some(hit)
-        });
-        let Some((id, tab, last)) = next else { break };
-        if tab {
+        let mut app = cell.borrow_mut();
+        if hit.trigger.chord.key == craft::keymap::Key::Tab {
             // egui already read this Tab as "focus the next widget" (Photoshop's Tab hides the
             // panels instead, #1313): the shortcut took it, so cancel that move.
             ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
         }
-        let id = clip_key_command(app, delete_key_command(app, id));
-        let (gate, before) = (key_gate(app), owner(app, ctx));
-        dispatch_as(app, ctx, &id, last);
-        ran = true;
-        if key_gate(app) != gate || owner(app, ctx) != before {
-            break;
-        }
-    }
+        let id = clip_key_command(&app, delete_key_command(&app, id));
+        dispatch_as(&mut app, ctx, &id, false);
+        ran.set(true);
+    });
+    let mut ran = ran.get();
+    ran |= dispatch_last_settings(&mut cell.into_inner(), ctx, &keymap);
+    app.key_router = router;
     ran
+}
+
+/// Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L, ⌥⌘M,
+/// #8900), unless that key is bound to something else. The keymap has no binding for the ⌥ chord,
+/// so its press is still in egui's input after the routing.
+fn dispatch_last_settings(app: &mut PhotocraftApp, ctx: &egui::Context, keymap: &ShortcutKeymap) -> bool {
+    use craft::keymap::{Chord, CommandRef, Mods, egui::platform};
+    let events = ctx.input(|i| i.events.clone());
+    for (at, event) in events.iter().enumerate() {
+        let egui::Event::Key { key, pressed: true, modifiers, .. } = event else { continue };
+        if !modifiers.alt {
+            continue;
+        }
+        let plain = egui::Modifiers { alt: false, ..*modifiers };
+        let Some(found) = keymap
+            .table()
+            .iter()
+            .find(|(id, text)| crate::adjust_dialog::has_dialog(id) && parse(text).is_some_and(|sc| key_matches(&sc, *key, plain)))
+        else {
+            continue;
+        };
+        let Some(ckey) = craft::keymap::Key::from_egui(*key) else { continue };
+        let chord = Chord { mods: Mods::from_egui(modifiers, platform(ctx)), key: ckey };
+        let gate = key_gate(app);
+        if !KeyRouter::allows(ctx, KeyRouter::owner(ctx, &gate), &gate, &chord, &CommandRef::new(&found.0)) {
+            continue;
+        }
+        ctx.input_mut(|i| i.events.remove(at));
+        dispatch_as(app, ctx, &found.0, true);
+        return true;
+    }
+    false
 }
 
 /// Clear's key (Delete / Backspace) with nothing selected deletes the selected layers, of any

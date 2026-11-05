@@ -366,6 +366,8 @@ pub struct PhotocraftApp {
     pub(crate) menu_cache: Option<menus::ItemCache>,
     /// The shortcut catalog with the user's assignments (`shortcut_keymap`).
     pub(crate) keymap: shortcut_keymap::Cache,
+    /// Routes the frame's key presses to commands ([`shortcut_dispatch::dispatch_pressed`]).
+    pub(crate) key_router: craft::keymap::ui::KeyRouter,
     /// Move tool drag shown live (`move_ui`).
     pub(crate) move_preview: Option<move_ui::MovePreview>,
     /// Move tool › Show Highlight on Rollover: the last hover answer (`move_hover`).

@@ -97,6 +97,9 @@ pub struct ShortcutKeymap {
     /// on first use: a draft in the Keyboard Shortcuts dialog never needs it.
     fires: OnceLock<HashSet<String>>,
     user_main: HashSet<String>,
+    /// The dispatch table and the keymap built from it, on first use.
+    table: OnceLock<Vec<(String, String)>>,
+    dispatch: OnceLock<Keymap>,
 }
 
 impl ShortcutKeymap {
@@ -152,7 +155,7 @@ impl ShortcutKeymap {
         let keymap = defaults.with_overrides(overrides);
 
         let user_main = shortcuts.iter().filter(|(_, s)| !s.is_empty()).map(|(id, _)| id.clone()).collect();
-        ShortcutKeymap { keymap, main_overridden, main_cleared, alternates_overridden, fires: OnceLock::new(), user_main }
+        ShortcutKeymap { keymap, main_overridden, main_cleared, alternates_overridden, fires: OnceLock::new(), user_main, table: OnceLock::new(), dispatch: OnceLock::new() }
     }
 
     pub fn keymap(&self) -> &Keymap {
@@ -201,6 +204,51 @@ impl ShortcutKeymap {
     /// Photoshop's shared keys and Shift cycling. Held tools never do ([`crate::hold_keys`]).
     pub fn fires(&self, id: &str) -> bool {
         self.fires.get_or_init(|| self.dispatched()).contains(id)
+    }
+
+    /// Every key binding of a command the dispatch runs (command id and chord text), each chord
+    /// owned by one command: command and shell shortcuts, then the menu catalogue's for live
+    /// items without their own, then Edit › Keyboard Shortcuts assignments to any other menu
+    /// item, then the commands' alternate keys (#3665: F3 is Copy as well as ⌘C, see
+    /// [`photocraft_engine::prefs::ALTERNATE_SHORTCUTS`]), which a main key of another command
+    /// wins. The user's keys come ahead of any default that still names them (#1272): OK clears
+    /// the old owner's row, but that row can be another id for the same item, or a default the
+    /// dialog doesn't list. D and X and the fill keys are commands like any other, so their
+    /// overrides apply. Held temporary tools (Space…) are not here: see [`crate::hold_keys`].
+    pub fn table(&self) -> &[(String, String)] {
+        self.table.get_or_init(|| {
+            let ids: Vec<&str> = self.ids().filter(|id| self.fires(id)).collect();
+            let mains = ids.iter().filter_map(|id| Some((*id, self.main(id)?, self.main_overridden(id))));
+            let alternates = ids.iter().flat_map(|id| self.alternates(id).into_iter().map(move |k| (*id, k, self.alternates_overridden(id))));
+            let mut candidates: Vec<(&str, String, bool)> = mains.chain(alternates).collect();
+            candidates.sort_by_key(|(_, _, user)| !user);
+            let mut taken: Vec<egui::KeyboardShortcut> = Vec::new();
+            let mut all = Vec::new();
+            for (id, text, _) in candidates {
+                let Some(sc) = crate::shortcuts::parse(&text) else { continue };
+                if !taken.contains(&sc) {
+                    taken.push(sc);
+                    all.push((id.to_string(), text));
+                }
+            }
+            all
+        })
+    }
+
+    /// The keymap the shortcut dispatch runs ([`craft::keymap::ui::KeyRouter::route`]): the
+    /// [`ShortcutKeymap::table`] and nothing else.
+    pub fn dispatch(&self) -> &Keymap {
+        self.dispatch.get_or_init(|| {
+            let mut catalog: Vec<Bindable> = Vec::new();
+            for (id, text) in self.table() {
+                let Ok(binding) = Binding::parse(text) else { continue };
+                match catalog.iter_mut().find(|b| b.command.id == *id) {
+                    Some(b) => *b = b.clone().with_default(binding),
+                    None => catalog.push(Bindable::new(CommandRef::new(id), id, Scope::app()).with_default(binding)),
+                }
+            }
+            Keymap::new(catalog, Scopes::new(), Platform::current())
+        })
     }
 
     fn dispatched(&self) -> HashSet<String> {

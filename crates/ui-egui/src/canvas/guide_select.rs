@@ -84,7 +84,7 @@ pub fn flip(app: &mut PhotocraftApp, vertical: bool, index: usize, at: [f64; 2])
 /// stops Edit › Clear from reaching the pixels, as in Photoshop.
 pub fn keys(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
     // Text fields and widgets that delete with these keys themselves keep them (#1534).
-    if selected(app).is_none() || !crate::shortcut_dispatch::delete_keys_free(app, ctx) {
+    if selected(app).is_none() || !(craft::ui::focus::key_owner::canvas_keys_free(ctx) && app.ui.text_edit.is_none() && !crate::shortcut_dispatch::delete_claimed(ctx)) {
         return false;
     }
     let pressed = ctx.input(|i| i.modifiers.is_none() && (i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace)));

@@ -366,7 +366,7 @@ fn selected_id(app: &mut PhotocraftApp, promote: bool) -> Option<u32> {
 /// An auto slice has nothing to delete, and View › Lock Slices refuses with a message.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // Text fields and widgets that delete with these keys themselves keep them.
-    if app.ui.tool != Tool::SliceSelect || app.ui.slices.selected.is_none() || !crate::shortcut_dispatch::delete_keys_free(app, ctx) {
+    if app.ui.tool != Tool::SliceSelect || app.ui.slices.selected.is_none() || !(craft::ui::focus::key_owner::canvas_keys_free(ctx) && app.ui.text_edit.is_none() && !crate::shortcut_dispatch::delete_claimed(ctx)) {
         return false;
     }
     let mods = ctx.input(|i| i.modifiers);

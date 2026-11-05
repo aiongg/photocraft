@@ -397,7 +397,7 @@ pub(crate) fn trash_action((layer, filter): FilterDrag) -> (String, Value) {
 /// deleting the smart object or reaching Edit › Clear.
 pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // Text fields and widgets that delete with these keys themselves keep them (#1534).
-    if !crate::shortcut_dispatch::delete_keys_free(app, ctx) {
+    if !(craft::ui::focus::key_owner::canvas_keys_free(ctx) && app.ui.text_edit.is_none() && !crate::shortcut_dispatch::delete_claimed(ctx)) {
         return false;
     }
     let Some(st) = app.session.active() else { return false };

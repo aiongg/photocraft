@@ -633,7 +633,7 @@ fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -
     }
     // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in
     // Photoshop (#5702), never Edit › Clear on the pixels under it.
-    if crate::shortcut_dispatch::delete_keys_free(app, ctx) && crate::vector_ui::delete_key_deletes_work_path(app) {
+    if craft::ui::focus::key_owner::canvas_keys_free(ctx) && app.ui.text_edit.is_none() && !crate::shortcut_dispatch::delete_claimed(ctx) && crate::vector_ui::delete_key_deletes_work_path(app) {
         let mods = ctx.input(|i| i.modifiers);
         if !mods.command && !mods.ctrl && !mods.shift && !mods.alt && ctx.input_mut(|i| i.consume_key(mods, Key::Backspace) || i.consume_key(mods, Key::Delete))
         {
