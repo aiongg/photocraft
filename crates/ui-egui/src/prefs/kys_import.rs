@@ -7,13 +7,17 @@
 //! The import fills the open dialog's overrides, so OK applies them like hand-made changes
 //! (a shortcut moved to a command is taken from its old owner) and Cancel discards them.
 //!
-//! At first launch beside Photoshop, its live set is offered, never applied unasked: a prompt
-//! names the set, and Import applies it ([`offer_import`], [`show_offer`]).
+//! At first launch beside Photoshop, its live set is offered, never applied unasked: a library prompt
+//! names the set, and Import applies it ([`offer_import`], [`take_offer_answer`]).
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+
+use craft::keymap::ImportOptions;
+use craft::keymap::ui::{ImportOffer, OfferAnswer};
+use craft::ui::dialog::{DialogResult, StartupStage};
 
 use crate::PhotocraftApp;
 pub use photocraft_engine::kys::{KysCommand, KysSet, MAX_BYTES, Plan, parse};
@@ -129,7 +133,7 @@ pub fn import_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
 /// and whether it was imported), so it is made once.
 pub const IMPORTED_PREF: &str = "photoshopShortcuts";
 
-/// A set found at first launch, waiting for the user's answer ([`show_offer`]).
+/// A set found at first launch, waiting for the user's answer ([`take_offer_answer`]).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Offer {
@@ -153,32 +157,31 @@ fn not_imported(app: &mut PhotocraftApp, e: &str) {
 }
 
 /// First launch on a machine with Photoshop: its live set ([`crate::Services::photoshop_shortcuts`])
-/// is offered once. Someone who already changed a shortcut keeps their own set and is not asked;
-/// a set that changes nothing (Photoshop's defaults are ours too) is not offered either. The
+/// is offered once, as a library [`ImportOffer`] queued at [`StartupStage::Offer`]. Someone who
+/// already changed a shortcut keeps their own set and is not asked; a set that changes nothing
+/// (Photoshop's defaults are ours too) is not offered either ([`ImportOffer::prepare`]). The
 /// preference remembers each outcome, so a later launch never asks again.
 pub fn offer_import(app: &mut PhotocraftApp) {
+    use craft::keymap::ui::NoOffer;
     if crate::host_settings::recall_ref(app, IMPORTED_PREF).is_some() {
         return;
     }
     let Some((source, text)) = app.services.photoshop_shortcuts.as_mut().and_then(|f| f()) else { return };
-    if !app.session.prefs().shortcuts.is_empty() {
-        return remember(app, &source, false);
+    if let Err(e) = parse(&text) {
+        remember(app, &source, false);
+        return not_imported(app, &e);
     }
-    let set = match parse(&text) {
-        Ok(set) => set,
-        Err(e) => {
-            remember(app, &source, false);
-            return not_imported(app, &e);
+    let Ok(set) = craft::keymap::import::kys::read(&text) else { return remember(app, &source, false) };
+    let km = app.keymap();
+    let record = None;
+    match ImportOffer::prepare(&source, &set, km.keymap(), &ImportOptions::default(), record) {
+        Ok(offer) => {
+            app.ui.kys_offer = Some(Offer { source, set: offer.set_name.clone(), changes: offer.changes, text });
+            app.ui.host.enqueue(StartupStage::Offer, offer);
         }
-    };
-    let plan = plan(app, &set);
-    let default = |id: &str| crate::shortcuts::default_shortcut(id).and_then(|d| photocraft_engine::prefs::normalize_shortcut(&d));
-    let changes = plan.set.iter().filter(|(id, sc)| default(id).as_deref() != Some(sc.as_str())).count();
-    if changes == 0 {
-        return remember(app, &source, false);
+        Err(NoOffer::Answered) => {}
+        Err(_) => remember(app, &source, false),
     }
-    let name = set.name.unwrap_or_else(|| std::path::Path::new(&source).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default());
-    app.ui.kys_offer = Some(Offer { source, set: name, changes, text });
 }
 
 /// The offer's answer: Import applies the set and says so; either answer is remembered.
@@ -208,25 +211,13 @@ pub fn answer_offer(app: &mut PhotocraftApp, import: bool) {
     }
 }
 
-/// The first-launch prompt: which set was found, and Import / Don't Import.
-pub fn show_offer(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let Some(offer) = &app.ui.kys_offer else { return };
-    let n = offer.changes.to_string();
-    let line = crate::i18n::fmt(
-        tl!(
-            "PhotoCraft found your keyboard shortcut set {set} from another image editor on this computer: {n} of its shortcuts differ from PhotoCraft's. Import it?"
-        ),
-        &[("set", &offer.set), ("n", &n)],
-    );
-    let message = format!("{line}\n\n{}", tl!("Edit › Keyboard Shortcuts › Reset All to Defaults undoes an import."));
-    use craft::ui::dialog::ButtonRole;
-    let answer = craft::ui::dialog::Prompt::new("kys-offer", tl!("Import keyboard shortcuts?"), message)
-        .answer(ButtonRole::Default, tl!("Import"), None)
-        .answer(ButtonRole::Alternate, tl!("Don't Import"), None)
-        .show(ctx)
-        .map(|role| role == ButtonRole::Default);
-    if let Some(import) = answer {
-        answer_offer(app, import);
+/// The library prompt's answer: Import and Don't Import (Esc) are recorded; a host close is not,
+/// so the next launch asks again.
+pub fn take_offer_answer(app: &mut PhotocraftApp) {
+    match app.ui.host.take::<ImportOffer>() {
+        Some(DialogResult::Ok(answer)) => answer_offer(app, answer == OfferAnswer::Import),
+        Some(_) => app.ui.kys_offer = None,
+        None => {}
     }
 }
 

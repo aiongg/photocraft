@@ -308,7 +308,7 @@ impl PhotocraftApp {
         notices::show(self, &ctx);
         updates_ui::show(self, &ctx);
         gpu_status::show_fallback(self);
-        kys_import::show_offer(self, &ctx);
+        kys_import::take_offer_answer(self);
         if self.titlebar_modal_drag(chrome) {
             let rects = craft::ui::title_bar::ModalRects::take(&ctx, ctx.viewport_id());
             craft::ui::title_bar::TitleBar::modal_drag_overlay(&ctx, ctx.viewport_id(), &rects);
