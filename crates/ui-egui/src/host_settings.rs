@@ -9,7 +9,7 @@
 //! The Host is shared (`Arc`) and the preferences are the session's, so the store keeps a copy of
 //! `prefs.dialogs` that [`sync`] exchanges with the preferences at the points where dialogs run.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use craft::host::SectionStore;
@@ -30,6 +30,10 @@ struct Mirror {
     rev: Option<u64>,
     /// The Host wrote since the last [`sync`].
     dirty: bool,
+    /// The `prefs.dialogs` scopes and the sections the Host changed since the last [`sync`]. Only
+    /// these go into the preferences, so a preference edit of another scope in between is kept.
+    written: BTreeSet<String>,
+    written_sections: BTreeSet<String>,
 }
 
 /// The store the Host reads and writes: the `remembered` section over `prefs.dialogs`, every other
@@ -66,13 +70,28 @@ pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn exchange(app: &mut PhotocraftApp, mirror: &mut Mirror) {
     let rev = app.session.prefs.rev();
     if mirror.dirty {
-        let (dialogs, sections) = (mirror.dialogs.clone(), mirror.sections.clone());
+        let mut dialogs = app.session.prefs().dialogs.clone();
+        let mut sections = app.session.prefs().sections.clone();
+        for scope in std::mem::take(&mut mirror.written) {
+            match mirror.dialogs.get(&scope) {
+                Some(value) => dialogs.insert(scope, value.clone()),
+                None => dialogs.remove(&scope),
+            };
+        }
+        for key in std::mem::take(&mut mirror.written_sections) {
+            match mirror.sections.get(&key) {
+                Some(value) => sections.insert(key, value.clone()),
+                None => sections.remove(&key),
+            };
+        }
         if app.session.prefs().dialogs != dialogs || app.session.prefs().sections != sections {
+            let (d, s) = (dialogs.clone(), sections.clone());
             app.session.prefs.edit(|p| {
-                p.dialogs = dialogs;
-                p.sections = sections;
+                p.dialogs = d;
+                p.sections = s;
             });
         }
+        (mirror.dialogs, mirror.sections) = (dialogs, sections);
         mirror.dirty = false;
         mirror.rev = Some(app.session.prefs.rev());
     } else if mirror.rev != Some(rev) {
@@ -155,6 +174,7 @@ impl SectionStore for PrefsSections {
             let json = to_json(&toml::Value::Table(table));
             if mirror.sections.get(key) != Some(&json) {
                 mirror.sections.insert(key.to_owned(), json);
+                mirror.written_sections.insert(key.to_owned());
                 mirror.dirty = true;
             }
             return;
@@ -182,6 +202,13 @@ impl SectionStore for PrefsSections {
             }
         }
         if next != mirror.dialogs {
+            let changed: Vec<String> = next
+                .iter()
+                .filter(|(scope, value)| mirror.dialogs.get(*scope) != Some(*value))
+                .map(|(scope, _)| scope.clone())
+                .chain(mirror.dialogs.keys().filter(|scope| !next.contains_key(*scope)).cloned())
+                .collect();
+            mirror.written.extend(changed);
             mirror.dialogs = next;
             mirror.dirty = true;
         }
@@ -278,6 +305,18 @@ mod tests {
         app.session.prefs.edit(|p| p.sections.insert("fonts_panel".into(), json!({"width": 300})));
         sync(&mut app, &ctx);
         assert_eq!(host.setting::<Panel>(), Panel { width: 300 });
+    }
+
+    #[test]
+    fn a_preference_edit_and_a_host_store_between_syncs_both_survive() {
+        let (mut app, ctx, host) = app_and_host();
+        app.session.prefs.edit(|p| p.dialogs.insert("filter.blur.gaussianBlur".into(), json!({"radius": 4})));
+        Remembered::<bool>::new("prompt.zoom.warn.skip").store(&host, &true);
+        sync(&mut app, &ctx);
+        let dialogs = &app.session.prefs().dialogs;
+        assert_eq!(dialogs["filter.blur.gaussianBlur"], json!({"radius": 4}));
+        assert_eq!(dialogs["zoom.warn"], json!({"skip": true}));
+        assert_eq!(dialogs["layer.delete.confirmation"], json!({"skip": true}));
     }
 
     #[test]
