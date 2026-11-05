@@ -64,7 +64,7 @@ fn opens_with_output_at_the_input_resolution_and_a_pattern_id() {
 /// Photoshop's Halftone Screen settings show only for the Halftone Screen method. The hosted rows
 /// cannot be hidden (library gap: no row visibility), so they are shown disabled instead.
 #[test]
-#[ignore = "gap K: ParamDialog has no row visibility, so the Halftone Screen rows are disabled, not hidden"]
+#[ignore = "gap Y: ParamDialog has no row visibility, so the Halftone Screen rows are disabled, not hidden"]
 fn halftone_settings_show_only_for_halftone_screen() {
     let mut h = harness(72.0, 8);
     let id = open(&mut h);
