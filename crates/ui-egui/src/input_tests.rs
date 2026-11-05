@@ -862,7 +862,7 @@ fn global_cmd_shift_keys_still_work_outside_type_editing() {
     assert_eq!(history(&h).last().map(String::as_str), Some("Inverse"));
     h.key_press_modifiers(cmd_shift, Key::K);
     h.run_steps(3);
-    assert_eq!(h.state().ui.dialogs.len(), 1, "Color Settings opens");
+    assert_eq!(h.state().ui.dialogs.len() + h.state().ui.hosted.len(), 1, "Color Settings opens");
     assert!(!char_style(&h, id, 0).faux_italic && char_style(&h, id, 0).caps == photocraft_doc::text::Caps::Normal);
 }
 

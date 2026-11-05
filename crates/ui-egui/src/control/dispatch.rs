@@ -62,7 +62,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Ou
         return err(error);
     }
     crate::canvas_tool_menu::choose(app, ctx, id);
-    ok(json!({"command": id, "dialog": app.ui.dialogs.last().map(|d| d.id)}))
+    ok(json!({"command": id, "dialog": app.ui.hosted.last().map(|h| h.id).or_else(|| app.ui.dialogs.last().map(|d| d.id))}))
 }
 
 fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {

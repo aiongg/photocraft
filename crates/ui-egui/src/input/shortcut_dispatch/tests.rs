@@ -276,8 +276,15 @@ fn common_shortcuts_work_after_clicking_panels() {
         // Dialogs: Image Size (⌥⌘I, shown in the menu but unbound before #127) and Levels (⌘L).
         for (sc, what) in [("Cmd+Alt+I", "Image Size"), ("Cmd+Alt+C", "Canvas Size"), ("Cmd+L", "Levels"), ("Cmd+M", "Curves")] {
             press(&mut h, sc);
-            assert_eq!(h.state().ui.dialogs.len(), 1, "{place:?}: {sc} opens {what}");
-            h.state_mut().ui.dialogs.clear();
+            let open = |h: &Harness<'_, PhotocraftApp>| (h.state().ui.dialogs.len() + h.state().ui.hosted.len(), h.state().ui.hosted.last().map(|d| d.id));
+            assert_eq!(open(&h).0, 1, "{place:?}: {sc} opens {what}");
+            match open(&h).1 {
+                Some(id) => {
+                    let ctx = h.ctx.clone();
+                    crate::dialogs::cancel_in(h.state_mut(), &ctx, id).unwrap();
+                }
+                None => h.state_mut().ui.dialogs.clear(),
+            }
             h.run_steps(2);
         }
         if !text {

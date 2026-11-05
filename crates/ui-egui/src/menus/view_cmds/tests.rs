@@ -583,10 +583,11 @@ fn esc_leaves_full_screen_modes_unless_something_else_owns_it() {
     // An open dialog takes Esc first.
     menu(&mut app, &ctx, "view.screenMode.fullScreen", json!({})).unwrap();
     menu(&mut app, &ctx, "image.canvasSize", json!({})).unwrap();
-    assert_eq!(app.ui.dialogs.len(), 1);
+    assert_eq!(app.ui.dialogs.len() + app.ui.hosted.len(), 1);
     press_esc(&mut app, &ctx);
     assert_eq!(app.ui.view.screen_mode, "fullScreen");
-    app.ui.dialogs.clear();
+    let id = app.ui.hosted.last().map(|h| h.id).expect("Canvas Size is hosted");
+    crate::dialogs::cancel_in(&mut app, &ctx, id).unwrap();
     // So does Free Transform: Esc cancels it and the mode stays.
     app.run("select.all", json!({})).unwrap();
     crate::transform_tool::begin(&mut app, &ctx).unwrap();

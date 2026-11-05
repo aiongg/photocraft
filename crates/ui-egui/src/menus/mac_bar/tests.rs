@@ -330,7 +330,7 @@ fn an_open_dialog_blocks_menu_clicks_except_view_navigation() {
     let mut app = app(true);
     let ctx = egui::Context::default();
     crate::menus::invoke(&mut app, &ctx, "image.imageSize", json!({})).unwrap();
-    assert!(!app.ui.dialogs.is_empty(), "Image Size opened its dialog");
+    assert!(app.ui.any_dialog_open(), "Image Size opened its dialog");
     let size = |app: &PhotocraftApp| app.session.active().map(|d| (d.doc.size.width, d.doc.size.height));
     let zoom = app.ui.views[0].zoom;
     let events = vec![click("image.imageRotation.90cw"), click("view.zoomIn")];
@@ -349,7 +349,8 @@ fn an_open_dialog_blocks_menu_clicks_except_view_navigation() {
     assert!(!bar.find(&"image.imageRotation.90cw".into()).unwrap().enabled);
     assert!(bar.find(&"view.zoomIn".into()).unwrap().enabled);
     // With the dialog closed the rows come back and a click runs.
-    app.ui.dialogs.clear();
+    let id = app.ui.hosted.last().map(|h| h.id).expect("Image Size is hosted");
+    crate::dialogs::cancel_in(&mut app, &ctx, id).unwrap();
     frame(&ctx, egui::RawInput::default(), |ui| sync(&mut app, ui.ctx()));
     assert!(synced.borrow().last().unwrap().find(&"image.imageRotation.90cw".into()).unwrap().enabled);
 }
