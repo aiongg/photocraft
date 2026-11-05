@@ -281,18 +281,19 @@ pub fn show_fallback(app: &mut PhotocraftApp) {
     if app.ui.prompt_with(owns).is_some() {
         return;
     }
-    let retry_line =
-        if can_retry_now(app) { tl!("Retry GPU tries the graphics processor again now.") } else { tl!("Retry GPU requires a restart. Save your work first.") };
-    let prompt = StandardPrompt::custom(format!(
-        "{}\n\n{retry_line}",
-        tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.")
-    ))
-    .title(tsrc!("Switched to CPU rendering"))
-    .tone(Tone::Warn, tsrc!("GPU acceleration could not continue. Your documents are unchanged."))
-    .details(reason.clone())
-    .button(PromptChoice::Proceed, tsrc!("Keep Using CPU"), None)
-    .button(PromptChoice::Alternate, tsrc!("Retry GPU"), None)
-    .button(PromptChoice::Cancel, tsrc!("Cancel"), None);
+    let retry_line = if can_retry_now(app) {
+        tsrc!("Retry GPU tries the graphics processor again now.")
+    } else {
+        tsrc!("Retry GPU requires a restart. Save your work first.")
+    };
+    let prompt = StandardPrompt::custom(tsrc!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter."))
+        .paragraph(retry_line)
+        .title(tsrc!("Switched to CPU rendering"))
+        .tone(Tone::Warn, tsrc!("GPU acceleration could not continue. Your documents are unchanged."))
+        .details(reason.clone())
+        .button(PromptChoice::Proceed, tsrc!("Keep Using CPU"), None)
+        .button(PromptChoice::Alternate, tsrc!("Retry GPU"), None)
+        .button(PromptChoice::Cancel, tsrc!("Cancel"), None);
     let mut fields = serde_json::Map::new();
     fields.insert(MARK.into(), json!(true));
     fields.insert("__label".into(), json!("Switched to CPU rendering"));

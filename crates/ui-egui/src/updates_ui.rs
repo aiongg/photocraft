@@ -85,6 +85,7 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
 #[cfg(not(target_arch = "wasm32"))]
 fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
     use craft::update::stack_dialogs::UpdateCheckDialog;
+    take_answer(app, ctx);
     let rt = &mut app.updates_rt;
     rt.updater.tick(ctx);
     if !app.ui.updates_open {
@@ -171,7 +172,6 @@ pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str
         if !app.ui.host.confirm_by_id::<UpdateCheckDialog>(ctx, id) {
             return Err(format!("the update dialog does not offer `{choice}` now"));
         }
-        show(app, ctx);
         Ok(serde_json::json!({"choice": choice}))
     }
     #[cfg(target_arch = "wasm32")]
@@ -194,8 +194,30 @@ pub fn cancel_control(app: &mut PhotocraftApp) -> Result<Value, String> {
 pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        use craft::ui::dialog::DialogResult;
-        use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
+        take_answer(app, ctx);
+        // The restart helper is scheduled before the app closes, so no update starts over unsaved
+        // work: the close waits until the work is saved.
+        {
+            let can_close = !app.has_unsaved_work();
+            if app.updates_rt.updater.take_close(can_close) {
+                // The guarded close path asks about unsaved work and waits for saves; the restart
+                // helper relaunches once the process exits.
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    let _ = (app, ctx);
+}
+
+/// Acts on the check dialog's answer: a click read after the host drew, or a confirm made
+/// between passes. Read before [`push_state`] can open the dialog again, which drops a result
+/// nobody took.
+#[cfg(not(target_arch = "wasm32"))]
+fn take_answer(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    use craft::ui::dialog::DialogResult;
+    use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
+    {
         if let Some(result) = app.ui.host.take::<UpdateCheckDialog>() {
             match result {
                 DialogResult::Ok(CheckChoice::CheckNow | CheckChoice::CheckAgain) => {
@@ -218,19 +240,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 _ => app.ui.updates_open = false,
             }
         }
-        // The restart helper is scheduled before the app closes, so no update starts over unsaved
-        // work: the close waits until the work is saved.
-        {
-            let can_close = !app.has_unsaved_work();
-            if app.updates_rt.updater.take_close(can_close) {
-                // The guarded close path asks about unsaved work and waits for saves; the restart
-                // helper relaunches once the process exits.
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            }
-        }
     }
-    #[cfg(target_arch = "wasm32")]
-    let _ = (app, ctx);
 }
 
 #[cfg(test)]
@@ -477,6 +487,8 @@ mod tests {
         assert_eq!(listed["fields"]["choices"], serde_json::json!(["close"]));
         assert_eq!(call(&mut app, "ui.dialog.confirm", serde_json::json!({"dialog": CONTROL_ID, "choice": "update"}))["ok"], false);
         assert_eq!(call(&mut app, "ui.dialog.confirm", serde_json::json!({"dialog": CONTROL_ID, "choice": "close"}))["ok"], true);
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| at_ctx(&mut app, ui.ctx()));
+        output.textures_delta.clear();
         assert!(!app.ui.updates_open);
     }
 }

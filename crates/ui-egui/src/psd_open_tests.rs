@@ -197,3 +197,33 @@ fn background_damage_only_open_does_not_create_a_spurious_profile_question() {
     assert_eq!(app.session.documents().len(), 1);
     assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty(), "color:null is not a profile question");
 }
+
+/// The damage prompt opened in English redraws in the language chosen afterwards, paragraph by
+/// paragraph.
+#[test]
+fn damaged_file_prompt_draws_in_the_selected_language() {
+    use crate::i18n::{Lang, tr, with_language};
+    with_language(Lang::EN, || {
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            app()
+        });
+        h.run_steps(4);
+        h.state_mut().open_bytes("corrupt-green-rle.psd", &recovery_psd::make_psd(true)).unwrap();
+        h.state_mut().run("prefs.set", json!({"path": "interface.language", "value": "uk"})).unwrap();
+        h.run_steps(4);
+        let uk = Lang::from_code("uk").expect("registered language");
+        let mut text = Vec::new();
+        fn collect(shape: &egui::Shape, text: &mut Vec<String>) {
+            match shape {
+                egui::Shape::Text(shape) => text.push(shape.galley.job.text.clone()),
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| collect(shape, text)),
+                _ => {}
+            }
+        }
+        h.output().shapes.iter().for_each(|shape| collect(&shape.shape, &mut text));
+        let expected = tr(uk, "Some layers, pixels or masks could not be read. Do you want to continue opening it?");
+        assert_ne!(expected, "Some layers, pixels or masks could not be read. Do you want to continue opening it?");
+        assert!(text.iter().any(|t| t.contains(expected)), "the damage prompt draws the Ukrainian paragraph");
+    });
+}
