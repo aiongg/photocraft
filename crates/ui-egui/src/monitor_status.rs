@@ -580,7 +580,7 @@ mod tests {
         app.session.color.set_displays(Ok(displays(None)));
         app.session.color.main_display = Some(1);
         let d = crate::prefs_ui::invoke(&mut app, &ctx, "edit.colorSettings", &serde_json::json!({})).unwrap().unwrap()["dialog"].as_u64().unwrap();
-        let shown = |app: &PhotocraftApp| app.ui.dialogs.iter().find(|x| x.id == d).unwrap().fields["__note"].as_str().unwrap().to_string();
+        let shown = |app: &PhotocraftApp| app.ui.dialog_fields(d).unwrap()["__note"].as_str().unwrap().to_string();
         assert!(shown(&app).contains("on Built-in Retina Display: sRGB") && shown(&app).contains("fallback"), "{}", shown(&app));
         apply(&mut app, Ok(displays(p3())));
         app.session.color.main_display = Some(4);

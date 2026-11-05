@@ -248,7 +248,7 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::smart_filter_dialog::owns(fields) => crate::smart_filter_dialog::body(app, ui, fields),
         _ if crate::adjust_dialog::owns(fields) => crate::adjust_dialog::body(app, ui, fields),
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
-        _ if is_filter_route(fields) => filter_body(app, ui, fields, id),
+        _ if is_filter_route(fields) => filter_body(ui, fields, id),
         _ if crate::new_guide_ui::owns(fields) => crate::new_guide_ui::body(ui, fields),
         _ => {}
     }
@@ -317,11 +317,7 @@ fn is_filter_route(fields: &Fields) -> bool {
 
 /// A filter-style dialog's parameters. The library scrolls them (`Body::Scroll`) above the
 /// in-dialog preview window, which [`filter_below`] draws.
-fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, id: egui::Id) {
-    // Color Settings: the monitor profile in use can change while it is open.
-    if fields.get("__command").and_then(Value::as_str) == Some("edit.colorSettings") {
-        fields.insert("__note".into(), Value::String(crate::monitor_status::note(app)));
-    }
+fn filter_body(ui: &mut egui::Ui, fields: &mut Fields, id: egui::Id) {
     let body = |ui: &mut egui::Ui, fields: &mut serde_json::Map<String, Value>| crate::filter_dialog::body(ui, fields);
     // Select and Mask leaves the keyboard to its view keys (F, X, O, V…).
     if crate::select_mask_view::owns(fields) {

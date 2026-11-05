@@ -28,20 +28,21 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
         "edit.menus" => Some(Ok(json!({"dialog": open_shortcuts(app, 1)}))),
         "edit.toolbar" => Some(Ok(json!({"dialog": open_shortcuts(app, 2)}))),
         "edit.colorSettings" => {
-            // Stays on the legacy list: `ParamDialog::below` is library row 150.
-            let d = crate::filter_dialog::open_legacy(app, "edit.colorSettings");
+            let d = crate::filter_dialog::open(app, "edit.colorSettings");
             let cur = serde_json::to_value(&app.session.color.settings).unwrap_or_default();
             // What Monitor Profile resolves to, so a fallback to sRGB is visible (#569): read the
-            // displays again now, and the dialog refreshes this line as it draws.
+            // displays again now, and the app pushes the dialog's note line before each pass.
             crate::monitor_status::read_now(app);
             let note = crate::monitor_status::note(app);
-            if let Some(dm) = d.and_then(|d| app.ui.dialog_mut(d)) {
+            if let Some(id) = d {
+                if let Some(fields) = app.ui.hosted_fields_mut(id) {
+                    fields.set("__note", note);
+                }
                 for (k, v) in cur.as_object().into_iter().flatten() {
-                    if dm.fields.contains_key(k) {
-                        dm.fields.insert(k.clone(), v.clone());
+                    if app.ui.dialog_fields(id).is_some_and(|f| f.contains_key(k)) {
+                        let _ = crate::dialogs::hosted::set_field(app, id, k, v.clone());
                     }
                 }
-                dm.fields.insert("__note".into(), json!(note));
             }
             dialog(d)
         }

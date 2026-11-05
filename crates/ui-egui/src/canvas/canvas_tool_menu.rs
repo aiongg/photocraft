@@ -999,12 +999,8 @@ fn choose_type(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result<
 }
 
 /// A parameter dialog for `command` following `spec` (registry notation), prefilled with `fields`.
-fn spec_dialog(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, mut fields: serde_json::Map<String, serde_json::Value>) {
-    fields.insert("__command".into(), json!(command));
-    fields.insert("__label".into(), json!(label));
-    fields.insert("__filter".into(), json!(true));
-    fields.insert("__spec".into(), json!(spec));
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+fn spec_dialog(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fields: serde_json::Map<String, serde_json::Value>) {
+    crate::filter_dialog::open_with_spec(app, command, label, spec, fields);
 }
 
 /// Photoshop's Stroke Path dialog: the brush-based tool to stroke with (painting with that tool's
