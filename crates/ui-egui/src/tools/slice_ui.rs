@@ -365,13 +365,8 @@ fn selected_id(app: &mut PhotocraftApp, promote: bool) -> Option<u32> {
 /// deletes that slice, as in Photoshop (#7862). It never reaches Layer › Delete or Edit › Clear.
 /// An auto slice has nothing to delete, and View › Lock Slices refuses with a message.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    use crate::shortcut_dispatch::Focus;
     // Text fields and widgets that delete with these keys themselves keep them.
-    if app.ui.tool != Tool::SliceSelect
-        || app.ui.slices.selected.is_none()
-        || app.ui.text_edit.is_some()
-        || matches!(Focus::of(ctx), Focus::Text | Focus::DeletingWidget)
-    {
+    if app.ui.tool != Tool::SliceSelect || app.ui.slices.selected.is_none() || !crate::shortcut_dispatch::delete_keys_free(app, ctx) {
         return false;
     }
     let mods = ctx.input(|i| i.modifiers);
