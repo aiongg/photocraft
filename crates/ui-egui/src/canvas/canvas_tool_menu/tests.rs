@@ -472,7 +472,7 @@ fn selection_menu_layer_and_path_actions() {
     app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
     assert!(open(&mut app, Tool::EllipseMarquee, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.toWorkPath");
-    let dialog = app.ui.dialogs.last().map(|d| d.id).expect("tolerance dialog");
+    let dialog = app.ui.hosted.last().map(|d| d.id).expect("tolerance dialog");
     assert!(app.session.active().unwrap().doc.work_path.is_none(), "nothing happens before OK");
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert!(app.session.active().unwrap().doc.work_path.is_some());
@@ -493,7 +493,7 @@ fn disabled_selection_rows_do_nothing() {
     let before = app.session.journal.len();
     choose(&mut app, &Context::default(), "edit.fade");
     assert_eq!(app.session.journal.len(), before);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     // Rows of the other variant are not part of this menu.
     assert!(open(&mut app, Tool::MagicWand, [10.0, 10.0]));
     choose(&mut app, &Context::default(), "select.all");
@@ -709,7 +709,7 @@ fn completed_pen_path_right_click_makes_selection() {
     assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.tool == Tool::Pen && m.has_path));
     let ctx = h.ctx.clone();
     choose(h.state_mut(), &ctx, "path.toSelection");
-    let dialog = h.state().ui.dialogs.last().map(|d| d.id).unwrap();
+    let dialog = h.state().ui.hosted.last().map(|d| d.id).unwrap();
     crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
     assert!(h.state().session.active().unwrap().doc.selection.is_some());
     assert_eq!(h.state().session.journal.last().map(|(id, _)| id.as_str()), Some("path.toSelection"));
@@ -738,7 +738,7 @@ fn pen_menu_finishes_in_progress_path_before_selection() {
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
     assert!(entry_enabled(&app, menu, "path.toSelection"));
     choose(&mut app, &Context::default(), "path.toSelection");
-    let dialog = app.ui.dialogs.last().map(|d| d.id).unwrap();
+    let dialog = app.ui.hosted.last().map(|d| d.id).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert!(app.session.active().unwrap().doc.work_path.is_some());
     assert!(app.session.active().unwrap().doc.selection.is_some());
@@ -752,13 +752,13 @@ fn pen_options_bar_makes_a_selection_from_the_path() {
     let mut app = app();
     app.ui.tool = Tool::Pen;
     assert!(make_selection(&mut app).is_err(), "no path yet");
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     for (x, y) in [(2.0, 2.0), (20.0, 2.0), (20.0, 20.0)] {
         crate::vector_ui::pen_down(&mut app, x, y, false);
         crate::vector_ui::pen_up(&mut app);
     }
     make_selection(&mut app).unwrap();
-    let dialog = app.ui.dialogs.last().map(|d| d.id).unwrap();
+    let dialog = app.ui.hosted.last().map(|d| d.id).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     let st = app.session.active().unwrap();
     assert!(st.doc.work_path.is_some() && st.doc.selection.is_some());
@@ -766,10 +766,10 @@ fn pen_options_bar_makes_a_selection_from_the_path() {
     // Paths panel again, and then it is, with no pen path in progress.
     app.run("select.deselect", json!({})).unwrap();
     assert!(make_selection(&mut app).is_err(), "the hidden Work Path is not the active path");
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     app.ui.selected_path = Some("work".into());
     make_selection(&mut app).unwrap();
-    let dialog = app.ui.dialogs.last().map(|d| d.id).unwrap();
+    let dialog = app.ui.hosted.last().map(|d| d.id).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert!(app.session.active().unwrap().doc.selection.is_some());
     // Drawn with a saved path selected, the path is added to that one (#4721): the dialog is
@@ -781,7 +781,7 @@ fn pen_options_bar_makes_a_selection_from_the_path() {
         crate::vector_ui::pen_up(&mut app);
     }
     make_selection(&mut app).unwrap();
-    assert_eq!(app.ui.dialogs.last().and_then(|d| d.fields.get("name")), Some(&json!("Cutout")));
+    assert_eq!(app.ui.hosted.last().and_then(|h| app.ui.dialog_fields(h.id)).as_ref().and_then(|f| f.get("name")), Some(&json!("Cutout")));
 }
 
 /// #1056: the Path Selection and Direct Selection tools' right-click opens the path menu for
@@ -804,7 +804,7 @@ fn path_selection_tools_open_the_path_menu() {
         assert_eq!(rows(&menu), PEN_MENU, "{tool:?}");
         assert!(menu.has_path && entry_enabled(&app, &menu, "path.toSelection"), "{tool:?}");
         choose(&mut app, &Context::default(), "path.toSelection");
-        let dialog = app.ui.dialogs.last().map(|d| d.id).unwrap();
+        let dialog = app.ui.hosted.last().map(|d| d.id).unwrap();
         crate::dialogs::confirm(&mut app, dialog).unwrap();
         assert!(app.session.active().unwrap().doc.selection.is_some(), "{tool:?}: Make Selection made one");
     }
@@ -855,7 +855,7 @@ fn pen_menu_has_all_reference_rows_in_order_and_guards_unavailable_actions() {
     let before = app.session.journal.len();
     choose(&mut app, &Context::default(), "path.toSelection");
     assert_eq!(app.session.journal.len(), before);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
 }
 
 #[test]
@@ -870,15 +870,15 @@ fn pen_menu_creates_mask_deletes_path_and_opens_named_path_dialogs() {
     assert_eq!(app.ui.selected_path.as_deref(), Some("layer"));
     app.ui.selected_path = Some("work".into());
     choose_open(&mut app, "edit.defineCustomShape");
-    let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let id = app.ui.hosted.last().map(|d| d.id).unwrap();
+    let fields = app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields.get("path"), Some(&json!("work")));
-    app.ui.dialog_mut(id).unwrap().fields.insert("name".into(), json!("Menu Shape"));
+    crate::dialogs::hosted::set_field(&mut app, id, "name", json!("Menu Shape")).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert!(app.session.edit_state.custom_shapes.iter().any(|s| s.name == "Menu Shape"));
     choose_open(&mut app, "path.fill");
-    let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
-    assert_eq!(app.ui.dialogs.last().unwrap().fields.get("name"), Some(&json!("work")));
+    let id = app.ui.hosted.last().map(|d| d.id).unwrap();
+    assert_eq!(app.ui.dialog_fields(id).unwrap().get("name"), Some(&json!("work")));
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("path.fill"));
     choose_open(&mut app, "path.delete");
@@ -895,13 +895,13 @@ fn pen_menu_saved_path_clipping_and_numeric_transform() {
     assert!(open(&mut app, Tool::Pen, [10.0, 10.0]));
     assert!(entry_enabled(&app, app.ui.canvas_tool_menu.as_ref().unwrap(), "path.clippingPath.set"));
     choose(&mut app, &Context::default(), "path.clippingPath.set");
-    let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
-    app.ui.dialog_mut(id).unwrap().fields.insert("flatness".into(), json!(2.0));
+    let id = app.ui.hosted.last().map(|d| d.id).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "flatness", json!(2.0)).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.active().unwrap().doc.clipping_path.as_ref().map(|p| p.name.as_str()), Some("Cutout"));
     choose_open(&mut app, "path.transform");
-    let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
-    app.ui.dialog_mut(id).unwrap().fields.insert("translateX".into(), json!(5.0));
+    let id = app.ui.hosted.last().map(|d| d.id).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "translateX", json!(5.0)).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("path.transform"));
 }

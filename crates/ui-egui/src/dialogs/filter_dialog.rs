@@ -829,49 +829,8 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                     let initial = default.as_deref().or_else(|| options.first().map(String::as_str)).unwrap_or("");
                     let mut cur = f.get(&p.key).and_then(Value::as_str).unwrap_or(initial).to_string();
                     let labels: Vec<String> = options.iter().map(|o| choice_label(o)).collect();
-                    let mut opts: Vec<(String, &str)> = options.iter().cloned().zip(labels.iter().map(String::as_str)).collect();
-                    // Lens Blur's Source: each alpha channel by its name, in place of `channel`.
-                    let depth = cmd == LENS_BLUR && p.key == "depthMap";
-                    let names: Vec<String> = if depth {
-                        f.get("__channels").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect()
-                    } else {
-                        Vec::new()
-                    };
-                    let channels: Vec<String> = (0..names.len()).map(channel_choice).collect();
-                    if depth {
-                        opts.retain(|(v, _)| v != "channel");
-                        opts.extend(channels.iter().cloned().zip(names.iter().map(String::as_str)));
-                        if cur == "channel"
-                            && let Some(i) = f.get("depthChannel").and_then(|v| channel_index(v, &names))
-                        {
-                            cur = channel_choice(i);
-                        }
-                    }
-                    // Like Photoshop, the profile menus also list the profiles installed in the
-                    // system (printer and paper profiles, press conditions), by description.
-                    let lists_installed = installed_filter(&cmd, &p.key).is_some();
-                    let installed =
-                        if lists_installed { installed_choices(&cmd, &p.key, &photocraft_engine::installed_profiles::installed()) } else { Vec::new() };
-                    opts.extend(installed.iter().map(|(path, description)| (path.clone(), description.as_str())));
-                    // Assign Profile: only what the document's colour mode can take (#4951).
-                    if p.key == "profile"
-                        && let Some(allowed) = f.get("__profiles").and_then(Value::as_array)
-                    {
-                        opts.retain(|(v, _)| allowed.iter().any(|a| a.as_str() == Some(v.as_str())));
-                    }
-                    // A profile given by path that isn't listed (typed by an agent, or spelled with
-                    // different case) still shows, by its file name, instead of a blank menu.
-                    let stem = std::path::Path::new(&cur).file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                    if lists_installed && !opts.iter().any(|(v, _)| *v == cur) {
-                        opts.push((cur.clone(), stem.as_str()));
-                    }
+                    let opts: Vec<(String, &str)> = options.iter().cloned().zip(labels.iter().map(String::as_str)).collect();
                     crate::widgets::dropdown(ui, &format!("flt-{cmd}-{}", p.key), &label(&p.key), &mut cur, &opts, 170.0);
-                    if let Some(i) = cur.strip_prefix("channel:").filter(|_| depth).and_then(|i| i.parse::<usize>().ok()) {
-                        f.insert("depthChannel".into(), json!(i));
-                        cur = "channel".into();
-                    } else if depth {
-                        f.remove("depthChannel");
-                    }
                     f.insert(p.key.clone(), json!(cur));
                 });
             }
@@ -880,90 +839,9 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 crate::widgets::checkbox(ui, &mut b, &label(&p.key));
                 f.insert(p.key, json!(b));
             }
-            Kind::Text => {
-                let mut v = f.get(&p.key).and_then(Value::as_str).unwrap_or_default().to_string();
-                ui.horizontal(|ui| {
-                    let lp = ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
-                    ui.add(egui::TextEdit::singleline(&mut v).desired_width(200.0)).labelled_by(lp.id);
-                });
-                if v.is_empty() {
-                    f.remove(&p.key);
-                } else {
-                    f.insert(p.key, json!(v));
-                }
-            }
-            Kind::Document => {
-                let names: Vec<String> =
-                    f.get("__docs").and_then(Value::as_array).map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
-                let cur = f.get(&p.key).and_then(Value::as_i64).unwrap_or(-1);
-                let mut sel = cur.to_string();
-                let mut opts: Vec<(String, &str)> = vec![("-1".to_string(), tl!("None"))];
-                opts.extend(names.iter().enumerate().map(|(i, n)| (i.to_string(), n.as_str())));
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
-                    crate::widgets::dropdown(ui, &format!("flt-{cmd}-{}", p.key), &label(&p.key), &mut sel, &opts, 170.0);
-                });
-                match sel.parse::<i64>() {
-                    Ok(i) if i >= 0 => f.insert(p.key, json!(i)),
-                    _ => f.insert(p.key, json!(-1)),
-                };
-            }
-            Kind::Grid(n) => {
-                let side = (n as f32).sqrt().round().max(1.0) as usize;
-                let mut vals: Vec<f32> =
-                    f.get(&p.key).and_then(Value::as_array).map(|a| a.iter().map(|v| v.as_f64().unwrap_or(0.0) as f32).collect()).unwrap_or_default();
-                vals.resize(n, 0.0);
-                ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
-                egui::Grid::new(format!("flt-grid-{cmd}-{}", p.key)).spacing([4.0, 4.0]).show(ui, |ui| {
-                    for (i, v) in vals.iter_mut().enumerate() {
-                        crate::widgets::value_field(ui, v, -999.0..=999.0, "", 44.0).accessible_name(format!("{} {}", label(&p.key), i + 1));
-                        if (i + 1) % side == 0 {
-                            ui.end_row();
-                        }
-                    }
-                });
-                f.insert(p.key, json!(vals.iter().map(|v| v.round() as i64).collect::<Vec<_>>()));
-            }
-            Kind::Json => {}
-            Kind::Color(default) => {
-                let set = f.get(&p.key).and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex);
-                let rgb = set.or(default).unwrap_or([0.0; 3]);
-                let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-                let bytes = rgb.map(q);
-                let name = label(&p.key);
-                let mut clicked = false;
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(&name).color(t.color.text.muted.to_egui()));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // PhotoCraft's Color Picker, as everywhere else (#2144).
-                        clicked = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(bytes[0], bytes[1], bytes[2]), &name).clicked();
-                        ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.color.text.muted.to_egui()).monospace());
-                    });
-                });
-                if set.is_none() && default.is_some() {
-                    f.insert(p.key.clone(), json!(crate::color_picker_ui::hex(rgb)));
-                }
-                if clicked {
-                    if !f.contains_key(&p.key) {
-                        f.insert(p.key.clone(), json!(crate::color_picker_ui::hex(rgb)));
-                    }
-                    crate::color_picker_ui::request_field(f, &p.key, &crate::color_picker_ui::title_for(&name));
-                }
-            }
-            Kind::Int { default } => {
-                let mut v = f.get(&p.key).and_then(Value::as_f64).unwrap_or(default as f64) as f32;
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
-                    crate::widgets::value_field(ui, &mut v, -30000.0..=30000.0, "", 80.0).accessible_name(label(&p.key));
-                });
-                f.insert(p.key, json!(v.round() as i64));
-            }
+            // Select and Mask is the one dialog on this route: it takes sliders, menus and check boxes.
+            _ => {}
         }
-    }
-    // Read-only context the dialog opener supplies (e.g. the monitor profile in use).
-    if let Some(note) = f.get("__note").and_then(Value::as_str) {
-        ui.add_space(craft::ui::theme::scale::Space::S4.px());
-        ui.add(egui::Label::new(egui::RichText::new(note).color(t.color.text.muted.to_egui())).wrap());
     }
     if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
         ui.add_space(craft::ui::theme::scale::Space::S4.px());

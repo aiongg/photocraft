@@ -6,7 +6,7 @@
 //! converts between that and the JSON automation and the commands use.
 
 use craft::ui::controls::SliderScale;
-use craft::ui::dialog::{DialogFields, FieldValue, ParamDialog, ParamKind as Lib, PathKind};
+use craft::ui::dialog::{DialogFields, FieldValue, ParamDialog, ParamKind as Lib, ParamLayout, PathKind};
 use craft::ui::localized::Unit;
 use egui::{Response, Sense, Ui};
 use serde_json::{Map, Value, json};
@@ -266,7 +266,7 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
             Kind::Color(default) => {
                 let row = LibParam::new(key.as_str(), name, Lib::Color { default });
                 // Replace Color's From swatch has the pipette toggle for the canvas eyedropper.
-                out.push(if command == REPLACE_COLOR && key == "color" { row.eyedropper() } else { row });
+                out.push(if command == REPLACE_COLOR && key == "color" { row.eyedropper().armed(true) } else { row });
             }
             // A seed gets a Random button (#5710); it draws from 0..=30000, what the field takes.
             Kind::Int { default } if key == "seed" => {
@@ -378,18 +378,15 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         preview: Default::default(),
     };
     let wire = Wire::of(&record);
-    let (mut values, extra) = wire.fields(&map);
-    if command == crate::bitmap_dialog::COMMAND {
-        crate::bitmap_dialog::view_state(&mut values);
-    }
+    let (values, extra) = wire.fields(&map);
     let mut dialog = ParamDialog::new(command, crate::dialogs::display_label(label), params)
         .values(values)
         // Cmd/Ctrl+Z steps the dialog's own settings (#4697), and the close box follows the platform.
         .history(true)
         .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()))
-        // The Preview check box sits in the bottom footer, as PhotoCraft's does.
         .preview(map.contains_key("__preview"))
-        .layout(craft::ui::dialog::ParamLayout::BottomFooter);
+        // The Stacked layout draws no `footer_extra`, which the Color Table's Load… and Save… need (gap BA).
+        .layout(if crate::color_table_ui::owns(&map) { ParamLayout::BottomFooter } else { ParamLayout::Stacked });
     // Color Settings: the monitor profile in use, which the app pushes before each pass.
     if command == "edit.colorSettings" {
         dialog = dialog.below(|ui, fields| {
@@ -432,9 +429,11 @@ fn push_one(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) {
     let Some(fields) = app.ui.dialog_fields(record.id) else { return };
     let fields_now = app.ui.hosted_fields(id).cloned().unwrap_or_default();
     let ok = crate::dialogs::enabled_for(app, &fields).0;
+    let comparing = app.ui.hosted_params(id).is_some_and(ParamDialog::comparing);
     let note = (record.key == "edit.colorSettings").then(|| crate::monitor_status::note(app));
     let image = Some(&fields).and_then(|fields| {
-        let on = fields.get("__preview").and_then(Value::as_bool) == Some(true);
+        // The canvas follows the check box alone; the pane shows the original while Compare is held.
+        let on = fields.get("__preview").and_then(Value::as_bool) == Some(true) && !comparing;
         // The record's cache is out of the record while the textures are built from the app.
         let mut cache = app.ui.hosted.iter_mut().find(|h| h.id == id).map(|h| std::mem::take(&mut h.preview))?;
         let image = crate::filter_preview_ui::pane_image(app, ctx, &mut cache, id, fields, on);
@@ -649,6 +648,28 @@ mod tests {
         h.run_steps(3);
         assert!(h.state().ui.hosted(id).is_some(), "Reset keeps the dialog open");
         assert_eq!(h.state().ui.dialog_fields(id).unwrap()["radius"], 9.0);
+    }
+
+    /// Holding the Preview label compares in the dialog's pane only: the canvas preview follows the
+    /// check box, and `ui.dialog.set` of `__preview` turns the check box off.
+    #[test]
+    fn holding_compare_leaves_the_canvas_preview_on() {
+        let mut h = harness();
+        let id = open(&mut h, "filter.blur.gaussianBlur");
+        let canvas_preview = |h: &Harness<'static, PhotocraftApp>| h.state().ui.dialog_fields(id).unwrap().get("__preview").and_then(Value::as_bool);
+        assert_eq!(canvas_preview(&h), Some(true));
+        let at = h.get_by_label("Preview").rect().center();
+        h.hover_at(at);
+        h.run_steps(2);
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+        h.event(button(true));
+        h.run_steps(2);
+        assert!(h.state().ui.hosted_params(id).is_some_and(ParamDialog::comparing), "the pane compares");
+        assert_eq!(canvas_preview(&h), Some(true), "the canvas preview stays on while Compare is held");
+        h.event(button(false));
+        h.run_steps(2);
+        crate::dialogs::hosted::set_field(h.state_mut(), id, "__preview", json!(false)).unwrap();
+        assert_eq!(canvas_preview(&h), Some(false), "automation turns the check box off");
     }
 
     /// Rows 148, 151 and 152: Replace Color's sampled points are a list in the dialog's fields, the

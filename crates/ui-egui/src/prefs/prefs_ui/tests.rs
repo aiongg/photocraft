@@ -1980,8 +1980,9 @@ fn edit_dialogs_open() {
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.sync_views();
     let d = crate::menus::invoke(&mut app, &ctx, "edit.colorSettings", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialogs.iter().find(|x| x.id == d).unwrap().fields["workingRgb"], "srgb");
-    let note = app.ui.dialogs.iter().find(|x| x.id == d).unwrap().fields["__note"].as_str().unwrap().to_string();
+    let fields = app.ui.dialog_fields(d).unwrap();
+    assert_eq!(fields["workingRgb"], "srgb");
+    let note = fields["__note"].as_str().unwrap().to_string();
     assert!(note.starts_with("Monitor profile in use: sRGB") && note.contains("fallback"), "{note}");
     assert!(crate::menus::invoke(&mut app, &ctx, "edit.fade", json!({})).is_err());
     app.run("select.rect", json!({"x": 4, "y": 4, "width": 8, "height": 8})).unwrap();
