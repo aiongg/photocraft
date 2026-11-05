@@ -11,10 +11,6 @@ pub(crate) struct Runtime {
     /// The self-update behind the check dialog (desktop).
     #[cfg(not(target_arch = "wasm32"))]
     updater: craft::update::updater::Updater,
-    /// An install ran in an earlier frame: its end is waiting for the updater's restart signal.
-    install_seen: bool,
-    /// The install ended: ask the updater once for the close it owes.
-    finishing: bool,
 }
 
 impl Default for Runtime {
@@ -22,8 +18,6 @@ impl Default for Runtime {
         Self {
             startup_checked: false,
             notified_version: None,
-            install_seen: false,
-            finishing: false,
             #[cfg(not(target_arch = "wasm32"))]
             updater: craft::update::updater::Updater::new(&crate::UPDATE_APP, photocraft_engine::build_info::VERSION),
         }
@@ -93,11 +87,6 @@ fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
     use craft::update::stack_dialogs::UpdateCheckDialog;
     let rt = &mut app.updates_rt;
     rt.updater.tick(ctx);
-    if rt.updater.is_installing() {
-        rt.install_seen = true;
-    } else if std::mem::take(&mut rt.install_seen) {
-        rt.finishing = true;
-    }
     if !app.ui.updates_open {
         if app.ui.host.is_open::<UpdateCheckDialog>() {
             app.ui.host.cancel::<UpdateCheckDialog>(ctx);
@@ -120,7 +109,7 @@ fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let (installing, message) = (app.updates_rt.updater.is_installing(), app.updates_rt.updater.status_message());
     if let Some(dialog) = app.ui.host.get_mut::<UpdateCheckDialog>() {
         dialog.set_status(status);
-        dialog.set_available(available, true);
+        dialog.set_available(available);
         dialog.set_installing(installing);
         dialog.set_message(message);
     }
@@ -134,7 +123,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
         if let Some(result) = app.ui.host.take::<UpdateCheckDialog>() {
             match result {
-                DialogResult::Ok(CheckChoice::CheckAgain) => {
+                DialogResult::Ok(CheckChoice::CheckNow | CheckChoice::CheckAgain) => {
                     let _ = check(app, ctx, serde_json::json!({}));
                 }
                 // The window stays open and shows the progress; a refusal for unsaved work is
@@ -150,14 +139,15 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         crate::links::open(app, ctx, &url);
                     }
                 }
+                // Release Notes is answered inside the dialog.
                 _ => app.ui.updates_open = false,
             }
         }
         // The restart helper is scheduled before the app closes, so no update starts over unsaved
         // work: the close waits until the work is saved.
-        if app.updates_rt.finishing && !app.has_unsaved_work() {
-            app.updates_rt.finishing = false;
-            if app.updates_rt.updater.show_if(ctx, true) == craft::update::updater::Action::Close {
+        {
+            let can_close = !app.has_unsaved_work();
+            if app.updates_rt.updater.take_close(can_close) {
                 // The guarded close path asks about unsaved work and waits for saves; the restart
                 // helper relaunches once the process exits.
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -173,7 +163,7 @@ mod tests {
     use super::*;
     use crate::{Services, menus};
     #[cfg(not(target_arch = "wasm32"))]
-    use craft::update::stack_dialogs::UpdateCheckDialog;
+    use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
     use photocraft_engine::{Session, updates_cmds::Release};
     use std::sync::{Arc, Mutex, mpsc};
 
@@ -322,7 +312,7 @@ mod tests {
 
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
-    #[ignore = "gap BB: UpdateCheckDialog has no programmatic confirm, so Update and Restart cannot be answered without a pointer"]
+    #[ignore = "gap CX: on an install that cannot update itself the dialog offers Download only, so Update and Restart cannot be answered and the updater's refusal status is unreachable"]
     fn update_and_restart_on_an_unsupported_install_shows_the_updaters_status() {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
@@ -340,7 +330,9 @@ mod tests {
             output.textures_delta.clear();
         };
         frame(&mut app);
-        assert!(app.ui.host.confirm::<UpdateCheckDialog>(&ctx));
+        let id = app.ui.host.top_id().expect("the check dialog is open");
+        app.ui.host.get_mut::<UpdateCheckDialog>().unwrap().set_choice(CheckChoice::Update);
+        assert!(app.ui.host.confirm_by_id::<UpdateCheckDialog>(&ctx, id));
         frame(&mut app);
         frame(&mut app);
         assert!(app.ui.updates_open, "the dialog stays for the install's status");
