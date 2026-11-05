@@ -60,6 +60,8 @@ pub struct Hosted {
     pub table: Pending<Option<crate::color_table_ui::Action>>,
     /// The textures of the preview pane (filter dialogs).
     pub preview: crate::filter_preview_ui::PaneCache,
+    /// The library dialog remembers its values at OK (`ParamDialog::remember`), so the app does not.
+    pub remembers: bool,
 }
 
 /// `DialogHost` as a `UiState` field: not saved, and a clone starts empty (open dialogs belong to
@@ -317,6 +319,7 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
         documents: Vec::new(),
         table: Pending::default(),
         preview: Default::default(),
+        remembers: false,
     };
     app.ui.hosted.push(record);
     id
@@ -367,6 +370,9 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
     let mut fields = crate::filter_dialog::Wire::of(&record).json(answer);
     fields.extend(record.extra);
     fields.extend(record.private);
+    if record.remembers {
+        fields.insert(crate::filter_dialog::HOST_REMEMBERED.into(), Value::Bool(true));
+    }
     let dialog = crate::state::Dialog { id: record.id, kind: crate::state::DialogKind::Command, fields };
     crate::dialogs::confirm_generic_command(app, dialog)
 }
@@ -383,6 +389,7 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
         HostedKind::Form => app.ui.host.confirm_by_id::<CommandForm>(ctx, did),
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),
     };
+    crate::host_settings::sync(app, ctx);
     if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
     }

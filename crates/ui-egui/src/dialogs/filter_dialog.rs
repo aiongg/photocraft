@@ -367,9 +367,12 @@ fn restore_remembered(app: &PhotocraftApp, command: &str, spec: &str, fields: &m
     }
 }
 
+/// Marks fields of a dialog whose library `ParamDialog` already remembered them through the Host.
+pub(crate) const HOST_REMEMBERED: &str = "__hostRemembered";
+
 /// Remember successful built-in schema dialogs; failed or cancelled dialogs do not persist.
 pub(crate) fn remember(app: &mut PhotocraftApp, command: &str, fields: &Map<String, Value>) {
-    if !fields.contains_key("__filter") || fields.contains_key("__spec") || fields.contains_key("__smartFilter") {
+    if fields.contains_key(HOST_REMEMBERED) || !fields.contains_key("__filter") || fields.contains_key("__spec") || fields.contains_key("__smartFilter") {
         return;
     }
     let Some(spec) = photocraft_engine::commands::find(command) else { return };

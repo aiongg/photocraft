@@ -694,7 +694,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
     crate::filter_dialog::push_state(app, ctx);
+    crate::host_settings::sync(app, ctx);
     app.ui.host.show(ctx);
+    crate::host_settings::sync(app, ctx);
     hosted::collect(app);
     standard_prompts::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();

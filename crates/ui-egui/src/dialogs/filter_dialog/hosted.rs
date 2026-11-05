@@ -368,6 +368,14 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
     } else {
         params_for(command, spec, &map)
     };
+    // The library remembers what the app's JSON shape and `remember` keep the same way; Lens
+    // Blur's channel menu, the document menus, Select and Mask's Remember Settings, the bitmap
+    // dialog, plug-ins and smart filters keep the app's own `remember`.
+    let remembers = map.contains_key("__filter")
+        && !map.contains_key("__spec")
+        && !map.contains_key("__smartFilter")
+        && !matches!(command, super::LENS_BLUR | crate::select_mask_view::COMMAND | crate::bitmap_dialog::COMMAND)
+        && documents.is_empty();
     let record = Hosted {
         id: 0,
         kind: HostedKind::Params,
@@ -380,6 +388,7 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         documents,
         table: Pending::default(),
         preview: Default::default(),
+        remembers,
     };
     let wire = Wire::of(&record);
     let (mut values, extra) = wire.fields(&map);
@@ -394,6 +403,9 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         // The Preview check box sits in the bottom footer, as PhotoCraft's does.
         .preview(map.contains_key("__preview"))
         .layout(craft::ui::dialog::ParamLayout::BottomFooter);
+    if remembers {
+        dialog = dialog.remember(command);
+    }
     // Color Settings: the monitor profile in use, which the app pushes before each pass.
     if command == "edit.colorSettings" {
         dialog = dialog.below(|ui, fields| {
