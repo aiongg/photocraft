@@ -194,12 +194,12 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
         match p.kind {
             Kind::Range { min, max, default } => {
                 if command == "image.mode.indexedColor" && key == "colors" {
-                    out.push(LibParam::custom("colors", name, |ui, fields| color_count(ui, fields)));
+                    out.push(LibParam::custom("colors", name, |ui, fields, _| color_count(ui, fields)));
                     continue;
                 }
                 if command == super::RADIAL_BLUR && matches!(key.as_str(), "centerX" | "centerY") {
                     if key == "centerX" {
-                        out.push(LibParam::custom("centerX", "Center", |ui, fields| super::zoom_center::row(ui, fields)));
+                        out.push(LibParam::custom("centerX", "Center", |ui, fields, _| super::zoom_center::row(ui, fields)));
                     }
                     continue;
                 }
@@ -254,7 +254,7 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
                 let mut row = LibParam::new(key.as_str(), name, Lib::Text { default: String::new() });
                 // Install Plug-in…: pick the .wasm file instead of typing its path (#7531).
                 if command == "plugin.install" && key == "path" {
-                    row = row.browse(PathKind::OpenFile);
+                    row = row.browse(PathKind::open_file(&["wasm"]));
                 }
                 out.push(row);
             }
@@ -272,11 +272,11 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
         }
     }
     if command == REPLACE_COLOR {
-        out.push(LibParam::custom("result", "Result", |ui, fields| replace_color_result(ui, fields)));
+        out.push(LibParam::custom("result", "Result", |ui, fields, _| replace_color_result(ui, fields)));
     }
     // Color Settings: the monitor profile in use, which the app pushes before each pass.
     if command == "edit.colorSettings" {
-        out.push(LibParam::custom(NOTE, "", |ui, fields| {
+        out.push(LibParam::custom(NOTE, "", |ui, fields, _| {
             let t = craft::ui::theme::current(ui.ctx());
             use craft::ui::theme::ToEgui as _;
             let note = fields.text(NOTE).unwrap_or_default().to_owned();

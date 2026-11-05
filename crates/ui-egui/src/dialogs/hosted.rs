@@ -420,14 +420,12 @@ fn browse(app: &mut PhotocraftApp) {
     let Some((PathRequest { key: field, kind }, fields, key)) = pressed else { return };
     let current = fields.text(&field).unwrap_or_default().to_owned();
     let Some(id) = app.ui.hosted.iter().find(|h| h.key == key).map(|h| h.id) else { return };
-    let field_for_ext = field.clone();
     let fill = move |app: &mut PhotocraftApp, path: String| fill_path(app, id, &field, path);
     let result = match kind {
         PathKind::Folder => app.ask_folder(fill),
-        PathKind::OpenFile => {
+        PathKind::OpenFile { extensions } => {
             let initial_dir = crate::file_dialog::last_used_dir(&app.ui.recent_files);
-            // The library's path request carries no file types (gap S): Install Plug-in… takes `.wasm`.
-            let extensions = (key == "plugin.install" && field_for_ext == "path").then(|| vec!["wasm".to_string()]);
+            let extensions = (!extensions.is_empty()).then_some(extensions);
             let request = crate::file_dialog::FileDialogRequest::Open { multiple: false, initial_dir, extensions };
             app.ask_file(request, move |app, answer| match answer {
                 crate::file_dialog::FileDialogAnswer::Paths(mut paths) if !paths.is_empty() => fill(app, paths.remove(0)),
