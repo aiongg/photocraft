@@ -243,8 +243,6 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
         _ if crate::channel_options_ui::owns_new_spot(fields) => crate::channel_options_ui::new_spot_body(ui, fields),
         _ if crate::shape_dialog::owns(fields) => crate::shape_dialog::body(app, ui, fields),
         _ if crate::delete_layer_prompt::owns(fields) => crate::delete_layer_prompt::body(ui, fields),
-        _ if crate::disk_change_prompt::owns(fields) => crate::disk_change_prompt::body(ui, fields),
-        _ if crate::replace_prompt::owns(fields) => crate::replace_prompt::body(ui, fields),
         _ if crate::actions::owns_insert_stop(fields) => crate::actions::insert_stop_body(ui, fields),
         _ if crate::new_layer_ui::owns(fields) => crate::new_layer_ui::body(ui, fields),
         _ if crate::mask_trash_prompt::owns(fields) => crate::mask_trash_prompt::body(ui, fields),
@@ -406,8 +404,6 @@ fn ok_label(d: &Dialog) -> &'static str {
         tl!("Continue")
     } else if crate::delete_layer_prompt::owns(&d.fields) {
         tl!("Delete")
-    } else if crate::disk_change_prompt::owns(&d.fields) || crate::replace_prompt::owns(&d.fields) {
-        tl!("Replace")
     } else if d.fields.contains_key("__export") {
         tl!("Export")
     } else {
@@ -700,6 +696,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     crate::filter_dialog::push_state(app, ctx);
     app.ui.host.show(ctx);
     hosted::collect(app);
+    standard_prompts::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
     for id in app.ui.host.stack().ids().filter(|id| !legacy.contains(id)) {
         if let Some(rect) = ctx.memory(|m| m.area_rect(id)) {
@@ -817,7 +814,7 @@ pub fn is_route_marker(key: &str) -> bool {
 /// The file command a dialog's handler stands for when it reads or writes files itself, outside
 /// the engine (a disk-change save, Export As, Save for Web, Print), so automation is judged for
 /// that command rather than for the dialog's `__command`.
-fn file_command(fields: &Fields) -> Option<&'static str> {
+pub(crate) fn file_command(fields: &Fields) -> Option<&'static str> {
     if crate::disk_change_prompt::owns(fields) {
         Some("file.save")
     } else if fields.contains_key("__export") {
@@ -938,8 +935,6 @@ fn confirm_command(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> 
         _ if crate::channel_options_ui::owns_new_spot(&d.fields) => crate::channel_options_ui::confirm_new_spot(app, &d.fields),
         _ if crate::shape_dialog::owns(&d.fields) => crate::shape_dialog::confirm(app, &d.fields),
         _ if crate::delete_layer_prompt::owns(&d.fields) => crate::delete_layer_prompt::confirm(app, &d.fields),
-        _ if crate::disk_change_prompt::owns(&d.fields) => crate::disk_change_prompt::confirm(app, &d.fields),
-        _ if crate::replace_prompt::owns(&d.fields) => crate::replace_prompt::confirm(app),
         _ if crate::actions::owns_insert_stop(&d.fields) => crate::actions::insert_stop_confirm(app, &d.fields),
         _ if crate::new_layer_ui::owns(&d.fields) => crate::new_layer_ui::confirm(app, &d.fields),
         _ if crate::mask_trash_prompt::owns(&d.fields) => crate::mask_trash_prompt::confirm(app, &d.fields),
@@ -976,6 +971,9 @@ pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resu
     if app.ui.hosted(id).is_some() {
         return hosted::confirm(app, ctx, id);
     }
+    if app.ui.prompt(id).is_some() {
+        return standard_prompts::confirm(app, ctx, id);
+    }
     confirm_preflight(app, id)?;
     let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
     match d.kind {
@@ -1003,6 +1001,9 @@ pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 }
 
 pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
+    if app.ui.prompt(id).is_some() {
+        return standard_prompts::cancel(app, ctx, id);
+    }
     let Some(closed) = app.ui.close_dialog(id) else { return hosted::cancel(app, ctx, id) };
     crate::actions::stopped(app, &closed.fields);
     if crate::guide_layout_ui::owns(&closed.fields) {
@@ -1013,10 +1014,6 @@ pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resul
         crate::open_prompt::answer_damage(app, false)?;
     } else if crate::open_prompt::owns(&closed.fields) {
         crate::open_prompt::answer(app, None)?;
-    }
-    // Cancel on the question whether to replace a file writes nothing.
-    if crate::replace_prompt::owns(&closed.fields) {
-        crate::replace_prompt::cancel(app)?;
     }
     app.ui.dialogs.retain(|d| !crate::layer_style::color_picker::child_of(&d.fields, id));
     app.filter_preview = None;
@@ -1115,6 +1112,7 @@ pub mod smart_filter_dialog;
 pub mod snapshot_dialog;
 pub(crate) mod solid_fill_ui;
 pub mod stack_dialog;
+pub mod standard_prompts;
 pub mod stroke_ui;
 pub mod targa_options_ui;
 #[cfg(test)]

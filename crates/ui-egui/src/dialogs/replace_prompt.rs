@@ -4,15 +4,16 @@
 //! Preferences ▸ File Handling › Lowercase Extension is on. When a file exists under the changed
 //! name, Replace writes over it and Cancel ends the save like the save dialog's Cancel.
 //!
-//! The prompt is an ordinary dialog in the UI state: `ui.dialog.confirm` replaces the file and
-//! `ui.dialog.cancel` keeps it. The file dialog stays open until it is answered
+//! The prompt is a library [`StandardPrompt`] on the dialog host with a record in the UI state
+//! (`dialogs::standard_prompts`): `ui.dialog.confirm` replaces the file and `ui.dialog.cancel`
+//! keeps it. The file dialog stays open until it is answered
 //! ([`PhotocraftApp::file_dialog_open`]).
 
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::file_open::display_name;
-use crate::state::DialogKind;
+use craft::ui::dialog::StandardPrompt;
 
 const MARK: &str = "__replaceSaved";
 
@@ -26,13 +27,8 @@ pub(crate) fn open(app: &mut PhotocraftApp, answered: &str, path: &str) {
     let message = crate::i18n::fmt(tl!("“{name}” already exists. Replace it?"), &[("name", display_name(path).as_str())]);
     let detail = crate::i18n::fmt(tl!("The name in the save dialog was “{name}”."), &[("name", display_name(answered).as_str())]);
     let fields = json!({MARK: true, "__label": "Save", "message": message, "detail": detail, "path": path});
-    app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
-}
-
-pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {
-    ui.label(fields.get("message").and_then(Value::as_str).unwrap_or_default());
-    ui.add_space(craft::ui::theme::scale::Space::S6.px());
-    ui.label(fields.get("detail").and_then(Value::as_str).unwrap_or_default());
+    let prompt = StandardPrompt::replace_file(display_name(path), Some(display_name(answered)));
+    crate::standard_prompts::open(app, prompt, "Save", fields.as_object().cloned().unwrap_or_default());
 }
 
 /// Replace: the save the prompt held back.

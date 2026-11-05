@@ -2,14 +2,15 @@
 //! the document was opened from it or last saved to it (#6596). Replace writes the document over
 //! it anyway; Cancel leaves the file and the document as they are, and File › Save As keeps both.
 //!
-//! The prompt is an ordinary dialog in the UI state: `ui.dialog.confirm` replaces the file and
-//! `ui.dialog.cancel` keeps it. Recorded actions and automation saves don't ask.
+//! The prompt is a library [`StandardPrompt`] on the dialog host with a record in the UI state
+//! (`dialogs::standard_prompts`): `ui.dialog.confirm` replaces the file and `ui.dialog.cancel`
+//! keeps it. Recorded actions and automation saves don't ask.
 
 use photocraft_doc::DocId;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::DialogKind;
+use craft::ui::dialog::StandardPrompt;
 
 const MARK: &str = "__diskChanged";
 
@@ -24,7 +25,7 @@ pub(crate) fn intercept(app: &mut PhotocraftApp, doc: DocId, path: &str, flat: b
     if !app.changed_on_disk(doc, path) {
         return None;
     }
-    if app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
+    if app.ui.prompt_with(owns).is_some() {
         return Some(Ok(json!({"confirmationPending": true})));
     }
     let name = crate::file_open::display_name(path);
@@ -32,14 +33,11 @@ pub(crate) fn intercept(app: &mut PhotocraftApp, doc: DocId, path: &str, flat: b
     let mut fields = json!({MARK: true, "__label": "Save", "message": message, "document": doc.0, "path": path, "flat": flat});
     // A script's Targa, DDS or JPEG answer is kept for the save Replace writes.
     choices.record(&mut fields);
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let prompt = StandardPrompt::changed_on_disk(name);
+    let Some(id) = crate::standard_prompts::open(app, prompt, "Save", fields.as_object().cloned().unwrap_or_default()) else {
+        return Some(Ok(json!({"confirmationPending": true})));
+    };
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
-}
-
-pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {
-    ui.label(fields.get("message").and_then(Value::as_str).unwrap_or_default());
-    ui.add_space(craft::ui::theme::scale::Space::S6.px());
-    ui.label(tl!("Replace it with this document, or cancel and use File › Save As to keep both."));
 }
 
 /// Replace: the save the prompt held back.
