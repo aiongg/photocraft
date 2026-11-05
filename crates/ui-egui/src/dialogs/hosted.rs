@@ -141,13 +141,10 @@ impl crate::state::UiState {
         };
         fields.extend(record.extra.clone());
         fields.extend(record.private.clone());
-        // The Preview check box is the library's: it reads as the dialog shows it (on and not held
-        // to compare). `ui.dialog.set` of `__preview` false also turns it off: the library has no
-        // setter for the check box (gap L).
+        // The Preview check box is the library's; the hold to compare does not change it.
         if record.kind == HostedKind::Params && fields.contains_key("__preview") {
-            let wanted = record.private.get("__preview").and_then(Value::as_bool) != Some(false);
             let on = self.hosted_params(id).is_some_and(ParamDialog::preview_on);
-            fields.insert("__preview".into(), json!(on && wanted));
+            fields.insert("__preview".into(), json!(on));
         }
         Some(fields)
     }
@@ -204,6 +201,15 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
     let record = &mut app.ui.hosted[at];
     if field == crate::actions::RESUME {
         return Err("the paused action token is read-only".into());
+    }
+    if field == "__preview"
+        && record.kind == HostedKind::Params
+        && let Some(on) = value.as_bool()
+    {
+        let did = record.did;
+        record.private.insert(field.to_owned(), value);
+        app.ui.host.get_mut_by_id::<ParamDialog>(did).ok_or_else(|| format!("no dialog {id}"))?.set_preview(on);
+        return Ok(());
     }
     if field.starts_with("__") {
         if !record.private.contains_key(field) && crate::dialogs::is_route_marker(field) {
