@@ -17,7 +17,11 @@ impl PhotocraftApp {
         if gate.is_some() {
             self.session.authorize = gate;
         }
+        let started = (self.run_depth == 0).then(web_time::Instant::now);
         let result = self.run_command(id, params);
+        if let Some(started) = started {
+            self.ui.last_command_time = Some(started.elapsed());
+        }
         if gate.is_some() {
             self.session.authorize = None;
         }

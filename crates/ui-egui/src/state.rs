@@ -467,6 +467,9 @@ pub struct UiState {
     /// The status message is an error (shown in the warning colour).
     #[serde(default)]
     pub status_error: bool,
+    /// How long the last command run through `PhotocraftApp::run` took (the status bar's Timing).
+    #[serde(skip)]
+    pub last_command_time: Option<std::time::Duration>,
     /// Non-blocking notices (import/export warnings, files that couldn't open), newest last.
     #[serde(default)]
     pub notices: Vec<crate::notices::Notice>,
@@ -587,6 +590,7 @@ impl Default for UiState {
             next_id: 1,
             status: String::new(),
             status_error: false,
+            last_command_time: None,
             notices: Vec::new(),
             updates_open: false,
             gpu_fallback_notice: None,
