@@ -181,7 +181,7 @@ pub fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) 
                             ui.label(tl!("No patterns"));
                         } else {
                             // Photoshop shows the pattern itself and opens a grid of swatches.
-                            if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
+                            if let Some(id) = crate::preset_panels::pattern_picker(&app.session.patterns, ui, &pat) {
                                 f.insert("pattern".into(), json!(id));
                             }
                             let name = app.session.patterns.items.iter().find(|p| p.id == get_str(f, "pattern", "")).map(|p| p.display_name().to_string());

@@ -24,17 +24,15 @@ type LibParam = craft::ui::dialog::Param;
 /// - Indexed Color and Radial Blur: `Param::full_width` (149);
 /// - Color Settings: `ParamDialog::below` (150);
 /// - Color Table: the colour list (152);
-/// - Bitmap: its pattern picker reads the app (`preset_panels::pattern_picker` takes `&PhotocraftApp`);
 /// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (rechecked in 3b);
 /// - Warp Text and Arbitrary Rotation: live preview reads the legacy Vec until 3b.
 pub(crate) fn hosts(command: &str, spec: &str) -> bool {
-    const LEGACY: [&str; 8] = [
+    const LEGACY: [&str; 7] = [
         REPLACE_COLOR,
         "image.mode.indexedColor",
         super::RADIAL_BLUR,
         "edit.colorSettings",
         "image.mode.colorTable",
-        crate::bitmap_dialog::COMMAND,
         "type.warpText",
         "image.rotation.arbitrary",
     ];
@@ -352,7 +350,12 @@ pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec:
 }
 
 fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Map<String, Value>) -> u64 {
-    let (params, documents) = params_for(command, spec, &map);
+    let (params, documents) = if command == crate::bitmap_dialog::COMMAND {
+        let input = map.get("__inputResolution").and_then(Value::as_f64).unwrap_or(72.0) as f32;
+        (crate::bitmap_dialog::params(std::sync::Arc::new(app.session.patterns.clone()), input), Vec::new())
+    } else {
+        params_for(command, spec, &map)
+    };
     let record = Hosted {
         id: 0,
         kind: HostedKind::Params,
@@ -366,7 +369,10 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         table: Pending::default(),
     };
     let wire = Wire::of(&record);
-    let (values, extra) = wire.fields(&map);
+    let (mut values, extra) = wire.fields(&map);
+    if command == crate::bitmap_dialog::COMMAND {
+        crate::bitmap_dialog::view_state(&mut values);
+    }
     let mut dialog = ParamDialog::new(command, crate::dialogs::display_label(label), params)
         .values(values)
         // Cmd/Ctrl+Z steps the dialog's own settings (#4697), and the close box follows the platform.

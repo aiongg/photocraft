@@ -353,13 +353,7 @@ fn filter_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, fields: &mut Fields, 
     if fields.get("__command").and_then(Value::as_str) == Some("edit.colorSettings") {
         fields.insert("__note".into(), Value::String(crate::monitor_status::note(app)));
     }
-    let body = |ui: &mut egui::Ui, fields: &mut serde_json::Map<String, Value>| {
-        if crate::bitmap_dialog::owns(fields) {
-            crate::bitmap_dialog::body(app, ui, fields);
-        } else {
-            crate::filter_dialog::body(ui, fields);
-        }
-    };
+    let body = |ui: &mut egui::Ui, fields: &mut serde_json::Map<String, Value>| crate::filter_dialog::body(ui, fields);
     // Select and Mask leaves the keyboard to its view keys (F, X, O, V…); a dialog that opens on
     // an angle dial gets its focus from the host.
     if crate::select_mask_view::owns(fields) || crate::filter_dialog::opens_on_angle_dial(fields) {
