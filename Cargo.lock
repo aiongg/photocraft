@@ -5494,7 +5494,6 @@ dependencies = [
  "photocraft-raster",
  "photocraft-tablet",
  "photocraft-ui-egui",
- "rfd",
  "ron",
  "serde",
  "serde_json",

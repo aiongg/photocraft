@@ -17,6 +17,10 @@ struct State {
     /// Answers handed out as picks arrive (`None`: the user cancels). `None` as a whole: picks stay
     /// open until [`ScriptedFiles::answer`].
     script: Option<VecDeque<Option<Picked>>>,
+    /// A pick is a test failure: the flow under test must not show a picker.
+    refuse: Option<String>,
+    /// A Save is answered with the suggested name; every other pick is cancelled.
+    save_suggested: bool,
 }
 
 /// Answers each pick with the next of a script, or keeps it open until the test answers it, and
@@ -37,6 +41,20 @@ impl ScriptedFiles {
         Arc::new(files)
     }
 
+    /// Every Save is answered with the suggested name (in the suggested folder); other picks are cancelled.
+    pub fn saving_suggested() -> Option<Arc<dyn Files>> {
+        let files = Self::default();
+        files.state().save_suggested = true;
+        Arc::new(files).service()
+    }
+
+    /// Any pick fails the test with `why`.
+    pub fn refusing(why: &str) -> Option<Arc<dyn Files>> {
+        let files = Self::default();
+        files.state().refuse = Some(why.to_owned());
+        Arc::new(files).service()
+    }
+
     /// For `Services::files`.
     pub fn service(self: &Arc<Self>) -> Option<Arc<dyn Files>> {
         Some(Arc::clone(self) as Arc<dyn Files>)
@@ -49,6 +67,11 @@ impl ScriptedFiles {
     /// Every request asked so far, in order.
     pub fn requests(&self) -> Vec<PickRequest> {
         self.state().asked.clone()
+    }
+
+    /// The kind of each request asked so far, in order.
+    pub fn kinds(&self) -> Vec<craft::host::PickKind> {
+        self.state().asked.iter().map(|r| r.kind).collect()
     }
 
     /// How many picks the user is still in.
@@ -67,9 +90,23 @@ impl ScriptedFiles {
 impl Files for ScriptedFiles {
     fn pick(&self, request: PickRequest) -> PickId {
         let mut state = self.state();
+        if let Some(why) = &state.refuse {
+            panic!("{why}");
+        }
         state.next += 1;
         let id = PickId(state.next);
+        let picked = (state.save_suggested).then(|| match request.kind {
+            craft::host::PickKind::Save => {
+                let name = PathBuf::from(request.file_name.clone().unwrap_or_default());
+                Picked::Paths(vec![request.directory.as_ref().map_or(name.clone(), |d| d.join(&name))])
+            }
+            _ => Picked::Cancelled,
+        });
         state.asked.push(request);
+        if let Some(picked) = picked {
+            state.answered.push((id, picked));
+            return id;
+        }
         let at = state.asked.len() - 1;
         match state.script.as_mut() {
             Some(script) => {
@@ -108,4 +145,35 @@ impl Files for ScriptedFiles {
     fn last_folder(&self, _purpose: &str) -> Option<PathBuf> {
         None
     }
+}
+
+/// A pick answered with these paths.
+pub fn paths<P: Into<PathBuf>>(paths: impl IntoIterator<Item = P>) -> Picked {
+    Picked::Paths(paths.into_iter().map(Into::into).collect())
+}
+
+/// A pick answered with the path to save to.
+pub fn save_to(path: impl Into<PathBuf>) -> Picked {
+    Picked::Paths(vec![path.into()])
+}
+
+/// A pick answered with a folder.
+pub fn folder(path: impl Into<PathBuf>) -> Picked {
+    save_to(path)
+}
+
+/// A pick answered with one file's name and bytes, as the web's picker does.
+pub fn contents(name: impl Into<String>, bytes: Vec<u8>) -> Picked {
+    Picked::Contents(vec![(name.into(), bytes)])
+}
+
+/// A pick answered with several files' names and bytes.
+pub fn contents_many(files: Vec<(String, Vec<u8>)>) -> Picked {
+    Picked::Contents(files)
+}
+
+/// A service answering each pick with the next of `answers`, and the handle that lists the requests.
+pub fn fake(answers: Vec<Option<Picked>>) -> (Option<Arc<dyn Files>>, Arc<ScriptedFiles>) {
+    let files = ScriptedFiles::answering(answers);
+    (files.service(), files)
 }

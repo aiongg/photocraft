@@ -6,15 +6,15 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use craft::host::{FileError, Files, PickId, PickKind, PickRequest, Picked};
 use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_doc::Document;
 use photocraft_ui_egui::i18n;
 use photocraft_ui_egui::served_fonts;
 use photocraft_ui_egui::theme::ThemeKind;
 use photocraft_ui_egui::{PhotocraftApp, Services};
-use craft::host::{FileError, Files, PickId, PickKind, PickRequest, Picked};
-use wasm_bindgen::JsCast as _;
 use std::path::{Path, PathBuf};
+use wasm_bindgen::JsCast as _;
 
 type Inbox = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 

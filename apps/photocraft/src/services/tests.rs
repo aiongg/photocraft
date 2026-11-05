@@ -1,68 +1,10 @@
 use super::*;
+use craft::host::PickKind;
 use photocraft_engine::Session;
 use photocraft_format::list_recovery;
+use photocraft_ui_egui::file_picks::filters::{OPEN_EXTS, OPEN_FILTERS, SAVE_FILTERS, netpbm_as_pnm, save_filters};
 use photocraft_ui_egui::{PhotocraftApp, prefs_ui};
 use serde_json::{Value, json};
-
-/// #6601: a chosen path whose name isn't valid Unicode is reported, never handed on lossily
-/// (Open would fail with "No such file", Save would write a second, renamed file).
-#[test]
-fn a_chosen_path_that_is_not_valid_unicode_is_an_error_not_another_name() {
-    #[cfg(unix)]
-    let bad = {
-        use std::os::unix::ffi::OsStrExt;
-        std::env::temp_dir().join(std::ffi::OsStr::from_bytes(b"img\xFF.png"))
-    };
-    #[cfg(windows)]
-    let bad = {
-        use std::os::windows::ffi::OsStringExt;
-        let mut wide: Vec<u16> = "img".encode_utf16().collect();
-        wide.push(0xD800);
-        wide.extend(".png".encode_utf16());
-        std::env::temp_dir().join(std::ffi::OsString::from_wide(&wide))
-    };
-    let good = std::env::temp_dir().join("ok.png");
-    let save = |path: &Path| answer_one(path, true, FileDialogAnswer::SaveTo);
-    assert!(matches!(save(&bad), FileDialogAnswer::Unavailable(e) if e.contains("not valid Unicode") && e.contains("another name")));
-    assert!(matches!(save(&good), FileDialogAnswer::SaveTo(p) if p == good.to_str().unwrap()));
-    let open = answer([good.as_path(), bad.as_path()], false, FileDialogAnswer::Paths);
-    assert!(matches!(open, FileDialogAnswer::Unavailable(e) if e.contains("open it again")));
-}
-
-/// #6121: the file type picked in the save dialog gives the name its extension where the
-/// dialog left the one it opened with, and only there.
-#[test]
-fn the_picked_file_type_gives_the_name_its_extension() {
-    let exts = |e: &[&str]| e.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    let (png, psd) = (exts(&["png"]), exts(&["psd", "psb"]));
-    let opened = Some("Untitled-1.psd");
-    let cases = [
-        // PNG picked, the name as the dialog opened (or renamed, its extension kept).
-        ("/pics/Untitled-1.psd", opened, &png, "/pics/Untitled-1.png"),
-        ("/pics/art.psd", opened, &png, "/pics/art.png"),
-        ("/pics/ART.PSD", opened, &png, "/pics/ART.png"),
-        // No extension: the type's. One PhotoCraft doesn't save is part of the name.
-        ("/pics/art", opened, &png, "/pics/art.png"),
-        ("/pics/scan.2024", opened, &png, "/pics/scan.2024.png"),
-        // Typed, an extension PhotoCraft saves is the user's: kept, whatever the type says
-        // (the PSD type untouched, or PNG picked and .jpg typed).
-        ("/pics/art.png", opened, &psd, "/pics/art.png"),
-        ("/pics/art.jpg", opened, &png, "/pics/art.jpg"),
-        ("/pics/art.pcraft", opened, &png, "/pics/art.pcraft"),
-        // Already the type's: kept, including its other extensions.
-        ("/pics/art.png", opened, &png, "/pics/art.png"),
-        ("/pics/art.PNG", opened, &png, "/pics/art.PNG"),
-        ("/pics/big.psb", opened, &psd, "/pics/big.psb"),
-        // The dialog opened on a .pcraft: that is the extension the type replaces.
-        ("/pics/art.pcraft", Some("art.pcraft"), &png, "/pics/art.png"),
-        ("/pics/art.psd", Some("art.pcraft"), &png, "/pics/art.psd"),
-    ];
-    for (typed, opened, chosen, want) in cases {
-        assert_eq!(with_chosen_type(Path::new(typed), opened, chosen), PathBuf::from(want), "{typed} (opened {opened:?})");
-    }
-    // No type picked: the name as typed.
-    assert_eq!(with_chosen_type(Path::new("/pics/art.psd"), opened, &[]), PathBuf::from("/pics/art.psd"));
-}
 
 /// Regression using the real clipboard on an isolated Windows CI runner.
 #[cfg(target_os = "windows")]
@@ -113,74 +55,7 @@ fn busy_native_clipboard_preserves_copied_shape() {
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-#[test]
-fn open_filters_cover_uppercase_and_mixed_case_extensions() {
-    // Matches `text` against a glob of literals and `[..]` classes, as the portal would after `*.`.
-    fn matches(glob: &str, text: &str) -> bool {
-        let mut text = text.chars();
-        let mut glob = glob.chars();
-        while let Some(g) = glob.next() {
-            let class: String = if g == '[' { glob.by_ref().take_while(|&c| c != ']').collect() } else { g.to_string() };
-            if !text.next().is_some_and(|t| class.contains(t)) {
-                return false;
-            }
-        }
-        text.next().is_none()
-    }
-    assert_eq!(open_filter_extensions(&["cr2", "pcraft"]), ["[cC][rR]2", "[pP][cC][rR][aA][fF][tT]"]);
-    let globs = open_filter_extensions(OPEN_EXTS);
-    assert_eq!(globs.len(), OPEN_EXTS.len());
-    for (ext, glob) in OPEN_EXTS.iter().zip(&globs) {
-        // Every casing: lower, UPPER, and alternating both ways (JpG, jPg).
-        let alternating = |upper_first: bool| -> String {
-            ext.chars().enumerate().map(|(i, c)| if (i % 2 == 0) == upper_first { c.to_ascii_uppercase() } else { c }).collect()
-        };
-        for name in [ext.to_string(), ext.to_ascii_uppercase(), alternating(true), alternating(false)] {
-            assert!(matches(glob, &name), "{glob} should match .{name}");
-        }
-        assert!(!matches(glob, &format!("{ext}x")) && !matches(glob, &ext[..ext.len() - 1]), "{glob} matches only .{ext}");
-    }
-    assert!(!globs.iter().any(|glob| matches(glob, "txt")));
-    let svg_filter = open_filters().into_iter().find(|(name, _)| *name == "SVG").map(|(_, exts)| exts).unwrap_or_default();
-    assert_eq!(svg_filter, open_filter_extensions(SVG_EXTS));
-    let psd_filter = open_filters().into_iter().find(|(name, _)| *name == "Photoshop").map(|(_, exts)| exts).unwrap_or_default();
-    assert_eq!(psd_filter, open_filter_extensions(&["psd", "psb", "psdt"]));
-    assert!(psd_filter.iter().any(|glob| matches(glob, "psd")) && psd_filter.iter().any(|glob| matches(glob, "PSD")));
-    assert!(svg_filter.iter().any(|glob| matches(glob, "svg")) && svg_filter.iter().any(|glob| matches(glob, "svgz")));
-}
-
-/// #6337: after All Formats, every format File › Open reads has its own filter, and no filter
-/// offers an extension All Formats doesn't.
-#[test]
-fn every_open_format_has_its_own_filter() {
-    let filters = open_filters();
-    assert_eq!(filters[0], ("All Formats", open_filter_extensions(OPEN_EXTS)), "All Formats comes first");
-    let mut named: Vec<&str> = OPEN_FILTERS.iter().flat_map(|(_, exts)| exts.iter().copied()).collect();
-    let total = named.len();
-    named.sort_unstable();
-    named.dedup();
-    assert_eq!(named.len(), total, "an extension is listed under two filters");
-    let mut all = OPEN_EXTS.to_vec();
-    all.sort_unstable();
-    assert_eq!(named, all, "the named filters cover All Formats exactly");
-    let names: Vec<&str> = filters.iter().map(|(name, _)| *name).collect();
-    for name in ["Photoshop", "Affinity", "HEIF", "PNG", "JPEG", "TIFF", "Portable Bitmap", "OpenEXR", "Radiance HDR", "Paint.NET"] {
-        assert!(names.contains(&name), "{name}");
-    }
-}
-
 #[cfg(not(all(unix, not(target_os = "macos"))))]
-#[test]
-fn open_filters_keep_literal_extensions_on_windows_and_macos() {
-    assert_eq!(open_filter_extensions(OPEN_EXTS), OPEN_EXTS);
-    assert_eq!(open_filter_extensions(&["pcraft"]), ["pcraft"]);
-    assert_eq!(open_filters().into_iter().find(|(name, _)| *name == "SVG").map(|(_, exts)| exts), Some(vec!["svg".to_string(), "svgz".to_string()]));
-    assert_eq!(
-        open_filters().into_iter().find(|(name, _)| *name == "Photoshop").map(|(_, exts)| exts),
-        Some(vec!["psd".to_string(), "psb".to_string(), "psdt".to_string()])
-    );
-}
-
 #[test]
 fn native_services_provide_update_transport() {
     assert!(native(None).check_updates.is_some());
@@ -207,18 +82,9 @@ fn xwayland_command_matches_how_photocraft_was_installed() {
 /// in the save panel, or the panel appends the first type's extension (`photo.webp.psd`, `photo.gif.psd`).
 #[test]
 fn every_save_dialog_leads_with_its_own_extension() {
-    let asked: Rc<RefCell<Vec<String>>> = Rc::default();
-    let log = asked.clone();
-    // Record each save dialog's suggested name and cancel it, as the user would.
-    let services = Services {
-        file_dialog: Some(Box::new(move |request, _parent, reply| {
-            if let FileDialogRequest::Save { suggested } = request {
-                log.borrow_mut().push(suggested);
-            }
-            reply.send(None);
-        })),
-        ..Default::default()
-    };
+    // Every save dialog is answered with Cancel, as the user would; the requests are kept.
+    let files = photocraft_ui_egui::file_picks::scripted::ScriptedFiles::answering(Vec::new());
+    let services = Services { files: files.service(), ..Default::default() };
     let mut app = PhotocraftApp::new(Session::new(), services);
     let ctx = egui::Context::default();
     // Dialogs are shown on the next frame: poll once so each is answered before the next asks.
@@ -261,8 +127,8 @@ fn every_save_dialog_leads_with_its_own_extension() {
     app.run("image.analysis.recordMeasurements", json!({})).unwrap();
     let _ = invoke(&mut app, "measurementLog.export");
     dialog(&mut app, "edit.presets.exportImportPresets", json!({"action": "export"}));
-    let asked = asked.borrow();
-    let exts: Vec<&str> = asked.iter().filter_map(|s| s.rsplit_once('.').map(|(_, e)| e)).collect();
+    let asked: Vec<_> = files.requests().into_iter().filter(|r| r.kind == PickKind::Save).collect();
+    let exts: Vec<&str> = asked.iter().filter_map(|r| r.file_name.as_deref().and_then(|s| s.rsplit_once('.')).map(|(_, e)| e)).collect();
     // The extension each save above should suggest, in order.
     let want = [
         "psd",                            // Save As untitled
@@ -275,9 +141,9 @@ fn every_save_dialog_leads_with_its_own_extension() {
     ]
     .join(" ");
     assert_eq!(exts, want.split(' ').collect::<Vec<_>>());
-    for (name, ext) in asked.iter().zip(exts) {
+    for (request, ext) in asked.iter().zip(exts) {
         // The first type's first extension is the one Windows adds to the bare name.
-        assert_eq!(save_filters(name)[0].1.first().map(String::as_str), Some(ext), "{name}: {:?}", save_filters(name)[0]);
+        assert_eq!(request.filters[0].extensions.first().map(String::as_str), Some(ext), "{:?}: {:?}", request.file_name, request.filters[0]);
     }
     assert_eq!(save_filters("Untitled")[0].0, "PSD Document", "no extension keeps the default");
 }
@@ -337,77 +203,6 @@ fn save_as_offers_only_writable_formats_including_ico() {
     assert!(hdr.bytes.starts_with(b"#?RADIANCE"), "a Radiance header");
     let err = photocraft_io::export(&doc(300), "icon.ico", &opts).map(|_| ()).unwrap_err().to_string();
     assert!(err.contains("256"), "{err}");
-}
-
-/// #4394: with File name extensions shown, Windows kept `image.psd` when the type was changed to
-/// PhotoCraft. Given the bare `image`, it adds the extension of whichever type is picked
-/// (checked by hand with rfd 0.17.2 on Windows 11), defaulting to the first type's.
-#[test]
-fn the_windows_save_dialog_gets_a_bare_name_so_the_type_picks_the_extension() {
-    for (suggested, name, first) in [
-        ("/pics/image.psd", "image", "psd"),
-        ("/pics/image.psb", "image", "psb"),
-        ("/pics/image.pcraft", "image", "pcraft"),
-        ("/pics/sky.fit", "sky", "fit"),
-        ("cat.jpeg", "cat", "jpeg"),
-        ("swatches.aco", "swatches", "aco"),
-    ] {
-        assert_eq!(dialog_file_name(suggested, true).as_deref(), Some(name), "{suggested}");
-        assert_eq!(save_filters(suggested)[0].1[0], first, "{suggested}");
-        // Elsewhere the dialogs keep the whole name (see `dialog_file_name`).
-        let whole = Path::new(suggested).file_name().unwrap().to_string_lossy().into_owned();
-        assert_eq!(dialog_file_name(suggested, false), Some(whole), "{suggested}");
-    }
-    // Kept whole: a second dot (Windows could keep `scan.jpg`), the user's upper case, no
-    // extension, and a dotfile.
-    for name in ["scan.jpg.psd", "my.photo.psd", "transparent.PNG", "Untitled", ".psd"] {
-        assert_eq!(dialog_file_name(name, true).as_deref(), Some(name));
-    }
-    assert_eq!(dialog_file_name("", true), None);
-}
-
-/// A name in another letter case reaches the same file where the file system ignores case
-/// (Windows, and macOS by default), and only there. Two files with the same contents are two.
-#[test]
-fn same_file_follows_the_file_system() {
-    let dir = std::env::temp_dir().join(format!("photocraft-same-file-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let (cat, dog, upper) = (dir.join("CAT.psd"), dir.join("dog.psd"), dir.join("CAT.PSD"));
-    std::fs::write(&cat, b"same").unwrap();
-    std::fs::write(&dog, b"same").unwrap();
-    assert!(same_file(&cat, &cat));
-    assert!(!same_file(&cat, &dog));
-    assert_eq!(same_file(&upper, &cat), upper.exists(), "the same file only where letter case is ignored");
-    assert!(!same_file(&dir.join("missing.psd"), &cat));
-    std::fs::remove_dir_all(&dir).unwrap();
-}
-
-/// A hard link is another entry in the folder, though it reaches the same file: a save to it
-/// replaces that entry and leaves the other name on the old file. Another spelling of a name,
-/// where letter case is ignored, is the same entry.
-#[test]
-fn a_hard_link_is_another_entry() {
-    let dir = std::env::temp_dir().join(format!("photocraft-same-entry-{}", std::process::id()));
-    std::fs::create_dir_all(dir.join("other")).unwrap();
-    let (cat, bare, upper, other) = (dir.join("CAT.psd"), dir.join("CAT"), dir.join("CAT.PSD"), dir.join("other").join("CAT.psd"));
-    std::fs::write(&cat, b"cat").unwrap();
-    std::fs::hard_link(&cat, &bare).unwrap();
-    std::fs::hard_link(&cat, &other).unwrap();
-    // Where both names reach one file (one inode on Unix), the folder still lists both.
-    let one_file = |_: &Path, _: &Path| true;
-    assert!(!same_entry(&bare, &cat, one_file));
-    assert!(!same_entry(&bare, &cat, same_file));
-    assert!(!same_entry(&other, &cat, same_file), "another folder");
-    assert!(same_entry(&cat, &cat, one_file));
-    assert!(same_entry(&cat, &cat, same_file));
-    if upper.exists() {
-        assert!(same_entry(&upper, &cat, same_file), "one entry where letter case is ignored");
-    } else {
-        std::fs::hard_link(&cat, &upper).unwrap();
-        assert!(!same_entry(&upper, &cat, same_file), "two entries where letter case tells names apart");
-    }
-    assert!(!same_entry(&dir.join("missing.psd"), &cat, same_file));
-    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]

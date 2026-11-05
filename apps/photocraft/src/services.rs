@@ -7,7 +7,6 @@ use photocraft_ui_egui::{Recoverable, Services};
 use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 

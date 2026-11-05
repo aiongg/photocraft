@@ -434,7 +434,7 @@ fn save_for_web_authorizes_before_opening_a_picker() {
                 app.ui.dialog_mut(id).unwrap().fields.insert("path".into(), json!("denied.png"));
             }
             app.services.automation_authorize = Some(deny);
-            app.services.file_dialog = Some(Box::new(|_, _, _| panic!("denied export must not show a picker")));
+            app.services.files = crate::file_picks::scripted::ScriptedFiles::refusing("denied export must not show a picker");
             app.services.write = Some(Box::new(|_, _| panic!("denied export must not write")));
             let error = if synthetic_input {
                 app.automation_input = true;
@@ -468,7 +468,7 @@ fn save_for_web_authorizes_generated_palette_before_opening_a_picker() {
         } else {
             app.session.authorize = Some(deny_palette);
         }
-        app.services.file_dialog = Some(Box::new(|_, _, _| panic!("denied palette must not show a picker")));
+        app.services.files = crate::file_picks::scripted::ScriptedFiles::refusing("denied palette must not show a picker");
         app.services.write = Some(Box::new(|_, _| panic!("denied palette must not write")));
         assert_eq!(crate::dialogs::confirm(&mut app, id).unwrap_err(), "palette denied");
         assert!(!app.file_dialog_open());
@@ -657,13 +657,12 @@ fn print_dialog_opens_with_the_settings_remembered_from_an_earlier_session() {
 /// document's name as a PDF) rather than needing a typed path.
 #[test]
 fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
-    use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
     use egui_kittest::{Harness, kittest::Queryable};
     let out = std::env::temp_dir().join(format!("pc-printui-browse-{}", std::process::id())).to_string_lossy().into_owned();
-    let (show, asked) = crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo(out.clone()))]);
+    let (show, asked) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to(format!("{out}.pdf")))]);
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 960.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() });
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: show, ..Default::default() });
         app.session.printer_source =
             Some(Arc::new(|| vec![craft::print::Printer { name: "Test printer".into(), default: true, two_sided: None, description: String::new() }]));
         app
@@ -673,8 +672,11 @@ fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
     h.run_steps(3);
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert!(matches!(asked.borrow().as_slice(), [FileDialogRequest::Save { suggested }] if suggested.ends_with("poster.pdf")), "{:?}", asked.borrow());
-    // A name chosen without an extension gets the suggested one.
+    assert!(
+        matches!(asked.requests().as_slice(), [r] if r.kind == craft::host::PickKind::Save && r.file_name.as_deref() == Some("poster.pdf")),
+        "{:?}",
+        asked.requests()
+    );
     assert_eq!(h.state_mut().ui.dialog_mut(id).unwrap().fields["output"], json!(format!("{out}.pdf")));
 }
 

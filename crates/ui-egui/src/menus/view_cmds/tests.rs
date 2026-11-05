@@ -21,7 +21,7 @@ fn place_embedded_enablement_does_not_require_native_doc() {
         for has_picker in [true, false] {
             let (mut app, _) = app_with(usize::from(has_doc));
             if has_picker {
-                app.services.file_dialog = Some(Box::new(|_, _, _| {}));
+                app.services.files = crate::file_picks::scripted::ScriptedFiles::held().service();
             }
             for native_filesystem in [false, true] {
                 let native_doc = native_filesystem && has_doc;
@@ -518,7 +518,7 @@ fn load_selection_without_alpha_channels_offers_the_composite() {
 #[test]
 fn video_menu_commands_open_pickers_and_dialogs() {
     let (mut app, ctx) = app_with(1);
-    app.services.file_dialog = Some(Box::new(|_, _, _| {}));
+    app.services.files = crate::file_picks::scripted::ScriptedFiles::held().service();
 
     for id in ["layer.videoLayers.newVideoLayerFromFile", "layer.videoLayers.replaceFootage"] {
         assert!(is_live(id), "{id}");

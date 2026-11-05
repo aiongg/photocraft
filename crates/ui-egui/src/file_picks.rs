@@ -89,11 +89,7 @@ impl PhotocraftApp {
     /// Queue a pick; `then` continues with the user's choice on a later frame (see the module
     /// docs). Returns at once with `{"fileDialog": "open" | "folder" | "save"}`; `Err` without a
     /// file service ("cancelled") or while a dialog is open.
-    pub(crate) fn ask_file(
-        &mut self,
-        request: PickRequest,
-        then: impl FnOnce(&mut Self, Picked) -> Result<Value, String> + 'static,
-    ) -> Result<Value, String> {
+    pub(crate) fn ask_file(&mut self, request: PickRequest, then: impl FnOnce(&mut Self, Picked) -> Result<Value, String> + 'static) -> Result<Value, String> {
         let Some(files) = self.services.files.clone() else { return Err(CANCELLED.into()) };
         if self.file_dialog.is_some() {
             return Err("a file dialog is already open".into());

@@ -106,8 +106,8 @@ fn save_copy_and_export_keep_the_editable_document_identity() {
     let before = identity(&app);
     app.write_document("copy.psd".into(), &ExportSettings::default(), true).unwrap();
     assert_eq!(identity(&app), before);
-    let (dialog, _) = crate::file_dialog::fake(vec![Some(crate::file_dialog::FileDialogAnswer::SaveTo("export.png".into()))]);
-    app.services.file_dialog = Some(dialog);
+    let (dialog, _) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to("export.png"))]);
+    app.services.files = dialog;
     let ctx = egui::Context::default();
     crate::export_dialog::confirm(&mut app, json!({"format": "png", "scale": 100}).as_object().unwrap()).unwrap();
     app.poll_file_dialog(&ctx, None);
@@ -118,8 +118,8 @@ fn save_copy_and_export_keep_the_editable_document_identity() {
 #[test]
 fn web_download_and_automation_saves_use_the_same_identity_completion() {
     let mut app = app();
-    let (dialog, _) = crate::file_dialog::fake(vec![Some(crate::file_dialog::FileDialogAnswer::SaveTo("Untitled-1.psd".into()))]);
-    app.services.file_dialog = Some(dialog);
+    let (dialog, _) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to("Untitled-1.psd"))]);
+    app.services.files = dialog;
     app.save_as(None).unwrap();
     app.poll_file_dialog(&egui::Context::default(), None);
     assert_eq!(app.session.active().unwrap().doc.name, "Untitled-1.psd");
