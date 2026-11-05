@@ -161,17 +161,6 @@ fn resample_preference_dialog_resizes_on_ok() {
     assert_eq!(app.session.active().unwrap().doc.size, photocraft_doc::Size::new(50, 25));
 }
 
-#[test]
-#[ignore = "expectation overtaken by library row 162: ui.dialog.set now reaches the size dialogs' setters"]
-fn a_script_cannot_set_size_dialog_values() {
-    let mut app = app_with(200, 100, 72);
-    let id = open(&mut app, "image.canvasSize").unwrap();
-    assert!(crate::dialogs::hosted::set_field(&mut app, id, "width", json!(300)).is_err());
-    crate::dialogs::cancel(&mut app, id).unwrap();
-    assert!(app.ui.hosted(id).is_none() && !app.ui.host.is_open::<CanvasSizeDialog>());
-    assert_eq!(app.session.active().unwrap().doc.size.width, 200);
-}
-
 /// Lanczos is the library's last method and reaches the command by the name it takes.
 #[test]
 fn lanczos_maps_to_the_command_name() {
