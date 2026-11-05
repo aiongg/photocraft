@@ -21,7 +21,7 @@ fn harness() -> Option<(Harness, Writes)> {
                 PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
                 let services = Services {
                     // Save dialogs answer with the suggested name.
-                    files: photocraft_ui_egui::file_picks::scripted::ScriptedFiles::saving_suggested(),
+                    files: Some(std::sync::Arc::new(photocraft_ui_egui::file_picks::scripted::ScriptedFiles::new().saving_suggested())),
                     export: Some(Box::new(|doc, path, settings| {
                         let opts = photocraft_io::ExportOptions {
                             xmp: if settings.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None },

@@ -169,7 +169,7 @@ fn source_files_list_is_built_with_browse_remove_sort_and_open_files() {
 
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert_eq!(asked.kinds()[0], craft::host::PickKind::OpenMany, "{:?}", asked.requests());
+    assert_eq!(crate::file_picks::scripted::kinds(&asked)[0], craft::host::PickKind::OpenMany, "{:?}", asked.requests());
     assert_eq!(listed(&h), ["b.png", "c.png"]);
     assert!(h.get_by_label("b.png").rect().bottom() <= h.get_by_label("c.png").rect().top(), "source files must be vertical rows");
     h.get_by_label("Browse…").click();
@@ -217,7 +217,7 @@ fn a_folder_loads_its_images() {
     assert!(h.get_by_label("Remove").accesskit_node().is_disabled() && h.get_by_label("Add Open Files").accesskit_node().is_disabled());
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert_eq!(asked.kinds()[0], craft::host::PickKind::Folder);
+    assert_eq!(crate::file_picks::scripted::kinds(&asked)[0], craft::host::PickKind::Folder);
     assert!(h.query_by_label("one.png").is_some() && h.query_by_label("two.png").is_some(), "the folder's images are listed");
     // Create Smart Object after Loading Layers: both images inside one smart object.
     h.get_by_label("Create Smart Object after Loading Layers").click();

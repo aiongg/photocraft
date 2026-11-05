@@ -11,7 +11,7 @@ type Open = Arc<ScriptedFiles>;
 /// An app with an untitled document, whose file dialogs stay open until the test answers them, and
 /// whose writer records the paths it wrote.
 fn app() -> (PhotocraftApp, Open, Rc<RefCell<Vec<String>>>) {
-    let open = ScriptedFiles::held();
+    let open = scripted::held();
     let written: Rc<RefCell<Vec<String>>> = Default::default();
     let w = written.clone();
     let services = Services {
@@ -20,7 +20,7 @@ fn app() -> (PhotocraftApp, Open, Rc<RefCell<Vec<String>>>) {
             w.borrow_mut().push(path.to_string());
             Ok(())
         })),
-        files: open.service(),
+        files: scripted::service(&open),
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
@@ -259,7 +259,7 @@ fn menu_open_exr_parts_asks_for_a_file_then_shows_the_parts_dialog() {
     let r = menus::invoke(&mut app, &ctx, "file.openExrParts", json!({})).unwrap();
     assert_eq!(r["fileDialog"], "open", "{r}");
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Open] && filter_extensions(&open) == [["exr"]]);
+    assert!(scripted::kinds(&open) == [PickKind::Open] && filter_extensions(&open) == [["exr"]]);
     answer(&open, Some(scripted::paths(vec![path.clone()])));
     app.poll_file_dialog(&ctx, None);
     assert!(!app.ui.status_error, "{}", app.ui.status);
@@ -428,7 +428,7 @@ fn filtered_picker_requests_only_the_given_extensions() {
     let (mut app, open, _) = app();
     app.pick_file_bytes_filtered(&["cube", "3dl", "look"], |_, _, _| Ok(Value::Null)).unwrap();
     app.poll_file_dialog(&egui::Context::default(), None);
-    assert!(open.kinds() == [PickKind::Open] && filter_extensions(&open) == [["cube", "3dl", "look"]]);
+    assert!(scripted::kinds(&open) == [PickKind::Open] && filter_extensions(&open) == [["cube", "3dl", "look"]]);
 }
 
 #[test]
@@ -436,7 +436,7 @@ fn scripts_browse_lists_only_script_files() {
     let (mut app, open, _) = app();
     menus::invoke(&mut app, &egui::Context::default(), "file.scripts.browse", json!({})).unwrap();
     app.poll_file_dialog(&egui::Context::default(), None);
-    assert!(open.kinds() == [PickKind::Open] && filter_extensions(&open) == [["psjs", "ccjs", "jsx", "js", "jsxbin", "json", "txt", "pcdroplet"]]);
+    assert!(scripted::kinds(&open) == [PickKind::Open] && filter_extensions(&open) == [["psjs", "ccjs", "jsx", "js", "jsxbin", "json", "txt", "pcdroplet"]]);
 }
 
 #[test]
@@ -450,15 +450,6 @@ fn scripts_browse_extendscript_picks_report_the_error() {
     app.poll_file_dialog(&ctx, None);
     assert!(app.ui.status_error);
     assert!(app.ui.status.contains("not Photoshop ExtendScript"), "{}", app.ui.status);
-}
-
-#[test]
-fn last_used_dir_takes_the_most_recent_parent() {
-    assert_eq!(last_used_dir(&[]), None);
-    assert_eq!(last_used_dir(&["/pics/cat.psd".into()]), Some("/pics".into()));
-    assert_eq!(last_used_dir(&["/pics/cat.psd".into(), "/old/dog.png".into()]), Some("/pics".into()));
-    assert_eq!(last_used_dir(&["cat.psd".into()]), None, "no folder to start in");
-    assert_eq!(last_used_dir(&["/".into()]), None, "the root has no parent");
 }
 
 #[test]
@@ -651,7 +642,7 @@ fn place_embedded_uses_the_single_file_picker_and_accepts_contents() {
     // Cancel leaves the document alone and does not report an error.
     menus::invoke(&mut app, &ctx, "file.placeEmbedded", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Open]);
+    assert!(scripted::kinds(&open) == [PickKind::Open]);
     answer(&open, None);
     app.poll_file_dialog(&ctx, None);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers_before);
@@ -695,7 +686,7 @@ fn replace_contents_picks_a_file_for_every_instance() {
     // Cancelling changes nothing.
     menus::invoke(&mut app, &ctx, "layer.smartObjects.replaceContents", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Open]);
+    assert!(scripted::kinds(&open) == [PickKind::Open]);
     answer(&open, None);
     app.poll_file_dialog(&ctx, None);
     assert_eq!(ids.map(|id| smart_source(&app, id)), before);
@@ -728,7 +719,7 @@ fn relink_to_file_picks_a_file_for_every_instance() {
     // Cancelling changes nothing.
     menus::invoke(&mut app, &ctx, "layer.smartObjects.relinkToFile", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Open]);
+    assert!(scripted::kinds(&open) == [PickKind::Open]);
     answer(&open, None);
     app.poll_file_dialog(&ctx, None);
     assert_eq!(ids.map(|id| smart_source(&app, id)), before);
@@ -778,7 +769,7 @@ fn convert_to_linked_asks_where_to_write_the_contents() {
     let path = dir.join("linked.pcraft").to_string_lossy().into_owned();
     menus::invoke(&mut app, &ctx, "layer.smartObjects.convertToLinked", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Save]);
+    assert!(scripted::kinds(&open) == [PickKind::Save]);
     answer(&open, Some(scripted::save_to(path.clone())));
     app.poll_file_dialog(&ctx, None);
     assert!(!app.ui.status_error, "{}", app.ui.status);
@@ -1047,7 +1038,7 @@ fn render_video_menu_asks_for_directory_and_writes_frames_only_after_confirmatio
     let result = menus::invoke(&mut app, &ctx, "file.export.renderVideo", json!({})).unwrap();
     assert_eq!(result["fileDialog"], "folder");
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Folder]);
+    assert!(scripted::kinds(&open) == [PickKind::Folder]);
     assert!(!dir.exists(), "a menu click must not create an output directory");
 
     answer(&open, None);
@@ -1224,7 +1215,7 @@ fn import_variable_data_sets_menu_asks_for_a_csv_and_imports_it() {
     let ctx = egui::Context::default();
     assert_eq!(crate::menus::invoke(&mut app, &ctx, "file.import.variableDataSets", json!({})).unwrap(), json!({"fileDialog": "open"}));
     app.poll_file_dialog(&ctx, None);
-    assert!(open.kinds() == [PickKind::Open] && filter_extensions(&open) == [["csv", "txt"]]);
+    assert!(scripted::kinds(&open) == [PickKind::Open] && filter_extensions(&open) == [["csv", "txt"]]);
     answer(&open, Some(scripted::contents("sets.csv", b"headline\nHello\nWorld\n".to_vec())));
     app.poll_file_dialog(&ctx, None);
     assert_eq!(app.session.active().map(|d| d.doc.variables.data_sets.len()), Some(2));

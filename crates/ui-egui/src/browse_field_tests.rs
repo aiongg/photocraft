@@ -31,7 +31,7 @@ fn artboards_to_files_folder_is_chosen_with_browse() {
     assert!(field(&h, "dir").is_some(), "the dialog has a Dir field");
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert_eq!(asked.kinds(), [craft::host::PickKind::Folder]);
+    assert_eq!(crate::file_picks::scripted::kinds(&asked), [craft::host::PickKind::Folder]);
     assert_eq!(field(&h, "dir"), Some(json!("/tmp/exports")));
 }
 
@@ -79,5 +79,5 @@ fn image_processor_folders_are_chosen_with_browse() {
     h.query_all_by_label("Browse…").nth(1).unwrap().click();
     h.run_steps(4);
     assert_eq!(field(&h, "output"), Some(json!("/tmp/web")));
-    assert_eq!(asked.kinds(), [craft::host::PickKind::Folder; 2]);
+    assert_eq!(crate::file_picks::scripted::kinds(&asked), [craft::host::PickKind::Folder; 2]);
 }

@@ -407,7 +407,7 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
     use std::{cell::RefCell, rc::Rc};
     let written: Rc<RefCell<Vec<String>>> = Rc::default();
     let w = written.clone();
-    let files = crate::file_picks::scripted::ScriptedFiles::held();
+    let files = crate::file_picks::scripted::held();
     let mut app = app_with_docs(1);
     make_dirty(&mut app, 0);
     app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
@@ -416,7 +416,7 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
         Ok(())
     }));
     // A dialog the user takes their time with.
-    app.services.files = files.service();
+    app.services.files = crate::file_picks::scripted::service(&files);
     let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
     let answer = |h: &mut Prompted, a: Option<craft::host::Picked>| {
         files.answer(a.unwrap_or(craft::host::Picked::Cancelled));

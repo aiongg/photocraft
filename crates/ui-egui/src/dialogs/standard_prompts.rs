@@ -3,10 +3,14 @@
 //! record keeps the fields the legacy dialog had (`ui.inspect` and `ui.dialog.set` read and write
 //! them) and the prompt carries the id as its tag, so an answer finds its record.
 //!
+//! The file service's Replace question is a prompt instance of its own on the host
+//! ([`adopt_file_question`] gives it a record, `foreign`): its answer belongs to the service, so
+//! automation answers it but PhotoCraft never takes its result.
+//!
 //! The host holds one `StandardPrompt` at a time: opening a second replaces the first, whose
 //! record is then swept as cancelled (gap AB).
 
-use craft::ui::dialog::{DialogId, DialogResult, PromptChoice, StackDialog, StandardPrompt};
+use craft::ui::dialog::{DialogId, DialogResult, PromptChoice, PromptKind, StackDialog, StandardPrompt};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -23,6 +27,9 @@ pub struct PromptRecord {
     /// The title `ui.inspect` lists.
     pub title: String,
     pub fields: Fields,
+    /// A question another component opened on the host (the file service's Replace): answered
+    /// through the host, its result left for the component.
+    pub foreign: bool,
 }
 
 impl crate::state::UiState {
@@ -44,7 +51,7 @@ pub fn open(app: &mut PhotocraftApp, prompt: StandardPrompt, title: &str, fields
     let id = app.ui.alloc_id();
     let dialog = StackDialog::id(&prompt);
     app.ui.host.open(prompt.tag(id));
-    app.ui.prompts.push(PromptRecord { id, dialog, title: title.to_owned(), fields });
+    app.ui.prompts.push(PromptRecord { id, dialog, title: title.to_owned(), fields, foreign: false });
     Some(id)
 }
 
@@ -108,7 +115,9 @@ fn close(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Prompt
     let at = app.ui.prompts.iter().position(|p| p.id == id).ok_or_else(|| format!("no dialog {id}"))?;
     let record = app.ui.prompts.remove(at);
     app.ui.host.cancel_by_id::<StandardPrompt>(ctx, record.dialog);
-    app.ui.host.take_by_id::<StandardPrompt>(record.dialog);
+    if !record.foreign {
+        app.ui.host.take_by_id::<StandardPrompt>(record.dialog);
+    }
     Ok(record)
 }
 
@@ -136,7 +145,9 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
     }) && app.ui.host.confirm_by_id::<StandardPrompt>(ctx, dialog);
     if confirmed {
         crate::host_settings::sync(app, ctx);
-        app.ui.host.take_by_id::<StandardPrompt>(dialog);
+        if !app.ui.prompt(id).is_some_and(|r| r.foreign) {
+            app.ui.host.take_by_id::<StandardPrompt>(dialog);
+        }
         let at = app.ui.prompts.iter().position(|p| p.id == id).ok_or_else(|| format!("no dialog {id}"))?;
         let record = app.ui.prompts.remove(at);
         return run(app, record, choice);
@@ -195,6 +206,19 @@ pub fn collect(app: &mut PhotocraftApp) {
     if let Some(error) = errors.pop() {
         app.ui.status = error;
     }
+}
+
+/// Gives the file service's Replace question, when it is the top dialog, a record, so
+/// `ui.inspect` lists it and `ui.dialog.confirm` / `ui.dialog.cancel` answer it like any prompt.
+pub fn adopt_file_question(app: &mut PhotocraftApp) {
+    let Some(dialog) = app.ui.host.top_id() else { return };
+    if app.ui.prompts.iter().any(|p| p.dialog == dialog) {
+        return;
+    }
+    let Some(PromptKind::ReplaceFile { name, answered }) = app.ui.host.get_by_id::<StandardPrompt>(dialog).map(|p| p.kind().clone()) else { return };
+    let fields = json!({"__fileQuestion": true, "__label": "Save", "name": name, "answered": answered});
+    let id = app.ui.alloc_id();
+    app.ui.prompts.push(PromptRecord { id, dialog, title: "Save".to_owned(), fields: fields.as_object().cloned().unwrap_or_default(), foreign: true });
 }
 
 /// Runs the cancel of every record whose prompt is no longer in the host.

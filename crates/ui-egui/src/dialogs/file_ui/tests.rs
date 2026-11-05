@@ -434,7 +434,8 @@ fn save_for_web_authorizes_before_opening_a_picker() {
                 app.ui.dialog_mut(id).unwrap().fields.insert("path".into(), json!("denied.png"));
             }
             app.services.automation_authorize = Some(deny);
-            app.services.files = crate::file_picks::scripted::ScriptedFiles::refusing("denied export must not show a picker");
+            let files = crate::file_picks::scripted::held();
+            app.services.files = crate::file_picks::scripted::service(&files);
             app.services.write = Some(Box::new(|_, _| panic!("denied export must not write")));
             let error = if synthetic_input {
                 app.automation_input = true;
@@ -447,6 +448,7 @@ fn save_for_web_authorizes_before_opening_a_picker() {
             };
             assert_eq!(error, "export denied");
             assert!(!app.file_dialog_open());
+            assert!(files.requests().is_empty(), "a denied export shows no picker");
         }
     }
 }
@@ -468,10 +470,12 @@ fn save_for_web_authorizes_generated_palette_before_opening_a_picker() {
         } else {
             app.session.authorize = Some(deny_palette);
         }
-        app.services.files = crate::file_picks::scripted::ScriptedFiles::refusing("denied palette must not show a picker");
+        let files = crate::file_picks::scripted::held();
+        app.services.files = crate::file_picks::scripted::service(&files);
         app.services.write = Some(Box::new(|_, _| panic!("denied palette must not write")));
         assert_eq!(crate::dialogs::confirm(&mut app, id).unwrap_err(), "palette denied");
         assert!(!app.file_dialog_open());
+        assert!(files.requests().is_empty(), "a denied palette shows no picker");
     }
 }
 

@@ -108,12 +108,10 @@ impl PhotocraftApp {
         Ok(json!({ "fileDialog": kind }))
     }
 
-    /// Ask the user to choose a folder, starting in the folder of the most recent file when known.
+    /// Ask the user to choose a folder, starting in the one the last such dialog answered with.
     /// `then` receives the selected path when the dialog is answered.
     pub(crate) fn ask_folder(&mut self, then: impl FnOnce(&mut Self, String) -> Result<Value, String> + 'static) -> Result<Value, String> {
-        let mut request = PickRequest::folder("folder");
-        request.directory = last_used_dir(&self.ui.recent_files).map(Into::into);
-        self.ask_file(request, move |app, picked| then(app, first_path(&picked, false)?))
+        self.ask_file(PickRequest::folder("folder"), move |app, picked| then(app, first_path(&picked, false)?))
     }
 
     /// Ask where to save: `then` gets the chosen path. The service completes a name typed without
@@ -121,18 +119,14 @@ impl PhotocraftApp {
     /// of the chosen file type), lowercases the extension when Preferences ▸ File Handling ›
     /// Lowercase Extension is on, and asks whether to replace a file it named that way.
     ///
-    /// A bare file name (export dialogs, an untitled document) starts beside the document, and a
-    /// document's dialogs start in the folder its last dialog answered with (#1826, #1866). A
-    /// caller's explicit directory is the starting folder otherwise.
+    /// A suggested path with a folder (Save As, the document's own path) starts in that folder. A
+    /// bare file name (export dialogs) starts in the folder the document's last dialog answered
+    /// with (#1826, #1866).
     pub(crate) fn pick_save(&mut self, suggested: &str, then: impl FnOnce(&mut Self, String) -> Result<Value, String> + 'static) -> Result<Value, String> {
         let suggested = filters::netpbm_as_pnm(suggested);
         let path = Path::new(&suggested);
         let doc = self.session.active().map(|d| d.doc.id);
-        let directory = path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .map(Path::to_path_buf)
-            .or_else(|| self.session.active().and_then(|d| d.path.as_deref()).and_then(|p| Path::new(p).parent()).map(Path::to_path_buf));
+        let directory = path.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf);
         // A document keeps its own folder: the service remembers one folder per purpose.
         let mut request = PickRequest::save(doc.map_or_else(|| "save".to_owned(), |DocId(id)| format!("save.{id}")));
         request.directory = directory;
@@ -166,12 +160,25 @@ impl PhotocraftApp {
         })
     }
 
+    /// [`Self::pick_file_bytes`] starting in `directory` (Relink to File: the missing file's folder).
+    pub(crate) fn pick_file_bytes_in(
+        &mut self,
+        directory: Option<std::path::PathBuf>,
+        then: impl FnOnce(&mut Self, String, Vec<u8>) -> Result<Value, String> + 'static,
+    ) -> Result<Value, String> {
+        let mut request = self.open_request(false, &[]);
+        request.directory = directory;
+        self.ask_file(request, move |app, picked| {
+            let (name, bytes) = read_picked(picked)?;
+            then(app, name, bytes)
+        })
+    }
+
     /// An Open request for `extensions` (every format File › Open reads when empty), starting in
-    /// the folder of the most recent file until the service has a folder for the purpose.
+    /// the folder the service remembers for the purpose.
     pub(crate) fn open_request(&self, multiple: bool, extensions: &[&str]) -> PickRequest {
         let purpose = if extensions.is_empty() { "open".to_owned() } else { format!("open.{}", extensions.join(".")) };
         let mut request = if multiple { PickRequest::open_many(purpose) } else { PickRequest::open(purpose) };
-        request.directory = last_used_dir(&self.ui.recent_files).map(Into::into);
         if extensions.is_empty() {
             for (name, extensions) in filters::open_filters() {
                 request = request.filter(name, &extensions.iter().map(String::as_str).collect::<Vec<_>>());
@@ -273,6 +280,7 @@ impl PhotocraftApp {
         {
             let policy = native::policy(self.session.prefs().file_handling.lowercase_extension);
             self.file_panels.pump(policy, &mut self.ui.host, parent);
+            crate::standard_prompts::adopt_file_question(self);
         }
         #[cfg(target_arch = "wasm32")]
         let _ = parent;
@@ -292,12 +300,6 @@ impl PhotocraftApp {
             self.ui.status_error = true;
         }
     }
-}
-
-/// The folder an open dialog starts in: the directory of the most recent file (UI-217-3).
-pub(crate) fn last_used_dir(recent: &[String]) -> Option<String> {
-    let dir = Path::new(recent.first()?).parent()?;
-    (!dir.as_os_str().is_empty()).then(|| dir.to_string_lossy().into_owned())
 }
 
 /// The first chosen path as text; a name that isn't valid Unicode is an error (#6601).

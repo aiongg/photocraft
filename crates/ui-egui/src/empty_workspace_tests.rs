@@ -11,8 +11,8 @@ use crate::{PhotocraftApp, Services};
 type Requests = std::sync::Arc<crate::file_picks::scripted::ScriptedFiles>;
 
 fn harness(home: bool) -> (Harness<'static, PhotocraftApp>, Requests) {
-    let requests = crate::file_picks::scripted::ScriptedFiles::held();
-    let services = Services { files: requests.service(), ..Default::default() };
+    let requests = crate::file_picks::scripted::held();
+    let services = Services { files: crate::file_picks::scripted::service(&requests), ..Default::default() };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     app.session.edit_prefs(|p| p.general.auto_show_home_screen = home);
     let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
@@ -52,7 +52,7 @@ fn clicks(h: &mut Harness<'static, PhotocraftApp>, at: Pos2, count: usize) {
 }
 
 fn opens(requests: &Requests) -> usize {
-    requests.kinds().iter().filter(|k| **k == craft::host::PickKind::OpenMany).count()
+    crate::file_picks::scripted::kinds(&requests).iter().filter(|k| **k == craft::host::PickKind::OpenMany).count()
 }
 
 #[test]

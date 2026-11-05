@@ -83,8 +83,8 @@ fn xwayland_command_matches_how_photocraft_was_installed() {
 #[test]
 fn every_save_dialog_leads_with_its_own_extension() {
     // Every save dialog is answered with Cancel, as the user would; the requests are kept.
-    let files = photocraft_ui_egui::file_picks::scripted::ScriptedFiles::answering(Vec::new());
-    let services = Services { files: files.service(), ..Default::default() };
+    let files = std::sync::Arc::new(photocraft_ui_egui::file_picks::scripted::ScriptedFiles::new());
+    let services = Services { files: photocraft_ui_egui::file_picks::scripted::service(&files), ..Default::default() };
     let mut app = PhotocraftApp::new(Session::new(), services);
     let ctx = egui::Context::default();
     // Dialogs are shown on the next frame: poll once so each is answered before the next asks.
