@@ -1021,7 +1021,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             #[cfg(target_arch = "wasm32")]
             let exact: Option<u64> = None;
             let est =
-                exact.or_else(|| preview.as_ref().and_then(|preview| preview.estimate)).map_or("—".to_string(), |b| crate::sizing::human_bytes(b as f64));
+                exact.or_else(|| preview.as_ref().and_then(|preview| preview.estimate)).map_or("—".to_string(), |b| craft::ui::dialog::human_bytes(b as f64));
             ui.add(Text::new(format!("{}  ≈ {est}", s_fmt(f).to_uppercase())).role(TypeRole::Caption).content(Content::Muted));
         });
     });
@@ -1060,7 +1060,7 @@ fn write_export(app: &mut PhotocraftApp, doc: &Document, f: &Map<String, Value>,
     let write = app.services.write.as_mut().ok_or("no writer configured")?;
     write(path, &bytes)?;
     let template = "Exported {path} ({size})";
-    app.ui.status = crate::i18n::fmt(tl!(template), &[("path", path), ("size", &crate::sizing::human_bytes(bytes.len() as f64))]);
+    app.ui.status = crate::i18n::fmt(tl!(template), &[("path", path), ("size", &craft::ui::dialog::human_bytes(bytes.len() as f64))]);
     app.ui.status_error = false;
     let template = "Exported {path}";
     let what = crate::i18n::fmt(tl!(template), &[("path", &crate::file_open::display_name(path))]);

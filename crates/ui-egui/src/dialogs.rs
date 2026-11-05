@@ -259,7 +259,7 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
     outcome
 }
 
-/// The rest of the command dialogs: files, colour, export, sizing, filters and forms.
+/// The rest of the command dialogs: files, colour, export, filters and forms.
 fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &mut Fields, id: egui::Id, interactive: bool) -> Option<bool> {
     let mut outcome: Option<bool> = None;
     match d.kind {
@@ -274,8 +274,6 @@ fn command_body_more(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fie
         _ if crate::color_range_ui::owns(fields) => crate::color_range_ui::body(app, ui, fields),
         _ if crate::prefs_ui::owns(fields) => outcome = crate::prefs_ui::body(app, ui, fields, interactive),
         _ if fields.contains_key("__export") => crate::export_dialog::body(app, ui, fields),
-        // Image Size and Canvas Size open on Width, selected (#2329).
-        _ if fields.contains_key("__sizing") => crate::sizing::body(ui, fields),
         _ if crate::smart_filter_dialog::owns(fields) => crate::smart_filter_dialog::body(app, ui, fields),
         _ if crate::adjust_dialog::owns(fields) => crate::adjust_dialog::body(app, ui, fields),
         _ if crate::blur_pins::owns(fields) => crate::blur_pins::body(ui, fields),
@@ -332,7 +330,7 @@ fn dialog_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &
 }
 
 /// Whether the fields route to [`filter_body`] rather than to one of the editors that come before
-/// it in [`command_body_more`] (the adjustments, Smart Filters, blur pins, sizing and the files).
+/// it in [`command_body_more`] (the adjustments, Smart Filters, blur pins and the files).
 fn is_filter_route(fields: &Fields) -> bool {
     fields.contains_key("__filter")
         && !(crate::file_ui::owns(fields)
@@ -340,7 +338,6 @@ fn is_filter_route(fields: &Fields) -> bool {
             || crate::color_range_ui::owns(fields)
             || crate::prefs_ui::owns(fields)
             || fields.contains_key("__export")
-            || fields.contains_key("__sizing")
             || crate::smart_filter_dialog::owns(fields)
             || crate::adjust_dialog::owns(fields)
             || crate::blur_pins::owns(fields))
@@ -397,11 +394,7 @@ fn library_fields(kind: DialogKind, fields: &Fields) -> bool {
 /// Whether the dialog opens with its first field focused and selected, so typing replaces it
 /// (Photoshop's Name dialogs). Those bodies are library fields; the rest place focus themselves.
 fn opens_on_first_field(kind: DialogKind, fields: &Fields) -> bool {
-    kind == DialogKind::NewDocument
-        || crate::new_layer_ui::owns(fields)
-        || crate::new_group_ui::owns(fields)
-        || crate::snapshot_dialog::owns(fields)
-        || fields.contains_key("__sizing")
+    kind == DialogKind::NewDocument || crate::new_layer_ui::owns(fields) || crate::new_group_ui::owns(fields) || crate::snapshot_dialog::owns(fields)
 }
 
 /// The default button's label: what OK means for this dialog.

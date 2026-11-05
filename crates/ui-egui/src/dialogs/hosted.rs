@@ -21,6 +21,17 @@ pub enum HostedKind {
     Form,
     /// A [`ParamDialog`] (`filter_dialog::open_hosted`).
     Params,
+    /// The library's Image Size (`sizing::open`).
+    ImageSize,
+    /// The library's Canvas Size (`sizing::open`).
+    CanvasSize,
+}
+
+impl HostedKind {
+    /// Image Size and Canvas Size: typed dialogs with no [`DialogFields`].
+    pub fn is_sizing(self) -> bool {
+        matches!(self, HostedKind::ImageSize | HostedKind::CanvasSize)
+    }
 }
 
 /// State the footer hook sets and the app reads after the dialog drew (the hook cannot reach the
@@ -113,6 +124,7 @@ impl crate::state::UiState {
         match self.hosted(id)?.kind {
             HostedKind::Form => self.hosted_form(id).map(CommandForm::fields),
             HostedKind::Params => self.hosted_params(id).map(ParamDialog::fields),
+            HostedKind::ImageSize | HostedKind::CanvasSize => None,
         }
     }
 
@@ -123,6 +135,7 @@ impl crate::state::UiState {
         match kind {
             HostedKind::Form => dialog.downcast_mut::<CommandForm>().map(CommandForm::fields_mut),
             HostedKind::Params => dialog.downcast_mut::<ParamDialog>().map(ParamDialog::fields_mut),
+            HostedKind::ImageSize | HostedKind::CanvasSize => None,
         }
     }
 
@@ -132,10 +145,15 @@ impl crate::state::UiState {
             return Some(d.fields.clone());
         }
         let record = self.hosted(id)?;
+        if record.kind.is_sizing() {
+            let mut fields = crate::sizing::fields_of(self, record)?;
+            fields.extend(record.private.clone());
+            return Some(fields);
+        }
         let library = self.hosted_fields(id)?;
         let mut fields = match record.kind {
             HostedKind::Form => fields_json(library),
-            HostedKind::Params => crate::filter_dialog::Wire::of(record).json(library),
+            _ => crate::filter_dialog::Wire::of(record).json(library),
         };
         fields.extend(record.extra.clone());
         fields.extend(record.private.clone());
@@ -200,6 +218,12 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
             return Err(format!("`{field}` is set only by the dialog it belongs to"));
         }
         record.private.insert(field.to_owned(), value);
+        return Ok(());
+    }
+    if record.kind.is_sizing() {
+        // The library's size dialogs take no values from outside: a value a script sets rides along
+        // to the command at OK and wins over the dialog's own (gap Z2).
+        record.extra.insert(field.to_owned(), value);
         return Ok(());
     }
     let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
@@ -329,7 +353,7 @@ fn cancel_replaced<D: craft::ui::dialog::StackDialog>(app: &mut PhotocraftApp) {
 
 /// The command a closed form runs: the dialog is gone, so the preview and the paused action settle
 /// with the command's result.
-fn run_form(app: &mut PhotocraftApp, record: Hosted, mut params: Fields) -> Result<Value, String> {
+pub(super) fn run_form(app: &mut PhotocraftApp, record: Hosted, mut params: Fields) -> Result<Value, String> {
     params.extend(record.extra);
     app.filter_preview = None;
     let result = app.run(&record.key, Value::Object(params));
@@ -355,12 +379,15 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
 /// is disabled), then the same path a click takes.
 pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
+    if kind.is_sizing() {
+        return crate::sizing::confirm(app, ctx, id);
+    }
     if app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
     let confirmed = match kind {
         HostedKind::Form => app.ui.host.confirm::<CommandForm>(ctx),
-        HostedKind::Params => app.ui.host.confirm::<ParamDialog>(ctx),
+        _ => app.ui.host.confirm::<ParamDialog>(ctx),
     };
     if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
@@ -372,7 +399,7 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
 pub fn collect(app: &mut PhotocraftApp) {
     browse(app);
     crate::filter_dialog::requests(app);
-    for kind in [HostedKind::Form, HostedKind::Params] {
+    for kind in [HostedKind::Form, HostedKind::Params, HostedKind::ImageSize, HostedKind::CanvasSize] {
         if let Some(Err(error)) = settle(app, kind) {
             app.ui.status = error;
         }
@@ -382,12 +409,15 @@ pub fn collect(app: &mut PhotocraftApp) {
 /// Takes the dialog's stored answer. OK runs the command and returns its result; Cancel runs the
 /// cleanup of the record the answer's key names.
 fn settle(app: &mut PhotocraftApp, kind: HostedKind) -> Option<Result<Value, String>> {
+    if kind.is_sizing() {
+        return crate::sizing::settle(app, kind);
+    }
     let (result, key) = match kind {
         HostedKind::Form => {
             let (result, key) = app.ui.host.take_keyed::<CommandForm>()?;
             (result.ok().map(|answer| answer.fields), key)
         }
-        HostedKind::Params => {
+        _ => {
             let (result, key) = app.ui.host.take_keyed::<ParamDialog>()?;
             (result.ok().map(|answer| answer.fields), key)
         }
@@ -398,7 +428,7 @@ fn settle(app: &mut PhotocraftApp, kind: HostedKind) -> Option<Result<Value, Str
             app.ui.hosted.retain(|h| h.id != record.id);
             Some(match kind {
                 HostedKind::Form => run_form(app, record, fields_json(&answer)),
-                HostedKind::Params => run_params(app, record, &answer),
+                _ => run_params(app, record, &answer),
             })
         }
         None => {
@@ -474,7 +504,7 @@ pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
 /// `ui.dialog.cancel` for a hosted dialog: closes the library dialog, then runs the cleanup.
 pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
-    if app.ui.hosted_fields(id).is_none() {
+    if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
     match kind {
@@ -486,6 +516,7 @@ pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<V
             app.ui.host.cancel::<ParamDialog>(ctx);
             app.ui.host.take_keyed::<ParamDialog>();
         }
+        HostedKind::ImageSize | HostedKind::CanvasSize => crate::sizing::close(app, ctx, kind),
     }
     cancelled(app, id);
     Ok(Value::Null)

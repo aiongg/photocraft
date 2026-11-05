@@ -184,7 +184,7 @@ fn web_pane(app: &PhotocraftApp, ui: &mut egui::Ui, size: egui::Vec2, p: Option<
                 // Photoshop's download estimate at 56.6 Kbps.
                 let secs = (bytes as f64 * 8.0 / 56_600.0).ceil();
                 (
-                    format!("{}  {}", ext.to_uppercase(), crate::sizing::human_bytes(bytes as f64)),
+                    format!("{}  {}", ext.to_uppercase(), craft::ui::dialog::human_bytes(bytes as f64)),
                     format!("{secs} sec @ 56.6 Kbps{}", colors.map(|c| format!("  ·  {c} colors")).unwrap_or_default()),
                 )
             }
