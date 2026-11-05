@@ -201,11 +201,11 @@ fn show_damage(app: &mut PhotocraftApp) {
     .into_iter()
     .collect();
     let prompt = StandardPrompt::damaged_file(&front.name)
-        .title(tl!("Damaged Photoshop document"))
+        .title(tsrc!("Damaged Photoshop document"))
         .message(message)
         .warnings(front.warnings.clone())
-        .button(PromptChoice::Proceed, tl!("Continue"), None)
-        .button(PromptChoice::Cancel, tl!("Cancel"), None);
+        .button(PromptChoice::Proceed, tsrc!("Continue"), None)
+        .button(PromptChoice::Cancel, tsrc!("Cancel"), None);
     crate::standard_prompts::open(app, prompt, "Damaged Photoshop document", fields);
 }
 

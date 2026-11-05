@@ -181,8 +181,10 @@ fn tl_keys(sources: &[(PathBuf, String)]) -> BTreeSet<Key> {
         }
         let code = without_test_modules(source);
         let mut rest = code.as_str();
-        while let Some(at) = rest.find("tl!(\"") {
-            rest = rest.get(at + 5..).unwrap_or("");
+        // `tl!` translates when it runs; `tsrc!` hands the English source to a library component
+        // that translates it when it draws.
+        while let Some(at) = ["tl!(\"", "tsrc!(\""].iter().filter_map(|marker| rest.find(marker).map(|at| (at, marker.len()))).min() {
+            rest = rest.get(at.0 + at.1..).unwrap_or("");
             let bytes = rest.as_bytes();
             let mut end = 0;
             while end < bytes.len() && !(bytes[end] == b'"' && (end == 0 || bytes[end - 1] != b'\\')) {

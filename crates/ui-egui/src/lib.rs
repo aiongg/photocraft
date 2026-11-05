@@ -22,6 +22,13 @@ macro_rules! tl {
         $crate::i18n::t($s)
     };
 }
+/// An English UI string for a library component that translates it when it draws (a
+/// `StandardPrompt` text); the catalog scan lists it like a `tl!` key.
+macro_rules! tsrc {
+    ($s:expr) => {
+        $s
+    };
+}
 pub mod canvas;
 pub mod control;
 pub mod dialogs;
