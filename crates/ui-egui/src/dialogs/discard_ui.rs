@@ -22,9 +22,7 @@ pub struct Prompt {
     params: Value,
     /// The document the command was aimed at (`document` param, else the active one), if it has one.
     target: Option<DocId>,
-    /// The documents still to ask about, the one asked now first.
-    docs: Vec<DocId>,
-    /// Steps through `docs`: what each answer leads to.
+    /// Steps through the documents still to ask about, the one asked now first: what each answer leads to.
     guard: CloseGuard<DocId>,
     /// The first document is being saved: the question is closed until the save ends.
     saving: bool,
@@ -37,7 +35,7 @@ impl Prompt {
             "file.revert" => CloseScope::Revert,
             _ => CloseScope::Close,
         };
-        Self { id: id.to_string(), params, target, guard: CloseGuard::new(scope, docs.clone()), docs, saving: false }
+        Self { id: id.to_string(), params, target, guard: CloseGuard::new(scope, docs), saving: false }
     }
 }
 
@@ -114,7 +112,7 @@ pub fn intercept(app: &mut PhotocraftApp, id: &str, params: &Value) -> bool {
 /// later one is shown as it comes up (see [`advance`]).
 fn ask(app: &mut PhotocraftApp, prompt: Prompt) {
     if !matches!(reach(&prompt.id), Some(Reach::Target)) {
-        show_tab(app, prompt.docs.first().copied());
+        show_tab(app, prompt.guard.current().copied());
     }
     app.discard = Some(prompt);
     open_question(app);
@@ -123,8 +121,8 @@ fn ask(app: &mut PhotocraftApp, prompt: Prompt) {
 /// Opens the question about the first document, over any other the host holds.
 fn open_question(app: &mut PhotocraftApp) {
     let Some(p) = app.discard.as_ref().filter(|p| !p.saving) else { return };
-    let Some(name) = p.docs.first().and_then(|d| index_of(app, *d)).map(|i| app.session.documents()[i].doc.name.clone()) else { return };
-    app.ui.host.open(UnsavedChangesDialog::new(p.guard.scope(), name).remaining(p.docs.len()));
+    let Some(name) = p.guard.current().and_then(|d| index_of(app, *d)).map(|i| app.session.documents()[i].doc.name.clone()) else { return };
+    app.ui.host.open(UnsavedChangesDialog::new(p.guard.scope(), name).remaining(p.guard.remaining()));
 }
 
 /// Makes `doc` the active tab, if it is still open.
@@ -175,7 +173,7 @@ pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// asked about again (#2547). Cancel then keeps only the unanswered ones.
 fn advance(app: &mut PhotocraftApp, ctx: &egui::Context, saved: bool) {
     let Some(p) = app.discard.as_mut() else { return };
-    let Some(answered) = (!p.docs.is_empty()).then(|| p.docs.remove(0)) else { return };
+    let Some(answered) = p.guard.current().copied() else { return };
     let one_by_one = !matches!(reach(&p.id), Some(Reach::Target));
     let step = if saved {
         if !p.saving {
@@ -312,7 +310,7 @@ fn save(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) -> bool {
 pub(crate) fn saved_document(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) {
     // Still the prompt that asked (quitting may have replaced it meanwhile).
     if !app.save_options_open()
-        && app.discard.as_ref().is_some_and(|p| p.docs.first() == Some(&doc))
+        && app.discard.as_ref().is_some_and(|p| p.guard.current() == Some(&doc))
         && index_of(app, doc).is_some_and(|i| app.services.write_unconfirmed || !app.session.documents()[i].is_dirty())
     {
         advance(app, ctx, true);
@@ -343,26 +341,26 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if app.file_dialog_open() || app.save_options_open() || app.saving() {
         return;
     }
-    let Some(&doc) = app.discard.as_ref().and_then(|p| p.docs.first()) else { return };
+    let Some(&doc) = app.discard.as_ref().and_then(|p| p.guard.current()) else { return };
     if index_of(app, doc).is_none() {
         // Closed by something else while the prompt was up: nothing left to ask about.
         if let Some(p) = app.discard.as_mut() {
             p.guard.forget(&doc);
         }
-        advance_forgotten(app, ctx, doc);
+        advance_forgotten(app, ctx);
     } else if !app.ui.host.is_open::<UnsavedChangesDialog>() {
-        // A save that ended without closing the document: ask again.
-        if let Some(p) = app.discard.as_mut() {
-            *p = Prompt::new(&p.id, p.params.clone(), p.target, p.docs.clone());
+        // A save that ended without closing the document (cancelled Save As, failed write): the
+        // whole close ends and the remaining documents stay open.
+        let step = app.discard.as_mut().map(|p| p.guard.save_failed());
+        if let Some(step) = step {
+            follow(app, ctx, step);
         }
-        open_question(app);
     }
 }
 
-/// `doc`, the first document, is gone: moves on without closing anything.
-fn advance_forgotten(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) {
+/// The first document is gone (already forgotten by the guard): moves on without closing anything.
+fn advance_forgotten(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(p) = app.discard.as_mut() else { return };
-    p.docs.retain(|d| *d != doc);
     p.saving = false;
     let step = p.guard.saved();
     follow(app, ctx, step);
@@ -383,7 +381,7 @@ pub const CONTROL_ID: &str = "discard";
 /// it asks about, how many are still to answer, and the choices `ui.dialog.confirm` takes.
 pub fn inspect(app: &PhotocraftApp) -> Option<Value> {
     let p = app.discard.as_ref()?;
-    let doc = *p.docs.first()?;
+    let doc = *p.guard.current()?;
     let name = index_of(app, doc).and_then(|i| app.session.documents().get(i)).map(|d| d.doc.name.clone())?;
     let reverts = p.id == "file.revert";
     let (choices, default): (&[&str], _) = if reverts { (&["dontSave", "cancel"], "dontSave") } else { (&["save", "dontSave", "cancel"], "save") };
@@ -391,7 +389,7 @@ pub fn inspect(app: &PhotocraftApp) -> Option<Value> {
         "id": CONTROL_ID,
         "kind": "unsavedChanges",
         "title": if reverts { "Revert" } else { "Unsaved changes" },
-        "fields": {"command": p.id, "document": name, "remaining": p.docs.len(), "choices": choices, "default": default},
+        "fields": {"command": p.id, "document": name, "remaining": p.guard.remaining(), "choices": choices, "default": default},
     }))
 }
 
@@ -404,7 +402,7 @@ pub fn pending_command(app: &PhotocraftApp) -> Option<(String, Value)> {
 /// Answers the prompt for a control client: `save`, `dontSave` or `cancel` (Revert takes
 /// `dontSave` or `cancel`). Like the buttons, Save may first ask for a path in the save dialog.
 pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Result<Value, String> {
-    if app.discard.as_ref().and_then(|p| p.docs.first()).is_none() {
+    if app.discard.as_ref().and_then(|p| p.guard.current()).is_none() {
         return Err("no unsaved-changes prompt is open".into());
     }
     if app.file_dialog_open() || app.save_options_open() || app.saving() {

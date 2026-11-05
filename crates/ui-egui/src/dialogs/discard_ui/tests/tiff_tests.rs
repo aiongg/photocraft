@@ -105,8 +105,9 @@ fn cancelling_failing_or_copying_a_tiff_keeps_the_original_unsaved() {
         }
         assert!(h.state().tiff_options.is_none());
         assert_eq!(h.state().session.documents().len(), 2, "{outcome}");
-        assert_eq!(docs_left(&h), Some(1), "{outcome}");
-        assert!(h.query_by_label("(Y)es").is_some());
+        // A cancelled or failed save ends the close.
+        assert_eq!(docs_left(&h), None, "{outcome}");
+        assert!(h.query_by_label("(Y)es").is_none());
         let original = &h.state().session.documents()[0];
         assert!(original.is_dirty());
         assert_eq!(original.path.as_deref(), Some("original.tif"));

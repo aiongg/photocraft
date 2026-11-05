@@ -103,7 +103,11 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
         crate::menus::invoke(&mut app, &ctx, command, json!({})).unwrap();
         make_dirty(&mut app, 1);
         advance(&mut app, &ctx, false);
-        assert_eq!(app.discard.as_ref().map(|p| p.docs.clone()), Some(vec![late]), "{command}: asks about the newly dirty document");
+        assert_eq!(
+            app.discard.as_ref().map(|p| (p.guard.current().copied(), p.guard.remaining())),
+            Some((Some(late), 1)),
+            "{command}: asks about the newly dirty document"
+        );
         assert!(!app.allow_close, "{command}");
         assert_eq!(app.session.documents().len(), 1, "{command}: it is not discarded unasked");
         advance(&mut app, &ctx, false);
@@ -118,7 +122,11 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
     make_dirty(&mut app, 1);
     make_dirty(&mut app, 2);
     advance(&mut app, &ctx, false);
-    assert_eq!(app.discard.as_ref().map(|p| p.docs.clone()), Some(vec![late]), "file.closeOthers: asks about the newly dirty other document");
+    assert_eq!(
+        app.discard.as_ref().map(|p| (p.guard.current().copied(), p.guard.remaining())),
+        Some((Some(late), 1)),
+        "file.closeOthers: asks about the newly dirty other document"
+    );
     advance(&mut app, &ctx, false);
     assert!(app.discard.is_none());
     assert_eq!(app.session.documents().iter().map(|d| d.doc.id).collect::<Vec<_>>(), [kept]);
@@ -161,14 +169,14 @@ fn quitting_replaces_a_pending_close_but_other_requests_are_refused() {
     make_dirty(&mut app, 1);
     assert!(intercept(&mut app, "file.close", &json!({"document": 0})));
     assert!(intercept(&mut app, "file.closeAll", &Value::Null));
-    assert_eq!(app.discard.as_ref().map(|p| (p.id.as_str(), p.docs.len())), Some(("file.close", 1)));
+    assert_eq!(app.discard.as_ref().map(|p| (p.id.as_str(), p.guard.remaining())), Some(("file.close", 1)));
     assert!(app.ui.status_error);
     assert!(intercept(&mut app, EXIT, &Value::Null));
-    assert_eq!(app.discard.as_ref().map(|p| (p.id.as_str(), p.docs.len())), Some((EXIT, 2)));
+    assert_eq!(app.discard.as_ref().map(|p| (p.id.as_str(), p.guard.remaining())), Some((EXIT, 2)));
     // Pressing the window's X again must not restart the questions.
-    app.discard.as_mut().unwrap().docs.remove(0);
+    app.discard.as_mut().unwrap().guard.discarded();
     assert!(intercept(&mut app, EXIT, &Value::Null));
-    assert_eq!(app.discard.as_ref().unwrap().docs.len(), 1);
+    assert_eq!(app.discard.as_ref().unwrap().guard.remaining(), 1);
 }
 
 #[test]
@@ -235,7 +243,7 @@ fn arrows_walk(h: &mut Prompted, labels: [&str; 3], default: usize) {
 }
 
 fn docs_left(h: &Prompted) -> Option<usize> {
-    h.state().discard.as_ref().map(|p| p.docs.len())
+    h.state().discard.as_ref().map(|p| p.guard.remaining())
 }
 
 /// Which of `labels` has keyboard focus.
@@ -364,7 +372,8 @@ fn macos_plain_labels_keep_save_and_escape_shortcuts() {
         h.key_press(key);
         h.run_steps(2);
         assert_eq!(asked.borrow().len(), 1, "{key:?} opens the save dialog");
-        assert_eq!(docs_left(&h), Some(2), "cancelling the save dialog keeps the prompt");
+        // A cancelled or failed save ends the close.
+        assert_eq!(docs_left(&h), None, "cancelling the save dialog ends the close");
         h.key_press(Key::Escape);
         h.run_steps(2);
         assert!(h.state().discard.is_none());
@@ -375,13 +384,14 @@ fn macos_plain_labels_keep_save_and_escape_shortcuts() {
 #[test]
 fn enter_takes_the_default_answer_or_the_focused_button() {
     let mut h = prompt_on(egui::os::OperatingSystem::Windows);
-    // Backing out of the save dialog keeps the prompt.
+    // Backing out of the save dialog ends the close (a cancelled or failed save ends the close).
     let (show, asked) = crate::file_dialog::fake(vec![None]);
     h.state_mut().services.file_dialog = Some(show);
     h.key_press(Key::Enter);
     h.run_steps(2);
     assert_eq!(asked.borrow().len(), 1, "Enter answered Yes, which saves");
-    assert_eq!(docs_left(&h), Some(2));
+    assert_eq!(docs_left(&h), None);
+    let mut h = prompt_on(egui::os::OperatingSystem::Windows);
     // The arrow key from the focused Yes to No (Tab visits a dialog's fields only): Enter now presses it.
     h.key_press(Key::ArrowRight);
     h.run_steps(2);
@@ -413,14 +423,16 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
         waiting.borrow_mut().take().expect("the save dialog is open").send(a);
         h.run_steps(2);
     };
-    // Cancelling the save dialog brings the prompt back.
+    // A cancelled or failed save ends the close: cancelling the save dialog drops the prompt.
     h.key_press(Key::Y);
     h.run_steps(3);
     assert!(h.state().file_dialog_open());
     assert!(h.query_by_label("(Y)es").is_none(), "the prompt waits behind the dialog");
     answer(&mut h, None);
-    assert_eq!(docs_left(&h), Some(1));
-    assert_eq!(focused(&h, &["(Y)es", "(N)o", "(C)ancel"]), Some("(Y)es"), "the prompt comes back with Yes focused");
+    assert_eq!(docs_left(&h), None);
+    assert_eq!(h.state().session.documents().len(), 1, "the document stays open");
+    assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
+    h.run_steps(3);
     // Saving closes the document.
     h.key_press(Key::Y);
     h.run_steps(3);
@@ -467,8 +479,11 @@ fn saving_from_the_prompt_waits_for_the_question_whether_to_replace() {
     crate::dialogs::cancel(h.state_mut(), id).unwrap();
     h.run_steps(2);
     assert!(written.borrow().is_empty(), "Cancel writes nothing");
-    assert_eq!(docs_left(&h), Some(1));
-    assert_eq!(focused(&h, &["(Y)es", "(N)o", "(C)ancel"]), Some("(Y)es"), "the prompt comes back");
+    // A cancelled or failed save ends the close.
+    assert_eq!(docs_left(&h), None);
+    assert_eq!(h.state().session.documents().len(), 1, "the document stays open");
+    assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
+    h.run_steps(3);
 
     let id = save(&mut h);
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
