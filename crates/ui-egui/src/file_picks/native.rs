@@ -12,6 +12,11 @@ use crate::PhotocraftApp;
 pub(crate) struct Panels(Option<FilePanels>);
 
 impl Panels {
+    /// The ids of the Replace questions the panels have open on the host.
+    pub(crate) fn open_questions(&self) -> Vec<craft::ui::dialog::DialogId> {
+        self.0.as_ref().map_or_else(Vec::new, |panels| panels.open_questions().collect())
+    }
+
     /// Shows the next queued panel and settles the answers. The Replace question is a prompt on
     /// `host`, shown with the app's other dialogs.
     pub(crate) fn pump(&mut self, policy: ExtensionPolicy, host: &mut craft::ui::dialog::DialogHost, parent: Option<&eframe::Frame>) {

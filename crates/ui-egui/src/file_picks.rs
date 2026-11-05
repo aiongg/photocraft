@@ -42,6 +42,14 @@ pub(crate) use native::Panels;
 #[derive(Default)]
 pub(crate) struct Panels;
 
+#[cfg(target_arch = "wasm32")]
+impl Panels {
+    /// The browser asks no Replace question.
+    pub(crate) fn open_questions(&self) -> Vec<craft::ui::dialog::DialogId> {
+        Vec::new()
+    }
+}
+
 /// What to do with the answer.
 type Then = Box<dyn FnOnce(&mut PhotocraftApp, Picked) -> Result<Value, String>>;
 
@@ -127,15 +135,11 @@ impl PhotocraftApp {
         let path = Path::new(&suggested);
         let doc = self.session.active().map(|d| d.doc.id);
         let purpose = doc.map_or_else(|| "save".to_owned(), |DocId(id)| format!("save.{id}"));
-        // An explicit directory wins over the remembered folder, so a bare name gives it only when
-        // the document has no remembered folder yet.
-        let directory = path.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf).or_else(|| {
-            let remembered = self.services.files.as_ref().and_then(|f| f.last_folder(&purpose));
-            let beside = self.session.active().and_then(|d| d.path.as_deref()).and_then(|p| Path::new(p).parent()).map(Path::to_path_buf);
-            if remembered.is_some() { None } else { beside }
-        });
         let mut request = PickRequest::save(purpose);
-        request.directory = directory;
+        // The suggested path's own folder wins over the remembered one; the document's folder is
+        // only where a purpose with nothing remembered starts.
+        request.directory = path.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf);
+        request.default_directory = self.session.active().and_then(|d| d.path.as_deref()).and_then(|p| Path::new(p).parent()).map(Path::to_path_buf);
         request.file_name = path.file_name().map(|n| n.to_string_lossy().into_owned());
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             request = request.suggested_extension(ext);
@@ -286,7 +290,6 @@ impl PhotocraftApp {
         {
             let policy = native::policy(self.session.prefs().file_handling.lowercase_extension);
             self.file_panels.pump(policy, &mut self.ui.host, parent);
-            crate::standard_prompts::adopt_file_question(self);
         }
         #[cfg(target_arch = "wasm32")]
         let _ = parent;

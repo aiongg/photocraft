@@ -868,6 +868,9 @@ pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resu
     if app.ui.hosted(id).is_some() {
         return hosted::confirm(app, ctx, id);
     }
+    if let Some(answer) = standard_prompts::answer_file_question(app, ctx, id, true) {
+        return answer;
+    }
     if app.ui.prompt(id).is_some() {
         return standard_prompts::confirm(app, ctx, id);
     }
@@ -898,6 +901,9 @@ pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 }
 
 pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
+    if let Some(answer) = standard_prompts::answer_file_question(app, ctx, id, false) {
+        return answer;
+    }
     if app.ui.prompt(id).is_some() {
         return standard_prompts::cancel(app, ctx, id);
     }
