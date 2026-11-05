@@ -979,6 +979,9 @@ fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     if app.ui.hosted(id).is_some() {
         return wrap(crate::dialogs::hosted::set_field(app, id, field, value).map(|()| Value::Null));
     }
+    if app.ui.prompt(id).is_some() {
+        return wrap(crate::dialogs::standard_prompts::set_field(app, id, field, value).map(|()| Value::Null));
+    }
     match app.ui.dialog_mut(id) {
         // A continuation belongs to the dialog that paused it, even when another
         // action has a valid token. Replacing it would resume or cancel that action.

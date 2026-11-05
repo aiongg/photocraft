@@ -381,6 +381,9 @@ pub struct UiState {
     /// The open hosted dialogs, by automation id.
     #[serde(skip)]
     pub hosted: Vec<crate::dialogs::hosted::Hosted>,
+    /// The open standard prompts, by automation id.
+    #[serde(skip)]
+    pub prompts: Vec<crate::dialogs::standard_prompts::PromptRecord>,
     /// The legacy dialogs the shared stack holds, so `dialogs::show` can drop the ones that closed.
     #[serde(skip)]
     pub legacy_stacked: Vec<u64>,
@@ -554,6 +557,7 @@ impl Default for UiState {
             dialogs: Vec::new(),
             host: Default::default(),
             hosted: Vec::new(),
+            prompts: Vec::new(),
             legacy_stacked: Vec::new(),
             windows: Vec::new(),
             theme: crate::theme::ThemeKind::ProMedium,

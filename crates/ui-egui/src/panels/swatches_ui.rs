@@ -510,7 +510,7 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
         export_dialog(&mut app, "aco").unwrap();
         app.poll_file_dialog(&egui::Context::default(), None);
-        let id = app.ui.dialogs.iter().find(|d| crate::replace_prompt::owns(&d.fields)).map(|d| d.id).expect("the export asks first");
+        let id = app.ui.prompt_with(crate::replace_prompt::owns).map(|p| p.id).expect("the export asks first");
         assert!(written.borrow().is_empty(), "nothing is written before the answer");
         crate::dialogs::confirm(&mut app, id).unwrap();
         assert_eq!(*written.borrow(), ["/swatches/Swatches.aco"]);
