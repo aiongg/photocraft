@@ -38,7 +38,6 @@ mod caption_style;
 mod control_server;
 mod crash_guard;
 mod cursor;
-mod file_dialog_probe;
 mod gpu_startup;
 mod launch_args;
 // Pure logic is tested on every platform; only Linux runs the check.
@@ -49,7 +48,6 @@ mod monitor_profile;
 mod photoshop_settings;
 // Save As through the desktop portal, which reports the file type picked (#6121).
 #[cfg(target_os = "linux")]
-mod portal_save;
 mod presentation;
 // The print portal needs the session bus (zbus, Linux only); its pure helpers are tested everywhere.
 #[cfg(any(target_os = "linux", test))]
@@ -479,7 +477,6 @@ fn main() -> eframe::Result {
             #[cfg(target_os = "linux")]
             {
                 services.is_wayland = display == Some(tablet::DisplayKind::Wayland);
-                file_dialog_probe::start();
                 if services.is_wayland {
                     let var = |name| std::env::var(name).ok();
                     services.xwayland_command =
@@ -593,6 +590,7 @@ fn main() -> eframe::Result {
                 let rx = control_server::start(port, token, cc.egui_ctx.clone());
                 app = app.with_control(rx);
             }
+            app.install_native_files(&cc.egui_ctx);
             #[cfg(target_os = "macos")]
             {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));

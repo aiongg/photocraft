@@ -88,13 +88,11 @@ fn run(app: &mut PhotocraftApp, mut record: PromptRecord, choice: PromptChoice) 
             crate::gpu_status::recover(app, choice == PromptChoice::Alternate);
             Ok(Value::Null)
         } else {
-            crate::replace_prompt::confirm(app)
+            Ok(Value::Null)
         }
     } else {
         crate::actions::stopped(app, fields);
-        if crate::replace_prompt::owns(fields) {
-            crate::replace_prompt::cancel(app)
-        } else if crate::open_prompt::owns_damage(fields) {
+        if crate::open_prompt::owns_damage(fields) {
             crate::open_prompt::answer_damage(app, false)
         } else if crate::gpu_status::owns(fields) {
             app.ui.gpu_fallback_notice = None;

@@ -887,17 +887,16 @@ pub(crate) fn needs_displace_map(command: &str, params: &Value) -> bool {
 /// as a document and picked as Map Document there. It displaces the document that asked, even
 /// when another one was activated while the picker was open.
 pub(crate) fn ask_displace_map(app: &mut PhotocraftApp, command: String, fields: Map<String, Value>) -> Result<Value, String> {
-    use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
+    use craft::host::Picked;
     let doc = app.active_doc_id()?;
-    let initial_dir = crate::file_dialog::last_used_dir(&app.ui.recent_files);
-    app.ask_file(FileDialogRequest::Open { multiple: false, initial_dir, extensions: None }, move |app, answer| {
-        let path = match answer {
-            FileDialogAnswer::Paths(paths) => paths.into_iter().next().ok_or("no displacement map was chosen")?,
-            FileDialogAnswer::Unavailable(e) => return Err(e),
-            FileDialogAnswer::Contents(..) | FileDialogAnswer::ContentsMany(_) => {
+    let request = app.open_request(false, &[]);
+    app.ask_file(request, move |app, picked| {
+        let path = match picked {
+            Picked::Paths(paths) => crate::file_open::path_text(paths.first().ok_or("no displacement map was chosen")?, false)?,
+            Picked::Contents(_) => {
                 return Err("open the displacement map as a document, then choose it as the Map Document".into());
             }
-            FileDialogAnswer::SaveTo(_) | FileDialogAnswer::FolderTo(_) => return Err("unexpected answer from the file dialog".into()),
+            Picked::Cancelled => return Err(crate::file_picks::CANCELLED.into()),
         };
         let mut fields = fields;
         fields.insert("mapPath".into(), json!(path));

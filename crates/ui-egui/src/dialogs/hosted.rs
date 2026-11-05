@@ -493,19 +493,14 @@ fn browse(app: &mut PhotocraftApp) {
     let result = match kind {
         PathKind::Folder => app.ask_folder(fill),
         PathKind::OpenFile { extensions } => {
-            let initial_dir = crate::file_dialog::last_used_dir(&app.ui.recent_files);
-            let extensions = (!extensions.is_empty()).then_some(extensions);
-            let request = crate::file_dialog::FileDialogRequest::Open { multiple: false, initial_dir, extensions };
-            app.ask_file(request, move |app, answer| match answer {
-                crate::file_dialog::FileDialogAnswer::Paths(mut paths) if !paths.is_empty() => fill(app, paths.remove(0)),
-                _ => Err("the file dialog gave an unexpected answer".into()),
-            })
+            let request = app.open_request(false, &extensions.iter().map(String::as_str).collect::<Vec<_>>());
+            app.ask_file(request, move |app, picked| fill(app, crate::file_picks::first_path(&picked, false)?))
         }
-        PathKind::SaveFile => app.ask_file(crate::file_dialog::FileDialogRequest::Save { suggested: current }, move |app, answer| match answer {
-            crate::file_dialog::FileDialogAnswer::SaveTo(path) => fill(app, path),
-            _ => Err("the file dialog gave an unexpected answer".into()),
-        }),
+        PathKind::SaveFile => app.pick_save(&current, fill),
     };
+    if result.is_ok() {
+        app.file_dialog_for(id);
+    }
     crate::dialogs::report_browse(app, result);
 }
 
@@ -537,6 +532,7 @@ pub fn set_color(app: &mut PhotocraftApp, id: u64, key: &str, hex: &str) -> Resu
 pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
     let at = app.ui.hosted.iter().position(|h| h.id == id)?;
     let record = app.ui.hosted.remove(at);
+    app.forget_file_dialog_of(id);
     crate::actions::stopped(app, &record.private);
     app.filter_preview = None;
     Some(record)

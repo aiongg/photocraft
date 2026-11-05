@@ -67,7 +67,7 @@ pub(crate) fn import_gradients_dialog(app: &mut PhotocraftApp) {
         Ok(Value::Null)
     });
     if let Err(error) = result
-        && error != crate::file_dialog::CANCELLED
+        && error != crate::file_picks::CANCELLED
     {
         app.ui.status = error;
         app.ui.status_error = true;

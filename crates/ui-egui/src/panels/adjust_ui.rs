@@ -261,7 +261,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
     }
     if browse
         && let Err(e) = browse_color_lookup(app, id)
-        && e != crate::file_dialog::CANCELLED
+        && e != crate::file_picks::CANCELLED
     {
         app.ui.status = e;
         app.ui.status_error = true;

@@ -1,4 +1,4 @@
-use super::{CaptionStyle, Document, FileDialogFn, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, screen_picker, targa_options_ui};
+use super::{CaptionStyle, Document, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, screen_picker, targa_options_ui};
 
 /// The error a save gets while another save waits on its format prompt.
 pub(crate) const SAVE_OPTIONS_OPEN: &str = "Answer the TIFF, Targa, DDS or JPEG Options before starting another save";
@@ -194,9 +194,6 @@ pub struct FileStamp {
 /// The [`FileStamp`] of the file at a path, `None` when it can't be read.
 pub type FileStampFn = Box<dyn Fn(&str) -> Option<FileStamp>>;
 
-/// Whether two paths name one entry in one folder on disk; false when either can't be read.
-pub type SameFileFn = Box<dyn Fn(&str, &str) -> bool>;
-
 /// Encode a document and write it to a path, reporting the stage to the job; returns the export
 /// warnings. Runs on a worker thread (see [`Services::save_file`]). It must call
 /// [`jobs_ui::SaveCtl::commit`] right before replacing the file, and write nothing if that fails.
@@ -335,18 +332,14 @@ pub struct Services {
     /// Background save over the automation write authority (`app.save`, #2017): same worker
     /// contract as `save_file`, but the bytes go through the capability-scoped workspace.
     pub automation_save: Option<SaveFileFn>,
-    /// Show an Open or Save dialog without waiting for it (see `file_dialog`).
-    pub file_dialog: Option<FileDialogFn>,
+    /// The file service behind every Open, Save and folder pick (see `file_picks`). Native
+    /// builds install the library's service with `PhotocraftApp::install_native_files`.
+    pub files: Option<std::sync::Arc<dyn craft::host::Files>>,
     /// Write bytes to a path (native) or trigger a download (web).
     pub write: Option<WriteFn>,
     /// Size and modification time of a file (native); `None` on the web, where Save never
     /// writes back to a file.
     pub file_stamp: Option<FileStampFn>,
-    /// Whether two paths name one entry in one folder (native): a save dialog's answer and the
-    /// path the save writes to after Lowercase Extension, on a file system that ignores letter
-    /// case. A hard link is another entry. A save asks before replacing an entry it finds
-    /// different (`replace_prompt`).
-    pub same_file: Option<SameFileFn>,
     /// `write` only asks for the bytes to be kept (a browser download, which the user can
     /// cancel and which reports nothing back), so a save through it names the document but
     /// leaves its changes unsaved and the leave-page guard armed (#4962).

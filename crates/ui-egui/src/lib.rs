@@ -26,8 +26,8 @@ pub mod canvas;
 pub mod control;
 pub mod dialogs;
 pub mod dock;
-pub mod file_dialog;
 pub mod file_open;
+pub mod file_picks;
 pub mod frame_stages;
 pub mod gpu_status;
 pub mod host_settings;
@@ -64,7 +64,6 @@ use photocraft_engine::Session;
 use serde_json::{Value, json};
 
 pub use control::{ControlRequest, ControlResponse};
-pub use file_dialog::{FileDialogAnswer, FileDialogFn, FileDialogReply, FileDialogRequest};
 pub use file_open::OsEvent;
 pub use state::{Tool, UiState};
 
@@ -158,7 +157,6 @@ pub use dialogs::open_prompt;
 pub use dialogs::palette;
 pub(crate) use dialogs::pattern_fill_ui;
 pub use dialogs::rasterize_prompt;
-pub use dialogs::replace_prompt;
 pub use dialogs::screen_picker;
 pub use dialogs::select_mask_ui;
 pub use dialogs::shape_dialog;
@@ -244,7 +242,7 @@ pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
     CaptionStyleFn, ClipboardGetFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, EncodePngFn, ExportFn, ExportSettings, FileStamp,
     FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenUrlFn, OsEventsFn, PhotoshopShortcutsFn, QuitFn, RecoverFn, Recoverable, RightButtonDownFn,
-    SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, WindowFrameFn, WindowRestoreFn, WriteFn,
+    SaveFileFn, SaveTextFn, Services, SystemThemeFn, WindowFrameFn, WindowRestoreFn, WriteFn,
 };
 pub use text::bidi_text;
 pub use text::cjk_fonts;
@@ -649,13 +647,12 @@ pub struct PhotocraftApp {
     pub(crate) updates_rt: updates_ui::Runtime,
     /// Close, Revert or Exit parked behind the unsaved-changes prompt (see `discard_ui`).
     pub(crate) discard: Option<discard_ui::Prompt>,
-    /// The Open or Save dialog in progress, and the action waiting on it (see `file_dialog`).
-    pub(crate) file_dialog: Option<file_dialog::Pending>,
+    /// The Open or Save dialog in progress, and the action waiting on it (see `file_picks`).
+    pub(crate) file_dialog: Option<file_picks::Pending>,
+    /// The native file panels behind `services.files`.
+    pub(crate) file_panels: file_picks::Panels,
     /// A Save As to a layered TIFF parked behind the TIFF Options prompt (see `tiff_options_ui`).
     pub(crate) tiff_options: Option<tiff_options_ui::Prompt>,
-    /// Where each document was last saved or exported to through a dialog (#1826): its next Save
-    /// As or export dialog starts there rather than beside the document. Session-only.
-    pub(crate) save_dirs: HashMap<photocraft_doc::DocId, std::path::PathBuf>,
     /// Each document's own file as it was when the document was opened from it or saved to it
     /// (see [`FileStamp`]).
     pub(crate) disk_stamps: HashMap<photocraft_doc::DocId, (String, FileStamp)>,
