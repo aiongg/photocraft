@@ -49,7 +49,7 @@ fn evidence(h: &mut Harness, name: &str) {
 fn open_format_choices(h: &mut Harness) {
     // The caption is a separate Label node with the same text; the accessible ComboBox name
     // identifies the actual form field without guessing from coordinates.
-    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Format:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Format").click();
     h.run_steps(3);
 }
 
@@ -76,11 +76,11 @@ fn edit_path(h: &mut Harness, name: &str, value: &Path) {
 }
 
 fn edit_quality(h: &mut Harness, value: &str) {
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").click();
     h.run_steps(2);
     replace_text(h, value);
     // Clicking the caption commits the field without Enter confirming the dialog.
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Quality:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "Quality").click();
     h.run_steps(3);
 }
 
@@ -100,7 +100,7 @@ fn batch_menu_offers_quality() {
     let mut h = harness();
     open(&mut h, "file.automate.batch");
     evidence(&mut h, "batch-quality");
-    assert!(h.query_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality:").is_some(), "Batch must expose its supported output quality");
+    assert!(h.query_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").is_some(), "Batch must expose its supported output quality");
 }
 
 #[test]
@@ -240,8 +240,8 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
                 assert_eq!(f["convertToSrgb"], json!(true));
             }
             choose_webp(&mut h);
-            edit_path(&mut h, "Input:", &input);
-            edit_path(&mut h, "Output:", &output);
+            edit_path(&mut h, "Input", &input);
+            edit_path(&mut h, "Output", &output);
             edit_quality(&mut h, &quality.to_string());
             evidence(&mut h, &format!("{prefix}-webp-quality-{quality}"));
             h.get_by_label("OK").click();
@@ -281,7 +281,7 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     }
     let mut h = harness();
     open(&mut h, "file.automate.batch");
-    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming").click();
     h.run_steps(2);
     replace_text(&mut h, "cancelled_{serial}");
     h.get_by_label("Cancel").click();
@@ -291,16 +291,16 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     let f = fields(&h);
     assert_eq!(f["naming"], "");
     assert_eq!(f["startingSerial"], 1);
-    edit_path(&mut h, "Input:", &input);
-    edit_path(&mut h, "Output:", &output);
-    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming:").click();
+    edit_path(&mut h, "Input", &input);
+    edit_path(&mut h, "Output", &output);
+    h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming").click();
     h.run_steps(2);
     replace_text(&mut h, "{serial}_{name}");
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting serial:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting serial").click();
     h.run_steps(2);
     h.event(egui::Event::Text("7".into()));
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial:").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial").click();
     h.run_steps(3);
     assert_eq!(fields(&h)["startingSerial"], 7, "typing changes the starting serial");
     evidence(&mut h, "batch-naming");
@@ -337,8 +337,8 @@ fn batch_default_quality_keeps_lossless_webp_and_existing_jpeg_bytes() {
             h.get_by_label("Jpg").click();
             h.run_steps(3);
         }
-        edit_path(&mut h, "Input:", &input);
-        edit_path(&mut h, "Output:", &output);
+        edit_path(&mut h, "Input", &input);
+        edit_path(&mut h, "Output", &output);
         assert!(fields(&h).get("quality").is_none_or(Value::is_null));
         evidence(&mut h, &format!("batch-default-{format}"));
         h.get_by_label("OK").click();

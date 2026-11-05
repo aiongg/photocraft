@@ -2521,8 +2521,8 @@ mod multi_layer_formatting {
             let styles = ids.map(|id| text(&app, id).char_runs());
             let steps = app.session.active().unwrap().history.entries().len();
             crate::menus::invoke(&mut app, &egui::Context::default(), "type.warpText", json!({})).unwrap();
-            let dialog = app.ui.dialogs.last().unwrap().id;
-            let fields = &app.ui.dialogs.last().unwrap().fields;
+            let dialog = app.ui.hosted.last().unwrap().id;
+            let fields = &app.ui.dialog_fields(dialog).unwrap();
             if inline {
                 assert_eq!(fields["layer"], ids[0].0);
                 assert_eq!(fields["coalesce"], "batch-type-edit");
@@ -2546,12 +2546,12 @@ mod multi_layer_formatting {
             for label in ["Layer", "Layers", "Range", "Coalesce"] {
                 assert!(h.query_by_label(label).is_none(), "target metadata must not become a form field: {label}");
             }
-            h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("style".into(), json!("arc"));
-            h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("bend".into(), json!(25.0));
+            crate::dialogs::hosted::set_field(h.state_mut(), dialog, "style", json!("arc")).unwrap();
+            crate::dialogs::hosted::set_field(h.state_mut(), dialog, "bend", json!(25.0)).unwrap();
             selected(h.state_mut(), &[ids[2]]);
             h.get_by_label("OK").click();
             h.run_steps(3);
-            assert!(h.state().ui.dialogs.is_empty());
+            assert!(!h.state().ui.hosted_open());
             for (i, id) in ids.into_iter().enumerate() {
                 let t = text(h.state(), id);
                 assert_eq!(t.warp.as_ref().map(|w| w.value), (i == 0 || (!inline && i == 1)).then_some(25.0), "inline={inline}, layer={i}");
@@ -2606,10 +2606,9 @@ mod multi_layer_formatting {
         let mut h = controls(app, false);
         h.get_by_role_and_label(Role::Button, "Create warped text").click();
         h.run();
-        let dialog = h.state().ui.dialogs.last().unwrap();
-        assert_eq!(dialog.fields.get("__command").and_then(|c| c.as_str()), Some("type.warpText"));
-        let dialog = dialog.id;
-        h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("style".into(), json!("arc"));
+        let dialog = h.state().ui.hosted.last().unwrap().id;
+        assert_eq!(h.state().ui.dialog_fields(dialog).unwrap().get("__command").and_then(|c| c.as_str()), Some("type.warpText"));
+        crate::dialogs::hosted::set_field(h.state_mut(), dialog, "style", json!("arc")).unwrap();
         crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
         for id in &ids[..2] {
             assert!(text(h.state(), *id).warp.is_some(), "a selected layer is warped");

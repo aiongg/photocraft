@@ -122,7 +122,7 @@ fn single_frame_trackpad_tap_keeps_dialog_dropdown_above_modal_and_selects_optio
     tap(&mut h, perceptual_pos);
     assert!(!craft::ui::popup_list::any_open(&h.ctx), "tap on option closes the dropdown");
     assert_eq!(
-        h.state().ui.dialogs.iter().find(|d| d.id == d2).and_then(|d| d.fields.get("palette")).and_then(|v| v.as_str()),
+        h.state().ui.dialog_fields(d2).as_ref().and_then(|f| f.get("palette")).and_then(|v| v.as_str()),
         Some("perceptual"),
         "tap on Perceptual selected it"
     );

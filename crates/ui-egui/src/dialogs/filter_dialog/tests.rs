@@ -446,7 +446,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
 #[test]
 fn indexed_counts_are_integer_json_while_dither_amounts_keep_their_decimals() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    open(&mut app, "image.mode.indexedColor").unwrap();
+    open_legacy(&mut app, "image.mode.indexedColor").unwrap();
     let mut defaults = app.ui.dialogs.first().unwrap().fields.clone();
     let before = params_of(&defaults)["colors"].clone();
     egui::Context::default().run_ui(Default::default(), |ui| body(ui, &mut defaults)).textures_delta.clear();
@@ -1495,7 +1495,7 @@ fn replace_color_eyedropper_samples_the_image() {
     s.execute("file.new", json!({"width": 16, "height": 16, "background": "#00ff00"})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     app.run("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
-    let id = open(&mut app, REPLACE_COLOR).unwrap();
+    let id = open_legacy(&mut app, REPLACE_COLOR).unwrap();
     assert_eq!(app.ui.dialogs.last().unwrap().fields["color"], json!("#ff0000"), "the dialog starts from the foreground colour");
     // #6279: armed as it opens, so the first click on the image samples.
     assert!(color_eyedropper_armed(&app));
@@ -1524,7 +1524,7 @@ fn replace_color_dialog_arms_the_eyedropper_button() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
-    open(h.state_mut(), REPLACE_COLOR).unwrap();
+    open_legacy(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     assert!(color_eyedropper_armed(h.state()), "armed as the dialog opens");
     h.get_by_label("Pick Color From Image").click();
@@ -1548,7 +1548,7 @@ fn replace_color_result_swatch_sets_the_sliders() {
     app.run("tools.setColors", json!({"foreground": "#cc3333"})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
-    let id = open(h.state_mut(), REPLACE_COLOR).unwrap();
+    let id = open_legacy(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     // No shift yet: the Result is the sampled colour.
     assert_eq!(h.get_all_by_label("#cc3333").count(), 2, "the sampled colour and the Result both read #cc3333");
@@ -1587,7 +1587,7 @@ fn replace_color_localized_color_clusters() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 800.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
-    let id = open(h.state_mut(), REPLACE_COLOR).unwrap();
+    let id = open_legacy(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     let _ = h.get_by_label("Localized Color Clusters");
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert(COLOR_EYEDROPPER.into(), json!(true));

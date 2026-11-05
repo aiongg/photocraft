@@ -59,7 +59,7 @@ fn arbitrary_rotation_starts_at_the_ruler_angle() {
     let (mut app, ctx) = app();
     let open = |app: &mut PhotocraftApp| {
         let r = crate::menus::invoke(app, &ctx, "image.rotation.arbitrary", json!({})).unwrap();
-        let f = &app.ui.dialog_mut(r["dialog"].as_u64().unwrap()).unwrap().fields;
+        let f = app.ui.dialog_fields(r["dialog"].as_u64().unwrap()).unwrap();
         (f["angle"].as_f64().unwrap(), f["direction"].clone())
     };
     assert_eq!(open(&mut app), (0.0, json!("cw")));

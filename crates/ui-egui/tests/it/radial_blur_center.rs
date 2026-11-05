@@ -31,7 +31,7 @@ fn themed_harness(theme: ThemeKind, size: Vec2) -> Harness<'static, PhotocraftAp
     );
     PhotocraftApp::setup_context(&h.ctx, theme);
     control(&mut h, "ui.menu.invoke", json!({"id": COMMAND}));
-    let id = h.state().ui.dialogs.last().unwrap().id;
+    let id = h.state().ui.hosted.last().unwrap().id;
     control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": "method", "value": "zoom"}));
     h
 }
@@ -44,8 +44,8 @@ fn control(h: &mut Harness<'_, PhotocraftApp>, method: &str, params: Value) {
     h.run_steps(3);
 }
 
-fn fields<'a>(h: &'a Harness<'_, PhotocraftApp>) -> &'a Map<String, Value> {
-    &h.state().ui.dialogs.last().unwrap().fields
+fn fields(h: &Harness<'_, PhotocraftApp>) -> Map<String, Value> {
+    h.state().ui.dialog_fields(h.state().ui.hosted.last().unwrap().id).unwrap()
 }
 
 fn center(h: &Harness<'_, PhotocraftApp>) -> [f64; 2] {
@@ -140,7 +140,7 @@ fn keyboard_steps_and_automation_share_the_diagram_coordinates() {
     h.key_press(Key::ArrowDown);
     h.run_steps(2);
     assert_eq!(center(&h), [0.99, 0.01]);
-    let id = h.state().ui.dialogs.last().unwrap().id;
+    let id = h.state().ui.hosted.last().unwrap().id;
     for (field, value) in [("centerX", 0.12), ("centerY", 0.87)] {
         control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": field, "value": value}));
     }
@@ -153,14 +153,14 @@ fn only_zoom_has_the_diagram_and_switching_methods_keeps_the_center() {
     let mut h = harness();
     click(&mut h, 0.2, 0.7);
     for method in ["spin", "zoom"] {
-        h.state_mut().ui.dialogs.last_mut().unwrap().fields.insert("method".into(), json!(method));
-        h.run_steps(3);
+        let id = h.state().ui.hosted.last().unwrap().id;
+        control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": "method", "value": method}));
         assert_eq!(h.query_by_role_and_label(Role::Slider, "Center").is_some(), method == "zoom");
         let [x, y] = center(&h);
         assert!((x - 0.2).abs() < 1e-6 && (y - 0.7).abs() < 1e-6);
         assert_eq!(h.get_all_by_role(Role::SpinButton).count(), 3, "no duplicated centre controls");
     }
-    let id = h.state().ui.dialogs.last().unwrap().id;
+    let id = h.state().ui.hosted.last().unwrap().id;
     control(&mut h, "ui.dialog.cancel", json!({"dialog": id}));
     control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.gaussianBlur"}));
     assert!(h.query_by_role_and_label(Role::Slider, "Center").is_none(), "other filters keep their existing controls");
@@ -173,16 +173,16 @@ fn editing_the_diagram_is_only_a_preview_until_confirmed() {
     click(&mut h, 0.25, 0.75);
     assert_eq!(h.state().session.active().unwrap().revision, revision);
     let before = h.state().session.active().unwrap().doc.clone();
-    let params = filter_dialog::params_of(fields(&h));
+    let params = filter_dialog::params_of(&fields(&h));
     let active_layer = h.state().session.active().unwrap().active_layer;
     let expected = filter_dialog::preview_document(&before, active_layer, COMMAND, &params, 1).unwrap();
-    let id = h.state().ui.dialogs.last().unwrap().id;
+    let id = h.state().ui.hosted.last().unwrap().id;
     control(&mut h, "ui.dialog.confirm", json!({"dialog": id}));
     let actual = &h.state().session.active().unwrap().doc;
     assert_eq!(photocraft_compose::render(actual, actual.bounds()), photocraft_compose::render(&expected, expected.bounds()));
     assert!(h.state().session.active().unwrap().revision > revision);
     control(&mut h, "ui.menu.invoke", json!({"id": COMMAND}));
-    let id = h.state().ui.dialogs.last().unwrap().id;
+    let id = h.state().ui.hosted.last().unwrap().id;
     let revision = h.state().session.active().unwrap().revision;
     click(&mut h, 0.8, 0.2);
     control(&mut h, "ui.dialog.cancel", json!({"dialog": id}));
@@ -192,11 +192,10 @@ fn editing_the_diagram_is_only_a_preview_until_confirmed() {
 #[test]
 fn hostile_coordinates_are_bounded_before_drawing() {
     let mut h = harness();
-    for (x, y, expected) in [(json!(1e100), json!(-1e100), [1.0, 0.0]), (json!("invalid"), Value::Null, [0.5, 0.5])] {
-        let fields = &mut h.state_mut().ui.dialogs.last_mut().unwrap().fields;
-        fields.insert("centerX".into(), x);
-        fields.insert("centerY".into(), y);
-        h.run_steps(3);
+    for (x, y, expected) in [(json!(1e100), json!(-1e100), [1.0, 0.0]), (json!("invalid"), json!("invalid"), [0.5, 0.5])] {
+        let id = h.state().ui.hosted.last().unwrap().id;
+        control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": "centerX", "value": x}));
+        control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": "centerY", "value": y}));
         assert_eq!(center(&h), expected);
         assert_marker(&h, expected[0] as f32, expected[1] as f32);
     }
@@ -228,7 +227,7 @@ fn diagram_and_sliders_fit_every_theme_and_amount_changes_the_rays() {
             };
             let before = rays(&h);
             assert!(!before.is_empty(), "the diagram paints the streaks");
-            let id = h.state().ui.dialogs.last().unwrap().id;
+            let id = h.state().ui.hosted.last().unwrap().id;
             control(&mut h, "ui.dialog.set", json!({"dialog": id, "field": "amount", "value": 75}));
             assert_ne!(before, rays(&h), "Amount changes the schematic streaks");
             assert_eq!(center(&h), [0.25, 0.75]);

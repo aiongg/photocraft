@@ -58,9 +58,7 @@ fn close(a: [f32; 3], b: [f32; 3]) -> bool {
 #[test]
 fn filter_dialog_colours_open_the_color_picker() {
     for (cmd, key, label) in [("filter.other.colorToAlpha", "color", "Color"), ("filter.render.pictureFrame", "vineColor", "Vine Color")] {
-        // Colour to Alpha is a hosted dialog, whose rows name their swatch with the row's colon;
-        // Picture Frame (a seed row) is on the legacy list.
-        let swatch = if cmd == "filter.other.colorToAlpha" { format!("{label}:") } else { label.to_string() };
+        let swatch = label.to_string();
         let mut h = harness(|_| {});
         let ctx = h.ctx.clone();
         let id = crate::menus::invoke(h.state_mut(), &ctx, cmd, json!({})).unwrap()["dialog"].as_u64().unwrap();

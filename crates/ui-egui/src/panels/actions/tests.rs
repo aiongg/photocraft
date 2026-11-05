@@ -921,9 +921,8 @@ fn a_step_dialog_keeps_its_continuation_token() {
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     for (name, steps) in [
         ("First", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]),
-        // The host holds one parameter dialog, so the second pause is a dialog on the legacy list
-        // (Clouds has a seed row).
-        ("Second", vec![("filter.render.clouds".into(), json!({})), ("select.all".into(), json!({}))]),
+        // The second pause is a dialog on the legacy list (Tilt-Shift's pins live on the canvas).
+        ("Second", vec![("filter.blurGallery.tiltShift".into(), json!({})), ("select.all".into(), json!({}))]),
     ] {
         let mut action = Action::new(name, steps);
         action.dialogs.insert(0);
@@ -949,7 +948,6 @@ fn a_step_dialog_keeps_its_continuation_token() {
 }
 
 #[test]
-#[ignore = "library gap row 154: two ParamDialogs of one type"]
 fn a_step_dialog_keeps_its_continuation_token_across_two_filter_dialogs() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.background_jobs = false;

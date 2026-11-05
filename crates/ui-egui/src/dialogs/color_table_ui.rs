@@ -33,6 +33,14 @@ fn drop_loaded_unless_custom(fields: &mut Map<String, Value>) {
     }
 }
 
+/// [`body_done`] for a hosted dialog's fields.
+pub fn drop_loaded(fields: &mut craft::ui::dialog::DialogFields) {
+    if fields.text("table").is_some_and(|t| t != "custom") {
+        fields.remove("colors");
+        fields.remove("transparent");
+    }
+}
+
 /// The pending table: the dialog's loaded colors (while the Table menu is on Custom), else its
 /// preset, else the document's table.
 fn pending(app: &PhotocraftApp, fields: &Map<String, Value>) -> Option<(Vec<[u8; 3]>, Option<u16>)> {
@@ -88,6 +96,18 @@ pub fn run(app: &mut PhotocraftApp, id: u64, fields: &Map<String, Value>, action
                 let (colors, transparent) =
                     photocraft_engine::swatch_cmds::act_table(&bytes).map_err(|e| format!("{}: {e}", crate::file_open::display_name(&name)))?;
                 // The dialog may close while the picker is open; then there is nothing to fill.
+                if let Some(fields) = app.ui.hosted_fields_mut(id) {
+                    use craft::ui::dialog::FieldValue;
+                    fields.set("table", FieldValue::Text("custom".into()));
+                    fields.set("colors", FieldValue::List(colors.into_iter().map(FieldValue::Text).collect()));
+                    match transparent {
+                        Some(i) => fields.set("transparent", i as i64),
+                        None => {
+                            fields.remove("transparent");
+                        }
+                    }
+                    return Ok(Value::Null);
+                }
                 let Some(d) = app.ui.dialogs.iter_mut().find(|d| d.id == id) else { return Ok(Value::Null) };
                 d.fields.insert("table".into(), json!("custom"));
                 d.fields.insert("colors".into(), Value::Array(colors.into_iter().map(Value::String).collect()));
