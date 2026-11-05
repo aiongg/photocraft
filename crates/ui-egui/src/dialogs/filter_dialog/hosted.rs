@@ -365,12 +365,14 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         params_for(command, spec, &map)
     };
     // The library remembers what the app's JSON shape and `remember` keep the same way; Lens
-    // Blur's channel menu, the document menus, Select and Mask's Remember Settings, the bitmap
+    // Blur's channel menu, the document menus, the dialogs that open on the document's own state (the
+    // library's remembered values win over `values`), Select and Mask's Remember Settings, the bitmap
     // dialog, plug-ins and smart filters keep the app's own `remember`.
     let remembers = map.contains_key("__filter")
         && !map.contains_key("__spec")
         && !map.contains_key("__smartFilter")
         && !matches!(command, super::LENS_BLUR | crate::select_mask_view::COMMAND | crate::bitmap_dialog::COMMAND)
+        && !super::opens_on_document_state(command)
         && documents.is_empty();
     let record = Hosted {
         id: 0,

@@ -348,11 +348,11 @@ fn rememberable(kind: &Kind, value: &Value) -> bool {
 }
 
 fn restore_remembered(app: &PhotocraftApp, command: &str, spec: &str, fields: &mut Map<String, Value>) {
-    let Some(Value::Object(saved)) = app.session.prefs().dialogs.get(command) else { return };
+    let Some(Value::Object(saved)) = crate::host_settings::recall_ref(app, command) else { return };
     // Select and Mask starts from its defaults unless Remember Settings was on, as in Photoshop
     // (#9423).
     if command == crate::select_mask_view::COMMAND {
-        let remember = crate::select_mask_view::remembers(saved);
+        let remember = crate::select_mask_view::remembers(&saved);
         fields.insert(crate::select_mask_view::REMEMBER.into(), json!(remember));
         if !remember {
             return;
@@ -386,7 +386,7 @@ pub(crate) fn remember(app: &mut PhotocraftApp, command: &str, fields: &Map<Stri
         saved.insert(crate::select_mask_view::REMEMBER.into(), json!(remember));
     }
     if !saved.is_empty() {
-        app.session.prefs.edit(|prefs| prefs.dialogs.insert(command.into(), Value::Object(saved)));
+        crate::host_settings::remember(app, command, &Value::Object(saved));
     }
 }
 
@@ -417,6 +417,20 @@ fn default_value(app: &PhotocraftApp, command: &str, p: &Param) -> Option<Value>
         Kind::Json if p.key == "background" => json!(app.session.tools.background),
         Kind::Json => return None,
     })
+}
+
+/// The commands whose `apply_command_defaults` replace remembered values with the document's own
+/// state; the library's recall would put the remembered ones back.
+pub(crate) fn opens_on_document_state(command: &str) -> bool {
+    matches!(
+        command,
+        "image.rotation.arbitrary"
+            | "type.warpText"
+            | "edit.definePattern"
+            | "layer.new.artboardFromLayers"
+            | "layer.layerStyle.globalLight"
+            | "view.proofSetup"
+    )
 }
 
 /// Command-specific open defaults (ruler straighten, warp from layer, …), not remembered prefs.

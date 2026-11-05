@@ -47,7 +47,7 @@ pub(super) const SIZE_UNIT_KEY: &str = "edit.freeTransform";
 /// The W/H unit, with the document's resolution and the points per inch it converts with.
 pub(super) fn size_unit(app: &PhotocraftApp) -> crate::layer_props_ui::LenUnit {
     use photocraft_engine::prefs::Unit;
-    let unit = app.session.prefs().dialogs.get(SIZE_UNIT_KEY).and_then(|v| v.get("sizeUnit")).and_then(serde_json::Value::as_str).and_then(Unit::parse);
+    let unit = crate::host_settings::recall_ref(app, SIZE_UNIT_KEY).and_then(|v| v.get("sizeUnit").and_then(serde_json::Value::as_str).and_then(Unit::parse));
     crate::layer_props_ui::LenUnit { unit: unit.unwrap_or(Unit::Percent), ..crate::layer_props_ui::LenUnit::of(app) }
 }
 

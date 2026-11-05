@@ -729,9 +729,9 @@ pub fn open(app: &mut PhotocraftApp) -> Result<(), String> {
     let mask_only = st.doc.selection.is_none() && layer.and_then(|id| st.doc.layer(id)).is_some_and(|l| l.mask.is_some());
     let k = u32::try_from((canvas.width().max(canvas.height()) as usize).div_ceil(PROXY_SIDE).max(1)).unwrap_or(u32::MAX);
     let mut opts = SmOpts::default();
-    match app.session.prefs().dialogs.get(REMEMBERED) {
+    match crate::host_settings::recall_ref(app, REMEMBERED) {
         Some(saved) if saved.get("remember").and_then(Value::as_bool) == Some(true) => {
-            let _ = opts.apply(saved);
+            let _ = opts.apply(&saved);
         }
         _ if mask_only || target_mask => opts.output = "layerMask".into(),
         _ => {}
@@ -818,7 +818,7 @@ fn commit_params(w: &SelectMaskWorkspace) -> Value {
 
 fn remember(app: &mut PhotocraftApp, opts: &SmOpts) {
     let v = if opts.remember { opts.to_json() } else { json!({"remember": false}) };
-    app.session.prefs.edit(|p| p.dialogs.insert(REMEMBERED.into(), v));
+    crate::host_settings::remember(app, REMEMBERED, &v);
 }
 
 /// OK: runs `select.refineEdge` and closes. A failure leaves the workspace open with the error in

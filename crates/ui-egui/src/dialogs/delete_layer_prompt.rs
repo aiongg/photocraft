@@ -31,9 +31,7 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     };
     let fields = json!({MARK: true, "__command": command, "__label": "Delete Layer", "message": message,
         "document": state.doc.id.0, "selected": selected.iter().map(|id| id.0).collect::<Vec<_>>(), "params": params, "skip": false});
-    let prompt = StandardPrompt::confirm_delete(names.split(", "), ids.len())
-        .noun("{n} layer", "{n} layers")
-        .dont_show_again(PREF);
+    let prompt = StandardPrompt::confirm_delete(names.split(", "), ids.len()).noun("{n} layer", "{n} layers").dont_show_again(PREF);
     let Some(id) = crate::standard_prompts::open(app, prompt, "Delete Layer", fields.as_object().cloned().unwrap_or_default()) else {
         return Some(Ok(json!({"confirmationPending": true})));
     };

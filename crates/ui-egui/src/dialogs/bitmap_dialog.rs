@@ -121,7 +121,9 @@ pub(crate) fn params(library: Arc<PatternLibrary>, input: f32) -> Vec<LibParam> 
             let (v, unit) = if text(f, RES_UNIT, "ppi") == "ppcm" { (input / CM, res_units[1].1) } else { (input, res_units[0].1) };
             ui.label(egui::RichText::new(format!("{} {unit}", crate::widgets::fmt_num_prec(f64::from(v), 3))).color(t.color.text.normal.to_egui()))
         }),
-        LibParam::custom("resolutionRow", "Output", move |ui, f, _| per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, RES_UNIT, res_units)),
+        LibParam::custom("resolutionRow", "Output", move |ui, f, _| {
+            per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, RES_UNIT, res_units)
+        }),
         LibParam::new("method", "Use", Lib::Choice { options: choices(&METHODS), default: Some("diffusion".into()) }),
         LibParam::custom("patternRow", "Custom Pattern", move |ui, f, _| {
             let t = craft::ui::theme::current(ui.ctx());
@@ -135,8 +137,10 @@ pub(crate) fn params(library: Arc<PatternLibrary>, input: f32) -> Vec<LibParam> 
             response
         })
         .enabled_when("method", "customPattern"),
-        LibParam::custom("frequencyRow", "Frequency", move |ui, f, _| per_unit_row(ui, f, "frequency", tl!("Frequency"), FREQUENCY, 53.0, FREQ_UNIT, freq_units))
-            .enabled_when("method", "halftone"),
+        LibParam::custom("frequencyRow", "Frequency", move |ui, f, _| {
+            per_unit_row(ui, f, "frequency", tl!("Frequency"), FREQUENCY, 53.0, FREQ_UNIT, freq_units)
+        })
+        .enabled_when("method", "halftone"),
         LibParam::number("angle", "Angle", 45.0, 1.0, 1).bounds(Some(-180.0), Some(180.0)).unit(Unit::new("°")).enabled_when("method", "halftone"),
         LibParam::new("shape", "Shape", Lib::Choice { options: choices(&SHAPES), default: Some("round".into()) }).enabled_when("method", "halftone"),
     ]

@@ -44,7 +44,7 @@ pub fn fields(app: &PhotocraftApp) -> Map<String, Value> {
     f.insert("mode".into(), json!("normal"));
     f.insert("opacity".into(), json!(100.0));
     f.insert("preserveTransparency".into(), json!(false));
-    if let Some(Value::Object(saved)) = app.session.prefs().dialogs.get(COMMAND) {
+    if let Some(Value::Object(saved)) = crate::host_settings::recall_ref(app, COMMAND) {
         for key in KEYS {
             if let Some(value) = saved.get(key).filter(|v| valid(key, v)) {
                 f.insert(key.into(), value.clone());
@@ -68,7 +68,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     let remembered = params(f);
     let result = app.run(COMMAND, remembered.clone());
     if result.is_ok() {
-        app.session.prefs.edit(|p| p.dialogs.insert(COMMAND.into(), remembered));
+        crate::host_settings::remember(app, COMMAND, &remembered);
     }
     result
 }

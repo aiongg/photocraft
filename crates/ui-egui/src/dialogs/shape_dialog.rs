@@ -83,7 +83,7 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> Option<u64> {
         }
         _ => {}
     }
-    if let Some(Value::Object(saved)) = app.session.prefs().dialogs.get(&pref_key(kind)) {
+    if let Some(Value::Object(saved)) = crate::host_settings::recall_ref(app, &pref_key(kind)) {
         for key in KEYS {
             if f.contains_key(key)
                 && let Some(v) = saved.get(key).filter(|v| valid(key, v))
@@ -144,7 +144,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
         Ok(_) => {
             if let Some(kind) = f.get(MARK).and_then(Value::as_str) {
                 let saved: Map<String, Value> = KEYS.iter().filter_map(|k| f.get(*k).map(|v| (k.to_string(), v.clone()))).collect();
-                app.session.prefs.edit(|p| p.dialogs.insert(pref_key(kind), Value::Object(saved)));
+                crate::host_settings::remember(app, &pref_key(kind), &Value::Object(saved));
             }
         }
         Err(e) => {

@@ -34,9 +34,17 @@ struct Mirror {
 
 /// The store the Host reads and writes: the `remembered` section over `prefs.dialogs`, every other
 /// section as a table of `prefs.sections`.
-#[derive(Default)]
 pub struct PrefsSections {
     mirror: Mutex<Mirror>,
+    /// Object scopes read as the library's `DialogFields` (`{values: {...}}`; see [`wrap`]).
+    /// Off for the app's own scopes, which keep their JSON.
+    wrap: bool,
+}
+
+impl Default for PrefsSections {
+    fn default() -> Self {
+        Self { mirror: Mutex::default(), wrap: true }
+    }
 }
 
 impl PrefsSections {
@@ -60,7 +68,10 @@ pub fn of(ctx: &egui::Context) -> Arc<PrefsSections> {
 /// preferences, otherwise a preference change since the last call is copied into the store.
 pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let store = of(ctx);
-    let mut mirror = store.mirror();
+    exchange(app, &mut store.mirror());
+}
+
+fn exchange(app: &mut PhotocraftApp, mirror: &mut Mirror) {
     let rev = app.session.prefs.rev();
     if mirror.dirty {
         let (dialogs, sections) = (mirror.dialogs.clone(), mirror.sections.clone());
@@ -76,6 +87,52 @@ pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
         mirror.dialogs = app.session.prefs().dialogs.clone();
         mirror.sections = app.session.prefs().sections.clone();
         mirror.rev = Some(rev);
+    }
+}
+
+const APP: craft::host::AppInfo = craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") };
+
+/// Runs `f` with a Host over the preferences as they are now, for the app code that has no egui
+/// context (a dialog's seed or its OK). What `f` writes is in the preferences when it returns. The
+/// app's own scopes keep their JSON (no `DialogFields` shape).
+pub fn with_host<R>(app: &mut PhotocraftApp, f: impl FnOnce(&craft::host::Host) -> R) -> R {
+    let store = Arc::new(PrefsSections { mirror: Mutex::default(), wrap: false });
+    exchange(app, &mut store.mirror());
+    let host = craft::host::Host::builder(APP).settings(store.clone()).build();
+    let result = f(&host);
+    exchange(app, &mut store.mirror());
+    result
+}
+
+/// The value remembered under `scope` (`prefs.dialogs[scope]`), through the Host.
+pub fn recall(app: &mut PhotocraftApp, scope: &str) -> Option<Value> {
+    with_host(app, |host| craft::settings::Remembered::<Value>::new(scope).recall(host))
+}
+
+/// [`recall`] for code that only has the app by reference.
+pub fn recall_ref(app: &PhotocraftApp, scope: &str) -> Option<Value> {
+    let store = Arc::new(PrefsSections { mirror: Mutex::default(), wrap: false });
+    {
+        let mut mirror = store.mirror();
+        mirror.dialogs = app.session.prefs().dialogs.clone();
+        mirror.sections = app.session.prefs().sections.clone();
+    }
+    let host = craft::host::Host::builder(APP).settings(store).build();
+    craft::settings::Remembered::<Value>::new(scope).recall(&host)
+}
+
+/// Remembers `value` under `scope` through the Host. Nulls are left out: the settings tables
+/// cannot hold them.
+pub fn remember(app: &mut PhotocraftApp, scope: &str, value: &Value) {
+    let value = without_nulls(value);
+    with_host(app, |host| craft::settings::Remembered::<Value>::new(scope).store(host, &value));
+}
+
+fn without_nulls(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(map.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), without_nulls(v))).collect()),
+        Value::Array(items) => Value::Array(items.iter().map(without_nulls).collect()),
+        other => other.clone(),
     }
 }
 
@@ -95,7 +152,7 @@ impl SectionStore for PrefsSections {
                 table.insert(format!("{PROMPT}{scope}.{SKIP}"), toml::Value::Boolean(skip));
             }
             if let Some(value) = rest.as_ref().and_then(to_toml) {
-                table.insert(scope.clone(), wrap(value));
+                table.insert(scope.clone(), if self.wrap { wrap(value) } else { value });
             }
         }
         Some(table)
@@ -120,7 +177,7 @@ impl SectionStore for PrefsSections {
                 continue;
             }
             let (kept, _) = mirror.dialogs.get(scope).map(split_skip).unwrap_or((None, None));
-            let value = &unwrap(value);
+            let value = &(if self.wrap { unwrap(value) } else { value.clone() });
             // A value that did not change keeps its stored JSON, which TOML cannot always hold (null).
             let json = match kept {
                 Some(kept) if to_toml(&kept).as_ref() == Some(value) => kept,

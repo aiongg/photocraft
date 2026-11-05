@@ -144,9 +144,7 @@ pub struct Offer {
 }
 
 fn remember(app: &mut PhotocraftApp, source: &str, imported: bool) {
-    app.session.prefs.edit(|p| {
-        p.dialogs.insert(IMPORTED_PREF.into(), json!({"source": source, "imported": imported}));
-    });
+    crate::host_settings::remember(app, IMPORTED_PREF, &json!({"source": source, "imported": imported}));
 }
 
 fn not_imported(app: &mut PhotocraftApp, e: &str) {
@@ -159,7 +157,7 @@ fn not_imported(app: &mut PhotocraftApp, e: &str) {
 /// a set that changes nothing (Photoshop's defaults are ours too) is not offered either. The
 /// preference remembers each outcome, so a later launch never asks again.
 pub fn offer_import(app: &mut PhotocraftApp) {
-    if app.session.prefs().dialogs.contains_key(IMPORTED_PREF) {
+    if crate::host_settings::recall_ref(app, IMPORTED_PREF).is_some() {
         return;
     }
     let Some((source, text)) = app.services.photoshop_shortcuts.as_mut().and_then(|f| f()) else { return };
