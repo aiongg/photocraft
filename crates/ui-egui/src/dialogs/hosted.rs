@@ -221,10 +221,8 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
         return Ok(());
     }
     if record.kind.is_sizing() {
-        // The library's size dialogs take no values from outside: a value a script sets rides along
-        // to the command at OK and wins over the dialog's own (gap Z2).
-        record.extra.insert(field.to_owned(), value);
-        return Ok(());
+        // The library's size dialogs take no values from outside (library row 162).
+        return Err(format!("`{field}`: the size dialogs take no values from a script"));
     }
     let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
     if kind == HostedKind::Params {

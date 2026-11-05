@@ -237,6 +237,7 @@ fn image_size(s: &mut Session, p: &Value) -> Result<Value> {
     if !matches!(resample, Method::None) && (nw, nh) != (ow, oh) {
         check_resample_budget("image.imageSize", &d.doc, nw, nh, ", or turn Resample off to change only the resolution")?;
     }
+    let scale_styles = p.get("scaleStyles").and_then(Value::as_bool).unwrap_or(true);
     let dpi = p.get("resolution").and_then(Value::as_f64).map(|v| v as f32);
     if !matches!(resample, Method::None) && (nw, nh) != (ow, oh) {
         // Color Sampler points scale with the pixels (same map `transform_geometry` applies).
@@ -254,7 +255,7 @@ fn image_size(s: &mut Session, p: &Value) -> Result<Value> {
             Method::Automatic if nw > ow || nh > oh => Resample::PreserveDetails,
             Method::Automatic => Resample::BicubicSharper,
         };
-        resample_doc(doc, nw, nh, filter);
+        resample_doc_styles(doc, nw, nh, filter, scale_styles);
         Ok(())
     })?;
     // The size the document has now: without resampling `width`/`height` are ignored (#1815).
@@ -292,6 +293,11 @@ pub(crate) fn check_working_budget(cmd: &str, doc: &Document, nw: u32, nh: u32, 
 /// `nw` x `nh` px with `filter`: the body of Image Size, shared by the Crop tool's W x H x Resolution
 /// mode. Callers check [`check_resample_budget`] first.
 pub(crate) fn resample_doc(doc: &mut Document, nw: u32, nh: u32, filter: Resample) {
+    resample_doc_styles(doc, nw, nh, filter, true);
+}
+
+/// [`resample_doc`] with Image Size's Scale Styles choice: off, layer effects keep their sizes.
+pub(crate) fn resample_doc_styles(doc: &mut Document, nw: u32, nh: u32, filter: Resample, scale_styles: bool) {
     let (ow, oh) = (doc.size.width, doc.size.height);
     let (sx, sy) = (nw as f64 / ow.max(1) as f64, nh as f64 / oh.max(1) as f64);
     if (sx - 1.0).abs() < 1e-12 && (sy - 1.0).abs() < 1e-12 {
@@ -305,7 +311,9 @@ pub(crate) fn resample_doc(doc: &mut Document, nw: u32, nh: u32, filter: Resampl
     });
     let k = ((sx + sy) / 2.0) as f32;
     for_each_layer(&mut doc.layers, &mut |l| {
-        scale_effects(&mut l.effects, k);
+        if scale_styles {
+            scale_effects(&mut l.effects, k);
+        }
         // Canvas resampling scales the whole appearance, including shape strokes (#8341).
         // Dash lengths and offsets are already expressed in multiples of this width.
         if let LayerContent::Shape(sh) = &mut l.content
@@ -970,7 +978,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "image.imageSize",
             "Image Size…",
             ["Image"],
-            r##"{"width":px,"height":px,"percent":%? (both sides; an explicit side wins),"resolution":ppi,"keepPrintSize":bool=false (with only a resolution: resample the pixels to keep the print size),"resample":"automatic|preserveDetails|bicubicSmoother|bicubicSharper|bicubicAutomatic|bicubic|nearest|bilinear|lanczos|none"="bicubic"} → {width,height} (the document's size after the command; "none" changes the resolution only)"##,
+            r##"{"width":px,"height":px,"percent":%? (both sides; an explicit side wins),"resolution":ppi,"keepPrintSize":bool=false (with only a resolution: resample the pixels to keep the print size),"resample":"automatic|preserveDetails|bicubicSmoother|bicubicSharper|bicubicAutomatic|bicubic|nearest|bilinear|lanczos|none"="bicubic","scaleStyles":bool=true (layer effects scale with the pixels; false keeps their sizes)} → {width,height} (the document's size after the command; "none" changes the resolution only)"##,
             has_doc,
             image_size
         ),

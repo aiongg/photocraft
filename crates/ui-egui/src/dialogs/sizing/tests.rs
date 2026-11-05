@@ -30,6 +30,7 @@ fn set(app: &mut PhotocraftApp, id: u64, key: &str, value: Value) {
 }
 
 #[test]
+#[ignore = "library row 162: sizing dialogs have no setters or getters"]
 fn dialog_maps_to_engine_command() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.imageSize").unwrap();
@@ -59,6 +60,7 @@ fn confirming_unchanged_dialogs_keeps_the_document() {
 }
 
 #[test]
+#[ignore = "library row 162: sizing dialogs have no setters or getters"]
 fn cancel_closes_the_dialog_and_runs_nothing() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.canvasSize").unwrap();
@@ -150,11 +152,27 @@ fn resample_follows_the_interpolation_preference() {
         assert_eq!((f.get("resample"), f.get("__resample")), (Some(&json!(method)), Some(&json!(method))), "{pref}");
         crate::dialogs::cancel(&mut app, id).unwrap();
     }
+}
+
+#[test]
+#[ignore = "library row 162: sizing dialogs have no setters or getters"]
+fn resample_preference_dialog_resizes_on_ok() {
+    let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.imageSize").unwrap();
     set(&mut app, id, "width", json!(50));
     set(&mut app, id, "height", json!(25));
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(app.session.active().unwrap().doc.size, photocraft_doc::Size::new(50, 25));
+}
+
+#[test]
+fn a_script_cannot_set_size_dialog_values() {
+    let mut app = app_with(200, 100, 72);
+    let id = open(&mut app, "image.canvasSize").unwrap();
+    assert!(crate::dialogs::hosted::set_field(&mut app, id, "width", json!(300)).is_err());
+    crate::dialogs::cancel(&mut app, id).unwrap();
+    assert!(app.ui.hosted(id).is_none() && !app.ui.host.is_open::<CanvasSizeDialog>());
+    assert_eq!(app.session.active().unwrap().doc.size.width, 200);
 }
 
 /// Lanczos is the library's last method and reaches the command by the name it takes.

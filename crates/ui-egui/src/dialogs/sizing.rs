@@ -3,8 +3,7 @@
 //!
 //! The app opens the dialog with the document's size, resolution and the preferences, keeps a
 //! [`Hosted`] record for automation, and runs `image.imageSize` or `image.canvasSize` with the
-//! answer. The library dialogs hold their own state: a script's `ui.dialog.set` values ride along
-//! in the record's `extra` and win over the dialog's own at OK (gap Z2).
+//! answer. The library dialogs hold their own state, which a script cannot set (library row 162).
 
 use craft::ui::dialog::{Anchor, CanvasExtension, CanvasSizeDialog, CanvasSizeResult, ImageSizeDialog, ImageSizeResult, PixelSize, Resample, StackDialog};
 use serde_json::{Map, Value, json};
@@ -98,6 +97,7 @@ fn image_params(result: &ImageSizeResult) -> Fields {
     let mut f = size_params(result.size);
     f.insert("resolution".into(), json!(result.size.pixels_per_inch));
     f.insert("resample".into(), json!(resample_name(result.resample)));
+    f.insert("scaleStyles".into(), json!(result.scale_styles));
     f
 }
 
@@ -110,7 +110,7 @@ fn canvas_params(result: &CanvasSizeResult) -> Fields {
 }
 
 /// The values of an open size dialog as `ui.dialog.*` and the command see them: what the dialog's
-/// size fields hold now, the options it opened with, and the values a script set.
+/// size fields hold now and the options it opened with.
 pub fn fields_of(ui: &UiState, record: &Hosted) -> Option<Fields> {
     let mut f = match record.kind {
         HostedKind::ImageSize => {
@@ -129,7 +129,6 @@ pub fn fields_of(ui: &UiState, record: &Hosted) -> Option<Fields> {
             f
         }
     };
-    f.extend(record.extra.clone());
     Some(f)
 }
 
