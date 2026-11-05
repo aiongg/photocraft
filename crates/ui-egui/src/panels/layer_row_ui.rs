@@ -216,8 +216,6 @@ pub struct Rename {
     pub text: String,
     /// Focus was given to the field (only once: asking every frame kept it from ever losing focus).
     pub focused: bool,
-    /// The pass its field was last drawn in.
-    pub pass: u64,
 }
 
 impl Rename {
@@ -242,11 +240,6 @@ pub fn renaming(ctx: &egui::Context) -> Option<u64> {
     rename(ctx).map(|r| r.layer)
 }
 
-/// Is a rename field on screen (drawn this pass or the last)? It owns the keyboard meanwhile.
-pub fn rename_active(ctx: &egui::Context) -> bool {
-    rename(ctx).is_some_and(|r| r.pass + 1 >= ctx.cumulative_pass_nr())
-}
-
 fn store(ctx: &egui::Context, r: Option<Rename>) {
     ctx.data_mut(|d| match r {
         Some(r) => {
@@ -265,7 +258,7 @@ pub fn start_rename(ctx: &egui::Context, layer: u64, name: &str) -> Option<(Stri
     if previous.as_ref().is_some_and(|r| r.layer == layer) {
         return None;
     }
-    store(ctx, Some(Rename { layer, original: name.to_string(), text: name.to_string(), focused: false, pass: ctx.cumulative_pass_nr() }));
+    store(ctx, Some(Rename { layer, original: name.to_string(), text: name.to_string(), focused: false }));
     previous.and_then(|r| r.commit_action())
 }
 
@@ -317,7 +310,6 @@ pub fn take_next_rename(ctx: &egui::Context) -> Option<(u64, bool)> {
 /// committed. Tab and ⇧Tab commit too and ask for the next rename ([`take_next_rename`]).
 pub fn apply_rename_events(ctx: &egui::Context, layer: u64, events: &[RowEvent<u64>]) -> Option<(String, Value)> {
     let mut r = rename(ctx).filter(|r| r.layer == layer)?;
-    r.pass = ctx.cumulative_pass_nr();
     r.focused = true;
     for event in events {
         match event {
