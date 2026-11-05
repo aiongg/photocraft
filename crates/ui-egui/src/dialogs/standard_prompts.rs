@@ -52,7 +52,13 @@ pub fn open(app: &mut PhotocraftApp, prompt: StandardPrompt, title: &str, fields
 fn run(app: &mut PhotocraftApp, record: PromptRecord, proceed: bool) -> Result<Value, String> {
     let fields = &record.fields;
     if proceed {
-        if crate::disk_change_prompt::owns(fields) { crate::disk_change_prompt::confirm(app, fields) } else { crate::replace_prompt::confirm(app) }
+        if crate::disk_change_prompt::owns(fields) {
+            crate::disk_change_prompt::confirm(app, fields)
+        } else if crate::delete_layer_prompt::owns(fields) {
+            crate::delete_layer_prompt::confirm(app, fields)
+        } else {
+            crate::replace_prompt::confirm(app)
+        }
     } else {
         crate::actions::stopped(app, fields);
         if crate::replace_prompt::owns(fields) { crate::replace_prompt::cancel(app) } else { Ok(Value::Null) }
@@ -79,6 +85,16 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
     {
         authorize(command, &Value::Object(record.fields.clone()))?;
     }
+    // The host answers with the default button, which stores "Don't show again" through the Host.
+    crate::host_settings::sync(app, ctx);
+    let dialog = app.ui.prompt(id).ok_or_else(|| format!("no dialog {id}"))?.dialog;
+    if app.ui.host.confirm_by_id::<StandardPrompt>(ctx, dialog) {
+        crate::host_settings::sync(app, ctx);
+        app.ui.host.take_by_id::<StandardPrompt>(dialog);
+        let at = app.ui.prompts.iter().position(|p| p.id == id).ok_or_else(|| format!("no dialog {id}"))?;
+        let record = app.ui.prompts.remove(at);
+        return run(app, record, true);
+    }
     let record = close(app, ctx, id)?;
     run(app, record, true)
 }
@@ -97,6 +113,15 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
     }
     if !record.fields.contains_key(field) && crate::dialogs::is_route_marker(field) {
         return Err(format!("`{field}` is set only by the dialog it belongs to"));
+    }
+    if field == "skip" && crate::delete_layer_prompt::owns(&record.fields) {
+        let skip = value.as_bool().ok_or("`skip` takes true or false")?;
+        let dialog = record.dialog;
+        record.fields.insert(field.to_owned(), value);
+        if let Some(prompt) = app.ui.host.get_mut_by_id::<StandardPrompt>(dialog) {
+            prompt.set_skip(skip);
+        }
+        return Ok(());
     }
     record.fields.insert(field.to_owned(), value);
     Ok(())

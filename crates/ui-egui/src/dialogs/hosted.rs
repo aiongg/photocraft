@@ -385,6 +385,7 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
         return Err(format!("no dialog {id}"));
     }
     let did = app.ui.hosted(id).map(|h| h.did).ok_or_else(|| format!("no dialog {id}"))?;
+    crate::host_settings::sync(app, ctx);
     let confirmed = match kind {
         HostedKind::Form => app.ui.host.confirm_by_id::<CommandForm>(ctx, did),
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),

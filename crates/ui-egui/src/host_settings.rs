@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use craft::host::{MemorySections, SectionStore};
+use craft::host::SectionStore;
 use serde_json::{Map, Value};
 
 use crate::PhotocraftApp;
@@ -24,6 +24,8 @@ const SKIP: &str = "skip";
 #[derive(Default)]
 struct Mirror {
     dialogs: BTreeMap<String, Value>,
+    /// The other sections, `prefs.sections`.
+    sections: BTreeMap<String, Value>,
     /// The preferences revision `dialogs` was copied from or written to.
     rev: Option<u64>,
     /// The Host wrote since the last [`sync`].
@@ -31,11 +33,10 @@ struct Mirror {
 }
 
 /// The store the Host reads and writes: the `remembered` section over `prefs.dialogs`, every other
-/// section in memory.
+/// section as a table of `prefs.sections`.
 #[derive(Default)]
 pub struct PrefsSections {
     mirror: Mutex<Mirror>,
-    other: MemorySections,
 }
 
 impl PrefsSections {
@@ -62,14 +63,18 @@ pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let mut mirror = store.mirror();
     let rev = app.session.prefs.rev();
     if mirror.dirty {
-        let dialogs = mirror.dialogs.clone();
-        if app.session.prefs().dialogs != dialogs {
-            app.session.prefs.edit(|p| p.dialogs = dialogs);
+        let (dialogs, sections) = (mirror.dialogs.clone(), mirror.sections.clone());
+        if app.session.prefs().dialogs != dialogs || app.session.prefs().sections != sections {
+            app.session.prefs.edit(|p| {
+                p.dialogs = dialogs;
+                p.sections = sections;
+            });
         }
         mirror.dirty = false;
         mirror.rev = Some(app.session.prefs.rev());
     } else if mirror.rev != Some(rev) {
         mirror.dialogs = app.session.prefs().dialogs.clone();
+        mirror.sections = app.session.prefs().sections.clone();
         mirror.rev = Some(rev);
     }
 }
@@ -77,7 +82,10 @@ pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
 impl SectionStore for PrefsSections {
     fn read(&self, key: &str) -> Option<toml::Table> {
         if key != SECTION {
-            return self.other.read(key);
+            return match self.mirror().sections.get(key).map(to_toml) {
+                Some(Some(toml::Value::Table(table))) => Some(table),
+                _ => None,
+            };
         }
         let mirror = self.mirror();
         let mut table = toml::Table::new();
@@ -94,10 +102,15 @@ impl SectionStore for PrefsSections {
     }
 
     fn write(&self, key: &str, table: toml::Table) {
-        if key != SECTION {
-            return self.other.write(key, table);
-        }
         let mut mirror = self.mirror();
+        if key != SECTION {
+            let json = to_json(&toml::Value::Table(table));
+            if mirror.sections.get(key) != Some(&json) {
+                mirror.sections.insert(key.to_owned(), json);
+                mirror.dirty = true;
+            }
+            return;
+        }
         let mut next = BTreeMap::new();
         // The prompts' `skip` flags, by the key of the dialog they belong to.
         let skips: Vec<(&str, bool)> =
@@ -229,6 +242,24 @@ mod tests {
         Remembered::<bool>::new("prompt.layer.delete.confirmation.skip").forget(&host);
         sync(&mut app, &ctx);
         assert!(!app.session.prefs().dialogs.contains_key("layer.delete.confirmation"));
+    }
+
+    #[test]
+    fn every_section_is_kept_in_the_preferences() {
+        #[derive(serde::Serialize, serde::Deserialize, Default, PartialEq, Debug)]
+        struct Panel {
+            width: u32,
+        }
+        impl craft::host::Section for Panel {
+            const KEY: &'static str = "fonts_panel";
+        }
+        let (mut app, ctx, host) = app_and_host();
+        host.set_setting(&Panel { width: 240 });
+        sync(&mut app, &ctx);
+        assert_eq!(app.session.prefs().sections["fonts_panel"], json!({"width": 240}));
+        app.session.prefs.edit(|p| p.sections.insert("fonts_panel".into(), json!({"width": 300})));
+        sync(&mut app, &ctx);
+        assert_eq!(host.setting::<Panel>(), Panel { width: 300 });
     }
 
     #[test]
