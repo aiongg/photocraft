@@ -1,4 +1,5 @@
 use super::*;
+use egui::Key;
 
 fn app_with_docs(n: usize) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -61,7 +62,7 @@ fn closing_a_dirty_document_waits_for_an_answer() {
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({"document": 1})).unwrap();
     assert_eq!(app.session.documents().len(), 2, "nothing closes before the user answers");
     assert!(app.discard.is_some());
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert!(app.discard.is_none());
     assert_eq!(app.session.documents().len(), 1);
 }
@@ -85,9 +86,9 @@ fn close_all_asks_per_dirty_document_then_runs() {
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 2);
     crate::menus::invoke(&mut app, &ctx, "file.closeAll", json!({})).unwrap();
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert_eq!(app.session.documents().len(), 2, "the answered document closes; still waiting on the second");
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert!(app.session.documents().is_empty());
 }
 
@@ -101,11 +102,11 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
         let late = doc_id(&app, 1);
         crate::menus::invoke(&mut app, &ctx, command, json!({})).unwrap();
         make_dirty(&mut app, 1);
-        advance(&mut app, &ctx);
+        advance(&mut app, &ctx, false);
         assert_eq!(app.discard.as_ref().map(|p| p.docs.clone()), Some(vec![late]), "{command}: asks about the newly dirty document");
         assert!(!app.allow_close, "{command}");
         assert_eq!(app.session.documents().len(), 1, "{command}: it is not discarded unasked");
-        advance(&mut app, &ctx);
+        advance(&mut app, &ctx, false);
         assert!(app.discard.is_none(), "{command}");
     }
     // Close Others asks about the others too, but still not about the document it keeps.
@@ -116,9 +117,9 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
     crate::menus::invoke(&mut app, &ctx, "file.closeOthers", json!({"document": 2})).unwrap();
     make_dirty(&mut app, 1);
     make_dirty(&mut app, 2);
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert_eq!(app.discard.as_ref().map(|p| p.docs.clone()), Some(vec![late]), "file.closeOthers: asks about the newly dirty other document");
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert!(app.discard.is_none());
     assert_eq!(app.session.documents().iter().map(|d| d.doc.id).collect::<Vec<_>>(), [kept]);
 }
@@ -131,10 +132,10 @@ fn close_others_closes_each_answered_document_and_keeps_its_target() {
     let kept = doc_id(&app, 1);
     crate::menus::invoke(&mut app, &ctx, "file.closeOthers", json!({"document": 1})).unwrap();
     assert_eq!(app.session.active_index(), Some(0), "the first one asked about is shown");
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert_eq!(app.session.documents().len(), 2);
     assert_eq!(app.session.active().map(|d| d.doc.id), Some(doc_id(&app, 1)), "the next one asked about is shown");
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert!(app.discard.is_none());
     assert_eq!(app.session.documents().iter().map(|d| d.doc.id).collect::<Vec<_>>(), [kept]);
 }
@@ -148,7 +149,7 @@ fn the_parked_close_still_hits_its_document_after_tabs_move() {
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({"document": 2})).unwrap();
     // Another document closes while the prompt is up, shifting the tab to index 1.
     app.run("file.close", json!({"document": 0})).unwrap();
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert_eq!(app.session.documents().len(), 1);
     assert!(index_of(&app, doomed).is_none());
 }
@@ -177,7 +178,7 @@ fn exit_is_held_back_until_confirmed() {
     make_dirty(&mut app, 0);
     assert!(intercept(&mut app, EXIT, &Value::Null));
     assert!(!app.allow_close);
-    advance(&mut app, &ctx);
+    advance(&mut app, &ctx, false);
     assert!(app.allow_close);
 }
 
@@ -189,6 +190,7 @@ fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) 
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             show(app, ui.ctx());
+            app.ui.host.show(ui.ctx());
             app.poll_file_dialog(ui.ctx(), None);
         },
         app,
@@ -455,7 +457,7 @@ fn saving_from_the_prompt_waits_for_the_question_whether_to_replace() {
         h.run_steps(3);
         waiting.borrow_mut().take().expect("the save dialog is open").send(Some(FileDialogAnswer::SaveTo("/pics/kept".into())));
         h.run_steps(2);
-        h.state().ui.dialogs.iter().find(|d| crate::replace_prompt::owns(&d.fields)).map(|d| d.id).expect("the save asks first")
+        h.state().ui.prompt_with(crate::replace_prompt::owns).map(|p| p.id).expect("the save asks first")
     };
     let id = save(&mut h);
     assert!(h.state().file_dialog_open());
@@ -499,6 +501,7 @@ fn saving_from_the_prompt_waits_for_a_background_save_then_closes() {
         |ui, app| {
             crate::jobs_ui::tick(app, ui.ctx());
             show(app, ui.ctx());
+            app.ui.host.show(ui.ctx());
         },
         app,
     );

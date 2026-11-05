@@ -30,6 +30,7 @@ fn dds_app(to: &str) -> (Prompted, Writes) {
     let h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             show(app, ui.ctx());
+            app.ui.host.show(ui.ctx());
             dds_options_ui::show(app, ui.ctx());
             app.poll_file_dialog(ui.ctx(), None);
         },

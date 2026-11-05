@@ -25,6 +25,7 @@ fn tiff_prompt(command: &str) -> (Prompted, Writes, DocId, DocId) {
     let mut h = builder.build_ui_state(
         |ui, app| {
             show(app, ui.ctx());
+            app.ui.host.show(ui.ctx());
             tiff_options_ui::show(app, ui.ctx());
             app.poll_file_dialog(ui.ctx(), None);
         },
