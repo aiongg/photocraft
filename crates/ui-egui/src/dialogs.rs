@@ -627,7 +627,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     crate::host_settings::sync(app, ctx);
     app.ui.host.show(ctx);
     crate::host_settings::sync(app, ctx);
-    hosted::collect(app);
+    hosted::collect(app, ctx);
     standard_prompts::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
     for id in app.ui.host.stack().ids().filter(|id| !legacy.contains(id)) {

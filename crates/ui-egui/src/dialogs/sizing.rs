@@ -238,7 +238,7 @@ fn flag(field: &str, value: &Value) -> Result<bool, String> {
 }
 
 /// `ui.dialog.set` for a size dialog: the dialog's setters change what it shows, as typing or
-/// picking would. `width` and `height` are in the unit the dialog shows now.
+/// picking would. `width` and `height` are pixels, whatever unit the dialog shows.
 pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: &Value) -> Result<(), String> {
     let record = app.ui.hosted(id).ok_or_else(|| format!("no dialog {id}"))?;
     let (kind, did) = (record.kind, record.did);
@@ -246,8 +246,8 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: &Value) -
     if kind == HostedKind::ImageSize {
         let dialog = app.ui.host.get_mut_by_id::<ImageSizeDialog>(did).ok_or_else(missing)?;
         match field {
-            "width" => dialog.set_width(number(field, value)?),
-            "height" => dialog.set_height(number(field, value)?),
+            "width" => dialog.fields_mut().set_width(number(field, value)?),
+            "height" => dialog.fields_mut().set_height(number(field, value)?),
             "resolution" => dialog.set_resolution(number(field, value)?),
             "unit" => dialog.set_unit(choice(field, value, &UNIT_NAMES)?),
             "resolutionUnit" => dialog.set_resolution_unit(choice(field, value, &RESOLUTION_UNITS)?),
@@ -258,8 +258,8 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: &Value) -
     } else {
         let dialog = app.ui.host.get_mut_by_id::<CanvasSizeDialog>(did).ok_or_else(missing)?;
         match field {
-            "width" => dialog.set_width(number(field, value)?),
-            "height" => dialog.set_height(number(field, value)?),
+            "width" => dialog.fields_mut().set_width(number(field, value)?),
+            "height" => dialog.fields_mut().set_height(number(field, value)?),
             "unit" => dialog.set_unit(choice(field, value, &UNIT_NAMES)?),
             "relative" => dialog.set_relative(flag(field, value)?),
             "anchor" => dialog.set_anchor(

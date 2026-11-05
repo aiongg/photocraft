@@ -34,17 +34,9 @@ struct Mirror {
 
 /// The store the Host reads and writes: the `remembered` section over `prefs.dialogs`, every other
 /// section as a table of `prefs.sections`.
+#[derive(Default)]
 pub struct PrefsSections {
     mirror: Mutex<Mirror>,
-    /// Object scopes read as the library's `DialogFields` (`{values: {...}}`; see [`wrap`]).
-    /// Off for the app's own scopes, which keep their JSON.
-    wrap: bool,
-}
-
-impl Default for PrefsSections {
-    fn default() -> Self {
-        Self { mirror: Mutex::default(), wrap: true }
-    }
 }
 
 impl PrefsSections {
@@ -93,10 +85,9 @@ fn exchange(app: &mut PhotocraftApp, mirror: &mut Mirror) {
 const APP: craft::host::AppInfo = craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") };
 
 /// Runs `f` with a Host over the preferences as they are now, for the app code that has no egui
-/// context (a dialog's seed or its OK). What `f` writes is in the preferences when it returns. The
-/// app's own scopes keep their JSON (no `DialogFields` shape).
+/// context (a dialog's seed or its OK). What `f` writes is in the preferences when it returns.
 pub fn with_host<R>(app: &mut PhotocraftApp, f: impl FnOnce(&craft::host::Host) -> R) -> R {
-    let store = Arc::new(PrefsSections { mirror: Mutex::default(), wrap: false });
+    let store = Arc::new(PrefsSections::default());
     exchange(app, &mut store.mirror());
     let host = craft::host::Host::builder(APP).settings(store.clone()).build();
     let result = f(&host);
@@ -111,7 +102,7 @@ pub fn recall(app: &mut PhotocraftApp, scope: &str) -> Option<Value> {
 
 /// [`recall`] for code that only has the app by reference.
 pub fn recall_ref(app: &PhotocraftApp, scope: &str) -> Option<Value> {
-    let store = Arc::new(PrefsSections { mirror: Mutex::default(), wrap: false });
+    let store = Arc::new(PrefsSections::default());
     {
         let mut mirror = store.mirror();
         mirror.dialogs = app.session.prefs().dialogs.clone();
@@ -152,7 +143,7 @@ impl SectionStore for PrefsSections {
                 table.insert(format!("{PROMPT}{scope}.{SKIP}"), toml::Value::Boolean(skip));
             }
             if let Some(value) = rest.as_ref().and_then(to_toml) {
-                table.insert(scope.clone(), if self.wrap { wrap(value) } else { value });
+                table.insert(scope.clone(), value);
             }
         }
         Some(table)
@@ -177,7 +168,6 @@ impl SectionStore for PrefsSections {
                 continue;
             }
             let (kept, _) = mirror.dialogs.get(scope).map(split_skip).unwrap_or((None, None));
-            let value = &(if self.wrap { unwrap(value) } else { value.clone() });
             // A value that did not change keeps its stored JSON, which TOML cannot always hold (null).
             let json = match kept {
                 Some(kept) if to_toml(&kept).as_ref() == Some(value) => kept,
@@ -195,29 +185,6 @@ impl SectionStore for PrefsSections {
             mirror.dialogs = next;
             mirror.dirty = true;
         }
-    }
-}
-
-/// An object scope as the library's `DialogFields` reads it: its map under `values`. PhotoCraft
-/// stores the map itself (`prefs.dialogs[command] = {"radius": 2.5}`), so reading wraps it and
-/// writing unwraps it. An object that already has a `values` table is left as it is.
-fn wrap(value: toml::Value) -> toml::Value {
-    match value {
-        toml::Value::Table(table) if !matches!(table.get("values"), Some(toml::Value::Table(_))) => {
-            toml::Value::Table(toml::Table::from_iter([("values".to_owned(), toml::Value::Table(table))]))
-        }
-        other => other,
-    }
-}
-
-/// The inverse of [`wrap`]: a table that holds only `values` (a table) is that table.
-fn unwrap(value: &toml::Value) -> toml::Value {
-    match value {
-        toml::Value::Table(table) if table.len() == 1 => match table.get("values") {
-            Some(inner @ toml::Value::Table(_)) => inner.clone(),
-            _ => value.clone(),
-        },
-        other => other.clone(),
     }
 }
 
@@ -265,12 +232,6 @@ mod tests {
 
     use super::*;
 
-    /// The shape of the library's `DialogFields`.
-    #[derive(serde::Serialize, serde::Deserialize)]
-    struct Values {
-        values: serde_json::Map<String, Value>,
-    }
-
     fn app_and_host() -> (PhotocraftApp, egui::Context, Host) {
         let ctx = egui::Context::default();
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -286,10 +247,10 @@ mod tests {
     #[test]
     fn remembered_values_are_the_prefs_dialogs_entries() {
         let (mut app, ctx, host) = app_and_host();
-        let blur = Remembered::<Values>::new("filter.blur.gaussianBlur");
-        assert_eq!(blur.recall(&host).unwrap().values["radius"], 9.0);
+        let blur = Remembered::<Map<String, Value>>::new("filter.blur.gaussianBlur");
+        assert_eq!(blur.recall(&host).unwrap()["radius"], 9.0);
         assert_eq!(Remembered::<bool>::new("prompt.layer.delete.confirmation.skip").recall(&host), Some(true));
-        blur.store(&host, &Values { values: json!({"radius": 2.5}).as_object().cloned().unwrap() });
+        blur.store(&host, json!({"radius": 2.5}).as_object().unwrap());
         Remembered::<bool>::new("prompt.zoom.warn.skip").store(&host, &true);
         sync(&mut app, &ctx);
         let dialogs = &app.session.prefs().dialogs;
@@ -324,7 +285,7 @@ mod tests {
         let (mut app, ctx, host) = app_and_host();
         app.session.prefs.edit(|p| p.dialogs.insert("filter.blur.gaussianBlur".into(), json!({"radius": 4})));
         sync(&mut app, &ctx);
-        let blur = Remembered::<Values>::new("filter.blur.gaussianBlur");
-        assert_eq!(blur.recall(&host).unwrap().values["radius"], 4);
+        let blur = Remembered::<Map<String, Value>>::new("filter.blur.gaussianBlur");
+        assert_eq!(blur.recall(&host).unwrap()["radius"], 4);
     }
 }

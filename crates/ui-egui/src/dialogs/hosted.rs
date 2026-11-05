@@ -71,7 +71,7 @@ pub struct Hosted {
     pub table: Pending<Option<crate::color_table_ui::Action>>,
     /// The textures of the preview pane (filter dialogs).
     pub preview: crate::filter_preview_ui::PaneCache,
-    /// The library dialog remembers its values at OK (`ParamDialog::remember`), so the app does not.
+    /// The library dialog remembers its values (`ParamDialog::remember`) once the command succeeded (`ParamResult::remember`), so the app does not.
     pub remembers: bool,
 }
 
@@ -423,16 +423,16 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
     if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
     }
-    settle(app, id).unwrap_or_else(|| Err(format!("no dialog {id}")))
+    settle(app, ctx, id).unwrap_or_else(|| Err(format!("no dialog {id}")))
 }
 
 /// The dialogs' answers, after `DialogHost::show`: OK runs the command, Cancel runs the cleanup.
-pub fn collect(app: &mut PhotocraftApp) {
+pub fn collect(app: &mut PhotocraftApp, ctx: &egui::Context) {
     browse(app);
     crate::filter_dialog::requests(app);
     let ids: Vec<u64> = app.ui.hosted.iter().map(|h| h.id).collect();
     for id in ids {
-        if let Some(Err(error)) = settle(app, id) {
+        if let Some(Err(error)) = settle(app, ctx, id) {
             app.ui.status = error;
         }
     }
@@ -440,23 +440,30 @@ pub fn collect(app: &mut PhotocraftApp) {
 
 /// Takes the dialog's stored answer. OK runs the command and returns its result; Cancel runs the
 /// cleanup of the record the answer's key names.
-fn settle(app: &mut PhotocraftApp, id: u64) -> Option<Result<Value, String>> {
+fn settle(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Option<Result<Value, String>> {
     let record = app.ui.hosted(id)?.clone();
     let (kind, did) = (record.kind, record.did);
     if kind.is_sizing() {
         return crate::sizing::settle(app, id);
     }
     let result = match kind {
-        HostedKind::Form => app.ui.host.take_by_id::<CommandForm>(did)?.ok().map(|answer| answer.fields),
-        HostedKind::Params => app.ui.host.take_by_id::<ParamDialog>(did)?.ok().map(|answer| answer.fields),
+        HostedKind::Form => app.ui.host.take_by_id::<CommandForm>(did)?.ok().map(|answer| (answer.fields, None)),
+        HostedKind::Params => app.ui.host.take_by_id::<ParamDialog>(did)?.ok().map(|answer| (answer.fields.clone(), Some(answer))),
         _ => return None,
     };
     match result {
-        Some(answer) => {
+        Some((answer, params)) => {
             app.ui.hosted.retain(|h| h.id != record.id);
             Some(match kind {
                 HostedKind::Form => run_form(app, record, fields_json(&answer)),
-                _ => run_params(app, record, &answer),
+                _ => {
+                    let result = run_params(app, record, &answer);
+                    // The values are remembered only once the command succeeded.
+                    if let (Ok(_), Some(params)) = (&result, params) {
+                        params.remember(ctx);
+                    }
+                    result
+                }
             })
         }
         None => {

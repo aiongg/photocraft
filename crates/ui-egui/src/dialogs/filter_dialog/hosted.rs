@@ -243,7 +243,9 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
                     listed.push((current.to_owned(), stem));
                 }
                 let default = default.or_else(|| listed.first().map(|(id, _)| id.clone()));
-                out.push(LibParam::new(key, name, Lib::Choice { options: listed, default }));
+                let depth_source = command == super::LENS_BLUR && key == "depthMap";
+                let row = LibParam::new(key, name, Lib::Choice { options: listed, default });
+                out.push(if depth_source { row.not_remembered() } else { row });
             }
             Kind::Bool(default) => out.push(LibParam::new(key, name, Lib::Bool { default })),
             Kind::Text => {
@@ -259,7 +261,7 @@ fn params_for(command: &str, spec: &str, fields: &Map<String, Value>) -> (Vec<Li
                 let mut listed = vec![("-1".to_owned(), tl!("None").to_owned())];
                 listed.extend(names.enumerate().map(|(i, n)| (i.to_string(), n.to_owned())));
                 documents.push(key.clone());
-                out.push(LibParam::new(key, name, Lib::Choice { options: listed, default: Some("-1".into()) }));
+                out.push(LibParam::new(key, name, Lib::Choice { options: listed, default: Some("-1".into()) }).not_remembered());
             }
             Kind::Grid(cells) => out.push(LibParam::new(key, name, Lib::Grid { cells, default: 0 })),
             Kind::Json => {}
@@ -364,16 +366,14 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
     } else {
         params_for(command, spec, &map)
     };
-    // The library remembers what the app's JSON shape and `remember` keep the same way; Lens
-    // Blur's channel menu, the document menus, the dialogs that open on the document's own state (the
-    // library's remembered values win over `values`), Select and Mask's Remember Settings, the bitmap
-    // dialog, plug-ins and smart filters keep the app's own `remember`.
+    // The dialogs that open on the document's own state (the library's remembered values win over
+    // `values`), Select and Mask's Remember Settings, the bitmap dialog, plug-ins and smart filters
+    // keep the app's own `remember`.
     let remembers = map.contains_key("__filter")
         && !map.contains_key("__spec")
         && !map.contains_key("__smartFilter")
-        && !matches!(command, super::LENS_BLUR | crate::select_mask_view::COMMAND | crate::bitmap_dialog::COMMAND)
-        && !super::opens_on_document_state(command)
-        && documents.is_empty();
+        && !matches!(command, crate::select_mask_view::COMMAND | crate::bitmap_dialog::COMMAND)
+        && !super::opens_on_document_state(command);
     let record = Hosted {
         id: 0,
         kind: HostedKind::Params,
@@ -396,8 +396,7 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         .history(true)
         .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()))
         .preview(map.contains_key("__preview"))
-        // The Stacked layout draws no `footer_extra`, which the Color Table's Load… and Save… need (gap BA).
-        .layout(if crate::color_table_ui::owns(&map) { ParamLayout::BottomFooter } else { ParamLayout::Stacked });
+        .layout(ParamLayout::Stacked);
     if remembers {
         dialog = dialog.remember(command);
     }
