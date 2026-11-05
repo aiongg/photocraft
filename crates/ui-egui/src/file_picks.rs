@@ -290,7 +290,9 @@ impl PhotocraftApp {
         // No dialog could open: the action ends as for a Cancel (so what chained on it still
         // cleans up), and the status says why.
         let r = match picked {
-            Picked::Unavailable(cause) => then(self, Picked::Cancelled).and(Err(<craft::dialogs::ui::UnavailableLabels as craft::ui::localized::Labels>::of_ctx(ctx).message(&cause))),
+            Picked::Unavailable(cause) => {
+                then(self, Picked::Cancelled).and(Err(<craft::dialogs::ui::UnavailableLabels as craft::ui::localized::Labels>::of_ctx(ctx).message(&cause)))
+            }
             picked => then(self, picked),
         };
         if let Err(e) = &r

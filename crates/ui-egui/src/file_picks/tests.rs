@@ -906,7 +906,6 @@ fn cancelling_multi_layer_quick_export_writes_nothing() {
 /// #3354: a system with no dialog backend answers `Unavailable`; the message reaches the status
 /// bar as an error, where a cancelled dialog stays silent.
 #[test]
-#[ignore = "gap CP-C: the library's file service answers Cancelled when no dialog can be shown, so the 'install zenity' message never reaches the status bar"]
 fn an_unavailable_dialog_is_reported_and_a_cancelled_one_is_not() {
     let ctx = egui::Context::default();
     let (mut app, open, _) = app();
@@ -919,10 +918,10 @@ fn an_unavailable_dialog_is_reported_and_a_cancelled_one_is_not() {
 
     menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    unreachable!("the library has no way to report an unavailable dialog");
+    answer(&open, Some(Picked::Unavailable("no portal".into())));
     app.poll_file_dialog(&ctx, None);
     assert!(app.ui.status_error);
-    assert_eq!(app.ui.status, "No file dialog can open");
+    assert_eq!(app.ui.status, craft::dialogs::ui::UnavailableLabels::default().message("no portal"));
     assert!(!app.file_dialog_open(), "the pending dialog is over");
 }
 
@@ -1305,4 +1304,38 @@ fn a_chosen_path_that_is_not_valid_unicode_is_an_error_not_another_name() {
     assert!(first_path(&scripted::save_to(bad.clone()), true).is_err_and(|e| e.contains("not valid Unicode") && e.contains("another name")));
     assert_eq!(first_path(&scripted::save_to(good.clone()), true).unwrap(), good.to_str().unwrap());
     assert!(first_path(&scripted::paths([good, bad]), false).is_ok(), "the first path is the one used");
+}
+
+/// The file service's Replace question lives on the dialog host as a prompt of its own: automation
+/// lists it and answers it with `ui.dialog.confirm` / `ui.dialog.cancel`, and its result stays
+/// the service's (PhotoCraft's drain of its own prompts leaves it).
+#[test]
+fn automation_answers_the_replace_question() {
+    use craft::ui::dialog::{DialogResult, PromptChoice, StandardPrompt};
+    let ctx = egui::Context::default();
+    let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
+        let (request, _) = crate::control::ControlRequest::new(method, params);
+        let crate::control::Outcome::Done(reply) = crate::control::handle(app, &ctx, &request) else { panic!("{method} did not finish") };
+        reply
+    };
+    for (method, proceed) in [("ui.dialog.confirm", true), ("ui.dialog.cancel", false)] {
+        let (mut app, _, _) = app();
+        let prompt = StandardPrompt::replace_file("Photo.png", Some("Photo".into())).instance(("craft-dialogs.replace", 1));
+        let dialog = app.ui.host.open(prompt);
+        crate::standard_prompts::adopt_file_question(&mut app);
+        crate::standard_prompts::adopt_file_question(&mut app);
+        assert_eq!(app.ui.prompts.len(), 1, "one record for the question");
+        let listed = call(&mut app, "ui.inspect", json!({}));
+        let entry =
+            listed["result"]["dialogs"].as_array().unwrap().iter().find(|d| d["fields"]["name"] == "Photo.png").expect("the question is listed").clone();
+        let reply = call(&mut app, method, json!({"dialog": entry["id"]}));
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert!(app.ui.prompts.is_empty());
+        assert!(app.ui.host.take::<StandardPrompt>().is_none(), "the app's drain leaves the question's result");
+        match app.ui.host.take_by_id::<StandardPrompt>(dialog) {
+            Some(DialogResult::Ok(answer)) if proceed => assert_eq!(answer.choice, PromptChoice::Proceed),
+            Some(DialogResult::Cancel) if !proceed => {}
+            other => panic!("{method}: the service's result is missing or wrong: {:?}", other.is_some()),
+        }
+    }
 }

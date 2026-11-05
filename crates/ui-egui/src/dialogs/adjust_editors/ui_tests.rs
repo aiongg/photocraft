@@ -737,6 +737,7 @@ fn gradient_map_picker_import_cancel_and_errors_preserve_state() {
         )),
         Some(crate::file_picks::scripted::contents("wrong.abr", Vec::new())),
         Some(crate::file_picks::scripted::paths(["/nonexistent/photocraft-gradients.grd"])),
+        Some(craft::host::Picked::Unavailable("dialog unavailable".into())),
     ] {
         let mut h = app_harness("gradientMap", "rgb", 8);
         h.state_mut().session.presets.gradients.truncate(1);

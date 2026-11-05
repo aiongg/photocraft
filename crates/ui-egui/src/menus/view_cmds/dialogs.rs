@@ -315,7 +315,9 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
             // of the file the layer links to.
             let missing = st.doc.layer(layer).and_then(|l| match &l.content {
                 photocraft_doc::LayerContent::Smart(sm) => match &sm.source {
-                    photocraft_doc::SmartSource::Linked { path } => std::path::Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()).map(std::path::Path::to_path_buf),
+                    photocraft_doc::SmartSource::Linked { path } => {
+                        std::path::Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()).map(std::path::Path::to_path_buf)
+                    }
                     photocraft_doc::SmartSource::Embedded { .. } => None,
                 },
                 _ => None,

@@ -1002,6 +1002,7 @@ fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled(
     let missing = dir.path().join("missing.png").to_string_lossy().into_owned();
     for answer in [
         None,
+        Some(craft::host::Picked::Unavailable("no picker available".into())),
         Some(craft::host::Picked::Paths(Vec::new())),
         Some(crate::file_picks::scripted::contents("map.png", Vec::new())),
         Some(crate::file_picks::scripted::paths(vec![missing])),
