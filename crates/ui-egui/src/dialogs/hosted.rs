@@ -252,7 +252,7 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
         return crate::sizing::set_field(app, id, field, &value);
     }
     if record.kind == HostedKind::ColorPicker {
-        return Err("the Color Picker's colour cannot be set from outside".into());
+        return crate::color_picker_ui::set_color(app, id, field, &value);
     }
     let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
     if kind == HostedKind::Params {
@@ -421,10 +421,7 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
 /// is disabled), then the same path a click takes.
 pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
-    if kind == HostedKind::ColorPicker {
-        return Err("the Color Picker has no programmatic OK".into());
-    }
-    if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {
+    if !kind.is_typed() && app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
     let did = app.ui.hosted(id).map(|h| h.did).ok_or_else(|| format!("no dialog {id}"))?;
@@ -434,7 +431,7 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),
         HostedKind::ImageSize => app.ui.host.confirm_by_id::<craft::ui::dialog::ImageSizeDialog>(ctx, did),
         HostedKind::CanvasSize => app.ui.host.confirm_by_id::<craft::ui::dialog::CanvasSizeDialog>(ctx, did),
-        HostedKind::ColorPicker => false,
+        HostedKind::ColorPicker => app.ui.host.confirm_by_id::<craft::color::ui::ColorPickerDialog>(ctx, did),
     };
     crate::host_settings::sync(app, ctx);
     if !confirmed {
@@ -568,6 +565,7 @@ pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<V
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
     if kind == HostedKind::ColorPicker {
         crate::color_picker_ui::close(app, ctx, id);
+        crate::type_panels_ui::color_picker::prune(app, ctx);
         return Ok(Value::Null);
     }
     if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {

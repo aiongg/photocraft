@@ -62,7 +62,7 @@ fn open_picker(app: &mut PhotocraftApp, target: &str, label: &str, rgb: [f32; 3]
     let key = format!("{target}.{id}");
     let web_only = crate::host_settings::recall_ref(app, "colorPicker.memory").and_then(|v| v.get("webColors").and_then(Value::as_bool)).unwrap_or(false);
     let orig = if web_only { web_safe(rgb) } else { rgb };
-    let request = ColorRequest::new(key.clone(), srgba(rgb)).title(super::display_label(label));
+    let request = ColorRequest::new(key.clone(), srgba(rgb)).title(label);
     let mut dialog = ColorPickerDialog::from_request(request);
     if let Some(inks) = kept {
         dialog = dialog.kept(ModelValues::new(CMYK_ID, &inks.map(|v| v * 100.0)));
@@ -232,6 +232,35 @@ pub fn fields_of(ui: &crate::state::UiState, id: u64) -> Option<Fields> {
     let record = ui.hosted(id).filter(|h| h.kind == HostedKind::ColorPicker)?;
     let dialog = ui.host.get_by_id::<ColorPickerDialog>(record.did)?;
     Some(picked_fields(record.private.clone(), &dialog.current()))
+}
+
+/// `ui.dialog.set` on picker `id`: `color` (`#rrggbb`) is the colour an edit would give; the
+/// picker's other fields are its own.
+pub fn set_color(app: &mut PhotocraftApp, id: u64, field: &str, value: &Value) -> Result<(), String> {
+    if field != "color" {
+        return Err(format!("the Color Picker has no `{field}` field to set"));
+    }
+    let rgb = value.as_str().and_then(parse_hex).ok_or("not a colour")?;
+    let did = app.ui.hosted(id).map(|h| h.did).ok_or_else(|| format!("no dialog {id}"))?;
+    let dialog = app.ui.host.get_mut_by_id::<ColorPickerDialog>(did).ok_or_else(|| format!("no dialog {id}"))?;
+    // `PickedColor` has no constructor outside the library: edit the current one.
+    let mut picked = dialog.current();
+    (picked.color, picked.model) = (srgba(rgb), None);
+    dialog.set_color(picked);
+    Ok(())
+}
+
+/// Types CMYK `inks` into picker `id` as the CMYK fields would: the colour is their sRGB value and
+/// the inks stay as typed.
+#[cfg(test)]
+pub(crate) fn set_inks(app: &mut PhotocraftApp, id: u64, inks: [f32; 4]) {
+    let did = app.ui.hosted(id).expect("an open picker").did;
+    let dialog = app.ui.host.get_mut_by_id::<ColorPickerDialog>(did).expect("an open picker");
+    let model = CmykModel(None);
+    let values = ModelValues::new(CMYK_ID, &inks.map(|v| v * 100.0));
+    let mut picked = dialog.current();
+    (picked.color, picked.model) = (model.to_srgb(&values.values), Some(values));
+    dialog.set_color(picked);
 }
 
 /// `private` plus the picked colour: `color`, and the values of the model it was edited in.
