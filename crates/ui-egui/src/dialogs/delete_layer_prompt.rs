@@ -1,5 +1,6 @@
 //! Confirmation for a Layers-panel trash-button click; other deletion routes stay immediate.
-use crate::{PhotocraftApp, state::DialogKind};
+use crate::PhotocraftApp;
+use craft::ui::dialog::StandardPrompt;
 use serde_json::{Map, Value, json};
 const MARK: &str = "__deleteLayer";
 const PREF: &str = "layer.delete.confirmation";
@@ -30,19 +31,11 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     };
     let fields = json!({MARK: true, "__command": command, "__label": "Delete Layer", "message": message,
         "document": state.doc.id.0, "selected": selected.iter().map(|id| id.0).collect::<Vec<_>>(), "params": params, "skip": false});
-    if app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
+    let prompt = StandardPrompt::confirm_delete(names.split(", "), ids.len()).noun("{n} layer", "{n} layers").dont_show_again(PREF);
+    let Some(id) = crate::standard_prompts::open(app, prompt, "Delete Layer", fields.as_object().cloned().unwrap_or_default()) else {
         return Some(Ok(json!({"confirmationPending": true})));
-    }
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    };
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
-}
-
-pub fn body(ui: &mut egui::Ui, fields: &mut Map<String, Value>) {
-    ui.label(fields.get("message").and_then(Value::as_str).unwrap_or(tl!("Delete layer?")));
-    ui.add_space(craft::ui::theme::scale::Space::S8.px());
-    let mut skip = fields.get("skip").and_then(Value::as_bool).unwrap_or(false);
-    ui.checkbox(&mut skip, tl!("Don't show again"));
-    fields.insert("skip".into(), json!(skip));
 }
 
 pub fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> Result<Value, String> {
@@ -57,10 +50,8 @@ pub fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> Result<V
         return Err(tl!("Invalid delete command").into());
     }
     let result = app.run_command(command, fields.get("params").cloned().unwrap_or(Value::Null))?;
-    if fields.get("skip").and_then(Value::as_bool) == Some(true) {
-        app.session.edit_prefs(|prefs| {
-            prefs.dialogs.insert(PREF.into(), json!({"skip": true}));
-        });
+    // The prompt stored "Don't show again" through the Host (`prefs.dialogs[PREF].skip`).
+    if app.session.prefs().dialogs.get(PREF).and_then(|v| v.get("skip")).and_then(Value::as_bool) == Some(true) {
         if let Err(error) = crate::prefs_ui::save_preferences(app) {
             app.ui.status = crate::i18n::fmt(tl!("Layer deleted, but confirmation preference could not be saved: {error}"), &[("error", &error)]);
             app.ui.status_error = true;
@@ -85,10 +76,10 @@ mod tests {
         let id = app.session.active().unwrap().active_layer.unwrap();
         let result = app.run("layer.delete", json!({"__trash":true})).unwrap();
         let dialog = result["dialog"].as_u64().unwrap();
-        assert!(owns(&app.ui.dialogs[0].fields));
-        assert!(app.ui.dialogs[0].fields["message"].as_str().unwrap().contains("Ink"));
-        app.ui.dialog_mut(dialog).unwrap().fields.insert("skip".into(), json!(true));
-        app.ui.close_dialog(dialog);
+        assert!(owns(&app.ui.prompts[0].fields));
+        assert!(app.ui.prompts[0].fields["message"].as_str().unwrap().contains("Ink"));
+        crate::standard_prompts::set_field(&mut app, dialog, "skip", json!(true)).unwrap();
+        crate::standard_prompts::cancel(&mut app, &egui::Context::default(), dialog).unwrap();
         assert!(app.session.active().unwrap().doc.layer(id).is_some());
         assert!(!app.session.prefs().dialogs.contains_key(PREF));
     }
@@ -105,11 +96,11 @@ mod tests {
         let target = app.session.active().unwrap().active_layer.unwrap();
         let before = app.session.active().unwrap().history.past_len();
         let dialog = app.run("layer.delete", json!({"__trash":true})).unwrap()["dialog"].as_u64().unwrap();
-        app.ui.dialog_mut(dialog).unwrap().fields.insert("skip".into(), json!(true));
+        crate::standard_prompts::set_field(&mut app, dialog, "skip", json!(true)).unwrap();
         crate::dialogs::confirm(&mut app, dialog).unwrap();
         assert!(app.session.active().unwrap().doc.layer(target).is_none());
         assert_eq!(app.session.active().unwrap().history.past_len(), before + 1);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(app.ui.prompts.is_empty());
         app.session.undo();
         assert!(app.session.active().unwrap().doc.layer(target).is_some());
         let text = saved.borrow().clone();
@@ -119,7 +110,7 @@ mod tests {
         session.execute("layer.new.layer", json!({"name":"Fresh"})).unwrap();
         let mut fresh = PhotocraftApp::new(session, crate::Services { load_prefs: Some(Box::new(move || Some(text.clone()))), ..Default::default() });
         fresh.run("layer.delete", json!({"__trash":true})).unwrap();
-        assert!(fresh.ui.dialogs.is_empty());
+        assert!(fresh.ui.prompts.is_empty());
     }
     #[test]
     fn changed_document_refuses_confirmation_and_clear_does_not_prompt() {
@@ -142,10 +133,11 @@ mod tests {
         let id = h.state().session.active().unwrap().active_layer.unwrap();
         h.get_by_label("Delete layer").click();
         h.run_steps(4);
-        assert!(h.state().ui.dialogs.iter().any(|d| owns(&d.fields)));
+        assert!(h.state().ui.prompt_with(owns).is_some());
         assert!(h.state().session.active().unwrap().doc.layer(id).is_some());
-        let dialog = h.state().ui.dialogs[0].id;
-        h.state_mut().ui.close_dialog(dialog);
+        let dialog = h.state().ui.prompts[0].id;
+        let ctx = h.ctx.clone();
+        crate::standard_prompts::cancel(h.state_mut(), &ctx, dialog).unwrap();
         h.state_mut().run("layer.delete", json!({})).unwrap();
         assert!(h.state().ui.dialogs.is_empty());
         assert!(h.state().session.active().unwrap().doc.layer(id).is_none());

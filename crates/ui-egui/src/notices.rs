@@ -69,7 +69,7 @@ pub(crate) fn paste_hint(app: &PhotocraftApp) -> String {
 /// command that starts this install under XWayland (where drops work), when there is one.
 pub fn wayland_file_drop_guidance(app: &mut PhotocraftApp) {
     if !app.services.is_wayland
-        || app.session.prefs().dialogs.get(WAYLAND_FILE_DROP_DISMISSED).and_then(serde_json::Value::as_bool) == Some(true)
+        || crate::host_settings::recall_ref(app, WAYLAND_FILE_DROP_DISMISSED).and_then(|v| v.as_bool()) == Some(true)
         || app.ui.notices.iter().any(|notice| notice.dismiss_pref.as_deref() == Some(WAYLAND_FILE_DROP_DISMISSED))
     {
         return;
@@ -149,9 +149,7 @@ fn dismiss(app: &mut PhotocraftApp, id: u64) {
     let dismiss_pref = app.ui.notices.iter().find(|notice| notice.id == id).and_then(|notice| notice.dismiss_pref.clone());
     app.ui.notices.retain(|notice| notice.id != id);
     if let Some(key) = dismiss_pref {
-        app.session.prefs.edit(|prefs| {
-            prefs.dialogs.insert(key, serde_json::Value::Bool(true));
-        });
+        crate::host_settings::remember(app, &key, &serde_json::Value::Bool(true));
     }
 }
 

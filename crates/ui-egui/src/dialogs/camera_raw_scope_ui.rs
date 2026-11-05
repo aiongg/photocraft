@@ -226,8 +226,8 @@ pub(crate) fn persist(app: &mut crate::PhotocraftApp, ctx: &egui::Context) {
         return;
     };
     const KEY: &str = "filter.cameraRaw.scope";
-    if app.session.prefs().dialogs.get(KEY) != Some(&value) {
-        app.session.prefs.edit(|p| p.dialogs.insert(KEY.into(), value));
+    if crate::host_settings::recall_ref(app, KEY).as_ref() != Some(&value) {
+        crate::host_settings::remember(app, KEY, &value);
     }
 }
 

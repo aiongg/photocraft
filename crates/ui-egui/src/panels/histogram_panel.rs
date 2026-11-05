@@ -102,15 +102,13 @@ impl Default for HistogramPanelState {
 /// Saves the panel options with the preferences.
 pub fn persist_options(app: &mut PhotocraftApp) {
     if let Ok(value) = serde_json::to_value(app.ui.histogram_panel) {
-        app.session.prefs.edit(|p| {
-            p.dialogs.insert(OPTIONS_PREF.into(), value);
-        });
+        crate::host_settings::remember(app, OPTIONS_PREF, &value);
     }
 }
 
 /// Restores the saved panel options; unreadable ones keep the defaults.
 pub fn restore_options(app: &mut PhotocraftApp) {
-    if let Some(v) = app.session.prefs().dialogs.get(OPTIONS_PREF)
+    if let Some(v) = crate::host_settings::recall_ref(app, OPTIONS_PREF)
         && let Ok(state) = serde_json::from_value(v.clone())
     {
         app.ui.histogram_panel = state;

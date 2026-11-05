@@ -8,7 +8,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-craft = { workspace = true, features = ["ui", "ui-window-frame", "color", "draw", "imaging", "keymap", "menu", "print", "quit", "theme-store", "window"] }
+toml = "1"
+craft = { workspace = true, features = ["settings", "ui", "ui-window-frame", "color", "draw", "imaging", "keymap", "menu", "print", "quit", "theme-store", "window"] }
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
 photocraft-cms = { workspace = true }

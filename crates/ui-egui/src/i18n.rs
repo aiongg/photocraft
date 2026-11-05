@@ -458,6 +458,7 @@ fn install_host(ctx: &egui::Context, lang: Lang) {
     craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
         .i18n(i18n)
         .lang(library_lang)
+        .settings(crate::host_settings::of(ctx))
         .install(ctx);
 }
 
@@ -484,7 +485,7 @@ fn host_lang_id() -> egui::Id {
     egui::Id::new("photocraft-host-language")
 }
 
-fn set_host_language(ctx: &egui::Context, lang: Lang) {
+pub(crate) fn set_host_language(ctx: &egui::Context, lang: Lang) {
     if ctx.data(|data| data.get_temp::<Lang>(host_lang_id())) != Some(lang) {
         ctx.data_mut(|data| data.insert_temp(host_lang_id(), lang));
         install_host(ctx, lang);

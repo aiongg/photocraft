@@ -95,7 +95,7 @@ fn in_ruler_unit(app: &PhotocraftApp, px: f64, vertical: bool) -> String {
 /// Open the dialog with the last successful guide's orientation, position (in the current ruler
 /// unit) and colour, else horizontal at 0.
 pub fn open(app: &mut PhotocraftApp) -> u64 {
-    let saved = app.session.prefs().dialogs.get(COMMAND).and_then(Value::as_object).cloned().unwrap_or_default();
+    let saved = crate::host_settings::recall_ref(app, COMMAND).and_then(|v| v.as_object().cloned()).unwrap_or_default();
     let orientation = saved.get("orientation").and_then(Value::as_str).filter(|o| matches!(*o, "horizontal" | "vertical")).unwrap_or("horizontal");
     let px = saved.get("positionPx").and_then(Value::as_f64).filter(|p| p.is_finite()).unwrap_or(0.0);
     let position = in_ruler_unit(app, px, orientation == "vertical");
@@ -232,7 +232,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
                 "color": f.get("color").cloned().unwrap_or(json!(DEFAULT_COLOR)),
                 "customColor": custom_color(f),
             });
-            app.session.prefs.edit(|prefs| prefs.dialogs.insert(COMMAND.into(), remembered));
+            crate::host_settings::remember(app, COMMAND, &remembered);
             Ok(result)
         }
         Err(e) => {

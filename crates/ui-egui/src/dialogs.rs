@@ -213,7 +213,6 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
         _ if crate::channel_options_ui::owns(fields) => crate::channel_options_ui::body(ui, fields),
         _ if crate::channel_options_ui::owns_new_spot(fields) => crate::channel_options_ui::new_spot_body(ui, fields),
         _ if crate::shape_dialog::owns(fields) => crate::shape_dialog::body(app, ui, fields),
-        _ if crate::delete_layer_prompt::owns(fields) => crate::delete_layer_prompt::body(ui, fields),
         _ if crate::actions::owns_insert_stop(fields) => crate::actions::insert_stop_body(ui, fields),
         _ if crate::new_layer_ui::owns(fields) => crate::new_layer_ui::body(ui, fields),
         _ if crate::mask_trash_prompt::owns(fields) => crate::mask_trash_prompt::body(ui, fields),
@@ -361,8 +360,6 @@ fn ok_label(d: &Dialog) -> &'static str {
         tl!("Create")
     } else if crate::open_prompt::owns_damage(&d.fields) {
         tl!("Continue")
-    } else if crate::delete_layer_prompt::owns(&d.fields) {
-        tl!("Delete")
     } else if d.fields.contains_key("__export") {
         tl!("Export")
     } else {
@@ -627,7 +624,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
     crate::filter_dialog::push_state(app, ctx);
+    crate::host_settings::sync(app, ctx);
     app.ui.host.show(ctx);
+    crate::host_settings::sync(app, ctx);
     hosted::collect(app);
     standard_prompts::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();
@@ -867,7 +866,6 @@ fn confirm_command(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> 
         _ if crate::channel_options_ui::owns(&d.fields) => crate::channel_options_ui::confirm(app, &d.fields),
         _ if crate::channel_options_ui::owns_new_spot(&d.fields) => crate::channel_options_ui::confirm_new_spot(app, &d.fields),
         _ if crate::shape_dialog::owns(&d.fields) => crate::shape_dialog::confirm(app, &d.fields),
-        _ if crate::delete_layer_prompt::owns(&d.fields) => crate::delete_layer_prompt::confirm(app, &d.fields),
         _ if crate::actions::owns_insert_stop(&d.fields) => crate::actions::insert_stop_confirm(app, &d.fields),
         _ if crate::new_layer_ui::owns(&d.fields) => crate::new_layer_ui::confirm(app, &d.fields),
         _ if crate::mask_trash_prompt::owns(&d.fields) => crate::mask_trash_prompt::confirm(app, &d.fields),
@@ -897,7 +895,10 @@ fn confirm_command_more(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, Str
 /// [`confirm_in`] for callers without a frame (tests, the shortcut import): a hosted dialog's OK
 /// needs a context only to open its fields, which a dialog never shown has not done.
 pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    confirm_in(app, &egui::Context::default(), id)
+    // A context of its own still carries the Host, so a prompt's "Don't show again" is stored.
+    let ctx = egui::Context::default();
+    crate::i18n::set_host_language(&ctx, crate::i18n::Lang::EN);
+    confirm_in(app, &ctx, id)
 }
 
 pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {

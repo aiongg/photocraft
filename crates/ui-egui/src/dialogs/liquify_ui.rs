@@ -570,8 +570,8 @@ fn open_on(
     // A sensible starting brush (about a tenth of the image), then the settings last used, so
     // Liquify opens as it was left (#418). Saved values are clamped; a bad one is skipped.
     d.opts.size = ((canvas.width().max(canvas.height()) as f32) / 10.0).round().clamp(10.0, 1500.0);
-    if let Some(saved) = app.session.prefs().dialogs.get(REMEMBERED) {
-        let _ = d.opts.apply(saved);
+    if let Some(saved) = crate::host_settings::recall_ref(app, REMEMBERED) {
+        let _ = d.opts.apply(&saved);
     }
     // Layer ids belong to one document: a remembered backdrop Use starts at All Layers.
     d.opts.backdrop_layer = None;
@@ -583,7 +583,7 @@ fn open_on(
 /// Keeps the brush settings for the next time Liquify opens, also after a restart.
 fn remember(app: &mut PhotocraftApp, opts: &LiquifyOpts) {
     let v = opts.to_json();
-    app.session.prefs.edit(|p| p.dialogs.insert(REMEMBERED.into(), v));
+    crate::host_settings::remember(app, REMEMBERED, &v);
 }
 
 /// Cancel (button, Esc or the control channel): the document is untouched; the brush settings

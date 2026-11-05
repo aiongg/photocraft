@@ -36,7 +36,7 @@ pub fn open_web(app: &mut PhotocraftApp) -> u64 {
         .file_menu
         .last_web
         .clone()
-        .or_else(|| app.session.prefs().dialogs.get(WEB_COMMAND).cloned())
+        .or_else(|| crate::host_settings::recall_ref(app, WEB_COMMAND))
         .unwrap_or_else(|| json!({"format": "jpeg", "quality": 60}));
     if let Value::Object(m) = last {
         for (k, v) in m {

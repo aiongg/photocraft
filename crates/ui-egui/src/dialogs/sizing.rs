@@ -354,6 +354,7 @@ fn host<D: StackDialog>(app: &mut PhotocraftApp, kind: HostedKind, dialog: D, co
         documents: Vec::new(),
         table: Pending::default(),
         preview: Default::default(),
+        remembers: false,
     });
     id
 }

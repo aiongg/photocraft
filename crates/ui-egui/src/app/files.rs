@@ -653,7 +653,7 @@ fn remembered_new_document_value(key: &str, v: &serde_json::Value) -> bool {
 pub(crate) fn remember_new_document(app: &mut PhotocraftApp, f: &serde_json::Map<String, serde_json::Value>) {
     let kept: serde_json::Map<String, serde_json::Value> =
         NEW_DOCUMENT_REMEMBERED.iter().filter_map(|k| f.get(*k).filter(|v| remembered_new_document_value(k, v)).map(|v| (k.to_string(), v.clone()))).collect();
-    app.session.prefs.edit(|p| p.dialogs.insert(NEW_DOCUMENT.into(), serde_json::Value::Object(kept)));
+    crate::host_settings::remember(app, NEW_DOCUMENT, &serde_json::Value::Object(kept));
 }
 
 impl PhotocraftApp {
@@ -663,7 +663,7 @@ impl PhotocraftApp {
     /// request, so the OS clipboard is read here, as for a paste.
     pub(crate) fn new_document_fields(&mut self) -> serde_json::Map<String, serde_json::Value> {
         let mut f = crate::state::UiState::new_document_fields();
-        if let Some(serde_json::Value::Object(saved)) = self.session.prefs().dialogs.get(NEW_DOCUMENT) {
+        if let Some(serde_json::Value::Object(saved)) = crate::host_settings::recall_ref(self, NEW_DOCUMENT) {
             for k in NEW_DOCUMENT_REMEMBERED {
                 if let Some(v) = saved.get(k).filter(|v| remembered_new_document_value(k, v)) {
                     f.insert(k.into(), v.clone());

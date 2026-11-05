@@ -155,8 +155,8 @@ fn footer_trash_still_deletes_the_layer_when_its_content_is_targeted() {
     let at = h.get_by_label("Delete layer").rect().center();
     click_with(&mut h, at, Modifiers::NONE);
     assert!(h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(masked)).is_some());
-    assert!(h.state().ui.dialogs.iter().any(|d| crate::delete_layer_prompt::owns(&d.fields)));
-    h.get_by_label("Delete").click();
+    assert!(h.state().ui.prompt_with(crate::delete_layer_prompt::owns).is_some());
+    h.get_by_label("(D)elete").click();
     h.run_steps(3);
     assert!(h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(masked)).is_none());
 }

@@ -71,6 +71,8 @@ pub struct Hosted {
     pub table: Pending<Option<crate::color_table_ui::Action>>,
     /// The textures of the preview pane (filter dialogs).
     pub preview: crate::filter_preview_ui::PaneCache,
+    /// The library dialog remembers its values at OK (`ParamDialog::remember`), so the app does not.
+    pub remembers: bool,
 }
 
 /// `DialogHost` as a `UiState` field: not saved, and a clone starts empty (open dialogs belong to
@@ -344,6 +346,7 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
         documents: Vec::new(),
         table: Pending::default(),
         preview: Default::default(),
+        remembers: false,
     };
     app.ui.hosted.push(record);
     id
@@ -394,6 +397,9 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
     let mut fields = crate::filter_dialog::Wire::of(&record).json(answer);
     fields.extend(record.extra);
     fields.extend(record.private);
+    if record.remembers {
+        fields.insert(crate::filter_dialog::HOST_REMEMBERED.into(), Value::Bool(true));
+    }
     let dialog = crate::state::Dialog { id: record.id, kind: crate::state::DialogKind::Command, fields };
     crate::dialogs::confirm_generic_command(app, dialog)
 }
@@ -406,12 +412,14 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
         return Err(format!("no dialog {id}"));
     }
     let did = app.ui.hosted(id).map(|h| h.did).ok_or_else(|| format!("no dialog {id}"))?;
+    crate::host_settings::sync(app, ctx);
     let confirmed = match kind {
         HostedKind::Form => app.ui.host.confirm_by_id::<CommandForm>(ctx, did),
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),
         HostedKind::ImageSize => app.ui.host.confirm_by_id::<craft::ui::dialog::ImageSizeDialog>(ctx, did),
         HostedKind::CanvasSize => app.ui.host.confirm_by_id::<craft::ui::dialog::CanvasSizeDialog>(ctx, did),
     };
+    crate::host_settings::sync(app, ctx);
     if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
     }

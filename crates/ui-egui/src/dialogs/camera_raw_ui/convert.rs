@@ -114,7 +114,7 @@ pub(super) fn open_pixels(
     let display = app.session.color.canvas_display(&st.doc).map_err(|e| e.to_string())?;
     let lab_transform = photocraft_cms::cached(&source, photocraft_cms::Builtin::LabD50.profile(), Default::default()).map_err(|e| e.to_string())?;
     let scope_transform = photocraft_cms::cached(&source, photocraft_cms::Builtin::Srgb.profile(), Default::default()).map_err(|e| e.to_string())?;
-    if let Some(saved) = app.session.prefs().dialogs.get("filter.cameraRaw.scope")
+    if let Some(saved) = crate::host_settings::recall_ref(app, "filter.cameraRaw.scope")
         && saved.get("samplers").and_then(Value::as_array).is_none_or(|a| a.len() <= MAX_SAMPLERS)
         && let Ok(view) = serde_json::from_value(saved.clone())
     {

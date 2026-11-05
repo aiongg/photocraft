@@ -15,15 +15,13 @@ const OPTIONS_PREF: &str = "ui.layersPanelOptions";
 /// Save independently of Workspace > Remember Workspace Changes, as Photoshop does.
 pub fn persist_options(app: &mut PhotocraftApp) {
     if let Ok(value) = serde_json::to_value(&app.ui.layers_panel_options) {
-        app.session.prefs.edit(|p| {
-            p.dialogs.insert(OPTIONS_PREF.into(), value);
-        });
+        crate::host_settings::remember(app, OPTIONS_PREF, &value);
     }
 }
 
 /// Restore independently from a saved workspace. Older preferences retain the defaults.
 pub fn restore_options(app: &mut PhotocraftApp) {
-    if let Some(opts) = app.session.prefs().dialogs.get(OPTIONS_PREF)
+    if let Some(opts) = crate::host_settings::recall_ref(app, OPTIONS_PREF)
         && let Ok(value) = serde_json::from_value(opts.clone())
     {
         app.ui.layers_panel_options = value;

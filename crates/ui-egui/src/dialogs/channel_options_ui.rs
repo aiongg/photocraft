@@ -188,7 +188,7 @@ pub fn owns_new_spot(fields: &Map<String, Value>) -> bool {
 /// (red and 0% at first), or `None` without a document.
 pub fn new_spot_fields(app: &PhotocraftApp) -> Option<Map<String, Value>> {
     let doc = &app.session.active()?.doc;
-    let saved = app.session.prefs().dialogs.get(NEW_SPOT).cloned().unwrap_or_default();
+    let saved = crate::host_settings::recall_ref(app, NEW_SPOT).unwrap_or_default();
     let color = saved.get("color").and_then(Value::as_str).filter(|h| crate::color_picker_ui::parse_hex(h).is_some()).unwrap_or("#ff0000");
     let solidity = saved.get("solidity").and_then(Value::as_f64).filter(|v| (0.0..=100.0).contains(v)).unwrap_or(0.0);
     let mut f = Map::new();
@@ -222,7 +222,7 @@ pub fn confirm_new_spot(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Resu
     let result = app.run(NEW_SPOT, p.clone());
     if result.is_ok() {
         let remembered = json!({ "color": p.get("color"), "solidity": p.get("solidity") });
-        app.session.prefs.edit(|prefs| prefs.dialogs.insert(NEW_SPOT.into(), remembered));
+        crate::host_settings::remember(app, NEW_SPOT, &remembered);
     }
     result
 }

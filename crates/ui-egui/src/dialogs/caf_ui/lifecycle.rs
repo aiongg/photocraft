@@ -14,8 +14,8 @@ pub fn open(app: &mut PhotocraftApp) -> Result<(), String> {
     let k = (canvas.width().max(canvas.height()) as usize).div_ceil(PROXY_SIDE).max(1);
     let (pw, ph) = ((canvas.width() as usize).div_ceil(k), (canvas.height() as usize).div_ceil(k));
     let mut opts = CafOpts::default();
-    if let Some(saved) = app.session.prefs().dialogs.get(REMEMBERED) {
-        let _ = opts.apply(saved);
+    if let Some(saved) = crate::host_settings::recall_ref(app, REMEMBERED) {
+        let _ = opts.apply(&saved);
     }
     let mut w = CafWorkspace {
         layer,
@@ -73,7 +73,7 @@ pub(super) fn bounds(b: &Base) -> Rect {
 
 fn remember(app: &mut PhotocraftApp, opts: &CafOpts) {
     let v = opts.to_json();
-    app.session.prefs.edit(|p| p.dialogs.insert(REMEMBERED.into(), v));
+    crate::host_settings::remember(app, REMEMBERED, &v);
 }
 
 /// Apply: fill with the current state (one history step); the workspace stays open.

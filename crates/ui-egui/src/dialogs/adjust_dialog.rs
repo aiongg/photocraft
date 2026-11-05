@@ -285,7 +285,7 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
     let id = open(app, command)?;
     let kind = command.strip_prefix(PREFIX).unwrap_or_default();
     let mode = curve_mode(app, kind);
-    let Some(last) = app.session.prefs().dialogs.get(command).cloned() else { return Some(id) };
+    let Some(last) = crate::host_settings::recall_ref(app, command) else { return Some(id) };
     let Ok(adjustment) = photocraft_engine::adjust_params::from_params(kind, &last, None, mode) else { return Some(id) };
     if let (Some(dialog), Value::Object(values)) = (app.ui.dialog_mut(id), photocraft_engine::adjust_params::to_params(&adjustment)) {
         dialog.fields.retain(|k, _| k.starts_with("__"));
@@ -302,7 +302,7 @@ pub(crate) fn remember(app: &mut PhotocraftApp, fields: &Map<String, Value>) {
     }
     let Some(command) = fields.get("__command").and_then(Value::as_str).filter(|c| has_dialog(c)) else { return };
     let values = crate::filter_dialog::params_of(fields);
-    app.session.prefs.edit(|prefs| prefs.dialogs.insert(command.into(), values));
+    crate::host_settings::remember(app, command, &values);
 }
 
 /// The Curves dialog's single-channel target: the Channels panel's, plus the Layers panel's mask

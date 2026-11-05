@@ -66,6 +66,9 @@ impl PhotocraftApp {
         ctx.add_plugin(tool_cursor::CursorLifecycle);
         ctx.add_plugin(single_line_drag::SingleLineDrag::default());
         theme::install_fonts(ctx);
+        // The library Host (app identity, words, settings over the preferences) from the first frame;
+        // `i18n::sync_context` swaps its language.
+        crate::i18n::set_host_language(ctx, crate::i18n::Lang::EN);
         egui_extras::install_image_loaders(ctx);
         theme::apply(ctx, kind);
         // Right-click in any text field: its Cut / Copy / Paste menu (text_field_menu.rs).
