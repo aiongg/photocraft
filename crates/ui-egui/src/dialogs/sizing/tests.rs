@@ -98,7 +98,7 @@ fn canvas_extension_dropdown_is_named_for_its_setting() {
     open(h.state_mut(), "image.canvasSize").unwrap();
     h.run_steps(3);
     let labels: Vec<String> = h.query_all_by_role(Role::ComboBox).filter_map(|n| n.accesskit_node().label()).collect();
-    assert!(labels.iter().any(|label| label.trim_end_matches(':') == "Canvas extension color"), "{labels:?}");
+    assert!(labels.iter().any(|label| label == "Canvas extension color"), "{labels:?}");
     assert!(!labels.iter().any(|label| label == "Size"), "the dialog's Size label names a different field: {labels:?}");
 }
 

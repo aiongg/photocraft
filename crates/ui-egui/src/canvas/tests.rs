@@ -48,7 +48,7 @@ fn the_cpu_canvas_shows_a_filter_dialogs_preview() {
         let ctx = egui::Context::default();
         let (tex, _) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
         let (_, plain) = pixels(&ctx, tex);
-        crate::filter_dialog::open_legacy(&mut app, "filter.stylize.solarize").unwrap();
+        crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
         let (tex, _) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
         let (tex_size, shown) = pixels(&ctx, tex);
         let preview = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the dialog's preview");
@@ -72,10 +72,9 @@ fn the_cpu_canvas_shows_a_filter_dialogs_preview() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.background_jobs = false;
     app.run("file.new", json!({"width": 64, "height": 32, "background": "white"})).unwrap();
-    let id = crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
-    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
-    d.fields.insert("angle".into(), json!(90.0));
-    d.fields.insert("__preview".into(), json!(true));
+    let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "angle", json!(90.0)).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "__preview", json!(true)).unwrap();
     let ctx = egui::Context::default();
     let t = ensure_texture_in_view(&mut app, &ctx, 0, None, None).unwrap();
     let (size, _) = pixels(&ctx, t.texture);
@@ -85,7 +84,7 @@ fn the_cpu_canvas_shows_a_filter_dialogs_preview() {
     assert_eq!(centre(t.bounds), centre(app.session.active().unwrap().doc.bounds()), "the same centre, so the view's pan holds");
     // Preview off, then Cancel: the document again, unchanged.
     let revision = app.session.active().unwrap().revision;
-    app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap().fields.insert("__preview".into(), json!(false));
+    crate::dialogs::hosted::set_field(&mut app, id, "__preview", json!(false)).unwrap();
     let t = ensure_texture_in_view(&mut app, &ctx, 0, None, None).unwrap();
     assert_eq!(t.bounds, DRect::new(0, 0, 64, 32), "Preview off");
     crate::dialogs::cancel(&mut app, id).unwrap();
@@ -103,10 +102,9 @@ fn a_channel_overlay_follows_a_size_changing_preview() {
     app.background_jobs = false;
     app.run("file.new", json!({"width": 64, "height": 32, "background": "white"})).unwrap();
     app.run("channel.new", json!({"name": "Alpha", "fill": "black"})).unwrap();
-    let id = crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
-    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
-    d.fields.insert("angle".into(), json!(90.0));
-    d.fields.insert("__preview".into(), json!(true));
+    let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "angle", json!(90.0)).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "__preview", json!(true)).unwrap();
     let ctx = egui::Context::default();
     for rotation in [0.0f32, 30.0] {
         let view = View { zoom: 4.0, center: [32.0, 16.0], rotation, ..app.ui.views[0].clone() };
@@ -145,7 +143,7 @@ fn inline_filter_preview_is_composited_and_recorded_once() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.background_jobs = false;
     app.run("file.new", json!({"width": 320, "height": 240})).unwrap();
-    crate::filter_dialog::open_legacy(&mut app, "filter.stylize.solarize").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
     app.perf.stage = Default::default();
     let (_, _, size) = ensure_filter_preview(&mut app, 0, &egui::Context::default()).expect("a preview");
     assert_eq!(size, [320, 240]);
@@ -167,7 +165,7 @@ fn filter_preview_at_100_percent_is_full_resolution() {
     app.background_jobs = false;
     app.run("file.new", json!({"width": 2400, "height": 2200})).unwrap();
     assert_eq!(crate::proxy::preview_factor(&app.session.active().unwrap().doc, true), 2, "big enough for a proxy");
-    crate::filter_dialog::open_legacy(&mut app, "filter.stylize.solarize").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
     let ctx = egui::Context::default();
     let preview_at = |app: &mut PhotocraftApp, zoom: f32| {
         app.ui.views.get_mut(0).expect("the new document's view").zoom = zoom;
@@ -218,7 +216,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let ctx = egui::Context::default();
     let wait_for = |app: &mut PhotocraftApp, radius: f64| {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
@@ -231,17 +229,17 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
     // The first frame hands the blur to the worker and returns.
     assert!(ensure_filter_preview(&mut app, 0, &ctx).is_none());
     assert!(app.filter_preview_worker.busy(), "the preview computes on the worker");
-    let first = app.ui.dialogs[0].fields["radius"].as_f64().unwrap();
+    let first = crate::dialogs::hosted::test_field(&app, "radius").as_f64().unwrap();
     wait_for(&mut app, first);
     assert!(app.filter_preview.as_ref().unwrap().result.is_some());
 
     // A preview for old values occupies the worker until it is cancelled.
     let st = app.session.active().unwrap();
-    let d = &app.ui.dialogs[0];
+    let (dialog, _) = crate::filter_dialog::live_dialog(&app).unwrap();
     let stale = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
         revision: st.revision,
-        dialog: d.id,
+        dialog,
         active: st.active_layer,
         target: st.channel_view.target,
         command: "filter.blur.gaussianBlur".into(),
@@ -261,7 +259,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
         .unwrap();
     // The slider moves on and stops: once the value settles, the stale preview is cancelled
     // instead of being waited out.
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(12.0));
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(12.0));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     let was_cancelled = loop {
         ensure_filter_preview(&mut app, 0, &ctx);
@@ -282,10 +280,10 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
 // test that relies on a real blur beating a 150 ms timer is a test that fails on a loaded box.
 #[cfg(not(target_arch = "wasm32"))]
 fn gated_blur_preview(app: &mut PhotocraftApp, ctx: &egui::Context) -> (std::sync::mpsc::Sender<()>, f64) {
-    let d = app.ui.dialogs.first().expect("a dialog is open");
+    let (dialog, fields) = crate::filter_dialog::live_dialog(app).expect("a dialog is open");
     let st = app.session.active().expect("a document is active");
     let command = "filter.blur.gaussianBlur";
-    let params = app.with_mask_target(command, crate::filter_dialog::params_of(&d.fields));
+    let params = app.with_mask_target(command, crate::filter_dialog::params_of(&fields));
     assert_eq!(
         crate::filter_dialog::preview_factor(command, &params, 1),
         1,
@@ -294,7 +292,7 @@ fn gated_blur_preview(app: &mut PhotocraftApp, ctx: &egui::Context) -> (std::syn
     let key = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
         revision: st.revision,
-        dialog: d.id,
+        dialog,
         active: st.active_layer,
         target: st.channel_view.target,
         command: command.into(),
@@ -350,13 +348,13 @@ fn a_preview_computed_mid_drag_reaches_the_canvas_and_then_converges() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let ctx = egui::Context::default();
     let (release, first) = gated_blur_preview(&mut app, &ctx);
 
     // The pointer moves on before the frame lands.
     let moved = first + 4.0;
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(moved));
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(moved));
     release.send(()).expect("released");
     drive_until(&mut app, &ctx, "the mid-drag frame", |a| a.filter_preview.is_some());
 
@@ -364,7 +362,7 @@ fn a_preview_computed_mid_drag_reaches_the_canvas_and_then_converges() {
     let shown = app.filter_preview.as_ref().expect("the mid-drag frame was published");
     assert_eq!(shown.key.params["radius"].as_f64(), Some(first), "the frame is the one the worker finished");
     assert!(shown.result.is_some());
-    assert_eq!(app.ui.dialogs[0].fields["radius"].as_f64(), Some(moved), "the slider kept moving");
+    assert_eq!(crate::dialogs::hosted::test_field(&app, "radius").as_f64(), Some(moved), "the slider kept moving");
     // The display gate lets it through, so the canvas has something to draw: this is what
     // re-adding `params` to that gate would break.
     assert!(ensure_filter_preview(&mut app, 0, &ctx).is_some(), "the canvas draws the mid-drag frame");
@@ -386,7 +384,7 @@ fn a_mid_drag_frame_does_not_replace_a_frame_that_is_already_exact() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let ctx = egui::Context::default();
 
     // A frame for the radius the dialog holds right now reaches the canvas. This also proves
@@ -399,10 +397,10 @@ fn a_mid_drag_frame_does_not_replace_a_frame_that_is_already_exact() {
 
     // The slider moves away and a frame for the new radius is computed...
     let moved = first + 4.0;
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(moved));
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(moved));
     let (release_moved, _) = gated_blur_preview(&mut app, &ctx);
     // ...and back to `first` before that frame lands.
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(first));
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(first));
     release_moved.send(()).expect("released");
 
     // The frame for `moved` arrives late. It belongs to this preview, but the frame on screen
@@ -425,7 +423,7 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let ctx = egui::Context::default();
 
     let (release, first) = gated_blur_preview(&mut app, &ctx);
@@ -436,13 +434,13 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
     // The slider moves and a job for the new radius is started, then the slider moves again
     // before that job lands: its result is stale by the time it arrives.
     let moved = first + 4.0;
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(moved));
-    let d = app.ui.dialogs.first().expect("a dialog is open");
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(moved));
+    let (dialog, fields) = crate::filter_dialog::live_dialog(&app).expect("a dialog is open");
     let st = app.session.active().expect("a document is active");
     let key = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
         revision: st.revision,
-        dialog: d.id,
+        dialog,
         active: st.active_layer,
         target: st.channel_view.target,
         command: "filter.blur.gaussianBlur".into(),
@@ -456,7 +454,7 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
             crate::dialogs::filter_preview_worker::Computed { result: None, ms: 0.0 }
         })
         .expect("the worker starts");
-    app.ui.dialogs[0].fields.insert("radius".into(), json!(moved + 4.0));
+    crate::dialogs::hosted::test_set(&mut app, "radius", json!(moved + 4.0));
     release_empty.send(()).expect("released");
 
     // Storing an empty result here would drop the canvas back to the unfiltered layer for a
@@ -477,16 +475,16 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let ctx = egui::Context::default();
-    let first_dialog = app.ui.dialogs.first().expect("a dialog is open").id;
+    let first_dialog = crate::filter_dialog::live_dialog(&app).expect("a dialog is open").0;
     let (release, _) = gated_blur_preview(&mut app, &ctx);
 
     // Close that dialog and open another one for the same layer and the same command. Only the
     // dialog id differs, which is exactly what `same_target` has to notice.
-    app.ui.dialogs.clear();
-    crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-    let second_dialog = app.ui.dialogs.first().expect("a dialog is open").id;
+    crate::dialogs::cancel(&mut app, first_dialog).unwrap();
+    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    let second_dialog = crate::filter_dialog::live_dialog(&app).expect("a dialog is open").0;
     assert_ne!(second_dialog, first_dialog, "a reopened dialog gets a new id");
     release.send(()).expect("released");
 

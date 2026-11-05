@@ -35,65 +35,13 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
     if !shows(f) {
         return;
     }
-    let Some(cmd) = f.get("__command").and_then(Value::as_str).map(str::to_owned) else { return };
-    let Some(idx) = app.session.active_index() else { return };
-    let Some(st) = app.session.documents().get(idx) else { return };
-    let (doc_id, revision) = (st.doc.id, st.revision);
-
-    // The filtered proxy the canvas already computed for this dialog, when there is one. Matching
-    // the dialog keeps a stacked dialog from showing another's preview; the Preview checkbox still
-    // decides whether the filtered result (rather than the original) is shown.
     let preview_on = f.get("__preview").and_then(Value::as_bool) == Some(true);
-    let filtered: Option<(FilterPreviewKey, std::sync::Arc<Document>)> = app.filter_preview.as_ref().and_then(|p| {
-        // An edited smart filter previews as `layer.smartFilter.setParams` (#6324).
-        let previewed = crate::smart_ui::preview_command(f, &cmd);
-        (preview_on && p.key.dialog == dialog && p.key.doc == doc_id && p.key.command == previewed)
-            .then(|| p.result.clone().map(|r| (p.key.clone(), r)))
-            .flatten()
-    });
-    // The proxy factor the preview runs at (the filtered key's when it exists, else the request's).
-    // The fallback must be the factor the canvas will ask for, not the document's own: since #6326
-    // the canvas caps it with the view's zoom, and a window that sized its textures from the
-    // uncapped factor built a proxy the canvas never asked for, then rebuilt it (a full-size copy
-    // and upload on the UI thread at 100 %) the moment the first result arrived, shifting this
-    // window's 100 % mapping and pan clamp for a frame.
-    let base_k = filtered.as_ref().map(|(k, _)| k.k).unwrap_or_else(|| {
-        let params = app.with_mask_target(&cmd, crate::filter_dialog::params_of(f));
-        crate::canvas::filter_preview_factor(app, &st.doc, &cmd, &params)
-    });
-
-    let t = craft::ui::theme::current(ui.ctx());
     let cache_id = egui::Id::unique(("filter-preview-ui", dialog));
     let mut cache: Cache = ui.ctx().data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Cache>(cache_id)));
-    // Channel visibility and the active mask can change without a document revision. Both the
-    // original (press-and-hold) and filtered textures must follow the canvas's current view.
-    let view = (st.channel_view.clone(), app.session.prefs().interface.show_channels_in_color, st.active_layer);
-    if cache.view.as_ref() != Some(&view) {
-        cache = Cache { view: Some(view), ..Default::default() };
-    }
-
-    // Unfiltered proxy: built once per document revision and factor (cheap at the proxy factor).
-    let orig_key = TexKey::Original(doc_id, revision, base_k);
-    if cache.original.as_ref().map(|c| &c.key) != Some(&orig_key) {
-        let proxy = crate::proxy::proxy_document(&st.doc, base_k);
-        let tex = upload(ui.ctx(), app, "filter-preview-original", &proxy);
-        cache.original = Some(CachedTex { key: orig_key, tex, size: [proxy.size.width, proxy.size.height] });
-    }
-    // Filtered proxy: rebuilt whenever the worker publishes a new result.
-    match &filtered {
-        Some((key, filtered_doc)) => {
-            let fkey = TexKey::Filtered(key.clone());
-            if cache.filtered.as_ref().map(|c| &c.key) != Some(&fkey) {
-                let tex = upload(ui.ctx(), app, "filter-preview-filtered", filtered_doc);
-                cache.filtered = Some(CachedTex { key: fkey, tex, size: [filtered_doc.size.width, filtered_doc.size.height] });
-            }
-        }
-        None => cache.filtered = None,
-    }
-    let orig = cache.original.as_ref().map(|c| (c.tex.clone(), c.size));
-    let filt = cache.filtered.as_ref().map(|c| (c.tex.clone(), c.size));
+    let fresh = refresh(app, ui.ctx(), &mut cache, dialog, f, preview_on);
     ui.ctx().data_mut(|d| d.insert_temp(cache_id, cache));
-
+    let Some(Fresh { orig, filt, base_k }) = fresh else { return };
+    let t = craft::ui::theme::current(ui.ctx());
     let Some([img_w, img_h]) = filt.as_ref().map(|(_, s)| *s).or_else(|| orig.as_ref().map(|(_, s)| *s)) else { return };
     if img_w == 0 || img_h == 0 {
         return;
@@ -156,6 +104,108 @@ pub(crate) fn window(app: &PhotocraftApp, dialog: u64, ui: &mut egui::Ui, f: &mu
     f.insert(ZOOM_FIELD.into(), json!(zoom.clamp(MIN_ZOOM, MAX_ZOOM)));
     f.insert(CENTER_X_FIELD.into(), json!(cx));
     f.insert(CENTER_Y_FIELD.into(), json!(cy));
+}
+
+/// The preview textures of one dialog pass: the unfiltered proxy, the filtered one when the worker
+/// has published it, and the proxy factor both were built at.
+struct Fresh {
+    orig: Option<(egui::TextureHandle, [u32; 2])>,
+    filt: Option<(egui::TextureHandle, [u32; 2])>,
+    base_k: u32,
+}
+
+/// Brings `cache` up to date for the dialog `dialog` whose fields are `f`.
+fn refresh(app: &PhotocraftApp, ctx: &egui::Context, cache: &mut Cache, dialog: u64, f: &Map<String, Value>, preview_on: bool) -> Option<Fresh> {
+    let cmd = f.get("__command").and_then(Value::as_str).map(str::to_owned)?;
+    let idx = app.session.active_index()?;
+    let st = app.session.documents().get(idx)?;
+    let (doc_id, revision) = (st.doc.id, st.revision);
+
+    // The filtered proxy the canvas already computed for this dialog, when there is one. Matching
+    // the dialog keeps a stacked dialog from showing another's preview; the Preview checkbox still
+    // decides whether the filtered result (rather than the original) is shown.
+    let filtered: Option<(FilterPreviewKey, std::sync::Arc<Document>)> = app.filter_preview.as_ref().and_then(|p| {
+        // An edited smart filter previews as `layer.smartFilter.setParams` (#6324).
+        let previewed = crate::smart_ui::preview_command(f, &cmd);
+        (preview_on && p.key.dialog == dialog && p.key.doc == doc_id && p.key.command == previewed)
+            .then(|| p.result.clone().map(|r| (p.key.clone(), r)))
+            .flatten()
+    });
+    // The proxy factor the preview runs at (the filtered key's when it exists, else the request's).
+    // The fallback must be the factor the canvas will ask for, not the document's own: since #6326
+    // the canvas caps it with the view's zoom, and a window that sized its textures from the
+    // uncapped factor built a proxy the canvas never asked for, then rebuilt it (a full-size copy
+    // and upload on the UI thread at 100 %) the moment the first result arrived, shifting this
+    // window's 100 % mapping and pan clamp for a frame.
+    let base_k = filtered.as_ref().map(|(k, _)| k.k).unwrap_or_else(|| {
+        let params = app.with_mask_target(&cmd, crate::filter_dialog::params_of(f));
+        crate::canvas::filter_preview_factor(app, &st.doc, &cmd, &params)
+    });
+
+    // Channel visibility and the active mask can change without a document revision. Both the
+    // original (press-and-hold) and filtered textures must follow the canvas's current view.
+    let view = (st.channel_view.clone(), app.session.prefs().interface.show_channels_in_color, st.active_layer);
+    if cache.view.as_ref() != Some(&view) {
+        *cache = Cache { view: Some(view), ..Default::default() };
+    }
+
+    // Unfiltered proxy: built once per document revision and factor (cheap at the proxy factor).
+    let orig_key = TexKey::Original(doc_id, revision, base_k);
+    if cache.original.as_ref().map(|c| &c.key) != Some(&orig_key) {
+        let proxy = crate::proxy::proxy_document(&st.doc, base_k);
+        let tex = upload(ctx, app, "filter-preview-original", &proxy);
+        cache.original = Some(CachedTex { key: orig_key, tex, size: [proxy.size.width, proxy.size.height] });
+    }
+    // Filtered proxy: rebuilt whenever the worker publishes a new result.
+    match &filtered {
+        Some((key, filtered_doc)) => {
+            let fkey = TexKey::Filtered(key.clone());
+            if cache.filtered.as_ref().map(|c| &c.key) != Some(&fkey) {
+                let tex = upload(ctx, app, "filter-preview-filtered", filtered_doc);
+                cache.filtered = Some(CachedTex { key: fkey, tex, size: [filtered_doc.size.width, filtered_doc.size.height] });
+            }
+        }
+        None => cache.filtered = None,
+    }
+    let orig = cache.original.as_ref().map(|c| (c.tex.clone(), c.size));
+    let filt = cache.filtered.as_ref().map(|c| (c.tex.clone(), c.size));
+    Some(Fresh { orig, filt, base_k })
+}
+
+/// A hosted dialog's preview textures, held in its record. Equal to every other, like the other
+/// handles a record carries.
+#[derive(Clone, Default)]
+pub struct PaneCache(Cache);
+
+impl std::fmt::Debug for PaneCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PaneCache").finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for PaneCache {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+/// The image the library's preview pane shows for the hosted dialog `dialog` with fields `f`: the
+/// filtered proxy while Preview shows the result and the worker has published it, else the
+/// unfiltered one. Its size is the document's at 100 %, one document pixel per point.
+pub(crate) fn pane_image(
+    app: &PhotocraftApp,
+    ctx: &egui::Context,
+    cache: &mut PaneCache,
+    dialog: u64,
+    f: &Map<String, Value>,
+    preview_on: bool,
+) -> Option<egui::load::SizedTexture> {
+    if !shows(f) {
+        return None;
+    }
+    let Fresh { orig, filt, base_k } = refresh(app, ctx, &mut cache.0, dialog, f, preview_on)?;
+    let (tex, size) = if preview_on { filt.or(orig) } else { orig }?;
+    (size[0] > 0 && size[1] > 0).then(|| egui::load::SizedTexture::new(tex.id(), document_size(size, base_k)))
 }
 
 /// The zoom levels the − / + buttons step through, like the Filter Gallery's.
@@ -362,8 +412,8 @@ mod tests {
         app.run("channel.new", json!({"name": "Black", "fill": "black"})).unwrap();
         app.session.active_mut().unwrap().channel_view.target = ChannelTarget::Alpha(0);
         let revision = app.session.active().unwrap().revision;
-        let id = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-        let mut fields = app.ui.dialogs.last().unwrap().fields.clone();
+        let id = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        let mut fields = app.ui.dialog_fields(id).unwrap();
         let ctx = egui::Context::default();
         let cache_id = egui::Id::unique(("filter-preview-ui", id));
         ctx.run_ui(Default::default(), |ui| window(&app, id, ui, &mut fields)).textures_delta.clear();
@@ -497,8 +547,8 @@ mod tests {
     fn the_window_defaults_its_view_and_never_panics() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-        let id = crate::filter_dialog::open_legacy(&mut app, "filter.stylize.emboss").expect("Emboss opens a dialog");
-        let mut f = app.ui.dialogs.iter().find(|d| d.id == id).expect("the dialog is open").fields.clone();
+        let id = crate::filter_dialog::open(&mut app, "filter.stylize.emboss").expect("Emboss opens a dialog");
+        let mut f = app.ui.dialog_fields(id).expect("the dialog is open");
         assert!(f.contains_key("__preview"), "Emboss previews");
         egui::Context::default().run_ui(Default::default(), |ui| window(&app, id, ui, &mut f)).textures_delta.clear();
         assert_eq!(f.get(ZOOM_FIELD), Some(&json!(1.0)), "100% by default");
@@ -511,5 +561,20 @@ mod tests {
         egui::Context::default().run_ui(Default::default(), |ui| window(&app, id, ui, &mut f)).textures_delta.clear();
         assert_eq!(f.get(ZOOM_FIELD), Some(&json!(1.0)));
         assert_eq!(f.get(CENTER_Y_FIELD), Some(&json!(0.0)));
+    }
+
+    #[test]
+    fn the_hosted_dialogs_pane_shows_the_proxy_at_one_point_per_document_pixel() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+        let id = crate::filter_dialog::open(&mut app, "filter.stylize.emboss").unwrap();
+        let fields = app.ui.dialog_fields(id).unwrap();
+        let (ctx, mut cache) = (egui::Context::default(), PaneCache::default());
+        let image = pane_image(&app, &ctx, &mut cache, id, &fields, false).expect("the unfiltered proxy shows before a result exists");
+        assert_eq!(image.size, vec2(64.0, 48.0));
+        // A command without the filter menu's preview pane (Arbitrary rotation) has none.
+        let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+        let fields = app.ui.dialog_fields(id).unwrap();
+        assert!(pane_image(&app, &ctx, &mut cache, id, &fields, true).is_none());
     }
 }

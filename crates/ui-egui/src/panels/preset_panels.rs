@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::state::Tool;
 use crate::theme::Tokens;
+use photocraft_engine::pattern_cmds::PatternLibrary;
 
 mod panels;
 
@@ -254,11 +255,16 @@ fn pattern_texture(ctx: &egui::Context, pat: &photocraft_doc::Pattern) -> Textur
 /// Photoshop's pattern picker: a swatch of the library pattern `selected` (an id) that opens a grid
 /// of every library pattern's swatch, each named in its tooltip. Returns the id of a newly picked
 /// pattern.
-pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &str) -> Option<String> {
+pub(crate) fn pattern_picker(library: &PatternLibrary, ui: &mut egui::Ui, selected: &str) -> Option<String> {
+    pattern_swatch(library, ui, selected).1
+}
+
+/// [`pattern_picker`], with the swatch's response (what a labelled row centres on).
+pub(crate) fn pattern_swatch(library: &PatternLibrary, ui: &mut egui::Ui, selected: &str) -> (egui::Response, Option<String>) {
     const SWATCH: f32 = 40.0;
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
-    let pats = &app.session.patterns.items;
+    let pats = &library.items;
     let current = pats.iter().find(|p| p.id == selected);
     let uv = Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0));
     let (r, resp) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
@@ -276,14 +282,14 @@ pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Patterns")));
     let mut picked = None;
     egui::Popup::menu(&resp).show(|ui| {
-        picked = pattern_grid(app, ui, selected);
+        picked = pattern_grid(library, ui, selected);
     });
-    picked
+    (resp, picked)
 }
 
 /// Library grid shared by the standalone picker and paint popups. Drawing it inline avoids
 /// replacing an already-open paint popup with a second memory-backed popup.
-pub(crate) fn pattern_grid(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &str) -> Option<String> {
+pub(crate) fn pattern_grid(library: &PatternLibrary, ui: &mut egui::Ui, selected: &str) -> Option<String> {
     const SWATCH: f32 = 40.0;
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
@@ -292,7 +298,7 @@ pub(crate) fn pattern_grid(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &st
     ui.set_max_width(6.0 * (SWATCH + 4.0));
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
-        for p in &app.session.patterns.items {
+        for p in &library.items {
             let (r, cell) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
             ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
             let (w, c) = if p.id == selected { (2.0, t.accent) } else { (1.0, t.field_border) };

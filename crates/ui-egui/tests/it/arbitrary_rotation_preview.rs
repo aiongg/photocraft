@@ -66,8 +66,7 @@ fn angle(h: &mut Harness, id: u64, value: f64) {
 fn blue(h: &mut Harness, name: &str) -> (usize, u32, u32) {
     h.run_steps(3);
     let rect = h.state().last_canvas_rect.shrink(3.0);
-    let modals: Vec<_> =
-        h.state().ui.dialogs.iter().map(|d| h.ctx.memory(|m| m.area_rect(craft::ui::dialog::dialog_id(d.id))).expect("laid-out dialog").expand(4.0)).collect();
+    let modals: Vec<_> = h.state().ui.host.stack().ids().map(|id| h.ctx.memory(|m| m.area_rect(id)).expect("laid-out dialog").expand(4.0)).collect();
     let img = h.render().expect("render");
     if let Some(dir) = std::env::var_os("PHOTOCRAFT_ROTATION_EVIDENCE_DIR") {
         std::fs::create_dir_all(&dir).expect("evidence directory");
@@ -109,11 +108,11 @@ fn size_changing_rotation_preview_is_visible_and_preserves_the_panned_center() {
         angle(&mut h, id, degrees);
         h.get_by_label("Preview").click();
         h.run_steps(4);
-        assert_eq!(h.state().ui.dialogs[0].fields["__preview"], false);
+        assert_eq!(h.state().ui.dialog_fields(id).unwrap()["__preview"], false);
         assert!(blue(&mut h, &format!("{width}x{height}-{degrees}-off")).0 > 5_000, "Preview off shows the original image");
         h.get_by_label("Preview").click();
         h.run_steps(4);
-        assert_eq!(h.state().ui.dialogs[0].fields["__preview"], true);
+        assert_eq!(h.state().ui.dialog_fields(id).unwrap()["__preview"], true);
         let (count, top, bottom) = blue(&mut h, &format!("{width}x{height}-{degrees}-on"));
         assert!(count > 5_000, "{width}x{height}, {degrees}°, factor {factor}: rotated blue pixels disappeared ({count} remain)");
         let rect = photocraft_ui_egui::rulers::content_rect(h.state(), h.state().last_canvas_rect);
@@ -137,11 +136,11 @@ fn preview_toggle_and_cancel_keep_the_document_while_ok_applies_rotation() {
     assert!(blue(&mut h, "control-zero-on").0 > 5_000);
     h.get_by_label("Preview").click();
     h.run_steps(4);
-    assert_eq!(h.state().ui.dialogs[0].fields["__preview"], false);
+    assert_eq!(h.state().ui.dialog_fields(id).unwrap()["__preview"], false);
     assert!(blue(&mut h, "control-zero-off").0 > 5_000);
     h.get_by_label("Preview").click();
     h.run_steps(4);
-    assert_eq!(h.state().ui.dialogs[0].fields["__preview"], true);
+    assert_eq!(h.state().ui.dialog_fields(id).unwrap()["__preview"], true);
     assert!(blue(&mut h, "control-zero-restored").0 > 5_000);
     h.get_by_label("Preview").click();
     h.run_steps(4);
@@ -160,7 +159,7 @@ fn preview_toggle_and_cancel_keep_the_document_while_ok_applies_rotation() {
     angle(&mut h, id, 45.0);
     h.get_by_label("OK").click();
     h.run_steps(4);
-    assert!(h.state().ui.dialogs.is_empty());
+    assert!(!h.state().ui.any_dialog_open());
     let st = h.state().session.active().unwrap();
     assert_eq!((st.doc.size.width, st.doc.size.height), (453, 453));
     assert_eq!(st.history.entries().len(), history.len() + 1);

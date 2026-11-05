@@ -534,7 +534,7 @@ fn save_paths_without_an_extension_get_the_suggested_one() {
 
 /// The question whether to replace a file (`replace_prompt`), when one is open.
 fn replace_prompt(app: &PhotocraftApp) -> Option<u64> {
-    app.ui.dialogs.iter().find(|d| crate::replace_prompt::owns(&d.fields)).map(|d| d.id)
+    app.ui.prompt_with(crate::replace_prompt::owns).map(|p| p.id)
 }
 
 /// File › Save As, answered with `path`.
@@ -556,7 +556,7 @@ fn a_save_asks_before_replacing_the_file_its_added_extension_names() {
     changed_by_another_app(&disk, "/pics/cat.psd");
     save_as(&mut app, &open, "/pics/cat");
     let id = replace_prompt(&app).expect("the save asks first");
-    let fields = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
+    let fields = &app.ui.prompt(id).unwrap().fields;
     assert!(fields["message"].as_str().unwrap().contains("“cat.psd”"), "{fields:?}");
     assert!(fields["detail"].as_str().unwrap().contains("“cat”"), "{fields:?}");
     assert!(written.borrow().is_empty(), "nothing is written before the answer");
@@ -571,7 +571,8 @@ fn a_save_asks_before_replacing_the_file_its_added_extension_names() {
 
     // A question closed without an answer counts as Cancel.
     save_as(&mut app, &open, "/pics/cat");
-    app.ui.close_dialog(replace_prompt(&app).expect("asked again"));
+    assert!(replace_prompt(&app).is_some());
+    app.ui.host.cancel::<craft::ui::dialog::StandardPrompt>(&ctx);
     app.poll_file_dialog(&ctx, None);
     assert!(written.borrow().is_empty() && !app.file_dialog_open());
 
@@ -1342,8 +1343,8 @@ fn changed_by_another_app(disk: &Disk, path: &str) {
     *disk.borrow_mut().entry(path.to_string()).or_default() += 1;
 }
 
-fn disk_prompt(app: &PhotocraftApp) -> Option<&crate::state::Dialog> {
-    app.ui.dialogs.iter().find(|d| crate::disk_change_prompt::owns(&d.fields))
+fn disk_prompt(app: &PhotocraftApp) -> Option<&crate::dialogs::standard_prompts::PromptRecord> {
+    app.ui.prompt_with(crate::disk_change_prompt::owns)
 }
 
 #[test]
@@ -1370,7 +1371,7 @@ fn save_asks_before_replacing_a_file_another_app_changed() {
 
     // Cancel leaves the file and the unsaved document alone.
     let id = prompt.id;
-    app.ui.close_dialog(id);
+    crate::dialogs::cancel(&mut app, id).unwrap();
     assert_eq!(written.borrow().len(), 1);
     assert!(app.session.active().unwrap().is_dirty());
 

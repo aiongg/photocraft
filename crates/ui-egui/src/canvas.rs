@@ -2105,8 +2105,8 @@ mod rotation_preview_isolation_tests {
         let ctx = egui::Context::default();
         let texture = crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
         ctx.tex_manager().write().take_delta().clear();
-        let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-        app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
+        let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        crate::dialogs::hosted::test_set(&mut app, "radius", json!(2.0));
         ensure_filter_preview(&mut app, 0, &ctx).unwrap();
         crate::channel_view::ensure(&mut app, &ctx, 0);
         let mut delta = ctx.tex_manager().write().take_delta();
@@ -2117,13 +2117,13 @@ mod rotation_preview_isolation_tests {
         assert_ne!(image.pixels, original, "a nontrivial filter must be visible before OK");
         delta.clear();
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
-        app.ui.dialogs.last_mut().unwrap().fields.insert("__preview".into(), json!(false));
+        crate::dialogs::hosted::test_set(&mut app, "__preview", json!(false));
         crate::channel_view::ensure(&mut app, &ctx, 0);
         let mut delta = ctx.tex_manager().write().take_delta();
         let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("Preview off restores channel")[0].image;
         assert_eq!(image.pixels, original);
         delta.clear();
-        app.ui.dialogs.last_mut().unwrap().fields.insert("__preview".into(), json!(true));
+        crate::dialogs::hosted::test_set(&mut app, "__preview", json!(true));
         crate::channel_view::ensure(&mut app, &ctx, 0);
         ctx.tex_manager().write().take_delta().clear();
         crate::dialogs::cancel(&mut app, dialog).unwrap();
@@ -2161,8 +2161,8 @@ mod rotation_preview_isolation_tests {
             session.active_mut().unwrap().channel_view.target = target;
             let mut app = PhotocraftApp::new(session, crate::Services::default());
             app.background_jobs = false;
-            let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-            app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
+            let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+            crate::dialogs::hosted::test_set(&mut app, "radius", json!(2.0));
             ensure_filter_preview(&mut app, 0, &egui::Context::default()).unwrap();
             let preview = app.filter_preview.as_ref().unwrap().result.as_ref().unwrap().clone();
             crate::dialogs::confirm(&mut app, dialog).unwrap();
@@ -2218,8 +2218,8 @@ mod rotation_preview_isolation_tests {
             .unwrap();
         app.session.active_mut().unwrap().channel_view.target = ChannelTarget::Alpha(0);
         let revision = app.session.active().unwrap().revision;
-        let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-        app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
+        let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+        crate::dialogs::hosted::test_set(&mut app, "radius", json!(2.0));
         let ctx = egui::Context::default();
         let (first, first_key) = filter_channel_preview(&mut app, 0, &ctx).unwrap();
         app.session.active_mut().unwrap().channel_view.target = ChannelTarget::Alpha(1);
@@ -2267,8 +2267,8 @@ mod rotation_preview_isolation_tests {
             let ctx = egui::Context::default();
             let texture = crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
             ctx.tex_manager().write().take_delta().clear();
-            let dialog = crate::filter_dialog::open_legacy(&mut app, "filter.blur.gaussianBlur").unwrap();
-            app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
+            let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+            crate::dialogs::hosted::test_set(&mut app, "radius", json!(2.0));
             crate::channel_view::ensure(&mut app, &ctx, 0).unwrap();
             let mut delta = ctx.tex_manager().write().take_delta();
             let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("preview must refresh overlay")[0].image;
@@ -2311,16 +2311,16 @@ mod rotation_preview_isolation_tests {
         let original = app.session.active().unwrap().doc.clone();
         let before = shown_pixels(&app, &original);
         let preview = |app: &mut PhotocraftApp, command: &str, profile: &str| {
-            crate::filter_dialog::open_legacy(app, command).unwrap();
-            let fields = &mut app.ui.dialogs.last_mut().unwrap().fields;
-            assert_eq!(fields.get("__preview"), Some(&json!(true)), "{command} has a Preview checkbox, on");
-            fields.insert("profile".into(), json!(profile));
+            crate::filter_dialog::open(app, command).unwrap();
+            assert_eq!(crate::filter_dialog::live_dialog(app).unwrap().1.get("__preview"), Some(&json!(true)), "{command} has a Preview checkbox, on");
+            crate::dialogs::hosted::test_set(app, "profile", json!(profile));
             ensure_filter_preview(app, 0, &egui::Context::default()).expect("a preview");
             let result = app.filter_preview.as_ref().unwrap().result.clone().unwrap();
             let key = original.id.0 ^ (1u64 << 61);
             assert_eq!(filter_preview_display_doc(app, &original, key).icc_profile, result.icc_profile, "the canvas shows it through its own profile");
             assert_eq!(app.session.active().unwrap().doc.icc_profile, original.icc_profile, "previewing changes nothing");
-            app.ui.dialogs.clear();
+            let id = app.ui.hosted.last().unwrap().id;
+            crate::dialogs::cancel(app, id).unwrap();
             app.filter_preview = None;
             result
         };
@@ -2347,10 +2347,9 @@ mod rotation_preview_isolation_tests {
         session.execute("file.new", json!({"width": 96, "height": 48})).unwrap();
         let mut app = PhotocraftApp::new(session, crate::Services::default());
         assert!(app.gpu.is_none());
-        crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
-        let dialog = app.ui.dialogs.last_mut().unwrap();
-        dialog.fields.insert("angle".into(), json!(90.0));
-        dialog.fields.insert("direction".into(), json!("cw"));
+        crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+        crate::dialogs::hosted::test_set(&mut app, "angle", json!(90.0));
+        crate::dialogs::hosted::test_set(&mut app, "direction", json!("cw"));
 
         let (factor, _, size) = ensure_filter_preview(&mut app, 0, &egui::Context::default()).expect("CPU preview computed");
         assert_eq!(factor, 1);
@@ -2358,7 +2357,7 @@ mod rotation_preview_isolation_tests {
         let original = &app.session.active().unwrap().doc;
         assert_eq!([original.size.width, original.size.height], [96, 48]);
 
-        app.ui.dialogs.last_mut().unwrap().fields.insert("__preview".into(), json!(false));
+        crate::dialogs::hosted::test_set(&mut app, "__preview", json!(false));
         assert!(ensure_filter_preview(&mut app, 0, &egui::Context::default()).is_none(), "disabling Preview must hide the preview");
         assert_eq!([app.session.active().unwrap().doc.size.width, app.session.active().unwrap().doc.size.height], [96, 48]);
     }
@@ -2370,8 +2369,8 @@ mod rotation_preview_isolation_tests {
         let mut session = photocraft_engine::Session::new();
         session.execute("file.new", json!({"width": 96, "height": 48})).unwrap();
         let mut app = PhotocraftApp::new(session, crate::Services::default());
-        crate::filter_dialog::open_legacy(&mut app, "image.rotation.arbitrary").unwrap();
-        app.ui.dialogs.last_mut().unwrap().fields.insert("angle".into(), json!(90.0));
+        crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+        crate::dialogs::hosted::test_set(&mut app, "angle", json!(90.0));
         assert!(ensure_filter_preview(&mut app, 0, &egui::Context::default()).is_some());
 
         app.session.execute("file.new", json!({"width": 40, "height": 20})).unwrap();

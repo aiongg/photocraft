@@ -312,7 +312,7 @@ impl PhotocraftApp {
         if p.held.is_some() {
             // The question whether to replace answers through `answer_replace`. Closed without an
             // answer, it counts as Cancel.
-            if !self.ui.dialogs.iter().any(|d| crate::replace_prompt::owns(&d.fields)) {
+            if self.ui.prompt_with(crate::replace_prompt::owns).is_none() {
                 let _ = self.answer_replace(false);
             }
             return;

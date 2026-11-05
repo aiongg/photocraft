@@ -603,7 +603,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The panel menu button ends every tab strip; its menu has the panel's items, then the group's
     // (collapse, float, move up and down, close).
     style.panel_menu_button = true;
-    let style = style.localized(|key| DOCK_LABELS.iter().find(|(k, _)| *k == key).map(|(_, english)| tl!(english).to_string()));
+    let words = |key: &str| DOCK_LABELS.iter().find(|(k, _)| *k == key).map(|(_, english)| tl!(english).to_string());
+    style.panel_menu = Some(std::sync::Arc::new(<craft::ui::docking::panel_menu::PanelMenuLabels as craft::ui::localized::Labels>::of(ui).localized(words)));
+    let style = style.localized(words);
     let mut dock = craft::ui::docking::DockArea::new(area)
         .locked(locked)
         .auto_collapse_iconic(app.session.prefs().workspace.auto_collapse_icon_panels)

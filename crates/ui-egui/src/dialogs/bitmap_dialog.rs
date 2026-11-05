@@ -5,17 +5,25 @@
 //! Angle, Shape), which Photoshop asks for in a second dialog after OK, show here only while
 //! Halftone Screen is the method.
 //!
-//! It is the schema dialog of `image.mode.bitmap` with its own body: the fields are the command's
-//! params (`resolution` in pixels/inch, `frequency` in lines/inch), so OK, the live preview,
-//! `ui.dialog.set` and `ui.dialog.confirm` work as for every schema dialog. The units are view
-//! state (`__resUnit`, `__freqUnit`).
+//! It is the hosted `ParamDialog` of `image.mode.bitmap` with custom rows for the unit fields and
+//! the pattern picker: the fields are the command's params (`resolution` in pixels/inch,
+//! `frequency` in lines/inch), so OK, the live preview, `ui.dialog.set` and `ui.dialog.confirm` work
+//! as for every schema dialog. The units are view state kept in the dialog's values
+//! (`__resUnit`, `__freqUnit`). The pattern picker draws from a snapshot of the pattern library
+//! taken when the dialog opens.
 
-use craft::ui::composites::SectionLabel;
+use std::sync::Arc;
+
+use craft::ui::dialog::{DialogFields, ParamKind as Lib};
+use craft::ui::localized::Unit;
 use craft::ui::theme::ToEgui;
+use egui::Response;
+use photocraft_engine::pattern_cmds::PatternLibrary;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
+
+type LibParam = craft::ui::dialog::Param;
 
 pub(crate) const COMMAND: &str = "image.mode.bitmap";
 
@@ -38,11 +46,6 @@ const METHODS: [(&str, &str); 5] = [
 const SHAPES: [(&str, &str); 6] =
     [("round", "Round"), ("diamond", "Diamond"), ("ellipse", "Ellipse"), ("line", "Line"), ("square", "Square"), ("cross", "Cross")];
 
-/// Is this dialog the Bitmap dialog? (A plug-in's own `__spec` dialog never is.)
-pub(crate) fn owns(f: &Map<String, Value>) -> bool {
-    f.get("__filter").and_then(Value::as_bool) == Some(true) && f.get("__command").and_then(Value::as_str) == Some(COMMAND) && !f.contains_key("__spec")
-}
-
 /// Open defaults: Output starts at the document's resolution (Input, as in Photoshop), Custom
 /// Pattern at the Patterns panel's pattern.
 pub(crate) fn defaults(app: &PhotocraftApp, f: &mut Map<String, Value>) {
@@ -53,116 +56,90 @@ pub(crate) fn defaults(app: &PhotocraftApp, f: &mut Map<String, Value>) {
         Some(p) => f.insert("pattern".into(), json!(p.id)),
         None => f.remove("pattern"),
     };
-    f.entry("__resUnit").or_insert_with(|| json!("ppi"));
-    f.entry("__freqUnit").or_insert_with(|| json!("lpi"));
 }
 
-fn num(f: &Map<String, Value>, key: &str, default: f32) -> f32 {
-    f.get(key).and_then(Value::as_f64).map_or(default, |v| v as f32)
+const RES_UNIT: &str = "__resUnit";
+const FREQ_UNIT: &str = "__freqUnit";
+
+fn num(f: &DialogFields, key: &str, default: f32) -> f32 {
+    f.number(key).map_or(default, |v| v as f32)
 }
 
-fn text(f: &Map<String, Value>, key: &str, default: &str) -> String {
-    f.get(key).and_then(Value::as_str).unwrap_or(default).to_string()
+fn text<'a>(f: &'a DialogFields, key: &str, default: &'a str) -> &'a str {
+    f.text(key).unwrap_or(default)
 }
 
-fn label(ui: &mut egui::Ui, text: &str) {
-    let t = craft::ui::theme::current(ui.ctx());
-    ui.add_sized([96.0, 20.0], egui::Label::new(egui::RichText::new(text).color(t.color.text.muted.to_egui())).truncate());
+/// The view state the rows keep in the dialog's values: the units start at per inch.
+pub(crate) fn view_state(fields: &mut DialogFields) {
+    fields.set(RES_UNIT, "ppi");
+    fields.set(FREQ_UNIT, "lpi");
 }
 
 /// A value stored in per-inch units, edited in per-inch or per-centimeter ones: `field` holds the
 /// per-inch value, `unit` the view's unit (`per_cm` when its value is per centimeter).
 // The explicit accessible name accompanies the existing numeric-field parameters.
 #[expect(clippy::too_many_arguments)]
-fn per_unit_row(ui: &mut egui::Ui, f: &mut Map<String, Value>, field: &str, name: &str, range: (f32, f32), default: f32, unit: &str, units: [(&str, &str); 2]) {
+fn per_unit_row(
+    ui: &mut egui::Ui,
+    f: &mut DialogFields,
+    field: &str,
+    name: &str,
+    range: (f32, f32),
+    default: f32,
+    unit: &str,
+    units: [(&str, &str); 2],
+) -> Response {
     let per_inch = num(f, field, default);
-    let mut cur = text(f, unit, units[0].0);
-    let per_cm = cur == units[1].0;
-    let k = if per_cm { CM } else { 1.0 };
+    let mut cur = text(f, unit, units[0].0).to_owned();
+    let k = if cur == units[1].0 { CM } else { 1.0 };
     let mut shown = per_inch / k;
-    if crate::widgets::value_field(ui, &mut shown, range.0 / k..=range.1 / k, "", 70.0).accessible_name(name).changed() {
-        f.insert(field.into(), json!(((shown * k).clamp(range.0, range.1) * 1000.0).round() / 1000.0));
-    }
-    let opts: Vec<(String, &str)> = units.iter().map(|(id, l)| (id.to_string(), *l)).collect();
-    if crate::widgets::dropdown(ui, &format!("bitmap-{unit}"), tl!("Units"), &mut cur, &opts, 150.0) {
-        f.insert(unit.into(), json!(cur));
-    }
-}
-
-/// The dialog body.
-pub(crate) fn body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let t = craft::ui::theme::current(ui.ctx());
-    ui.spacing_mut().item_spacing.y = t.space.gap.stack;
-    let res_units = [("ppi", tl!("Pixels/Inch")), ("ppcm", tl!("Pixels/Centimeter"))];
-
-    SectionLabel::new(tl!("Resolution")).show(ui);
-    crate::widgets::hairline(ui);
+    let mut response = None;
     ui.horizontal(|ui| {
-        label(ui, tl!("Input:"));
-        let input = num(f, "__inputResolution", 72.0);
-        let (v, unit) = if text(f, "__resUnit", "ppi") == "ppcm" { (input / CM, res_units[1].1) } else { (input, res_units[0].1) };
-        ui.label(egui::RichText::new(format!("{} {unit}", crate::widgets::fmt_num_prec(f64::from(v), 3))).color(t.color.text.normal.to_egui()));
-    });
-    ui.horizontal(|ui| {
-        label(ui, tl!("Output:"));
-        let input = num(f, "__inputResolution", 72.0);
-        per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, "__resUnit", res_units);
-    });
-
-    ui.add_space(craft::ui::theme::scale::Space::S4.px());
-    SectionLabel::new(tl!("Method")).show(ui);
-    crate::widgets::hairline(ui);
-    let mut method = text(f, "method", "diffusion");
-    ui.horizontal(|ui| {
-        label(ui, tl!("Use:"));
-        let opts: Vec<(String, &str)> = METHODS.iter().map(|(id, l)| (id.to_string(), tl!(l))).collect();
-        if crate::widgets::dropdown(ui, "bitmap-method", tl!("Method"), &mut method, &opts, 190.0) {
-            f.insert("method".into(), json!(method));
+        let r = crate::widgets::value_field(ui, &mut shown, range.0 / k..=range.1 / k, "", 70.0).accessible_name(name);
+        if r.changed() {
+            f.set(field, ((shown * k).clamp(range.0, range.1) * 1000.0).round() as f64 / 1000.0);
+        }
+        response = Some(r);
+        let opts: Vec<(String, &str)> = units.iter().map(|(id, l)| (id.to_string(), *l)).collect();
+        if crate::widgets::dropdown(ui, &format!("bitmap-{unit}"), tl!("Units"), &mut cur, &opts, 150.0) {
+            f.set(unit, cur.as_str());
         }
     });
-    // Photoshop greys the pattern out unless the method is Custom Pattern.
-    ui.horizontal(|ui| {
-        ui.add_enabled_ui(method == "customPattern", |ui| {
-            label(ui, tl!("Custom Pattern:"));
-            let pat = text(f, "pattern", "");
-            if app.session.patterns.items.is_empty() {
-                ui.label(egui::RichText::new(tl!("No patterns")).color(t.color.text.faint.to_egui()));
-            } else if let Some(id) = crate::preset_panels::pattern_picker(app, ui, &pat) {
-                f.insert("pattern".into(), json!(id));
-            }
-        });
-    });
+    response.expect("the row draws its field")
+}
 
-    if method == "halftone" {
-        ui.add_space(craft::ui::theme::scale::Space::S4.px());
-        SectionLabel::new(tl!("Halftone Screen")).show(ui);
-        crate::widgets::hairline(ui);
-        ui.horizontal(|ui| {
-            label(ui, tl!("Frequency:"));
-            per_unit_row(ui, f, "frequency", tl!("Frequency"), FREQUENCY, 53.0, "__freqUnit", [("lpi", tl!("Lines/Inch")), ("lpcm", tl!("Lines/Centimeter"))]);
-        });
-        ui.horizontal(|ui| {
-            label(ui, tl!("Angle:"));
-            let mut angle = num(f, "angle", 45.0);
-            if crate::widgets::value_field(ui, &mut angle, -180.0..=180.0, "°", 70.0).accessible_name(tl!("Angle:")).changed() {
-                f.insert("angle".into(), json!((angle.clamp(-180.0, 180.0) * 10.0).round() / 10.0));
+/// The rows of the dialog. Photoshop greys the pattern out unless the method is Custom Pattern;
+/// the Halftone Screen settings, which it asks for in a second dialog, are greyed unless the
+/// method is Halftone Screen. `input` is the document's resolution in pixels/inch.
+pub(crate) fn params(library: Arc<PatternLibrary>, input: f32) -> Vec<LibParam> {
+    let res_units = [("ppi", tl!("Pixels/Inch")), ("ppcm", tl!("Pixels/Centimeter"))];
+    let freq_units = [("lpi", tl!("Lines/Inch")), ("lpcm", tl!("Lines/Centimeter"))];
+    let choices = |list: &[(&str, &str)]| list.iter().map(|(id, label)| ((*id).to_owned(), (*label).to_owned())).collect::<Vec<_>>();
+    vec![
+        LibParam::custom("input", "Input", move |ui, f, _| {
+            let t = craft::ui::theme::current(ui.ctx());
+            let (v, unit) = if text(f, RES_UNIT, "ppi") == "ppcm" { (input / CM, res_units[1].1) } else { (input, res_units[0].1) };
+            ui.label(egui::RichText::new(format!("{} {unit}", crate::widgets::fmt_num_prec(f64::from(v), 3))).color(t.color.text.normal.to_egui()))
+        }),
+        LibParam::custom("resolutionRow", "Output", move |ui, f, _| per_unit_row(ui, f, "resolution", tl!("Resolution"), RESOLUTION, input, RES_UNIT, res_units)),
+        LibParam::new("method", "Use", Lib::Choice { options: choices(&METHODS), default: Some("diffusion".into()) }),
+        LibParam::custom("patternRow", "Custom Pattern", move |ui, f, _| {
+            let t = craft::ui::theme::current(ui.ctx());
+            if library.items.is_empty() {
+                return ui.label(egui::RichText::new(tl!("No patterns")).color(t.color.text.faint.to_egui()));
             }
-        });
-        ui.horizontal(|ui| {
-            label(ui, tl!("Shape:"));
-            let mut shape = text(f, "shape", "round");
-            let opts: Vec<(String, &str)> = SHAPES.iter().map(|(id, l)| (id.to_string(), tl!(l))).collect();
-            if crate::widgets::dropdown(ui, "bitmap-shape", tl!("Shape"), &mut shape, &opts, 150.0) {
-                f.insert("shape".into(), json!(shape));
+            let (response, picked) = crate::preset_panels::pattern_swatch(&library, ui, text(f, "pattern", ""));
+            if let Some(id) = picked {
+                f.set("pattern", id);
             }
-        });
-    }
-
-    if let Some(mut preview) = f.get("__preview").and_then(Value::as_bool) {
-        ui.add_space(craft::ui::theme::scale::Space::S4.px());
-        crate::widgets::checkbox(ui, &mut preview, tl!("Preview"));
-        f.insert("__preview".into(), json!(preview));
-    }
+            response
+        })
+        .enabled_when("method", "customPattern"),
+        LibParam::custom("frequencyRow", "Frequency", move |ui, f, _| per_unit_row(ui, f, "frequency", tl!("Frequency"), FREQUENCY, 53.0, FREQ_UNIT, freq_units))
+            .enabled_when("method", "halftone"),
+        LibParam::number("angle", "Angle", 45.0, 1.0, 1).bounds(Some(-180.0), Some(180.0)).unit(Unit::new("°")).enabled_when("method", "halftone"),
+        LibParam::new("shape", "Shape", Lib::Choice { options: choices(&SHAPES), default: Some("round".into()) }).enabled_when("method", "halftone"),
+    ]
 }
 
 #[cfg(test)]

@@ -26,8 +26,8 @@ fn custom(fields: &Map<String, Value>) -> bool {
 }
 
 /// A preset picked after Load… replaces the loaded table: forget its colors and transparent entry.
-fn drop_loaded_unless_custom(fields: &mut Map<String, Value>) {
-    if !custom(fields) {
+pub fn drop_loaded(fields: &mut craft::ui::dialog::DialogFields) {
+    if fields.text("table").is_some_and(|t| t != "custom") {
         fields.remove("colors");
         fields.remove("transparent");
     }
@@ -60,12 +60,6 @@ pub enum Action {
     Save,
 }
 
-/// Drops the loaded table from the frame's copy of `fields` (the one the dialog writes back and OK
-/// sends) once a preset is picked, so OK applies what the Table menu shows.
-pub fn body_done(fields: &mut Map<String, Value>) {
-    drop_loaded_unless_custom(fields);
-}
-
 /// The Load… and Save… buttons at the footer's trailing edge: the button pressed, if any.
 pub fn buttons(ui: &mut egui::Ui) -> Option<Action> {
     use craft::ui::controls::{Button, ButtonVariant};
@@ -88,6 +82,18 @@ pub fn run(app: &mut PhotocraftApp, id: u64, fields: &Map<String, Value>, action
                 let (colors, transparent) =
                     photocraft_engine::swatch_cmds::act_table(&bytes).map_err(|e| format!("{}: {e}", crate::file_open::display_name(&name)))?;
                 // The dialog may close while the picker is open; then there is nothing to fill.
+                if let Some(fields) = app.ui.hosted_fields_mut(id) {
+                    use craft::ui::dialog::FieldValue;
+                    fields.set("table", FieldValue::Text("custom".into()));
+                    fields.set("colors", FieldValue::List(colors.into_iter().map(FieldValue::Text).collect()));
+                    match transparent {
+                        Some(i) => fields.set("transparent", i as i64),
+                        None => {
+                            fields.remove("transparent");
+                        }
+                    }
+                    return Ok(Value::Null);
+                }
                 let Some(d) = app.ui.dialogs.iter_mut().find(|d| d.id == id) else { return Ok(Value::Null) };
                 d.fields.insert("table".into(), json!("custom"));
                 d.fields.insert("colors".into(), Value::Array(colors.into_iter().map(Value::String).collect()));
@@ -171,21 +177,21 @@ mod tests {
     /// (which `image.mode.colorTable` would apply over the preset), and Custom keeps them.
     #[test]
     fn a_preset_picked_after_load_drops_the_loaded_colors() {
+        use craft::ui::dialog::{DialogFields, FieldValue};
         let loaded = |table: &str| {
-            Map::from_iter([
-                ("__command".to_string(), json!("image.mode.colorTable")),
-                ("table".to_string(), json!(table)),
-                ("colors".to_string(), json!(["#ff0000"])),
-                ("transparent".to_string(), json!(0)),
-            ])
+            let mut fields = DialogFields::new();
+            fields.set("table", FieldValue::Text(table.into()));
+            fields.set("colors", FieldValue::List(vec![FieldValue::Text("#ff0000".into())]));
+            fields.set("transparent", 0);
+            fields
         };
         let mut fields = loaded("grayscale");
-        drop_loaded_unless_custom(&mut fields);
-        assert!(!fields.contains_key("colors") && !fields.contains_key("transparent"), "{fields:?}");
-        assert_eq!(fields.get("table"), Some(&json!("grayscale")));
+        drop_loaded(&mut fields);
+        assert!(!fields.contains("colors") && !fields.contains("transparent"));
+        assert_eq!(fields.text("table"), Some("grayscale"));
         let mut fields = loaded("custom");
-        drop_loaded_unless_custom(&mut fields);
-        assert_eq!(fields, loaded("custom"));
+        drop_loaded(&mut fields);
+        assert!(fields.contains("colors") && fields.contains("transparent"));
     }
 
     #[test]

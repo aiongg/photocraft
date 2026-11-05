@@ -56,9 +56,8 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 /// Set dialog values as the sliders and dropdowns would, and compute the canvas preview as a
 /// frame of the canvas does.
 fn edit_and_preview(h: &mut Harness<'_, PhotocraftApp>, id: u64, values: Value) {
-    let f = &mut h.state_mut().ui.dialog_mut(id).unwrap().fields;
     for (k, v) in values.as_object().unwrap() {
-        f.insert(k.clone(), v.clone());
+        crate::dialogs::hosted::set_field(h.state_mut(), id, k, v.clone()).unwrap();
     }
     h.run_steps(2);
     crate::canvas::ensure_filter_preview(h.state_mut(), 0, &egui::Context::default());
@@ -68,7 +67,7 @@ fn edit_and_preview(h: &mut Harness<'_, PhotocraftApp>, id: u64, values: Value) 
 fn open(app: &mut PhotocraftApp) -> (u64, Map<String, Value>) {
     let r = crate::menus::invoke(app, &egui::Context::default(), "type.warpText", json!({})).unwrap();
     let id = r["dialog"].as_u64().unwrap();
-    (id, app.ui.dialog_mut(id).unwrap().fields.clone())
+    (id, app.ui.dialog_fields(id).unwrap())
 }
 
 fn shown(fields: &Map<String, Value>) -> (&str, f64, f64, f64, &str) {
@@ -108,9 +107,8 @@ fn warp_text_opens_at_none_for_a_layer_without_warp() {
 fn remembered_warp_values_never_override_the_layers_warp() {
     let mut app = app_with_type();
     let (id, _) = open(&mut app);
-    let f = &mut app.ui.dialog_mut(id).unwrap().fields;
-    f.insert("style".into(), json!("twist"));
-    f.insert("bend".into(), json!(80.0));
+    crate::dialogs::hosted::set_field(&mut app, id, "style", json!("twist")).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, id, "bend", json!(80.0)).unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(warp(&app).map(|w| (w.style, w.value)), Some(("warpTwist".to_string(), 80.0)));
     app.run("type.create", json!({"x": 20, "y": 60, "text": "Other", "size": 30})).unwrap();
@@ -169,7 +167,7 @@ fn cancelling_warp_text_leaves_the_document_and_history_untouched() {
     h.get_by_label("Cancel").click();
     h.run_steps(2);
     let app = h.state();
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     assert!(app.filter_preview.is_none(), "the preview is gone");
     assert_eq!(app.session.active().unwrap().revision, revision);
     assert_eq!((warp(app), steps(app)), (before, history));
@@ -186,7 +184,7 @@ fn confirming_warp_text_is_one_undoable_step() {
     h.get_by_label("OK").click();
     h.run_steps(2);
     let app = h.state_mut();
-    assert!(app.ui.dialogs.is_empty());
+    assert!(!app.ui.any_dialog_open());
     assert_eq!(warp(app).map(|w| (w.style, w.value, w.horizontal)), Some(("warpFish".to_string(), 25.0, true)));
     assert_eq!(steps(app), history + 1);
     assert_eq!(app.session.active().unwrap().history.entries().last().map(|e| e.to_string()), Some("Warp Text".to_string()));
@@ -201,7 +199,7 @@ fn warp_text_dialog_lists_style_orientation_then_bend_and_distortions() {
     let mut app = app_with_type();
     open(&mut app);
     let h = harness(app);
-    let top = |name: &str| h.query_all_by_label(name).map(|n| n.rect().top()).fold(f32::INFINITY, f32::min);
+    let top = |name: &str| h.query_all_by_label_contains(name).map(|n| n.rect().top()).fold(f32::INFINITY, f32::min);
     let order = ["Style", "Orientation", "Bend", "Horizontal Distortion", "Vertical Distortion"].map(top);
     assert!(order.iter().all(|y| y.is_finite()), "every field is shown: {order:?}");
     assert!(order.windows(2).all(|w| w[0] < w[1]), "fields top to bottom: {order:?}");

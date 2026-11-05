@@ -457,10 +457,8 @@ pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm:
             return;
         }
     };
-    // Legacy list: the edit's live preview (`layer.smartFilter.setParams`) reads it until the hosted
-    // dialog drives the preview (task 3b).
     let Some(id) = crate::adjust_dialog::open(app, &f.command).or_else(|| {
-        let id = crate::filter_dialog::has_dialog(&f.command).then(|| crate::filter_dialog::open_legacy(app, &f.command)).flatten()?;
+        let id = crate::filter_dialog::has_dialog(&f.command).then(|| crate::filter_dialog::open(app, &f.command)).flatten()?;
         // The filter dialog opens on the user's last-used values; a recorded filter that lacks a
         // key must show (and save) the schema default instead.
         let mut fields = app.ui.dialog_fields(id)?;
@@ -760,16 +758,15 @@ mod tests {
         };
         let sm = smart(&app, &app.session.active().unwrap().doc);
         open_editor(&mut app, &egui::Context::default(), id, &sm, 0);
-        let d = app.ui.dialogs.last_mut().expect("the filter's dialog opened");
-        assert_eq!(d.fields.get("__preview"), Some(&json!(true)), "the dialog previews");
-        d.fields.insert("radius".into(), json!(6.0));
-        let dialog = d.id;
+        let (dialog, fields) = crate::filter_dialog::live_dialog(&app).expect("the filter's dialog opened");
+        assert_eq!(fields.get("__preview"), Some(&json!(true)), "the dialog previews");
+        crate::dialogs::hosted::test_set(&mut app, "radius", json!(6.0));
 
         crate::canvas::ensure_filter_preview(&mut app, 0, &egui::Context::default()).expect("a preview");
         let preview = app.filter_preview.as_ref().unwrap();
         assert_eq!(preview.key.command, "layer.smartFilter.setParams");
         // The dialog's own preview window matches it to the dialog by that command.
-        let fields = &app.ui.dialogs.last().unwrap().fields;
+        let fields = &crate::dialogs::hosted::test_fields(&app);
         assert_eq!(preview_command(fields, "filter.blur.gaussianBlur"), preview.key.command);
         assert_eq!(preview_command(&serde_json::Map::new(), "filter.blur.gaussianBlur"), "filter.blur.gaussianBlur");
         let shown = preview.result.clone().expect("the preview's document");

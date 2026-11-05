@@ -40,30 +40,30 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
     if crate::adjust_preview::on_layer(app, idx) {
         return None;
     }
-    let d = app.ui.dialogs.iter().find(|d| d.fields.contains_key("__filter"))?;
-    if d.fields.get("__preview").and_then(serde_json::Value::as_bool) != Some(true) {
+    let (dialog, fields) = crate::filter_dialog::live_dialog(app)?;
+    if fields.get("__preview").and_then(serde_json::Value::as_bool) != Some(true) {
         return None;
     }
-    let cmd = d.fields.get("__command")?.as_str()?.to_string();
+    let cmd = fields.get("__command")?.as_str()?.to_string();
     // Previews edit what the command will: a targeted layer mask included (#780).
-    let (cmd, mut params) = if d.fields.contains_key("__smartFilter") {
-        crate::smart_filter_dialog::edit_command(app, &d.fields).ok()?
+    let (cmd, mut params) = if fields.contains_key("__smartFilter") {
+        crate::smart_filter_dialog::edit_command(app, &fields).ok()?
     } else {
-        (cmd.clone(), app.with_mask_target(&cmd, crate::filter_dialog::params_of(&d.fields)))
+        (cmd.clone(), app.with_mask_target(&cmd, crate::filter_dialog::params_of(&fields)))
     };
     // Select and Mask previews in its view mode; holding X shows the image without one.
-    if crate::select_mask_view::owns(&d.fields) {
-        if crate::select_mask_view::hides_view(&d.fields) {
+    if crate::select_mask_view::owns(&fields) {
+        if crate::select_mask_view::hides_view(&fields) {
             return None;
         }
-        params = crate::select_mask_view::request_params(&d.fields, params);
+        params = crate::select_mask_view::request_params(&fields, params);
     }
     let st = app.session.documents().get(idx)?;
     let k = filter_preview_factor(app, &st.doc, &cmd, &params);
     let request = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
         revision: st.revision,
-        dialog: d.id,
+        dialog,
         active: st.active_layer,
         target: st.channel_view.target,
         command: cmd,
