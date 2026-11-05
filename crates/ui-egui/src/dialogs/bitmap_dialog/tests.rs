@@ -61,20 +61,18 @@ fn opens_with_output_at_the_input_resolution_and_a_pattern_id() {
     assert!(p.as_object().unwrap().keys().all(|k| !k.starts_with("__")), "{p}");
 }
 
-/// Photoshop's Halftone Screen settings show only for the Halftone Screen method. The hosted rows
-/// cannot be hidden (library gap: no row visibility), so they are shown disabled instead.
+/// Photoshop's Halftone Screen settings show only for the Halftone Screen method.
 #[test]
-#[ignore = "gap Y: ParamDialog has no row visibility, so the Halftone Screen rows are disabled, not hidden"]
 fn halftone_settings_show_only_for_halftone_screen() {
     let mut h = harness(72.0, 8);
     let id = open(&mut h);
     for (method, halftone) in [("diffusion", false), ("threshold", false), ("pattern", false), ("customPattern", false), ("halftone", true)] {
         set(&mut h, id, "method", json!(method));
-        for label in ["Frequency:", "Angle:", "Shape:"] {
-            assert_eq!(h.query_by_label(label).is_some(), halftone, "{method}: {label}");
+        for label in ["Frequency", "Angle", "Shape"] {
+            assert_eq!(h.query_all_by_label(label).next().is_some(), halftone, "{method}: {label}");
         }
-        for label in ["Input:", "Output:", "Use:", "Custom Pattern:"] {
-            assert!(h.query_by_label(label).is_some(), "{method}: {label}");
+        for label in ["Input", "Output", "Use", "Custom Pattern"] {
+            assert!(h.query_all_by_label(label).next().is_some(), "{method}: {label}");
         }
     }
 }
@@ -90,8 +88,10 @@ fn halftone_settings_are_enabled_only_for_halftone_screen_and_the_pattern_only_f
             assert!(!nodes.is_empty(), "{method}: no node named {label}");
             nodes.iter().all(|n| n.accesskit_node().is_disabled())
         };
-        assert_eq!(!disabled(&h, "Angle"), halftone, "{method}: Angle");
-        assert_eq!(!disabled(&h, "Frequency"), halftone, "{method}: Frequency");
+        // The Halftone Screen rows are hidden, not disabled, for the other methods.
+        if halftone {
+            assert!(!disabled(&h, "Angle") && !disabled(&h, "Frequency"), "{method}");
+        }
         assert_eq!(!disabled(&h, "Custom Pattern"), pattern, "{method}: pattern picker");
         assert!(!disabled(&h, "Output") && !disabled(&h, "Use"), "{method}");
     }
