@@ -4,7 +4,8 @@
 //! mask?" OK runs `layer.vectorMask.delete`, Cancel keeps it. A click on the Trash still deletes the
 //! targeted mask at once (#2197).
 //!
-//! The prompt is an ordinary dialog in the UI state: `ui.inspect` shows it, `ui.dialog.confirm`
+//! The prompt is a library [`StandardPrompt`] with a record in the UI state
+//! (`dialogs::standard_prompts`): `ui.inspect` shows it, `ui.dialog.confirm`
 //! applies (or deletes the vector mask), `ui.dialog.set` with `"choice": "delete"` then
 //! `ui.dialog.confirm` deletes a layer mask, and `ui.dialog.cancel` keeps the mask.
 
@@ -13,7 +14,7 @@ use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::mask_thumbs_ui::MaskKind;
-use crate::state::DialogKind;
+use craft::ui::dialog::StandardPrompt;
 
 const MARK: &str = "__maskTrash";
 const LAYER_MASK_DELETE: &str = "layer.layerMask.delete";
@@ -47,30 +48,22 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     let layer = params.get("layer").and_then(Value::as_u64)?;
     let state = app.session.active()?;
     state.doc.layer(LayerId(layer)).filter(|l| if vector { l.vector_mask.is_some() } else { l.mask.is_some() })?;
-    let fields = if vector {
-        json!({MARK: true, "kind": "vector", "__label": "Delete Vector Mask", "message": "Delete the vector mask?",
-            "document": state.doc.id.0, "layer": layer})
+    let (fields, prompt, title) = if vector {
+        let fields = json!({MARK: true, "kind": "vector", "__label": "Delete Vector Mask", "message": "Delete the vector mask?",
+            "document": state.doc.id.0, "layer": layer});
+        (fields, StandardPrompt::trash_vector_mask().message(tl!("Delete the vector mask?")), "Delete Vector Mask")
     } else {
         // Apply needs a pixel layer (Layer › Layer Mask › Apply is greyed out otherwise).
         let can_apply = app.session.is_enabled_with("layer.layerMask.apply", &json!({"layer": layer}));
-        json!({MARK: true, "kind": "pixel", "__label": "Delete Layer Mask", "message": "Apply mask to layer before removing?",
-            "document": state.doc.id.0, "layer": layer, "canApply": can_apply, "choice": if can_apply { "apply" } else { "delete" }})
+        let fields = json!({MARK: true, "kind": "pixel", "__label": "Delete Layer Mask", "message": "Apply mask to layer before removing?",
+            "document": state.doc.id.0, "layer": layer, "canApply": can_apply, "choice": if can_apply { "apply" } else { "delete" }});
+        (fields, StandardPrompt::trash_mask().message(tl!("Apply mask to layer before removing?")).can_apply(can_apply), "Delete Layer Mask")
     };
-    if app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
+    let prompt = prompt.title(tl!(title));
+    let Some(id) = crate::standard_prompts::open(app, prompt, title, fields.as_object().cloned().unwrap_or_default()) else {
         return Some(Ok(json!({"confirmationPending": true})));
-    }
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    };
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
-}
-
-pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {
-    let fallback = if is_vector(fields) { "Delete the vector mask?" } else { "Apply mask to layer before removing?" };
-    ui.label(tl!(fields.get("message").and_then(Value::as_str).unwrap_or(fallback)));
-}
-
-/// Apply is the default button; it's greyed out where the mask can't be applied.
-pub fn can_apply(fields: &Map<String, Value>) -> bool {
-    fields.get("canApply").and_then(Value::as_bool).unwrap_or(false)
 }
 
 /// Runs the answer: the vector mask is deleted; for a layer mask `choice` "delete" deletes it and

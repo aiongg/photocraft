@@ -42,8 +42,8 @@ fn click(app: &mut PhotocraftApp, x: f64, y: f64) {
     tool_event(app, ToolEvent::Up { x, y }, Modifiers::NONE);
 }
 
-fn prompt(app: &PhotocraftApp) -> Option<&crate::state::Dialog> {
-    app.ui.dialogs.iter().find(|d| owns(&d.fields))
+fn prompt(app: &PhotocraftApp) -> Option<&crate::standard_prompts::PromptRecord> {
+    app.ui.prompt_with(owns)
 }
 
 #[test]
@@ -92,8 +92,8 @@ fn cancel_does_nothing() {
     let id = prompt(&app).unwrap().id;
     // A second press while it is up doesn't stack another prompt.
     click(&mut app, 40.0, 20.0);
-    assert_eq!(app.ui.dialogs.len(), 1);
-    app.ui.close_dialog(id).unwrap();
+    assert_eq!(app.ui.prompts.len(), 1);
+    crate::dialogs::cancel(&mut app, id).unwrap();
     assert_eq!(past(&app), before.0);
     assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &before.1) || *app.session.active().unwrap().doc == *before.1);
     assert_eq!(active_content(&app), "Type");
@@ -112,7 +112,7 @@ fn only_pixel_painting_asks() {
         app.ui.tool = tool;
         click(&mut app, 30.0, 20.0);
         let id = prompt(&app).unwrap_or_else(|| panic!("{tool:?} asks")).id;
-        app.ui.close_dialog(id);
+        crate::dialogs::cancel(&mut app, id).unwrap();
     }
     // ⌥-click with the Clone Stamp sets the source.
     app.ui.tool = Tool::CloneStamp;
@@ -138,14 +138,14 @@ fn a_stale_or_bad_prompt_fails_gracefully() {
     assert!(crate::dialogs::confirm(&mut app, id).is_err());
     // Garbage fields.
     for f in [json!({"__rasterize": "plaid", "layer": 1}), json!({"__rasterize": "type"}), json!({"__rasterize": "type", "layer": u64::MAX})] {
-        let id = app.ui.open_dialog(crate::state::DialogKind::Command, f.as_object().unwrap().clone());
+        let id = crate::standard_prompts::open(&mut app, StandardPrompt::custom("x"), "x", f.as_object().unwrap().clone()).unwrap();
         assert!(crate::dialogs::confirm(&mut app, id).is_err(), "{f}");
     }
     // A bad tool or point rasterizes without painting.
     let mut app = app_with(Kind::Fill);
     let layer = app.session.active().unwrap().active_layer.unwrap();
-    let id = open(&mut app, Kind::Fill, layer, Tool::Brush, [f64::NAN, 1.0, 1.0]);
-    app.ui.dialog_mut(id).unwrap().fields.insert("tool".into(), json!("no such tool"));
+    let id = open(&mut app, Kind::Fill, layer, Tool::Brush, [f64::NAN, 1.0, 1.0]).unwrap();
+    crate::standard_prompts::set_field(&mut app, id, "tool", json!("no such tool")).unwrap();
     let r = crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(r["painted"], json!(false));
     assert_eq!(active_content(&app), "Pixel");
@@ -216,10 +216,10 @@ fn cancelling_the_filter_prompt_keeps_the_type_layer() {
     menu(&mut app, BLUR).unwrap();
     // The menu again while it is up doesn't stack another prompt.
     menu(&mut app, BLUR).unwrap();
-    assert_eq!(app.ui.dialogs.len(), 1);
+    assert_eq!(app.ui.prompts.len(), 1);
     let id = prompt(&app).unwrap().id;
     crate::dialogs::cancel(&mut app, id).unwrap();
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.prompts.is_empty());
     assert_eq!(past(&app), before.0);
     assert_eq!(*app.session.active().unwrap().doc, *before.1);
     assert_eq!(active_content(&app), "Type");
@@ -231,7 +231,7 @@ fn convert_to_smart_object_applies_a_smart_filter() {
     let mut app = app_with(Kind::Type);
     menu(&mut app, BLUR).unwrap();
     let id = prompt(&app).unwrap().id;
-    app.ui.dialog_mut(id).unwrap().fields.insert("choice".into(), json!("smartObject"));
+    crate::standard_prompts::set_field(&mut app, id, "choice", json!("smartObject")).unwrap();
     answer(&mut app, id);
     assert_eq!(active_content(&app), "Smart Object");
     let blur = filter_dialog(&app).expect("Gaussian Blur opens on the Smart Object");
@@ -249,7 +249,7 @@ fn a_filter_without_a_dialog_runs_after_rasterizing() {
     menu(&mut app, "filter.blur.blurMore").unwrap();
     let id = prompt(&app).unwrap().id;
     answer(&mut app, id);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.prompts.is_empty());
     assert_eq!(past(&app), before + 2);
     assert_eq!(active_content(&app), "Pixel");
 }
@@ -327,7 +327,7 @@ fn filters_with_their_own_window_open_after_the_prompt() {
             menu(&mut app, filter).unwrap();
             assert!(!is_open(&app), "{filter}: waits for the answer");
             let id = prompt(&app).unwrap_or_else(|| panic!("{filter}: no prompt")).id;
-            app.ui.dialog_mut(id).unwrap().fields.insert("choice".into(), json!(choice));
+            crate::standard_prompts::set_field(&mut app, id, "choice", json!(choice)).unwrap();
             answer(&mut app, id);
             assert!(!app.ui.status_error, "{filter}/{choice}: {}", app.ui.status);
             assert_eq!(active_content(&app), if choice == "rasterize" { "Pixel" } else { "Smart Object" }, "{filter}");
@@ -393,7 +393,7 @@ fn vanishing_point_offers_only_rasterize() {
     h.run_steps(4);
     assert!(h.query_by_label("Convert to Smart Object").is_none());
     let id = prompt(h.state()).unwrap().id;
-    h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("choice".into(), json!("smartObject"));
+    crate::standard_prompts::set_field(h.state_mut(), id, "choice", json!("smartObject")).unwrap();
     assert!(crate::dialogs::confirm(h.state_mut(), id).is_err(), "no conversion behind its back");
     assert_eq!(active_content(h.state()), "Type");
     menu(h.state_mut(), "filter.vanishingPoint").unwrap();

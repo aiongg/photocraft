@@ -5,7 +5,8 @@
 //! "started" hook once the first frames have rendered (the crash-safe startup marker), and
 //! provides the Help › System Info text (including the monitor profile in use).
 
-use craft::ui::theme::ToEgui;
+use craft::ui::composites::Tone;
+use craft::ui::dialog::{PromptChoice, StandardPrompt};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -201,6 +202,7 @@ pub fn system_info_json(app: &PhotocraftApp) -> serde_json::Value {
 /// Queue the same recovery warning for startup and runtime failures.
 pub fn queue_fallback_notice(app: &mut PhotocraftApp, reason: impl Into<String>) {
     app.ui.gpu_fallback_notice = Some(reason.into());
+    app.ui.gpu_fallback_dismissed = false;
 }
 
 /// Whether Retry GPU can build a new GPU canvas now: the canvas was dropped after an error (out
@@ -258,44 +260,44 @@ fn choose_recovery(app: &mut PhotocraftApp, retry: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Recovery is an explicit choice; the CPU document renderer stays active while the user works.
-pub fn show_fallback(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let Some(reason) = app.ui.gpu_fallback_notice.clone() else { return };
-    let retry_now = can_retry_now(app);
-    let t = craft::ui::theme::current(ctx);
-    let mut choice = None;
-    egui::Window::new(tl!("Switched to CPU rendering"))
-        .id(egui::Id::unique("gpu-fallback-warning"))
-        .collapsible(false)
-        .resizable(false)
-        .default_width(440.0)
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(ctx, |ui| {
-            ui.label(egui::RichText::new(tl!("GPU acceleration could not continue. Your documents are unchanged.")).color(t.color.status.warn.fg.to_egui()));
-            ui.label(tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter."));
-            ui.collapsing(tl!("Details"), |ui| {
-                ui.label(&reason);
-            });
-            if retry_now {
-                ui.label(tl!("Retry GPU tries the graphics processor again now."));
-            } else {
-                ui.label(tl!("Retry GPU requires a restart. Save your work first."));
-            }
-            ui.add_space(craft::ui::theme::scale::Space::S8.px());
-            ui.horizontal(|ui| {
-                use crate::widgets::{ButtonRole, DialogButton};
-                let buttons =
-                    [DialogButton::new(ButtonRole::Default, tl!("Keep Using CPU"), 150.0), DialogButton::new(ButtonRole::Alternate, tl!("Retry GPU"), 120.0)];
-                if let Some(role) = crate::widgets::dialog_buttons(ui, &buttons) {
-                    choice = Some(role == ButtonRole::Alternate);
-                }
-            });
-        });
-    if let Some(retry) = choice
-        && let Err(error) = choose_recovery(app, retry)
-    {
+/// The field that marks the recovery prompt's record.
+const MARK: &str = "__gpuFallback";
+
+pub fn owns(fields: &serde_json::Map<String, serde_json::Value>) -> bool {
+    fields.contains_key(MARK)
+}
+
+/// The recovery prompt's answer: Retry GPU (`retry`) or Keep Using CPU.
+pub fn recover(app: &mut PhotocraftApp, retry: bool) {
+    if let Err(error) = choose_recovery(app, retry) {
         crate::notices::error(app, error);
     }
+}
+
+/// Recovery is an explicit choice; the CPU document renderer stays active while the user works.
+/// Cancel (Esc) closes the prompt and leaves the notice set.
+pub fn show_fallback(app: &mut PhotocraftApp) {
+    let Some(reason) = app.ui.gpu_fallback_notice.clone() else { return };
+    if app.ui.gpu_fallback_dismissed || app.ui.prompt_with(owns).is_some() {
+        return;
+    }
+    let retry_line =
+        if can_retry_now(app) { tl!("Retry GPU tries the graphics processor again now.") } else { tl!("Retry GPU requires a restart. Save your work first.") };
+    let prompt = StandardPrompt::custom(format!(
+        "{}\n\n{retry_line}",
+        tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.")
+    ))
+    .title(tl!("Switched to CPU rendering"))
+    .tone(Tone::Warn, tl!("GPU acceleration could not continue. Your documents are unchanged."))
+    .details(reason.clone())
+    .button(PromptChoice::Proceed, tl!("Keep Using CPU"), None)
+    .button(PromptChoice::Alternate, tl!("Retry GPU"), None)
+    .button(PromptChoice::Cancel, tl!("Cancel"), None);
+    let mut fields = serde_json::Map::new();
+    fields.insert(MARK.into(), json!(true));
+    fields.insert("__label".into(), json!("Switched to CPU rendering"));
+    fields.insert("reason".into(), json!(reason));
+    crate::standard_prompts::open(app, prompt, "Switched to CPU rendering", fields);
 }
 
 #[cfg(test)]
@@ -482,13 +484,13 @@ mod tests {
         h.run_steps(4);
         let title = tl!("Switched to CPU rendering");
         assert!(h.state().ui.gpu_fallback_notice.is_some());
-        assert!(h.query_by_label(title).is_some(), "window drawn while the notice is set");
+        assert!(h.query_all_by_label(title).next().is_some(), "window drawn while the notice is set");
         let at = h.get_by_role_and_label(egui::accesskit::Role::Button, tl!("Keep Using CPU")).rect().center();
         h.event(egui::Event::PointerMoved(at));
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
         h.run();
         assert!(h.state().ui.gpu_fallback_notice.is_none(), "Keep Using CPU clears the notice");
-        assert!(h.query_by_label(title).is_none(), "window gone with the notice");
+        assert!(h.query_all_by_label(title).next().is_none(), "window gone with the notice");
     }
 }

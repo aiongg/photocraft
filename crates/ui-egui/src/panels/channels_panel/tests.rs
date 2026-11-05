@@ -286,7 +286,7 @@ fn double_clicking_the_layer_mask_row_opens_its_display_options() {
 fn the_layer_mask_row_on_the_trash_asks_first() {
     let (mut h, masked) = channels_harness();
     drag_to(&mut h, "Masked Mask", "Delete current channel");
-    assert!(h.state().ui.dialogs.iter().any(|d| crate::mask_trash_prompt::owns(&d.fields)), "the prompt is open");
+    assert!(h.state().ui.prompt_with(crate::mask_trash_prompt::owns).is_some(), "the prompt is open");
     let st = h.state().session.active().unwrap();
     assert!(st.doc.layer(photocraft_doc::LayerId(masked)).unwrap().mask.is_some(), "nothing deleted yet");
 }

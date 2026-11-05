@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use craft::ui::dialog::{PromptChoice, StandardPrompt};
 use photocraft_doc::{ColorMode, Document};
 use serde_json::{Value, json};
 
@@ -56,7 +57,7 @@ pub fn arrive(app: &mut PhotocraftApp, held: Held) {
 fn advance(app: &mut PhotocraftApp) {
     while let Some(front) = app.held_opens.front() {
         if front.damage_pending {
-            if !app.ui.dialogs.iter().any(|d| owns_damage(&d.fields)) {
+            if app.ui.prompt_with(owns_damage).is_none() {
                 show_damage(app);
             }
             return;
@@ -199,18 +200,20 @@ fn show_damage(app: &mut PhotocraftApp) {
     ]
     .into_iter()
     .collect();
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+    let prompt = StandardPrompt::damaged_file(&front.name)
+        .title(tl!("Damaged Photoshop document"))
+        .message(message)
+        .warnings(front.warnings.clone())
+        .button(PromptChoice::Proceed, tl!("Continue"), None)
+        .button(PromptChoice::Cancel, tl!("Cancel"), None);
+    crate::standard_prompts::open(app, prompt, "Damaged Photoshop document", fields);
 }
 
-/// Body of the standard modal; the same fields are visible to automation.
-pub(crate) fn damage_body(ui: &mut egui::Ui, fields: &serde_json::Map<String, Value>) {
-    ui.label(fields.get("message").and_then(Value::as_str).unwrap_or_default());
-    if let Some(warnings) = fields.get("warnings").and_then(Value::as_array) {
-        egui::ScrollArea::vertical().max_height(140.0).show(ui, |ui| {
-            for warning in warnings.iter().filter_map(Value::as_str) {
-                ui.label(warning);
-            }
-        });
+/// Shows the damage prompt again when another prompt held it back: the host has room for one
+/// standard prompt at a time.
+pub(crate) fn retry(app: &mut PhotocraftApp) {
+    if app.held_opens.front().is_some_and(|h| h.damage_pending) && app.ui.prompt_with(owns_damage).is_none() {
+        show_damage(app);
     }
 }
 

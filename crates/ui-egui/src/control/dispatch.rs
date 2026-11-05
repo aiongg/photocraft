@@ -838,8 +838,10 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
         "ui.dialog.apply" if s("dialog") == Some(SHELL_DIALOG) => err("`ui.dialog.apply` is for Preferences; use `ui.dialog.confirm`"),
         // The unsaved-changes prompt (closing, Revert, quitting), listed by ui.inspect with the
         // id "discard" (#4920): confirm takes a `choice` (save, dontSave, cancel; default save).
-        "ui.dialog.confirm" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => discard_dialog_confirm(app, ctx, s("choice").unwrap_or("save")),
-        "ui.dialog.cancel" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => wrap(crate::discard_ui::answer_control(app, ctx, "cancel")),
+        "ui.dialog.confirm" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => {
+            discard_dialog_confirm(app, ctx, s("choice").unwrap_or("save"), p.get("applyToAll").and_then(Value::as_bool).unwrap_or(false))
+        }
+        "ui.dialog.cancel" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => wrap(crate::discard_ui::answer_control(app, ctx, "cancel", false)),
         "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => {
             err("the unsaved-changes prompt has no fields; use `ui.dialog.confirm` with a `choice`")
         }
@@ -962,7 +964,7 @@ fn shell_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context) -> Outcome
     wrap(crate::workspace_ui::confirm(app, ctx))
 }
 
-fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Outcome {
+fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str, apply_to_all: bool) -> Outcome {
     if choice != "cancel"
         && let Some((command, params)) = crate::discard_ui::pending_command(app)
         && let Some(authorize) = app.services.automation_command.as_ref()
@@ -970,7 +972,7 @@ fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: 
     {
         return err(error);
     }
-    wrap(crate::discard_ui::answer_control(app, ctx, choice))
+    wrap(crate::discard_ui::answer_control(app, ctx, choice, apply_to_all))
 }
 
 fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {

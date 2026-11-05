@@ -139,7 +139,7 @@ fn camera_raw_control_continuation_does_not_bypass_other_modal_or_command_gates(
     app.ui.dialogs.clear();
     assert!(crate::discard_ui::intercept(&mut app, "file.close", &json!({})));
     assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-    crate::discard_ui::answer_control(&mut app, &ctx, "cancel").unwrap();
+    crate::discard_ui::answer_control(&mut app, &ctx, "cancel", false).unwrap();
     app.ui.tool = Tool::Crop;
     app.ui.crop_rect = Some([1.0, 1.0, 10.0, 10.0]);
     assert!(crate::crop_ui::blocks(&app, "filter.cameraRaw"));

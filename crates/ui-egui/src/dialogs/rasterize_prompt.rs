@@ -3,8 +3,9 @@
 //! proceeding. Its text will no longer be editable. Rasterize the type?"), instead of failing
 //! with a status-bar message.
 //!
-//! The prompt is an ordinary dialog in the UI state (`ui.inspect` shows it, `ui.dialog.confirm`
-//! and `ui.dialog.cancel` answer it). OK runs the matching `layer.rasterize.*` command, then paints
+//! The prompt is a library [`StandardPrompt`] with a record in the UI state
+//! (`dialogs::standard_prompts`; `ui.inspect` shows it, `ui.dialog.confirm` and `ui.dialog.cancel`
+//! answer it). OK runs the matching `layer.rasterize.*` command, then paints
 //! where the click was, so rasterizing and painting are two history states, as in Photoshop.
 //! Cancel does nothing.
 //!
@@ -13,12 +14,12 @@
 //! again from the menu (its dialog, window or mode opens, or it runs), a smart filter on the Smart
 //! Object. `ui.dialog.set` with `"choice": "smartObject"` picks the conversion.
 
-use craft::ui::theme::ToEgui;
+use craft::ui::dialog::{PromptChoice, StandardPrompt};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;
-use crate::state::{DialogKind, Tool};
+use crate::state::Tool;
 
 const MARK: &str = "__rasterize";
 
@@ -107,14 +108,13 @@ pub fn intercept(app: &mut PhotocraftApp, tool: Tool, x: f64, y: f64, pressure: 
         return false;
     }
     let Some((kind, layer)) = needed(app) else { return false };
-    if !app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
-        open(app, kind, layer, tool, [x, y, f64::from(pressure)]);
-    }
+    open(app, kind, layer, tool, [x, y, f64::from(pressure)]);
     true
 }
 
 /// Open the prompt for `layer`; OK rasterizes it, then `tool` paints at `at` (x, y, pressure).
-pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId, tool: Tool, at: [f64; 3]) -> u64 {
+/// `None` while another prompt is open.
+pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId, tool: Tool, at: [f64; 3]) -> Option<u64> {
     let mut f = Map::new();
     f.insert(MARK.into(), json!(kind.key()));
     f.insert("__command".into(), json!(kind.command()));
@@ -123,7 +123,12 @@ pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId,
     f.insert("layer".into(), json!(layer.0));
     f.insert("tool".into(), json!(format!("{tool:?}")));
     f.insert("at".into(), json!(at));
-    app.ui.open_dialog(DialogKind::Command, f)
+    let prompt = StandardPrompt::custom(tl!(kind.message())).title("PhotoCraft").button(PromptChoice::Proceed, tl!("OK"), None).button(
+        PromptChoice::Cancel,
+        tl!("Cancel"),
+        None,
+    );
+    crate::standard_prompts::open(app, prompt, "PhotoCraft", f)
 }
 
 /// The active type layer when `id` is a filter that only needs it rasterized: the engine greys it
@@ -157,8 +162,8 @@ pub fn filter_needs(app: &PhotocraftApp, id: &str) -> Option<(photocraft_doc::La
 /// A filter chosen on a type layer: open the prompt instead and return its answer to the caller.
 pub fn intercept_filter(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let (layer, smart) = filter_needs(app, id)?;
-    if let Some(d) = app.ui.dialogs.iter().find(|d| owns(&d.fields)) {
-        return Some(Ok(json!({"dialog": d.id})));
+    if let Some(p) = app.ui.prompt_with(owns) {
+        return Some(Ok(json!({"dialog": p.id})));
     }
     let mut f = Map::new();
     f.insert(MARK.into(), json!(Kind::Type.key()));
@@ -169,7 +174,16 @@ pub fn intercept_filter(app: &mut PhotocraftApp, id: &str, params: &Value) -> Op
     f.insert("params".into(), params.clone());
     f.insert("choice".into(), json!("rasterize"));
     f.insert("smartObject".into(), json!(smart));
-    Some(Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)})))
+    // Esc and the close box answer Cancel, so the prompt always has one.
+    let mut prompt = StandardPrompt::custom(tl!(Kind::Type.message())).title("PhotoCraft").button(PromptChoice::Proceed, tl!("Rasterize"), None);
+    if smart {
+        prompt = prompt.button(PromptChoice::Alternate, tl!("Convert to Smart Object"), None);
+    }
+    let prompt = prompt.button(PromptChoice::Cancel, tl!("Cancel"), None);
+    let Some(id) = crate::standard_prompts::open(app, prompt, "PhotoCraft", f) else {
+        return Some(Ok(json!({"confirmationPending": true})));
+    };
+    Some(Ok(json!({"dialog": id})))
 }
 
 /// Is this the filter prompt (Convert to Smart Object / Rasterize / Cancel)?
@@ -185,18 +199,6 @@ pub fn offers_smart_object(fields: &Map<String, Value>) -> bool {
 /// Is this dialog the prompt?
 pub fn owns(fields: &Map<String, Value>) -> bool {
     fields.contains_key(MARK)
-}
-
-/// The prompt's body: the question, with a caution mark.
-pub fn body(ui: &mut egui::Ui, f: &Map<String, Value>) {
-    let t = craft::ui::theme::current(ui.ctx());
-    let text = f.get("message").and_then(Value::as_str).unwrap_or("This layer must be rasterized before proceeding.");
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 12.0;
-        let (r, _) = ui.allocate_exact_size(egui::vec2(32.0, 32.0), egui::Sense::hover());
-        crate::icons::paint(ui, r, "triangle-alert", 30.0, t.color.status.warn.fg.to_egui());
-        ui.add(egui::Label::new(egui::RichText::new(tl!(text)).color(t.color.text.normal.to_egui()).size(13.0)).wrap());
-    });
 }
 
 /// OK: rasterize, then paint at the click (two history states).

@@ -263,7 +263,7 @@ fn thumbnails_off_forget_the_mask_rects_and_drag_the_layer() {
     }
     h.event(egui::Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
     h.run_steps(3);
-    assert!(!h.state().ui.dialogs.iter().any(|d| crate::mask_trash_prompt::owns(&d.fields)), "no mask prompt: the mask was not dragged");
+    assert!(h.state().ui.prompt_with(crate::mask_trash_prompt::owns).is_none(), "no mask prompt: the mask was not dragged");
     assert!(h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(masked)).is_none(), "the layer went to the trash");
 }
 
@@ -291,7 +291,7 @@ fn dragging_the_mask_thumbnail_to_trash_asks_to_apply_or_delete_it() {
         }
         h.event(egui::Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
         h.run_steps(3);
-        let d = h.state().ui.dialogs.iter().find(|d| crate::mask_trash_prompt::owns(&d.fields)).expect("the prompt is open");
+        let d = h.state().ui.prompt_with(crate::mask_trash_prompt::owns).expect("the prompt is open");
         assert_eq!(d.fields["message"], "Apply mask to layer before removing?");
         assert!(layer(h, masked).mask.is_some(), "nothing changes before the answer");
         d.id
@@ -313,7 +313,7 @@ fn dragging_the_mask_thumbnail_to_trash_asks_to_apply_or_delete_it() {
     h.run_steps(2);
     // Delete: the mask is gone and the pixels are as they were.
     let dialog = drag_mask(&mut h);
-    h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("choice".into(), json!("delete"));
+    crate::standard_prompts::set_field(h.state_mut(), dialog, "choice", json!("delete")).unwrap();
     crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
     assert!(layer(&h, masked).mask.is_none());
     assert_eq!(pixels(&h), before);
@@ -341,7 +341,7 @@ fn dragging_the_vector_mask_thumbnail_to_trash_asks_to_delete_just_the_mask() {
         h.run_steps(3);
         let st = h.state().session.active().unwrap();
         assert!(st.doc.layer(photocraft_doc::LayerId(masked)).is_some(), "the layer is not deleted");
-        let d = h.state().ui.dialogs.iter().find(|d| crate::mask_trash_prompt::owns(&d.fields)).expect("the prompt is open");
+        let d = h.state().ui.prompt_with(crate::mask_trash_prompt::owns).expect("the prompt is open");
         assert_eq!(d.fields["message"], "Delete the vector mask?");
         assert!(layer(h, masked).vector_mask.is_some(), "nothing changes before the answer");
         d.id

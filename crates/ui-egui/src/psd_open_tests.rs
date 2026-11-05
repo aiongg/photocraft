@@ -56,7 +56,7 @@ fn healthy_psd_opens_without_a_damage_prompt() {
     let mut app = app();
     app.open_bytes("valid-two-layers.psd", &recovery_psd::make_psd(false)).unwrap();
     assert_eq!(app.session.documents().len(), 1);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty());
     assert!(!app.session.active().unwrap().source_read_only);
 }
 
@@ -70,14 +70,14 @@ fn damaged_psd_can_be_cancelled_or_accepted_through_agent_dialog_commands() {
     let id = damage_dialog(&mut app);
     assert_eq!(call(&mut app, "ui.dialog.cancel", json!({"dialog": id}))["ok"], true);
     assert!(app.session.documents().is_empty());
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty());
 
     app.open_bytes("corrupt-green-rle.psd", &bytes).unwrap();
     let id = damage_dialog(&mut app);
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
     assert_eq!(app.session.documents().len(), 1);
     assert!(!app.session.active().unwrap().source_read_only);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty());
 }
 
 /// Verifies consent retains the original save path and restores ordinary Save behavior.
@@ -132,7 +132,7 @@ fn damaged_psd_automation_import_does_not_require_interactive_confirmation() {
     let warnings = app.open_automation_bytes("corrupt-green-rle.psd", &recovery_psd::make_psd(true)).unwrap();
     assert_eq!(app.session.documents().len(), 1);
     assert!(!app.session.active().unwrap().source_read_only);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty());
     assert!(warnings.iter().any(|w| w.contains("could not be decoded")));
 }
 
@@ -149,7 +149,7 @@ fn cancelling_one_damaged_open_does_not_open_the_next_damaged_file_without_conse
     assert!(app.session.documents().is_empty());
     let second = damage_dialog(&mut app);
     assert_ne!(first, second);
-    assert_eq!(app.ui.dialogs[0].fields["name"], "second.psd");
+    assert_eq!(app.ui.prompts[0].fields["name"], "second.psd");
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": second}))["ok"], true);
     assert_eq!(app.session.documents().len(), 1);
     assert_eq!(app.session.active().unwrap().doc.name, "second.psd");
@@ -172,7 +172,7 @@ fn damage_confirmation_precedes_the_profile_question() {
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
     assert!(app.session.documents().is_empty(), "the profile question still needs its own answer");
     assert_eq!(app.ui.dialogs.len(), 1);
-    assert!(!crate::open_prompt::owns_damage(&app.ui.dialogs[0].fields));
+    assert!(app.ui.prompts.is_empty(), "the damage question is answered");
     let profile = app.ui.dialogs[0].id;
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": profile}))["ok"], true);
     assert_eq!(app.session.documents().len(), 1);
@@ -195,5 +195,5 @@ fn background_damage_only_open_does_not_create_a_spurious_profile_question() {
     let id = damage_dialog(&mut app);
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
     assert_eq!(app.session.documents().len(), 1);
-    assert!(app.ui.dialogs.is_empty(), "color:null is not a profile question");
+    assert!(app.ui.dialogs.is_empty() && app.ui.prompts.is_empty(), "color:null is not a profile question");
 }

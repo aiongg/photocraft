@@ -400,8 +400,8 @@ pub fn pending_command(app: &PhotocraftApp) -> Option<(String, Value)> {
 }
 
 /// Answers the prompt for a control client: `save`, `dontSave` or `cancel` (Revert takes
-/// `dontSave` or `cancel`). Like the buttons, Save may first ask for a path in the save dialog.
-pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Result<Value, String> {
+/// `dontSave` or `cancel`), with the Apply to All box set to `apply_to_all`. Like the buttons, Save may first ask for a path in the save dialog.
+pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str, apply_to_all: bool) -> Result<Value, String> {
     if app.discard.as_ref().and_then(|p| p.guard.current()).is_none() {
         return Err("no unsaved-changes prompt is open".into());
     }
@@ -418,10 +418,14 @@ pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str
             return Err(format!("unknown choice `{other}`: {choices}"));
         }
     };
-    // The library question has no programmatic answer: it closes, and the answer runs as its button's would.
-    app.ui.host.cancel::<UnsavedChangesDialog>(ctx);
-    app.ui.host.take::<UnsavedChangesDialog>();
-    apply(app, ctx, answer, false);
+    if !app.ui.host.confirm_with::<UnsavedChangesDialog>(ctx, |d| {
+        d.set_answer(answer);
+        d.set_apply_to_all(apply_to_all);
+    }) {
+        return Err("no unsaved-changes prompt is open".into());
+    }
+    let Some(DialogResult::Ok(answered)) = app.ui.host.take::<UnsavedChangesDialog>() else { return Err("the unsaved-changes prompt gave no answer".into()) };
+    apply(app, ctx, answered.answer, answered.apply_to_all);
     Ok(json!({"open": app.discard.is_some(), "fileDialog": app.file_dialog_open()}))
 }
 

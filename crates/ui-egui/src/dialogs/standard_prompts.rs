@@ -7,7 +7,7 @@
 //! record is then swept as cancelled (gap AB).
 
 use craft::ui::dialog::{DialogId, DialogResult, PromptChoice, StackDialog, StandardPrompt};
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
 
@@ -48,20 +48,60 @@ pub fn open(app: &mut PhotocraftApp, prompt: StandardPrompt, title: &str, fields
     Some(id)
 }
 
-/// Runs what the answer means for the prompt `record` was: `proceed` confirms, anything else cancels.
-fn run(app: &mut PhotocraftApp, record: PromptRecord, proceed: bool) -> Result<Value, String> {
+/// The answer the fields' `choice` stands for: the Alternate button where the prompt has one.
+fn choice_of(fields: &Fields) -> PromptChoice {
+    let alternate = if crate::mask_trash_prompt::owns(fields) {
+        fields.get("choice").and_then(Value::as_str) == Some("delete")
+    } else if crate::rasterize_prompt::is_filter(fields) {
+        fields.get("choice").and_then(Value::as_str) == Some("smartObject")
+    } else {
+        crate::gpu_status::owns(fields) && fields.get("choice").and_then(Value::as_str) == Some("retry")
+    };
+    if alternate { PromptChoice::Alternate } else { PromptChoice::Proceed }
+}
+
+/// Runs what the answer means for the prompt `record` was: Proceed and Alternate confirm (the
+/// handler reads the Alternate from the fields' `choice`), Cancel cancels.
+fn run(app: &mut PhotocraftApp, mut record: PromptRecord, choice: PromptChoice) -> Result<Value, String> {
+    let proceed = choice != PromptChoice::Cancel;
+    if proceed {
+        let alternate = choice == PromptChoice::Alternate;
+        if crate::mask_trash_prompt::owns(&record.fields) && !crate::mask_trash_prompt::is_vector(&record.fields) {
+            record.fields.insert("choice".into(), json!(if alternate { "delete" } else { "apply" }));
+        } else if crate::rasterize_prompt::is_filter(&record.fields) {
+            record.fields.insert("choice".into(), json!(if alternate { "smartObject" } else { "rasterize" }));
+        }
+    }
     let fields = &record.fields;
     if proceed {
         if crate::disk_change_prompt::owns(fields) {
             crate::disk_change_prompt::confirm(app, fields)
         } else if crate::delete_layer_prompt::owns(fields) {
             crate::delete_layer_prompt::confirm(app, fields)
+        } else if crate::mask_trash_prompt::owns(fields) {
+            crate::mask_trash_prompt::confirm(app, fields)
+        } else if crate::rasterize_prompt::owns(fields) {
+            crate::rasterize_prompt::confirm(app, fields)
+        } else if crate::open_prompt::owns_damage(fields) {
+            crate::open_prompt::answer_damage(app, true)
+        } else if crate::gpu_status::owns(fields) {
+            crate::gpu_status::recover(app, choice == PromptChoice::Alternate);
+            Ok(Value::Null)
         } else {
             crate::replace_prompt::confirm(app)
         }
     } else {
         crate::actions::stopped(app, fields);
-        if crate::replace_prompt::owns(fields) { crate::replace_prompt::cancel(app) } else { Ok(Value::Null) }
+        if crate::replace_prompt::owns(fields) {
+            crate::replace_prompt::cancel(app)
+        } else if crate::open_prompt::owns_damage(fields) {
+            crate::open_prompt::answer_damage(app, false)
+        } else if crate::gpu_status::owns(fields) {
+            app.ui.gpu_fallback_dismissed = true;
+            Ok(Value::Null)
+        } else {
+            Ok(Value::Null)
+        }
     }
 }
 
@@ -85,24 +125,35 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
     {
         authorize(command, &Value::Object(record.fields.clone()))?;
     }
-    // The host answers with the default button, which stores "Don't show again" through the Host.
+    // The host answers as the fields' `choice` says (the default button's unless set), which
+    // stores "Don't show again" through the Host.
     crate::host_settings::sync(app, ctx);
-    let dialog = app.ui.prompt(id).ok_or_else(|| format!("no dialog {id}"))?.dialog;
-    if app.ui.host.confirm_by_id::<StandardPrompt>(ctx, dialog) {
+    let (dialog, choice) = {
+        let record = app.ui.prompt(id).ok_or_else(|| format!("no dialog {id}"))?;
+        (record.dialog, choice_of(&record.fields))
+    };
+    let confirmed = app.ui.host.get_mut_by_id::<StandardPrompt>(dialog).is_some_and(|prompt| {
+        prompt.set_choice(choice);
+        true
+    }) && app.ui.host.confirm_by_id::<StandardPrompt>(ctx, dialog);
+    if confirmed {
         crate::host_settings::sync(app, ctx);
         app.ui.host.take_by_id::<StandardPrompt>(dialog);
         let at = app.ui.prompts.iter().position(|p| p.id == id).ok_or_else(|| format!("no dialog {id}"))?;
         let record = app.ui.prompts.remove(at);
-        return run(app, record, true);
+        return run(app, record, choice);
+    }
+    if app.ui.host.get_dyn(dialog).is_some() {
+        return Err("OK is disabled: the prompt's answer is not available".into());
     }
     let record = close(app, ctx, id)?;
-    run(app, record, true)
+    run(app, record, choice)
 }
 
 /// `ui.dialog.cancel`.
 pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let record = close(app, ctx, id)?;
-    run(app, record, false)
+    run(app, record, PromptChoice::Cancel)
 }
 
 /// `ui.dialog.set`: a prompt's fields are its question's data; the markers stay.
@@ -137,11 +188,12 @@ pub fn collect(app: &mut PhotocraftApp) {
         let Some(record) = answer.take_tag::<u64>().and_then(|id| app.ui.prompts.iter().position(|p| p.id == id)).map(|at| app.ui.prompts.remove(at)) else {
             continue;
         };
-        if let Err(error) = run(app, record, answer.choice == PromptChoice::Proceed) {
+        if let Err(error) = run(app, record, answer.choice) {
             errors.push(error);
         }
     }
     sweep(app);
+    crate::open_prompt::retry(app);
     if let Some(error) = errors.pop() {
         app.ui.status = error;
     }
@@ -153,7 +205,7 @@ pub fn sweep(app: &mut PhotocraftApp) {
     for id in gone {
         if let Some(at) = app.ui.prompts.iter().position(|p| p.id == id) {
             let record = app.ui.prompts.remove(at);
-            let _ = run(app, record, false);
+            let _ = run(app, record, PromptChoice::Cancel);
         }
     }
 }

@@ -201,7 +201,6 @@ pub(crate) const CLOSE_BOX: bool = !cfg!(target_os = "macos");
 fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: &mut Fields, id: egui::Id, interactive: bool) -> Option<bool> {
     let mut outcome: Option<bool> = None;
     match d.kind {
-        _ if crate::open_prompt::owns_damage(fields) => crate::open_prompt::damage_body(ui, fields),
         _ if crate::guide_layout_ui::owns(fields) => crate::guide_layout_ui::body(app, ui, fields),
         _ if crate::brush_preset_dialog::owns(fields) => outcome = crate::brush_preset_dialog::body(app, ui, fields, interactive),
         _ if crate::fill_ui::owns(fields) => crate::fill_ui::body(app, ui, fields),
@@ -215,8 +214,6 @@ fn command_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, d: &Dialog, fields: 
         _ if crate::shape_dialog::owns(fields) => crate::shape_dialog::body(app, ui, fields),
         _ if crate::actions::owns_insert_stop(fields) => crate::actions::insert_stop_body(ui, fields),
         _ if crate::new_layer_ui::owns(fields) => crate::new_layer_ui::body(ui, fields),
-        _ if crate::mask_trash_prompt::owns(fields) => crate::mask_trash_prompt::body(ui, fields),
-        _ if crate::rasterize_prompt::owns(fields) => crate::rasterize_prompt::body(ui, fields),
         _ if crate::duplicate_layer_ui::owns(fields) => crate::duplicate_layer_ui::body(app, ui, fields),
         _ if crate::stack_dialog::owns(fields) => crate::stack_dialog::body(app, ui, fields, d.id),
         _ if crate::tool_reset::owns(fields) => crate::tool_reset::body(ui),
@@ -358,8 +355,6 @@ fn opens_on_first_field(kind: DialogKind, fields: &Fields) -> bool {
 fn ok_label(d: &Dialog) -> &'static str {
     if d.kind == DialogKind::NewDocument {
         tl!("Create")
-    } else if crate::open_prompt::owns_damage(&d.fields) {
-        tl!("Continue")
     } else if d.fields.contains_key("__export") {
         tl!("Export")
     } else {
@@ -371,11 +366,7 @@ fn ok_label(d: &Dialog) -> &'static str {
 /// need an input first (a preset name, a selection) grey OK out. The dialog body refreshes it each
 /// pass, and the footer reads it after the body ([`Footer::ok_enabled_with`]).
 fn enabled_for(app: &PhotocraftApp, fields: &Fields) -> (bool, bool) {
-    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
-        (crate::mask_trash_prompt::can_apply(fields), true)
-    } else if crate::rasterize_prompt::is_filter(fields) {
-        (true, true)
-    } else if crate::guide_layout_ui::owns(fields) {
+    if crate::guide_layout_ui::owns(fields) {
         (crate::guide_layout_ui::validate(app, fields).is_ok(), true)
     } else {
         (crate::crop_presets::can_confirm(app, fields) && crate::stack_dialog::can_confirm(fields), true)
@@ -410,15 +401,6 @@ fn footer_for<'a>(d: &Dialog, enabled: &'a Cell<(bool, bool)>, preview: &'a Cell
     }
     let mut footer = Footer::standard().cancel(if d.kind == DialogKind::NewDocument { tl!("Close") } else { tl!("Cancel") });
     footer = footer.labels(dialog_labels());
-    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
-        // Photoshop: Apply / Cancel / Delete. Delete answers with the choice set.
-        return footer.ok(tl!("Apply")).ok_enabled_with(move || enabled.get().0).alternate(tl!("Delete"));
-    }
-    if crate::rasterize_prompt::is_filter(fields) {
-        // Photoshop: Convert to Smart Object / Rasterize / Cancel (#4303).
-        footer = footer.ok(tl!("Rasterize"));
-        return if crate::rasterize_prompt::offers_smart_object(fields) { footer.alternate(tl!("Convert to Smart Object")) } else { footer };
-    }
     footer = footer.ok(ok_label(d)).ok_enabled_with(move || enabled.get().0);
     // Photoshop: holding Alt turns Cancel into Reset (the dialog stays open). Dialogs opt in via
     // `dialog_alt_reset::supported` (per marker).
@@ -463,16 +445,6 @@ pub(crate) fn show_prompt<H: Clone + PartialEq + Send + Sync + 'static>(
         }
     });
     response
-}
-
-/// What the answer to a prompt that offers a choice (`choice` field) is, for the role pressed.
-fn set_choice(fields: &mut Fields, outcome: Outcome) {
-    let alternate = outcome == Outcome::Alternate;
-    if crate::mask_trash_prompt::owns(fields) && !crate::mask_trash_prompt::is_vector(fields) {
-        fields.insert("choice".into(), json!(if alternate { "delete" } else { "apply" }));
-    } else if crate::rasterize_prompt::is_filter(fields) {
-        fields.insert("choice".into(), json!(if alternate { "smartObject" } else { "rasterize" }));
-    }
 }
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -581,10 +553,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         let mut done = match response.outcome {
             Some(Outcome::Ok) if matches!(d.kind, DialogKind::About) => Some(false),
-            Some(Outcome::Ok | Outcome::Alternate) => {
-                set_choice(&mut fields, response.outcome.unwrap_or(Outcome::Ok));
-                Some(true)
-            }
+            Some(Outcome::Ok | Outcome::Alternate) => Some(true),
             Some(Outcome::Cancel | Outcome::Close) => Some(false),
             _ => body_outcome.get(),
         };
@@ -715,8 +684,6 @@ const ROUTES: &[fn(&Fields) -> bool] = &[
     crate::new_layer_ui::owns,
     crate::new_group_ui::owns,
     crate::layers_panel_ui::owns,
-    crate::mask_trash_prompt::owns,
-    crate::rasterize_prompt::owns,
     crate::duplicate_layer_ui::owns,
     crate::stack_dialog::owns,
     crate::tool_reset::owns,
@@ -854,7 +821,6 @@ fn confirm_preflight(app: &mut PhotocraftApp, id: u64) -> Result<(), String> {
 /// and small editors are here, the rest in `confirm_command_more`.
 fn confirm_command(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> {
     match d.kind {
-        _ if crate::open_prompt::owns_damage(&d.fields) => crate::open_prompt::answer_damage(app, true),
         _ if crate::guide_layout_ui::owns(&d.fields) => crate::guide_layout_ui::confirm(app, &d.fields),
         _ if crate::brush_preset_dialog::owns(&d.fields) => crate::brush_preset_dialog::confirm(app, &d.fields),
         _ if crate::fill_ui::owns(&d.fields) => crate::fill_ui::confirm(app, &d.fields),
@@ -868,8 +834,6 @@ fn confirm_command(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, String> 
         _ if crate::shape_dialog::owns(&d.fields) => crate::shape_dialog::confirm(app, &d.fields),
         _ if crate::actions::owns_insert_stop(&d.fields) => crate::actions::insert_stop_confirm(app, &d.fields),
         _ if crate::new_layer_ui::owns(&d.fields) => crate::new_layer_ui::confirm(app, &d.fields),
-        _ if crate::mask_trash_prompt::owns(&d.fields) => crate::mask_trash_prompt::confirm(app, &d.fields),
-        _ if crate::rasterize_prompt::owns(&d.fields) => crate::rasterize_prompt::confirm(app, &d.fields),
         _ if crate::duplicate_layer_ui::owns(&d.fields) => crate::duplicate_layer_ui::confirm(app, &d.fields),
         _ if crate::stack_dialog::owns(&d.fields) => crate::stack_dialog::confirm(app, &d.fields),
         _ if crate::tool_reset::owns(&d.fields) => crate::tool_reset::confirm(app),
@@ -944,9 +908,7 @@ pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resul
         app.ui.dialogs.retain(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));
     }
     // Cancel on a profile prompt opens neither its file nor the ones still to come.
-    if crate::open_prompt::owns_damage(&closed.fields) {
-        crate::open_prompt::answer_damage(app, false)?;
-    } else if crate::open_prompt::owns(&closed.fields) {
+    if crate::open_prompt::owns(&closed.fields) {
         crate::open_prompt::answer(app, None)?;
     }
     app.ui.dialogs.retain(|d| !crate::layer_style::color_picker::child_of(&d.fields, id));
