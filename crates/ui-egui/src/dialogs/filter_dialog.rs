@@ -19,7 +19,7 @@ use crate::theme::Tokens;
 mod hosted;
 mod zoom_center;
 
-pub(crate) use hosted::{Wire, live_fields, push_state, requests};
+pub(crate) use hosted::{Wire, live_fields, push_state, requests, result_picked};
 pub(crate) use hosted::{eyedropper_armed as hosted_eyedropper, eyedropper_sample as hosted_eyedropper_sample};
 pub use hosted::{open, open_with_spec};
 

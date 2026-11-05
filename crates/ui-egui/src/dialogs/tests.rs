@@ -295,7 +295,7 @@ fn motion_blur_angle_dial_sets_the_angle_by_click_and_drag() {
     use egui_kittest::kittest::Queryable;
     let mut h = dialog_harness(egui::vec2(1280.0, 800.0), "filter.blur.motionBlur");
     let angle = |h: &egui_kittest::Harness<'static, PhotocraftApp>| top_number(h.state(), "angle");
-    let centre = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.get_by_role_and_label(egui::accesskit::Role::Slider, "Angle:").rect().center();
+    let centre = |h: &egui_kittest::Harness<'static, PhotocraftApp>| h.get_by_role_and_label(egui::accesskit::Role::Slider, "Angle").rect().center();
     let press = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>, pos: egui::Pos2, pressed: bool| {
         h.event(egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
     };
@@ -441,7 +441,7 @@ fn fit_image_is_as_narrow_as_its_content() {
     let window = h.ctx.memory(|m| m.area_rect(craft::ui::dialog::dialog_id("file.automate.fitImage"))).expect("the Fit Image window");
     assert!(window.width() < 300.0, "Fit Image is {} points wide", window.width());
     // The library form puts a colon after a row's label.
-    for label in ["Fit Image", "Width:", "Height:", "OK", "Cancel"] {
+    for label in ["Fit Image", "Width", "Height", "OK", "Cancel"] {
         // A caption and the field it names share the label; either sits inside the window.
         let node = h
             .query_all_by_label(label)
