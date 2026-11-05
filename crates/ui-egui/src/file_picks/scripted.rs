@@ -64,14 +64,19 @@ impl ScriptedFiles {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Every request asked so far, in order.
+    /// The requests asked so far, in order. A service that holds its picks lists only the ones the
+    /// user is still in.
     pub fn requests(&self) -> Vec<PickRequest> {
-        self.state().asked.clone()
+        let state = self.state();
+        match state.script {
+            Some(_) => state.asked.clone(),
+            None => state.open.iter().map(|(_, at)| state.asked[*at].clone()).collect(),
+        }
     }
 
     /// The kind of each request asked so far, in order.
     pub fn kinds(&self) -> Vec<craft::host::PickKind> {
-        self.state().asked.iter().map(|r| r.kind).collect()
+        self.requests().iter().map(|r| r.kind).collect()
     }
 
     /// How many picks the user is still in.

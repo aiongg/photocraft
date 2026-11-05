@@ -152,7 +152,7 @@ fn layered_save_respects_explicit_jpeg_choices() {
     let (mut app, open, written) = jpeg_app(Some("/pics/My image.JPEG"), true);
     menus::invoke(&mut app, &ctx, "file.saveAs", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    answer(&open, Some(scripted::save_to("/exports/chosen.JPEG")));
+    answer(&open, Some(scripted::save_to("/exports/chosen.jpeg")));
     app.poll_file_dialog(&ctx, None);
     // JPEG Options asks first (FILE-215-19, #5563). The JPEG can't hold the layers, so it is a
     // copy and the document keeps its file (#2550).
@@ -606,7 +606,7 @@ fn an_answer_of_the_wrong_kind_is_an_error_not_a_crash() {
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "file.saveAs", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    answer(&open, Some(scripted::paths(["/pics/a.psd"])));
+    answer(&open, Some(Picked::Paths(Vec::new())));
     app.poll_file_dialog(&ctx, None);
     assert!(app.ui.status_error && app.ui.status == UNEXPECTED);
     assert!(written.borrow().is_empty());
@@ -1278,7 +1278,7 @@ fn closing_the_dialog_that_asked_forgets_its_pick() {
     app.forget_file_dialog_of(8);
     assert!(app.file_dialog_open(), "another dialog's closing keeps the pick");
     app.forget_file_dialog_of(7);
-    assert!(!app.file_dialog_open() && !open.requests().is_empty());
+    assert!(!app.file_dialog_open() && open.open() == 0);
     app.poll_file_dialog(&ctx, None);
 }
 

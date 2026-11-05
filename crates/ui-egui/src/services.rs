@@ -348,7 +348,7 @@ pub struct Services {
     /// window (#2017). With background jobs on, saves use it instead of `export` and `write`.
     pub save_file: Option<SaveFileFn>,
     /// File access used only by control/MCP requests. Interactive dialogs keep
-    /// using `file_dialog` and `write` with the user's authority.
+    /// using `files` and `write` with the user's authority.
     pub automation_read: Option<AutomationReadFn>,
     pub automation_write: Option<AutomationWriteFn>,
     pub automation_open_pcraft: Option<AutomationOpenPcraftFn>,
