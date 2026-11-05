@@ -37,7 +37,7 @@ pub(crate) fn modal_allows(app: &PhotocraftApp, id: &str) -> bool {
     if app.camera_raw.is_some() || crate::distort_ui::modal_workspace(app).is_some() || crate::crop_ui::blocks(app, id) {
         return false;
     }
-    (!app.ui.any_dialog_open() && app.discard.is_none()) || crate::shortcuts::NAV_COMMANDS.contains(&id)
+    (!app.ui.any_dialog_open() && app.discard.is_none()) || craft::keymap::ui::NAVIGATION_COMMANDS.contains(&id)
 }
 
 /// Top-level menus in Photoshop order.

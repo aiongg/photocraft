@@ -65,7 +65,6 @@ fn ukrainian_color_picker_titles_draw_in_the_selected_language() {
 }
 
 #[test]
-#[ignore = "gap AS: StandardPrompt takes its message as a finished string, so a prompt opened before the language change draws in the old language"]
 fn ukrainian_rasterize_prompt_draws_in_the_selected_language() {
     use crate::rasterize_prompt::Kind;
 

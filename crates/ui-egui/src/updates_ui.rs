@@ -1,6 +1,5 @@
-//! One background check at startup and a non-modal window for release information.
+//! One background check at startup and the library's check dialog for release information.
 
-use craft::ui::theme::ToEgui;
 use photocraft_engine::updates_cmds::Status;
 use serde_json::Value;
 
@@ -9,7 +8,7 @@ use crate::PhotocraftApp;
 pub(crate) struct Runtime {
     startup_checked: bool,
     notified_version: Option<String>,
-    /// The startup prompt and the self-update behind it (desktop).
+    /// The self-update behind the check dialog (desktop).
     #[cfg(not(target_arch = "wasm32"))]
     updater: craft::update::updater::Updater,
 }
@@ -65,6 +64,8 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
         #[cfg(not(target_arch = "wasm32"))]
         app.updates_rt.updater.offer(release_of(release));
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    push_state(app, ctx);
     if app.session.updates.check.is_none() {
         return;
     }
@@ -79,100 +80,165 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let mut download: Option<String> = None;
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let was_open = app.updates_rt.updater.prompt_open();
-        app.updates_rt.updater.tick(ctx);
-        // The restart helper is scheduled before the app closes, so no update starts over unsaved work.
-        let clean = !app.has_unsaved_work();
-        match app.updates_rt.updater.show_if(ctx, clean) {
-            craft::update::updater::Action::None => {}
-            craft::update::updater::Action::OpenUrl(url) => download = Some(url),
-            // The guarded close path asks about unsaved work and waits for saves; the restart helper
-            // relaunches once the process exits.
-            craft::update::updater::Action::Close => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
-        }
-        if was_open && !app.updates_rt.updater.prompt_open() {
-            app.ui.updates_open = false;
-        }
-        if app.updates_rt.updater.prompt_open() {
-            return;
-        }
-    }
-
+/// Opens, closes and feeds the check dialog before the dialog host draws, and starts the part of
+/// the finished install that waits for saved work.
+#[cfg(not(target_arch = "wasm32"))]
+fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    use craft::update::stack_dialogs::UpdateCheckDialog;
+    let rt = &mut app.updates_rt;
+    rt.updater.tick(ctx);
     if !app.ui.updates_open {
-        if let Some(url) = download {
-            crate::links::open(app, ctx, &url);
+        if app.ui.host.is_open::<UpdateCheckDialog>() {
+            app.ui.host.cancel::<UpdateCheckDialog>(ctx);
         }
         return;
     }
-    let mut open = true;
-    let status = app.session.updates.status.clone();
-    let mut retry = false;
-    egui::Window::new(tl!("PhotoCraft Updates"))
-        .id(egui::Id::unique("photocraft_updates"))
-        .open(&mut open)
-        .collapsible(false)
-        .resizable(false)
-        .default_width(380.0)
-        .show(ctx, |ui| {
-            let t = craft::ui::theme::current(ctx);
-            ui.label(crate::i18n::fmt(crate::i18n::t("Installed version: {version}"), &[("version", photocraft_engine::build_info::VERSION)]));
-            ui.add_space(craft::ui::theme::scale::Space::S8.px());
-            match &status {
-                Status::Checking => {
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                        ui.label(tl!("Checking for updates…"));
-                    });
-                }
-                Status::Available { release } => {
-                    ui.label(crate::i18n::fmt(crate::i18n::t("PhotoCraft {version} is available."), &[("version", &release.version)]));
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        if crate::widgets::primary_button(ui, tl!("Update and Restart"), 180.0).clicked() {
-                            app.updates_rt.updater.offer(release_of(release));
-                        }
-                        if ui.button(tl!("Release Notes")).clicked() {
-                            download = Some(release.url.clone());
-                        }
-                    }
-                    #[cfg(target_arch = "wasm32")]
-                    if crate::widgets::primary_button(ui, tl!("Open Download Page"), 160.0).clicked() {
-                        download = Some(release.url.clone());
-                    }
-                }
-                Status::UpToDate => {
-                    ui.label(tl!("PhotoCraft is up to date."));
-                }
-                Status::Failed { message } => {
-                    ui.colored_label(t.color.status.warn.fg.to_egui(), tl!("Could not check for updates."));
-                    ui.label(message);
-                }
-                Status::Idle => {
-                    ui.label(tl!("Updates have not been checked yet."));
-                }
-            }
-            if !matches!(status, Status::Checking) && ui.button(tl!("Check Again")).clicked() {
-                retry = true;
-            }
-        });
-    app.ui.updates_open = open;
-    if let Some(url) = download {
-        crate::links::open(app, ctx, &url);
+    if !app.ui.host.is_open::<UpdateCheckDialog>() {
+        app.ui.host.open(UpdateCheckDialog::new(photocraft_engine::build_info::VERSION));
     }
-    if retry {
-        let _ = check(app, ctx, serde_json::json!({}));
+    let status = match &app.session.updates.status {
+        Status::Idle | Status::Available { .. } => craft::update::updater::Status::Idle,
+        Status::Checking => craft::update::updater::Status::Checking,
+        Status::UpToDate => craft::update::updater::Status::UpToDate,
+        Status::Failed { message } => craft::update::updater::Status::Failed(message.clone()),
+    };
+    let available = match &app.session.updates.status {
+        Status::Available { release } => Some(release_of(release)),
+        _ => None,
+    };
+    let (installing, message) = (app.updates_rt.updater.is_installing(), app.updates_rt.updater.status_message());
+    if let Some(dialog) = app.ui.host.get_mut::<UpdateCheckDialog>() {
+        dialog.set_status(status);
+        dialog.set_available(available);
+        dialog.set_installing(installing);
+        dialog.set_message(message);
     }
+}
+
+/// The id `ui.inspect` lists the check dialog under, and `ui.dialog.confirm` and `ui.dialog.cancel`
+/// take.
+pub const CONTROL_ID: &str = "updates";
+
+/// The check dialog as `ui.inspect` lists it: the engine's status, the release on offer, the
+/// install's progress and the choices `ui.dialog.confirm` takes in this state.
+pub fn inspect(app: &PhotocraftApp) -> Option<Value> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if !app.ui.host.is_open::<craft::update::stack_dialogs::UpdateCheckDialog>() {
+            return None;
+        }
+        let (state, version, choices): (&str, Option<&str>, &[&str]) = match &app.session.updates.status {
+            Status::Idle => ("idle", None, &["checkNow", "close"]),
+            Status::Checking => ("checking", None, &["close"]),
+            Status::UpToDate => ("upToDate", None, &["checkAgain", "close"]),
+            Status::Failed { .. } => ("failed", None, &["checkAgain", "close"]),
+            Status::Available { release } => ("available", Some(release.version.as_str()), &["update", "download", "checkAgain", "close"]),
+        };
+        let message = match &app.session.updates.status {
+            Status::Failed { message } => Some(message.clone()),
+            _ => app.updates_rt.updater.status_message(),
+        };
+        Some(serde_json::json!({
+            "id": CONTROL_ID,
+            "kind": "updates",
+            "title": "Check for Updates",
+            "fields": {"state": state, "version": version, "installing": app.updates_rt.updater.is_installing(), "message": message, "choices": choices},
+        }))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = app;
+        None
+    }
+}
+
+/// Answers the check dialog for a control client with one of the choices [`inspect`] lists, as
+/// pressing that button would. A choice the dialog's state doesn't offer is refused.
+pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Result<Value, String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
+        let answer = match choice {
+            "close" => CheckChoice::Close,
+            "checkNow" => CheckChoice::CheckNow,
+            "checkAgain" => CheckChoice::CheckAgain,
+            "update" => CheckChoice::Update,
+            "download" => CheckChoice::Download,
+            other => return Err(format!("unknown choice `{other}`: close, checkNow, checkAgain, update or download")),
+        };
+        let id = app.ui.host.top_id().filter(|_| app.ui.host.is_open::<UpdateCheckDialog>()).ok_or("the update dialog is not open")?;
+        app.ui.host.get_mut::<UpdateCheckDialog>().ok_or("the update dialog is not open")?.set_choice(answer);
+        if !app.ui.host.confirm_by_id::<UpdateCheckDialog>(ctx, id) {
+            return Err(format!("the update dialog does not offer `{choice}` now"));
+        }
+        show(app, ctx);
+        Ok(serde_json::json!({"choice": choice}))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (app, ctx, choice);
+        Err("the update dialog is not open".into())
+    }
+}
+
+/// Closes the check dialog for `ui.dialog.cancel`.
+pub fn cancel_control(app: &mut PhotocraftApp) -> Result<Value, String> {
+    if !app.ui.updates_open {
+        return Err("the update dialog is not open".into());
+    }
+    app.ui.updates_open = false;
+    Ok(Value::Null)
+}
+
+/// The dialog's answer, after the dialog host drew.
+pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use craft::ui::dialog::DialogResult;
+        use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
+        if let Some(result) = app.ui.host.take::<UpdateCheckDialog>() {
+            match result {
+                DialogResult::Ok(CheckChoice::CheckNow | CheckChoice::CheckAgain) => {
+                    let _ = check(app, ctx, serde_json::json!({}));
+                }
+                // The window stays open and shows the progress; a refusal for unsaved work is
+                // the updater's status line.
+                DialogResult::Ok(CheckChoice::Update) => {
+                    let can_start = !app.has_unsaved_work();
+                    app.updates_rt.updater.request_install(ctx, can_start);
+                }
+                DialogResult::Ok(CheckChoice::Download) => {
+                    app.ui.updates_open = false;
+                    if let Status::Available { release } = &app.session.updates.status {
+                        let url = release.url.clone();
+                        crate::links::open(app, ctx, &url);
+                    }
+                }
+                // Release Notes is answered inside the dialog.
+                _ => app.ui.updates_open = false,
+            }
+        }
+        // The restart helper is scheduled before the app closes, so no update starts over unsaved
+        // work: the close waits until the work is saved.
+        {
+            let can_close = !app.has_unsaved_work();
+            if app.updates_rt.updater.take_close(can_close) {
+                // The guarded close path asks about unsaved work and waits for saves; the restart
+                // helper relaunches once the process exits.
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    let _ = (app, ctx);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Services, menus};
+    #[cfg(not(target_arch = "wasm32"))]
+    use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
     use photocraft_engine::{Session, updates_cmds::Release};
     use std::sync::{Arc, Mutex, mpsc};
 
@@ -196,6 +262,12 @@ mod tests {
             },
         );
         (app, calls, sender)
+    }
+
+    fn at_ctx(app: &mut PhotocraftApp, ctx: &egui::Context) {
+        tick(app, ctx);
+        app.ui.host.show(ctx);
+        show(app, ctx);
     }
 
     fn at(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64) {
@@ -288,6 +360,8 @@ mod tests {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
         at(&mut app, &ctx, 0.0);
+        app.ui.updates_open = true;
+        app.ui.host.open(UpdateCheckDialog::new(photocraft_engine::build_info::VERSION).with_self_updating(true));
         sender
             .lock()
             .unwrap()
@@ -296,14 +370,49 @@ mod tests {
             .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/storytold/photocraft/releases/tag/v99.0.0".into() })))
             .unwrap();
         at(&mut app, &ctx, 1.0);
-        assert!(app.updates_rt.updater.prompt_open(), "startup prompt initialized on available release");
+        assert!(app.ui.updates_open);
+        assert!(app.ui.host.is_open::<UpdateCheckDialog>(), "the available release opens the check dialog");
 
-        // Rendering show() renders the prompt modal
-        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
-            show(&mut app, ui.ctx());
-        });
-        output.textures_delta.clear();
-        assert!(app.updates_rt.updater.prompt_open());
+        let frame = |app: &mut PhotocraftApp| {
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                at_ctx(app, ui.ctx());
+            });
+            output.textures_delta.clear();
+        };
+        frame(&mut app);
+        assert!(app.ui.host.is_open::<UpdateCheckDialog>(), "still open after a frame");
+        // Later closes it.
+        assert!(app.ui.host.cancel::<UpdateCheckDialog>(&ctx));
+        show(&mut app, &ctx);
+        assert!(!app.ui.updates_open);
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn update_and_restart_on_an_unsupported_install_shows_the_updaters_status() {
+        let (mut app, _, sender) = app();
+        let ctx = egui::Context::default();
+        at(&mut app, &ctx, 0.0);
+        sender
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .send(Ok(Some(Release { version: "99.0.0".into(), url: "https://github.com/storytold/photocraft/releases/tag/v99.0.0".into() })))
+            .unwrap();
+        at(&mut app, &ctx, 1.0);
+        let frame = |app: &mut PhotocraftApp| {
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| at_ctx(app, ui.ctx()));
+            output.textures_delta.clear();
+        };
+        frame(&mut app);
+        let id = app.ui.host.top_id().expect("the check dialog is open");
+        app.ui.host.get_mut::<UpdateCheckDialog>().unwrap().set_choice(CheckChoice::Update);
+        assert!(app.ui.host.confirm_by_id::<UpdateCheckDialog>(&ctx, id));
+        frame(&mut app);
+        frame(&mut app);
+        assert!(app.ui.updates_open, "the dialog stays for the install's status");
+        assert!(app.updates_rt.updater.status_message().is_some());
     }
 
     #[test]

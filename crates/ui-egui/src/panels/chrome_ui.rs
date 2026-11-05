@@ -4,6 +4,9 @@
 use photocraft_doc::{Document, LayerContent};
 use serde::{Deserialize, Serialize};
 
+use craft::ui::canvas::ZoomLadder;
+use craft::ui::patterns::{StatusItem, StatusReadout, StatusValues};
+
 use crate::render_path::CpuReason;
 use crate::{PhotocraftApp, widgets};
 
@@ -11,7 +14,7 @@ use crate::{PhotocraftApp, widgets};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChromeState {
-    /// What the status bar shows next to the zoom field (one of [`STATUS_INFO`] keys).
+    /// What the status bar shows next to the zoom field (a key of [`status_item`]).
     pub status_info: String,
     /// Home screen shown over the open documents (Options bar › Home); holds the document count
     /// when it was opened, so opening or creating a document leaves it.
@@ -39,17 +42,36 @@ impl Default for ChromeState {
     }
 }
 
-/// The status bar "Show" menu, in Photoshop's order: (key, menu label).
-pub const STATUS_INFO: &[(&str, &str)] = &[
-    ("sizes", "Document Sizes"),
-    ("profile", "Document Profile"),
-    ("dimensions", "Document Dimensions"),
-    ("measurementScale", "Measurement Scale"),
-    ("scratch", "Scratch Sizes"),
-    ("efficiency", "Efficiency"),
-    ("tool", "Current Tool"),
-    ("layers", "Layer Count"),
-];
+/// The status readout item a [`ChromeState::status_info`] key names (Photoshop's Show menu).
+pub fn status_item(key: &str) -> StatusItem {
+    match key {
+        "sizes" => StatusItem::DocumentSizes,
+        "profile" => StatusItem::DocumentProfile,
+        "measurementScale" => StatusItem::MeasurementScale,
+        "scratch" => StatusItem::ScratchSizes,
+        "efficiency" => StatusItem::Efficiency,
+        "timing" => StatusItem::Timing,
+        "tool" => StatusItem::CurrentTool,
+        "layers" => StatusItem::LayerCount,
+        _ => StatusItem::DocumentDimensions,
+    }
+}
+
+/// The [`ChromeState::status_info`] key of `item`.
+fn status_key(item: StatusItem) -> &'static str {
+    match item {
+        StatusItem::DocumentSizes => "sizes",
+        StatusItem::DocumentProfile => "profile",
+        StatusItem::DocumentDimensions => "dimensions",
+        StatusItem::MeasurementScale => "measurementScale",
+        StatusItem::ScratchSizes => "scratch",
+        StatusItem::Efficiency => "efficiency",
+        StatusItem::Timing => "timing",
+        StatusItem::CurrentTool => "tool",
+        StatusItem::LayerCount => "layers",
+        _ => "dimensions",
+    }
+}
 
 /// Photoshop's compact byte format: "10.3M", "412.5K".
 pub fn fmt_bytes(b: u64) -> String {
@@ -79,43 +101,50 @@ pub fn document_sizes(doc: &Document) -> (u64, u64) {
     (flat, layered.max(flat))
 }
 
-/// The status bar text for `key` (Photoshop wording).
-pub fn status_info_text(doc: &Document, key: &str, tool: &str, profile: &str) -> String {
-    status_info_text_with_units(doc, key, tool, profile, &Default::default())
-}
-
-fn status_info_text_with_units(doc: &Document, key: &str, tool: &str, profile: &str, units: &photocraft_engine::prefs::UnitsAndRulers) -> String {
-    let bits = doc.depth.bits();
-    match key {
-        "sizes" => {
-            let (flat, layered) = document_sizes(doc);
-            crate::i18n::fmt(tl!("Doc: {flat}/{layered}"), &[("flat", &fmt_bytes(flat)), ("layered", &fmt_bytes(layered))])
-        }
-        "profile" => format!("{profile} ({bits}bpc)"),
-        "measurementScale" => "1 pixel = 1.0000 pixels".into(),
-        "scratch" => {
-            let (_, layered) = document_sizes(doc);
-            crate::i18n::fmt(tl!("Scratch: {size}"), &[("size", &fmt_bytes(layered))])
-        }
-        "efficiency" => tl!("Efficiency: 100%").into(),
-        "tool" => tool.to_string(),
-        "layers" => {
-            let n = doc.layer_count();
-            crate::i18n::trn(crate::i18n::current(), n as u64, "{n} Layer", "{n} Layers")
-        }
-        _ if units.rulers == photocraft_engine::prefs::Unit::Pixels => crate::i18n::fmt(
+/// The dimensions item's text: the size in the ruler unit and the resolution.
+fn dimensions_text(doc: &Document, units: &photocraft_engine::prefs::UnitsAndRulers) -> String {
+    if units.rulers == photocraft_engine::prefs::Unit::Pixels {
+        return crate::i18n::fmt(
             tl!("{w} px x {h} px ({ppi} ppi)"),
             &[("w", &doc.size.width.to_string()), ("h", &doc.size.height.to_string()), ("ppi", &widgets::fmt_num(doc.resolution_dpi as f64))],
-        ),
-        _ => {
-            let dpi = doc.resolution_dpi as f64;
-            let (w, h) = (doc.size.width as f64, doc.size.height as f64);
-            crate::i18n::fmt(
-                tl!("{w} {unit} x {h} {unit} ({ppi} ppi)"),
-                &[("w", &units.format(w, dpi, w)), ("h", &units.format(h, dpi, h)), ("unit", units.rulers.suffix()), ("ppi", &widgets::fmt_num(dpi))],
-            )
-        }
+        );
     }
+    let dpi = doc.resolution_dpi as f64;
+    let (w, h) = (doc.size.width as f64, doc.size.height as f64);
+    crate::i18n::fmt(
+        tl!("{w} {unit} x {h} {unit} ({ppi} ppi)"),
+        &[("w", &units.format(w, dpi, w)), ("h", &units.format(h, dpi, h)), ("unit", units.rulers.suffix()), ("ppi", &widgets::fmt_num(dpi))],
+    )
+}
+
+/// What the readout's items show for the active document. Memory use is sampled once a second.
+fn status_values(app: &PhotocraftApp, ctx: &egui::Context, doc: &Document) -> StatusValues {
+    let mut values = StatusValues::default();
+    values.document_sizes = Some(document_sizes(doc));
+    values.document_profile = Some(format!("{} ({}bpc)", profile_name(doc), doc.depth.bits()));
+    values.document_dimensions = Some(dimensions_text(doc, &app.session.prefs().units_and_rulers));
+    values.measurement_scale = Some("1 pixel = 1.0000 pixels".into());
+    values.scratch_sizes = memory_use(ctx);
+    values.efficiency = Some(100);
+    values.timing = app.ui.last_command_time;
+    values.current_tool = Some(tl!(app.ui.tool.label()).to_string());
+    values.layer_count = Some(doc.layer_count());
+    values
+}
+
+/// The process's used and available memory, sampled at most once a second.
+fn memory_use(ctx: &egui::Context) -> Option<(u64, u64)> {
+    let id = egui::Id::new("pc-status-memory");
+    let now = ctx.input(|i| i.time);
+    if let Some((at, sample)) = ctx.data(|d| d.get_temp::<(f64, Option<(u64, u64)>)>(id))
+        && now - at < 1.0
+    {
+        return sample;
+    }
+    let sample = craft::platform::usage::sample().map(|m| (m.used, m.available));
+    ctx.data_mut(|d| d.insert_temp(id, (now, sample)));
+    ctx.request_repaint_after(std::time::Duration::from_secs(1));
+    sample
 }
 
 fn profile_name(doc: &Document) -> String {
@@ -137,58 +166,52 @@ fn profile_name(doc: &Document) -> String {
     name.to_owned()
 }
 
-/// The zoom field of the status bar: a [`NumberField`] that scrubs past the screen edge in full
-/// screen, in the field cell of the bar.
-pub fn zoom_field(app: &mut PhotocraftApp, ui: &mut egui::Ui, i: usize) {
-    use craft::ui::controls::{ControlSize, NumberField};
-    use craft::ui::localized::{LocaleNumbers, Unit};
-    let numbers = LocaleNumbers::of(ui);
-    let range = crate::zoom_levels::percent_range(&app.ui.views[i]);
-    let pct = f64::from(app.ui.views[i].zoom * 100.0);
-    craft::ui::patterns::StatusBar::field(ui, |ui| {
-        let edit = NumberField::new("status-zoom", tl!("Zoom"), pct, &numbers)
-            .range(f64::from(*range.start())..=f64::from(*range.end()))
-            .decimals(0..=1)
-            .unit(Unit::new("{n}%"))
-            .scrub_wrap(true)
-            .size(ControlSize::Sm)
-            .show(ui);
-        if let Some(pct) = edit.event.as_ref().and_then(|e| e.value()).copied() {
-            let view = &mut app.ui.views[i];
-            view.zoom = crate::zoom_levels::clamp(pct as f32 / 100.0, view.doc_size);
-            view.zoom_animating = false;
-            view.zoom_anchor = None;
-            view.fit_pending = false;
+/// Applies a status bar zoom edit to view `i`: previews and edits set the zoom, and a cancelled
+/// gesture puts back the zoom it began with.
+fn apply_zoom(ctx: &egui::Context, view: &mut crate::state::View, event: &craft::ui::edit::EditEvent<f64>) {
+    use craft::ui::edit::EditEvent;
+    let before = egui::Id::new("pc-status-zoom-before");
+    let percent = match event {
+        EditEvent::Begin { value, .. } => {
+            ctx.data_mut(|d| d.insert_temp(before, view.zoom));
+            value.as_ref().map(|p| *p as f32 / 100.0)
         }
-    });
+        EditEvent::Update { value, .. } | EditEvent::Set { value, .. } => Some(*value as f32 / 100.0),
+        EditEvent::Commit { value, changed, .. } => changed.then_some(*value as f32 / 100.0),
+        EditEvent::Cancel { .. } => ctx.data(|d| d.get_temp::<f32>(before)),
+        _ => None,
+    };
+    if let Some(zoom) = percent {
+        view.zoom = crate::zoom_levels::clamp(zoom, view.doc_size);
+        view.zoom_animating = false;
+        view.zoom_anchor = None;
+        view.fit_pending = false;
+    }
 }
 
-/// Status bar leading group (Pro): zoom %, the chosen info field and its ">" menu, then status
-/// messages.
-pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    use craft::ui::controls::ControlSize;
-    use craft::ui::menu::{MenuEntry, MenuItem, PressMenu};
-    use craft::ui::patterns::StatusBar;
+/// Status bar leading group: the [`StatusReadout`] (zoom %, the chosen info item and its ▸
+/// menu), then status messages.
+pub fn status_leading(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) else {
-        StatusBar::info(ui, tl!("No document"));
+        craft::ui::patterns::StatusBar::info(ui, tl!("No document"));
         // A command run with no document open still reports here (#1567: File › Automate › Batch).
         status_message(app, ui);
         return;
     };
-    let text = status_info_text_with_units(
-        &st.doc,
-        &app.ui.chrome.status_info,
-        tl!(app.ui.tool.label()),
-        &profile_name(&st.doc),
-        &app.session.prefs().units_and_rulers,
+    let view = &app.ui.views[i];
+    let size = craft::ui::canvas::kurbo::Size::new(f64::from(view.doc_size[0]), f64::from(view.doc_size[1]));
+    let values = status_values(app, ui.ctx(), &st.doc);
+    let output = StatusReadout::new("status").range(ZoomLadder::percent_range(f64::from(view.zoom), size)).show(
+        ui,
+        f64::from(view.zoom) * 100.0,
+        status_item(&app.ui.chrome.status_info),
+        &values,
     );
-    zoom_field(app, ui, i);
-    StatusBar::info(ui, tl!(&text));
-    let button = StatusBar::menu_button(ui, tl!("Show"));
-    let entries: Vec<MenuEntry<usize>> =
-        STATUS_INFO.iter().enumerate().map(|(n, (key, label))| MenuItem::new(*label, n).radio(app.ui.chrome.status_info == *key).into()).collect();
-    if let Some(n) = PressMenu::new(&entries).size(ControlSize::Sm).show(ui, &button).chosen {
-        app.ui.chrome.status_info = STATUS_INFO[n].0.to_string();
+    if let Some(event) = &output.zoom {
+        apply_zoom(ui.ctx(), &mut app.ui.views[i], event);
+    }
+    if let Some(item) = output.item {
+        app.ui.chrome.status_info = status_key(item).to_string();
     }
     status_message(app, ui);
 }
@@ -310,10 +333,8 @@ mod tests {
     fn default_status_shows_dimensions_like_photoshop() {
         let d = doc();
         assert_eq!(ChromeState::default().status_info, "dimensions");
-        assert_eq!(status_info_text(&d, "dimensions", "", ""), "2400 px x 1500 px (72 ppi)");
-        assert_eq!(status_info_text(&d, "layers", "", ""), "1 Layer");
-        assert_eq!(status_info_text(&d, "tool", "Brush Tool", ""), "Brush Tool");
-        assert!(status_info_text(&d, "profile", "", "sRGB IEC61966-2.1").ends_with("(8bpc)"));
+        assert_eq!(dimensions_text(&d, &Default::default()), "2400 px x 1500 px (72 ppi)");
+        assert_eq!(status_item(&ChromeState::default().status_info), StatusItem::DocumentDimensions);
     }
 
     #[test]
@@ -331,14 +352,11 @@ mod tests {
             (Unit::Percent, "100 % x 100 % (300 ppi)"),
         ] {
             let units = UnitsAndRulers { rulers: unit, ..Default::default() };
-            assert_eq!(status_info_text_with_units(&d, "dimensions", "", "", &units), expected);
-            for (key, _) in STATUS_INFO.iter().filter(|(key, _)| *key != "dimensions") {
-                assert_eq!(status_info_text_with_units(&d, key, "Brush Tool", "sRGB", &units), status_info_text(&d, key, "Brush Tool", "sRGB"));
-            }
+            assert_eq!(dimensions_text(&d, &units), expected);
         }
         d.resolution_dpi = 240.0;
         let units = UnitsAndRulers { rulers: Unit::Points, point_size: PointSize::Traditional, ..Default::default() };
-        assert_eq!(status_info_text_with_units(&d, "dimensions", "", "", &units), "722.7 pt x 451.7 pt (240 ppi)");
+        assert_eq!(dimensions_text(&d, &units), "722.7 pt x 451.7 pt (240 ppi)");
     }
 
     /// L3: layers over the GPU memory budget show "GPU Memory Full" in the status bar, for that
@@ -464,7 +482,6 @@ mod tests {
         rgb.icc_profile = Some(photocraft_engine::color_cmds::working_profile(rgb.mode).to_bytes());
         let before = rgb.icc_profile.clone();
         assert_eq!(profile_name(&rgb), "sRGB IEC61966-2.1");
-        assert_eq!(status_info_text(&rgb, "profile", "", &profile_name(&rgb)), "sRGB IEC61966-2.1 (8bpc)");
         assert_eq!(rgb.icc_profile, before);
 
         let mut gray = doc();
@@ -503,7 +520,8 @@ mod tests {
     fn document_sizes_match_photoshop_rounding() {
         let d = doc();
         // 2400 x 1500 x 3 bytes = 10.3M flattened, as Photoshop shows.
-        assert_eq!(status_info_text(&d, "sizes", "", ""), "Doc: 10.3M/13.7M");
+        let (flat, layered) = document_sizes(&d);
+        assert_eq!((fmt_bytes(flat), fmt_bytes(layered)), ("10.3M".to_string(), "13.7M".to_string()));
         assert_eq!(fmt_bytes(512 * 1024), "512.0K");
     }
 
@@ -576,17 +594,9 @@ mod tests {
         let e = crate::menus::invoke(&mut app, &egui::Context::default(), "file.automate.batch", json!({})).unwrap_err();
         app.ui.status = e.clone();
         app.ui.status_error = true;
-        let mut h = Harness::builder().with_size(vec2(900.0, 40.0)).build_ui_state(|ui, app| status_bar_pro(app, ui), app);
+        let mut h = Harness::builder().with_size(vec2(900.0, 40.0)).build_ui_state(|ui, app| status_leading(app, ui), app);
         h.run_steps(2);
         assert!(h.query_by_label("No document").is_some());
         assert!(h.query_all_by_label(&e).count() > 0, "status bar shows {e:?}");
-    }
-
-    #[test]
-    fn every_status_key_has_text() {
-        let d = doc();
-        for (k, _) in STATUS_INFO {
-            assert!(!status_info_text(&d, k, "x", "p").is_empty());
-        }
     }
 }

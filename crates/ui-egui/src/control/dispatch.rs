@@ -845,6 +845,15 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
         "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => {
             err("the unsaved-changes prompt has no fields; use `ui.dialog.confirm` with a `choice`")
         }
+        // The check-for-updates dialog, listed by ui.inspect with the id "updates": confirm takes a
+        // `choice` (close, checkNow, checkAgain, update, download; default close).
+        "ui.dialog.confirm" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => {
+            wrap(crate::updates_ui::answer_control(app, ctx, s("choice").unwrap_or("close")))
+        }
+        "ui.dialog.cancel" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => wrap(crate::updates_ui::cancel_control(app)),
+        "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => {
+            err("the update dialog has no fields; use `ui.dialog.confirm` with a `choice`")
+        }
         "ui.dialog.cancel" if s("dialog") == Some(SHELL_DIALOG) => match app.ui.shell.dialog.take() {
             Some(_) => ok(Value::Null),
             None => err("no such dialog"),

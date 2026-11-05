@@ -123,9 +123,9 @@ pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId,
     f.insert("layer".into(), json!(layer.0));
     f.insert("tool".into(), json!(format!("{tool:?}")));
     f.insert("at".into(), json!(at));
-    let prompt = StandardPrompt::custom(tl!(kind.message())).title("PhotoCraft").button(PromptChoice::Proceed, tl!("OK"), None).button(
+    let prompt = StandardPrompt::custom(kind.message()).title("PhotoCraft").button(PromptChoice::Proceed, tsrc!("OK"), None).button(
         PromptChoice::Cancel,
-        tl!("Cancel"),
+        tsrc!("Cancel"),
         None,
     );
     crate::standard_prompts::open(app, prompt, "PhotoCraft", f)
@@ -175,11 +175,11 @@ pub fn intercept_filter(app: &mut PhotocraftApp, id: &str, params: &Value) -> Op
     f.insert("choice".into(), json!("rasterize"));
     f.insert("smartObject".into(), json!(smart));
     // Esc and the close box answer Cancel, so the prompt always has one.
-    let mut prompt = StandardPrompt::custom(tl!(Kind::Type.message())).title("PhotoCraft").button(PromptChoice::Proceed, tl!("Rasterize"), None);
+    let mut prompt = StandardPrompt::custom(Kind::Type.message()).title("PhotoCraft").button(PromptChoice::Proceed, tsrc!("Rasterize"), None);
     if smart {
-        prompt = prompt.button(PromptChoice::Alternate, tl!("Convert to Smart Object"), None);
+        prompt = prompt.button(PromptChoice::Alternate, tsrc!("Convert to Smart Object"), None);
     }
-    let prompt = prompt.button(PromptChoice::Cancel, tl!("Cancel"), None);
+    let prompt = prompt.button(PromptChoice::Cancel, tsrc!("Cancel"), None);
     let Some(id) = crate::standard_prompts::open(app, prompt, "PhotoCraft", f) else {
         return Some(Ok(json!({"confirmationPending": true})));
     };

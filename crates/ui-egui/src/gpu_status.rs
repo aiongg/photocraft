@@ -287,12 +287,12 @@ pub fn show_fallback(app: &mut PhotocraftApp) {
         "{}\n\n{retry_line}",
         tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.")
     ))
-    .title(tl!("Switched to CPU rendering"))
-    .tone(Tone::Warn, tl!("GPU acceleration could not continue. Your documents are unchanged."))
+    .title(tsrc!("Switched to CPU rendering"))
+    .tone(Tone::Warn, tsrc!("GPU acceleration could not continue. Your documents are unchanged."))
     .details(reason.clone())
-    .button(PromptChoice::Proceed, tl!("Keep Using CPU"), None)
-    .button(PromptChoice::Alternate, tl!("Retry GPU"), None)
-    .button(PromptChoice::Cancel, tl!("Cancel"), None);
+    .button(PromptChoice::Proceed, tsrc!("Keep Using CPU"), None)
+    .button(PromptChoice::Alternate, tsrc!("Retry GPU"), None)
+    .button(PromptChoice::Cancel, tsrc!("Cancel"), None);
     let mut fields = serde_json::Map::new();
     fields.insert(MARK.into(), json!(true));
     fields.insert("__label".into(), json!("Switched to CPU rendering"));

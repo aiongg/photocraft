@@ -396,9 +396,8 @@ pub(crate) fn trash_action((layer, filter): FilterDrag) -> (String, Value) {
 /// Smart Filters row: all of them), as the panel's Delete button does (#4751), instead of
 /// deleting the smart object or reaching Edit › Clear.
 pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    use crate::shortcut_dispatch::Focus;
     // Text fields and widgets that delete with these keys themselves keep them (#1534).
-    if app.ui.text_edit.is_some() || matches!(Focus::of(ctx), Focus::Text | Focus::DeletingWidget) {
+    if !crate::shortcut_dispatch::delete_keys_free(app, ctx) {
         return false;
     }
     let Some(st) = app.session.active() else { return false };
