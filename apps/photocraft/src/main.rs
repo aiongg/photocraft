@@ -46,8 +46,6 @@ mod linux_libs;
 mod logging;
 mod monitor_profile;
 mod photoshop_settings;
-// Save As through the desktop portal, which reports the file type picked (#6121).
-#[cfg(target_os = "linux")]
 mod presentation;
 // The print portal needs the session bus (zbus, Linux only); its pure helpers are tested everywhere.
 #[cfg(any(target_os = "linux", test))]

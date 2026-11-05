@@ -140,7 +140,7 @@ fn transparent_png_keeps_its_format_until_its_lone_layer_becomes_smart() {
     assert!(matches!(app.session.active().unwrap().doc.layers[0].content, photocraft_doc::LayerContent::Smart(_)));
     menus::invoke(&mut app, &ctx, "file.saveAs", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(matches!(saves(&open).as_slice(), [suggested] if suggested == "/pics/transparent.psd"));
+    assert!(matches!(saves(&open).as_slice(), [.., suggested] if suggested == "/pics/transparent.psd"));
     assert!(written.borrow().is_empty());
     answer(&open, None);
     app.poll_file_dialog(&ctx, None);
@@ -226,10 +226,11 @@ fn plain_save_of_a_flat_jpeg_records_and_replays_a_changed_quality() {
     let index = app.session.add_document(photocraft_io::import("other.jpg", &bytes).unwrap().document, Some("/pics/other.jpg".into()));
     app.session.set_active(index);
     written.borrow_mut().clear();
+    let asked = open.requests().len();
     let played = app.run("actions.play", json!({"action": 0})).unwrap();
     assert!(played.get("failed").is_none(), "{played}");
     assert!(app.jpeg_options.is_none(), "playback does not ask");
-    assert!(open.requests().is_empty(), "no Save dialog");
+    assert_eq!(open.requests().len(), asked, "no Save dialog");
     assert_eq!(*written.borrow(), ["/pics/other.jpg"]);
     assert_eq!(qualities.borrow().last().copied().flatten(), Some(photocraft_engine::file_cmds::jpeg_quality(3.0)));
 }
@@ -385,15 +386,17 @@ fn menu_place_preserves_an_unfinished_transform() {
     }
 }
 
+/// Open names no folder: the service starts it in the one the last Open answered with (an explicit
+/// directory would win over that).
 #[test]
-fn open_starts_in_the_last_used_folder() {
+fn open_leaves_the_starting_folder_to_the_service() {
     let (mut app, open, _) = app();
     let ctx = egui::Context::default();
     app.ui.recent_files = vec!["/pics/cat.psd".into(), "/old/dog.png".into()];
     menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
     assert!(
-        matches!(open.requests().as_slice(), [r] if r.kind == PickKind::OpenMany && r.directory.as_deref() == Some(std::path::Path::new("/pics"))),
+        matches!(open.requests().as_slice(), [r] if r.kind == PickKind::OpenMany && r.directory.is_none() && r.purpose == "open"),
         "{:?}",
         open.requests().first().cloned()
     );
@@ -403,7 +406,6 @@ fn open_starts_in_the_last_used_folder() {
 fn ask_folder_uses_the_async_dialog_and_returns_the_selected_path() {
     let (mut app, open, _) = app();
     let ctx = egui::Context::default();
-    app.ui.recent_files = vec!["/pics/cat.psd".into()];
     let selected = Rc::new(RefCell::new(None));
     let result = selected.clone();
 
@@ -416,7 +418,7 @@ fn ask_folder_uses_the_async_dialog_and_returns_the_selected_path() {
         json!({"fileDialog": "folder"})
     );
     app.poll_file_dialog(&ctx, None);
-    assert!(matches!(open.requests().as_slice(), [r] if r.kind == PickKind::Folder && r.directory.as_deref() == Some(std::path::Path::new("/pics"))));
+    assert!(matches!(open.requests().as_slice(), [r] if r.kind == PickKind::Folder && r.directory.is_none()));
 
     answer(&open, Some(scripted::folder("/pics/frames")));
     app.poll_file_dialog(&ctx, None);
@@ -497,7 +499,7 @@ fn save_suggestions_preserve_explicit_directories_and_untitled_names() {
         app.session.active_mut().unwrap().path = document_path.map(str::to_string);
         app.pick_save(suggested, |_, _| Ok(Value::Null)).unwrap();
         app.poll_file_dialog(&ctx, None);
-        assert_eq!(saves(&open)[0], suggested);
+        assert_eq!(saves(&open).last().map(String::as_str), Some(suggested));
         answer(&open, None);
         app.poll_file_dialog(&ctx, None);
     }
@@ -841,9 +843,10 @@ fn same_folder_quick_export_asks_before_replacing_the_documents_own_file() {
     // Beside a PSD, Same Folder still writes without a prompt.
     app.session.active_mut().unwrap().path = Some(dir.join("photo.psd").to_string_lossy().into_owned());
     std::fs::write(&own, b"earlier export").unwrap();
+    let asked = open.requests().len();
     menus::invoke(&mut app, &ctx, "file.export.quickExportAsPng", Value::Null).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(open.requests().is_empty(), "no dialog");
+    assert_eq!(open.requests().len(), asked, "no dialog");
     assert!(std::fs::read(&own).unwrap().starts_with(b"\x89PNG\r\n\x1a\n"));
     std::fs::remove_dir_all(&dir).ok();
 }

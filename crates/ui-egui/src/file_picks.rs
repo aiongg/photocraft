@@ -120,15 +120,21 @@ impl PhotocraftApp {
     /// Lowercase Extension is on, and asks whether to replace a file it named that way.
     ///
     /// A suggested path with a folder (Save As, the document's own path) starts in that folder. A
-    /// bare file name (export dialogs) starts in the folder the document's last dialog answered
-    /// with (#1826, #1866).
+    /// bare file name (export dialogs, Save a Copy) starts in the folder the document's last
+    /// dialog answered with (#1826, #1866), else beside the document.
     pub(crate) fn pick_save(&mut self, suggested: &str, then: impl FnOnce(&mut Self, String) -> Result<Value, String> + 'static) -> Result<Value, String> {
         let suggested = filters::netpbm_as_pnm(suggested);
         let path = Path::new(&suggested);
         let doc = self.session.active().map(|d| d.doc.id);
-        let directory = path.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf);
-        // A document keeps its own folder: the service remembers one folder per purpose.
-        let mut request = PickRequest::save(doc.map_or_else(|| "save".to_owned(), |DocId(id)| format!("save.{id}")));
+        let purpose = doc.map_or_else(|| "save".to_owned(), |DocId(id)| format!("save.{id}"));
+        // An explicit directory wins over the remembered folder, so a bare name gives it only when
+        // the document has no remembered folder yet.
+        let directory = path.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf).or_else(|| {
+            let remembered = self.services.files.as_ref().and_then(|f| f.last_folder(&purpose));
+            let beside = self.session.active().and_then(|d| d.path.as_deref()).and_then(|p| Path::new(p).parent()).map(Path::to_path_buf);
+            if remembered.is_some() { None } else { beside }
+        });
+        let mut request = PickRequest::save(purpose);
         request.directory = directory;
         request.file_name = path.file_name().map(|n| n.to_string_lossy().into_owned());
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
@@ -291,7 +297,8 @@ impl PhotocraftApp {
         // cleans up), and the status says why.
         let r = match picked {
             Picked::Unavailable(cause) => {
-                then(self, Picked::Cancelled).and(Err(<craft::dialogs::ui::UnavailableLabels as craft::ui::localized::Labels>::of_ctx(ctx).message(&cause)))
+                let _ = then(self, Picked::Cancelled);
+                Err(unavailable_message(ctx, &cause))
             }
             picked => then(self, picked),
         };
@@ -302,6 +309,18 @@ impl PhotocraftApp {
             self.ui.status_error = true;
         }
     }
+}
+
+/// The status sentence for a pick no dialog could answer.
+#[cfg(not(target_arch = "wasm32"))]
+fn unavailable_message(ctx: &egui::Context, cause: &str) -> String {
+    <craft::dialogs::ui::UnavailableLabels as craft::ui::localized::Labels>::of_ctx(ctx).message(cause)
+}
+
+/// The browser's service never answers `Unavailable`; the cause is the sentence.
+#[cfg(target_arch = "wasm32")]
+fn unavailable_message(_: &egui::Context, cause: &str) -> String {
+    cause.to_owned()
 }
 
 /// The first chosen path as text; a name that isn't valid Unicode is an error (#6601).
