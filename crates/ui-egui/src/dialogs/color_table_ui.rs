@@ -26,14 +26,6 @@ fn custom(fields: &Map<String, Value>) -> bool {
 }
 
 /// A preset picked after Load… replaces the loaded table: forget its colors and transparent entry.
-fn drop_loaded_unless_custom(fields: &mut Map<String, Value>) {
-    if !custom(fields) {
-        fields.remove("colors");
-        fields.remove("transparent");
-    }
-}
-
-/// [`body_done`] for a hosted dialog's fields.
 pub fn drop_loaded(fields: &mut craft::ui::dialog::DialogFields) {
     if fields.text("table").is_some_and(|t| t != "custom") {
         fields.remove("colors");
@@ -66,12 +58,6 @@ fn pending(app: &PhotocraftApp, fields: &Map<String, Value>) -> Option<(Vec<[u8;
 pub enum Action {
     Load,
     Save,
-}
-
-/// Drops the loaded table from the frame's copy of `fields` (the one the dialog writes back and OK
-/// sends) once a preset is picked, so OK applies what the Table menu shows.
-pub fn body_done(fields: &mut Map<String, Value>) {
-    drop_loaded_unless_custom(fields);
 }
 
 /// The Load… and Save… buttons at the footer's trailing edge: the button pressed, if any.
@@ -191,21 +177,21 @@ mod tests {
     /// (which `image.mode.colorTable` would apply over the preset), and Custom keeps them.
     #[test]
     fn a_preset_picked_after_load_drops_the_loaded_colors() {
+        use craft::ui::dialog::{DialogFields, FieldValue};
         let loaded = |table: &str| {
-            Map::from_iter([
-                ("__command".to_string(), json!("image.mode.colorTable")),
-                ("table".to_string(), json!(table)),
-                ("colors".to_string(), json!(["#ff0000"])),
-                ("transparent".to_string(), json!(0)),
-            ])
+            let mut fields = DialogFields::new();
+            fields.set("table", FieldValue::Text(table.into()));
+            fields.set("colors", FieldValue::List(vec![FieldValue::Text("#ff0000".into())]));
+            fields.set("transparent", 0);
+            fields
         };
         let mut fields = loaded("grayscale");
-        drop_loaded_unless_custom(&mut fields);
-        assert!(!fields.contains_key("colors") && !fields.contains_key("transparent"), "{fields:?}");
-        assert_eq!(fields.get("table"), Some(&json!("grayscale")));
+        drop_loaded(&mut fields);
+        assert!(!fields.contains("colors") && !fields.contains("transparent"));
+        assert_eq!(fields.text("table"), Some("grayscale"));
         let mut fields = loaded("custom");
-        drop_loaded_unless_custom(&mut fields);
-        assert_eq!(fields, loaded("custom"));
+        drop_loaded(&mut fields);
+        assert!(fields.contains("colors") && fields.contains("transparent"));
     }
 
     #[test]

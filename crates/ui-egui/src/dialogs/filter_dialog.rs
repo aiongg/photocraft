@@ -7,14 +7,12 @@
 use craft::ui::theme::ToEgui;
 use std::sync::Arc;
 
-use craft::ui::dialog::DialogFields;
 use photocraft_doc::Document;
 use photocraft_engine::color_cmds::ColorSettings;
 use photocraft_engine::installed_profiles::InstalledProfile;
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 mod hosted;
 mod zoom_center;
@@ -607,13 +605,6 @@ fn proof_setup_defaults(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
     fields.insert("simulatePaper".into(), json!(pv.setup.simulate_paper));
 }
 
-/// A filter dialog with live preview for `command` whose parameters follow `spec` (registry
-/// notation) instead of the command's own; `fixed` params (e.g. a plug-in id) are passed through.
-pub fn open_with_spec_legacy(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> u64 {
-    let fields = spec_fields(command, label, spec, fixed);
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields)
-}
-
 /// The opening fields of a filter dialog that follows `spec`.
 pub(crate) fn spec_fields(command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> Map<String, Value> {
     let mut fields = fixed;
@@ -762,100 +753,23 @@ const REPLACE_COLOR: &str = "image.adjustments.replaceColor";
 const SMART_FILTER_SET_PARAMS: &str = "layer.smartFilter.setParams";
 const COLOR_EYEDROPPER: &str = "__colorEyedropper";
 
-fn color_eyedropper_owns(f: &Map<String, Value>) -> bool {
-    f.get("__filter").and_then(Value::as_bool) == Some(true)
-        && f.get("__command").and_then(Value::as_str) == Some(REPLACE_COLOR)
-        && f.get(COLOR_EYEDROPPER).and_then(Value::as_bool) == Some(true)
-}
-
 /// Whether the top dialog is a Replace Color with its canvas eyedropper armed.
 pub(crate) fn color_eyedropper_armed(app: &PhotocraftApp) -> bool {
-    app.ui.dialogs.last().is_some_and(|d| color_eyedropper_owns(&d.fields)) || hosted_eyedropper(app).is_some()
+    hosted_eyedropper(app).is_some()
 }
 
 /// Sample the merged image at document point (x, y) into the armed dialog's "From" colour.
 /// Returns true when the click was consumed, even off-image or over transparency, where nothing
 /// changes and the eyedropper stays armed (like the Curves picker).
 pub(crate) fn color_eyedropper_sample(app: &mut PhotocraftApp, x: f64, y: f64) -> bool {
-    let Some(id) = app.ui.dialogs.last().filter(|d| color_eyedropper_owns(&d.fields)).map(|d| d.id) else {
-        let Some(id) = hosted_eyedropper(app) else { return false };
-        if let Some(rgb) = crate::canvas::composite_color(app, x, y) {
-            hosted_eyedropper_sample(app, id, rgb, x, y);
-        }
-        return true;
-    };
-    if let Some(rgb) = crate::canvas::composite_color(app, x, y)
-        && let Some(d) = app.ui.dialog_mut(id)
-    {
-        d.fields.insert("color".into(), json!(crate::color_picker_ui::hex(rgb)));
-        // Where it was picked: Localized Color Clusters match the colour near this point (#4457).
-        d.fields.insert("points".into(), json!([[x.floor(), y.floor()]]));
+    let Some(id) = hosted_eyedropper(app) else { return false };
+    if let Some(rgb) = crate::canvas::composite_color(app, x, y) {
+        hosted_eyedropper_sample(app, id, rgb, x, y);
     }
     true
 }
 
-/// The Color Picker of Replace Color's Result swatch writes here (#6278).
-const RESULT_PICKED: &str = "__resultPicked";
-/// The Result the picker opened on: a picked colour that differs from it sets the sliders.
-const RESULT_FROM: &str = "__resultFrom";
-
-/// Replace Color's Result swatch (#6278), as in Photoshop: the sampled colour after the Hue,
-/// Saturation and Lightness shift. Picking a Result in its Color Picker sets the three sliders so
-/// the sampled colour becomes it.
-fn replace_color_result(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use photocraft_algo::tone;
-    let t = craft::ui::theme::current(ui.ctx());
-    let from = f.get("color").and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex).unwrap_or([0.0; 3]);
-    let picked = f.get(RESULT_PICKED).and_then(Value::as_str).and_then(crate::color_picker_ui::parse_hex);
-    if let Some(to) = picked
-        && f.get(RESULT_PICKED) != f.get(RESULT_FROM)
-    {
-        let (hue, saturation, lightness) = tone::replace_color_shift(from, to);
-        for (key, v) in [("hue", hue), ("saturation", saturation), ("lightness", lightness)] {
-            f.insert(key.into(), json!(v.round()));
-        }
-        f.remove(RESULT_PICKED);
-        f.remove(RESULT_FROM);
-    }
-    let num = |key: &str| f.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-    let rgb = tone::replace_color_result(from, num("hue"), num("saturation"), num("lightness"));
-    let bytes = rgb.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
-    let name = tl!("Result");
-    let mut clicked = false;
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(name).color(t.color.text.muted.to_egui()));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            clicked = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(bytes[0], bytes[1], bytes[2]), name).clicked();
-            ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.color.text.muted.to_egui()).monospace());
-        });
-    });
-    if clicked {
-        let hex = json!(crate::color_picker_ui::hex(rgb));
-        f.insert(RESULT_PICKED.into(), hex.clone());
-        f.insert(RESULT_FROM.into(), hex);
-        crate::color_picker_ui::request_field(f, RESULT_PICKED, &crate::color_picker_ui::title_for(name));
-    }
-}
-
 /// Dialog body for filter commands.
-/// Whether the dialog's first parameter is an angle dial. The dial's field is a library control, so
-/// the dialog host focuses it (`InitialFocus::FirstField`); PhotoCraft's own first-field focus
-/// would reach the next number instead.
-pub fn opens_on_angle_dial(f: &Map<String, Value>) -> bool {
-    if crate::select_mask_view::owns(f) {
-        return false;
-    }
-    let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default();
-    let spec = match f.get("__spec").and_then(Value::as_str) {
-        Some(s) => s.to_string(),
-        None => match photocraft_engine::commands::find(cmd) {
-            Some(c) => c.params.to_string(),
-            None => return false,
-        },
-    };
-    parse_spec(&spec).first().is_some_and(|p| matches!(p.kind, Kind::Range { .. }) && uses_angle_dial(cmd, &p.key))
-}
-
 pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let t = craft::ui::theme::current(ui.ctx());
     let cmd = f.get("__command").and_then(Value::as_str).unwrap_or_default().to_string();
@@ -871,33 +785,9 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
         crate::select_mask_view::controls(ui, f);
     }
     for p in parse_spec(&spec) {
-        if cmd == RADIAL_BLUR && f.get("method").and_then(Value::as_str) == Some("zoom") && matches!(p.key.as_str(), "centerX" | "centerY") {
-            if p.key == "centerX" {
-                let mut shared = DialogFields::new();
-                shared.set("method", "zoom");
-                for key in ["centerX", "centerY", "amount"] {
-                    if let Some(n) = f.get(key).and_then(Value::as_f64) {
-                        shared.set(key, n);
-                    }
-                }
-                zoom_center::row(ui, &mut shared);
-                for key in ["centerX", "centerY"] {
-                    f.insert(key.into(), json!(shared.number(key)));
-                }
-            }
-            continue;
-        }
         match p.kind {
             Kind::Range { min, max, default } => {
                 let mut v = f.get(&p.key).and_then(Value::as_f64).unwrap_or(default as f64) as f32;
-                if cmd == "image.mode.indexedColor" && p.key == "colors" {
-                    let mut count = v.round().clamp(2.0, 256.0) as u32;
-                    crate::widgets::color_count_row(ui, &label(&p.key), &mut count);
-                    f.insert(p.key, json!(count));
-                    continue;
-                }
-                // Replace Color's Range only applies with Localized Color Clusters on, as in Photoshop.
-                let enabled = !(cmd == REPLACE_COLOR && p.key == "range") || f.get("localized").and_then(Value::as_bool) == Some(true);
                 let unit = if is_pixel_param_of(&cmd, &p.key) {
                     "px"
                 } else if p.key == "angle" {
@@ -908,13 +798,7 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                     ""
                 };
                 ui.scope(|ui| {
-                    if !enabled {
-                        ui.disable();
-                    }
-                    if uses_angle_dial(&cmd, &p.key) {
-                        crate::widgets::angle_dial_row(ui, &label(&p.key), &mut v, min..=max);
-                        ui.add_space(craft::ui::theme::scale::Space::S4.px());
-                    } else if uses_logarithmic_slider(min, max) {
+                    if uses_logarithmic_slider(min, max) {
                         // Keep one numeric field for direct entry and one log-scaled slider for
                         // wide ranges. slider_row would add a second, linear slider (#146).
                         ui.horizontal(|ui| {
@@ -1001,10 +885,6 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 ui.horizontal(|ui| {
                     let lp = ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     ui.add(egui::TextEdit::singleline(&mut v).desired_width(200.0)).labelled_by(lp.id);
-                    // Install Plug-in…: pick the .wasm file instead of typing its path (#7531).
-                    if cmd == "plugin.install" && p.key == "path" && crate::widgets::secondary_button(ui, tl!("Browse…"), 0.0).clicked() {
-                        f.insert(crate::dialogs::BROWSE_FIELD.into(), json!(p.key));
-                    }
                 });
                 if v.is_empty() {
                     f.remove(&p.key);
@@ -1052,18 +932,11 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 let bytes = rgb.map(q);
                 let name = label(&p.key);
                 let mut clicked = false;
-                let eyedropper = cmd == REPLACE_COLOR && p.key == "color";
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new(&name).color(t.color.text.muted.to_egui()));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // PhotoCraft's Color Picker, as everywhere else (#2144).
                         clicked = crate::widgets::color_swatch_button(ui, egui::Color32::from_rgb(bytes[0], bytes[1], bytes[2]), &name).clicked();
-                        if eyedropper {
-                            let armed = f.get(COLOR_EYEDROPPER).and_then(Value::as_bool).unwrap_or(false);
-                            if crate::icons::button(ui, "pipette", 24.0, armed, "Pick Color From Image").clicked() {
-                                f.insert(COLOR_EYEDROPPER.into(), json!(!armed));
-                            }
-                        }
                         ui.label(egui::RichText::new(crate::color_picker_ui::hex(rgb)).color(t.color.text.muted.to_egui()).monospace());
                     });
                 });
@@ -1082,18 +955,10 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new(label(&p.key)).color(t.color.text.muted.to_egui()));
                     crate::widgets::value_field(ui, &mut v, -30000.0..=30000.0, "", 80.0).accessible_name(label(&p.key));
-                    // A seed gets a fresh random value in one click (#5710): Clouds, Add Noise,
-                    // Fibers… then render a new pattern, as each run of Photoshop's does.
-                    if p.key == "seed" && ui.button(tl!("Random")).clicked() {
-                        v = random_seed(ui.input(|i| i.time).to_bits(), v as i64) as f32;
-                    }
                 });
                 f.insert(p.key, json!(v.round() as i64));
             }
         }
-    }
-    if cmd == REPLACE_COLOR {
-        replace_color_result(ui, f);
     }
     // Read-only context the dialog opener supplies (e.g. the monitor profile in use).
     if let Some(note) = f.get("__note").and_then(Value::as_str) {
@@ -1107,16 +972,6 @@ pub fn body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     }
 }
 
-/// A new seed for a dialog's Random button: 0..=30000 (what the field takes), never `current`.
-/// `entropy` varies per click (the input time); the process's random hasher keys mix it.
-fn random_seed(entropy: u64, current: i64) -> i64 {
-    use std::hash::BuildHasher;
-    let h = std::collections::hash_map::RandomState::new().hash_one(entropy);
-    let seed = (h % 30_001) as i64;
-    if seed == current { (seed + 1) % 30_001 } else { seed }
-}
-
-/// User-facing params (strip the dialog's private `__` keys).
 pub fn params_of(f: &Map<String, Value>) -> Value {
     // A document picker left at "None" (-1) means "not given".
     let unset = |k: &str, v: &Value| k == "mapDocument" && v.as_i64() == Some(-1);
