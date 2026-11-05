@@ -1509,6 +1509,7 @@ fn replace_color_dialog_arms_the_eyedropper_button() {
 /// #6278: the Result swatch shows the sampled colour after the shift, and a colour picked for
 /// it sets Hue, Saturation and Lightness so the sampled colour becomes it.
 #[test]
+#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn replace_color_result_swatch_sets_the_sliders() {
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;

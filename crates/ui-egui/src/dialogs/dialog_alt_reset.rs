@@ -28,8 +28,6 @@ pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, fields: &mut Map<Stri
         crate::fill_ui::reset(app, fields);
     } else if crate::variables_ui::owns(fields) {
         crate::variables_ui::reset(fields);
-    } else if crate::color_picker_ui::owns(fields) {
-        crate::color_picker_ui::reset(fields);
     } else if crate::adjust_dialog::owns(fields) {
         crate::adjust_dialog::reset(app, ctx, fields);
     } else if fields.contains_key("__filter") {
@@ -45,8 +43,6 @@ fn match_arm(fields: &Map<String, Value>) -> Option<&'static str> {
         Some("fill")
     } else if crate::variables_ui::owns(fields) && fields.contains_key("__variablesOrig") {
         Some("variables")
-    } else if crate::color_picker_ui::owns(fields) {
-        Some("colorPicker")
     } else if crate::adjust_dialog::owns(fields) {
         Some("adjust")
     } else if fields.contains_key("__filter") {

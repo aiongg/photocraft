@@ -377,7 +377,7 @@ pub(crate) fn handle_forwarded(app: &mut PhotocraftApp, ctx: &egui::Context, eve
         }
     });
     // The main window runs no shortcuts while the screen color picker is open.
-    if crate::screen_picker::busy(ctx) {
+    if crate::screen_picker::busy(ctx) || craft::color::ui::ScreenColorPicker::busy(ctx) {
         return;
     }
     let typing = ctx.text_edit_focused() || app.ui.text_edit.is_some();

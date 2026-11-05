@@ -7,6 +7,8 @@ use serde_json::{Map, Value, json};
 use super::{P, defaults, effects_of, set_param, spec};
 use crate::{PhotocraftApp, color_picker_ui, state::DialogKind};
 
+type Fields = Map<String, Value>;
+
 const TARGET: &str = "__layerStyleColor";
 pub(super) const REQUEST: &str = "__openColorPicker";
 
@@ -35,7 +37,7 @@ pub(crate) fn child_of(fields: &Map<String, Value>, parent: u64) -> bool {
 }
 
 pub(crate) fn has_child(app: &PhotocraftApp, parent: u64) -> bool {
-    app.ui.dialogs.iter().any(|d| child_of(&d.fields, parent))
+    app.ui.hosted.iter().any(|h| h.kind == crate::dialogs::hosted::HostedKind::ColorPicker && child_of(&h.private, parent))
 }
 
 struct ColorField {
@@ -92,9 +94,9 @@ pub(crate) fn open(app: &mut PhotocraftApp, parent: u64, effect: &str, field: &s
     let t = Target { parent, document: st.doc.id, layer, effect: effect.into(), field: field.into(), color: color.clone(), source };
     validate(app, &t)?;
     let rgb = color_picker_ui::parse_hex(&color).ok_or("invalid effect color")?;
-    let mut fields = color_picker_ui::fields_with_web(app, "dialog", "Color Picker (Layer Style Color)", rgb);
+    let mut fields = Fields::new();
     fields.insert(TARGET.into(), serde_json::to_value(t).map_err(|e| e.to_string())?);
-    Ok(app.ui.open_dialog(DialogKind::Command, fields))
+    Ok(color_picker_ui::open_with(app, "Color Picker (Layer Style Color)", rgb, fields))
 }
 
 pub(crate) fn take_request(app: &mut PhotocraftApp, parent: u64) -> Result<(), String> {
@@ -109,7 +111,7 @@ pub(crate) fn take_request(app: &mut PhotocraftApp, parent: u64) -> Result<(), S
 
 /// Overlay only for rendering. Cancel therefore needs no rollback of parent fields.
 pub(crate) fn preview_fields<'a>(app: &PhotocraftApp, parent: u64, fields: &'a Map<String, Value>) -> Cow<'a, Map<String, Value>> {
-    let Some(d) = app.ui.dialogs.last().filter(|d| child_of(&d.fields, parent)) else { return Cow::Borrowed(fields) };
+    let Some(d) = color_picker_ui::top_dialog(app).filter(|d| child_of(&d.fields, parent)) else { return Cow::Borrowed(fields) };
     let Ok(t) = target(&d.fields) else { return Cow::Borrowed(fields) };
     if validate(app, &t).is_err() {
         return Cow::Borrowed(fields);
@@ -137,10 +139,19 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> R
 }
 
 /// Handles document switches and direct automation edits without stale previews.
-pub(crate) fn prune(app: &mut PhotocraftApp) {
-    let invalid: Vec<_> =
-        app.ui.dialogs.iter().filter(|d| owns(&d.fields) && target(&d.fields).and_then(|t| validate(app, &t)).is_err()).map(|d| d.id).collect();
-    app.ui.dialogs.retain(|d| !invalid.contains(&d.id));
+pub(crate) fn prune(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let invalid: Vec<_> = app
+        .ui
+        .hosted
+        .iter()
+        .filter(|h| {
+            h.kind == crate::dialogs::hosted::HostedKind::ColorPicker && owns(&h.private) && target(&h.private).and_then(|t| validate(app, &t)).is_err()
+        })
+        .map(|h| h.id)
+        .collect();
+    for id in invalid {
+        color_picker_ui::close(app, ctx, id);
+    }
 }
 
 #[cfg(test)]

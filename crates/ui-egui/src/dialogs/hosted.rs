@@ -25,12 +25,19 @@ pub enum HostedKind {
     ImageSize,
     /// The library's Canvas Size (`sizing::open`).
     CanvasSize,
+    /// The library's Color Picker (`color_picker_ui::open`).
+    ColorPicker,
 }
 
 impl HostedKind {
     /// Image Size and Canvas Size: typed dialogs with no [`DialogFields`].
     pub fn is_sizing(self) -> bool {
         matches!(self, HostedKind::ImageSize | HostedKind::CanvasSize)
+    }
+
+    /// A typed dialog with no [`DialogFields`]: the sizing dialogs and the Color Picker.
+    pub fn is_typed(self) -> bool {
+        self.is_sizing() || self == HostedKind::ColorPicker
     }
 }
 
@@ -128,7 +135,7 @@ impl crate::state::UiState {
         match self.hosted(id)?.kind {
             HostedKind::Form => self.hosted_form(id).map(CommandForm::fields),
             HostedKind::Params => self.hosted_params(id).map(ParamDialog::fields),
-            HostedKind::ImageSize | HostedKind::CanvasSize => None,
+            HostedKind::ImageSize | HostedKind::CanvasSize | HostedKind::ColorPicker => None,
         }
     }
 
@@ -139,7 +146,7 @@ impl crate::state::UiState {
         match kind {
             HostedKind::Form => dialog.downcast_mut::<CommandForm>().map(CommandForm::fields_mut),
             HostedKind::Params => dialog.downcast_mut::<ParamDialog>().map(ParamDialog::fields_mut),
-            HostedKind::ImageSize | HostedKind::CanvasSize => None,
+            HostedKind::ImageSize | HostedKind::CanvasSize | HostedKind::ColorPicker => None,
         }
     }
 
@@ -149,6 +156,9 @@ impl crate::state::UiState {
             return Some(d.fields.clone());
         }
         let record = self.hosted(id)?;
+        if record.kind == HostedKind::ColorPicker {
+            return crate::color_picker_ui::fields_of(self, id);
+        }
         if record.kind.is_sizing() {
             let mut fields = crate::sizing::fields_of(self, record)?;
             fields.extend(record.private.clone());
@@ -240,6 +250,9 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
     }
     if record.kind.is_sizing() {
         return crate::sizing::set_field(app, id, field, &value);
+    }
+    if record.kind == HostedKind::ColorPicker {
+        return Err("the Color Picker's colour cannot be set from outside".into());
     }
     let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
     if kind == HostedKind::Params {
@@ -408,6 +421,9 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
 /// is disabled), then the same path a click takes.
 pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
+    if kind == HostedKind::ColorPicker {
+        return Err("the Color Picker has no programmatic OK".into());
+    }
     if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
@@ -418,6 +434,7 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),
         HostedKind::ImageSize => app.ui.host.confirm_by_id::<craft::ui::dialog::ImageSizeDialog>(ctx, did),
         HostedKind::CanvasSize => app.ui.host.confirm_by_id::<craft::ui::dialog::CanvasSizeDialog>(ctx, did),
+        HostedKind::ColorPicker => false,
     };
     crate::host_settings::sync(app, ctx);
     if !confirmed {
@@ -430,7 +447,8 @@ pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<
 pub fn collect(app: &mut PhotocraftApp, ctx: &egui::Context) {
     browse(app);
     crate::filter_dialog::requests(app);
-    let ids: Vec<u64> = app.ui.hosted.iter().map(|h| h.id).collect();
+    crate::color_picker_ui::collect(app, ctx);
+    let ids: Vec<u64> = app.ui.hosted.iter().filter(|h| h.kind != HostedKind::ColorPicker).map(|h| h.id).collect();
     for id in ids {
         if let Some(Err(error)) = settle(app, ctx, id) {
             app.ui.status = error;
@@ -443,6 +461,9 @@ pub fn collect(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn settle(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Option<Result<Value, String>> {
     let record = app.ui.hosted(id)?.clone();
     let (kind, did) = (record.kind, record.did);
+    if kind == HostedKind::ColorPicker {
+        return crate::color_picker_ui::settle(app, ctx, id);
+    }
     if kind.is_sizing() {
         return crate::sizing::settle(app, id);
     }
@@ -485,7 +506,7 @@ fn browse(app: &mut PhotocraftApp) {
             let dialog = app.ui.host.get_mut_by_id::<ParamDialog>(did)?;
             dialog.pick_path().map(|r| (r, dialog.fields().clone(), id))
         }
-        HostedKind::ImageSize | HostedKind::CanvasSize => None,
+        HostedKind::ImageSize | HostedKind::CanvasSize | HostedKind::ColorPicker => None,
     });
     let Some((PathRequest { key: field, kind }, fields, id)) = pressed else { return };
     let current = fields.text(&field).unwrap_or_default().to_owned();
@@ -545,6 +566,10 @@ pub fn cancelled(app: &mut PhotocraftApp, id: u64) -> Option<Hosted> {
 /// `ui.dialog.cancel` for a hosted dialog: closes the library dialog, then runs the cleanup.
 pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
+    if kind == HostedKind::ColorPicker {
+        crate::color_picker_ui::close(app, ctx, id);
+        return Ok(Value::Null);
+    }
     if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
@@ -559,6 +584,7 @@ pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<V
             app.ui.host.take_by_id::<ParamDialog>(did);
         }
         HostedKind::ImageSize | HostedKind::CanvasSize => crate::sizing::close(app, ctx, id),
+        HostedKind::ColorPicker => {}
     }
     cancelled(app, id);
     Ok(Value::Null)

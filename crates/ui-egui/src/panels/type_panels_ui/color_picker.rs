@@ -5,7 +5,7 @@ use photocraft_doc::{Color, DocId, Document};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{PhotocraftApp, color_picker_ui, state::DialogKind};
+use crate::{PhotocraftApp, color_picker_ui};
 
 const TARGET: &str = "__textStyleColor";
 
@@ -82,13 +82,13 @@ pub(crate) fn open(app: &mut PhotocraftApp, kind: Kind, id: u32) -> Result<u64, 
     }
     // Style colors use encoded RGB, just like the existing compact style picker.
     let t = Target { document: st.doc.id, revision: st.revision, kind, id, color: color_picker_ui::hex(rgb) };
-    let mut fields = color_picker_ui::fields_with_web(app, "dialog", "Color Picker (Text Color)", rgb);
+    let mut fields = Map::new();
     fields.insert(TARGET.into(), serde_json::to_value(t).map_err(|e| e.to_string())?);
     let panels = &mut app.ui.type_panels;
     panels.styles = true;
     panels.styles_tab = usize::from(kind.paragraph());
     panels.options = Some((kind.paragraph(), id));
-    Ok(app.ui.open_dialog(DialogKind::Command, fields))
+    Ok(color_picker_ui::open_with(app, "Color Picker (Text Color)", rgb, fields))
 }
 
 fn chosen(fields: &Map<String, Value>) -> Result<String, String> {
@@ -106,19 +106,23 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> R
     app.run(t.kind.command(), json!({"id": t.id, "attrs": {"color": color}}))
 }
 
-pub(crate) fn prune(app: &mut PhotocraftApp) {
-    let invalid: Vec<_> =
-        app.ui.dialogs.iter().filter(|d| owns(&d.fields) && target(&d.fields).and_then(|t| validate(app, &t)).is_err()).map(|d| d.id).collect();
-    app.ui.dialogs.retain(|d| !invalid.contains(&d.id));
-    if !app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
+pub(crate) fn prune(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let invalid: Vec<_> = color_picker_ui::pickers(app)
+        .into_iter()
+        .filter(|d| owns(&d.fields) && target(&d.fields).and_then(|t| validate(app, &t)).is_err())
+        .map(|d| d.id)
+        .collect();
+    for id in invalid {
+        color_picker_ui::close(app, ctx, id);
+    }
+    if !color_picker_ui::pickers(app).iter().any(|d| owns(&d.fields)) {
         app.text_style_preview = None;
     }
 }
 
 /// CPU and GPU canvases use the same isolated document; unchanged frames reuse its Arc.
 pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
-    prune(app);
-    let d = app.ui.dialogs.last().filter(|d| owns(&d.fields))?;
+    let d = color_picker_ui::top_dialog(app).filter(|d| owns(&d.fields))?;
     let t = target(&d.fields).ok()?;
     validate(app, &t).ok()?;
     let color = match chosen(&d.fields) {

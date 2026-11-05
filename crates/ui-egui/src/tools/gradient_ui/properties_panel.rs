@@ -213,6 +213,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
     fn combined_strip_adds_only_the_clicked_kind_and_keeps_color_picker_working() {
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app());
         PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);

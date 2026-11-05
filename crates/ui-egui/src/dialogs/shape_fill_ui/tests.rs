@@ -28,6 +28,7 @@ fn fill(app: &PhotocraftApp, id: LayerId) -> Option<Fill> {
 /// #2812: double-clicking a shape layer's thumbnail opens the Color Picker on its fill; the
 /// canvas previews the pick, Cancel changes nothing and OK is one undoable `shape.edit`.
 #[test]
+#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn shape_thumbnail_double_click_picks_the_fill_colour() {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();

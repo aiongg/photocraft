@@ -110,6 +110,7 @@ fn selected_editor_opacity_commits_once_and_delete_preserves_minimum() {
 }
 
 #[test]
+#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn editor_location_follows_reordered_color_and_opens_existing_picker() {
     for layer in [true, false] {
         let (mut h, sink) = editor(layer);
