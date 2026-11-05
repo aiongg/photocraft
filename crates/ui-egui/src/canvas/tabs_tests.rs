@@ -163,14 +163,17 @@ fn ctrl_tab_with_one_document_or_a_focused_field() {
     h.run_steps(2);
     assert_eq!(h.state().session.active_index(), Some(0));
     assert!(crate::shortcut_dispatch::take_log(&h.ctx).iter().all(|(_, o)| *o == crate::shortcut_dispatch::Outcome::Ran), "no disabled-shortcut report");
-    use crate::shortcut_dispatch::Focus;
+    use crate::shortcut_dispatch::{KeyOwner, allows};
     for (key, sc) in [("Ctrl+Tab", "window.nextDocument"), ("Ctrl+Shift+Tab", "window.previousDocument")] {
         let parsed = crate::shortcuts::parse(key).unwrap();
-        assert!(Focus::Widget.allows(&parsed) && Focus::Text.allows(&parsed), "{key} reaches {sc} from a focused field");
+        assert!(
+            allows(h.state(), &h.ctx, KeyOwner::Widget, sc, &parsed) && allows(h.state(), &h.ctx, KeyOwner::Text, sc, &parsed),
+            "{key} reaches {sc} from a focused field"
+        );
         let bound = crate::shortcut_dispatch::bindings(h.state()).into_iter().find(|(_, s)| *s == parsed).map(|(id, _)| id);
         assert_eq!(bound.as_deref(), Some(sc));
     }
-    assert!(!Focus::Widget.allows(&crate::shortcuts::parse("Tab").unwrap()), "a focused widget keeps plain Tab");
+    assert!(!allows(h.state(), &h.ctx, KeyOwner::Widget, "view.tab", &crate::shortcuts::parse("Tab").unwrap()), "a focused widget keeps plain Tab");
 }
 
 #[test]

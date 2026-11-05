@@ -1,5 +1,5 @@
-//! The status bar's zoom field and Fit button sit inside the bar with an even margin above and
-//! below, in every theme (#2823).
+//! The status bar's zoom field sits inside the bar with an even margin above and below, in every
+//! theme (#2823).
 
 use egui::{Rect, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
@@ -56,14 +56,7 @@ fn status_bar_controls_sit_inside_the_bar_with_even_margins() {
         let number = h.get_by_role(egui::accesskit::Role::SpinButton).rect();
         assert!(inner.contains_rect(number), "{kind:?}: bar {bar:?}, number {number:?}");
         assert!((number.center().y - bar.center().y).abs() < 0.51, "{kind:?}: bar {bar:?}, number {number:?}");
-        // Pro (Photoshop) has no Fit button in the status bar.
-        if t.pro {
-            assert!(h.query_by_label("Fit").is_none(), "{kind:?}");
-            continue;
-        }
-        let fit = h.get_by_label("Fit").rect();
-        assert!(inner.contains_rect(fit), "{kind:?}: bar {bar:?}, Fit {fit:?}");
-        assert!((fit.center().y - bar.center().y).abs() < 0.51, "{kind:?}: bar {bar:?}, Fit {fit:?}");
+        assert!(h.query_by_label("Fit").is_none(), "{kind:?}");
     }
 }
 

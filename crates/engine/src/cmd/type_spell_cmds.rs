@@ -72,7 +72,7 @@ fn text(doc: &Document, id: LayerId) -> Option<&str> {
 
 /// The user dictionary plus `ignore` words, lowercased.
 fn accepted(s: &Session, p: &Value) -> HashSet<String> {
-    let mut set: HashSet<String> = s.prefs().user_dictionary.iter().map(|w| w.to_lowercase()).collect();
+    let mut set: HashSet<String> = s.prefs().user_dictionary.iter().map(|w| stored_word(w).to_lowercase()).collect();
     if let Some(a) = p.get("ignore").and_then(Value::as_array) {
         set.extend(a.iter().filter_map(Value::as_str).map(str::to_lowercase));
     }
@@ -173,16 +173,20 @@ fn change_all(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({ "changed": count, "layers": plan.len() }))
 }
 
+/// A dictionary word as stored: trimmed, with typographic apostrophes straight, as the checker reads words.
+fn stored_word(w: &str) -> String {
+    w.replace(['\u{2019}', '\u{2018}', '\u{02BC}'], "'").trim().to_owned()
+}
+
 fn add_word(s: &mut Session, p: &Value) -> Result<Value> {
     let word = p
         .get("word")
         .and_then(Value::as_str)
-        .map(str::trim)
+        .map(stored_word)
         .filter(|w| !w.is_empty() && !w.contains(char::is_whitespace))
-        .ok_or_else(|| bad("edit.checkSpelling", "`add` needs a single `word`"))?
-        .to_string();
+        .ok_or_else(|| bad("edit.checkSpelling", "`add` needs a single `word`"))?;
     let added = s.edit_prefs(|pr| {
-        if pr.user_dictionary.iter().any(|w| w.eq_ignore_ascii_case(&word)) {
+        if pr.user_dictionary.iter().any(|w| stored_word(w).eq_ignore_ascii_case(&word)) {
             false
         } else {
             pr.user_dictionary.push(word.clone());
@@ -194,10 +198,10 @@ fn add_word(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn remove_word(s: &mut Session, p: &Value) -> Result<Value> {
-    let word = p.get("word").and_then(Value::as_str).unwrap_or("").to_string();
+    let word = stored_word(p.get("word").and_then(Value::as_str).unwrap_or(""));
     let removed = s.edit_prefs(|pr| {
         let n = pr.user_dictionary.len();
-        pr.user_dictionary.retain(|w| !w.eq_ignore_ascii_case(&word));
+        pr.user_dictionary.retain(|w| !stored_word(w).eq_ignore_ascii_case(&word));
         n != pr.user_dictionary.len()
     });
     Ok(json!({ "removed": removed, "userDictionary": s.prefs().user_dictionary }))
@@ -367,6 +371,17 @@ mod tests {
         assert!(s.execute("edit.checkSpelling", json!({"action": "bogus"})).is_err());
         let r = s.execute("edit.checkSpelling", json!({"action": "suggest", "word": "recieve"})).unwrap();
         assert_eq!(r["correct"], false);
+    }
+
+    #[test]
+    fn user_words_keep_straight_apostrophes() {
+        let (mut s, _) = session("Teh end.");
+        s.execute("edit.checkSpelling", json!({"action": "addToDictionary", "word": " Zorb\u{2019}s "})).unwrap();
+        assert_eq!(s.prefs().user_dictionary, vec!["Zorb's".to_string()]);
+        let r = s.execute("edit.checkSpelling", json!({"action": "addToDictionary", "word": "zorb\u{2019}S"})).unwrap();
+        assert_eq!(r["added"], false);
+        s.execute("edit.checkSpelling", json!({"action": "removeFromDictionary", "word": "Zorb\u{2019}s"})).unwrap();
+        assert!(s.prefs().user_dictionary.is_empty());
     }
 
     #[test]

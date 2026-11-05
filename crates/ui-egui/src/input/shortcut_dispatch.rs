@@ -69,104 +69,42 @@ pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
     all
 }
 
-/// Where keyboard focus is: nowhere (the canvas), on a widget (a slider, the Curves graph, a
-/// button reached with Tab), or in a text field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Focus {
-    None,
-    Widget,
-    /// A focused widget that edits with ⌫ / Delete itself (a point curve deletes its selected
-    /// point), see [`claim_delete_keys`].
-    DeletingWidget,
-    Text,
-}
+pub use craft::keymap::ui::KeyOwner;
+use craft::keymap::ui::{KeyGate, KeyRouter, NAVIGATION_COMMANDS};
 
-/// Where [`claim_delete_keys`] keeps the id of the widget that owns ⌫ / Delete while focused.
-fn delete_owner_id() -> egui::Id {
-    egui::Id::unique("shortcut_dispatch::delete_owner")
-}
-
-/// Called by a widget that has keyboard focus and uses ⌫ / Delete itself (the Curves graph):
-/// while it keeps focus those keys reach it instead of Edit › Clear or Delete Layer. Every other
-/// focused widget (a Layers row, a slider) leaves them to the shortcuts, as in Photoshop (#1534).
-pub fn claim_delete_keys(ctx: &egui::Context, id: egui::Id) {
-    ctx.data_mut(|d| d.insert_temp(delete_owner_id(), id));
-}
-
-impl Focus {
-    pub fn of(ctx: &egui::Context) -> Focus {
-        // A layer rename keeps its keys even in the frame egui drops its focus (Esc, Tab).
-        if ctx.text_edit_focused() || crate::layer_row_ui::rename_active(ctx) {
-            Focus::Text
-        } else if ctx.egui_wants_keyboard_input() {
-            let owner = ctx.data(|d| d.get_temp::<egui::Id>(delete_owner_id()));
-            if owner.is_some() && ctx.memory(|m| m.focused()) == owner { Focus::DeletingWidget } else { Focus::Widget }
-        } else {
-            Focus::None
-        }
-    }
-
-    /// May `sc` fire with this focus? A focused widget keeps its navigation keys (arrows, ↩,
-    /// Space, Esc…, plus ⌫ / Delete when it claimed them); a text field keeps everything but ⌘ shortcuts (minus its own editing
-    /// ones: select all, clipboard, undo) and the function keys. Ctrl+Tab and Ctrl+Shift+Tab switch
-    /// documents whatever has focus, as in Photoshop: no widget or text field edits with them (#2340).
-    pub fn allows(self, sc: &KeyboardShortcut) -> bool {
-        let k = sc.logical_key;
-        if k == Key::Tab && sc.modifiers.ctrl {
-            return true;
-        }
-        let function = matches!(
-            k,
-            Key::F1
-                | Key::F2
-                | Key::F3
-                | Key::F4
-                | Key::F5
-                | Key::F6
-                | Key::F7
-                | Key::F8
-                | Key::F9
-                | Key::F10
-                | Key::F11
-                | Key::F12
-                | Key::F13
-                | Key::F14
-                | Key::F15
-        );
-        let navigation = matches!(
-            k,
-            Key::ArrowLeft
-                | Key::ArrowRight
-                | Key::ArrowUp
-                | Key::ArrowDown
-                | Key::Enter
-                | Key::Space
-                | Key::Tab
-                | Key::Escape
-                | Key::Home
-                | Key::End
-                | Key::PageUp
-                | Key::PageDown
-        );
-        match self {
-            Focus::None => true,
-            Focus::Widget => sc.modifiers.command || !navigation,
-            Focus::DeletingWidget => sc.modifiers.command || !(navigation || matches!(k, Key::Backspace | Key::Delete)),
-            Focus::Text => {
-                let text_edit = !sc.modifiers.alt && matches!(k, Key::A | Key::C | Key::X | Key::V | Key::Z | Key::Y)
-                    || navigation
-                    || matches!(k, Key::Backspace | Key::Delete);
-                function || (sc.modifiers.command && !text_edit)
-            }
-        }
+/// What the app knows about its own modal state this frame: a foreground save or Camera Raw
+/// blocks the window, and an app dialog or the unsaved-changes prompt is open. Only the navigation commands run under a dialog.
+pub fn key_gate(app: &PhotocraftApp) -> KeyGate<'static> {
+    KeyGate {
+        blocked: app.camera_raw.is_some() || crate::jobs_ui::foreground_save(app).is_some(),
+        dialog: app.ui.any_dialog_open() || app.discard.is_some(),
+        recording: false,
+        in_dialogs: &NAVIGATION_COMMANDS,
     }
 }
 
-/// What decides which keys [`crate::shortcuts::handle`] gives the shortcuts: an open menu, a
-/// dialog, the unsaved-changes prompt, a warp or the Filter Gallery, inline type.
-fn key_owner(app: &PhotocraftApp, ctx: &egui::Context) -> (bool, usize, bool, bool, bool) {
-    let distort = app.distort.active() || app.distort.gallery.is_some();
-    (craft::ui::menu::any_open(ctx), app.ui.dialogs.len(), app.discard.is_some(), distort, app.ui.text_edit.is_some())
+/// Who has the keyboard now: [`KeyRouter::owner`] with the app's gate. A layer rename keeps its
+/// keys even in the frame egui drops its focus (Esc, Tab), so it counts as a text field.
+pub fn owner(app: &PhotocraftApp, ctx: &egui::Context) -> KeyOwner {
+    match KeyRouter::owner(ctx, &key_gate(app)) {
+        KeyOwner::App | KeyOwner::Widget | KeyOwner::Popover if crate::layer_row_ui::rename_active(ctx) => KeyOwner::Text,
+        owner => owner,
+    }
+}
+
+/// Whether ⌫ / Delete belong to the shortcuts: no text field has them and no focused control
+/// claimed them (the Curves graph deletes its selected point).
+pub fn delete_keys_free(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+    let claimed = |key| craft::ui::behavior::KeyClaim::claimed(ctx, &KeyboardShortcut::new(egui::Modifiers::NONE, key));
+    app.ui.text_edit.is_none() && owner(app, ctx) != KeyOwner::Text && !claimed(Key::Delete) && !claimed(Key::Backspace)
+}
+
+/// May `sc`, bound to command `id`, fire under `owner`: [`KeyRouter::allows`].
+pub(crate) fn allows(app: &PhotocraftApp, ctx: &egui::Context, owner: KeyOwner, id: &str, sc: &KeyboardShortcut) -> bool {
+    use craft::keymap::{Chord, CommandRef, egui::platform};
+    let Some(key) = craft::keymap::Key::from_egui(sc.logical_key) else { return false };
+    let mods = craft::keymap::Mods::from_egui(&sc.modifiers, platform(ctx));
+    KeyRouter::allows(ctx, owner, &key_gate(app), &Chord { mods, key }, &CommandRef::new(id))
 }
 
 /// Keys whose shortcuts follow the key's position, as in Photoshop: ⇧⌘. is ⇧⌘> on a US layout,
@@ -181,16 +119,15 @@ const POSITIONAL: [Key; 2] = [Key::Period, Key::Comma];
 /// someone else (opens a dialog, a prompt, a menu or inline type), leaving the later presses to
 /// it. While typing (inline type), clipboard and select-all shortcuts belong to the text.
 /// Returns true when a shortcut was dispatched.
-pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Focus, editing: bool) -> bool {
+pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, editing: bool) -> bool {
     // Building the table walks the registry: only do it when a key went down.
     if !ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. }))) {
         return false;
     }
     const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
-    let table: Vec<(String, KeyboardShortcut)> = bindings(app)
-        .into_iter()
-        .filter(|(id, sc)| focus.allows(sc) && !craft::ui::behavior::KeyClaim::claimed(ctx, sc) && !(editing && TEXT_OWNED.contains(&id.as_str())))
-        .collect();
+    let key_owner = owner(app, ctx);
+    let table: Vec<(String, KeyboardShortcut)> =
+        bindings(app).into_iter().filter(|(id, sc)| allows(app, ctx, key_owner, id, sc) && !(editing && TEXT_OWNED.contains(&id.as_str()))).collect();
     let command = |e: &egui::Event| match e {
         egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
             let by_position = physical_key
@@ -222,10 +159,10 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
             ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
         }
         let id = clip_key_command(app, delete_key_command(app, id));
-        let owner = key_owner(app, ctx);
+        let (gate, before) = (key_gate(app), owner(app, ctx));
         dispatch_as(app, ctx, &id, last);
         ran = true;
-        if key_owner(app, ctx) != owner {
+        if key_gate(app) != gate || owner(app, ctx) != before {
             break;
         }
     }

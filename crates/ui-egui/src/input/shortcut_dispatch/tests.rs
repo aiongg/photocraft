@@ -9,7 +9,7 @@ use egui_kittest::kittest::Queryable;
 use photocraft_doc::LayerContent;
 use serde_json::json;
 
-use super::{Focus, Outcome, bindings, set_dry_run, take_log};
+use super::{KeyOwner, Outcome, allows, bindings, owner, set_dry_run, take_log};
 use crate::PhotocraftApp;
 use crate::shortcuts::parse;
 use crate::state::Tool;
@@ -124,14 +124,14 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
                 .expect("Layers opacity field")
                 .center();
             click(h, at);
-            assert_eq!(Focus::of(&h.ctx), Focus::Text, "clicking a value field edits it");
+            assert_eq!(owner(h.state(), &h.ctx), KeyOwner::Text, "clicking a value field edits it");
         }
         Place::FocusedWidget => {
             h.get_by_role_and_label(Role::ComboBox, "Blend Mode").scroll_to_me();
             h.run_steps(4);
             h.get_by_role_and_label(Role::ComboBox, "Blend Mode").focus();
             h.run_steps(2);
-            assert_eq!(Focus::of(&h.ctx), Focus::Widget, "a widget is focused");
+            assert_eq!(owner(h.state(), &h.ctx), KeyOwner::Widget, "a widget is focused");
         }
     }
     take_log(&h.ctx);
@@ -196,7 +196,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
         let mut h = harness();
         set_dry_run(&h.ctx, true);
         put_focus(&mut h, place);
-        let focus = Focus::of(&h.ctx);
+        let focus = owner(h.state(), &h.ctx);
         let items = crate::menus::menu_items(h.state());
         for (id, sc, live) in displayed(h.state()) {
             if !live {
@@ -205,7 +205,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
             let parsed = parse(&sc).unwrap();
             press(&mut h, &sc);
             let log = take_log(&h.ctx);
-            if !focus.allows(&parsed) {
+            if !allows(h.state(), &h.ctx, focus, &id, &parsed) {
                 // A focused text field keeps typing / editing keys: nothing may fire.
                 if !log.is_empty() {
                     failures.push(format!("{place:?}: {sc} ({id}) fired {log:?} into a focused field"));
@@ -220,7 +220,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
             }
         }
         // Tool letters from the tools panel tooltips ("Brush Tool  (B)").
-        if !matches!(focus, Focus::Text) {
+        if focus != KeyOwner::Text {
             // A tool's options bar draws slowly the first time (its icons are rasterized); a tap
             // that outlasts the spring-load hold time would switch back, so draw each once first.
             for t in Tool::ALL {
