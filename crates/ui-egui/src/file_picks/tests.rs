@@ -140,6 +140,7 @@ fn transparent_png_keeps_its_format_until_its_lone_layer_becomes_smart() {
     assert!(matches!(app.session.active().unwrap().doc.layers[0].content, photocraft_doc::LayerContent::Smart(_)));
     menus::invoke(&mut app, &ctx, "file.saveAs", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
+    assert_eq!(open.open(), 1);
     assert!(matches!(saves(&open).as_slice(), [.., suggested] if suggested == "/pics/transparent.psd"));
     assert!(written.borrow().is_empty());
     answer(&open, None);
@@ -226,11 +227,10 @@ fn plain_save_of_a_flat_jpeg_records_and_replays_a_changed_quality() {
     let index = app.session.add_document(photocraft_io::import("other.jpg", &bytes).unwrap().document, Some("/pics/other.jpg".into()));
     app.session.set_active(index);
     written.borrow_mut().clear();
-    let asked = open.requests().len();
     let played = app.run("actions.play", json!({"action": 0})).unwrap();
     assert!(played.get("failed").is_none(), "{played}");
     assert!(app.jpeg_options.is_none(), "playback does not ask");
-    assert_eq!(open.requests().len(), asked, "no Save dialog");
+    assert_eq!(open.open(), 0, "no Save dialog");
     assert_eq!(*written.borrow(), ["/pics/other.jpg"]);
     assert_eq!(qualities.borrow().last().copied().flatten(), Some(photocraft_engine::file_cmds::jpeg_quality(3.0)));
 }
@@ -471,7 +471,7 @@ fn the_app_keeps_running_while_a_dialog_is_open() {
     app.run("layer.new.layer", json!({})).unwrap();
     assert_eq!(menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap_err(), "a file dialog is already open");
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(open.requests().len(), 1);
+    assert_eq!(open.open(), 1);
     // The save goes on from where it asked.
     answer(&open, Some(scripted::save_to("/pics/a.psd")));
     app.poll_file_dialog(&ctx, None);
@@ -499,6 +499,7 @@ fn save_suggestions_preserve_explicit_directories_and_untitled_names() {
         app.session.active_mut().unwrap().path = document_path.map(str::to_string);
         app.pick_save(suggested, |_, _| Ok(Value::Null)).unwrap();
         app.poll_file_dialog(&ctx, None);
+        assert_eq!(open.open(), 1);
         assert_eq!(saves(&open).last().map(String::as_str), Some(suggested));
         answer(&open, None);
         app.poll_file_dialog(&ctx, None);
@@ -805,7 +806,7 @@ fn quick_export_selected_layers_writes_separate_pngs_with_one_prompt() {
     assert!(!crate::layer_menu_ui::single_layer_only("layer.quickExportAsPng"));
     menus::invoke(&mut app, &ctx, "layer.quickExportAsPng", Value::Null).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(open.requests().len(), 1, "one destination for the entire selection");
+    assert_eq!(open.open(), 1, "one destination for the entire selection");
     // Selection changes while choosing a destination must not change the captured sources.
     app.run("layer.select", json!({"layer": selected[0].0})).unwrap();
     answer(&open, Some(scripted::save_to("selected.png")));
@@ -834,7 +835,7 @@ fn same_folder_quick_export_asks_before_replacing_the_documents_own_file() {
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "file.export.quickExportAsPng", Value::Null).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(open.requests().len(), 1, "the save dialog asks");
+    assert_eq!(open.open(), 1, "the save dialog asks");
     assert_eq!(std::fs::read(&own).unwrap(), b"original", "nothing written before the answer");
     answer(&open, Some(scripted::save_to(own.clone())));
     app.poll_file_dialog(&ctx, None);
@@ -843,10 +844,9 @@ fn same_folder_quick_export_asks_before_replacing_the_documents_own_file() {
     // Beside a PSD, Same Folder still writes without a prompt.
     app.session.active_mut().unwrap().path = Some(dir.join("photo.psd").to_string_lossy().into_owned());
     std::fs::write(&own, b"earlier export").unwrap();
-    let asked = open.requests().len();
     menus::invoke(&mut app, &ctx, "file.export.quickExportAsPng", Value::Null).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(open.requests().len(), asked, "no dialog");
+    assert_eq!(open.open(), 0, "no dialog");
     assert!(std::fs::read(&own).unwrap().starts_with(b"\x89PNG\r\n\x1a\n"));
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -955,7 +955,7 @@ fn export_as_with_several_artboards_selected_writes_one_file_each() {
     fields.insert("scale".into(), json!(50));
     crate::export_dialog::confirm(&mut app, &fields).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(open.requests().len(), 1, "one destination for every board");
+    assert_eq!(open.open(), 1, "one destination for every board");
     answer(&open, Some(scripted::save_to("/out/boards.jpg")));
     app.poll_file_dialog(&ctx, None);
     assert!(!app.ui.status_error, "{}", app.ui.status);
@@ -1233,6 +1233,7 @@ fn save_dialogs_are_asked_per_document_and_start_beside_it() {
     let ask = |app: &mut PhotocraftApp, name: &str| {
         app.pick_save(name, |_, _| Ok(Value::Null)).unwrap();
         app.poll_file_dialog(&ctx, None);
+        assert_eq!(open.open(), 1);
         let request = open.requests().last().cloned().unwrap();
         answer(&open, None);
         app.poll_file_dialog(&ctx, None);
@@ -1279,9 +1280,9 @@ fn closing_the_dialog_that_asked_forgets_its_pick() {
 /// offers an extension All Formats doesn't.
 #[test]
 fn every_open_format_has_its_own_filter() {
-    use super::filters::{OPEN_EXTS, OPEN_FILTERS, open_filters};
+    use super::filters::{OPEN_EXTS, OPEN_FILTERS, open_filters, opens};
     let filters = open_filters();
-    assert_eq!(filters[0], ("All Formats", OPEN_EXTS.iter().map(|e| e.to_string()).collect::<Vec<_>>()), "All Formats comes first");
+    assert_eq!(filters[0], ("All Formats", OPEN_EXTS.iter().filter(|e| opens(e)).map(|e| e.to_string()).collect::<Vec<_>>()), "All Formats comes first");
     let mut named: Vec<&str> = OPEN_FILTERS.iter().flat_map(|(_, exts)| exts.iter().copied()).collect();
     let total = named.len();
     named.sort_unstable();
@@ -1291,9 +1292,16 @@ fn every_open_format_has_its_own_filter() {
     all.sort_unstable();
     assert_eq!(named, all, "the named filters cover All Formats exactly");
     let names: Vec<&str> = filters.iter().map(|(name, _)| *name).collect();
-    for name in ["Photoshop", "Affinity", "HEIF", "PNG", "JPEG", "TIFF", "Portable Bitmap", "OpenEXR", "Radiance HDR", "Paint.NET"] {
+    for name in ["Photoshop", "Affinity", "PNG", "JPEG", "TIFF", "Portable Bitmap", "OpenEXR", "Radiance HDR", "Paint.NET"] {
         assert!(names.contains(&name), "{name}");
     }
+}
+
+/// The web build lists only what it opens: HEIF is offered exactly when its decoder is compiled in.
+#[test]
+fn heif_is_listed_only_with_its_decoder() {
+    let listed = super::filters::open_filters().iter().any(|(name, exts)| *name == "HEIF" || exts.iter().any(|e| e == "heic"));
+    assert_eq!(listed, photocraft_codecs::caps(photocraft_codecs::Format::Heif).read);
 }
 
 /// #6601: a chosen path whose name isn't valid Unicode is reported, never handed on lossily

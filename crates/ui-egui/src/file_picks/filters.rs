@@ -54,10 +54,19 @@ pub const OPEN_FILTERS: &[(&str, &[&str])] = &[
     ("Keyboard Shortcuts", &["kys"]),
 ];
 
-/// File › Open's types: All Formats first, then one per format.
+/// Whether this build decodes files with extension `ext`: the format's decoder is compiled in
+/// (HEIF only with the `heif` feature). Extensions of documents, presets and raws have decoders
+/// in every build.
+pub fn opens(ext: &str) -> bool {
+    photocraft_codecs::from_extension(ext).is_none_or(|f| photocraft_codecs::caps(f).read)
+}
+
+/// File › Open's types: All Formats first, then one per format. Only formats this build opens
+/// are listed, so the web build (and a desktop build without HEIF) doesn't offer files it can't read.
 pub fn open_filters() -> Vec<(&'static str, Vec<String>)> {
-    std::iter::once(("All Formats", OPEN_EXTS.iter().map(|e| (*e).to_string()).collect()))
-        .chain(OPEN_FILTERS.iter().map(|(name, exts)| (*name, exts.iter().map(|e| (*e).to_string()).collect())))
+    let kept = |exts: &[&str]| exts.iter().filter(|e| opens(e)).map(|e| (*e).to_string()).collect::<Vec<_>>();
+    std::iter::once(("All Formats", kept(OPEN_EXTS)))
+        .chain(OPEN_FILTERS.iter().map(|(name, exts)| (*name, kept(exts))).filter(|(_, exts)| !exts.is_empty()))
         .collect()
 }
 
