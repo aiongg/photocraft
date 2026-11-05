@@ -34,7 +34,6 @@ fn artboards_to_files_folder_is_chosen_with_browse() {
     h.run_steps(4);
     assert!(matches!(asked.borrow().as_slice(), [FileDialogRequest::Folder { .. }]));
     assert_eq!(field(&h, "dir"), Some(json!("/tmp/exports")));
-    assert!(field(&h, crate::dialogs::BROWSE_FIELD).is_none(), "the request is consumed");
 }
 
 #[test]

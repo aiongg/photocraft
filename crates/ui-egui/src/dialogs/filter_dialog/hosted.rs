@@ -313,7 +313,6 @@ pub(crate) fn result_picked(app: &mut PhotocraftApp, id: u64, to: [f32; 3]) {
 /// Replace Color's Result swatch (#6278): the sampled colour after the Hue, Saturation and
 /// Lightness shift. Pressing it asks for the Color Picker (`requests`).
 fn replace_color_result(ui: &mut Ui, fields: &mut DialogFields, cx: &craft::ui::dialog::CustomContext) -> Response {
-    use photocraft_algo::tone;
     let t = craft::ui::theme::current(ui.ctx());
     use craft::ui::theme::ToEgui as _;
     let rgb = shown_result(fields);
@@ -354,9 +353,6 @@ pub(crate) fn open_forced(app: &mut PhotocraftApp, command: &str) -> Option<u64>
 /// [`open`] for a filter whose parameters follow `spec` (a plug-in's) instead of the command's own;
 /// `fixed` params (the plug-in id) ride along to the command.
 pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, fixed: Map<String, Value>) -> u64 {
-    if !hosts(command, spec) {
-        return super::open_with_spec_legacy(app, command, label, spec, fixed);
-    }
     let map = super::spec_fields(command, label, spec, fixed);
     host(app, command, label, spec, map)
 }
@@ -480,7 +476,7 @@ pub(crate) fn requests(app: &mut PhotocraftApp) {
 fn requests_of(app: &mut PhotocraftApp, id: u64) {
     let Some((did, key)) = app.ui.hosted(id).map(|h| (h.did, h.key.clone())) else { return };
     let Some(dialog) = app.ui.host.get_mut_by_id::<ParamDialog>(did) else { return };
-    let (pick, eyedropper, fields) = (dialog.pick_color(), dialog.pick_eyedropper(), dialog.fields().clone());
+    let (pick, eyedropper) = (dialog.pick_color(), dialog.pick_eyedropper());
     if let Some(request) = pick {
         let name = request.title.clone().unwrap_or_default();
         crate::color_picker_ui::open_for_field(app, &crate::color_picker_ui::title_for(&name), request.color.to_rgb_array(), id, &request.key);
