@@ -188,31 +188,9 @@ fn apply_zoom(ctx: &egui::Context, view: &mut crate::state::View, event: &craft:
     }
 }
 
-/// The zoom field of the status bar: a [`NumberField`] that scrubs past the screen edge in full
-/// screen, in the field cell of the bar.
-pub fn zoom_field(app: &mut PhotocraftApp, ui: &mut egui::Ui, i: usize) {
-    use craft::ui::controls::{ControlSize, NumberField};
-    use craft::ui::localized::{LocaleNumbers, Unit};
-    let numbers = LocaleNumbers::of(ui);
-    let range = crate::zoom_levels::percent_range(&app.ui.views[i]);
-    let pct = f64::from(app.ui.views[i].zoom * 100.0);
-    craft::ui::patterns::StatusBar::field(ui, |ui| {
-        let edit = NumberField::new("status-zoom", tl!("Zoom"), pct, &numbers)
-            .range(f64::from(*range.start())..=f64::from(*range.end()))
-            .decimals(0..=1)
-            .unit(Unit::new("{n}%"))
-            .scrub_wrap(true)
-            .size(ControlSize::Sm)
-            .show(ui);
-        if let Some(event) = &edit.event {
-            apply_zoom(ui.ctx(), &mut app.ui.views[i], event);
-        }
-    });
-}
-
-/// Status bar leading group (Pro): the [`StatusReadout`] (zoom %, the chosen info item and its ▸
+/// Status bar leading group: the [`StatusReadout`] (zoom %, the chosen info item and its ▸
 /// menu), then status messages.
-pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn status_leading(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) else {
         craft::ui::patterns::StatusBar::info(ui, tl!("No document"));
         // A command run with no document open still reports here (#1567: File › Automate › Batch).
@@ -615,9 +593,25 @@ mod tests {
         let e = crate::menus::invoke(&mut app, &egui::Context::default(), "file.automate.batch", json!({})).unwrap_err();
         app.ui.status = e.clone();
         app.ui.status_error = true;
-        let mut h = Harness::builder().with_size(vec2(900.0, 40.0)).build_ui_state(|ui, app| status_bar_pro(app, ui), app);
+        let mut h = Harness::builder().with_size(vec2(900.0, 40.0)).build_ui_state(|ui, app| status_leading(app, ui), app);
         h.run_steps(2);
         assert!(h.query_by_label("No document").is_some());
         assert!(h.query_all_by_label(&e).count() > 0, "status bar shows {e:?}");
+    }
+
+    #[test]
+    fn every_status_key_has_text() {
+        use craft::ui::localized::LocaleNumbers;
+        use craft::ui::patterns::StatusReadoutLabels;
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 2400, "height": 1500, "resolution": 72, "background": "white"})).unwrap();
+        let ctx = egui::Context::default();
+        let values = status_values(&app, &ctx, &app.session.active().unwrap().doc);
+        let (labels, numbers) = (StatusReadoutLabels::default(), LocaleNumbers::of_ctx(&ctx));
+        for key in ["sizes", "profile", "dimensions", "measurementScale", "scratch", "efficiency", "timing", "tool", "layers"] {
+            let item = status_item(key);
+            assert_eq!(status_key(item), key);
+            assert!(!item.text(&values, &labels, &numbers, &ctx).is_empty(), "{key}");
+        }
     }
 }
