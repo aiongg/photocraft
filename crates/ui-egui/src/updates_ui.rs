@@ -360,8 +360,6 @@ mod tests {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
         at(&mut app, &ctx, 0.0);
-        app.ui.updates_open = true;
-        app.ui.host.open(UpdateCheckDialog::new(photocraft_engine::build_info::VERSION).with_self_updating(true));
         sender
             .lock()
             .unwrap()
@@ -393,6 +391,8 @@ mod tests {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
         at(&mut app, &ctx, 0.0);
+        app.ui.updates_open = true;
+        app.ui.host.open(UpdateCheckDialog::new(photocraft_engine::build_info::VERSION).with_self_updating(true));
         sender
             .lock()
             .unwrap()
@@ -406,10 +406,7 @@ mod tests {
             output.textures_delta.clear();
         };
         frame(&mut app);
-        let id = app.ui.host.top_id().expect("the check dialog is open");
-        app.ui.host.get_mut::<UpdateCheckDialog>().unwrap().set_choice(CheckChoice::Update);
-        assert!(app.ui.host.confirm_by_id::<UpdateCheckDialog>(&ctx, id));
-        frame(&mut app);
+        answer_control(&mut app, &ctx, "update").unwrap();
         frame(&mut app);
         assert!(app.ui.updates_open, "the dialog stays for the install's status");
         assert!(app.updates_rt.updater.status_message().is_some());
@@ -457,6 +454,29 @@ mod tests {
         assert_eq!(call(&mut app, "ui.set", serde_json::json!({"updatesOpen": false, "maskTarget": "bad"}))["ok"], false);
         assert!(app.ui.updates_open);
         assert_eq!(call(&mut app, "ui.set", serde_json::json!({"updatesOpen": false}))["ok"], true);
+        assert!(!app.ui.updates_open);
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn the_check_dialog_is_listed_and_answered_through_the_control_routes() {
+        let (mut app, _, _) = app();
+        let ctx = egui::Context::default();
+        let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
+            let (req, _) = crate::control::ControlRequest::new(method, params);
+            match crate::control::handle(app, &ctx, &req) {
+                crate::control::Outcome::Done(value) => value,
+                _ => panic!("expected an immediate reply"),
+            }
+        };
+        call(&mut app, "ui.set", serde_json::json!({"updatesOpen": true}));
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| at_ctx(&mut app, ui.ctx()));
+        output.textures_delta.clear();
+        let inspected = call(&mut app, "ui.inspect", serde_json::json!({}));
+        let listed = inspected["result"]["dialogs"].as_array().unwrap().iter().find(|d| d["id"] == CONTROL_ID).cloned().expect("the update dialog is listed");
+        assert_eq!(listed["fields"]["choices"], serde_json::json!(["close"]));
+        assert_eq!(call(&mut app, "ui.dialog.confirm", serde_json::json!({"dialog": CONTROL_ID, "choice": "update"}))["ok"], false);
+        assert_eq!(call(&mut app, "ui.dialog.confirm", serde_json::json!({"dialog": CONTROL_ID, "choice": "close"}))["ok"], true);
         assert!(!app.ui.updates_open);
     }
 }
