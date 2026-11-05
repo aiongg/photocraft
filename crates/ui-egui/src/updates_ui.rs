@@ -115,6 +115,81 @@ fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
+/// The id `ui.inspect` lists the check dialog under, and `ui.dialog.confirm` and `ui.dialog.cancel`
+/// take.
+pub const CONTROL_ID: &str = "updates";
+
+/// The check dialog as `ui.inspect` lists it: the engine's status, the release on offer, the
+/// install's progress and the choices `ui.dialog.confirm` takes in this state.
+pub fn inspect(app: &PhotocraftApp) -> Option<Value> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if !app.ui.host.is_open::<craft::update::stack_dialogs::UpdateCheckDialog>() {
+            return None;
+        }
+        let (state, version, choices): (&str, Option<&str>, &[&str]) = match &app.session.updates.status {
+            Status::Idle => ("idle", None, &["checkNow", "close"]),
+            Status::Checking => ("checking", None, &["close"]),
+            Status::UpToDate => ("upToDate", None, &["checkAgain", "close"]),
+            Status::Failed { .. } => ("failed", None, &["checkAgain", "close"]),
+            Status::Available { release } => ("available", Some(release.version.as_str()), &["update", "download", "checkAgain", "close"]),
+        };
+        let message = match &app.session.updates.status {
+            Status::Failed { message } => Some(message.clone()),
+            _ => app.updates_rt.updater.status_message(),
+        };
+        Some(serde_json::json!({
+            "id": CONTROL_ID,
+            "kind": "updates",
+            "title": "Check for Updates",
+            "fields": {"state": state, "version": version, "installing": app.updates_rt.updater.is_installing(), "message": message, "choices": choices},
+        }))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = app;
+        None
+    }
+}
+
+/// Answers the check dialog for a control client with one of the choices [`inspect`] lists, as
+/// pressing that button would. A choice the dialog's state doesn't offer is refused.
+pub fn answer_control(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Result<Value, String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use craft::update::stack_dialogs::{CheckChoice, UpdateCheckDialog};
+        let answer = match choice {
+            "close" => CheckChoice::Close,
+            "checkNow" => CheckChoice::CheckNow,
+            "checkAgain" => CheckChoice::CheckAgain,
+            "update" => CheckChoice::Update,
+            "download" => CheckChoice::Download,
+            other => return Err(format!("unknown choice `{other}`: close, checkNow, checkAgain, update or download")),
+        };
+        let id = app.ui.host.top_id().filter(|_| app.ui.host.is_open::<UpdateCheckDialog>()).ok_or("the update dialog is not open")?;
+        app.ui.host.get_mut::<UpdateCheckDialog>().ok_or("the update dialog is not open")?.set_choice(answer);
+        if !app.ui.host.confirm_by_id::<UpdateCheckDialog>(ctx, id) {
+            return Err(format!("the update dialog does not offer `{choice}` now"));
+        }
+        show(app, ctx);
+        Ok(serde_json::json!({"choice": choice}))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (app, ctx, choice);
+        Err("the update dialog is not open".into())
+    }
+}
+
+/// Closes the check dialog for `ui.dialog.cancel`.
+pub fn cancel_control(app: &mut PhotocraftApp) -> Result<Value, String> {
+    if !app.ui.updates_open {
+        return Err("the update dialog is not open".into());
+    }
+    app.ui.updates_open = false;
+    Ok(Value::Null)
+}
+
 /// The dialog's answer, after the dialog host drew.
 pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     #[cfg(not(target_arch = "wasm32"))]
@@ -285,6 +360,8 @@ mod tests {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
         at(&mut app, &ctx, 0.0);
+        app.ui.updates_open = true;
+        app.ui.host.open(UpdateCheckDialog::new(photocraft_engine::build_info::VERSION).with_self_updating(true));
         sender
             .lock()
             .unwrap()
@@ -312,7 +389,6 @@ mod tests {
 
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
-    #[ignore = "gap CX: on an install that cannot update itself the dialog offers Download only, so Update and Restart cannot be answered and the updater's refusal status is unreachable"]
     fn update_and_restart_on_an_unsupported_install_shows_the_updaters_status() {
         let (mut app, _, sender) = app();
         let ctx = egui::Context::default();
