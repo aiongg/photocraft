@@ -110,7 +110,6 @@ fn selected_editor_opacity_commits_once_and_delete_preserves_minimum() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn editor_location_follows_reordered_color_and_opens_existing_picker() {
     for layer in [true, false] {
         let (mut h, sink) = editor(layer);
@@ -120,7 +119,7 @@ fn editor_location_follows_reordered_color_and_opens_existing_picker() {
         assert!(matches!(sink_fill(sink, h.state()).unwrap(), Fill::Gradient { stops, .. } if (stops[1].0 - 0.7).abs() < 1e-5));
         h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell).unwrap().click();
         h.run_steps(3);
-        assert!(!h.state().ui.dialogs.is_empty());
+        assert!(crate::color_picker_ui::top(h.state()).is_some());
     }
 }
 

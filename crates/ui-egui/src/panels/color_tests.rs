@@ -387,21 +387,21 @@ fn background_chip_retargets_the_color_field() {
 }
 
 #[test]
-#[ignore = "port pending: the test reads the picker through ui.dialogs, which no longer holds it (color_picker_ui::top_dialog and fields_of do)"]
 fn double_clicking_a_chip_opens_its_color_picker() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = field_harness(app);
     let min = h.ctx.input(|i| i.viewport_rect()).min;
     // Each point is on one chip only (the chips overlap, the active one in front).
     for (p, target) in [(vec2(40.0, 40.0), "background"), (vec2(12.0, 12.0), "foreground")] {
-        h.state_mut().ui.dialogs.clear();
         // Past the last double-click, so this one isn't counted as a triple-click.
         h.run_steps(40);
         click(&mut h, min + p);
-        assert!(h.state().ui.dialogs.is_empty(), "a single click only picks the chip");
+        assert!(crate::color_picker_ui::top_dialog(h.state()).is_none(), "a single click only picks the chip");
         click(&mut h, min + p);
-        let [d] = h.state().ui.dialogs.as_slice() else { panic!("one Color Picker") };
+        let d = crate::color_picker_ui::top_dialog(h.state()).expect("one Color Picker");
         assert_eq!(d.fields.get("__colorPicker").and_then(Value::as_str), Some(target));
+        let id = d.id;
+        crate::dialogs::cancel(h.state_mut(), id).unwrap();
     }
 }
 

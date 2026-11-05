@@ -223,14 +223,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
     fn the_color_picker_sets_the_custom_colour() {
         let mut app = crop_app();
         let id = pick_custom_color(&mut app);
-        let f = app.ui.dialog_mut(id).map(|d| d.fields.clone()).unwrap();
-        let mut f = f;
-        f.insert("color".into(), serde_json::json!("#ff8000"));
-        crate::color_picker_ui::confirm(&mut app, &f).unwrap();
+        crate::dialogs::hosted::set_field(&mut app, id, "color", serde_json::json!("#ff8000")).unwrap();
+        crate::dialogs::confirm(&mut app, id).unwrap();
         let s = &app.ui.tool_options.crop_shield;
         assert_eq!((s.color, s.custom_color), (ShieldColor::Custom, [255, 128, 0]));
         assert!(set_custom_color(&mut app, "nope").is_err());

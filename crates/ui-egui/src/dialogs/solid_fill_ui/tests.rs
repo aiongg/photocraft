@@ -42,7 +42,6 @@ fn row(h: &Harness<'_, PhotocraftApp>, id: LayerId) -> crate::layer_row_ui::RowR
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn new_solid_color_from_menu_cancel_keeps_document_and_history_unchanged() {
     let (mut h, _) = harness(1.0);
     let ctx = h.ctx.clone();
@@ -54,23 +53,22 @@ fn new_solid_color_from_menu_cancel_keeps_document_and_history_unchanged() {
     let opened = crate::menus::invoke(app, &ctx, "layer.newFillLayer.solidColor", json!({})).unwrap();
     assert!(opened.get("layer").is_none(), "no layer exists until OK");
     let dialog = opened["dialog"].as_u64().unwrap();
-    let picker = app.ui.dialogs.last().unwrap();
+    let picker = crate::color_picker_ui::top_dialog(app).expect("the picker is open");
     assert_eq!(picker.id, dialog);
     assert!(owns_new(&picker.fields), "new Solid Color fill opens the shared Color Picker");
     assert_eq!(picker.fields["__params"]["document"], before.id.0);
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
     assert_eq!(app.session.active().unwrap().history.entries().len(), steps);
 
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     crate::dialogs::cancel(app, dialog).unwrap();
-    assert!(app.ui.dialogs.iter().all(|d| d.id != dialog));
+    assert!(app.ui.hosted(dialog).is_none());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "Cancel must not create or delete a layer");
     assert_eq!(app.session.active().unwrap().active_layer, active);
     assert_eq!(app.session.active().unwrap().history.entries().len(), steps, "Cancel must not record a history entry");
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn new_solid_color_from_menu_ok_creates_one_layer_with_chosen_or_default_color() {
     let (mut h, _) = harness(1.0);
     let ctx = h.ctx.clone();
@@ -86,7 +84,7 @@ fn new_solid_color_from_menu_ok_creates_one_layer_with_chosen_or_default_color()
 
     let second = crate::menus::invoke(app, &ctx, "layer.newFillLayer.solidColor", json!({})).unwrap();
     let dialog = second["dialog"].as_u64().unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     let created = crate::dialogs::confirm(app, dialog).unwrap();
     let id = LayerId(created["layer"].as_u64().unwrap());
     let LayerContent::Fill(Fill::Solid(color)) = app.session.active().unwrap().doc.layer(id).unwrap().content else {
@@ -105,13 +103,12 @@ fn new_solid_color_from_menu_ok_creates_one_layer_with_chosen_or_default_color()
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn new_solid_color_picker_rejects_a_different_active_document() {
     let (mut h, _) = harness(1.0);
     let ctx = h.ctx.clone();
     let app = h.state_mut();
     let dialog = crate::menus::invoke(app, &ctx, "layer.newFillLayer.solidColor", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     app.run("file.new", json!({"width": 4, "height": 4})).unwrap();
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.entries().len();
@@ -121,7 +118,6 @@ fn new_solid_color_picker_rejects_a_different_active_document() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn only_the_colour_thumbnail_opens_the_solid_fill_picker() {
     for ppp in [1.0, 2.0] {
         let (mut h, id) = harness(ppp);
@@ -130,7 +126,7 @@ fn only_the_colour_thumbnail_opens_the_solid_fill_picker() {
         double_click(&mut h, pos2(r.left() + 46.0, r.center().y));
         assert_eq!(h.state().session.active().unwrap().active_layer, Some(id));
         assert!(!h.state().ui.mask_target && !h.state().ui.vector_mask_target, "the colour thumbnail targets the fill, not its mask");
-        let d = h.state().ui.dialogs.last().expect("Color Picker opened");
+        let d = crate::color_picker_ui::top_dialog(h.state()).expect("Color Picker opened");
         assert!(owns(&d.fields));
         assert_eq!(d.fields["__label"], "Color Picker (Solid Color)");
         assert_eq!(d.fields["color"], "#336699");
@@ -145,7 +141,7 @@ fn only_the_colour_thumbnail_opens_the_solid_fill_picker() {
         let (mut h, id) = harness(ppp);
         let r = crate::mask_thumbs_ui::recorded(&h.ctx, id.0).unwrap().0[0].1;
         double_click(&mut h, r.center());
-        assert!(!h.state().ui.dialogs.iter().any(|d| owns(&d.fields)), "mask thumbnail is not the colour thumbnail");
+        assert!(!crate::color_picker_ui::pickers(h.state()).iter().any(|d| owns(&d.fields)), "mask thumbnail is not the colour thumbnail");
     }
 }
 
@@ -158,12 +154,11 @@ fn gradient_and_adjustment_thumbnails_keep_their_properties_controls() {
         let r = row(&h, id).row;
         double_click(&mut h, pos2(r.left() + 46.0, r.center().y));
         assert!(h.state().ui.panels.properties);
-        assert!(!h.state().ui.dialogs.iter().any(|d| owns(&d.fields)));
+        assert!(!crate::color_picker_ui::pickers(h.state()).iter().any(|d| owns(&d.fields)));
     }
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
     let (mut h, id) = harness(1.0);
     let app = h.state_mut();
@@ -173,7 +168,7 @@ fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
     let steps = app.session.active().unwrap().history.entries().len();
     let tools = app.session.tools.foreground;
     let dialog = open(app).unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     let (preview, key) = display_doc(app, 0).unwrap();
     let (again, again_key) = display_doc(app, 0).unwrap();
     assert_eq!(key, again_key);
@@ -183,12 +178,12 @@ fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
     let LayerContent::Fill(Fill::Solid(color)) = preview.layer(id).unwrap().content else { panic!() };
     assert_eq!(color.to_rgba8(), [255, 136, 0, 128]);
     assert_eq!(thumbnail_color(app, before.id, id, original), color);
-    app.ui.close_dialog(dialog);
+    crate::dialogs::cancel(app, dialog).unwrap();
     assert!(display_doc(app, 0).is_none());
     assert!(app.solid_fill_preview.is_none());
     assert_eq!(thumbnail_color(app, before.id, id, original), original);
     let dialog = open(app).unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     let (_, reopened_key) = display_doc(app, 0).unwrap();
     assert_ne!(key, reopened_key, "reopening a picker never reuses a cancelled preview key");
     crate::dialogs::confirm(app, dialog).unwrap();
@@ -213,7 +208,6 @@ fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn unchanged_ok_keeps_imported_model_precision_and_alpha() {
     let (mut h, id) = harness(1.0);
     let app = h.state_mut();
@@ -227,13 +221,12 @@ fn unchanged_ok_keeps_imported_model_precision_and_alpha() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn picker_never_applies_to_a_different_document_with_the_same_layer_id() {
     let (mut h, id) = harness(1.0);
     let app = h.state_mut();
     app.run("layer.select", json!({"layer": id.0})).unwrap();
     let dialog = open(app).unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff0000"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff0000")).unwrap();
     app.run("file.new", json!({"width": 4, "height": 4})).unwrap();
     app.run("layer.newFillLayer.solidColor", json!({})).unwrap();
     let before = app.session.active().unwrap().doc.clone();
@@ -243,7 +236,6 @@ fn picker_never_applies_to_a_different_document_with_the_same_layer_id() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn cmyk_lab_preview_thumbnail_cancel_and_ok_are_consistent() {
     for (command, mode) in [("image.mode.cmyk", ColorMode::Cmyk), ("image.mode.lab", ColorMode::Lab)] {
         let (mut h, id) = harness(1.0);
@@ -255,19 +247,19 @@ fn cmyk_lab_preview_thumbnail_cancel_and_ok_are_consistent() {
         assert_eq!(before.mode, mode);
         let count = app.session.active().unwrap().history.entries().len();
         let dialog = open(app).unwrap();
-        app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+        crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
         let (shown, _) = display_doc(app, app.session.active_index().unwrap()).unwrap();
         let LayerContent::Fill(Fill::Solid(preview)) = shown.layer(id).unwrap().content else { panic!() };
         assert_eq!(preview, Color::rgba(1.0, 136.0 / 255.0, 0.0, original.alpha).in_mode(mode));
         assert_eq!(thumbnail_color(app, before.id, id, original), preview);
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);
-        app.ui.close_dialog(dialog);
+        crate::dialogs::cancel(app, dialog).unwrap();
         assert!(display_doc(app, app.session.active_index().unwrap()).is_none());
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);
         let dialog = open(app).unwrap();
-        app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+        crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
         crate::dialogs::confirm(app, dialog).unwrap();
         assert_eq!(app.session.active().unwrap().doc.layer(id).unwrap().content, LayerContent::Fill(Fill::Solid(preview)));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count + 1);
@@ -287,11 +279,6 @@ fn cmyk_typed_into_the_picker_is_the_fills_colour_in_a_cmyk_document() {
     s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
     s.execute("image.mode.cmyk", json!({})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
-    let typed = |f: &mut serde_json::Map<String, serde_json::Value>, inks: [f32; 4]| {
-        let [r, g, b] = photocraft_color::convert::cmyk_to_rgb(inks).map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
-        f.insert("color".into(), json!(format!("#{r:02x}{g:02x}{b:02x}")));
-        f.insert("__cmyk".into(), json!(inks));
-    };
     let fill = |app: &PhotocraftApp| {
         let st = app.session.active().unwrap();
         match st.doc.layer(st.active_layer.unwrap()).unwrap().content {
@@ -301,16 +288,14 @@ fn cmyk_typed_into_the_picker_is_the_fills_colour_in_a_cmyk_document() {
     };
     let inks = [0.5, 0.5, 0.5, 1.0];
     let id = open_new(&mut app).unwrap();
-    let mut f = app.ui.dialog_fields(id).unwrap();
-    typed(&mut f, inks);
-    confirm_new(&mut app, &f).unwrap();
+    color_picker_ui::set_inks(&mut app, id, inks);
+    crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(fill(&app), Color { mode: ColorMode::Cmyk, c: inks, alpha: 1.0 });
 
     let edit = [0.25, 0.75, 0.0, 0.1];
     let id = open(&mut app).unwrap();
-    let mut f = app.ui.dialog_fields(id).unwrap();
-    typed(&mut f, edit);
-    confirm(&mut app, &f).unwrap();
+    color_picker_ui::set_inks(&mut app, id, edit);
+    crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(fill(&app).c, edit);
     // Reopening the picker shows the stored inks.
     let id = open(&mut app).unwrap();
@@ -320,28 +305,20 @@ fn cmyk_typed_into_the_picker_is_the_fills_colour_in_a_cmyk_document() {
     // Other inks with the same display colour are still an edit.
     let near = [0.5, 0.5, 0.499, 1.0];
     let id = open(&mut app).unwrap();
-    let mut f = app.ui.dialog_fields(id).unwrap();
-    typed(&mut f, near);
-    confirm(&mut app, &f).unwrap();
+    color_picker_ui::set_inks(&mut app, id, near);
+    crate::dialogs::confirm(&mut app, id).unwrap();
     let rich = [0.5, 0.5, 0.5, 1.0];
     let id = open(&mut app).unwrap();
-    let mut f = app.ui.dialog_fields(id).unwrap();
-    typed(&mut f, rich);
+    color_picker_ui::set_inks(&mut app, id, rich);
+    let f = app.ui.dialog_fields(id).unwrap();
     assert_eq!(f.get("color"), f.get("__orig"), "both inks show as the same colour");
-    confirm(&mut app, &f).unwrap();
+    crate::dialogs::confirm(&mut app, id).unwrap();
     assert_eq!(fill(&app).c, rich);
-}
-
-fn with_inks(f: &mut serde_json::Map<String, serde_json::Value>, inks: [f32; 4]) {
-    let [r, g, b] = photocraft_color::convert::cmyk_to_rgb(inks).map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
-    f.insert("color".into(), json!(format!("#{r:02x}{g:02x}{b:02x}")));
-    f.insert("__cmyk".into(), json!(inks));
 }
 
 /// Inks that share the picker's hex with the fill's own are still a preview and a thumbnail, as
 /// they are an edit on OK (#8568).
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn same_hex_inks_preview_and_thumbnail_as_ok_commits_them() {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
@@ -349,14 +326,13 @@ fn same_hex_inks_preview_and_thumbnail_as_ok_commits_them() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let near = [0.5, 0.5, 0.499, 1.0];
     let id = open_new(&mut app).unwrap();
-    let mut f = app.ui.dialog_fields(id).unwrap();
-    with_inks(&mut f, near);
-    confirm_new(&mut app, &f).unwrap();
+    color_picker_ui::set_inks(&mut app, id, near);
+    crate::dialogs::confirm(&mut app, id).unwrap();
 
     let rich = [0.5, 0.5, 0.5, 1.0];
     let id = open(&mut app).unwrap();
-    with_inks(&mut app.ui.dialog_mut(id).unwrap().fields, rich);
-    let fields = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
+    color_picker_ui::set_inks(&mut app, id, rich);
+    let fields = &app.ui.dialog_fields(id).unwrap();
     assert_eq!(fields.get("color"), fields.get("__orig"), "both inks show as the same colour");
 
     let st = app.session.active().unwrap();
@@ -366,6 +342,12 @@ fn same_hex_inks_preview_and_thumbnail_as_ok_commits_them() {
     let (shown, _) = display_doc(&mut app, 0).expect("a preview of the new inks");
     let LayerContent::Fill(Fill::Solid(previewed)) = shown.layer(layer).unwrap().content else { panic!("not a solid fill") };
     assert_eq!(previewed.c, rich);
+}
+
+fn with_inks(f: &mut serde_json::Map<String, serde_json::Value>, inks: [f32; 4]) {
+    let [r, g, b] = photocraft_color::convert::cmyk_to_rgb(inks).map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
+    f.insert("color".into(), json!(format!("#{r:02x}{g:02x}{b:02x}")));
+    f.insert("__cmyk".into(), json!(inks));
 }
 
 /// An RGB fill inside a CMYK document that the picker gives inks at the unchanged hex is an edit;

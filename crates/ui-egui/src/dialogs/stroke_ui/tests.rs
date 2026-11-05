@@ -143,7 +143,6 @@ fn command_params_do_not_leak_private_dialog_fields() {
 /// Photoshop), not egui's compact popup; OK sets the stroke colour, not the foreground, and the
 /// stroke is drawn in it.
 #[test]
-#[ignore = "port pending: the test reads the picker through ui.dialogs, which no longer holds it (color_picker_ui::top_dialog and fields_of do)"]
 fn the_color_swatch_opens_the_color_picker() {
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
@@ -161,11 +160,11 @@ fn the_color_swatch_opens_the_color_picker() {
     h.get_by_label("Stroke color").click();
     h.run_steps(4);
     let picker = crate::color_picker_ui::top(h.state()).expect("the swatch opens the Color Picker");
-    let field = |h: &Harness<'_, PhotocraftApp>, d: u64, k: &str| h.state().ui.dialogs.iter().find(|x| x.id == d).and_then(|x| x.fields.get(k).cloned());
+    let field = |h: &Harness<'_, PhotocraftApp>, d: u64, k: &str| h.state().ui.dialog_fields(d).and_then(|x| x.get(k).cloned());
     assert_eq!(field(&h, picker, "color"), Some(json!("#20a040")));
     assert_eq!(field(&h, picker, "__label"), Some(json!("Color Picker (Stroke Color)")));
     assert!(!egui::Popup::is_any_open(&h.ctx), "no egui colour popup");
-    h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#0000ff"));
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#0000ff")).unwrap();
     crate::dialogs::confirm(h.state_mut(), picker).unwrap();
     h.run_steps(3);
     assert_eq!(crate::color_picker_ui::top(h.state()), None);

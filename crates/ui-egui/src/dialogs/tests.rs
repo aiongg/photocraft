@@ -133,7 +133,7 @@ fn the_close_box_and_the_title_drag_keep_apart() {
 }
 
 #[test]
-#[ignore = "port pending: the test reads the picker through ui.dialogs, which no longer holds it (color_picker_ui::top_dialog and fields_of do)"]
+#[ignore = "gap DH: ColorPickerDialog sets neither the roomy frame margin nor a content width (Dialog::roomy, 488 points), so its window is 454 wide with a 7 point right margin where PhotoCraft's was 520 wide with 16"]
 fn color_picker_has_inset_content_and_actions_at_the_right_edge() {
     use egui_kittest::{Harness, kittest::Queryable};
 
@@ -149,7 +149,7 @@ fn color_picker_has_inset_content_and_actions_at_the_right_edge() {
         let cancel = h.get_by_label("Cancel").rect();
         let web = h.get_by_label("Only Web Colors").rect();
         assert!((cancel.right() - ok.right()).abs() < 1.0);
-        assert!(frame.right() - ok.right() >= 16.0, "buttons retain the window's padding");
+        assert!(frame.right() - ok.right() >= 16.0, "buttons retain the window's padding: {ok:?} in {frame:?}");
         assert!(frame.right() - ok.right() < 32.0, "and sit at the right content edge: {ok:?} in {frame:?}");
         assert!(web.left() - frame.left() >= 16.0, "checkbox has comfortable left padding");
         assert!(frame.bottom() - web.bottom() >= 16.0, "checkbox has comfortable bottom padding");

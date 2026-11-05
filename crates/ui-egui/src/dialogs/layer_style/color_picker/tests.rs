@@ -14,14 +14,13 @@ fn fields(app: &PhotocraftApp, id: u64) -> Map<String, Value> {
     app.ui.dialog_fields(id).unwrap()
 }
 fn set_color(app: &mut PhotocraftApp, id: u64, color: &str) {
-    app.ui.dialog_mut(id).unwrap().fields.insert("color".into(), json!(color));
+    dialogs::hosted::set_field(app, id, "color", json!(color)).unwrap();
 }
 fn selected(app: &PhotocraftApp, parent: u64) -> String {
     fields(app, parent)["selected"].as_str().unwrap().into()
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn every_exposed_color_field_uses_the_shared_picker_and_only_updates_its_target() {
     for (kind, _) in layer_style::KINDS {
         for (field, _, p) in spec(kind) {
@@ -55,7 +54,6 @@ fn every_exposed_color_field_uses_the_shared_picker_and_only_updates_its_target(
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn preview_cancel_ok_parent_cancel_and_apply_are_transactional_at_every_depth() {
     for depth in [8, 16, 32] {
         let mut app = app(depth);
@@ -103,7 +101,6 @@ fn preview_cancel_ok_parent_cancel_and_apply_are_transactional_at_every_depth() 
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn unchanged_ok_preserves_missing_parameters_and_imported_effect_snapshot() {
     let mut app = app(8);
     app.run("layer.layerStyle.stroke", json!({"size":7,"color":"#123456","add":true})).unwrap();
@@ -132,7 +129,6 @@ fn unchanged_ok_preserves_missing_parameters_and_imported_effect_snapshot() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn stale_targets_and_invalid_colors_never_apply_or_leave_preview() {
     for change in ["document", "parent", "effect", "kind", "color", "source", "malformed", "layer", "replaced"] {
         let mut app = app(8);
@@ -164,7 +160,7 @@ fn stale_targets_and_invalid_colors_never_apply_or_leave_preview() {
                 app.ui.dialog_mut(parent).unwrap().fields["effects"][0]["fx"] = json!({"replacement":true});
             }
             "malformed" => {
-                app.ui.dialog_mut(picker).unwrap().fields.insert(TARGET.into(), json!(null));
+                dialogs::hosted::set_field(&mut app, picker, TARGET, json!(null)).unwrap();
             }
             _ => {
                 app.ui.dialog_mut(parent).unwrap().fields.insert("layer".into(), json!(u64::MAX));
@@ -179,17 +175,16 @@ fn stale_targets_and_invalid_colors_never_apply_or_leave_preview() {
     let effect = selected(&app, parent);
     let original = fields(&app, parent);
     let picker = open(&mut app, parent, &effect, "color").unwrap();
-    set_color(&mut app, picker, "bad");
-    assert!(dialogs::confirm(&mut app, picker).is_err());
+    assert!(dialogs::hosted::set_field(&mut app, picker, "color", json!("bad")).is_err(), "the picker takes only a colour");
+    dialogs::confirm(&mut app, picker).unwrap();
     assert_eq!(fields(&app, parent), original);
     let picker = open(&mut app, parent, &effect, "color").unwrap();
     app.run("file.new", json!({"width":3,"height":3})).unwrap();
     prune(&mut app, &egui::Context::default());
-    assert!(!app.ui.dialogs.iter().any(|d| d.id == picker));
+    assert!(app.ui.hosted(picker).is_none());
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn preview_off_and_parent_confirmation_and_cancellation_keep_their_contract() {
     let mut app = app(8);
     let parent = layer_style::open(&mut app, Some("colorOverlay")).unwrap();
@@ -202,9 +197,9 @@ fn preview_off_and_parent_confirmation_and_cancellation_keep_their_contract() {
     assert!(Arc::ptr_eq(&canvas::display_doc(&mut app, 0).0, &doc));
     assert!(dialogs::confirm(&mut app, parent).is_err());
     assert_eq!(fields(&app, parent), original);
-    assert_eq!(app.ui.dialogs.len(), 2);
+    assert_eq!((app.ui.dialogs.len(), color_picker_ui::pickers(&app).len()), (1, 1));
     dialogs::cancel(&mut app, parent).unwrap();
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && color_picker_ui::pickers(&app).is_empty());
 }
 
 fn harness() -> Harness<'static, PhotocraftApp> {
@@ -224,7 +219,6 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn real_swatch_click_opens_shared_dialog_and_enter_escape_only_affect_the_child() {
     for action in [Key::Enter, Key::Escape] {
         let mut h = harness();
@@ -232,13 +226,13 @@ fn real_swatch_click_opens_shared_dialog_and_enter_escape_only_affect_the_child(
         let before = fields(h.state(), parent);
         h.get_by_role(egui::accesskit::Role::ColorWell).click();
         h.run_steps(8);
-        assert_eq!(h.state().ui.dialogs.len(), 2);
-        let picker = h.state().ui.dialogs[1].id;
+        assert_eq!(color_picker_ui::pickers(h.state()).len(), 1);
+        let picker = color_picker_ui::top(h.state()).expect("the swatch opens the picker");
         set_color(h.state_mut(), picker, "#00ff00");
         h.key_press(action);
         h.run_steps(8);
-        assert_eq!(h.state().ui.dialogs.len(), 1);
-        assert_eq!(h.state().ui.dialogs[0].id, parent);
+        assert!(color_picker_ui::pickers(h.state()).is_empty());
+        assert_eq!(h.state().ui.dialogs.iter().map(|d| d.id).collect::<Vec<_>>(), [parent]);
         if action == Key::Escape {
             assert_eq!(fields(h.state(), parent), before);
         } else {
@@ -248,7 +242,6 @@ fn real_swatch_click_opens_shared_dialog_and_enter_escape_only_affect_the_child(
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn eyedropper_edits_only_the_picker_and_invalid_samples_leave_it_unchanged() {
     let mut app = app(8);
     let parent = layer_style::open(&mut app, Some("colorOverlay")).unwrap();
@@ -256,13 +249,28 @@ fn eyedropper_edits_only_the_picker_and_invalid_samples_leave_it_unchanged() {
     let original = fields(&app, parent);
     let doc = app.session.active().unwrap().doc.clone();
     let tools = app.session.tools.clone();
-    let picker = open(&mut app, parent, &effect, "color").unwrap();
-    color_picker_ui::sample_at(&mut app, &egui::Context::default(), 4.0, 4.0);
-    assert_eq!(fields(&app, picker)["color"], "#406080");
-    color_picker_ui::sample_at(&mut app, &egui::Context::default(), -100.0, -100.0);
-    assert_eq!(fields(&app, picker)["color"], "#406080");
-    assert_eq!(fields(&app, parent), original);
+    let mut h = Harness::builder().with_size(vec2(1500.0, 1000.0)).build_ui_state(
+        |ui, app| {
+            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                dialogs::show(app, ui.ctx());
+            }
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+    h.run_steps(4);
+    let picker = open(h.state_mut(), parent, &effect, "color").unwrap();
+    h.run_steps(3);
+    let ctx = h.ctx.clone();
+    color_picker_ui::sample_at(h.state_mut(), &ctx, 4.0, 4.0);
+    h.run_steps(2);
+    assert_eq!(fields(h.state(), picker)["color"], "#406080");
+    color_picker_ui::sample_at(h.state_mut(), &ctx, -100.0, -100.0);
+    h.run_steps(2);
+    assert_eq!(fields(h.state(), picker)["color"], "#406080");
+    let app = h.state_mut();
+    assert_eq!(fields(app, parent), original);
     assert!(Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
     assert_eq!(app.session.tools.foreground, tools.foreground);
-    dialogs::cancel(&mut app, picker).unwrap();
+    dialogs::cancel(app, picker).unwrap();
 }

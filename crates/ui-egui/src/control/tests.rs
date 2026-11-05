@@ -211,7 +211,6 @@ fn full_window_workspaces_are_modal_for_menu_invocations() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn layer_style_picker_control_binds_previews_confirms_and_cancels() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
@@ -222,7 +221,7 @@ fn layer_style_picker_control_binds_previews_confirms_and_cancels() {
     for field in ["from", "to"] {
         let reply = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","parent":parent,"effect":"fx1","field":field}));
         assert_eq!(reply["ok"], true, "{reply}");
-        let picker = app.ui.dialogs.last().unwrap().id;
+        let picker = crate::color_picker_ui::top(&app).expect("the Color Picker opens");
         let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
         assert!(inspected.to_string().contains("__layerStyleColor"));
         assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog":parent}))["ok"], false);
@@ -233,11 +232,10 @@ fn layer_style_picker_control_binds_previews_confirms_and_cancels() {
     assert_ne!(app.ui.dialogs[0].fields, before);
     call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","parent":parent,"effect":"fx1","field":"to"}));
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog":parent}))["ok"], true);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.ui.dialogs.is_empty() && crate::color_picker_ui::pickers(&app).is_empty());
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn text_style_picker_control_uses_bound_target_and_rejects_invalid_requests_atomically() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
@@ -254,14 +252,14 @@ fn text_style_picker_control_uses_bound_target_and_rejects_invalid_requests_atom
         let panels = app.ui.type_panels.clone();
         assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":style}))["ok"], false);
         assert_eq!(app.ui.type_panels, panels);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(app.ui.dialogs.is_empty() && crate::color_picker_ui::pickers(&app).is_empty());
     }
     assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id},"parent":1}))["ok"], false);
     let doc = app.session.active().unwrap().doc.clone();
     let r = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id}}));
     assert_eq!(r["ok"], true);
     let picker = r["result"]["dialog"].as_u64().unwrap();
-    assert_eq!(app.ui.dialogs[0].fields["__textStyleColor"]["id"], id);
+    assert_eq!(app.ui.dialog_fields(picker).unwrap()["__textStyleColor"]["id"], id);
     assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog":picker,"field":"color","value":"#00ff00"}))["ok"], true);
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog":picker}))["ok"], true);
     assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));

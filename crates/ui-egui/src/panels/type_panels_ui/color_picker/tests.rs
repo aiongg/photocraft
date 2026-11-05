@@ -17,11 +17,10 @@ fn fields(app: &PhotocraftApp, id: u64) -> Map<String, Value> {
     app.ui.dialog_fields(id).unwrap()
 }
 fn set(app: &mut PhotocraftApp, id: u64, color: &str) {
-    app.ui.dialog_mut(id).unwrap().fields.insert("color".into(), json!(color));
+    dialogs::hosted::set_field(app, id, "color", json!(color)).unwrap();
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn preview_is_cached_cancel_is_clean_and_ok_is_one_undo_step_at_all_depths() {
     for kind in [Kind::Character, Kind::Paragraph] {
         for depth in [8, 16, 32] {
@@ -64,7 +63,6 @@ fn preview_is_cached_cancel_is_clean_and_ok_is_one_undo_step_at_all_depths() {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn no_op_keeps_precise_imported_color_and_returning_to_original_removes_preview() {
     let (mut app, id) = fixture(Kind::Character, 32);
     app.run("type.characterStyle.set", json!({"id":id,"attrs":{"color":photocraft_doc::Color::rgba(0.12345,0.67891,0.33333,0.45678)}})).unwrap();
@@ -83,7 +81,6 @@ fn no_op_keeps_precise_imported_color_and_returning_to_original_removes_preview(
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn invalidated_targets_never_redirect_and_bad_color_never_commits() {
     for change in 0..6 {
         let (mut app, id) = fixture(Kind::Character, 8);
@@ -108,20 +105,19 @@ fn invalidated_targets_never_redirect_and_bad_color_never_commits() {
         let doc = app.session.active().unwrap().doc.clone();
         assert!(confirm(&mut app, &pending).is_err());
         prune(&mut app, &egui::Context::default());
-        assert!(app.ui.dialogs.is_empty());
+        assert!(color_picker_ui::pickers(&app).is_empty());
         assert!(app.text_style_preview.is_none());
         assert!(Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
     }
     let (mut app, id) = fixture(Kind::Character, 8);
     let picker = open(&mut app, Kind::Character, id).unwrap();
-    set(&mut app, picker, "invalid");
+    assert!(dialogs::hosted::set_field(&mut app, picker, "color", json!("invalid")).is_err(), "the picker takes only a colour");
     let doc = app.session.active().unwrap().doc.clone();
-    assert!(dialogs::confirm(&mut app, picker).is_err());
+    dialogs::confirm(&mut app, picker).unwrap();
     assert!(Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn inherited_colors_and_invalid_open_requests_are_atomic() {
     let (mut app, _) = fixture(Kind::Character, 8);
     let inherited = app.run("type.characterStyle.new", json!({"fromSelection":false})).unwrap()["id"].as_u64().unwrap() as u32;
@@ -129,7 +125,7 @@ fn inherited_colors_and_invalid_open_requests_are_atomic() {
     for (kind, id) in [(Kind::Character, 0), (Kind::Character, u32::MAX), (Kind::Character, inherited), (Kind::Paragraph, 0)] {
         assert!(open(&mut app, kind, id).is_err());
         assert_eq!(app.ui.type_panels, panels);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(color_picker_ui::pickers(&app).is_empty());
     }
     app.run("type.paragraphStyle.set", json!({"id":0,"attrs":{"color":"#112233"}})).unwrap();
     let picker = open(&mut app, Kind::Paragraph, 0).unwrap();
@@ -158,7 +154,6 @@ fn harness(kind: Kind) -> Harness<'static, PhotocraftApp> {
 }
 
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn actual_style_swatch_opens_shared_picker_enter_commits_escape_cancels() {
     for kind in [Kind::Character, Kind::Paragraph] {
         for key in [Key::Enter, Key::Escape] {
@@ -166,13 +161,13 @@ fn actual_style_swatch_opens_shared_picker_enter_commits_escape_cancels() {
             let doc = h.state().session.active().unwrap().doc.clone();
             h.get_by_role(egui::accesskit::Role::ColorWell).click();
             h.run();
-            assert_eq!(h.state().ui.dialogs.len(), 1);
-            let picker = h.state().ui.dialogs[0].id;
+            let picker = color_picker_ui::top(h.state()).expect("one picker");
+            assert_eq!(color_picker_ui::pickers(h.state()).len(), 1);
             assert_eq!(fields(h.state(), picker)["__label"], "Color Picker (Text Color)");
             set(h.state_mut(), picker, "#00ff00");
             h.key_press(key);
             h.run();
-            assert!(h.state().ui.dialogs.is_empty());
+            assert!(color_picker_ui::pickers(h.state()).is_empty());
             if key == Key::Escape {
                 assert!(Arc::ptr_eq(&h.state().session.active().unwrap().doc, &doc));
             } else {

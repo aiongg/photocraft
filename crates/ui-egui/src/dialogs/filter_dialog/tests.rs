@@ -1509,7 +1509,6 @@ fn replace_color_dialog_arms_the_eyedropper_button() {
 /// #6278: the Result swatch shows the sampled colour after the shift, and a colour picked for
 /// it sets Hue, Saturation and Lightness so the sampled colour becomes it.
 #[test]
-#[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
 fn replace_color_result_swatch_sets_the_sliders() {
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
@@ -1526,13 +1525,12 @@ fn replace_color_result_swatch_sets_the_sliders() {
     assert_eq!(h.get_all_by_label("#cc3333").count(), 1, "the Result reads the sampled colour #cc3333");
     h.get_by_role_and_label(egui::accesskit::Role::ColorWell, "Result").click();
     h.run_steps(3);
-    let picker = h.state().ui.dialogs.last().unwrap();
-    assert_ne!(picker.id, id, "the Color Picker opened over the dialog");
+    let picker = crate::color_picker_ui::top_dialog(h.state()).expect("the Color Picker opened over the dialog");
+    assert_ne!(picker.id, id);
     assert_eq!(picker.fields["color"], json!("#cc3333"), "on the current Result");
     let picker = picker.id;
-    h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#3355cc"));
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#3355cc")).unwrap();
     crate::dialogs::confirm(h.state_mut(), picker).unwrap();
-    h.state_mut().ui.dialogs.retain(|d| d.id != picker);
     h.run_steps(3);
     let f = h.state().ui.dialog_fields(id).unwrap();
     let n = |k: &str| f[k].as_f64().unwrap() as f32;

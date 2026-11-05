@@ -275,7 +275,6 @@ fn type_edit_menu_lists_spelling_suggestions_for_the_word_under_the_pointer() {
 }
 
 #[test]
-#[ignore = "port pending: the test reads the picker through ui.dialogs, which no longer holds it (color_picker_ui::top_dialog and fields_of do)"]
 fn right_click_outside_the_image_picks_the_pasteboard_color() {
     let mut app = app();
     app.ui.tool = Tool::RectMarquee;
@@ -294,9 +293,9 @@ fn right_click_outside_the_image_picks_the_pasteboard_color() {
     // Select Custom Color… opens the Color Picker; OK makes its colour the custom pasteboard.
     right_click(&mut h, outside, Modifiers::NONE);
     choose(h.state_mut(), &ctx, PASTEBOARD_PICK);
-    let mut f = h.state().ui.dialogs.last().unwrap().fields.clone();
-    f.insert("color".into(), json!("#123456"));
-    crate::color_picker_ui::confirm(h.state_mut(), &f).unwrap();
+    let picker = crate::color_picker_ui::top(h.state()).expect("Select Custom Color… opens the Color Picker");
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#123456")).unwrap();
+    crate::dialogs::confirm(h.state_mut(), picker).unwrap();
     assert_eq!(crate::prefs_ui::pasteboard_color(h.state()), Some(egui::Color32::from_rgb(0x12, 0x34, 0x56)));
     // A painting tool keeps its Brush Preset picker there.
     h.state_mut().ui.tool = Tool::Brush;

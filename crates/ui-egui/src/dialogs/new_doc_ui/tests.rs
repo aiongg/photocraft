@@ -345,22 +345,18 @@ mod dialog {
     /// #4789: the swatch beside Background Contents (and Custom…) opens the Color Picker; its
     /// colour becomes the new document's background (kept as its "#rrggbb").
     #[test]
-    #[ignore = "gap CDa: ColorPickerDialog has no setter and no programmatic OK, so a test cannot set the colour through the dialog fields or ui.dialog.confirm; drive its hex field when ported"]
     fn a_custom_background_color_is_picked_and_used() {
         let mut h = harness_with_store(&Arc::new(Mutex::new(None)));
         let nd = h.state().ui.dialogs[0].id;
         assert!(h.query_by_label("Custom background color").is_some());
         h.get_by_label("Custom background color").click();
         h.run_steps(3);
-        let picker = h
-            .state()
-            .ui
-            .dialogs
-            .iter()
+        let picker = crate::color_picker_ui::pickers(h.state())
+            .into_iter()
             .find(|d| d.fields.get("__dialog").and_then(serde_json::Value::as_u64) == Some(nd))
             .map(|d| d.id)
             .expect("the Color Picker opens over the dialog");
-        h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), serde_json::json!("#336699"));
+        crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", serde_json::json!("#336699")).unwrap();
         crate::dialogs::confirm(h.state_mut(), picker).unwrap();
         h.run_steps(3);
         let bg = h.state().ui.dialogs.iter().find(|d| d.id == nd).unwrap().fields["background"].clone();

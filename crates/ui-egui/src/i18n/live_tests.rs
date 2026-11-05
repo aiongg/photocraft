@@ -51,7 +51,6 @@ fn ukrainian_native_app_menu_keeps_product_and_language_names() {
 }
 
 #[test]
-#[ignore = "port pending: the test reads the picker through ui.dialogs, which no longer holds it (color_picker_ui::top_dialog and fields_of do)"]
 fn ukrainian_color_picker_titles_draw_in_the_selected_language() {
     with_language(Lang::EN, || {
         for (target, title) in [("foreground", "Color Picker (Foreground Color)"), ("background", "Color Picker (Background Color)")] {
