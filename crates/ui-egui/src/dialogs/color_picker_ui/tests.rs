@@ -174,3 +174,72 @@ fn hsv_round_trips() {
     assert_eq!(hex([1.0, 0.5, 0.0]), "#ff8000");
     assert_eq!(parse_hex("#FF8000").map(hex).as_deref(), Some("#ff8000"));
 }
+
+/// Turns Only Web Colors on for the pickers that follow: the checkbox, then OK stores the setting.
+fn remember_web_only(h: &mut Harness<'static, PhotocraftApp>) {
+    open(h.state_mut(), "foreground");
+    h.run_steps(3);
+    h.get_by_label("Only Web Colors").click();
+    h.run_steps(2);
+    h.get_by_label("OK").click();
+    h.run_steps(3);
+}
+
+/// Only Web Colors is remembered from OK, and every picker target opens on the nearest web colour
+/// with the compare swatch following, so OK with no edit changes nothing.
+#[test]
+fn only_web_colors_survives_a_reopen_and_other_picker_targets() {
+    let mut h = app_harness(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
+    h.state_mut().run("tools.setColors", json!({"foreground": "#123456"})).unwrap();
+    remember_web_only(&mut h);
+    assert_eq!(tools_hex(h.state(), "foreground"), "#003366", "OK stored the snapped colour");
+    h.state_mut().run("tools.setColors", json!({"foreground": "#123456"})).unwrap();
+    let id = open(h.state_mut(), "foreground");
+    h.run_steps(3);
+    let f = h.state().ui.dialog_fields(id).unwrap();
+    assert_eq!((f["color"].as_str(), f["__orig"].as_str()), (Some("#003366"), Some("#003366")));
+    let id = open_for_target(h.state_mut(), "noteColor", "Color Picker", [1.0, 0.53, 0.0]);
+    h.run_steps(3);
+    let f = h.state().ui.dialog_fields(id).unwrap();
+    assert_eq!(
+        (f["color"].as_str(), f["__orig"].as_str()),
+        (Some("#ff9900"), Some("#ff9900")),
+        "a start colour that is not a web colour is not committed by opening"
+    );
+}
+
+/// A canvas sample into the picker is snapped while Only Web Colors is on.
+#[test]
+fn a_sample_snaps_when_only_web_colors_is_on() {
+    let mut h = app_harness(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
+    h.state_mut().run("file.new", json!({"width": 20, "height": 20, "background": "transparent"})).unwrap();
+    h.state_mut().run("shape.create", json!({"kind": "rect", "rect": [0, 0, 20, 20], "fill": "#123456"})).unwrap();
+    remember_web_only(&mut h);
+    let id = open(h.state_mut(), "foreground");
+    h.run_steps(3);
+    let ctx = h.ctx.clone();
+    sample_at(h.state_mut(), &ctx, 5.5, 5.5);
+    h.run_steps(2);
+    assert_eq!(h.state().ui.dialog_fields(id).unwrap()["color"], json!("#003366"));
+}
+
+/// Typing a multi-digit CMYK value into a field gives PhotoCraft's profile conversion of the
+/// colour with that ink changed. (The Lab and HSB rows are the library's: `typed_lab_and_host_model_values_stay_while_they_give_the_same_colour`.)
+#[test]
+fn a_cmyk_field_takes_multi_digit_values() {
+    let mut h = app_harness(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
+    h.state_mut().run("tools.setColors", json!({"foreground": "#336699"})).unwrap();
+    let id = open(h.state_mut(), "foreground");
+    h.run_steps(3);
+    let base = parse_hex("#336699").unwrap();
+    let cmyk = photocraft_color::convert::rgb_to_cmyk(base);
+    h.get_by_role_and_label(Role::SpinButton, "Cyan").click();
+    h.run_steps(1);
+    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("40".into()));
+    h.run_steps(1);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(2);
+    let want = photocraft_color::convert::cmyk_to_rgb([0.4, cmyk[1], cmyk[2], cmyk[3]]);
+    assert_eq!(h.state().ui.dialog_fields(id).unwrap()["color"], json!(hex(want)));
+}
