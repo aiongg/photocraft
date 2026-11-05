@@ -476,9 +476,6 @@ pub struct UiState {
     /// Pending GPU fallback warning, visible to automation.
     #[serde(default)]
     pub gpu_fallback_notice: Option<String>,
-    /// Esc closed the recovery prompt: it stays closed until a new fault sets the notice again.
-    #[serde(skip)]
-    pub gpu_fallback_dismissed: bool,
     /// A keyboard shortcut set found at first launch, waiting for Import / Don't Import.
     #[serde(default)]
     pub kys_offer: Option<crate::kys_import::Offer>,
@@ -593,7 +590,6 @@ impl Default for UiState {
             notices: Vec::new(),
             updates_open: false,
             gpu_fallback_notice: None,
-            gpu_fallback_dismissed: false,
             kys_offer: None,
             slow_refresh_noticed: Vec::new(),
             chrome: Default::default(),

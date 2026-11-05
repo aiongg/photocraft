@@ -202,7 +202,6 @@ pub fn system_info_json(app: &PhotocraftApp) -> serde_json::Value {
 /// Queue the same recovery warning for startup and runtime failures.
 pub fn queue_fallback_notice(app: &mut PhotocraftApp, reason: impl Into<String>) {
     app.ui.gpu_fallback_notice = Some(reason.into());
-    app.ui.gpu_fallback_dismissed = false;
 }
 
 /// Whether Retry GPU can build a new GPU canvas now: the canvas was dropped after an error (out
@@ -275,10 +274,11 @@ pub fn recover(app: &mut PhotocraftApp, retry: bool) {
 }
 
 /// Recovery is an explicit choice; the CPU document renderer stays active while the user works.
-/// Cancel (Esc) closes the prompt and leaves the notice set.
+/// Cancel (Esc) clears the notice without changing the preferences, so the prompt stays closed
+/// until the next fault.
 pub fn show_fallback(app: &mut PhotocraftApp) {
     let Some(reason) = app.ui.gpu_fallback_notice.clone() else { return };
-    if app.ui.gpu_fallback_dismissed || app.ui.prompt_with(owns).is_some() {
+    if app.ui.prompt_with(owns).is_some() {
         return;
     }
     let retry_line =
