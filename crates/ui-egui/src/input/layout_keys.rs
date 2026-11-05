@@ -79,6 +79,16 @@ pub fn apply(ctx: &egui::Context) {
                 _ => String::new(),
             };
             let Some(Event::Key { key, physical_key, pressed: true, modifiers, .. }) = i.events.get_mut(at) else { continue };
+            // ⌘ shortcuts on the period and comma keys follow the key's position, as in Photoshop:
+            // ⇧⌘. is ⇧⌘> on a US layout, but types `:` on Nordic and German ones, so its character
+            // would never match. Plain `,` and `;` bindings (brush hardness on AZERTY, where `;`
+            // sits on the US comma key) match the character typed.
+            if modifiers.command
+                && let Some(p @ (Key::Period | Key::Comma)) = *physical_key
+            {
+                *key = p;
+                continue;
+            }
             if modifiers.command || modifiers.ctrl || modifiers.alt {
                 continue;
             }
@@ -95,6 +105,9 @@ pub fn apply(ctx: &egui::Context) {
                 if let Some(k) = LAYOUTS.iter().find_map(|l| lookup(l, &text, modifiers.shift)) {
                     learnt.table_layout = true;
                     *key = k;
+                    // The key is the bracket now: the dispatcher reads a logical key that differs
+                    // from the physical one as a symbol Shift typed, and would drop the ⇧ of ⇧#.
+                    *physical_key = Some(k);
                     continue;
                 }
             }

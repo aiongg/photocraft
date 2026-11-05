@@ -106,7 +106,7 @@ pub fn install(ctx: &egui::Context, app: &PhotocraftApp) -> Option<NativeMenu> {
     let built =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| craft::menu::mac::install_with(ctx, &layout.bar, craft::menu::mac::MacOptions::default())));
     match built {
-        // PhotoCraft runs its clipboard shortcuts itself (`shortcuts::clipboard_keys`).
+        // PhotoCraft runs its clipboard shortcuts itself (`shortcut_dispatch::dispatch_pressed`).
         Ok(menu) => menu.map(|m| m.clipboard_keys(ClipboardKeys::Raw)),
         Err(_) => {
             log::warn!("couldn't install the macOS menu bar; using the in-window menus");

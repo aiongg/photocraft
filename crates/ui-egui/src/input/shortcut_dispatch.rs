@@ -102,23 +102,29 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, editing: b
     let keymap = app.keymap();
     let mut router = std::mem::take(&mut app.key_router);
     let ran = std::cell::Cell::new(false);
+    let active = Active { typing: editing || app.ui.text_edit.is_some() || crate::shortcuts::label_copy_pending(app, ctx), ..Active::NONE };
     let cell = std::cell::RefCell::new(&mut *app);
-    let active = Active { typing: editing, ..Active::NONE };
-    router.route(ctx, keymap.dispatch(), &active, || key_gate(&cell.borrow()), |hit| {
-        let id = hit.command.id;
-        if editing && TEXT_OWNED.contains(&id.as_str()) {
-            return;
-        }
-        let mut app = cell.borrow_mut();
-        if hit.trigger.chord.key == craft::keymap::Key::Tab {
-            // egui already read this Tab as "focus the next widget" (Photoshop's Tab hides the
-            // panels instead, #1313): the shortcut took it, so cancel that move.
-            ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
-        }
-        let id = clip_key_command(&app, delete_key_command(&app, id));
-        dispatch_as(&mut app, ctx, &id, false);
-        ran.set(true);
-    });
+    router.route(
+        ctx,
+        keymap.dispatch(),
+        &active,
+        || key_gate(&cell.borrow()),
+        |hit| {
+            let id = hit.command.id;
+            if editing && TEXT_OWNED.contains(&id.as_str()) {
+                return;
+            }
+            let mut app = cell.borrow_mut();
+            if hit.trigger.chord.key == craft::keymap::Key::Tab {
+                // egui already read this Tab as "focus the next widget" (Photoshop's Tab hides the
+                // panels instead, #1313): the shortcut took it, so cancel that move.
+                ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
+            }
+            let id = clip_key_command(&app, delete_key_command(&app, id));
+            dispatch_as(&mut app, ctx, &id, false);
+            ran.set(true);
+        },
+    );
     let mut ran = ran.get();
     ran |= dispatch_last_settings(&mut cell.into_inner(), ctx, &keymap);
     app.key_router = router;
@@ -137,10 +143,8 @@ fn dispatch_last_settings(app: &mut PhotocraftApp, ctx: &egui::Context, keymap: 
             continue;
         }
         let plain = egui::Modifiers { alt: false, ..*modifiers };
-        let Some(found) = keymap
-            .table()
-            .iter()
-            .find(|(id, text)| crate::adjust_dialog::has_dialog(id) && parse(text).is_some_and(|sc| key_matches(&sc, *key, plain)))
+        let Some(found) =
+            keymap.table().iter().find(|(id, text)| crate::adjust_dialog::has_dialog(id) && parse(text).is_some_and(|sc| key_matches(&sc, *key, plain)))
         else {
             continue;
         };

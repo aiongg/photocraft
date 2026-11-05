@@ -155,7 +155,16 @@ impl ShortcutKeymap {
         let keymap = defaults.with_overrides(overrides);
 
         let user_main = shortcuts.iter().filter(|(_, s)| !s.is_empty()).map(|(id, _)| id.clone()).collect();
-        ShortcutKeymap { keymap, main_overridden, main_cleared, alternates_overridden, fires: OnceLock::new(), user_main, table: OnceLock::new(), dispatch: OnceLock::new() }
+        ShortcutKeymap {
+            keymap,
+            main_overridden,
+            main_cleared,
+            alternates_overridden,
+            fires: OnceLock::new(),
+            user_main,
+            table: OnceLock::new(),
+            dispatch: OnceLock::new(),
+        }
     }
 
     pub fn keymap(&self) -> &Keymap {

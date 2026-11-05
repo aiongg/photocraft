@@ -144,24 +144,6 @@ pub(crate) fn nav_shortcut(app: &PhotocraftApp, ctx: &egui::Context) -> Option<&
     })
 }
 
-/// The key press a clipboard event stands for outside text fields, with `mods` held: Copy, Cut
-/// and Paste are ⌘C, ⌘X and ⌘V (with ⇧/⌥ as held). On Windows egui-winit also sends Cut for
-/// Shift+Delete, which is Edit › Fill here (#530): a Cut with ⇧ and without Ctrl is that key.
-fn clipboard_press(e: &egui::Event, mods: Modifiers, is_windows: bool) -> Option<(Key, Modifiers)> {
-    let held = if mods.command { mods } else { Modifiers::COMMAND };
-    match e {
-        egui::Event::Copy => Some((Key::C, held)),
-        egui::Event::Cut if is_windows && mods.shift && !mods.command => Some((Key::Delete, mods)),
-        egui::Event::Cut => Some((Key::X, held)),
-        egui::Event::Paste(_) => Some((Key::V, held)),
-        // egui 0.37 emits this when the clipboard holds an image and no text. Treat it as the
-        // paste shortcut; the command reads the OS clipboard once through the existing import
-        // path, never a second time from this event.
-        egui::Event::PasteImage(_) => Some((Key::V, held)),
-        _ => None,
-    }
-}
-
 /// Text is selected in a label (an error notice's message, say): dragged across, double- or
 /// triple-clicked or shift-clicked, as egui selects it. ⌘C then copies that text, as in a text
 /// field, rather than running Edit › Copy on the layer (#7807). A plain click on a label leaves an
@@ -183,79 +165,18 @@ fn label_text_selected(ctx: &egui::Context) -> bool {
     selected
 }
 
-/// ⌘C, as egui-winit's `Event::Copy` or as a key press (the web, the Mac menu's key equivalent),
-/// without ⇧ (Copy Merged) or ⌥.
-fn plain_copy(e: &egui::Event, mods: Modifiers) -> bool {
-    match e {
-        egui::Event::Copy => !mods.shift && !mods.alt,
-        egui::Event::Key { key: Key::C, pressed: true, modifiers: m, .. } => m.command && !m.shift && !m.alt,
-        _ => false,
-    }
-}
-
-/// egui-winit turns ⌘C / ⌘X / ⌘V into `Event::Copy` / `Cut` / `Paste` and drops the key press, and
-/// drops ⌘V entirely when the clipboard holds no text (an image). Outside text fields, give the
-/// pixel commands their key presses back: Copy/Cut/Paste become ⌘C/⌘X/⌘V presses (with ⇧/⌥ as
-/// held, so ⇧⌘C is Copy Merged), and a ⌘V release without a ⌘V press (a paste event, or the Mac
-/// menu's key equivalent) becomes a ⌘V press.
+/// The clipboard keys the dispatcher ([`crate::shortcut_dispatch::dispatch_pressed`], with the
+/// library's clipboard events on) doesn't read, kept from the raw input of a frame outside text
+/// fields:
 ///
-/// The web build gets both: eframe forwards the ⌘V key-down, then the browser's `paste` event
-/// (the key-down's default action) arrives as `Event::Paste` in the same frame. A clipboard event
-/// right after its own ⌘ key press is that press, not a second one (#2638).
-///
-/// With an image on the clipboard the V release is all that reaches us, and ⌘ is often let go
-/// first: a V release whose press never arrived, after ⌘ was held and before any other key, is
-/// that swallowed ⌘V too (#6329). Releasing in either order then pastes.
-///
-/// Ctrl+Insert copies and Shift+Insert pastes: egui-winit maps them on Windows (a Shift+Insert
-/// release without a paste event pastes the image, like ⌘V), and we map them here on Linux.
-///
-/// With text selected in a label ([`label_text_selected`]) ⌘C copies the text; ⌘X and ⌘V stay
-/// the document's.
-pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInput) {
-    let text_selected = label_text_selected(ctx);
+/// - With an image on the clipboard egui-winit swallows the ⌘V press and sends only the V
+///   release (egui 0.37 also sends `PasteImage` when the clipboard holds only an image), and ⌘ is
+///   often let go first: a V release whose press never arrived, after ⌘ was held and before any
+///   other key, is that swallowed ⌘V (#6329); it and `PasteImage` become the ⌘V press. A V
+///   pressed and released on its own (the Move tool) is no paste.
+/// - Shift+Insert pastes on Windows: egui-winit sends the Paste event, which the dispatcher reads.
+pub fn swallowed_paste_keys(ctx: &egui::Context, raw: &mut egui::RawInput) {
     let press = |key, modifiers| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
-    if cfg!(target_os = "linux") {
-        raw.events.retain_mut(|e| {
-            let egui::Event::Key { key: Key::Insert, pressed: true, modifiers: m, .. } = *e else { return true };
-            match (m.ctrl, m.shift) {
-                (true, false) => *e = egui::Event::Copy,
-                // Text fields need the clipboard text: egui-winit reads it and sends a Paste event.
-                (false, true) if typing => {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
-                    return false;
-                }
-                (false, true) => *e = press(Key::V, Modifiers::COMMAND),
-                _ => {}
-            }
-            true
-        });
-    }
-    if typing {
-        // A text field copies and pastes on egui's Copy / Cut / Paste events, which egui-winit
-        // makes from the window's key and so never sends as key presses. A ⌘C / ⌘X / ⌘V press
-        // here is the Mac menu's key equivalent (AppKit takes the key while Edit › Copy, Cut or
-        // Paste is enabled), which a text field ignores: pasting text worked only while
-        // PhotoCraft's own clipboard was empty. Give those presses back as the events; Paste asks
-        // the window for the clipboard text, which arrives as a Paste event next frame.
-        raw.events.retain_mut(|e| {
-            let egui::Event::Key { key, pressed: true, modifiers: m, .. } = *e else { return true };
-            if !m.command || m.alt || m.shift {
-                return true;
-            }
-            match key {
-                Key::C => *e = egui::Event::Copy,
-                Key::X => *e = egui::Event::Cut,
-                Key::V => {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
-                    return false;
-                }
-                _ => {}
-            }
-            true
-        });
-        return;
-    }
     let seen = egui::Id::unique("pc-paste-key-seen");
     // A V press without ⌘ that reached us (the Move tool's key): its release is not a paste.
     let plain_v = egui::Id::unique("pc-plain-v-down");
@@ -266,9 +187,13 @@ pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInpu
     if mods.command {
         ctx.data_mut(|d| d.insert_temp(command_lately, true));
     }
+    let mark_paste = |ctx: &egui::Context| {
+        ctx.data_mut(|d| {
+            d.insert_temp(seen, true);
+            d.remove_temp::<bool>(plain_v);
+        });
+    };
     let mut out = Vec::with_capacity(raw.events.len());
-    // The last ⌘C/⌘X/⌘V press this frame whose clipboard event hasn't arrived (yet).
-    let mut unpaired: Option<Key> = None;
     for e in raw.events.drain(..) {
         if let egui::Event::ModifiersChanged(m) | egui::Event::Key { modifiers: m, .. } = &e {
             mods = *m;
@@ -276,35 +201,14 @@ pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInpu
                 ctx.data_mut(|d| d.insert_temp(command_lately, true));
             }
         }
-        if text_selected && plain_copy(&e, mods) {
-            out.push(egui::Event::Copy);
-            continue;
-        }
-        if let Some((key, held)) = clipboard_press(&e, mods, cfg!(target_os = "windows")) {
-            if key == Key::V {
-                ctx.data_mut(|d| {
-                    d.insert_temp(seen, true);
-                    d.remove_temp::<bool>(plain_v);
-                });
-            }
-            if unpaired.take_if(|k| *k == key).is_none() {
-                out.push(press(key, held));
-            }
-            continue;
-        }
         match &e {
-            // A ⌘C/⌘X/⌘V press egui-winit didn't swallow (the web, the Mac menu's key equivalent,
-            // Shift+Insert on Linux): its clipboard event and, for ⌘V, its release must not run
-            // the command a second time (#2638, #1638).
-            egui::Event::Key { key: key @ (Key::C | Key::X | Key::V), pressed: true, modifiers, .. } if modifiers.command => {
-                unpaired = Some(*key);
-                if *key == Key::V {
-                    ctx.data_mut(|d| {
-                        d.insert_temp(seen, true);
-                        d.remove_temp::<bool>(plain_v);
-                    });
-                }
+            egui::Event::PasteImage(_) => {
+                mark_paste(ctx);
+                out.push(press(Key::V, if mods.command { mods } else { Modifiers::COMMAND }));
+                continue;
             }
+            egui::Event::Paste(_) => mark_paste(ctx),
+            egui::Event::Key { key: Key::V, pressed: true, modifiers, .. } if modifiers.command => mark_paste(ctx),
             egui::Event::Key { key, pressed: true, modifiers, .. } if !modifiers.command => {
                 ctx.data_mut(|d| {
                     d.remove_temp::<bool>(command_lately);
@@ -315,18 +219,17 @@ pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInpu
             }
             // A paste key's release ends that press, with or without ⌘ still held (else a stale
             // mark would swallow the next image paste); without a press it is the paste itself.
-            egui::Event::Key { key: key @ (Key::V | Key::Insert), pressed: false, modifiers, .. } => {
+            egui::Event::Key { key: Key::V, pressed: false, modifiers, .. } => {
                 let had_press = ctx.data_mut(|d| d.remove_temp::<bool>(seen)).unwrap_or(false);
-                let had_plain_press = *key == Key::V && ctx.data_mut(|d| d.remove_temp::<bool>(plain_v)).unwrap_or(false);
+                let had_plain_press = ctx.data_mut(|d| d.remove_temp::<bool>(plain_v)).unwrap_or(false);
                 // Taken: one swallowed ⌘V is one paste.
-                let lately = *key == Key::V && ctx.data_mut(|d| d.remove_temp::<bool>(command_lately)).unwrap_or(false);
-                let held = match key {
-                    Key::V if modifiers.command => Some(*modifiers),
-                    // ⌘ let go before V: the press egui-winit swallowed was ⌘V (#6329). The web
-                    // always forwards the key-down, so there a lone release is no paste.
-                    Key::V if lately && !had_plain_press && !cfg!(target_arch = "wasm32") => Some(Modifiers::COMMAND),
-                    Key::Insert if cfg!(target_os = "windows") && modifiers.shift && !modifiers.ctrl => Some(Modifiers::COMMAND),
-                    _ => None,
+                let lately = ctx.data_mut(|d| d.remove_temp::<bool>(command_lately)).unwrap_or(false);
+                // ⌘ let go before V: the press egui-winit swallowed was ⌘V. The web always
+                // forwards the key-down, so there a lone release is no paste.
+                let held = if modifiers.command {
+                    Some(*modifiers)
+                } else {
+                    (lately && !had_plain_press && !cfg!(target_arch = "wasm32")).then_some(Modifiers::COMMAND)
                 };
                 if let Some(held) = held
                     && !had_press
@@ -339,6 +242,66 @@ pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInpu
         out.push(e);
     }
     raw.events = out;
+}
+
+/// What the library's clipboard reading ([`craft::keymap::clipboard_presses`]) leaves to the app
+/// before the shortcuts run:
+///
+/// - A ⌘C / ⌘X / ⌘V press with a text field focused and no clipboard event of its own is the Mac
+///   menu's key equivalent (AppKit takes the key while Edit › Copy, Cut or Paste is enabled), which
+///   a text field ignores: give those presses back as the Copy and Cut events the field acts on,
+///   and ask the window for the clipboard text for ⌘V (it arrives as a Paste event next frame).
+/// - Ctrl+Insert copies and Shift+Insert pastes on Linux, where egui-winit sends neither: the
+///   text field gets Copy and the text request, the document ⌘C and ⌘V (the keymap binds no
+///   Insert chord).
+pub(crate) fn text_clipboard_keys(ctx: &egui::Context, layout: &craft::keymap::Layout, typing: bool) {
+    use craft::keymap::{Key as CKey, Mods as CMods, clipboard_presses, egui::platform};
+    let platform = platform(ctx);
+    let found = ctx.input(|i| clipboard_presses(i, layout, platform));
+    let linux = cfg!(target_os = "linux");
+    // Event index -> replacement (None removes it).
+    let mut changes: Vec<(usize, Option<egui::Event>)> = Vec::new();
+    for p in found.iter().filter(|p| p.event.is_none()) {
+        let Some(at) = p.press else { continue };
+        let press = |key, modifiers| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
+        match (p.chord.key, p.chord.mods) {
+            (CKey::C, CMods::CMD) if typing => changes.push((at, Some(egui::Event::Copy))),
+            (CKey::X, CMods::CMD) if typing => changes.push((at, Some(egui::Event::Cut))),
+            (CKey::V, CMods::CMD) if typing => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
+                changes.push((at, None));
+            }
+            (CKey::Insert, CMods::CMD) if linux => changes.push((at, Some(if typing { egui::Event::Copy } else { press(Key::C, Modifiers::COMMAND) }))),
+            (CKey::Insert, CMods::SHIFT) if linux && typing => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
+                changes.push((at, None));
+            }
+            (CKey::Insert, CMods::SHIFT) if linux => changes.push((at, Some(press(Key::V, Modifiers::COMMAND)))),
+            _ => {}
+        }
+    }
+    if changes.is_empty() {
+        return;
+    }
+    ctx.input_mut(|i| {
+        for (at, event) in changes.into_iter().rev() {
+            match event {
+                Some(e) => i.events[at] = e,
+                None => _ = i.events.remove(at),
+            }
+        }
+    });
+}
+
+/// ⌘C with text selected in a label: the label copies its text (egui reads the Copy event or
+/// press itself), not Edit › Copy ([`label_text_selected`]). The dispatcher leaves it to the
+/// label when the frame counts as typing.
+pub(crate) fn label_copy_pending(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+    use craft::keymap::{Key as CKey, Mods as CMods};
+    let selected = label_text_selected(ctx);
+    let platform = craft::keymap::egui::platform(ctx);
+    let layout = app.key_router.dispatcher().layout();
+    selected && ctx.input(|i| craft::keymap::clipboard_presses(i, layout, platform).iter().any(|p| p.chord.key == CKey::C && p.chord.mods == CMods::CMD))
 }
 
 /// The keys held down in floating panels' own OS windows, from the presses and releases they
@@ -357,7 +320,7 @@ pub(crate) fn forwarded_keys_down(ctx: &egui::Context) -> Vec<Key> {
 /// [`handle`] in the frame they arrive, as if pressed in the main window: tool keys, undo and
 /// the clipboard work while a floating window has the keyboard. craft-ui forwards nothing while
 /// one of that window's widgets has keyboard focus. egui-winit sends ⌘C, ⌘X and ⌘V there as
-/// `Copy`, `Cut` and `Paste` too, so [`clipboard_keys`] turns them into presses first.
+/// `Copy`, `Cut` and `Paste` too, which the dispatcher reads as the clipboard chords.
 pub(crate) fn handle_forwarded(app: &mut PhotocraftApp, ctx: &egui::Context, events: Vec<egui::Event>, modifiers: Modifiers) {
     if events.is_empty() {
         return;
@@ -381,7 +344,9 @@ pub(crate) fn handle_forwarded(app: &mut PhotocraftApp, ctx: &egui::Context, eve
     let typing = ctx.text_edit_focused() || app.ui.text_edit.is_some();
     let (events_before, modifiers_before) = ctx.input_mut(|i| (std::mem::take(&mut i.events), std::mem::replace(&mut i.modifiers, modifiers)));
     let mut raw = egui::RawInput { events, ..Default::default() };
-    clipboard_keys(ctx, typing, &mut raw);
+    if !typing {
+        swallowed_paste_keys(ctx, &mut raw);
+    }
     ctx.input_mut(|i| i.events = raw.events);
     handle(app, ctx);
     ctx.input_mut(|i| {
@@ -402,6 +367,7 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     let down = if held { ctx.data(|d| d.get_temp::<std::collections::BTreeSet<Key>>(forwarded_down_id())).unwrap_or_default() } else { Default::default() };
     let added: Vec<Key> = ctx.input_mut(|i| down.into_iter().filter(|k| i.keys_down.insert(*k)).collect());
+    text_clipboard_keys(ctx, app.key_router.dispatcher().layout(), ctx.text_edit_focused() || app.ui.text_edit.is_some());
     handle_keys(app, ctx);
     if !added.is_empty() {
         ctx.input_mut(|i| added.iter().for_each(|k| _ = i.keys_down.remove(k)));
@@ -633,7 +599,11 @@ fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -
     }
     // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in
     // Photoshop (#5702), never Edit › Clear on the pixels under it.
-    if craft::ui::focus::key_owner::canvas_keys_free(ctx) && app.ui.text_edit.is_none() && !crate::shortcut_dispatch::delete_claimed(ctx) && crate::vector_ui::delete_key_deletes_work_path(app) {
+    if craft::ui::focus::key_owner::canvas_keys_free(ctx)
+        && app.ui.text_edit.is_none()
+        && !crate::shortcut_dispatch::delete_claimed(ctx)
+        && crate::vector_ui::delete_key_deletes_work_path(app)
+    {
         let mods = ctx.input(|i| i.modifiers);
         if !mods.command && !mods.ctrl && !mods.shift && !mods.alt && ctx.input_mut(|i| i.consume_key(mods, Key::Backspace) || i.consume_key(mods, Key::Delete))
         {

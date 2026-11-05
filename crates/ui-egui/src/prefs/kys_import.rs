@@ -159,29 +159,39 @@ fn not_imported(app: &mut PhotocraftApp, e: &str) {
 /// First launch on a machine with Photoshop: its live set ([`crate::Services::photoshop_shortcuts`])
 /// is offered once, as a library [`ImportOffer`] queued at [`StartupStage::Offer`]. Someone who
 /// already changed a shortcut keeps their own set and is not asked; a set that changes nothing
-/// (Photoshop's defaults are ours too) is not offered either ([`ImportOffer::prepare`]). The
-/// preference remembers each outcome, so a later launch never asks again.
+/// (Photoshop's defaults are ours too) is not offered either. The engine matches the set
+/// ([`plan`]) and counts the changes; the library offer only shows them. The preference
+/// remembers each outcome, so a later launch never asks again.
 pub fn offer_import(app: &mut PhotocraftApp) {
-    use craft::keymap::ui::NoOffer;
     if crate::host_settings::recall_ref(app, IMPORTED_PREF).is_some() {
         return;
     }
     let Some((source, text)) = app.services.photoshop_shortcuts.as_mut().and_then(|f| f()) else { return };
-    if let Err(e) = parse(&text) {
-        remember(app, &source, false);
-        return not_imported(app, &e);
+    if !app.session.prefs().shortcuts.is_empty() {
+        return remember(app, &source, false);
     }
-    let Ok(set) = craft::keymap::import::kys::read(&text) else { return remember(app, &source, false) };
-    let km = app.keymap();
-    let record = None;
-    match ImportOffer::prepare(&source, &set, km.keymap(), &ImportOptions::default(), record) {
-        Ok(offer) => {
-            app.ui.kys_offer = Some(Offer { source, set: offer.set_name.clone(), changes: offer.changes, text });
-            app.ui.host.enqueue(StartupStage::Offer, offer);
+    let set = match parse(&text) {
+        Ok(set) => set,
+        Err(e) => {
+            remember(app, &source, false);
+            return not_imported(app, &e);
         }
-        Err(NoOffer::Answered) => {}
-        Err(_) => remember(app, &source, false),
+    };
+    let plan = plan(app, &set);
+    let default = |id: &str| crate::shortcuts::default_shortcut(id).and_then(|d| photocraft_engine::prefs::normalize_shortcut(&d));
+    let changes = plan.set.iter().filter(|(id, sc)| default(id).as_deref() != Some(sc.as_str())).count();
+    // The library offer is built from its own reading of the set (`ImportOffer` has no other
+    // constructor); the engine's count is the one it shows.
+    let offered = craft::keymap::import::kys::read(&text)
+        .ok()
+        .and_then(|foreign| ImportOffer::prepare(&source, &foreign, app.keymap().keymap(), &ImportOptions::default(), None).ok());
+    let Some(mut offer) = offered.filter(|_| changes > 0) else { return remember(app, &source, false) };
+    offer.changes = changes;
+    if let Some(name) = set.name {
+        offer.set_name = name;
     }
+    app.ui.kys_offer = Some(Offer { source, set: offer.set_name.clone(), changes, text });
+    app.ui.host.enqueue(StartupStage::Offer, offer);
 }
 
 /// The offer's answer: Import applies the set and says so; either answer is remembered.

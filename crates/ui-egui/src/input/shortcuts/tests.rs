@@ -245,40 +245,29 @@ fn labels_show_the_effective_shortcut_in_platform_notation() {
     assert_eq!(command_label(&app, "New document…", "file.new"), "New document…");
 }
 
+/// Copy and Paste events run the pixel commands through the app's key handling (the pairing and
+/// the chords are the library's: keymap `tests/egui.rs`
+/// `clipboard_events_run_their_chords_outside_text_fields_when_turned_on` and
+/// `a_web_paste_carries_its_text_and_takes_its_event`).
 #[test]
-fn clipboard_events_become_pixel_shortcuts_outside_text() {
+fn clipboard_events_run_the_pixel_commands() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = egui::Context::default();
-    let raw = |mut events: Vec<egui::Event>, modifiers| {
-        events.insert(0, egui::Event::ModifiersChanged(modifiers));
-        egui::RawInput { events, ..Default::default() }
-    };
-    let keys = |r: &egui::RawInput| -> Vec<(Key, bool, bool)> {
-        r.events
-            .iter()
-            .filter_map(|e| if let egui::Event::Key { key, pressed, modifiers, .. } = e { Some((*key, *pressed, modifiers.shift)) } else { None })
-            .collect()
-    };
-    let cmd_shift = Modifiers::COMMAND | Modifiers::SHIFT;
-    let mut r = raw(vec![egui::Event::Copy, egui::Event::Cut], cmd_shift);
-    clipboard_keys(&ctx, false, &mut r);
-    assert_eq!(keys(&r), vec![(Key::C, true, true), (Key::X, true, true)]);
-    // A text paste becomes ⌘V; its key release then adds nothing.
-    let up = egui::Event::Key { key: Key::V, physical_key: None, pressed: false, repeat: false, modifiers: Modifiers::COMMAND };
-    let mut r = raw(vec![egui::Event::Paste("x".into()), up.clone()], Modifiers::COMMAND);
-    clipboard_keys(&ctx, false, &mut r);
-    assert_eq!(keys(&r), vec![(Key::V, true, false), (Key::V, false, false)]);
-    // An image on the clipboard: egui-winit sends only the release. It still pastes.
-    let mut r = raw(vec![up.clone()], Modifiers::COMMAND);
-    clipboard_keys(&ctx, false, &mut r);
-    assert_eq!(keys(&r), vec![(Key::V, true, false), (Key::V, false, false)]);
-    // In a text field the events stay text clipboard events.
-    let mut r = raw(vec![egui::Event::Paste("x".into())], Modifiers::COMMAND);
-    clipboard_keys(&ctx, true, &mut r);
-    assert!(matches!(r.events.as_slice(), [_, egui::Event::Paste(_)]));
+    crate::shortcut_dispatch::set_dry_run(&ctx, true);
+    let events = vec![
+        egui::Event::ModifiersChanged(Modifiers::COMMAND),
+        egui::Event::Copy,
+        egui::Event::Paste("x".into()),
+        egui::Event::Key { key: Key::V, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND },
+    ];
+    let input = egui::RawInput { events, ..Default::default() };
+    ctx.run_ui(input, |ui| handle(&mut app, ui.ctx())).textures_delta.clear();
+    let ids: Vec<String> = crate::shortcut_dispatch::take_log(&ctx).into_iter().map(|(id, _)| id).collect();
+    assert_eq!(ids, ["edit.copy", "edit.paste", "edit.paste"].map(String::from), "the web's press and its Paste event are two presses only when both arrive");
 }
 
-/// In a text field the Mac menu's ⌘C / ⌘X key equivalents become the field's Copy / Cut, and
-/// its ⌘V asks the window for the clipboard text, which the field pastes. Other keys, and ⇧ / ⌥
+/// In a text field the Mac menu's ⌘C / ⌘X key equivalents become the field's Copy / Cut, and its
+/// ⌘V asks the window for the clipboard text, which the field pastes. Other keys, and ⇧ / ⌥
 /// chords, pass through.
 #[test]
 fn menu_key_equivalents_reach_a_text_field_as_clipboard_events() {
@@ -293,15 +282,17 @@ fn menu_key_equivalents_reach_a_text_field_as_clipboard_events() {
         key(Key::A, true, cmd),
         key(Key::C, true, cmd | Modifiers::SHIFT),
     ];
-    let mut r = egui::RawInput { events: [vec![egui::Event::ModifiersChanged(cmd)], events].concat(), ..Default::default() };
-    // In a frame, as the app calls it, so the request for the clipboard text is in its output.
-    ctx.begin_pass(egui::RawInput::default());
-    clipboard_keys(&ctx, true, &mut r);
-    let mut out = ctx.end_pass();
+    let input = egui::RawInput { events: [vec![egui::Event::ModifiersChanged(cmd)], events].concat(), ..Default::default() };
+    let layout = craft::keymap::Layout::new();
+    let mut kept = Vec::new();
+    let mut out = ctx.run_ui(input, |ui| {
+        text_clipboard_keys(ui.ctx(), &layout, true);
+        kept = ui.ctx().input(|i| i.events.clone());
+    });
     out.textures_delta.clear();
     assert!(
         matches!(
-            &r.events[1..],
+            &kept[1..],
             [
                 egui::Event::Copy,
                 egui::Event::Cut,
@@ -310,42 +301,43 @@ fn menu_key_equivalents_reach_a_text_field_as_clipboard_events() {
                 egui::Event::Key { key: Key::C, .. }
             ]
         ),
-        "{:?}",
-        r.events
+        "{kept:?}"
     );
     // The ⌘V press became a request for the clipboard's text.
     let asked = out.viewport_output.values().flat_map(|v| &v.commands).any(|c| matches!(c, egui::ViewportCommand::RequestPaste));
     assert!(asked, "the window is asked for the clipboard text");
 }
 
-/// #1638: every ⌘V is one press, however its key-down and key-up arrive.
+/// #1638: a ⌘V press is one press, however its key-up arrives: the swallowed-press rule adds a
+/// press only for a release without one.
 #[test]
 fn each_paste_key_is_one_press() {
     let ctx = egui::Context::default();
     let key = |key, pressed, modifiers| egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers };
     let presses = |events: Vec<egui::Event>| {
         let mut r = egui::RawInput { events, ..Default::default() };
-        clipboard_keys(&ctx, false, &mut r);
+        swallowed_paste_keys(&ctx, &mut r);
         r.events.iter().filter(|e| matches!(e, egui::Event::Key { key: Key::V, pressed: true, .. })).count()
     };
     // A ⌘V press that reached us (the Mac menu's key equivalent), then its release.
     assert_eq!(presses(vec![key(Key::V, true, Modifiers::COMMAND)]), 1);
     assert_eq!(presses(vec![key(Key::V, false, Modifiers::COMMAND)]), 0, "the release of a press doesn't paste again");
-    // A text paste whose V is released after ⌘: the next image paste still pastes.
-    assert_eq!(presses(vec![egui::Event::Paste("x".into())]), 1);
+    // A text paste event (the dispatcher pastes it) whose V is released after ⌘ adds nothing; the next image paste still pastes.
+    assert_eq!(presses(vec![egui::Event::Paste("x".into())]), 0);
     assert_eq!(presses(vec![egui::Event::ModifiersChanged(Modifiers::NONE), key(Key::V, false, Modifiers::NONE)]), 0);
     assert_eq!(presses(vec![egui::Event::ModifiersChanged(Modifiers::COMMAND), key(Key::V, false, Modifiers::COMMAND)]), 1, "image paste");
 }
 
 /// #6329: with an image on the clipboard egui-winit swallows the ⌘V press and sends only the V
 /// release, which carries no ⌘ when ⌘ was let go first: that release still pastes, once. A V
-/// pressed and released on its own (the Move tool) never pastes.
+/// pressed and released on its own (the Move tool) never pastes. The library does not read this
+/// swallowed press (`clipboard_presses` documents it as the app's), so PhotoCraft keeps it.
 #[test]
 fn an_image_paste_released_after_command_still_pastes() {
     let key = |key, pressed, modifiers| egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers };
     let pastes = |ctx: &egui::Context, events: Vec<egui::Event>| {
         let mut r = egui::RawInput { events, ..Default::default() };
-        clipboard_keys(ctx, false, &mut r);
+        swallowed_paste_keys(ctx, &mut r);
         r.events.iter().filter(|e| matches!(e, egui::Event::Key { key: Key::V, pressed: true, modifiers, .. } if modifiers.command)).count()
     };
     let none = Modifiers::NONE;
@@ -366,88 +358,56 @@ fn an_image_paste_released_after_command_still_pastes() {
     assert_eq!(pastes(&ctx, vec![key(Key::V, false, none)]), 0);
     // Released with ⌘ still held it pastes as before.
     assert_eq!(pastes(&ctx, vec![egui::Event::ModifiersChanged(Modifiers::COMMAND), key(Key::V, false, Modifiers::COMMAND)]), 1);
-}
-
-/// #2638: on the web one ⌘V brings its key press and the browser's paste event; that is one paste.
-#[test]
-fn web_paste_key_and_paste_event_are_one_press() {
-    let ctx = egui::Context::default();
-    let key = |key, pressed| egui::Event::Key { key, physical_key: Some(key), pressed, repeat: false, modifiers: Modifiers::COMMAND };
-    let mut r = egui::RawInput { events: vec![key(Key::V, true), egui::Event::Paste("x".into()), key(Key::X, true), egui::Event::Cut], ..Default::default() };
-    clipboard_keys(&ctx, false, &mut r);
-    let presses = |k| r.events.iter().filter(|e| matches!(e, egui::Event::Key { key, pressed: true, .. } if *key == k)).count();
-    assert_eq!((presses(Key::V), presses(Key::X)), (1, 1));
-    let mut r = egui::RawInput { events: vec![key(Key::V, false)], ..Default::default() };
-    clipboard_keys(&ctx, false, &mut r);
-    assert!(!r.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. })), "its release doesn't paste again");
-}
-
-/// #530: egui-winit sends Cut for Shift+Delete on Windows; on the canvas it opens Fill.
-#[test]
-fn windows_shift_delete_fills_instead_of_cutting() {
-    let shift = Modifiers::SHIFT;
-    let ctrl = Modifiers::CTRL | Modifiers::COMMAND;
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let bound = |held| {
-        let (key, mods) = clipboard_press(&egui::Event::Cut, held, true)?;
-        assert_eq!((key, mods), (Key::Delete, held));
-        crate::shortcut_dispatch::bindings(&app).into_iter().find(|(_, sc)| key_matches(sc, key, mods)).map(|(id, _)| id)
-    };
-    assert_eq!(bound(shift).as_deref(), Some("edit.fill"));
-    // ⇧⌥Delete keeps ⌥: fill with the foreground, keeping transparency.
-    assert_eq!(bound(shift | Modifiers::ALT).as_deref(), Some("edit.fillForegroundPreserve"));
-    // Ctrl+X (and Ctrl+Shift+X) still cut; elsewhere a Cut is always ⌘X.
-    assert_eq!(clipboard_press(&egui::Event::Cut, ctrl, true), Some((Key::X, ctrl)));
-    assert_eq!(clipboard_press(&egui::Event::Cut, ctrl | shift, true), Some((Key::X, ctrl | shift)));
-    assert_eq!(clipboard_press(&egui::Event::Cut, shift, false), Some((Key::X, Modifiers::COMMAND)));
-    // Shift+Insert pastes on Windows.
-    assert_eq!(clipboard_press(&egui::Event::Paste("x".into()), shift, true), Some((Key::V, Modifiers::COMMAND)));
     // egui 0.37's image-only clipboard paste is the same ⌘V press; the command reads the
     // clipboard itself, once, through the existing import path.
     let image = std::sync::Arc::new(egui::ColorImage::filled([1, 1], egui::Color32::BLACK));
-    assert_eq!(clipboard_press(&egui::Event::PasteImage(image), shift, true), Some((Key::V, Modifiers::COMMAND)));
-    // Through the raw-input hook on this platform; a text field keeps its Cut.
     let ctx = egui::Context::default();
-    let cut = || egui::RawInput { events: vec![egui::Event::ModifiersChanged(shift), egui::Event::Cut], ..Default::default() };
-    let mut r = cut();
-    clipboard_keys(&ctx, false, &mut r);
-    let want = if cfg!(target_os = "windows") { Key::Delete } else { Key::X };
-    assert!(matches!(r.events.as_slice(), [_, egui::Event::Key { key, pressed: true, .. }] if *key == want), "{:?}", r.events);
-    let mut r = cut();
-    clipboard_keys(&ctx, true, &mut r);
-    assert!(matches!(r.events.as_slice(), [_, egui::Event::Cut]));
+    assert_eq!(pastes(&ctx, vec![egui::Event::PasteImage(image)]), 1);
+}
+
+/// #530: on Windows egui-winit sends Cut for Shift+Delete, which the library reads as the
+/// Shift+Delete chord (keymap `parity_tests` `clipboard_chords_pair_with_their_events` and
+/// `tests/egui.rs` `clipboard_chords_with_more_modifiers_run_their_bindings`); here it is Fill.
+#[test]
+fn shift_delete_is_fill() {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let bound = |mods| crate::shortcut_dispatch::bindings(&app).into_iter().find(|(_, sc)| key_matches(sc, Key::Delete, mods)).map(|(id, _)| id);
+    assert_eq!(bound(Modifiers::SHIFT).as_deref(), Some("edit.fill"));
+    // ⇧⌥Delete keeps ⌥: fill with the foreground, keeping transparency.
+    assert_eq!(bound(Modifiers::SHIFT | Modifiers::ALT).as_deref(), Some("edit.fillForegroundPreserve"));
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn ctrl_and_shift_insert_copy_and_paste_on_linux() {
-    let ctx = egui::Context::default();
     let insert = |modifiers| egui::RawInput {
         events: vec![egui::Event::Key { key: Key::Insert, physical_key: None, pressed: true, repeat: false, modifiers }],
         ..Default::default()
     };
-    let pressed = |r: &egui::RawInput| match r.events.as_slice() {
+    let layout = craft::keymap::Layout::new();
+    let after = |modifiers, typing| {
+        let ctx = egui::Context::default();
+        let mut kept = Vec::new();
+        ctx.run_ui(insert(modifiers), |ui| {
+            text_clipboard_keys(ui.ctx(), &layout, typing);
+            kept = ui.ctx().input(|i| i.events.clone());
+        })
+        .textures_delta
+        .clear();
+        kept
+    };
+    let pressed = |events: &[egui::Event]| match events {
         [egui::Event::Key { key, pressed: true, modifiers, .. }] if modifiers.command => Some(*key),
         _ => None,
     };
     // On the canvas they become the pixel commands' ⌘C / ⌘V.
-    let mut r = insert(Modifiers::CTRL);
-    clipboard_keys(&ctx, false, &mut r);
-    assert_eq!(pressed(&r), Some(Key::C));
-    let mut r = insert(Modifiers::SHIFT);
-    clipboard_keys(&ctx, false, &mut r);
-    assert_eq!(pressed(&r), Some(Key::V));
+    assert_eq!(pressed(&after(Modifiers::CTRL, false)), Some(Key::C));
+    assert_eq!(pressed(&after(Modifiers::SHIFT, false)), Some(Key::V));
     // In a text field Ctrl+Insert copies the text; Shift+Insert asks egui-winit for the text.
-    let mut r = insert(Modifiers::CTRL);
-    clipboard_keys(&ctx, true, &mut r);
-    assert!(matches!(r.events.as_slice(), [egui::Event::Copy]));
-    let mut r = insert(Modifiers::SHIFT);
-    clipboard_keys(&ctx, true, &mut r);
-    assert!(r.events.is_empty());
+    assert!(matches!(after(Modifiers::CTRL, true).as_slice(), [egui::Event::Copy]));
+    assert!(after(Modifiers::SHIFT, true).is_empty());
     // Plain Insert is left alone.
-    let mut r = insert(Modifiers::NONE);
-    clipboard_keys(&ctx, false, &mut r);
-    assert!(matches!(r.events.as_slice(), [egui::Event::Key { key: Key::Insert, .. }]));
+    assert!(matches!(after(Modifiers::NONE, false).as_slice(), [egui::Event::Key { key: Key::Insert, .. }]));
 }
 
 #[test]
