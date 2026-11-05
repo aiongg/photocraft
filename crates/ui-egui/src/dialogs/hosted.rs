@@ -231,8 +231,7 @@ pub fn set_field(app: &mut PhotocraftApp, id: u64, field: &str, value: Value) ->
         return Ok(());
     }
     if record.kind.is_sizing() {
-        // The library's size dialogs take no values from outside (library row 162).
-        return Err(format!("`{field}`: the size dialogs take no values from a script"));
+        return crate::sizing::set_field(app, id, field, &value);
     }
     let (kind, drawn) = (record.kind, record.params.iter().any(|p| p.key == field));
     if kind == HostedKind::Params {
@@ -397,16 +396,15 @@ fn run_params(app: &mut PhotocraftApp, record: Hosted, answer: &DialogFields) ->
 /// is disabled), then the same path a click takes.
 pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
     let kind = app.ui.hosted(id).map(|h| h.kind).ok_or_else(|| format!("no dialog {id}"))?;
-    if kind.is_sizing() {
-        return crate::sizing::confirm(app, ctx, id);
-    }
-    if app.ui.hosted_fields(id).is_none() {
+    if !kind.is_sizing() && app.ui.hosted_fields(id).is_none() {
         return Err(format!("no dialog {id}"));
     }
     let did = app.ui.hosted(id).map(|h| h.did).ok_or_else(|| format!("no dialog {id}"))?;
     let confirmed = match kind {
         HostedKind::Form => app.ui.host.confirm_by_id::<CommandForm>(ctx, did),
         HostedKind::Params => app.ui.host.confirm_by_id::<ParamDialog>(ctx, did),
+        HostedKind::ImageSize => app.ui.host.confirm_by_id::<craft::ui::dialog::ImageSizeDialog>(ctx, did),
+        HostedKind::CanvasSize => app.ui.host.confirm_by_id::<craft::ui::dialog::CanvasSizeDialog>(ctx, did),
     };
     if !confirmed {
         return Err("OK is disabled: the dialog's values are not complete".into());
@@ -431,9 +429,13 @@ pub fn collect(app: &mut PhotocraftApp) {
 fn settle(app: &mut PhotocraftApp, id: u64) -> Option<Result<Value, String>> {
     let record = app.ui.hosted(id)?.clone();
     let (kind, did) = (record.kind, record.did);
+    if kind.is_sizing() {
+        return crate::sizing::settle(app, id);
+    }
     let result = match kind {
         HostedKind::Form => app.ui.host.take_by_id::<CommandForm>(did)?.ok().map(|answer| answer.fields),
         HostedKind::Params => app.ui.host.take_by_id::<ParamDialog>(did)?.ok().map(|answer| answer.fields),
+        _ => return None,
     };
     match result {
         Some(answer) => {
@@ -462,6 +464,7 @@ fn browse(app: &mut PhotocraftApp) {
             let dialog = app.ui.host.get_mut_by_id::<ParamDialog>(did)?;
             dialog.pick_path().map(|r| (r, dialog.fields().clone(), id))
         }
+        HostedKind::ImageSize | HostedKind::CanvasSize => None,
     });
     let Some((PathRequest { key: field, kind }, fields, id)) = pressed else { return };
     let current = fields.text(&field).unwrap_or_default().to_owned();
@@ -534,7 +537,7 @@ pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<V
             app.ui.host.cancel_by_id::<ParamDialog>(ctx, did);
             app.ui.host.take_by_id::<ParamDialog>(did);
         }
-        HostedKind::ImageSize | HostedKind::CanvasSize => crate::sizing::close(app, ctx, kind),
+        HostedKind::ImageSize | HostedKind::CanvasSize => crate::sizing::close(app, ctx, id),
     }
     cancelled(app, id);
     Ok(Value::Null)

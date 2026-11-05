@@ -30,7 +30,6 @@ fn set(app: &mut PhotocraftApp, id: u64, key: &str, value: Value) {
 }
 
 #[test]
-#[ignore = "library row 162: sizing dialogs have no setters or getters"]
 fn dialog_maps_to_engine_command() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.imageSize").unwrap();
@@ -60,7 +59,6 @@ fn confirming_unchanged_dialogs_keeps_the_document() {
 }
 
 #[test]
-#[ignore = "library row 162: sizing dialogs have no setters or getters"]
 fn cancel_closes_the_dialog_and_runs_nothing() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.canvasSize").unwrap();
@@ -122,7 +120,6 @@ fn indexed_color_opens_on_nearest_neighbor() {
 
 /// #6019: the open list offers only Automatic and Nearest Neighbor on an Indexed Color document.
 #[test]
-#[ignore = "gap Z4: ImageSizeDialog offers every Resample method; it has no document mode to filter by"]
 fn indexed_color_offers_nearest_neighbor_and_automatic_only() {
     let mut app = indexed_app();
     app.session.execute("prefs.set", json!({"path": "general.imageInterpolation", "value": "nearestNeighbor"})).unwrap();
@@ -155,7 +152,6 @@ fn resample_follows_the_interpolation_preference() {
 }
 
 #[test]
-#[ignore = "library row 162: sizing dialogs have no setters or getters"]
 fn resample_preference_dialog_resizes_on_ok() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.imageSize").unwrap();
@@ -166,6 +162,7 @@ fn resample_preference_dialog_resizes_on_ok() {
 }
 
 #[test]
+#[ignore = "expectation overtaken by library row 162: ui.dialog.set now reaches the size dialogs' setters"]
 fn a_script_cannot_set_size_dialog_values() {
     let mut app = app_with(200, 100, 72);
     let id = open(&mut app, "image.canvasSize").unwrap();
@@ -269,7 +266,6 @@ fn resample_off_physical_width_changes_the_resolution() {
 /// #5756: with Traditional points (72.27 pt/in) and Resample off, 100 px typed as 72.27 pt wide
 /// is 100 ppi.
 #[test]
-#[ignore = "gap Z5: the library's size field rounds a typed value to the unit's display places (1 for points): 72.27 pt becomes 72.3 pt, 99.96 ppi"]
 fn traditional_points_with_resample_off_set_the_resolution() {
     let mut app = app_with(100, 50, 72);
     app.session.execute("prefs.set", json!({"path": "unitsAndRulers.pointSize", "value": "traditional"})).unwrap();
