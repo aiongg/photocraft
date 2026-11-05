@@ -61,8 +61,8 @@ fn names_and_blend_icons_have_separate_double_click_targets_and_no_overlap() {
             }
             click(&mut h, edit.center());
             click(&mut h, edit.center());
-            assert_eq!(h.state().ui.dialogs.last().unwrap().fields["__command"], json!("filter.blur.boxBlur"));
-            assert_eq!(h.state().ui.dialogs.last().unwrap().fields["radius"].as_f64(), Some(4.0));
+            assert_eq!(crate::dialogs::hosted::test_fields(h.state())["__command"], json!("filter.blur.boxBlur"));
+            assert_eq!(crate::dialogs::hosted::test_fields(h.state())["radius"].as_f64(), Some(4.0));
         }
     }
 }
@@ -119,7 +119,7 @@ fn adjustment_editor_reopens_stored_parameters_and_updates_instead_of_appending(
     app.run("image.adjustments.invert", json!({})).unwrap();
     let sm = smart(&app, layer).clone();
     super::open_editor(&mut app, &ctx, layer.0, &sm, 3);
-    assert!(app.ui.dialogs.is_empty(), "Invert has no parameter editor");
+    assert!(!app.ui.any_dialog_open(), "Invert has no parameter editor");
 }
 
 /// The Smart Filters mask and the layer mask of one layer are cached as separate thumbnails.
@@ -175,7 +175,7 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
     sm.smart_filters[index].params = json!({"amount": 125, "radius": 2});
 
     super::open_editor(&mut app, &ctx, layer.0, &sm, index);
-    let fields = &app.ui.dialogs.last().unwrap().fields;
+    let fields = &crate::dialogs::hosted::test_fields(&app);
     assert!(fields.contains_key("__smartFilter"), "it edits the recorded filter");
     assert_eq!(fields["reduceNoise"].as_f64(), Some(10.0), "the spec default, not the remembered 60");
     assert_eq!(fields["amount"].as_f64(), Some(125.0));

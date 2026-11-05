@@ -150,8 +150,9 @@ fn type_edit_menu_rows_act_on_the_text_and_the_layer() {
     // Warp Text… opens its dialog; Rasterize Type ends the edit and rasterizes the layer.
     reopen(&mut app);
     choose(&mut app, &ctx, "type.warpText");
-    assert!(!app.ui.dialogs.is_empty(), "Warp Text… asks for its settings");
-    app.ui.dialogs.clear();
+    assert!(app.ui.any_dialog_open(), "Warp Text… asks for its settings");
+    let dialog = app.ui.hosted.last().unwrap().id;
+    crate::dialogs::cancel(&mut app, dialog).unwrap();
     reopen(&mut app);
     choose(&mut app, &ctx, "type.rasterizeTypeLayer");
     assert!(app.ui.text_edit.is_none() && text_of(&app, id).is_none(), "the type layer is pixels now");

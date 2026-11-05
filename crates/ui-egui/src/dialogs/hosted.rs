@@ -58,6 +58,8 @@ pub struct Hosted {
     pub whole: Vec<String>,
     /// The Color Table footer's pressed button.
     pub table: Pending<Option<crate::color_table_ui::Action>>,
+    /// The textures of the preview pane (filter dialogs).
+    pub preview: crate::filter_preview_ui::PaneCache,
 }
 
 /// `DialogHost` as a `UiState` field: not saved, and a clone starts empty (open dialogs belong to
@@ -139,6 +141,14 @@ impl crate::state::UiState {
         };
         fields.extend(record.extra.clone());
         fields.extend(record.private.clone());
+        // The Preview check box is the library's: it reads as the dialog shows it (on and not held
+        // to compare). `ui.dialog.set` of `__preview` false also turns it off: the library has no
+        // setter for the check box (gap L).
+        if record.kind == HostedKind::Params && fields.contains_key("__preview") {
+            let wanted = record.private.get("__preview").and_then(Value::as_bool) != Some(false);
+            let on = self.hosted_params(id).is_some_and(ParamDialog::preview_on);
+            fields.insert("__preview".into(), json!(on && wanted));
+        }
         Some(fields)
     }
 
@@ -300,8 +310,19 @@ pub fn open_form(app: &mut PhotocraftApp, spec: FormSpec) -> u64 {
     // Opening over a form replaces it: its Cancel waits in the host with its key.
     app.ui.host.open(form);
     cancel_replaced::<CommandForm>(app);
-    let record =
-        Hosted { kind: HostedKind::Form, id, key: command, params, title, extra, private, documents: Vec::new(), whole: Vec::new(), table: Pending::default() };
+    let record = Hosted {
+        kind: HostedKind::Form,
+        id,
+        key: command,
+        params,
+        title,
+        extra,
+        private,
+        documents: Vec::new(),
+        whole: Vec::new(),
+        table: Pending::default(),
+        preview: Default::default(),
+    };
     app.ui.hosted.push(record);
     id
 }
@@ -489,6 +510,25 @@ pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<V
     }
     cancelled(app, id);
     Ok(Value::Null)
+}
+
+/// Test helpers for the open hosted filter dialog: set a field as automation would, read its JSON.
+#[cfg(test)]
+pub(crate) fn test_set(app: &mut PhotocraftApp, key: &str, value: Value) {
+    let id = app.ui.hosted.last().expect("a hosted dialog is open").id;
+    set_field(app, id, key, value).unwrap();
+}
+
+#[cfg(test)]
+pub(crate) fn test_fields(app: &PhotocraftApp) -> Fields {
+    let id = app.ui.hosted.last().expect("a hosted dialog is open").id;
+    app.ui.dialog_fields(id).unwrap()
+}
+
+#[cfg(test)]
+pub(crate) fn test_field(app: &PhotocraftApp, key: &str) -> Value {
+    let id = app.ui.hosted.last().expect("a hosted dialog is open").id;
+    app.ui.dialog_fields(id).unwrap().get(key).cloned().unwrap_or(Value::Null)
 }
 
 #[cfg(test)]
