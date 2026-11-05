@@ -686,7 +686,10 @@ fn backslash_toggles_the_rubylith() {
     h.run_steps(2);
     assert_eq!(mask_view(&h), serde_json::Value::Null);
     let sc = crate::shortcuts::parse("\\").unwrap();
-    assert!(!crate::shortcut_dispatch::Focus::Text.allows(&sc), "typing \\ in a text field stays text");
+    assert!(
+        !crate::shortcut_dispatch::allows(h.state(), &h.ctx, crate::shortcut_dispatch::KeyOwner::Text, "view.layerMask", &sc),
+        "typing \\ in a text field stays text"
+    );
 }
 
 /// #780: clicking the mask thumbnail targets the mask, and ⌘I (Image › Adjustments › Invert)

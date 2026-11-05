@@ -1,10 +1,12 @@
 //! Keyboard shortcuts: Photoshop defaults from the command registry, plus single-key tools.
 
+use craft::keymap::ui::NAVIGATION_COMMANDS;
 use craft::keymap::{Chord, Key as CKey, Mods as CMods, Platform};
 use egui::{Key, KeyboardShortcut, Modifiers};
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::shortcut_dispatch::KeyOwner;
 use crate::state::Tool;
 
 /// Parse `Cmd+Shift+N` style strings. `Cmd` maps to ⌘ on macOS and Ctrl elsewhere.
@@ -97,10 +99,6 @@ pub fn consume(ctx: &egui::Context, sc: &KeyboardShortcut) -> bool {
     })
 }
 
-/// View navigation that Photoshop keeps live while a dialog is open (so the image can be judged
-/// at any zoom): Zoom In / Out, Fit on Screen, 100%.
-pub const NAV_COMMANDS: [&str; 4] = ["view.zoomIn", "view.zoomOut", "view.fitOnScreen", "view.actualPixels"];
-
 /// ⌘+ / ⌘- / ⌘0 / ⌘1 (or their Edit › Keyboard Shortcuts overrides). Returns true when one ran.
 /// Layer › New › Layer's shortcut with ⌥ added (⌥⇧⌘N by default) makes the layer at once, as in
 /// Photoshop: the plain shortcut asks with the New Layer dialog first, like the menu item, and
@@ -135,12 +133,12 @@ fn nav_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     true
 }
 
-/// The [`NAV_COMMANDS`] entry whose shortcut (or an Edit › Keyboard Shortcuts override) was
+/// The [`NAVIGATION_COMMANDS`] entry (the view commands Photoshop keeps live under a dialog) whose shortcut (or an Edit › Keyboard Shortcuts override) was
 /// pressed this frame, with the key press consumed. A view with its own zoom, like Liquify's
 /// preview, steps it with the same keys (#7210).
 pub(crate) fn nav_shortcut(app: &PhotocraftApp, ctx: &egui::Context) -> Option<&'static str> {
     let km = app.keymap();
-    NAV_COMMANDS.into_iter().find(|id| {
+    NAVIGATION_COMMANDS.into_iter().find(|id| {
         let keys: Vec<KeyboardShortcut> = km.main(id).into_iter().chain(km.alternates(id)).filter_map(|k| parse(&k)).collect();
         keys.iter().any(|sc| consume(ctx, sc))
     })
@@ -447,7 +445,7 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // dropdown is open. This runs before Popup::show registers the current pass, so use
     // the editor's explicit state; otherwise Escape deselects or commits a pending Pen path.
     // Modified commands such as Undo still follow the ordinary dispatch below.
-    if app.ui.stroke_editor.is_some() && !ctx.input(|i| i.modifiers.command || i.modifiers.ctrl) {
+    if app.ui.stroke_editor.is_some() && !ctx.input(|i| i.modifiers.command) {
         return false;
     }
     // So does the right-click menu of text being edited: Esc closes only it, and keys typed while
@@ -493,22 +491,24 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     true
 }
 
-fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {
-    use crate::shortcut_dispatch::{Focus, dispatch_pressed};
+fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, owner: KeyOwner) -> bool {
+    use crate::shortcut_dispatch::dispatch_pressed;
     // Dialogs (and Liquify's panel while one of its controls has focus) keep canvas zoom; a
     // focused text field keeps its keys.
-    let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && focus != Focus::None;
+    // A dialog's text field is typing too, though the dialog owns the keys.
+    let typing = owner == KeyOwner::Text || ctx.text_edit_focused();
+    let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && owner != KeyOwner::App;
     if liquify_focus || app.ui.any_dialog_open() || app.discard.is_some() {
         // A text field keeps its plain keys, but the ⌘ view shortcuts (zoom) still reach the canvas.
-        if focus != Focus::Text || ctx.input(|i| i.modifiers.command) {
+        if !typing || ctx.input(|i| i.modifiers.command) {
             nav_keys(app, ctx);
         }
         return true;
     }
-    if focus == Focus::Text {
+    if typing {
         // A focused field keeps its typing and editing keys; menu shortcuts (⌘J, ⌘S, F7…) still
         // fire, as in Photoshop.
-        dispatch_pressed(app, ctx, focus, false);
+        dispatch_pressed(app, ctx, false);
         return true;
     }
     // Liquify / Puppet Warp / Perspective Warp: ↩ commits, Esc cancels.
@@ -544,19 +544,19 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
     }
     // Crop tool with a pending frame: arrows nudge it (⇧ ×10) and X swaps its orientation, before
     // the selection / layer nudge and the X colour swap (#1919).
-    if focus == Focus::None && crate::crop_ui::keys(app, ctx) {
+    if owner == KeyOwner::App && crate::crop_ui::keys(app, ctx) {
         return true;
     }
     // Perspective Crop with a pending quad: ↵ commits, Esc cancels.
-    if focus == Focus::None && crate::perspective_crop_ui::keys(app, ctx) {
+    if owner == KeyOwner::App && crate::perspective_crop_ui::keys(app, ctx) {
         return true;
     }
     // Move tool / Free Transform: arrows nudge (⇧ ×10, ⌥ duplicates first).
-    if focus == Focus::None && crate::move_mods::arrow_keys(app, ctx) {
+    if owner == KeyOwner::App && crate::move_mods::arrow_keys(app, ctx) {
         return true;
     }
     // Moved pixels still floating: ↩ drops them.
-    if focus == Focus::None
+    if owner == KeyOwner::App
         && app.session.active().is_some_and(|st| photocraft_engine::float_cmds::floating(st).is_some())
         && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter))
     {
@@ -595,11 +595,11 @@ fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !preflight_keys(app, ctx) {
         return;
     }
-    let focus = crate::shortcut_dispatch::Focus::of(ctx);
-    if handle_modal_canvas_keys(app, ctx, focus) || handle_pen_and_work_path_keys(app, ctx, focus) || handle_object_tool_keys(app, ctx) {
+    let owner = crate::shortcut_dispatch::owner(app, ctx);
+    if handle_modal_canvas_keys(app, ctx, owner) || handle_pen_and_work_path_keys(app, ctx) || handle_object_tool_keys(app, ctx) {
         return;
     }
-    if handle_registry_and_tool_keys(app, ctx, focus) {
+    if handle_registry_and_tool_keys(app, ctx, owner) {
         return;
     }
     handle_escape_and_view_keys(app, ctx);
@@ -607,7 +607,7 @@ fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// Pen path keys (#1466, #1769), the work-path delete key (#5702), and in-progress lasso state.
 /// Returns true when one of them consumed the key.
-fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {
+fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // A Pen path's points are uncommitted gesture state, not History entries (#1466).
     // Intercept Cmd/Ctrl+Z before the normal Edit › Undo shortcut, as well as unmodified
     // Backspace/Delete. Once the last anchor is removed, regular Undo works again.
@@ -633,7 +633,7 @@ fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
     }
     // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in
     // Photoshop (#5702), never Edit › Clear on the pixels under it.
-    if focus != crate::shortcut_dispatch::Focus::DeletingWidget && crate::vector_ui::delete_key_deletes_work_path(app) {
+    if crate::shortcut_dispatch::delete_keys_free(app, ctx) && crate::vector_ui::delete_key_deletes_work_path(app) {
         let mods = ctx.input(|i| i.modifiers);
         if !mods.command && !mods.ctrl && !mods.shift && !mods.alt && ctx.input_mut(|i| i.consume_key(mods, Key::Backspace) || i.consume_key(mods, Key::Delete))
         {
@@ -669,10 +669,10 @@ fn handle_object_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool
 
 /// Registry shortcuts, inline type, and the crop-tool and single-key tool shortcuts. Returns true
 /// when one consumed the key.
-fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {
+fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, owner: KeyOwner) -> bool {
     // Space+F (⇧Space+F backwards) cycles the pasteboard colour, as in Photoshop: F while the
     // Hand key is held, before F's own Cycle Screen Mode.
-    if !matches!(focus, crate::shortcut_dispatch::Focus::Text) && app.ui.text_edit.is_none() && crate::hold_keys::reposition_held(app, ctx) {
+    if owner != KeyOwner::Text && app.ui.text_edit.is_none() && crate::hold_keys::reposition_held(app, ctx) {
         let back = ctx.input_mut(|i| i.consume_key(Modifiers::SHIFT, Key::F));
         if back || ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F)) {
             if let Err(e) = crate::canvas_tool_menu::cycle_canvas_color(app, back) {
@@ -688,7 +688,7 @@ fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
         return true;
     }
     // Registry, UI and menu-catalogue shortcuts (see [`crate::shortcut_dispatch::bindings`]).
-    if crate::shortcut_dispatch::dispatch_pressed(app, ctx, focus, editing) {
+    if crate::shortcut_dispatch::dispatch_pressed(app, ctx, editing) {
         return true;
     }
     if editing {
