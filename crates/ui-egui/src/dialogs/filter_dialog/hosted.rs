@@ -25,19 +25,10 @@ type LibParam = craft::ui::dialog::Param;
 /// - Color Settings: `ParamDialog::below` (150);
 /// - Color Table: the colour list (152);
 /// - Bitmap: its pattern picker reads the app (`preset_panels::pattern_picker` takes `&PhotocraftApp`);
-/// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (rechecked in 3b);
-/// - Warp Text and Arbitrary Rotation: live preview reads the legacy Vec until 3b.
+/// - Select and Mask and the Blur Gallery workspaces: canvas-side keys (gap K).
 pub(crate) fn hosts(command: &str, spec: &str) -> bool {
-    const LEGACY: [&str; 8] = [
-        REPLACE_COLOR,
-        "image.mode.indexedColor",
-        super::RADIAL_BLUR,
-        "edit.colorSettings",
-        "image.mode.colorTable",
-        crate::bitmap_dialog::COMMAND,
-        "type.warpText",
-        "image.rotation.arbitrary",
-    ];
+    const LEGACY: [&str; 6] =
+        [REPLACE_COLOR, "image.mode.indexedColor", super::RADIAL_BLUR, "edit.colorSettings", "image.mode.colorTable", crate::bitmap_dialog::COMMAND];
     !(LEGACY.contains(&command)
         || command == crate::select_mask_view::COMMAND
         || crate::blur_pins::handles(command)
@@ -364,6 +355,7 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         documents,
         whole: map.iter().filter(|(_, v)| v.is_i64() || v.is_u64()).map(|(k, _)| k.clone()).collect(),
         table: Pending::default(),
+        preview: Default::default(),
     };
     let wire = Wire::of(&record);
     let (values, extra) = wire.fields(&map);
@@ -371,7 +363,10 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
         .values(values)
         // Cmd/Ctrl+Z steps the dialog's own settings (#4697), and the close box follows the platform.
         .history(true)
-        .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()));
+        .close_label(crate::dialogs::CLOSE_BOX.then(|| tl!("Close").to_string()))
+        // The Preview check box sits in the bottom footer, as PhotoCraft's does.
+        .preview(map.contains_key("__preview"))
+        .layout(craft::ui::dialog::ParamLayout::BottomFooter);
     if crate::color_table_ui::owns(&map) {
         let pending = record.table.clone();
         dialog = dialog.footer_extra(move |ui| {
@@ -385,15 +380,30 @@ fn host(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, map: Ma
     open_params(app, dialog, Hosted { extra, ..record })
 }
 
-/// What the app pushes into the open dialog before it draws: whether OK takes input, and the
-/// Color Settings note.
-pub(crate) fn push_state(app: &mut PhotocraftApp) {
+/// The open hosted filter dialog as the live preview reads it: its id and its JSON fields.
+pub(crate) fn live_fields(app: &PhotocraftApp) -> Option<(u64, Map<String, Value>)> {
+    let record = app.ui.hosted.iter().find(|h| h.kind == HostedKind::Params)?;
+    Some((record.id, app.ui.dialog_fields(record.id)?))
+}
+
+/// What the app pushes into the open dialog before it draws: whether OK takes input, the preview
+/// pane's image, and the Color Settings note.
+pub(crate) fn push_state(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(record) = app.ui.hosted.iter().find(|h| h.kind == HostedKind::Params).cloned() else { return };
     let Some(fields) = app.ui.dialog_fields(record.id) else { return };
     let ok = crate::dialogs::enabled_for(app, &fields).0;
     let note = (record.key == "edit.colorSettings").then(|| crate::monitor_status::note(app));
+    let image = live_fields(app).and_then(|(id, fields)| {
+        let on = fields.get("__preview").and_then(Value::as_bool) == Some(true);
+        // The record's cache is out of the record while the textures are built from the app.
+        let mut cache = app.ui.hosted.iter_mut().find(|h| h.id == id).map(|h| std::mem::take(&mut h.preview))?;
+        let image = crate::filter_preview_ui::pane_image(app, ctx, &mut cache, id, &fields, on);
+        app.ui.hosted.iter_mut().find(|h| h.id == id)?.preview = cache;
+        image
+    });
     let Some(dialog) = app.ui.host.get_mut::<ParamDialog>() else { return };
     dialog.set_ok_enabled(ok);
+    dialog.set_preview_image(image);
     if let Some(note) = note {
         dialog.fields_mut().set(NOTE, note);
     }

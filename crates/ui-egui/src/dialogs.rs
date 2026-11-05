@@ -703,7 +703,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         craft::ui::title_bar::ModalRects::push(ctx, ctx.viewport_id(), rect);
     }
     // The hosted dialogs draw above the legacy ones, then tell the title bar where they are.
-    crate::filter_dialog::push_state(app);
+    crate::filter_dialog::push_state(app, ctx);
     app.ui.host.show(ctx);
     hosted::collect(app);
     let legacy: Vec<_> = app.ui.legacy_stacked.iter().map(|id| dialog_id(id)).collect();

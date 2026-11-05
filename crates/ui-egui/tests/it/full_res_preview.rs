@@ -160,7 +160,7 @@ fn filter_dialog_previews_at_full_resolution_when_low_res_is_off() {
     assert!(committed > 60.0, "zoomed out the columns average to grey ({committed})");
     control(&mut h, "ui.set", json!({"zoom": 1.0, "center": [W / 2, H / 2]}));
     // Offset 0, 0 leaves the pixels as they are: any change is the preview's resolution.
-    photocraft_ui_egui::filter_dialog::open_legacy(h.state_mut(), "filter.other.offset").expect("Offset dialog");
+    photocraft_ui_egui::filter_dialog::open(h.state_mut(), "filter.other.offset").expect("Offset dialog");
     let at_100 = row(&mut h);
     assert!(columns(&at_100) > 0.9, "default at 100 %: the preview is never coarser than the screen ({})", columns(&at_100));
     control(&mut h, "ui.set", json!({"zoom": 0.5, "center": [W / 2, H / 2]}));

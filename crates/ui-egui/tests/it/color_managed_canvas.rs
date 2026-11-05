@@ -70,8 +70,7 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         drop(doc);
         let observer = observer.lock().expect("GPU observer lock").clone().expect("GPU observer");
         let ctx = harness.ctx.clone();
-        // The live preview reads the legacy dialog list until 3b.
-        photocraft_ui_egui::dialogs::filter_dialog::open_legacy(harness.state_mut(), "filter.blur.gaussianBlur").expect("Gaussian Blur opens a dialog");
+        let dialog = photocraft_ui_egui::dialogs::filter_dialog::open(harness.state_mut(), "filter.blur.gaussianBlur").expect("Gaussian Blur opens a dialog");
         harness.run_steps(6);
         let preview = id.0 ^ (1u64 << 61);
         assert!(observer.has(preview, [512, 512]), "filter preview uploaded");
@@ -84,7 +83,7 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         harness.state_mut().sync_views();
         harness.run_steps(6);
         assert!(observer.has(preview, [512, 512]), "same-ID reopen uploads the still-open filter preview again");
-        harness.state_mut().ui.dialogs.clear();
+        photocraft_ui_egui::dialogs::cancel(harness.state_mut(), dialog).expect("cancel the filter dialog");
         let after_reopen = sample(&mut harness);
         assert!((0..3).all(|i| gpu[i].abs_diff(after_reopen[i]) <= 1), "GPU native reopen changed display color: {gpu:?} -> {after_reopen:?}");
         let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id":"image.adjustments.brightnessContrast"}));

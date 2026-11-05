@@ -19,7 +19,7 @@ use crate::theme::Tokens;
 mod hosted;
 mod zoom_center;
 
-pub(crate) use hosted::{Wire, push_state, requests};
+pub(crate) use hosted::{Wire, live_fields, push_state, requests};
 pub(crate) use hosted::{eyedropper_armed as hosted_eyedropper, eyedropper_sample as hosted_eyedropper_sample};
 pub use hosted::{open, open_with_spec};
 
@@ -512,11 +512,15 @@ pub fn reset_fields(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
 }
 
 /// The filter dialog of `command` on the legacy dialog list. [`open`] picks it for the commands the
-/// host does not show. The live preview (filter_preview_ui, canvas) still reads this list, so the
-/// preview tests open dialogs with it until the hosted dialog drives the preview.
+/// host does not show.
 pub fn open_legacy(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
     let fields = opening_fields(app, command)?;
     Some(app.ui.open_dialog(crate::state::DialogKind::Command, fields))
+}
+
+/// The open filter dialog the live preview follows, hosted or legacy: its id and its fields.
+pub(crate) fn live_dialog(app: &PhotocraftApp) -> Option<(u64, Map<String, Value>)> {
+    app.ui.dialogs.iter().find(|d| d.fields.contains_key("__filter")).map(|d| (d.id, d.fields.clone())).or_else(|| live_fields(app))
 }
 
 /// The fields a filter dialog of `command` opens with: schema defaults, remembered values and the
