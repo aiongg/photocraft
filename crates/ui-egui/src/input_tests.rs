@@ -256,7 +256,7 @@ fn press(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, pressed: bool) {
 }
 
 fn picker_color(h: &Harness<'static, PhotocraftApp>) -> String {
-    let d = h.state().ui.dialogs.last().unwrap();
+    let d = crate::color_picker_ui::top_dialog(h.state()).unwrap();
     d.fields.get("color").and_then(serde_json::Value::as_str).unwrap().to_string()
 }
 
@@ -326,7 +326,7 @@ fn color_picker_samples_the_image_under_its_pipette() {
     assert_eq!(picker_color(&h), "#ff0000");
     h.key_press(Key::Enter);
     h.run_steps(2);
-    assert!(h.state().ui.dialogs.is_empty());
+    assert!(crate::color_picker_ui::top(h.state()).is_none());
     assert_eq!(h.state().session.tools.foreground, [1.0, 0.0, 0.0, 1.0]);
 }
 

@@ -14,10 +14,10 @@ fn fixture(kind: Kind, depth: u32) -> (PhotocraftApp, u32) {
     (app, id)
 }
 fn fields(app: &PhotocraftApp, id: u64) -> Map<String, Value> {
-    app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone()
+    app.ui.dialog_fields(id).unwrap()
 }
 fn set(app: &mut PhotocraftApp, id: u64, color: &str) {
-    app.ui.dialog_mut(id).unwrap().fields.insert("color".into(), json!(color));
+    dialogs::hosted::set_field(app, id, "color", json!(color)).unwrap();
 }
 
 #[test]
@@ -104,16 +104,16 @@ fn invalidated_targets_never_redirect_and_bad_color_never_commits() {
         }
         let doc = app.session.active().unwrap().doc.clone();
         assert!(confirm(&mut app, &pending).is_err());
-        prune(&mut app);
-        assert!(app.ui.dialogs.is_empty());
+        prune(&mut app, &egui::Context::default());
+        assert!(color_picker_ui::pickers(&app).is_empty());
         assert!(app.text_style_preview.is_none());
         assert!(Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
     }
     let (mut app, id) = fixture(Kind::Character, 8);
     let picker = open(&mut app, Kind::Character, id).unwrap();
-    set(&mut app, picker, "invalid");
+    assert!(dialogs::hosted::set_field(&mut app, picker, "color", json!("invalid")).is_err(), "the picker takes only a colour");
     let doc = app.session.active().unwrap().doc.clone();
-    assert!(dialogs::confirm(&mut app, picker).is_err());
+    dialogs::confirm(&mut app, picker).unwrap();
     assert!(Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
 }
 
@@ -125,7 +125,7 @@ fn inherited_colors_and_invalid_open_requests_are_atomic() {
     for (kind, id) in [(Kind::Character, 0), (Kind::Character, u32::MAX), (Kind::Character, inherited), (Kind::Paragraph, 0)] {
         assert!(open(&mut app, kind, id).is_err());
         assert_eq!(app.ui.type_panels, panels);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(color_picker_ui::pickers(&app).is_empty());
     }
     app.run("type.paragraphStyle.set", json!({"id":0,"attrs":{"color":"#112233"}})).unwrap();
     let picker = open(&mut app, Kind::Paragraph, 0).unwrap();
@@ -161,13 +161,13 @@ fn actual_style_swatch_opens_shared_picker_enter_commits_escape_cancels() {
             let doc = h.state().session.active().unwrap().doc.clone();
             h.get_by_role(egui::accesskit::Role::ColorWell).click();
             h.run();
-            assert_eq!(h.state().ui.dialogs.len(), 1);
-            let picker = h.state().ui.dialogs[0].id;
+            let picker = color_picker_ui::top(h.state()).expect("one picker");
+            assert_eq!(color_picker_ui::pickers(h.state()).len(), 1);
             assert_eq!(fields(h.state(), picker)["__label"], "Color Picker (Text Color)");
             set(h.state_mut(), picker, "#00ff00");
             h.key_press(key);
             h.run();
-            assert!(h.state().ui.dialogs.is_empty());
+            assert!(color_picker_ui::pickers(h.state()).is_empty());
             if key == Key::Escape {
                 assert!(Arc::ptr_eq(&h.state().session.active().unwrap().doc, &doc));
             } else {

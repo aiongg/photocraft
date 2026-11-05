@@ -185,7 +185,7 @@ fn fill_and_picker(h: &Harness<'_, PhotocraftApp>) -> (u64, Option<u64>) {
 }
 
 fn field(h: &Harness<'_, PhotocraftApp>, id: u64, key: &str) -> Value {
-    h.state().ui.dialogs.iter().find(|d| d.id == id).and_then(|d| d.fields.get(key).cloned()).unwrap_or(Value::Null)
+    h.state().ui.dialog_fields(id).and_then(|f| f.get(key).cloned()).unwrap_or(Value::Null)
 }
 
 /// Contents › Color… opens PhotoCraft's Color Picker on the dialog's colour (as Photoshop's Fill
@@ -210,7 +210,7 @@ fn choosing_color_opens_the_color_picker() {
     assert_eq!(field(&h, picker, "color"), json!("#ff0000"), "on the dialog's colour (the foreground at first)");
     assert_eq!(field(&h, picker, "__label"), json!("Color Picker (Fill Color)"));
     // OK sets the Fill colour; the Fill dialog stays open and the tool colours are untouched.
-    h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#336699"));
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#336699")).unwrap();
     crate::dialogs::confirm(h.state_mut(), picker).unwrap();
     h.run_steps(3);
     assert_eq!(fill_and_picker(&h), (fill, None));
@@ -243,8 +243,8 @@ fn the_color_swatch_opens_the_color_picker() {
     assert_eq!(field(&h, picker, "color"), json!("#20a040"));
     assert!(!egui::Popup::is_any_open(&h.ctx), "no egui colour popup");
     // Cancel: the Fill dialog is unchanged.
-    h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#000000"));
-    h.state_mut().ui.close_dialog(picker);
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#000000")).unwrap();
+    crate::dialogs::cancel(h.state_mut(), picker).unwrap();
     h.run_steps(3);
     assert_eq!(fill_and_picker(&h), (id, None));
     assert_eq!(field(&h, id, "contents"), json!("color"));

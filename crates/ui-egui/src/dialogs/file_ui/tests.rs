@@ -537,14 +537,15 @@ fn web_preview_grows_with_resize_and_accepts_zoom_and_pan() {
     h.run_steps(2);
     h.key_press(egui::Key::Enter);
     h.run_steps(4);
-    assert_eq!(h.state().ui.dialogs.len(), 2);
-    assert!(crate::color_picker_ui::owns(&h.state().ui.dialogs[1].fields));
+    assert_eq!(h.state().ui.dialogs.len(), 1);
+    assert!(crate::color_picker_ui::top_dialog(h.state()).is_some_and(|d| crate::color_picker_ui::owns(&d.fields)));
     for ch in "12ab34".chars() {
         h.event(egui::Event::Text(ch.to_string()));
         h.run_steps(1);
     }
     h.key_press(egui::Key::Enter);
     h.run_steps(4);
+    assert!(crate::color_picker_ui::top(h.state()).is_none(), "Enter closes the picker, not the dialog");
     assert_eq!(h.state().ui.dialogs.len(), 1);
     assert_eq!(h.state().ui.dialogs[0].fields["colorTableEdits"]["0"], "#12ab34");
 }

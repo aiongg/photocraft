@@ -1193,7 +1193,7 @@ fn pointer_eyedropper_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &Poi
     // With the Color Picker on top the image is its eyedropper, as for the mouse.
     if crate::color_picker_ui::top(app).is_some() {
         if !matches!(s.ev, ToolEvent::Up { .. }) {
-            crate::color_picker_ui::sample_at(app, x, y);
+            crate::color_picker_ui::sample_at(app, ctx, x, y);
         }
         return true;
     }

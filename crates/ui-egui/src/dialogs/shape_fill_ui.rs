@@ -41,11 +41,9 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<u64> {
     let layer = st.active_layer?;
     let color = solid_fill(&st.doc, layer)?;
     let params = json!({"layer": layer.0, "document": st.doc.id.0});
-    let id = color_picker_ui::open_for_command(app, "Color Picker (Solid Color)", color.to_rgb(), COMMAND, params);
-    if let Some(d) = app.ui.dialog_mut(id) {
-        d.fields.insert(MARKER.into(), json!(true));
-    }
-    Some(id)
+    let mut private = serde_json::Map::new();
+    private.insert(MARKER.into(), json!(true));
+    Some(color_picker_ui::open_for_command_marked(app, "Color Picker (Solid Color)", color.to_rgb(), COMMAND, params, private))
 }
 
 pub(crate) fn owns(f: &Map<String, Value>) -> bool {
@@ -85,7 +83,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result
 /// The canvas preview while the picker is open: the document with the shape re-rendered in the
 /// picked colour, cached per dialog, revision and colour.
 pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
-    let Some(d) = app.ui.dialogs.iter().rev().find(|d| owns(&d.fields)) else {
+    let Some(d) = color_picker_ui::pickers(app).into_iter().rev().find(|d| owns(&d.fields)) else {
         app.shape_fill_preview = None;
         return None;
     };

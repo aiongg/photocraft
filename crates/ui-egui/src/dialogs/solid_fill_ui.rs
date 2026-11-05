@@ -28,14 +28,11 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<u64> {
     let layer = st.active_layer?;
     let LayerContent::Fill(Fill::Solid(color)) = st.doc.layer(layer)?.content else { return None };
     let params = json!({"layer": layer.0, "document": st.doc.id.0});
-    let id = color_picker_ui::open_for_command(app, "Color Picker (Solid Color)", color.to_rgb(), cmds::SET, params);
     // A CMYK fill reopens showing its own inks, not ones recomputed from its sRGB stand-in (#8568).
-    if color.mode == photocraft_color::ColorMode::Cmyk
-        && let Some(d) = app.ui.dialog_mut(id)
-    {
-        d.fields.insert("__cmyk".into(), json!(color.c));
+    if color.mode == photocraft_color::ColorMode::Cmyk {
+        return Some(color_picker_ui::open_for_command_kept(app, "Color Picker (Solid Color)", color.to_rgb(), color.c, cmds::SET, params));
     }
-    Some(id)
+    Some(color_picker_ui::open_for_command(app, "Color Picker (Solid Color)", color.to_rgb(), cmds::SET, params))
 }
 
 /// Creating a Solid Color fill is transactional: the document is unchanged until OK.
@@ -74,8 +71,7 @@ pub(crate) fn owns(f: &Map<String, Value>) -> bool {
 }
 
 pub(crate) fn thumbnail_color(app: &PhotocraftApp, document: DocId, layer: LayerId, original: Color) -> Color {
-    app.ui
-        .dialogs
+    color_picker_ui::pickers(app)
         .iter()
         .rev()
         .filter(|d| owns(&d.fields))
@@ -139,7 +135,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result
 }
 
 pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
-    let dialog = app.ui.dialogs.iter().rev().find(|d| owns(&d.fields));
+    let dialog = color_picker_ui::pickers(app).into_iter().rev().find(|d| owns(&d.fields));
     let Some(d) = dialog else {
         app.solid_fill_preview = None;
         return None;

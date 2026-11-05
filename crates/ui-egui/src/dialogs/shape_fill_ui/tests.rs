@@ -48,22 +48,22 @@ fn shape_thumbnail_double_click_picks_the_fill_colour() {
     assert_eq!(app.session.active().unwrap().active_layer, Some(id));
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.entries().len();
-    let dialog = app.ui.dialogs.last().filter(|d| owns(&d.fields)).expect("Color Picker opened on the shape fill");
+    let dialog = crate::color_picker_ui::top_dialog(app).filter(|d| owns(&d.fields)).expect("Color Picker opened on the shape fill");
     assert_eq!(dialog.fields["color"], "#336699");
     let dialog = dialog.id;
 
     // Picking previews on the canvas without touching the document; Cancel drops it.
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     let (shown, _) = display_doc(app, 0).unwrap();
     let LayerContent::Shape(sh) = &shown.layer(id).unwrap().content else { panic!() };
     assert_eq!(sh.fill, Some(Fill::Solid(Color::rgb(1.0, 136.0 / 255.0, 0.0))));
-    app.ui.close_dialog(dialog);
+    crate::dialogs::cancel(app, dialog).unwrap();
     assert!(display_doc(app, 0).is_none());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "Cancel leaves the shape alone");
 
     // OK commits the colour as one undo step.
     let dialog = open(app).unwrap();
-    app.ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(app, dialog, "color", json!("#ff8800")).unwrap();
     crate::dialogs::confirm(app, dialog).unwrap();
     assert_eq!(fill(app, id), Some(Fill::Solid(Color::rgb(1.0, 136.0 / 255.0, 0.0))));
     assert_eq!(app.session.active().unwrap().history.entries().len(), steps + 1);

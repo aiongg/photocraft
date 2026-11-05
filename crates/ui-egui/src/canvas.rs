@@ -727,7 +727,7 @@ fn handle_dialog_canvas_input(app: &mut PhotocraftApp, input: DialogCanvasInput<
             } else if replace_picking {
                 crate::filter_dialog::color_eyedropper_sample(app, d[0], d[1]);
             } else {
-                crate::color_picker_ui::sample_at(app, d[0], d[1]);
+                crate::color_picker_ui::sample_at(app, input.ctx, d[0], d[1]);
             }
         }
     } else if pinning
