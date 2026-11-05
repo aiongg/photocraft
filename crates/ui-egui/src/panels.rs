@@ -24,7 +24,6 @@ pub mod brushes_tab;
 pub mod channels_panel;
 pub mod chrome_ui;
 pub mod clip_line_ui;
-mod color;
 pub mod color_panel_ui;
 pub mod comps_ui;
 pub mod doc_props_ui;
@@ -63,11 +62,6 @@ mod toolbar;
 pub mod type_panels_ui;
 pub(super) mod variables_ui;
 
-#[cfg(test)]
-use color::color_field_height;
-#[cfg(test)]
-pub(crate) use color::srgb_bytes;
-pub(crate) use color::{color_field, color_field_fill_id, field_chips, kept_values, offer_color_field_fill, remember_values};
 #[cfg(test)]
 pub(crate) use dock::DOCK_MIN_WIDTH;
 pub(crate) use dock::{canvas_panel, dock_body, dock_width_id, dock_width_range};
@@ -1083,7 +1077,7 @@ mod swatch_type_tests {
             resize: None,
             preedit: None,
         });
-        let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| color_field(app, ui), app);
+        let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::color_panel_ui::panel(app, ui), app);
         h.run_steps(4);
         assert_eq!(h.state().session.tools.foreground, fg);
         let st = h.state().session.active().unwrap();

@@ -514,6 +514,8 @@ struct PanelSet {
     dock_tabs: Option<crate::state::DockTabs>,
     dock: Option<crate::dock::DockLayout>,
     color_panel: Option<crate::state::ColorPanelState>,
+    /// The `colorPanel` object as sent, for the Only Web Colors an older state kept in it.
+    color_panel_saved: Option<Value>,
     dock_width: Option<f64>,
 }
 
@@ -535,6 +537,7 @@ impl PanelSet {
             dock: whole_object(&app.ui.dock, p.get("dock"), "dock")?,
             // Which chip the Color panel edits.
             color_panel: merged_object(&app.ui.color_panel, p.get("colorPanel"), "colorPanel")?,
+            color_panel_saved: p.get("colorPanel").cloned(),
             dock_width: f32_field(p, "dockWidth")?,
         })
     }
@@ -603,6 +606,9 @@ impl PanelSet {
     fn apply_color_and_width(&mut self, app: &mut PhotocraftApp, ctx: &egui::Context) {
         if let Some(v) = self.color_panel.take() {
             app.ui.color_panel = v;
+            if let Some(saved) = self.color_panel_saved.take() {
+                crate::color_panel_ui::carry_web_only(app, &saved);
+            }
         }
         // Right dock width in points (clamped to the dock's 250..=520 range), applied next frame.
         if let Some(w) = self.dock_width {
