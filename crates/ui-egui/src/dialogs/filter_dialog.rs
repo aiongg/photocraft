@@ -896,7 +896,7 @@ pub(crate) fn ask_displace_map(app: &mut PhotocraftApp, command: String, fields:
             Picked::Contents(_) => {
                 return Err("open the displacement map as a document, then choose it as the Map Document".into());
             }
-            Picked::Cancelled => return Err(crate::file_picks::CANCELLED.into()),
+            Picked::Cancelled | Picked::Unavailable(_) => return Err(crate::file_picks::CANCELLED.into()),
         };
         let mut fields = fields;
         fields.insert("mapPath".into(), json!(path));

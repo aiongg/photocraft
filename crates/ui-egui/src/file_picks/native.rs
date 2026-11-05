@@ -2,30 +2,22 @@
 
 use std::sync::Arc;
 
-use craft::dialogs::service::{ExtensionPolicy, FilePanels, FileService, ReplaceWords};
+use craft::dialogs::service::{ExtensionPolicy, FilePanels, FileService};
 use craft::host::Wake;
 
 use crate::PhotocraftApp;
 
-/// The panels and the extension policy they were last given.
+/// The panels the native service queues its picks for.
 #[derive(Default)]
-pub(crate) struct Panels {
-    panels: Option<FilePanels>,
-    policy: ExtensionPolicy,
-}
+pub(crate) struct Panels(Option<FilePanels>);
 
 impl Panels {
-    /// Shows the next queued panel and settles the answers. `FilePanels` takes its policy by
-    /// value, so a changed preference rebuilds it around the same state.
-    pub(crate) fn pump(&mut self, policy: ExtensionPolicy, parent: Option<&eframe::Frame>) {
-        let Some(mut panels) = self.panels.take() else { return };
-        if policy != self.policy {
-            self.policy = policy;
-            panels = panels.extension_policy(policy);
-        }
-        panels.set_replace_words(replace_words());
-        panels.pump(parent);
-        self.panels = Some(panels);
+    /// Shows the next queued panel and settles the answers. The Replace question is a prompt on
+    /// `host`, shown with the app's other dialogs.
+    pub(crate) fn pump(&mut self, policy: ExtensionPolicy, host: &mut craft::ui::dialog::DialogHost, parent: Option<&eframe::Frame>) {
+        let Some(panels) = self.0.as_mut() else { return };
+        panels.set_extension_policy(policy);
+        panels.pump_with(host, parent);
     }
 }
 
@@ -35,16 +27,6 @@ pub(crate) fn policy(lowercase: bool) -> ExtensionPolicy {
     ExtensionPolicy { lowercase, ..ExtensionPolicy::default() }
 }
 
-/// The Replace question, in PhotoCraft's words and the current language.
-fn replace_words() -> ReplaceWords {
-    ReplaceWords {
-        title: tl!("Replace").to_owned(),
-        question: tl!("“{name}” already exists. Replace it?").to_owned(),
-        replace: tl!("Replace").to_owned(),
-        cancel: tl!("Cancel").to_owned(),
-    }
-}
-
 impl PhotocraftApp {
     /// Installs the native file service: picks queue in it, and `poll_file_dialog` shows them.
     /// `ctx` is woken from the dialog's thread when an answer is in.
@@ -52,6 +34,6 @@ impl PhotocraftApp {
         let repaint = ctx.clone();
         let (service, panels) = FileService::new(Wake::new(move || repaint.request_repaint()));
         self.services.files = Some(Arc::new(service));
-        self.file_panels = Panels { panels: Some(panels), policy: ExtensionPolicy::default() };
+        self.file_panels = Panels(Some(panels));
     }
 }

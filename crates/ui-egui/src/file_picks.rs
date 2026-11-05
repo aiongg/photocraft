@@ -4,7 +4,7 @@
 //! A command that needs a file asks with [`PhotocraftApp::ask_file`] (or one of its wrappers) and
 //! hands over what to do with the answer. The request becomes a library ticket
 //! ([`Files::pick`]); [`PhotocraftApp::poll_file_dialog`], every frame, shows the queued panel on
-//! native builds (`FilePanels::pump`, with the window as its parent, so it is modal to the window
+//! native builds (`FilePanels::pump_with`, with the window as its parent, so it is modal to the window
 //! as Photoshop's are) and continues the action once `Files::take_answer` has the ticket's answer.
 //! The window keeps drawing and answering the compositor meanwhile. A dialog run to completion
 //! inside the frame froze the window (Linux compositors offered to kill it, #574) and, on macOS,
@@ -193,7 +193,7 @@ impl PhotocraftApp {
                     app.open_paths(&paths);
                 }
                 Picked::Contents(files) => app.open_contents(files),
-                Picked::Cancelled => return Err(CANCELLED.into()),
+                Picked::Cancelled | Picked::Unavailable(_) => return Err(CANCELLED.into()),
             }
             Ok(Value::Null)
         })
@@ -272,14 +272,19 @@ impl PhotocraftApp {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let policy = native::policy(self.session.prefs().file_handling.lowercase_extension);
-            self.file_panels.pump(policy, parent);
+            self.file_panels.pump(policy, &mut self.ui.host, parent);
         }
         #[cfg(target_arch = "wasm32")]
         let _ = parent;
         let Some(id) = self.file_dialog.as_ref().map(|p| p.id) else { return };
         let Some(picked) = files.take_answer(id) else { return };
         let Some(Pending { then, .. }) = self.file_dialog.take() else { return };
-        let r = then(self, picked);
+        // No dialog could open: the action ends as for a Cancel (so what chained on it still
+        // cleans up), and the status says why.
+        let r = match picked {
+            Picked::Unavailable(cause) => then(self, Picked::Cancelled).and(Err(<craft::dialogs::ui::UnavailableLabels as craft::ui::localized::Labels>::of_ctx(ctx).message(&cause))),
+            picked => then(self, picked),
+        };
         if let Err(e) = &r
             && e != CANCELLED
         {
@@ -312,5 +317,6 @@ fn read_picked(picked: Picked) -> Result<(String, Vec<u8>), String> {
             Ok((name, bytes))
         }
         Picked::Cancelled => Err(CANCELLED.into()),
+        Picked::Unavailable(_) => Err(UNEXPECTED.into()),
     }
 }
