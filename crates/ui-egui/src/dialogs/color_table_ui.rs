@@ -99,7 +99,7 @@ pub fn run(app: &mut PhotocraftApp, id: u64, fields: &Map<String, Value>, action
                 d.fields.insert("colors".into(), Value::Array(colors.into_iter().map(Value::String).collect()));
                 d.fields.insert("transparent".into(), transparent.map_or(Value::Null, |i| json!(i)));
                 Ok(Value::Null)
-            }) && e != crate::file_dialog::CANCELLED
+            }) && e != crate::file_picks::CANCELLED
             {
                 app.ui.status = e;
                 app.ui.status_error = true;

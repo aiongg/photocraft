@@ -27,10 +27,12 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         app.ui.dialogs.iter().map(|d| json!({"id": d.id, "kind": d.kind, "title": crate::dialogs::title(d), "fields": d.fields})).collect();
     dialogs.extend(app.ui.hosted.iter().filter_map(|h| Some(json!({"id": h.id, "kind": "Command", "title": h.title, "fields": app.ui.dialog_fields(h.id)?}))));
     dialogs.extend(app.ui.prompts.iter().map(|p| json!({"id": p.id, "kind": "Command", "title": p.title, "fields": p.fields})));
+    dialogs.extend(crate::standard_prompts::file_questions(app));
     if let Some((kind, fields)) = &app.ui.shell.dialog {
         dialogs.push(json!({"id": SHELL_DIALOG, "kind": kind, "title": crate::workspace_ui::title(kind), "fields": fields}));
     }
     dialogs.extend(crate::discard_ui::inspect(app));
+    dialogs.extend(crate::updates_ui::inspect(app));
     json!({
         "window": {"width": screen.width(), "height": screen.height(), "pixelsPerPoint": ctx.pixels_per_point()},
         "tool": app.ui.tool,

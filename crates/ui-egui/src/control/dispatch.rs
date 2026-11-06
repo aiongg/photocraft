@@ -514,6 +514,8 @@ struct PanelSet {
     dock_tabs: Option<crate::state::DockTabs>,
     dock: Option<crate::dock::DockLayout>,
     color_panel: Option<crate::state::ColorPanelState>,
+    /// The `colorPanel` object as sent, for the Only Web Colors an older state kept in it.
+    color_panel_saved: Option<Value>,
     dock_width: Option<f64>,
 }
 
@@ -535,6 +537,7 @@ impl PanelSet {
             dock: whole_object(&app.ui.dock, p.get("dock"), "dock")?,
             // Which chip the Color panel edits.
             color_panel: merged_object(&app.ui.color_panel, p.get("colorPanel"), "colorPanel")?,
+            color_panel_saved: p.get("colorPanel").cloned(),
             dock_width: f32_field(p, "dockWidth")?,
         })
     }
@@ -603,6 +606,9 @@ impl PanelSet {
     fn apply_color_and_width(&mut self, app: &mut PhotocraftApp, ctx: &egui::Context) {
         if let Some(v) = self.color_panel.take() {
             app.ui.color_panel = v;
+            if let Some(saved) = self.color_panel_saved.take() {
+                crate::color_panel_ui::carry_web_only(app, &saved);
+            }
         }
         // Right dock width in points (clamped to the dock's 250..=520 range), applied next frame.
         if let Some(w) = self.dock_width {
@@ -844,6 +850,15 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
         "ui.dialog.cancel" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => wrap(crate::discard_ui::answer_control(app, ctx, "cancel", false)),
         "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => {
             err("the unsaved-changes prompt has no fields; use `ui.dialog.confirm` with a `choice`")
+        }
+        // The check-for-updates dialog, listed by ui.inspect with the id "updates": confirm takes a
+        // `choice` (close, checkNow, checkAgain, update, download; default close).
+        "ui.dialog.confirm" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => {
+            wrap(crate::updates_ui::answer_control(app, ctx, s("choice").unwrap_or("close")))
+        }
+        "ui.dialog.cancel" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => wrap(crate::updates_ui::cancel_control(app)),
+        "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::updates_ui::CONTROL_ID) => {
+            err("the update dialog has no fields; use `ui.dialog.confirm` with a `choice`")
         }
         "ui.dialog.cancel" if s("dialog") == Some(SHELL_DIALOG) => match app.ui.shell.dialog.take() {
             Some(_) => ok(Value::Null),
@@ -1184,7 +1199,7 @@ fn pointer_eyedropper_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &Poi
     // With the Color Picker on top the image is its eyedropper, as for the mouse.
     if crate::color_picker_ui::top(app).is_some() {
         if !matches!(s.ev, ToolEvent::Up { .. }) {
-            crate::color_picker_ui::sample_at(app, x, y);
+            crate::color_picker_ui::sample_at(app, ctx, x, y);
         }
         return true;
     }

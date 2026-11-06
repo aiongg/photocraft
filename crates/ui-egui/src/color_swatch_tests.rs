@@ -42,8 +42,8 @@ fn answer(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> String {
     h.run_steps(4);
     let id = crate::color_picker_ui::top(h.state()).unwrap_or_else(|| panic!("the {label} swatch opens the Color Picker"));
     assert!(!egui::Popup::is_any_open(&h.ctx), "{label}: no egui colour popup");
-    let title = h.state().ui.dialogs.iter().find(|d| d.id == id).and_then(|d| d.fields.get("__label")).and_then(Value::as_str).unwrap_or("").to_string();
-    h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("color".into(), json!(PICKED));
+    let title = h.state().ui.dialog_fields(id).and_then(|f| f.get("__label").and_then(Value::as_str).map(str::to_owned)).unwrap_or_default();
+    crate::dialogs::hosted::set_field(h.state_mut(), id, "color", json!(PICKED)).unwrap();
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
     h.run_steps(3);
     assert!(crate::color_picker_ui::top(h.state()).is_none(), "{label}: OK closes the picker");
@@ -75,7 +75,7 @@ fn preferences_colours_open_the_color_picker() {
     let mut h = harness(|_| {});
     let id = crate::prefs_ui::open_preferences(h.state_mut(), "guidesGridAndSlices");
     h.run_steps(4);
-    let values = |h: &Harness<'_, PhotocraftApp>| h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap().fields["values"]["guidesGridAndSlices"].clone();
+    let values = |h: &Harness<'_, PhotocraftApp>| h.state().ui.dialog_fields(id).unwrap()["values"]["guidesGridAndSlices"].clone();
     let before = values(&h);
     // The library's Preferences rows name their swatch by the setting.
     h.get_by_role_and_label(Role::ColorWell, "Guide color").click();

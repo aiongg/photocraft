@@ -5,6 +5,8 @@ use super::{
     tool_memory, transform_tool, type_panels_ui, type_tool, updates_ui, vector_ui, view_cmds, wide_angle_ui, work_area, workspace_ui,
 };
 
+use craft::color::ui::ScreenColorPicker;
+
 impl PhotocraftApp {
     /// The interface direction: the UI language's, unless [`PhotocraftApp::direction_setting`] or
     /// `CRAFT_UI_DIRECTION` forces one.
@@ -94,7 +96,20 @@ impl PhotocraftApp {
         discard_ui::guard_window_close(self, ctx);
         // Background jobs: apply finished ones, keep frames coming, Esc cancels (before the
         // shortcuts see Esc).
-        if !screen_picker::tick(self, ctx) {
+        // The library's screen picker (the Color Picker dialog's eyedropper): Esc is its, and the
+        // pick ends when the document or the top dialog changes.
+        let pick_target = {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            (self.session.active_index(), self.ui.host.top_id()).hash(&mut hash);
+            hash.finish()
+        };
+        ScreenColorPicker::tick(ctx, pick_target);
+        if let Some(notice) = ScreenColorPicker::take_notice(ctx) {
+            self.ui.status = notice.text;
+            self.ui.status_error = true;
+        }
+        if !screen_picker::tick(self, ctx) && !ScreenColorPicker::busy(ctx) {
             jobs_ui::tick(self, ctx);
             #[cfg(not(target_arch = "wasm32"))]
             crate::dialogs::filter_preview_worker::discard_closed(self);
@@ -157,6 +172,7 @@ impl PhotocraftApp {
         if !self.fonts_ready
             || self.ui.any_dialog_open()
             || screen_picker::busy(&ctx)
+            || ScreenColorPicker::busy(&ctx)
             || self.ui.text_edit.is_none()
             || ctx.text_edit_focused()
             || ctx.egui_wants_keyboard_input()
@@ -261,13 +277,15 @@ impl PhotocraftApp {
         crate::widgets::set_field_resolution(&ctx, dpi, ppi);
         // View › Screen Mode › Full Screen Mode: only the image, on black (F or Esc returns).
         screen_picker::show(&ctx);
-        if screen_picker::busy(&ctx) && screen_picker::showing(&ctx) {
+        ScreenColorPicker::show(&ctx);
+        if (screen_picker::busy(&ctx) || ScreenColorPicker::busy(&ctx)) && (screen_picker::showing(&ctx) || ScreenColorPicker::showing(&ctx)) {
             let cancelled = craft::ui::dialog::BlockingOverlay::new("screen-color-wait")
                 .message(tl!("Pick a screen pixel or press Esc to cancel"))
                 .cancel(tl!("Cancel"))
                 .show(&ctx);
             if cancelled {
                 screen_picker::cancel(&ctx);
+                ScreenColorPicker::cancel(&ctx);
             }
             // This pass handled its input (the modal above ran): deliver the synthetic batch.
             self.finish_synthetic_pass();
@@ -276,7 +294,7 @@ impl PhotocraftApp {
             gpu_status::check_window(self, &ctx);
             return false;
         }
-        if screen_picker::busy(&ctx) {
+        if screen_picker::busy(&ctx) || ScreenColorPicker::busy(&ctx) {
             ui.disable();
             ui.set_opacity(1.0);
         }
@@ -342,7 +360,7 @@ impl PhotocraftApp {
         self.automation_input = false;
         shape_stroke_ui::finish_frame(self, &ctx);
         mac_bar::sync(self, &ctx);
-        if screen_picker::busy(&ctx) {
+        if screen_picker::busy(&ctx) || ScreenColorPicker::busy(&ctx) {
             // Block input without a backdrop: the worker may still be capturing the screen.
             craft::ui::dialog::BlockingOverlay::new("screen-color-wait").show(&ctx);
         }

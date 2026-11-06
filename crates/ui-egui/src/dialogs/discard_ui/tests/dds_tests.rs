@@ -1,7 +1,7 @@
 //! DDS Options on Save As and Save a Copy: the compression and mipmaps it asks for, the scripted
 //! `ddsCompression` and `ddsMipmaps` that skip it, and action recording and playback (#1327).
 use super::*;
-use crate::{FileDialogAnswer, dds_options_ui};
+use crate::dds_options_ui;
 use egui_kittest::kittest::Queryable;
 use photocraft_io::{DdsCompression, DdsOptions};
 use std::{cell::RefCell, rc::Rc};
@@ -18,7 +18,7 @@ fn dds_app(to: &str) -> (Prompted, Writes) {
     let writes: Writes = Rc::default();
     let (asked, written) = (Rc::new(RefCell::new(PLAIN)), writes.clone());
     let seen = asked.clone();
-    app.services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo(to.into()))]).0);
+    app.services.files = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to(to))]).0;
     app.services.export = Some(Box::new(move |_, _, settings| {
         *seen.borrow_mut() = settings.dds;
         Ok((Vec::new(), Vec::new()))
@@ -177,7 +177,7 @@ fn recorded_plain_save_of_a_dds_texture_keeps_its_options() {
     h.run_steps(2);
     h.get_by_label("OK").click();
     h.run_steps(3);
-    h.state_mut().services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("own.dds".into()))]).0);
+    h.state_mut().services.files = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to("own.dds"))]).0;
     crate::menus::invoke(h.state_mut(), &ctx, "file.save", json!({"ddsCompression": "bc3", "ddsMipmaps": true})).unwrap();
     h.run_steps(3);
     assert!(h.state().dds_options.is_none(), "scripted options don't ask");

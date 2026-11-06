@@ -10,7 +10,6 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::file_dialog::FileDialogAnswer;
 
 type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
 
@@ -21,8 +20,8 @@ fn dialog(answers: Vec<&str>) -> (Harness<'static, PhotocraftApp>, u64, Written)
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut services = crate::Services::default();
-        let (picker, _) = crate::file_dialog::fake(answers.iter().map(|a| Some(FileDialogAnswer::SaveTo((*a).into()))).collect());
-        services.file_dialog = Some(picker);
+        let (picker, _) = crate::file_picks::scripted::fake(answers.iter().map(|a| Some(crate::file_picks::scripted::save_to(*a))).collect());
+        services.files = picker;
         services.write = Some(Box::new(move |path: &str, bytes: &[u8]| {
             log.borrow_mut().push((path.to_string(), bytes.to_vec()));
             Ok(())

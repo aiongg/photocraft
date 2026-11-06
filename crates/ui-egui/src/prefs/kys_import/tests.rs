@@ -7,7 +7,6 @@ use serde_json::{Value, json};
 
 use super::{KysCommand, parse, plan};
 use crate::PhotocraftApp;
-use crate::file_dialog::FileDialogAnswer;
 
 /// A cut-down set in Photoshop's own layout: BOM, a dynamic (filter) row, static rows with
 /// their ids, a row with two shortcuts, an entity, scripts, and the tool keys.
@@ -120,8 +119,8 @@ fn an_unreadable_shortcut_is_reported_not_imported() {
 /// hand-made changes, taking a moved key from its old owner.
 #[test]
 fn import_button_fills_the_dialog_and_ok_applies_the_set() {
-    let answers = vec![Some(FileDialogAnswer::Contents("/sets/texcuts.kys".into(), SAMPLE.as_bytes().to_vec()))];
-    let services = crate::Services { file_dialog: Some(crate::file_dialog::fake(answers).0), ..Default::default() };
+    let answers = vec![Some(crate::file_picks::scripted::contents("/sets/texcuts.kys", SAMPLE.as_bytes().to_vec()))];
+    let services = crate::Services { files: crate::file_picks::scripted::fake(answers).0, ..Default::default() };
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         PhotocraftApp::new(photocraft_engine::Session::new(), services)

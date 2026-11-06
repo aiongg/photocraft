@@ -201,11 +201,14 @@ fn show_damage(app: &mut PhotocraftApp) {
     .into_iter()
     .collect();
     let prompt = StandardPrompt::damaged_file(&front.name)
-        .title(tl!("Damaged Photoshop document"))
-        .message(message)
+        .title(tsrc!("Damaged Photoshop document"))
+        .message(tsrc!("The document “{name}” may be damaged."))
+        .arg("name", front.name.clone())
+        .paragraph(tsrc!("Some layers, pixels or masks could not be read. Do you want to continue opening it?"))
+        .paragraph(tsrc!("If you continue, saving over the original may permanently discard unreadable data. Save a copy to keep the original."))
         .warnings(front.warnings.clone())
-        .button(PromptChoice::Proceed, tl!("Continue"), None)
-        .button(PromptChoice::Cancel, tl!("Cancel"), None);
+        .button(PromptChoice::Proceed, tsrc!("Continue"), None)
+        .button(PromptChoice::Cancel, tsrc!("Cancel"), None);
     crate::standard_prompts::open(app, prompt, "Damaged Photoshop document", fields);
 }
 

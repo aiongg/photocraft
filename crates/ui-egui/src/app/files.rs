@@ -146,7 +146,7 @@ impl PhotocraftApp {
     }
 
     /// Save the active document to `path`, or to a path chosen in the save dialog (which
-    /// continues on a later frame, see `file_dialog`). Returns `{"path", "warnings"}` (the export
+    /// continues on a later frame, see `file_picks`). Returns `{"path", "warnings"}` (the export
     /// warnings are also shown to the user).
     pub fn save_as(&mut self, path: Option<String>) -> Result<Value, String> {
         self.save_as_with(path, FormatChoices::default())

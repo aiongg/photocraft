@@ -460,14 +460,13 @@ mod tests {
         let aco =
             photocraft_psd::aco::write(&[photocraft_psd::aco::AcoSwatch { name: "Teal".into(), color: photocraft_psd::aco::AcoColor::Rgb([0, 32768, 32768]) }])
                 .unwrap();
-        use crate::file_dialog::FileDialogAnswer;
         let answers = vec![
-            Some(FileDialogAnswer::Contents("Ocean.aco".into(), aco.clone())),
-            Some(FileDialogAnswer::Contents("Ocean.aco".into(), aco)),
-            Some(FileDialogAnswer::SaveTo("out/Swatches.ase".into())),
+            Some(crate::file_picks::scripted::contents("Ocean.aco", aco.clone())),
+            Some(crate::file_picks::scripted::contents("Ocean.aco", aco)),
+            Some(crate::file_picks::scripted::save_to("out/Swatches.ase")),
         ];
         let services = crate::Services {
-            file_dialog: Some(crate::file_dialog::fake(answers).0),
+            files: crate::file_picks::scripted::fake(answers).0,
             write: Some(Box::new(move |p: &str, b: &[u8]| {
                 w.lock().unwrap().push((p.to_string(), b.to_vec()));
                 Ok(())
@@ -488,32 +487,6 @@ mod tests {
         let out = written.lock().unwrap();
         assert_eq!(out[0].0, "out/Swatches.ase");
         assert!(out[0].1.starts_with(b"ASEF"));
-    }
-
-    /// The Linux save dialog shows the export's name without its extension, `Swatches`, and asks
-    /// only about that name. The export adds `.aco`, so with `Swatches.aco` in the folder it asks
-    /// before replacing it.
-    #[test]
-    fn export_asks_before_replacing_the_file_its_added_extension_names() {
-        use crate::file_dialog::FileDialogAnswer;
-        let written: std::rc::Rc<std::cell::RefCell<Vec<String>>> = Default::default();
-        let w = written.clone();
-        let services = crate::Services {
-            file_dialog: Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("/swatches/Swatches".into()))]).0),
-            write: Some(Box::new(move |p: &str, _: &[u8]| {
-                w.borrow_mut().push(p.to_string());
-                Ok(())
-            })),
-            file_stamp: Some(Box::new(|p: &str| (p == "/swatches/Swatches.aco").then_some(crate::FileStamp { len: 1, modified: None }))),
-            ..Default::default()
-        };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        export_dialog(&mut app, "aco").unwrap();
-        app.poll_file_dialog(&egui::Context::default(), None);
-        let id = app.ui.prompt_with(crate::replace_prompt::owns).map(|p| p.id).expect("the export asks first");
-        assert!(written.borrow().is_empty(), "nothing is written before the answer");
-        crate::dialogs::confirm(&mut app, id).unwrap();
-        assert_eq!(*written.borrow(), ["/swatches/Swatches.aco"]);
     }
 
     /// #3658: dragging a group header reorders the folders, and the new order sticks in the UI

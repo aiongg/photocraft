@@ -1,7 +1,7 @@
 //! Targa Options on Save As and Save a Copy: the bits per pixel it asks for, the scripted
 //! `tgaBits` that skips it, and the close prompt waiting behind it.
 use super::*;
-use crate::{FileDialogAnswer, targa_options_ui};
+use crate::targa_options_ui;
 use egui_kittest::kittest::Queryable;
 use photocraft_io::TgaBits;
 use std::{cell::RefCell, rc::Rc};
@@ -24,7 +24,7 @@ fn targa_app(alpha_channel: bool, to: &str) -> (Prompted, Writes) {
     }
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo(to.into()))]).0);
+    app.services.files = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to(to))]).0;
     app.services.export = Some(Box::new(|_, _, settings| Ok((asked(settings.tga_bits.map(TgaBits::bits)), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));

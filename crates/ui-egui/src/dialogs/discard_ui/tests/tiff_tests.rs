@@ -1,6 +1,6 @@
 //! The two-modal save/close workflow, including the writer's success/failure boundary.
 use super::*;
-use crate::{FileDialogAnswer, tiff_options_ui};
+use crate::tiff_options_ui;
 use egui_kittest::kittest::Queryable;
 use std::{cell::RefCell, rc::Rc};
 
@@ -14,7 +14,7 @@ fn tiff_prompt(command: &str) -> (Prompted, Writes, DocId, DocId) {
     app.session.active_mut().unwrap().path = Some("original.tif".into());
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("kept.tif".into()))]).0);
+    app.services.files = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to("kept.tif"))]).0;
     app.services.export = Some(Box::new(move |doc, _, settings| Ok((serde_json::to_vec(&(doc.id, settings.tiff_layers)).unwrap(), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));
@@ -146,8 +146,11 @@ fn close_all_waits_for_each_layered_tiff_write() {
     // Rebuild the prompt after making the second document dirty.
     h.state_mut().discard = None;
     assert!(intercept(h.state_mut(), "file.closeAll", &Value::Null));
-    h.state_mut().services.file_dialog =
-        Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("first.tif".into())), Some(FileDialogAnswer::SaveTo("second.tif".into()))]).0);
+    h.state_mut().services.files = crate::file_picks::scripted::fake(vec![
+        Some(crate::file_picks::scripted::save_to("first.tif")),
+        Some(crate::file_picks::scripted::save_to("second.tif")),
+    ])
+    .0;
     for (i, doc) in [first, second].into_iter().enumerate() {
         h.key_press(Key::Y);
         h.run_steps(3);

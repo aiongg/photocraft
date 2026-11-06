@@ -294,11 +294,11 @@ mod panel_defaults {
         let before = app.session.tools.foreground;
         let revision = app.session.active().unwrap().revision;
         let dialog = super::super::open_color_picker(&mut app, [0.0; 3]);
-        app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#ff8800"));
+        crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#ff8800")).unwrap();
         crate::dialogs::cancel(&mut app, dialog).unwrap();
         assert_eq!(app.session.tools.foreground, before);
         let dialog = super::super::open_color_picker(&mut app, [0.0; 3]);
-        app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#336699"));
+        crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#336699")).unwrap();
         crate::dialogs::confirm(&mut app, dialog).unwrap();
         assert_eq!(super::super::default_styles(&app).0.color.to_rgba8(), [51, 102, 153, 255]);
         assert_eq!(app.session.active().unwrap().revision, revision);
@@ -1041,14 +1041,14 @@ fn text_color_dialog_edits_only_the_selected_range_and_cancel_is_inert() {
     let before = app.session.active().unwrap().history.entries().len();
     let selection = app.ui.text_edit.clone();
     let dialog = super::open_color_picker(&mut app, [0.0; 3]);
-    app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#ff0000"));
-    app.ui.close_dialog(dialog).unwrap();
+    crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#ff0000")).unwrap();
+    crate::dialogs::cancel(&mut app, dialog).unwrap();
     assert_eq!(rgb_at(&app, id, 6), [0, 0, 0, 255]);
     assert_eq!(app.session.active().unwrap().history.entries().len(), before);
     assert_eq!(app.ui.text_edit, selection);
     let dialog = super::open_color_picker(&mut app, [0.0; 3]);
-    assert_eq!(app.ui.dialogs.last().unwrap().fields["__label"], "Color Picker (Text Color)");
-    app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#00ff00"));
+    assert_eq!(app.ui.dialog_fields(dialog).unwrap()["__label"], "Color Picker (Text Color)");
+    crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#00ff00")).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert_eq!(rgb_at(&app, id, 0), [0, 0, 0, 255]);
     assert_eq!(rgb_at(&app, id, 5), [0, 0, 0, 255]);
@@ -1058,7 +1058,7 @@ fn text_color_dialog_edits_only_the_selected_range_and_cancel_is_inert() {
     assert_eq!(app.ui.text_edit, selection, "dialog preserves the caret and selection");
     assert_eq!(app.session.active().unwrap().history.entries().len(), before + 1);
     let dialog = super::open_color_picker(&mut app, [0.0, 1.0, 0.0]);
-    app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#0000ff"));
+    crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#0000ff")).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert_eq!(app.session.active().unwrap().history.entries().len(), before + 1, "one editing-session undo step");
     assert_eq!(rgb_at(&app, peer, 0), [0, 0, 0, 255], "a selected peer is outside the active text edit");
@@ -1069,7 +1069,7 @@ fn text_color_dialog_without_a_selection_edits_the_whole_layer() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text":"Hello","color":"#000000"})).unwrap()["layer"].as_u64().unwrap());
     let dialog = super::open_color_picker(&mut app, [0.0; 3]);
-    app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#ff8800"));
+    crate::dialogs::hosted::set_field(&mut app, dialog, "color", json!("#ff8800")).unwrap();
     crate::dialogs::confirm(&mut app, dialog).unwrap();
     assert_eq!(rgb_at(&app, id, 0), [255, 136, 0, 255]);
     assert_eq!(rgb_at(&app, id, 4), [255, 136, 0, 255]);
@@ -2575,13 +2575,13 @@ mod multi_layer_formatting {
             h.run();
             h.get_by_label("Set the text color").click();
             h.run();
-            let dialog = h.state().ui.dialogs.last().unwrap().id;
-            h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("color".into(), json!("#00ff00"));
+            let dialog = crate::color_picker_ui::top(h.state()).expect("the swatch opens the Color Picker");
+            crate::dialogs::hosted::set_field(h.state_mut(), dialog, "color", json!("#00ff00")).unwrap();
             selected(h.state_mut(), &[ids[2]]);
             if confirm {
                 crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
             } else {
-                h.state_mut().ui.close_dialog(dialog).unwrap();
+                crate::dialogs::cancel(h.state_mut(), dialog).unwrap();
             }
             for i in 0..3 {
                 let mut expected = originals[i].clone();

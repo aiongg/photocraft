@@ -166,9 +166,9 @@ fn displace_asks_for_its_map_after_ok() {
     let mut m = photocraft_engine::Session::new();
     m.execute("file.new", json!({"width": 16, "height": 16, "background": "white"})).unwrap();
     std::fs::write(&map, photocraft_io::export(&m.active().unwrap().doc, "map.png", &Default::default()).unwrap().bytes).unwrap();
-    let answers = vec![Some(crate::file_dialog::FileDialogAnswer::Paths(vec![map.to_string_lossy().into_owned()])), None];
-    let (show, asked) = crate::file_dialog::fake(answers);
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() });
+    let answers = vec![Some(crate::file_picks::scripted::paths(vec![map.to_string_lossy().into_owned()])), None];
+    let (show, asked) = crate::file_picks::scripted::fake(answers);
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: show, ..Default::default() });
     app.run("file.new", json!({"width": 16, "height": 16, "background": "white"})).unwrap();
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 8, "height": 16})).unwrap();
     app.run("edit.fill", json!({"color": "#000000"})).unwrap();
@@ -183,7 +183,7 @@ fn displace_asks_for_its_map_after_ok() {
     let other_steps = app.session.documents()[1].history.past_len();
     // The frame shows the picker (the service is asked then) and acts on its answer.
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(asked.borrow().len(), 1, "OK asks for the map");
+    assert_eq!(asked.requests().len(), 1, "OK asks for the map");
     assert_eq!(app.session.active_index(), Some(0), "the document that asked is shown");
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1, "Displace ran with the chosen map");
     assert_eq!(app.session.documents()[1].history.past_len(), other_steps, "not on the other document");
@@ -191,7 +191,7 @@ fn displace_asks_for_its_map_after_ok() {
     let id = open(&mut app, "filter.distort.displace").unwrap();
     crate::dialogs::confirm(&mut app, id).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert_eq!(asked.borrow().len(), 2);
+    assert_eq!(asked.requests().len(), 2);
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
     // A map given in the dialog runs without asking.
     assert!(!needs_displace_map("filter.distort.displace", &json!({"mapPath": "/maps/x.psd"})));
@@ -1525,13 +1525,12 @@ fn replace_color_result_swatch_sets_the_sliders() {
     assert_eq!(h.get_all_by_label("#cc3333").count(), 1, "the Result reads the sampled colour #cc3333");
     h.get_by_role_and_label(egui::accesskit::Role::ColorWell, "Result").click();
     h.run_steps(3);
-    let picker = h.state().ui.dialogs.last().unwrap();
-    assert_ne!(picker.id, id, "the Color Picker opened over the dialog");
+    let picker = crate::color_picker_ui::top_dialog(h.state()).expect("the Color Picker opened over the dialog");
+    assert_ne!(picker.id, id);
     assert_eq!(picker.fields["color"], json!("#cc3333"), "on the current Result");
     let picker = picker.id;
-    h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#3355cc"));
+    crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", json!("#3355cc")).unwrap();
     crate::dialogs::confirm(h.state_mut(), picker).unwrap();
-    h.state_mut().ui.dialogs.retain(|d| d.id != picker);
     h.run_steps(3);
     let f = h.state().ui.dialog_fields(id).unwrap();
     let n = |k: &str| f[k].as_f64().unwrap() as f32;

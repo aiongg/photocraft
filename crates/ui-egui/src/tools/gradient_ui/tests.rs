@@ -116,13 +116,12 @@ fn click_at(app: &mut PhotocraftApp, at: [f64; 2], double: bool) {
 fn a_double_click_asks_a_colour_only_when_both_clicks_hit_the_same_part() {
     let mut app = app_with_gradient("linear");
     drag(&mut app, [20.0, 60.0], [180.0, 60.0]);
-    app.ui.dialogs.clear();
     click_at(&mut app, [20.0, 60.0], false);
     click_at(&mut app, [180.0, 60.0], true);
-    assert!(app.ui.dialogs.is_empty(), "the clicks hit the start and the end handle");
+    assert!(crate::color_picker_ui::pickers(&app).is_empty(), "the clicks hit the start and the end handle");
     click_at(&mut app, [180.0, 60.0], false);
     click_at(&mut app, [180.0, 60.0], true);
-    assert_eq!(app.ui.dialogs.len(), 1, "both clicks hit the end handle");
+    assert_eq!(crate::color_picker_ui::pickers(&app).len(), 1, "both clicks hit the end handle");
 }
 
 #[test]

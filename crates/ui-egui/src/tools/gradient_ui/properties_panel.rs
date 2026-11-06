@@ -252,7 +252,7 @@ mod tests {
         assert_eq!(h.state().session.active().unwrap().history.past_len(), count);
         h.get_all_by_label("Color").find(|n| n.accesskit_node().role() == egui::accesskit::Role::ColorWell).unwrap().click();
         h.run_steps(2);
-        assert!(!h.state().ui.dialogs.is_empty());
+        assert!(crate::color_picker_ui::top(h.state()).is_some());
     }
 
     #[test]

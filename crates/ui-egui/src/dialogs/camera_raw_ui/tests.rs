@@ -961,7 +961,6 @@ fn sidecars_are_read_from_small_regular_files_only() {
 
 #[test]
 fn save_and_load_settings_round_trip_through_xmp_files() {
-    use crate::file_dialog::FileDialogAnswer;
     use std::sync::{Arc, Mutex};
     type Written = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
     let written: Written = Arc::default();
@@ -970,13 +969,13 @@ fn save_and_load_settings_round_trip_through_xmp_files() {
             <rdf:Description xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/" crs:Clarity2012="+25" crs:LensProfileEnable="1"/>
             </rdf:RDF></x:xmpmeta>"#;
     let answers = vec![
-        Some(FileDialogAnswer::SaveTo("/out/Look.xmp".into())),
-        Some(FileDialogAnswer::Contents("Look.xmp".into(), Vec::new())),
-        Some(FileDialogAnswer::Contents("Other.xmp".into(), foreign.to_vec())),
-        Some(FileDialogAnswer::Contents("Broken.xmp".into(), b"<nope".to_vec())),
+        Some(crate::file_picks::scripted::save_to("/out/Look.xmp")),
+        Some(crate::file_picks::scripted::contents("Look.xmp", Vec::new())),
+        Some(crate::file_picks::scripted::contents("Other.xmp", foreign.to_vec())),
+        Some(crate::file_picks::scripted::contents("Broken.xmp", b"<nope".to_vec())),
     ];
     let services = crate::Services {
-        file_dialog: Some(crate::file_dialog::fake(answers).0),
+        files: crate::file_picks::scripted::fake(answers).0,
         write: Some(Box::new(move |p: &str, b: &[u8]| {
             w.lock().unwrap().push((p.to_string(), b.to_vec()));
             Ok(())
@@ -1002,12 +1001,12 @@ fn save_and_load_settings_round_trip_through_xmp_files() {
     assert!(text.contains("crs:Exposure2012=\"+0.75\"") && text.contains("crs:SaturationAdjustmentGreen=\"+30\""), "{text}");
     // Reset, then load the saved file back (the fake dialog's second answer, with its bytes).
     app.camera_raw.as_mut().unwrap().params = CameraRaw::default();
-    let mut svc = crate::file_dialog::fake(vec![Some(FileDialogAnswer::Contents("Look.xmp".into(), bytes))]).0;
-    std::mem::swap(app.services.file_dialog.as_mut().unwrap(), &mut svc);
+    let mut svc = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::contents("Look.xmp", bytes))]).0;
+    std::mem::swap(&mut app.services.files, &mut svc);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"loadSettings": true}})).unwrap().unwrap();
     frame(&mut app);
     assert_eq!(app.camera_raw.as_ref().unwrap().params, saved_params);
-    std::mem::swap(app.services.file_dialog.as_mut().unwrap(), &mut svc);
+    std::mem::swap(&mut app.services.files, &mut svc);
     // The original service's next answer is the empty file: an error, settings untouched.
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"loadSettings": true}})).unwrap().unwrap();
     frame(&mut app);

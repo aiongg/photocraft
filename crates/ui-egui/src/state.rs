@@ -9,7 +9,10 @@ mod tool;
 mod tool_options;
 mod transform;
 
-pub use color_panel::{ColorPanelMode, ColorPanelState, ColorRamp, DockTabs};
+pub use color_panel::DockTabs;
+/// The Color panel's saved state is the library's: the same fields and camelCase names as
+/// PhotoCraft's own before it (`background`, `mode`, `ramp`, `webSafeRamp`).
+pub use craft::color::ui::{ColorPanelMode, ColorPanelRamp, ColorPanelState};
 pub use panel_state::{
     CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions, PointCurveDrag,
     PointCurveState,
@@ -467,6 +470,9 @@ pub struct UiState {
     /// The status message is an error (shown in the warning colour).
     #[serde(default)]
     pub status_error: bool,
+    /// How long the last command run through `PhotocraftApp::run` took (the status bar's Timing).
+    #[serde(skip)]
+    pub last_command_time: Option<std::time::Duration>,
     /// Non-blocking notices (import/export warnings, files that couldn't open), newest last.
     #[serde(default)]
     pub notices: Vec<crate::notices::Notice>,
@@ -587,6 +593,7 @@ impl Default for UiState {
             next_id: 1,
             status: String::new(),
             status_error: false,
+            last_command_time: None,
             notices: Vec::new(),
             updates_open: false,
             gpu_fallback_notice: None,

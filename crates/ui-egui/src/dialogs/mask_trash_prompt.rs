@@ -51,15 +51,15 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     let (fields, prompt, title) = if vector {
         let fields = json!({MARK: true, "kind": "vector", "__label": "Delete Vector Mask", "message": "Delete the vector mask?",
             "document": state.doc.id.0, "layer": layer});
-        (fields, StandardPrompt::trash_vector_mask().message(tl!("Delete the vector mask?")), "Delete Vector Mask")
+        (fields, StandardPrompt::trash_vector_mask().message(tsrc!("Delete the vector mask?")), tsrc!("Delete Vector Mask"))
     } else {
         // Apply needs a pixel layer (Layer › Layer Mask › Apply is greyed out otherwise).
         let can_apply = app.session.is_enabled_with("layer.layerMask.apply", &json!({"layer": layer}));
         let fields = json!({MARK: true, "kind": "pixel", "__label": "Delete Layer Mask", "message": "Apply mask to layer before removing?",
             "document": state.doc.id.0, "layer": layer, "canApply": can_apply, "choice": if can_apply { "apply" } else { "delete" }});
-        (fields, StandardPrompt::trash_mask().message(tl!("Apply mask to layer before removing?")).can_apply(can_apply), "Delete Layer Mask")
+        (fields, StandardPrompt::trash_mask().message(tsrc!("Apply mask to layer before removing?")).can_apply(can_apply), tsrc!("Delete Layer Mask"))
     };
-    let prompt = prompt.title(tl!(title));
+    let prompt = prompt.title(title);
     let Some(id) = crate::standard_prompts::open(app, prompt, title, fields.as_object().cloned().unwrap_or_default()) else {
         return Some(Ok(json!({"confirmationPending": true})));
     };

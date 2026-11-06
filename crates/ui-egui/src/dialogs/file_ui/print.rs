@@ -267,7 +267,7 @@ fn browse_pdf(app: &mut PhotocraftApp, id: u64, suggested: &str) {
         Ok(Value::Null)
     });
     if let Err(e) = r
-        && e != crate::file_dialog::CANCELLED
+        && e != crate::file_picks::CANCELLED
     {
         app.ui.status = e;
     }

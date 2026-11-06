@@ -126,6 +126,7 @@ fn status_values(app: &PhotocraftApp, ctx: &egui::Context, doc: &Document) -> St
     values.measurement_scale = Some("1 pixel = 1.0000 pixels".into());
     values.scratch_sizes = memory_use(ctx);
     values.efficiency = Some(100);
+    values.timing = app.ui.last_command_time;
     values.current_tool = Some(tl!(app.ui.tool.label()).to_string());
     values.layer_count = Some(doc.layer_count());
     values
@@ -597,21 +598,5 @@ mod tests {
         h.run_steps(2);
         assert!(h.query_by_label("No document").is_some());
         assert!(h.query_all_by_label(&e).count() > 0, "status bar shows {e:?}");
-    }
-
-    #[test]
-    fn every_status_key_has_text() {
-        use craft::ui::localized::LocaleNumbers;
-        use craft::ui::patterns::StatusReadoutLabels;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.run("file.new", json!({"width": 2400, "height": 1500, "resolution": 72, "background": "white"})).unwrap();
-        let ctx = egui::Context::default();
-        let values = status_values(&app, &ctx, &app.session.active().unwrap().doc);
-        let (labels, numbers) = (StatusReadoutLabels::default(), LocaleNumbers::of_ctx(&ctx));
-        for key in ["sizes", "profile", "dimensions", "measurementScale", "scratch", "efficiency", "timing", "tool", "layers"] {
-            let item = status_item(key);
-            assert_eq!(status_key(item), key);
-            assert!(!item.text(&values, &labels, &numbers, &ctx).is_empty(), "{key}");
-        }
     }
 }

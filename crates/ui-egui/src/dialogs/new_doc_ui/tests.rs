@@ -351,15 +351,12 @@ mod dialog {
         assert!(h.query_by_label("Custom background color").is_some());
         h.get_by_label("Custom background color").click();
         h.run_steps(3);
-        let picker = h
-            .state()
-            .ui
-            .dialogs
-            .iter()
+        let picker = crate::color_picker_ui::pickers(h.state())
+            .into_iter()
             .find(|d| d.fields.get("__dialog").and_then(serde_json::Value::as_u64) == Some(nd))
             .map(|d| d.id)
             .expect("the Color Picker opens over the dialog");
-        h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), serde_json::json!("#336699"));
+        crate::dialogs::hosted::set_field(h.state_mut(), picker, "color", serde_json::json!("#336699")).unwrap();
         crate::dialogs::confirm(h.state_mut(), picker).unwrap();
         h.run_steps(3);
         let bg = h.state().ui.dialogs.iter().find(|d| d.id == nd).unwrap().fields["background"].clone();

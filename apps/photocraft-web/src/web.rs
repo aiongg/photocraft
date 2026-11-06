@@ -6,25 +6,104 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use craft::host::{FileError, Files, PickId, PickKind, PickRequest, Picked};
 use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_doc::Document;
 use photocraft_ui_egui::i18n;
 use photocraft_ui_egui::served_fonts;
 use photocraft_ui_egui::theme::ThemeKind;
-use photocraft_ui_egui::{FileDialogAnswer, FileDialogRequest, PhotocraftApp, Services};
+use photocraft_ui_egui::{PhotocraftApp, Services};
+use std::path::{Path, PathBuf};
 use wasm_bindgen::JsCast as _;
 
 type Inbox = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 
-/// Everything File › Open reads: PhotoCraft, Photoshop, OpenRaster, Krita and Affinity documents, flat images, and
-/// Photoshop brushes (.abr), gradients (.grd), layer styles (.asl) and swatches (.aco, .act, .ase), which go to the preset libraries.
-const OPEN_EXTS: &[&str] = &[
-    "pcraft", "pdn", "ora", "xcf", "xcfgz", "gz", "kra", "krz", "psd", "psb", "psdt", "png", "jpg", "jpeg", "tif", "tiff", "webp", "gif", "bmp", "tga", "ico",
-    "qoi", "exr", "hdr", "pbm", "pgm", "ppm", "pam", "pfm", "dds", "fits", "fit", "fts", "dpx", "cin", "dcm", "dicom", "dc3", "iff", "lbm", "ilbm", "heic",
-    "heif", "hif", "dng", "cr2", "cr3", "nef", "nrw", "arw", "pef", "orf", "rw2", "raf", "abr", "grd", "asl", "svg", "svgz", "aco", "act", "ase", "af",
-    "afdesign", "afphoto", "afpub",
-];
-const SVG_EXTS: &[&str] = &["svg", "svgz"];
+/// The browser's file service: its Open picker hands over the files' contents, not paths.
+struct BrowserFiles {
+    ctx: egui::Context,
+    state: Arc<Mutex<BrowserPicks>>,
+}
+
+#[derive(Default)]
+struct BrowserPicks {
+    next: u64,
+    pending: HashSet<PickId>,
+    answered: Vec<(PickId, Picked)>,
+}
+
+impl BrowserFiles {
+    fn new(ctx: &egui::Context) -> Self {
+        Self { ctx: ctx.clone(), state: Arc::default() }
+    }
+}
+
+impl Files for BrowserFiles {
+    fn pick(&self, request: PickRequest) -> PickId {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.next += 1;
+        let id = PickId(state.next);
+        let answered = match request.kind {
+            PickKind::Open | PickKind::OpenMany => {
+                state.pending.insert(id);
+                let (shared, ctx) = (self.state.clone(), self.ctx.clone());
+                wasm_bindgen_futures::spawn_local(async move {
+                    let dialog = request.filters.iter().fold(rfd::AsyncFileDialog::new(), |dialog, filter| dialog.add_filter(&filter.name, &filter.extensions));
+                    let mut files = Vec::new();
+                    if request.kind == PickKind::OpenMany {
+                        for file in dialog.pick_files().await.unwrap_or_default() {
+                            files.push((file.file_name(), file.read().await));
+                        }
+                    } else if let Some(file) = dialog.pick_file().await {
+                        files.push((file.file_name(), file.read().await));
+                    }
+                    let picked = if files.is_empty() { Picked::Cancelled } else { Picked::Contents(files) };
+                    let mut state = shared.lock().unwrap_or_else(PoisonError::into_inner);
+                    // A pick the owner forgot meanwhile has no answer to keep.
+                    if state.pending.remove(&id) {
+                        state.answered.push((id, picked));
+                    }
+                    ctx.request_repaint();
+                });
+                return id;
+            }
+            // Browser folder handles cannot be represented as filesystem paths for engine commands.
+            PickKind::Folder => Picked::Cancelled,
+            // No save dialog on the web: the suggested name becomes the download name.
+            PickKind::Save => Picked::Paths(vec![request.file_name.map(Into::into).unwrap_or_default()]),
+        };
+        state.answered.push((id, answered));
+        id
+    }
+
+    fn take_answer(&self, id: PickId) -> Option<Picked> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let at = state.answered.iter().position(|(i, _)| *i == id)?;
+        Some(state.answered.remove(at).1)
+    }
+
+    fn forget(&self, id: PickId) {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.pending.remove(&id);
+        state.answered.retain(|(i, _)| *i != id);
+    }
+
+    fn pick_pending(&self) -> bool {
+        !self.state.lock().unwrap_or_else(PoisonError::into_inner).pending.is_empty()
+    }
+
+    fn read(&self, _path: &Path) -> Result<Vec<u8>, FileError> {
+        Err(FileError::Unsupported)
+    }
+
+    fn write(&self, _path: &Path, _bytes: &[u8]) -> Result<(), FileError> {
+        Err(FileError::Unsupported)
+    }
+
+    fn last_folder(&self, _purpose: &str) -> Option<PathBuf> {
+        None
+    }
+}
+
 const CANVAS_ID: &str = "photocraft_canvas";
 
 /// Fonts the host serves next to the page (`photocraft_ui_egui::served_fonts`): craft-fonts' manifest
@@ -90,6 +169,7 @@ pub fn start() {
                     preset_warnings.extend(warnings);
                     let drag = listen_drag(&pen_target);
                     let mut app = PhotocraftApp::new(session, services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)));
+                    app.services.files = Some(Arc::new(BrowserFiles::new(&cc.egui_ctx)));
                     if !preset_warnings.is_empty() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
@@ -415,42 +495,6 @@ fn services(inbox: Inbox, place_inbox: Inbox, cursor_pos: photocraft_ui_egui::Cu
         })),
         export: Some(Box::new(|doc: &Document, path: &str, settings: &photocraft_ui_egui::ExportSettings| {
             photocraft_io::export(doc, path, &settings.io_options()).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string())
-        })),
-        file_dialog: Some(Box::new(|request, _parent, reply| match request {
-            // The browser's file picker hands over the files' contents, not paths. File › Open
-            // asks for several files (`multiple`), each opened in its own tab.
-            FileDialogRequest::Open { multiple, extensions, .. } => wasm_bindgen_futures::spawn_local(async move {
-                let dialog = if let Some(exts) = extensions {
-                    rfd::AsyncFileDialog::new().add_filter("Supported Files", &exts)
-                } else {
-                    rfd::AsyncFileDialog::new().add_filter("All Formats", OPEN_EXTS).add_filter("SVG", SVG_EXTS)
-                };
-                let answer = if multiple {
-                    match dialog.pick_files().await {
-                        Some(picked) if !picked.is_empty() => {
-                            let mut files = Vec::with_capacity(picked.len());
-                            for file in picked {
-                                files.push((file.file_name(), file.read().await));
-                            }
-                            Some(FileDialogAnswer::ContentsMany(files))
-                        }
-                        _ => None,
-                    }
-                } else {
-                    match dialog.pick_file().await {
-                        Some(file) => Some(FileDialogAnswer::Contents(file.file_name(), file.read().await)),
-                        None => None,
-                    }
-                };
-                reply.send(answer);
-            }),
-            // Browser folder handles cannot be represented as filesystem paths for engine commands.
-            FileDialogRequest::Folder { .. } => reply.send(None),
-            // No save dialog on the web: the suggested name becomes the download name.
-            FileDialogRequest::Save { suggested } => {
-                let name = std::path::Path::new(&suggested).file_name().map_or_else(|| suggested.clone(), |n| n.to_string_lossy().to_string());
-                reply.send(Some(FileDialogAnswer::SaveTo(name)));
-            }
         })),
         write: Some(Box::new(|path: &str, bytes: &[u8]| download(path, bytes))),
         // A download may be cancelled and never reports back: it doesn't save the document.
