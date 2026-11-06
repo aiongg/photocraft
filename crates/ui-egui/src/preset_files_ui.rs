@@ -67,7 +67,7 @@ pub(crate) fn import_gradients_dialog(app: &mut PhotocraftApp) {
         Ok(Value::Null)
     });
     if let Err(error) = result
-        && error != crate::file_dialog::CANCELLED
+        && error != crate::file_picks::CANCELLED
     {
         app.ui.status = error;
         app.ui.status_error = true;
@@ -165,12 +165,13 @@ mod tests {
         }
         let img = photocraft_codecs::Image::from_u8(16, 16, photocraft_codecs::ChannelLayout::Gray, px).unwrap();
         let png = photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &Default::default()).unwrap();
-        let (show, asked) = crate::file_dialog::fake(vec![Some(crate::file_dialog::FileDialogAnswer::Contents("Leaf.png".into(), png))]);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() });
+        let (show, asked) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::contents("Leaf.png", png))]);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: show, ..Default::default() });
         import_brushes(&mut app).unwrap();
         app.poll_file_dialog(&egui::Context::default(), None);
-        match asked.borrow().first() {
-            Some(crate::file_dialog::FileDialogRequest::Open { extensions: Some(e), .. }) => {
+        match asked.requests().first() {
+            Some(r) if r.kind == craft::host::PickKind::Open && r.filters.len() == 1 => {
+                let e = &r.filters[0].extensions;
                 assert!(e.iter().any(|x| x == "abr") && e.iter().any(|x| x == "png"), "{e:?}")
             }
             other => panic!("expected a filtered open dialog, got {other:?}"),

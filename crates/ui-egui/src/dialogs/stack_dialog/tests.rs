@@ -3,7 +3,6 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 
 use super::*;
-use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
 
 /// `n` small PNGs named `names` in a fresh folder for `tag`: (folder, paths).
 fn pngs(tag: &str, names: &[&str]) -> (String, Vec<String>) {
@@ -23,11 +22,11 @@ fn pngs(tag: &str, names: &[&str]) -> (String, Vec<String>) {
     (dir.to_string_lossy().into_owned(), paths)
 }
 
-fn harness(answers: Vec<Option<FileDialogAnswer>>) -> (Harness<'static, PhotocraftApp>, std::rc::Rc<std::cell::RefCell<Vec<FileDialogRequest>>>) {
-    let (show, asked) = crate::file_dialog::fake(answers);
+fn harness(answers: Vec<Option<craft::host::Picked>>) -> (Harness<'static, PhotocraftApp>, std::sync::Arc<crate::file_picks::scripted::ScriptedFiles>) {
+    let (show, asked) = crate::file_picks::scripted::fake(answers);
     let h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() })
+        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: show, ..Default::default() })
     });
     (h, asked)
 }
@@ -65,7 +64,7 @@ fn statistics_browse_and_mode_selection_compute_the_chosen_statistic() {
     let mut source = photocraft_engine::Session::new();
     source.execute("file.new", json!({"width": 8, "height": 6, "background": "#80a0c0"})).unwrap();
     source.execute("file.saveACopy", json!({"path": paths[1]})).unwrap();
-    let (mut h, _) = harness(vec![Some(FileDialogAnswer::Paths(paths))]);
+    let (mut h, _) = harness(vec![Some(crate::file_picks::scripted::paths(paths))]);
     let ctx = h.ctx.clone();
     crate::menus::invoke(h.state_mut(), &ctx, STATISTICS, json!({})).unwrap();
     h.run_steps(3);
@@ -124,7 +123,7 @@ fn statistics_folder_and_alignment_reach_the_engine() {
     for path in paths {
         source.execute("file.saveACopy", json!({"path": path})).unwrap();
     }
-    let (mut h, _) = harness(vec![Some(FileDialogAnswer::FolderTo(dir))]);
+    let (mut h, _) = harness(vec![Some(crate::file_picks::scripted::folder(dir))]);
     let id = open_statistics(h.state_mut());
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("use".into(), json!("folder"));
     h.run_steps(3);
@@ -147,8 +146,8 @@ fn statistics_folder_and_alignment_reach_the_engine() {
 fn source_files_list_is_built_with_browse_remove_sort_and_open_files() {
     let (_, paths) = pngs("files", &["b.png", "c.png", "a.png"]);
     let (mut h, asked) = harness(vec![
-        Some(FileDialogAnswer::Paths(vec![paths[0].clone(), paths[1].clone()])),
-        Some(FileDialogAnswer::Paths(vec![paths[2].clone(), paths[0].clone()])),
+        Some(crate::file_picks::scripted::paths(vec![paths[0].clone(), paths[1].clone()])),
+        Some(crate::file_picks::scripted::paths(vec![paths[2].clone(), paths[0].clone()])),
     ]);
     let ctx = h.ctx.clone();
     crate::menus::invoke(h.state_mut(), &ctx, COMMAND, json!({})).unwrap();
@@ -170,7 +169,7 @@ fn source_files_list_is_built_with_browse_remove_sort_and_open_files() {
 
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert!(matches!(asked.borrow()[0], FileDialogRequest::Open { multiple: true, .. }), "{:?}", asked.borrow());
+    assert_eq!(crate::file_picks::scripted::kinds(&asked)[0], craft::host::PickKind::OpenMany, "{:?}", asked.requests());
     assert_eq!(listed(&h), ["b.png", "c.png"]);
     assert!(h.get_by_label("b.png").rect().bottom() <= h.get_by_label("c.png").rect().top(), "source files must be vertical rows");
     h.get_by_label("Browse…").click();
@@ -210,7 +209,7 @@ fn source_files_list_is_built_with_browse_remove_sort_and_open_files() {
 #[test]
 fn a_folder_loads_its_images() {
     let (dir, _) = pngs("folder", &["one.png", "two.png"]);
-    let (mut h, asked) = harness(vec![Some(FileDialogAnswer::FolderTo(dir.clone()))]);
+    let (mut h, asked) = harness(vec![Some(crate::file_picks::scripted::folder(dir.clone()))]);
     let id = open(h.state_mut());
     h.run_steps(3);
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("use".into(), json!("folder"));
@@ -218,7 +217,7 @@ fn a_folder_loads_its_images() {
     assert!(h.get_by_label("Remove").accesskit_node().is_disabled() && h.get_by_label("Add Open Files").accesskit_node().is_disabled());
     h.get_by_label("Browse…").click();
     h.run_steps(4);
-    assert!(matches!(asked.borrow()[0], FileDialogRequest::Folder { .. }));
+    assert_eq!(crate::file_picks::scripted::kinds(&asked)[0], craft::host::PickKind::Folder);
     assert!(h.query_by_label("one.png").is_some() && h.query_by_label("two.png").is_some(), "the folder's images are listed");
     // Create Smart Object after Loading Layers: both images inside one smart object.
     h.get_by_label("Create Smart Object after Loading Layers").click();

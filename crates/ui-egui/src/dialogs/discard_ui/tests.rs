@@ -367,11 +367,11 @@ fn macos_asks_dont_save_cancel_save_with_the_default_last() {
 fn macos_plain_labels_keep_save_and_escape_shortcuts() {
     for key in [Key::S, Key::Enter] {
         let mut h = prompt_on(egui::os::OperatingSystem::Mac);
-        let (show, asked) = crate::file_dialog::fake(vec![None]);
-        h.state_mut().services.file_dialog = Some(show);
+        let (show, asked) = crate::file_picks::scripted::fake(vec![None]);
+        h.state_mut().services.files = show;
         h.key_press(key);
         h.run_steps(2);
-        assert_eq!(asked.borrow().len(), 1, "{key:?} opens the save dialog");
+        assert_eq!(asked.requests().len(), 1, "{key:?} opens the save dialog");
         // A cancelled or failed save ends the close.
         assert_eq!(docs_left(&h), None, "cancelling the save dialog ends the close");
         h.key_press(Key::Escape);
@@ -385,11 +385,11 @@ fn macos_plain_labels_keep_save_and_escape_shortcuts() {
 fn enter_takes_the_default_answer_or_the_focused_button() {
     let mut h = prompt_on(egui::os::OperatingSystem::Windows);
     // Backing out of the save dialog ends the close (a cancelled or failed save ends the close).
-    let (show, asked) = crate::file_dialog::fake(vec![None]);
-    h.state_mut().services.file_dialog = Some(show);
+    let (show, asked) = crate::file_picks::scripted::fake(vec![None]);
+    h.state_mut().services.files = show;
     h.key_press(Key::Enter);
     h.run_steps(2);
-    assert_eq!(asked.borrow().len(), 1, "Enter answered Yes, which saves");
+    assert_eq!(asked.requests().len(), 1, "Enter answered Yes, which saves");
     assert_eq!(docs_left(&h), None);
     let mut h = prompt_on(egui::os::OperatingSystem::Windows);
     // The arrow key from the focused Yes to No (Tab visits a dialog's fields only): Enter now presses it.
@@ -397,18 +397,17 @@ fn enter_takes_the_default_answer_or_the_focused_button() {
     h.run_steps(2);
     h.key_press(Key::Enter);
     h.run_steps(2);
-    assert_eq!(asked.borrow().len(), 1, "no second dialog");
+    assert_eq!(asked.requests().len(), 1, "no second dialog");
     assert_eq!(docs_left(&h), Some(1), "Enter pressed the focused No");
 }
 
 #[test]
 fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
-    use crate::{FileDialogAnswer, FileDialogReply};
     use egui_kittest::kittest::Queryable;
     use std::{cell::RefCell, rc::Rc};
     let written: Rc<RefCell<Vec<String>>> = Rc::default();
-    let (w, waiting): (_, Rc<RefCell<Option<FileDialogReply>>>) = (written.clone(), Rc::default());
-    let held = waiting.clone();
+    let w = written.clone();
+    let files = crate::file_picks::scripted::held();
     let mut app = app_with_docs(1);
     make_dirty(&mut app, 0);
     app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
@@ -417,10 +416,10 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
         Ok(())
     }));
     // A dialog the user takes their time with.
-    app.services.file_dialog = Some(Box::new(move |_, _, reply| *held.borrow_mut() = Some(reply)));
+    app.services.files = crate::file_picks::scripted::service(&files);
     let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
-    let answer = |h: &mut Prompted, a: Option<FileDialogAnswer>| {
-        waiting.borrow_mut().take().expect("the save dialog is open").send(a);
+    let answer = |h: &mut Prompted, a: Option<craft::host::Picked>| {
+        files.answer(a.unwrap_or(craft::host::Picked::Cancelled));
         h.run_steps(2);
     };
     // A cancelled or failed save ends the close: cancelling the save dialog drops the prompt.
@@ -437,57 +436,7 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
     h.key_press(Key::Y);
     h.run_steps(3);
     assert_eq!(h.state().session.documents().len(), 1, "still open while the dialog is");
-    answer(&mut h, Some(FileDialogAnswer::SaveTo("/pics/kept.psd".into())));
-    assert_eq!(*written.borrow(), ["/pics/kept.psd"]);
-    assert!(h.state().discard.is_none());
-    assert!(h.state().session.documents().is_empty());
-}
-
-/// Save on closing an untitled document, answered with `kept` while `kept.psd` exists: the
-/// prompt waits for the question whether to replace it. Cancel brings the prompt back with
-/// nothing written; Replace saves and closes the document.
-#[test]
-fn saving_from_the_prompt_waits_for_the_question_whether_to_replace() {
-    use crate::{FileDialogAnswer, FileDialogReply};
-    use egui_kittest::kittest::Queryable;
-    use std::{cell::RefCell, rc::Rc};
-    let written: Rc<RefCell<Vec<String>>> = Rc::default();
-    let (w, waiting): (_, Rc<RefCell<Option<FileDialogReply>>>) = (written.clone(), Rc::default());
-    let held = waiting.clone();
-    let mut app = app_with_docs(1);
-    make_dirty(&mut app, 0);
-    app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
-    app.services.write = Some(Box::new(move |p: &str, _: &[u8]| {
-        w.borrow_mut().push(p.to_string());
-        Ok(())
-    }));
-    app.services.file_stamp = Some(Box::new(|p: &str| (p == "/pics/kept.psd").then_some(crate::FileStamp { len: 1, modified: None })));
-    app.services.file_dialog = Some(Box::new(move |_, _, reply| *held.borrow_mut() = Some(reply)));
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
-    let save = |h: &mut Prompted| {
-        h.key_press(Key::Y);
-        h.run_steps(3);
-        waiting.borrow_mut().take().expect("the save dialog is open").send(Some(FileDialogAnswer::SaveTo("/pics/kept".into())));
-        h.run_steps(2);
-        h.state().ui.prompt_with(crate::replace_prompt::owns).map(|p| p.id).expect("the save asks first")
-    };
-    let id = save(&mut h);
-    assert!(h.state().file_dialog_open());
-    assert!(h.query_by_label("(Y)es").is_none(), "the prompt waits behind the question");
-    assert!(written.borrow().is_empty());
-
-    crate::dialogs::cancel(h.state_mut(), id).unwrap();
-    h.run_steps(2);
-    assert!(written.borrow().is_empty(), "Cancel writes nothing");
-    // A cancelled or failed save ends the close.
-    assert_eq!(docs_left(&h), None);
-    assert_eq!(h.state().session.documents().len(), 1, "the document stays open");
-    assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
-    h.run_steps(3);
-
-    let id = save(&mut h);
-    crate::dialogs::confirm(h.state_mut(), id).unwrap();
-    h.run_steps(2);
+    answer(&mut h, Some(crate::file_picks::scripted::save_to("/pics/kept.psd")));
     assert_eq!(*written.borrow(), ["/pics/kept.psd"]);
     assert!(h.state().discard.is_none());
     assert!(h.state().session.documents().is_empty());

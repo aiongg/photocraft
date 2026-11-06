@@ -311,8 +311,18 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
             let st = app.session.active()?;
             let (doc, layer) = (st.doc.id, st.active_layer?);
             // A link needs a file on disk: the desktop picker answers its full path, the web
-            // picker only a name and the bytes, which can't be linked to.
-            Some(app.pick_file_bytes(move |app, path, _| {
+            // picker only a name and the bytes, which can't be linked to. It starts in the folder
+            // of the file the layer links to.
+            let missing = st.doc.layer(layer).and_then(|l| match &l.content {
+                photocraft_doc::LayerContent::Smart(sm) => match &sm.source {
+                    photocraft_doc::SmartSource::Linked { path } => {
+                        std::path::Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()).map(std::path::Path::to_path_buf)
+                    }
+                    photocraft_doc::SmartSource::Embedded { .. } => None,
+                },
+                _ => None,
+            });
+            Some(app.pick_file_bytes_in(missing, move |app, path, _| {
                 if !std::path::Path::new(&path).is_absolute() {
                     return Err(format!("{path}: Relink to File needs a file on disk"));
                 }

@@ -455,11 +455,21 @@ fn library_i18n(lang: Lang) -> Arc<craft::i18n::I18n> {
 fn install_host(ctx: &egui::Context, lang: Lang) {
     let i18n = library_i18n(lang);
     let library_lang = i18n.from_code(lang.code()).unwrap_or(craft::i18n::Lang::EN);
-    craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
+    let builder = craft::host::Host::builder(craft::host::AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
         .i18n(i18n)
         .lang(library_lang)
-        .settings(crate::host_settings::of(ctx))
-        .install(ctx);
+        .settings(crate::host_settings::of(ctx));
+    let builder = match crate::file_picks::files_of(ctx) {
+        Some(files) => builder.files(files),
+        None => builder,
+    };
+    builder.install(ctx);
+}
+
+/// Installs the Host again in the language it has, after the services it carries changed.
+pub(crate) fn reinstall_host(ctx: &egui::Context) {
+    let lang = ctx.data(|data| data.get_temp::<Lang>(host_lang_id())).unwrap_or(Lang::EN);
+    install_host(ctx, lang);
 }
 
 /// Keep the library Host of `ctx` in `lang` until the guard drops, then in the language `ctx` was

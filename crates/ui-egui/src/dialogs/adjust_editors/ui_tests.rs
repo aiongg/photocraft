@@ -705,11 +705,10 @@ fn gradient_map_picker_imports_grd_without_editing_the_map() {
         ],
         ..Default::default()
     }]);
-    h.state_mut().services.file_dialog = Some(Box::new(move |request, _, reply| {
-        assert!(matches!(request, crate::FileDialogRequest::Open { multiple: false, extensions: Some(ref exts), .. } if exts == &["grd"]));
-        reply.send(Some(crate::FileDialogAnswer::Contents("My Gradients.GRD".into(), bytes.clone())));
-    }));
+    let (files, asked) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::contents("My Gradients.GRD", bytes))]);
+    h.state_mut().services.files = files;
     import_gradients_from_picker(&mut h);
+    assert!(matches!(asked.requests().as_slice(), [r] if r.kind == craft::host::PickKind::Open && r.filters.len() == 1 && r.filters[0].extensions == ["grd"]));
     assert_eq!(layer(&h), before, "import does not edit the adjustment");
     assert_eq!(h.state().session.active().unwrap().history.past_len(), history);
     assert_eq!(h.state().session.presets.gradient, tool);
@@ -728,18 +727,17 @@ fn gradient_map_picker_imports_grd_without_editing_the_map() {
 
 #[test]
 fn gradient_map_picker_import_cancel_and_errors_preserve_state() {
-    use crate::FileDialogAnswer;
     for answer in [
         None,
-        Some(FileDialogAnswer::Contents("broken.grd".into(), b"invalid".to_vec())),
-        Some(FileDialogAnswer::Contents("old.grd".into(), b"8BGR\0\x03".to_vec())),
-        Some(FileDialogAnswer::Contents(
-            "noise.grd".into(),
+        Some(crate::file_picks::scripted::contents("broken.grd", b"invalid".to_vec())),
+        Some(crate::file_picks::scripted::contents("old.grd", b"8BGR\0\x03".to_vec())),
+        Some(crate::file_picks::scripted::contents(
+            "noise.grd",
             photocraft_psd::grd::write(&[photocraft_psd::grd::GrdGradient { noise: true, ..Default::default() }]),
         )),
-        Some(FileDialogAnswer::Contents("wrong.abr".into(), Vec::new())),
-        Some(FileDialogAnswer::Paths(vec!["/nonexistent/photocraft-gradients.grd".into()])),
-        Some(FileDialogAnswer::Unavailable("dialog unavailable".into())),
+        Some(crate::file_picks::scripted::contents("wrong.abr", Vec::new())),
+        Some(crate::file_picks::scripted::paths(["/nonexistent/photocraft-gradients.grd"])),
+        Some(craft::host::Picked::Unavailable("dialog unavailable".into())),
     ] {
         let mut h = app_harness("gradientMap", "rgb", 8);
         h.state_mut().session.presets.gradients.truncate(1);
@@ -747,7 +745,7 @@ fn gradient_map_picker_import_cancel_and_errors_preserve_state() {
         let presets = h.state().session.presets.gradients.clone();
         let history = h.state().session.active().unwrap().history.past_len();
         let error = answer.is_some();
-        h.state_mut().services.file_dialog = Some(Box::new(move |_, _, reply| reply.send(answer.clone())));
+        h.state_mut().services.files = crate::file_picks::scripted::fake(vec![answer]).0;
         import_gradients_from_picker(&mut h);
         assert_eq!(layer(&h), before);
         assert_eq!(h.state().session.presets.gradients, presets);
@@ -764,12 +762,11 @@ fn gradient_map_dialog_import_preserves_pending_settings() {
     let mut h = app_harness("gradientMap", "rgb", 8);
     let id = crate::adjust_dialog::open(h.state_mut(), "image.adjustments.gradientMap").unwrap();
     let fields = h.state_mut().ui.dialog_mut(id).unwrap().fields.clone();
-    h.state_mut().services.file_dialog = Some(Box::new(|request, _, reply| {
-        assert!(matches!(request, crate::FileDialogRequest::Open { extensions: Some(ref exts), .. } if exts == &["grd"]));
-        reply.send(None);
-    }));
+    let (files, asked) = crate::file_picks::scripted::fake(vec![None]);
+    h.state_mut().services.files = files;
     h.run_steps(3);
     import_gradients_from_picker(&mut h);
+    assert!(matches!(asked.requests().as_slice(), [r] if r.filters.len() == 1 && r.filters[0].extensions == ["grd"]));
     assert_eq!(h.state_mut().ui.dialog_mut(id).unwrap().fields, fields);
     assert!(!h.state().file_dialog_open());
     assert!(!h.state().ui.status_error);

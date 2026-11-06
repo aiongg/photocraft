@@ -295,7 +295,7 @@ fn save(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) -> bool {
                 && index_of(app, doc).is_some_and(|i| app.services.write_unconfirmed || !app.session.documents()[i].is_dirty())
         }
         // Backing out of the file dialog is the user's choice, not an error.
-        Err(e) if e == crate::file_dialog::CANCELLED => false,
+        Err(e) if e == crate::file_picks::CANCELLED => false,
         Err(e) => {
             app.ui.status = couldnt_save(e);
             app.ui.status_error = true;
@@ -319,7 +319,7 @@ pub(crate) fn saved_document(app: &mut PhotocraftApp, ctx: &egui::Context, doc: 
 
 /// A save failure as reported ("cancelled" stays as it is: it isn't reported).
 fn couldnt_save(e: String) -> String {
-    if e == crate::file_dialog::CANCELLED { e } else { format!("Couldn't save: {e}") }
+    if e == crate::file_picks::CANCELLED { e } else { format!("Couldn't save: {e}") }
 }
 
 /// Called every frame after the dialog host drew: takes the question's answer, and brings the

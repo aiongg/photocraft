@@ -1,5 +1,4 @@
 use super::*;
-use crate::file_dialog::{self, FileDialogAnswer, FileDialogRequest};
 use crate::{Services, menus, notices};
 use photocraft_color::{ColorMode, SampleType};
 use photocraft_doc::Document;
@@ -14,7 +13,7 @@ type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
 /// An app whose importer names the document after the file (like `photocraft-io`) and reports a
 /// warning for names containing "warn", and fails for bytes "bad"; the exporter warns for ".png"
 /// and the writer records what it wrote. Its file dialogs answer with `answers`, in order.
-fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) {
+fn app_with(answers: Vec<Option<craft::host::Picked>>) -> (PhotocraftApp, Written) {
     let written: Written = Rc::default();
     let w = written.clone();
     let services = Services {
@@ -29,7 +28,7 @@ fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) 
             let warnings = if path.ends_with(".png") { vec!["Layers were flattened".to_string()] } else { Vec::new() };
             Ok((b"out".to_vec(), warnings))
         })),
-        file_dialog: Some(file_dialog::fake(answers).0),
+        files: crate::file_picks::scripted::fake(answers).0,
         write: Some(Box::new(move |p: &str, b: &[u8]| {
             w.borrow_mut().push((p.to_string(), b.to_vec()));
             Ok(())
@@ -107,7 +106,7 @@ fn affinity_preview_does_not_acquire_the_source_path_even_when_renamed() {
 fn file_open_dialog_sets_path_so_save_writes_in_place() {
     // The dialog returns a full path: the document is named after the file, not the path.
     let (dir, paths) = files("in-place", &["cat.psd"], b"x");
-    let (mut app, written) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, written) = app_with(vec![Some(crate::file_picks::scripted::paths(paths.clone()))]);
     let ctx = egui::Context::default();
     assert_eq!(menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap(), json!({"fileDialog": "open"}));
     answer(&mut app);
@@ -126,7 +125,7 @@ fn file_open_dialog_sets_path_so_save_writes_in_place() {
 #[test]
 fn file_open_dialog_opens_every_selected_path() {
     let (dir, paths) = files("issue-595", &["one.psd", "two.png"], b"x");
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, _) = app_with(vec![Some(crate::file_picks::scripted::paths(paths.clone()))]);
 
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
@@ -154,7 +153,7 @@ fn cancelling_file_open_opens_nothing() {
 
 #[test]
 fn the_web_hands_over_contents_rather_than_paths() {
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Contents("cat.png".into(), b"x".to_vec()))]);
+    let (mut app, _) = app_with(vec![Some(crate::file_picks::scripted::contents("cat.png", b"x".to_vec()))]);
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
     let st = app.session.active().unwrap();
@@ -164,7 +163,7 @@ fn the_web_hands_over_contents_rather_than_paths() {
 #[test]
 fn the_web_opens_every_selected_file() {
     let files = vec![("one.png".into(), b"x".to_vec()), ("broken.png".into(), b"bad".to_vec()), ("two.jpg".into(), b"x".to_vec())];
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::ContentsMany(files))]);
+    let (mut app, _) = app_with(vec![Some(crate::file_picks::scripted::contents_many(files))]);
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
     // Each good file is its own tab; the broken one is reported without stopping the rest.
@@ -229,11 +228,13 @@ fn templates_open_as_new_untitled_documents() {
     assert!(app.session.documents().iter().all(|d| d.path.is_none()));
     assert_eq!(app.ui.recent_files.first().map(String::as_str), Some("/pics/card.psdt"));
     // File › Save asks for a new name (cancelled here) rather than suggesting the template.
-    let (show, asked) = file_dialog::fake(vec![None]);
-    app.services.file_dialog = Some(show);
+    let (show, asked) = crate::file_picks::scripted::fake(vec![None]);
+    app.services.files = show;
     menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     answer(&mut app);
-    assert_eq!(*asked.borrow(), [FileDialogRequest::Save { suggested: "Untitled-2.psd".into() }]);
+    let requests = asked.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!((requests[0].kind, requests[0].file_name.as_deref()), (craft::host::PickKind::Save, Some("Untitled-2.psd")));
     assert!(written.borrow().is_empty());
 }
 
@@ -274,7 +275,7 @@ fn export_warnings_reach_status_notice_and_control_response() {
 #[test]
 fn open_failures_are_errors_and_leave_no_document() {
     let (dir, paths) = files("broken", &["broken.psd"], b"bad");
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths))]);
+    let (mut app, _) = app_with(vec![Some(crate::file_picks::scripted::paths(paths))]);
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap();
     answer(&mut app);
@@ -289,7 +290,7 @@ fn open_failures_are_errors_and_leave_no_document() {
 #[test]
 fn a_picked_file_that_cannot_be_read_is_reported_like_any_open_failure() {
     let missing = std::env::temp_dir().join("photocraft-missing-dir").join("big.psb").to_string_lossy().into_owned();
-    let picked = || Some(FileDialogAnswer::Paths(vec![missing.clone()]));
+    let picked = || Some(crate::file_picks::scripted::paths(vec![missing.clone()]));
     let (mut app, _) = app_with(vec![picked(), picked(), None]);
     app.open_dialog_file().unwrap();
     answer(&mut app);
@@ -906,7 +907,7 @@ fn a_set_of_background_opens_keeps_its_order_however_they_finish() {
 /// the document keeps its own file and unsaved changes.
 #[test]
 fn save_a_copy_is_recorded_and_replayed_as_a_copy() {
-    let (mut app, written) = app_with(vec![Some(FileDialogAnswer::SaveTo("/pics/copy.png".into()))]);
+    let (mut app, written) = app_with(vec![Some(crate::file_picks::scripted::save_to("/pics/copy.png"))]);
     let ctx = egui::Context::default();
     app.open_file("/pics/work.pcraft", b"x").unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -939,7 +940,7 @@ fn export_as_is_recorded_and_replayed() {
             e.borrow_mut().push((path.to_string(), doc.size.width, doc.size.height, s.jpeg_quality));
             Ok((b"out".to_vec(), Vec::new()))
         })),
-        file_dialog: Some(file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("/pics/out.jpg".into()))]).0),
+        files: crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to("/pics/out.jpg"))]).0,
         write: Some(Box::new(|_: &str, _: &[u8]| Ok(()))),
         ..Default::default()
     };
@@ -974,7 +975,8 @@ fn export_as_is_recorded_and_replayed() {
 /// as opening it is; a Save a Copy isn't, since the document doesn't live there.
 #[test]
 fn saving_a_new_document_lists_it_in_recent_files() {
-    let (mut app, _written) = app_with(vec![Some(FileDialogAnswer::SaveTo("/pics/new.psd".into())), Some(FileDialogAnswer::SaveTo("/pics/copy.png".into()))]);
+    let (mut app, _written) =
+        app_with(vec![Some(crate::file_picks::scripted::save_to("/pics/new.psd")), Some(crate::file_picks::scripted::save_to("/pics/copy.png"))]);
     let ctx = egui::Context::default();
     app.run("file.new", json!({"width": 4, "height": 4})).unwrap();
     assert!(app.ui.recent_files.is_empty());

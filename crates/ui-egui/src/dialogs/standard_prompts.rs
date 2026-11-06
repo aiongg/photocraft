@@ -3,10 +3,14 @@
 //! record keeps the fields the legacy dialog had (`ui.inspect` and `ui.dialog.set` read and write
 //! them) and the prompt carries the id as its tag, so an answer finds its record.
 //!
+//! The file service's Replace question is a prompt instance of its own on the host
+//! (automation lists it with [`file_questions`] and answers it with [`answer_file_question`]): its
+//! answer belongs to the service, so PhotoCraft never takes its result.
+//!
 //! The host holds one `StandardPrompt` at a time: opening a second replaces the first, whose
 //! record is then swept as cancelled (gap AB).
 
-use craft::ui::dialog::{DialogId, DialogResult, PromptChoice, StackDialog, StandardPrompt};
+use craft::ui::dialog::{DialogId, DialogResult, PromptChoice, PromptKind, StackDialog, StandardPrompt};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -88,13 +92,11 @@ fn run(app: &mut PhotocraftApp, mut record: PromptRecord, choice: PromptChoice) 
             crate::gpu_status::recover(app, choice == PromptChoice::Alternate);
             Ok(Value::Null)
         } else {
-            crate::replace_prompt::confirm(app)
+            Ok(Value::Null)
         }
     } else {
         crate::actions::stopped(app, fields);
-        if crate::replace_prompt::owns(fields) {
-            crate::replace_prompt::cancel(app)
-        } else if crate::open_prompt::owns_damage(fields) {
+        if crate::open_prompt::owns_damage(fields) {
             crate::open_prompt::answer_damage(app, false)
         } else if crate::gpu_status::owns(fields) {
             app.ui.gpu_fallback_notice = None;
@@ -208,4 +210,25 @@ pub fn sweep(app: &mut PhotocraftApp) {
             let _ = run(app, record, PromptChoice::Cancel);
         }
     }
+}
+
+/// The file service's open Replace questions as `ui.inspect` lists them: the host dialog's id as the
+/// automation id, and the question's names as fields.
+pub fn file_questions(app: &PhotocraftApp) -> Vec<Value> {
+    app.file_panels
+        .open_questions()
+        .into_iter()
+        .filter_map(|dialog| {
+            let PromptKind::ReplaceFile { name, answered } = app.ui.host.get_by_id::<StandardPrompt>(dialog)?.kind().clone() else { return None };
+            Some(json!({"id": dialog.value(), "kind": "Command", "title": "Save", "fields": {"__label": "Save", "name": name, "answered": answered}}))
+        })
+        .collect()
+}
+
+/// `ui.dialog.confirm` / `ui.dialog.cancel` of the file service's Replace question `id`; `None` when
+/// `id` names no such question. The result stays the service's.
+pub fn answer_file_question(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64, confirm: bool) -> Option<Result<Value, String>> {
+    let dialog = app.file_panels.open_questions().into_iter().find(|d| d.value() == id)?;
+    let answered = if confirm { app.ui.host.confirm_by_id::<StandardPrompt>(ctx, dialog) } else { app.ui.host.cancel_by_id::<StandardPrompt>(ctx, dialog) };
+    Some(if answered { Ok(Value::Null) } else { Err("OK is disabled: the prompt's answer is not available".into()) })
 }

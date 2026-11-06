@@ -2,7 +2,7 @@
 //! scripted `quality` / `jpegFormat` that skip it, recording and playback, and the close prompt
 //! waiting behind it.
 use super::*;
-use crate::{FileDialogAnswer, jpeg_options_ui};
+use crate::jpeg_options_ui;
 use egui_kittest::kittest::Queryable;
 use photocraft_codecs::JpegFormat;
 use std::{cell::RefCell, rc::Rc};
@@ -26,7 +26,7 @@ fn jpeg_app(to: &str) -> (Prompted, Writes) {
     let mut app = app_with_docs(1);
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo(to.into()))]).0);
+    app.services.files = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::save_to(to))]).0;
     app.services.export = Some(Box::new(|_, _, settings| Ok((asked(settings.jpeg_quality, settings.jpeg_format), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));

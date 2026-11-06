@@ -465,14 +465,14 @@ fn recorded_save_as_and_save_replay_and_write_the_file() {
 }
 
 /// An app with the real importer/exporter and writer whose Save dialogs answer `answers`.
-fn disk_app(answers: Vec<Option<crate::file_dialog::FileDialogAnswer>>) -> PhotocraftApp {
+fn disk_app(answers: Vec<Option<craft::host::Picked>>) -> PhotocraftApp {
     let services = crate::Services {
         import: Some(Box::new(|name, bytes, opts| {
             photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
         })),
         export: Some(Box::new(|doc, path, _| photocraft_io::export(doc, path, &Default::default()).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string()))),
         write: Some(Box::new(|path, bytes| std::fs::write(path, bytes).map_err(|e| e.to_string()))),
-        file_dialog: Some(crate::file_dialog::fake(answers).0),
+        files: crate::file_picks::scripted::fake(answers).0,
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
@@ -484,13 +484,12 @@ fn disk_app(answers: Vec<Option<crate::file_dialog::FileDialogAnswer>>) -> Photo
 /// new layer first when `layered`). Returns the played result and whether `b` / `a`
 /// changed on disk.
 fn record_save_on_a_play_on_b(ext: &str, layered: bool) -> (Value, bool, bool) {
-    use crate::file_dialog::FileDialogAnswer::SaveTo;
     let dir = std::env::temp_dir().join(format!("photocraft-rec-save-{ext}-{layered}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = |n: &str| dir.join(format!("{n}.{ext}")).to_string_lossy().into_owned();
     let (a, b) = (path("a"), path("b"));
     // The dialog confirms the suggested name, which is the document's own file.
-    let mut app = disk_app(vec![Some(SaveTo(a.clone())), Some(SaveTo(a.clone()))]);
+    let mut app = disk_app(vec![Some(crate::file_picks::scripted::save_to(a.clone())), Some(crate::file_picks::scripted::save_to(a.clone()))]);
     let ctx = egui::Context::default();
     for p in [&a, &b] {
         app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
@@ -999,19 +998,18 @@ fn assert_displace_call_finished(app: &mut PhotocraftApp, suffix_count: usize) {
 
 #[test]
 fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled() {
-    use crate::file_dialog::FileDialogAnswer;
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("missing.png").to_string_lossy().into_owned();
     for answer in [
         None,
-        Some(FileDialogAnswer::Unavailable("no picker available".into())),
-        Some(FileDialogAnswer::Paths(Vec::new())),
-        Some(FileDialogAnswer::Contents("map.png".into(), Vec::new())),
-        Some(FileDialogAnswer::Paths(vec![missing])),
+        Some(craft::host::Picked::Unavailable("no picker available".into())),
+        Some(craft::host::Picked::Paths(Vec::new())),
+        Some(crate::file_picks::scripted::contents("map.png", Vec::new())),
+        Some(crate::file_picks::scripted::paths(vec![missing])),
     ] {
         let mut app = recording_with_displace_child();
-        let (show, _) = crate::file_dialog::fake(vec![answer]);
-        app.services.file_dialog = Some(show);
+        let (show, _) = crate::file_picks::scripted::fake(vec![answer]);
+        app.services.files = show;
         let id = pause_child(&mut app);
         crate::dialogs::confirm(&mut app, id).unwrap();
         assert!(app.file_dialog_open());
@@ -1036,8 +1034,8 @@ fn a_displace_step_resumes_and_records_its_call_once_after_choosing_a_map() {
     let map = dir.path().join("map.png");
     let bytes = photocraft_io::export(&app.session.active().unwrap().doc, "png", &Default::default()).unwrap().bytes;
     std::fs::write(&map, bytes).unwrap();
-    let (show, _) = crate::file_dialog::fake(vec![Some(crate::file_dialog::FileDialogAnswer::Paths(vec![map.to_string_lossy().into_owned()]))]);
-    app.services.file_dialog = Some(show);
+    let (show, _) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::paths(vec![map.to_string_lossy().into_owned()]))]);
+    app.services.files = show;
     let id = pause_child(&mut app);
     crate::dialogs::confirm(&mut app, id).unwrap();
     app.poll_file_dialog(&egui::Context::default(), None);

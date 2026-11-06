@@ -261,7 +261,7 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
     }
     if browse
         && let Err(e) = browse_color_lookup(app, id)
-        && e != crate::file_dialog::CANCELLED
+        && e != crate::file_picks::CANCELLED
     {
         app.ui.status = e;
         app.ui.status_error = true;
@@ -300,21 +300,20 @@ pub fn color_lookup_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: Layer
 #[cfg(test)]
 mod lookup_picker_tests {
     use super::*;
-    use crate::file_dialog::{self, FileDialogAnswer, FileDialogRequest};
     use serde_json::json;
 
     const CUBE: &str = "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n";
 
     #[test]
     fn chosen_lut_is_embedded_into_the_requested_adjustment_layer() {
-        let (dialog, asked) = file_dialog::fake(vec![Some(FileDialogAnswer::Contents("custom.cube".into(), CUBE.as_bytes().to_vec()))]);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(dialog), ..Default::default() });
+        let (dialog, asked) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::contents("custom.cube", CUBE.as_bytes().to_vec()))]);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: dialog, ..Default::default() });
         app.run("file.new", json!({"width": 16, "height": 12})).unwrap();
         let layer = app.run("layer.newAdjustmentLayer.colorLookup", json!({})).unwrap()["layer"].as_u64().unwrap();
         browse_color_lookup(&mut app, LayerId(layer)).unwrap();
         app.poll_file_dialog(&egui::Context::default(), None);
         assert!(
-            matches!(asked.borrow().first(), Some(FileDialogRequest::Open { multiple: false, extensions: Some(exts), .. }) if exts.iter().map(String::as_str).collect::<Vec<_>>() == ["cube", "3dl", "look"])
+            matches!(asked.requests().first(), Some(r) if r.kind == craft::host::PickKind::Open && r.filters.len() == 1 && r.filters[0].extensions == ["cube", "3dl", "look"])
         );
         app.poll_file_dialog(&egui::Context::default(), None);
         let adj = &app.session.active().unwrap().doc.layer(LayerId(layer)).unwrap().content;
@@ -363,8 +362,8 @@ mod lookup_picker_tests {
 
     #[test]
     fn invalid_lut_does_not_modify_the_existing_adjustment() {
-        let (dialog, _) = file_dialog::fake(vec![Some(FileDialogAnswer::Contents("broken.cube".into(), b"invalid".to_vec()))]);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(dialog), ..Default::default() });
+        let (dialog, _) = crate::file_picks::scripted::fake(vec![Some(crate::file_picks::scripted::contents("broken.cube", b"invalid".to_vec()))]);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: dialog, ..Default::default() });
         app.run("file.new", json!({"width": 16, "height": 12})).unwrap();
         let layer = app.run("layer.newAdjustmentLayer.colorLookup", json!({})).unwrap()["layer"].as_u64().unwrap();
         let before = app.session.active().unwrap().doc.layer(LayerId(layer)).unwrap().content.clone();
@@ -377,8 +376,8 @@ mod lookup_picker_tests {
 
     #[test]
     fn cancelling_the_lut_picker_preserves_the_adjustment() {
-        let (dialog, _) = file_dialog::fake(vec![None]);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(dialog), ..Default::default() });
+        let (dialog, _) = crate::file_picks::scripted::fake(vec![None]);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: dialog, ..Default::default() });
         app.run("file.new", json!({"width": 16, "height": 12})).unwrap();
         let layer = app.run("layer.newAdjustmentLayer.colorLookup", json!({})).unwrap()["layer"].as_u64().unwrap();
         let before = app.session.active().unwrap().doc.layer(LayerId(layer)).unwrap().content.clone();

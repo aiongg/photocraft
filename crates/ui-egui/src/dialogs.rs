@@ -26,7 +26,7 @@ pub(crate) fn is_folder_field(key: &str) -> bool {
 
 /// A Browse… that failed shows its error; one the user cancelled shows nothing.
 pub(crate) fn report_browse(app: &mut PhotocraftApp, result: Result<Value, String>) {
-    if let Err(e) = result.map(|_| ()).or_else(|e| if e == crate::file_dialog::CANCELLED { Ok(()) } else { Err(e) }) {
+    if let Err(e) = result.map(|_| ()).or_else(|e| if e == crate::file_picks::CANCELLED { Ok(()) } else { Err(e) }) {
         app.ui.status = e;
     }
 }
@@ -673,7 +673,6 @@ const ROUTES: &[fn(&Fields) -> bool] = &[
     crate::color_range_ui::owns,
     crate::prefs_ui::owns,
     crate::open_prompt::owns,
-    crate::replace_prompt::owns,
     crate::layer_style::color_picker::owns,
     |f| f.contains_key("__export"),
     |f| f.contains_key("__smartFilter"),
@@ -846,6 +845,9 @@ pub fn confirm_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Resu
     if app.ui.hosted(id).is_some() {
         return hosted::confirm(app, ctx, id);
     }
+    if let Some(answer) = standard_prompts::answer_file_question(app, ctx, id, true) {
+        return answer;
+    }
     if app.ui.prompt(id).is_some() {
         return standard_prompts::confirm(app, ctx, id);
     }
@@ -876,10 +878,14 @@ pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 }
 
 pub fn cancel_in(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) -> Result<Value, String> {
+    if let Some(answer) = standard_prompts::answer_file_question(app, ctx, id, false) {
+        return answer;
+    }
     if app.ui.prompt(id).is_some() {
         return standard_prompts::cancel(app, ctx, id);
     }
     let Some(closed) = app.ui.close_dialog(id) else { return hosted::cancel(app, ctx, id) };
+    app.forget_file_dialog_of(id);
     crate::actions::stopped(app, &closed.fields);
     if crate::guide_layout_ui::owns(&closed.fields) {
         app.ui.dialogs.retain(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));
@@ -975,7 +981,6 @@ pub mod open_prompt;
 pub mod palette;
 pub(crate) mod pattern_fill_ui;
 pub mod rasterize_prompt;
-pub mod replace_prompt;
 pub mod screen_picker;
 pub mod select_mask_ui;
 pub mod shape_dialog;
