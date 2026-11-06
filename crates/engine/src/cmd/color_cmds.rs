@@ -966,8 +966,10 @@ fn convert_to_profile(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn profile_info(s: &mut Session, p: &Value) -> Result<Value> {
-    let builtins: Vec<Value> =
-        crate::extra_profiles::all().iter().map(|(id, description, p)| json!({ "id": id, "description": description, "colorSpace": format!("{:?}", p.color_space) })).collect();
+    let builtins: Vec<Value> = crate::extra_profiles::all()
+        .iter()
+        .map(|(id, description, p)| json!({ "id": id, "description": description, "colorSpace": format!("{:?}", p.color_space) }))
+        .collect();
     let doc = s.active().map(|d| d.doc.clone());
     let info = match p.get("profile").and_then(Value::as_str) {
         Some(spec) => {
@@ -1390,7 +1392,10 @@ mod tests {
         for command in ["view.proofSetup.legacyMacintoshRgb", "view.proofSetup.colorBlindnessProtanopia", "view.proofSetup.colorBlindnessDeuteranopia"] {
             // These commands retain the previously selected custom profile.
             s.execute(command, json!({})).unwrap();
-            assert!(crate::GpuMatrixShaper::from_transform(&s.color.display_transform_for(&d, Some(1)).unwrap()).is_some(), "fixture must exercise the shortcut");
+            assert!(
+                crate::GpuMatrixShaper::from_transform(&s.color.display_transform_for(&d, Some(1)).unwrap()).is_some(),
+                "fixture must exercise the shortcut"
+            );
             assert!(s.color.gpu_canvas_matrix_shaper_for(&d, Some(1)).unwrap().is_none(), "{command} must retain its simulation");
             assert!(s.color.gpu_canvas_lut_for(&d, 9, Some(1)).unwrap().is_some(), "{command} still has its LUT fallback");
         }

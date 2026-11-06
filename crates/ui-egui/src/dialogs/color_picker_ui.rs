@@ -63,7 +63,7 @@ fn open_picker(app: &mut PhotocraftApp, target: &str, label: &str, rgb: [f32; 3]
     let web_only = crate::host_settings::recall_ref(app, "colorPicker.memory").and_then(|v| v.get("webColors").and_then(Value::as_bool)).unwrap_or(false);
     let orig = if web_only { web_safe(rgb) } else { rgb };
     let request = ColorRequest::new(key.clone(), srgba(rgb)).title(label);
-    let mut dialog = ColorPickerDialog::from_request(request);
+    let mut dialog = ColorPickerDialog::from_request(request).cmyk(&crate::cmyk_converter::working(app));
     if let Some(inks) = kept {
         dialog = dialog.kept(ModelValues::new(CMYK_ID, &inks.map(|v| v * 100.0)));
     }

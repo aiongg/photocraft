@@ -5,7 +5,7 @@
 //! lossless), plus colour-book entries we cannot evaluate kept verbatim. Nothing assumes sRGB:
 //! RGB and HSB components are in the RGB working space, CMYK and gray in the CMYK and gray
 //! working spaces (Edit › Color Settings), Lab is D50. Turning a swatch into the RGB the
-//! foreground colour holds (and the panel shows) goes through `photocraft-cms`
+//! foreground colour holds (and the panel shows) goes through `craft::cms`
 //! ([`SwatchConv`]).
 //!
 //! The library persists with the preferences document (`presets.swatches`, see
@@ -209,7 +209,7 @@ impl SwatchColor {
 
 // ------------------------------------------------------------------ colour management
 
-/// Converts swatch colours to the RGB working space through `photocraft-cms` (relative
+/// Converts swatch colours to the RGB working space through `craft::cms` (relative
 /// colorimetric + black point compensation, Photoshop's default). Build one per library or
 /// colour-settings change; evaluating is cheap.
 pub struct SwatchConv {

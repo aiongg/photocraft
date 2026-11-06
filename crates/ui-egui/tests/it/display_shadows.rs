@@ -82,7 +82,7 @@ fn profiles() -> (Arc<Vec<u8>>, Arc<Vec<u8>>) {
     (source.with_encoded_bytes().to_bytes(), monitor.with_encoded_bytes().to_bytes())
 }
 
-/// Solve the monitor matrix without using any photocraft-cms transform/math/curve evaluator.
+/// Solve the monitor matrix without using any craft::cms transform/math/curve evaluator.
 fn solve(mut m: [[f64; 3]; 3], mut xyz: [f64; 3]) -> [f64; 3] {
     for column in 0..3 {
         let pivot = (column..3).max_by(|&a, &b| m[a][column].abs().total_cmp(&m[b][column].abs())).unwrap();

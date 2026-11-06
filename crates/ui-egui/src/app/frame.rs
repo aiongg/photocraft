@@ -104,6 +104,8 @@ impl PhotocraftApp {
             (self.session.active_index(), self.ui.host.top_id()).hash(&mut hash);
             hash.finish()
         };
+        // Screen samples are converted from the main window's monitor profile.
+        ScreenColorPicker::set_monitor(ctx, &self.session.color.monitor_for(None));
         ScreenColorPicker::tick(ctx, pick_target);
         if let Some(notice) = ScreenColorPicker::take_notice(ctx) {
             self.ui.status = notice.text;

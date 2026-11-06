@@ -392,7 +392,7 @@ fn visible_pixels(image: Rect, viewport: Rect, area: PixelRect, max_side: usize)
     (crop.width() as usize <= max_side && crop.height() as usize <= max_side && crop.width() as u64 * crop.height() as u64 <= 16_777_216).then_some(crop)
 }
 
-/// Pixels per band [`display_image`] reads and colour-converts at once: at least `photocraft-cms`'s
+/// Pixels per band [`display_image`] reads and colour-converts at once: at least `craft::cms`'s
 /// parallel threshold (16K pixels), and small enough that a band's float scratch is 1 MiB.
 const CROP_BAND_PIXELS: usize = 64 * 1024;
 
@@ -403,7 +403,7 @@ fn crop_image(surface: &Surface, area: PixelRect, display: &photocraft_engine::d
 
 /// `area` as the canvas shows it, with `read` filling each band's float pixels. Converted in
 /// bands of rows, in parallel off wasm, not one row or one whole copy at a time: a row is below
-/// `photocraft-cms`'s parallel threshold, so a per-row conversion ran the display transform (any
+/// `craft::cms`'s parallel threshold, so a per-row conversion ran the display transform (any
 /// document profile other than the monitor's, such as an Adobe RGB photo on sRGB) on one core of
 /// the UI thread for every edit (#4682).
 pub(crate) fn display_image(

@@ -325,7 +325,8 @@ fn colour_managed_tiles_match_the_per_pixel_conversion() {
     use photocraft_color::ColorMode;
     use photocraft_color::convert::{CmykSpace, with_cmyk_space};
     let icc = Arc::new(
-        cmyk_profile(&CmykParams { description: "GPU test CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 5, grid_b2a: 9, ..Default::default() }).unwrap()
+        cmyk_profile(&CmykParams { description: "GPU test CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 5, grid_b2a: 9, ..Default::default() })
+            .unwrap()
             .to_bytes(),
     );
     let own = CmykSpace::for_profile(Some(&icc));

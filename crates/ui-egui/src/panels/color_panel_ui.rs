@@ -19,7 +19,8 @@ pub(crate) fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let numbers = LocaleNumbers::of(ui);
     let colors = [tool_color(app.session.tools.foreground), tool_color(app.session.tools.background)];
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
-    let response = ColorPanel::new(ID_SALT, &mut app.ui.color_panel, colors, &numbers).dynamic_tracks(dynamic).show(ui);
+    let cmyk = crate::cmyk_converter::working(app);
+    let response = ColorPanel::new(ID_SALT, &mut app.ui.color_panel, colors, &numbers).dynamic_tracks(dynamic).cmyk(&cmyk).show(ui);
     apply(app, ui.ctx(), response);
     crate::apply_color::track_focus(ui.ctx());
 }

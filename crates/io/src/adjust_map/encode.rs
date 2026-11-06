@@ -138,7 +138,8 @@ pub(super) fn color_lookup(name: &str, lut: Option<&[f32]>, size: u32, dither: b
             }
         },
         _ => {
-            let file = craft::cms::lutfile::LutFile { title: String::new(), ..craft::cms::lutfile::LutFile::identity(2).expect("a 2-point identity LUT is valid") };
+            let file =
+                craft::cms::lutfile::LutFile { title: String::new(), ..craft::cms::lutfile::LutFile::identity(2).expect("a 2-point identity LUT is valid") };
             (LutFormat::Cube, craft::cms::lutfile::write_cube(&file).into_bytes(), cube_file_name(name), false)
         }
     };

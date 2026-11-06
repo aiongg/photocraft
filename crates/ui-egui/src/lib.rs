@@ -30,6 +30,7 @@ macro_rules! tsrc {
     };
 }
 pub mod canvas;
+mod cmyk_converter;
 pub mod control;
 pub mod dialogs;
 pub mod dock;

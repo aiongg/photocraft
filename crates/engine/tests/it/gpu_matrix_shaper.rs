@@ -159,14 +159,16 @@ fn gpu_display_representation_accepts_u8_u16_and_float_samples() {
 
 #[test]
 fn absent_curves_and_matrix_use_identity_without_losing_offsets() {
-    let identity = GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, Vec::new()).unwrap(), TransformOptions::default()).unwrap()).unwrap();
+    let identity =
+        GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, Vec::new()).unwrap(), TransformOptions::default()).unwrap()).unwrap();
     for rgb in [[0.0; 3], [1.0; 3], [0.001, 0.2, 0.8], [-2.0, 0.5, 2.0]] {
         for (actual, input) in sample_gpu(&identity, rgb).into_iter().zip(rgb) {
             assert!((actual - input.clamp(0.0, 1.0)).abs() < 1e-6);
         }
     }
     let matrix = Stage::Matrix { rows: 3, cols: 3, m: vec![0.8, 0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0, 0.6], offset: vec![0.01, 0.02, 0.03] };
-    let transform = GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, vec![matrix]).unwrap(), TransformOptions::default()).unwrap()).unwrap();
+    let transform =
+        GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, vec![matrix]).unwrap(), TransformOptions::default()).unwrap()).unwrap();
     let input = [0.1, 0.2, 0.3];
     let output = sample_gpu(&transform, input);
     for (actual, expected) in output.into_iter().zip([0.09, 0.16, 0.21]) {
@@ -191,8 +193,11 @@ fn unsupported_clut_proof_and_non_rgb_transforms_retain_fallback() {
 #[test]
 fn malformed_matrix_storage_is_not_exposed_to_the_gpu() {
     for (coefficients, offsets) in [(vec![2.0; 8], vec![0.0; 3]), (vec![2.0; 9], vec![0.0; 2]), (vec![f64::INFINITY; 9], vec![0.0; 3])] {
-        let transform =
-            Transform::from_pipeline(Pipeline::new(3, vec![Stage::Matrix { rows: 3, cols: 3, m: coefficients, offset: offsets }]).unwrap(), TransformOptions::default()).unwrap();
+        let transform = Transform::from_pipeline(
+            Pipeline::new(3, vec![Stage::Matrix { rows: 3, cols: 3, m: coefficients, offset: offsets }]).unwrap(),
+            TransformOptions::default(),
+        )
+        .unwrap();
         assert!(GpuMatrixShaper::from_transform(&transform).is_none());
     }
 }

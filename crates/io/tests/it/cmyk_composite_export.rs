@@ -129,7 +129,8 @@ fn compare_flat_and_layered_mixed_cmyk_regions() {
         grid_a2b: 5,
         grid_b2a: 9,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
     let coated = Builtin::CoatedCmyk.profile().to_bytes();
     for (name, profile) in [("untagged", None), ("coated", Some(coated.clone())), ("uncoated", Some(custom.to_bytes()))] {
         for (depth, sample) in [(SampleType::U8, CodecSample::U8), (SampleType::U16, CodecSample::U16), (SampleType::F32, CodecSample::F32)] {
@@ -346,7 +347,8 @@ fn merged_composite_of_a_tagged_cmyk_file_reads_through_its_profile() {
     use photocraft_color::convert::{CmykSpace, cmyk_to_rgb, with_cmyk_space};
     let mut doc = Document::new("tagged", Size::new(6, 4), ColorMode::Cmyk, SampleType::U8);
     let profile =
-        cmyk_profile(&CmykParams { description: "Merged Test CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 5, grid_b2a: 9, ..Default::default() }).unwrap();
+        cmyk_profile(&CmykParams { description: "Merged Test CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 5, grid_b2a: 9, ..Default::default() })
+            .unwrap();
     doc.icc_profile = Some(profile.to_bytes());
     let mut surface = Surface::new(photocraft_color::PixelFormat::new(ColorMode::Cmyk, SampleType::U8, false));
     for x in 0..6 {

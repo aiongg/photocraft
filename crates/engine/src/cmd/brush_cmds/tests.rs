@@ -1177,7 +1177,8 @@ fn strokes_convert_through_the_documents_cmyk_profile() {
         grid_a2b: 5,
         grid_b2a: 9,
         ..Default::default()
-    }).unwrap()
+    })
+    .unwrap()
     .to_bytes();
     let cmyk_session = |tagged: bool| {
         let mut s = Session::new();

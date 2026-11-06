@@ -1,6 +1,6 @@
 //! Colour conversions between the document colour models.
 //!
-//! CMYK ↔ RGB goes through the ICC colour management module (`photocraft-cms`) with the
+//! CMYK ↔ RGB goes through the ICC colour management module (`craft::cms`) with the
 //! built-in coated CMYK profile and sRGB (relative colorimetric with black point
 //! compensation, Photoshop's default), so CMYK pixels display and accept painted colours the
 //! way a colour-managed editor does. A document's embedded CMYK profile replaces the built-in
@@ -296,13 +296,8 @@ mod tests {
     #[test]
     fn document_cmyk_space_scope() {
         // A synthetic uncoated-like profile (heavier dot gain than the built-in coated one).
-        let params = craft::cms::synth::CmykParams {
-            description: "Test Uncoated".into(),
-            tvi: [0.26, 0.26, 0.26, 0.3],
-            grid_a2b: 5,
-            grid_b2a: 9,
-            ..Default::default()
-        };
+        let params =
+            craft::cms::synth::CmykParams { description: "Test Uncoated".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 5, grid_b2a: 9, ..Default::default() };
         let p = craft::cms::synth::cmyk_profile(&params).unwrap();
         let bytes = p.to_bytes();
         let space = CmykSpace::for_profile(Some(&bytes)).expect("a CMYK profile other than the default");

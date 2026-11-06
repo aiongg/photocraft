@@ -43,7 +43,8 @@ fn cmyk_doc(profile: Option<&Profile>, ink: [f32; 4]) -> Document {
 
 /// Synthetic CMYK profile unlike the built-in coated one (heavier dot gain, small tables).
 fn test_cmyk() -> Profile {
-    cmyk_profile(&CmykParams { description: "Test Uncoated CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 7, grid_b2a: 11, ..Default::default() }).unwrap()
+    cmyk_profile(&CmykParams { description: "Test Uncoated CMYK".into(), tvi: [0.26, 0.26, 0.26, 0.3], grid_a2b: 7, grid_b2a: 11, ..Default::default() })
+        .unwrap()
 }
 
 /// What the CPU canvas shows at the centre pixel (RGBA8).
@@ -225,7 +226,10 @@ fn monitor_profile_setting() {
     assert!(!s.color.canvas_display(&srgb).unwrap().is_identity());
     let got = shown(&s, &srgb);
     let mut want = [0.0f32; 3];
-    Transform::new(Builtin::Srgb.profile(), Builtin::DisplayP3.profile(), Intent::RelativeColorimetric, true).unwrap().eval(&[0.8, 0.5, 0.3], &mut want).unwrap();
+    Transform::new(Builtin::Srgb.profile(), Builtin::DisplayP3.profile(), Intent::RelativeColorimetric, true)
+        .unwrap()
+        .eval(&[0.8, 0.5, 0.3], &mut want)
+        .unwrap();
     assert!(close(got, want.map(|v| v * 255.0), TOL), "{got:?} vs {want:?}");
     // `auto` uses the platform's profile when supplied, else sRGB.
     s.execute("edit.colorSettings", json!({"monitorProfile": "auto"})).unwrap();

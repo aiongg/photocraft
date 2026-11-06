@@ -108,7 +108,6 @@ photocraft/
 ├─ crates/
 │  │  ── foundation (no_std-friendly where practical, wasm-safe) ──
 │  ├─ geom/                    photocraft-geom      points, rects, affine/perspective, tile coords, bezier (kurbo)
-│  ├─ cms/                     photocraft-cms       pure-Rust ICC colour management: profiles, transforms, intents, BPC, soft proof, 3D LUTs
 │  ├─ color/                   photocraft-color     pixel formats, color spaces, blend-mode math (scalar reference); conversions via cms
 │  ├─ raster/                  photocraft-raster    tiled COW surfaces, masks, mip pyramids, damage regions, pixel iterators
 │  │  ── document ──
@@ -530,7 +529,7 @@ schemars = "1"
 blake3 = "1"
 zstd = "*"           # native; ruzstd for wasm decode
 # color / codecs
-# ICC: our own photocraft-cms (pure Rust)
+# ICC: craft-cms through the craft facade (pure Rust)
 image = { version = "*", default-features = false }
 jxl-oxide = "*"
 # gpu

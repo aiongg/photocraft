@@ -1731,7 +1731,8 @@ fn rgb_colours_become_ink_through_the_document_profile() {
         grid_a2b: 5,
         grid_b2a: 9,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
     let bytes = profile.to_bytes();
     let space = photocraft_color::convert::CmykSpace::for_profile(Some(&bytes));
     assert!(space.is_some(), "a profile other than the built-in one");
