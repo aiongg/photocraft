@@ -9,7 +9,10 @@ mod tool;
 mod tool_options;
 mod transform;
 
-pub use color_panel::{ColorPanelMode, ColorPanelState, ColorRamp, DockTabs};
+pub use color_panel::DockTabs;
+/// The Color panel's saved state is the library's: the same fields and camelCase names as
+/// PhotoCraft's own before it (`background`, `mode`, `ramp`, `webSafeRamp`).
+pub use craft::color::ui::{ColorPanelMode, ColorPanelRamp, ColorPanelState};
 pub use panel_state::{
     CameraRawPreviewState, CameraRawScopeState, CurvesEditorState, LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions, PointCurveDrag,
     PointCurveState,
