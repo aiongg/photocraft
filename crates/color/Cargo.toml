@@ -8,5 +8,5 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-photocraft-cms = { workspace = true }
+craft = { workspace = true, features = ["cms"] }
 serde = { workspace = true }

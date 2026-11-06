@@ -1364,6 +1364,7 @@ source = "git+https://github.com/aiongg/craft-libs?rev=afbcf64dee1e1e4ab48b88696
 dependencies = [
  "craft-automation",
  "craft-browse",
+ "craft-cms",
  "craft-color",
  "craft-dialogs",
  "craft-docpath",
@@ -5524,7 +5525,6 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "open",
  "photocraft-automation",
- "photocraft-cms",
  "photocraft-codecs",
  "photocraft-color",
  "photocraft-compose",
@@ -5620,14 +5620,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "photocraft-cms"
-version = "0.17.0"
-dependencies = [
- "moxcms",
- "rayon",
-]
-
-[[package]]
 name = "photocraft-codecs"
 version = "0.17.0"
 dependencies = [
@@ -5653,7 +5645,7 @@ dependencies = [
 name = "photocraft-color"
 version = "0.17.0"
 dependencies = [
- "photocraft-cms",
+ "craft",
  "serde",
 ]
 
@@ -5661,8 +5653,8 @@ dependencies = [
 name = "photocraft-compose"
 version = "0.17.0"
 dependencies = [
+ "craft",
  "criterion",
- "photocraft-cms",
  "photocraft-color",
  "photocraft-doc",
  "photocraft-geom",
@@ -5695,7 +5687,6 @@ dependencies = [
  "flate2",
  "photocraft-affinity",
  "photocraft-algo",
- "photocraft-cms",
  "photocraft-codecs",
  "photocraft-color",
  "photocraft-compose",
@@ -5760,10 +5751,10 @@ name = "photocraft-gpu"
 version = "0.17.0"
 dependencies = [
  "bytemuck",
+ "craft",
  "half",
  "log",
  "photocraft-algo",
- "photocraft-cms",
  "photocraft-color",
  "photocraft-compose",
  "photocraft-doc",
@@ -5793,7 +5784,6 @@ dependencies = [
  "miniz_oxide 0.9.1",
  "photocraft-affinity",
  "photocraft-algo",
- "photocraft-cms",
  "photocraft-codecs",
  "photocraft-color",
  "photocraft-compose",
@@ -5832,7 +5822,7 @@ dependencies = [
 name = "photocraft-paint"
 version = "0.17.0"
 dependencies = [
- "photocraft-cms",
+ "craft",
  "photocraft-color",
  "photocraft-geom",
  "photocraft-raster",
@@ -5944,7 +5934,6 @@ dependencies = [
  "flate2",
  "log",
  "photocraft-algo",
- "photocraft-cms",
  "photocraft-codecs",
  "photocraft-color",
  "photocraft-compose",

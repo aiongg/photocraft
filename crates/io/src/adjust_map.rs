@@ -486,13 +486,13 @@ fn read_lookup(d: &[u8]) -> Result<Adjustment, String> {
 }
 
 /// A LUT file's table, read the way a PSD read does (an XML file tagged `.cube` is sniffed as `.look`).
-fn parse_lut_source(format: LutFormat, bytes: &[u8]) -> Result<photocraft_cms::lutfile::LutFile, photocraft_cms::lutfile::LutError> {
-    let format = match format {
-        LutFormat::Cube => photocraft_cms::lutfile::Format::Cube,
-        LutFormat::ThreeDl => photocraft_cms::lutfile::Format::ThreeDl,
-        LutFormat::Look => photocraft_cms::lutfile::Format::Look,
+fn parse_lut_source(format: LutFormat, bytes: &[u8]) -> Result<craft::cms::lutfile::LutFile, craft::cms::lutfile::LutError> {
+    let ext = match format {
+        LutFormat::Cube => "cube",
+        LutFormat::ThreeDl => "3dl",
+        LutFormat::Look => "look",
     };
-    photocraft_cms::lutfile::parse(&format!("x.{}", format.extension()), bytes)
+    crate::lut_file::parse(&format!("x.{ext}"), bytes)
 }
 
 /// Photoshop's `LUTFormatType` value for a format.

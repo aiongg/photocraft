@@ -11,7 +11,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
-use photocraft_cms::{Builtin, ColorSpace, Intent, Profile, Transform};
+use craft::cms::{Builtin, ColorSpace, Intent, Profile, Transform};
 
 /// A document's own CMYK profile, linked to sRGB both ways (relative colorimetric + BPC, like
 /// the built-in defaults). While a space is active on a thread ([`with_cmyk_space`]),
@@ -109,7 +109,7 @@ pub fn cmyk_to_rgb(c: [f32; 4]) -> [f32; 3] {
     // The active document's embedded CMYK profile, if one is in scope.
     let active = ACTIVE_CMYK.with(|a| match &*a.borrow() {
         Some(s) => {
-            s.to_srgb.eval_fast(&c, &mut o);
+            s.to_srgb.eval_fast(&c, &mut o).expect("buffers match the transform's channel counts");
             true
         }
         None => false,
@@ -118,7 +118,7 @@ pub fn cmyk_to_rgb(c: [f32; 4]) -> [f32; 3] {
         let Some(t) = cmyk_to_srgb_transform() else {
             return cmyk_to_rgb_naive(c);
         };
-        t.eval_fast(&c, &mut o);
+        t.eval_fast(&c, &mut o).expect("buffers match the transform's channel counts");
     }
     o
 }
@@ -131,7 +131,7 @@ pub fn rgb_to_cmyk(rgb: [f32; 3]) -> [f32; 4] {
     let mut o = [0.0f32; 4];
     let active = ACTIVE_CMYK.with(|a| match &*a.borrow() {
         Some(s) => {
-            s.from_srgb.eval_fast(&v, &mut o);
+            s.from_srgb.eval_fast(&v, &mut o).expect("buffers match the transform's channel counts");
             true
         }
         None => false,
@@ -140,7 +140,7 @@ pub fn rgb_to_cmyk(rgb: [f32; 3]) -> [f32; 4] {
         let Some(t) = srgb_to_cmyk_transform() else {
             return rgb_to_cmyk_naive(rgb);
         };
-        t.eval_fast(&v, &mut o);
+        t.eval_fast(&v, &mut o).expect("buffers match the transform's channel counts");
     }
     o
 }
@@ -296,14 +296,14 @@ mod tests {
     #[test]
     fn document_cmyk_space_scope() {
         // A synthetic uncoated-like profile (heavier dot gain than the built-in coated one).
-        let params = photocraft_cms::synth::CmykParams {
+        let params = craft::cms::synth::CmykParams {
             description: "Test Uncoated".into(),
             tvi: [0.26, 0.26, 0.26, 0.3],
             grid_a2b: 5,
             grid_b2a: 9,
             ..Default::default()
         };
-        let p = photocraft_cms::synth::cmyk_profile(&params);
+        let p = craft::cms::synth::cmyk_profile(&params).unwrap();
         let bytes = p.to_bytes();
         let space = CmykSpace::for_profile(Some(&bytes)).expect("a CMYK profile other than the default");
         // Cached by allocation.
@@ -316,7 +316,7 @@ mod tests {
         let ink = [0.0, 0.5, 0.5, 0.0];
         let default = cmyk_to_rgb(ink);
         let mut expect = [0.0f32; 3];
-        Transform::new(&p, Builtin::Srgb.profile(), Intent::RelativeColorimetric, true).unwrap().eval(&ink, &mut expect);
+        Transform::new(&p, Builtin::Srgb.profile(), Intent::RelativeColorimetric, true).unwrap().eval(&ink, &mut expect).unwrap();
         let inside = with_cmyk_space(Some(&space), || {
             assert!(active_cmyk_space().is_some());
             cmyk_to_rgb(ink)

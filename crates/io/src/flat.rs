@@ -47,8 +47,8 @@ pub fn import_flat(name: &str, bytes: &[u8]) -> Result<ImportResult, IoError> {
     let d = &mut r.document;
     if d.icc_profile.is_none() && matches!(format, Some(Format::OpenExr | Format::Hdr)) {
         d.icc_profile = match d.mode {
-            ColorMode::Rgb => Some(photocraft_cms::Builtin::LinearSrgb.profile().to_bytes()),
-            ColorMode::Grayscale => Some(photocraft_cms::builtin::linear_gray().to_bytes()),
+            ColorMode::Rgb => Some(craft::cms::Builtin::LinearSrgb.profile().to_bytes()),
+            ColorMode::Grayscale => Some(craft::cms::builtin::linear_gray().to_bytes()),
             _ => None,
         };
     }
@@ -70,7 +70,7 @@ pub fn import_flat(name: &str, bytes: &[u8]) -> Result<ImportResult, IoError> {
 fn hdr_fallback(img: &Image) -> Option<(Arc<Vec<u8>>, String)> {
     let c = img.cicp.filter(|c| c.is_hdr() && img.sample_type().is_float())?;
     let warning = format!("the HDR colour primaries (H.273 code {}) aren't supported; the image is read as linear sRGB", c.primaries);
-    Some((photocraft_cms::Builtin::LinearSrgb.profile().to_bytes(), warning))
+    Some((craft::cms::Builtin::LinearSrgb.profile().to_bytes(), warning))
 }
 
 /// The profile a HEIF's `nclx` colour description stands for, when the file has no ICC profile
@@ -85,7 +85,49 @@ fn cicp_profile(img: &Image) -> Option<Arc<Vec<u8>>> {
     }
     // Unspecified primaries on an HDR image: BT.2100's, which PQ and HLG are defined with.
     let primaries = if c.primaries == 2 && c.is_hdr() { 9 } else { c.primaries };
-    photocraft_cms::builtin::cicp_rgb(primaries, c.transfer, linear).map(|p| p.to_bytes())
+    cicp_rgb(primaries, c.transfer, linear).map(|p| p.to_bytes())
+}
+
+/// The RGB profile for an ITU-T H.273 (CICP) colour description: BT.709, BT.2020 or P3-D65
+/// primaries (codes 1, 9, 12) with the sRGB, BT.709, linear or gamma 2.2/2.8 transfer
+/// (13; 1, 6, 14, 15; 8; 4; 5). `linear` means the samples were already decoded to linear light,
+/// as PQ and HLG (16, 18) images are held, since no ICC curve represents those transfers.
+/// `None` for anything else. The built-in profile of the same primaries supplies the colorants.
+fn cicp_rgb(primaries: u16, transfer: u16, linear: bool) -> Option<craft::cms::Profile> {
+    use craft::cms::curve::{Curve, srgb_trc};
+    use craft::cms::{Builtin, Profile};
+    let (base, name) = match primaries {
+        1 => (Builtin::Srgb, "BT.709"),
+        9 => (Builtin::Rec2020, "Rec. ITU-R BT.2020"),
+        12 => (Builtin::DisplayP3, "Display P3"),
+        _ => return None,
+    };
+    let transfer = if linear { 8 } else { transfer };
+    let builtin = match (primaries, transfer) {
+        (1, 13) => Some(Builtin::Srgb),
+        (1, 8) => Some(Builtin::LinearSrgb),
+        (12, 13) => Some(Builtin::DisplayP3),
+        (9, 1 | 6 | 14 | 15) => Some(Builtin::Rec2020),
+        _ => None,
+    };
+    if let Some(b) = builtin {
+        return Some(b.profile().clone());
+    }
+    let (trc, curve) = match transfer {
+        8 => (Curve::Gamma(1.0), "linear"),
+        13 => (srgb_trc(), "sRGB curve"),
+        1 | 6 | 14 | 15 => {
+            let a = 1.099;
+            (Curve::Parametric { kind: 3, p: [1.0 / 0.45, 1.0 / a, (a - 1.0) / a, 1.0 / 4.5, 0.081, 0.0, 0.0] }, "BT.709 curve")
+        }
+        4 => (Curve::Gamma(2.2), "gamma 2.2"),
+        5 => (Curve::Gamma(2.8), "gamma 2.8"),
+        _ => return None,
+    };
+    let mut profile: Profile = base.profile().clone();
+    profile.description = format!("{name} {curve} (PhotoCraft)");
+    profile.trc = Some([trc.clone(), trc.clone(), trc]);
+    Some(profile.with_encoded_bytes())
 }
 
 /// Every frame of a GIF as a single-layer document, handed to `each` in order with its delay in
@@ -445,7 +487,7 @@ impl<'a> FlatSource<'a> {
             // A CMYK target is written as CMYK with the document's own profile (#2220), which it
             // therefore needs; RGB-only targets keep the compositor's own handling (built-in
             // coated CMYK when the embedded profile is unusable).
-            use photocraft_cms::{Builtin, ColorSpace, Intent, Profile, Transform};
+            use craft::cms::{Builtin, ColorSpace, Intent, Profile, Transform};
             let profile = match doc.icc_profile.as_ref() {
                 Some(bytes) => Profile::parse(bytes).map_err(|e| IoError::Unsupported(format!("invalid CMYK composite profile: {e}")))?,
                 None => Builtin::CoatedCmyk.profile().clone(),
@@ -473,7 +515,7 @@ impl<'a> FlatSource<'a> {
             // RGB-only targets use the sRGB composite directly, without separating CMYK; the
             // compositor renders Lab documents in sRGB. Either way the file is tagged sRGB.
             warnings.push(format!("{:?} composite written as sRGB RGB (colour-managed conversion)", fmt.mode));
-            icc = Some(photocraft_cms::Builtin::Srgb.profile().to_bytes().to_vec());
+            icc = Some(craft::cms::Builtin::Srgb.profile().to_bytes().to_vec());
         }
         let mode = if fmt.mode == ColorMode::Grayscale { ColorMode::Grayscale } else { ColorMode::Rgb };
         Ok(Self { doc, native: None, mode, sample, inks: false, space: None, icc, rows: 0 })
@@ -701,7 +743,7 @@ fn strip_xmp(meta: &mut codecs::Metadata, opts: &ExportOptions) {
 /// format without CMYK, colours converted to what an untagged file means. Pixel by pixel, so a
 /// band of rows gets what the whole image would (and the same warnings).
 fn prepare_flat(mut img: Image, format: Format, warnings: &mut Vec<String>) -> Result<Image, IoError> {
-    use photocraft_cms::{Builtin, Intent};
+    use craft::cms::{Builtin, Intent};
     if img.layout().has_alpha() && !format.caps().alpha {
         // Flattened over white, as saving a transparent document without transparency does.
         img = matte_over_white(&img)?;
@@ -716,7 +758,7 @@ fn prepare_flat(mut img: Image, format: Format, warnings: &mut Vec<String>) -> R
         // see [`import_flat`]).
         if let Some(linear) = convert_rgb(&img, Builtin::LinearSrgb.profile(), Intent::RelativeColorimetric, false, CSample::F32)? {
             img = linear;
-        } else if let Some(linear) = convert_gray(&img, photocraft_cms::builtin::linear_gray(), CSample::F32)? {
+        } else if let Some(linear) = convert_gray(&img, craft::cms::builtin::linear_gray(), CSample::F32)? {
             img = linear;
         }
     } else if !format.caps().icc || (img.layout().is_gray() && !format.caps().layouts.iter().any(|l| l.is_gray())) {
@@ -1000,8 +1042,8 @@ fn matte_over_white(img: &Image) -> Result<Image, IoError> {
 
 /// RGB pixels converted from their profile (sRGB when untagged) to `dst`, unclamped, untagged and
 /// stored as `sample`. `None` when the image isn't RGB or already holds `dst`'s colours.
-fn convert_rgb(img: &Image, dst: &photocraft_cms::Profile, intent: photocraft_cms::Intent, bpc: bool, sample: CSample) -> Result<Option<Image>, IoError> {
-    use photocraft_cms::{Builtin, ColorSpace, Profile};
+fn convert_rgb(img: &Image, dst: &craft::cms::Profile, intent: craft::cms::Intent, bpc: bool, sample: CSample) -> Result<Option<Image>, IoError> {
+    use craft::cms::{Builtin, ColorSpace, Profile};
     if !img.layout().is_rgb() {
         return Ok(None);
     }
@@ -1012,8 +1054,8 @@ fn convert_rgb(img: &Image, dst: &photocraft_cms::Profile, intent: photocraft_cm
 
 /// Gray pixels converted from their profile (sGray when untagged) to `dst`, unclamped, untagged
 /// and stored as `sample`. `None` when the image isn't gray or already holds `dst`'s colours.
-fn convert_gray(img: &Image, dst: &photocraft_cms::Profile, sample: CSample) -> Result<Option<Image>, IoError> {
-    use photocraft_cms::{Builtin, ColorSpace, Intent, Profile};
+fn convert_gray(img: &Image, dst: &craft::cms::Profile, sample: CSample) -> Result<Option<Image>, IoError> {
+    use craft::cms::{Builtin, ColorSpace, Intent, Profile};
     if !matches!(img.layout(), ChannelLayout::Gray | ChannelLayout::GrayA) {
         return Ok(None);
     }
@@ -1025,19 +1067,19 @@ fn convert_gray(img: &Image, dst: &photocraft_cms::Profile, sample: CSample) -> 
 /// `img`'s pixels converted from `src` to `dst` (see [`convert_rgb`]).
 fn convert_from(
     img: &Image,
-    src: &photocraft_cms::Profile,
-    dst: &photocraft_cms::Profile,
-    intent: photocraft_cms::Intent,
+    src: &craft::cms::Profile,
+    dst: &craft::cms::Profile,
+    intent: craft::cms::Intent,
     bpc: bool,
     sample: CSample,
 ) -> Result<Option<Image>, IoError> {
     if src.same_colors(dst) {
         return Ok(None);
     }
-    let t = photocraft_cms::Transform::new(src, dst, intent, bpc).map_err(|e| IoError::Unsupported(e.to_string()))?;
+    let t = craft::cms::Transform::new(src, dst, intent, bpc).map_err(|e| IoError::Unsupported(e.to_string()))?;
     let stride = img.layout().channels();
     let out = map_bands(img, img.layout(), sample, |mut vals| {
-        t.apply(&mut vals, stride);
+        t.apply(&mut vals, stride).expect("buffers match the transform's channel counts");
         vals
     })?;
     Ok(Some(out.with_icc(None)))
@@ -1046,7 +1088,7 @@ fn convert_from(
 /// Colour-managed CMYK → sRGB for formats that cannot store CMYK (the document's embedded
 /// CMYK profile when it parses, else the built-in coated CMYK; relative colorimetric + BPC).
 fn cmyk_image_to_srgb(img: &Image) -> Result<Image, IoError> {
-    use photocraft_cms::{Builtin, ColorSpace, Intent, Profile, Transform};
+    use craft::cms::{Builtin, ColorSpace, Intent, Profile, Transform};
     let src = img
         .icc
         .as_ref()
@@ -1090,7 +1132,7 @@ fn cmyk_image_to_srgb(img: &Image) -> Result<Image, IoError> {
         vals.extend(Image::from_raw(w, n as u32, img.layout(), img.sample_type(), rows.to_vec())?.to_normalized());
         dst_band.clear();
         dst_band.resize(n * row * ds, 0.0);
-        t.convert_f32(&vals, ss, &mut dst_band, ds, true);
+        t.convert_f32(&vals, ss, &mut dst_band, ds, true).expect("buffers match the transform's channel counts");
         out.extend_from_slice(&dst_band);
     }
     Ok(Image::from_normalized(w, h, layout, sample, &out)?.with_icc(Some(dst.to_bytes().to_vec())).with_meta(img.meta.clone()))
@@ -1156,7 +1198,7 @@ fn export_mode_specific(doc: &Document, format: Format, opts: &ExportOptions) ->
 #[cfg(test)]
 mod cicp_tests {
     use super::*;
-    use photocraft_cms::{Builtin, Profile};
+    use craft::cms::{Builtin, Profile};
 
     fn tagged(sample: CSample, cicp: codecs::Cicp) -> Image {
         let mut img = Image::new(1, 1, ChannelLayout::Rgb, sample).unwrap();
@@ -1166,6 +1208,29 @@ mod cicp_tests {
 
     fn description(p: Option<Arc<Vec<u8>>>) -> Option<String> {
         p.map(|b| Profile::parse(&b).unwrap().description)
+    }
+
+    #[test]
+    fn cicp_maps_onto_the_builtins_and_linear_bt2020() {
+        use craft::cms::curve::Curve;
+        let desc = |p: Option<Profile>| p.map(|p| p.description);
+        assert_eq!(desc(cicp_rgb(1, 13, false)), Some(Builtin::Srgb.description().to_string()));
+        assert_eq!(desc(cicp_rgb(12, 13, false)), Some(Builtin::DisplayP3.description().to_string()));
+        assert_eq!(desc(cicp_rgb(9, 14, false)), Some(Builtin::Rec2020.description().to_string()));
+        assert_eq!(desc(cicp_rgb(1, 18, true)), Some(Builtin::LinearSrgb.description().to_string()));
+
+        // An HLG BT.2020 image decoded to linear light: BT.2020's colorants, a linear curve.
+        let hlg = cicp_rgb(9, 18, true).unwrap();
+        assert_eq!(hlg.trc, Some([Curve::Gamma(1.0), Curve::Gamma(1.0), Curve::Gamma(1.0)]));
+        assert_eq!(hlg.matrix, Builtin::Rec2020.profile().matrix);
+        assert!(hlg.description.contains("BT.2020") && hlg.description.contains("linear"), "{}", hlg.description);
+        assert!(Profile::parse(&hlg.to_bytes()).is_ok(), "encodes as a valid ICC profile");
+
+        // HLG and PQ have no ICC curve; unknown primaries have no profile.
+        assert!(cicp_rgb(9, 18, false).is_none());
+        assert!(cicp_rgb(9, 16, false).is_none());
+        assert!(cicp_rgb(2, 13, false).is_none());
+        assert!(cicp_rgb(u16::MAX, u16::MAX, true).is_none());
     }
 
     #[test]
@@ -1295,7 +1360,7 @@ mod streamed_png_tests {
         let mut rgba = Document::new("rgba", Size::new(130, 333), ColorMode::Rgb, SampleType::U8);
         rgba.layers = vec![layer(&rgba, &[(Rect::new(10, 20, 120, 300), &[0.3, 0.6, 0.9, 0.4])])];
         let mut cmyk = Document::new("cmyk", Size::new(97, 211), ColorMode::Cmyk, SampleType::U8);
-        cmyk.icc_profile = Some(photocraft_cms::Builtin::CoatedCmyk.profile().to_bytes());
+        cmyk.icc_profile = Some(craft::cms::Builtin::CoatedCmyk.profile().to_bytes());
         cmyk.layers = vec![layer(&cmyk, &[(cmyk.bounds(), &[0.3, 0.6, 0.1, 0.2, 1.0]), (Rect::new(0, 50, 97, 99), &[0.0, 0.9, 0.9, 0.0, 1.0])])];
         let mut gray = Document::new("gray", Size::new(64, 190), ColorMode::Grayscale, SampleType::U16);
         gray.layers = vec![layer(&gray, &[(gray.bounds(), &[0.25, 1.0]), (Rect::new(0, 0, 64, 77), &[0.6123, 1.0])])];

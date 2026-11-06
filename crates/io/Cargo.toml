@@ -18,7 +18,6 @@ heif = ["photocraft-codecs/heif"]
 [dependencies]
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
-photocraft-cms = { workspace = true }
 photocraft-raster = { workspace = true }
 photocraft-doc = { workspace = true }
 photocraft-compose = { workspace = true }
@@ -31,7 +30,7 @@ photocraft-text = { workspace = true }
 photocraft-paint = { workspace = true }
 photocraft-vector = { workspace = true }
 photocraft-format = { path = "../format" }
-craft = { workspace = true, features = ["docpath"] }
+craft = { workspace = true, features = ["cms", "docpath"] }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { version = "1.8", default-features = false, features = ["pure"] }

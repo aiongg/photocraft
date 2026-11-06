@@ -2,11 +2,12 @@
 //!
 //! Fixtures are generated here from the published sRGB equation and a synthetic monitor,
 //! with no photograph or device profile. The expected values implement ICC.1:2010 Annex F.3
-//! directly in f64, without Transform, Curve evaluation, or photocraft_cms::math:
+//! directly in f64, without Transform, Curve evaluation, or craft::cms::math:
 //! https://www.color.org/specification/ICC1v43_2010-12.pdf
 
-use photocraft_cms::pipeline::{Pipeline, Stage};
-use photocraft_cms::{Builtin, Clut, Curve, GpuMatrixShaper, Intent, Lut3d, Profile, Transform, TransformOptions};
+use craft::cms::pipeline::{Pipeline, Stage};
+use craft::cms::{Builtin, Clut, Curve, Intent, Lut3d, Profile, Transform, TransformOptions};
+use photocraft_engine::GpuMatrixShaper;
 
 const SOURCE_MATRIX: [[f64; 3]; 3] = [[0.4360747, 0.3850649, 0.1430804], [0.2225045, 0.7168786, 0.0606169], [0.0139322, 0.0971045, 0.7141733]];
 // Deliberately synthetic, D50-referenced wider-gamut monitor; not a user's measured profile.
@@ -103,7 +104,7 @@ fn check_reference(gpu: &GpuMatrixShaper, rgb: [f32; 3]) {
 fn sampled_srgb_to_gamma_display_preserves_neutral_and_colored_shadows() {
     for bpc in [false, true] {
         let transform = synthetic_transform(bpc);
-        let gpu = transform.gpu_matrix_shaper().unwrap();
+        let gpu = GpuMatrixShaper::from_transform(&transform).unwrap();
         assert_eq!(gpu.input_table().len(), GpuMatrixShaper::INPUT_INTERVALS + 1);
         assert_eq!(gpu.output_table().len(), GpuMatrixShaper::OUTPUT_ENTRIES);
         assert!(gpu.input_table().iter().chain(gpu.output_table()).all(|v| v[3] == 1.0));
@@ -127,8 +128,8 @@ fn sampled_srgb_to_gamma_display_preserves_neutral_and_colored_shadows() {
 #[test]
 fn coarse_final_rgb_lut_fails_the_same_icc_shadow_reference() {
     let transform = synthetic_transform(false);
-    let gpu = transform.gpu_matrix_shaper().unwrap();
-    let coarse = Lut3d::from_transform(&transform, 33);
+    let gpu = GpuMatrixShaper::from_transform(&transform).unwrap();
+    let coarse = Lut3d::from_transform(&transform, 33).unwrap();
     let rgb = [2.0 / 255.0; 3];
     let expected = reference(rgb);
     let old = coarse.sample(rgb);
@@ -141,7 +142,7 @@ fn coarse_final_rgb_lut_fails_the_same_icc_shadow_reference() {
 #[test]
 fn gpu_display_representation_accepts_u8_u16_and_float_samples() {
     let transform = synthetic_transform(false);
-    let gpu = transform.gpu_matrix_shaper().unwrap();
+    let gpu = GpuMatrixShaper::from_transform(&transform).unwrap();
     for v in [0_u8, 1, 2, 7, 8, 16, 32, 128, 255] {
         check_reference(&gpu, [v as f32 / 255.0; 3]);
     }
@@ -158,14 +159,14 @@ fn gpu_display_representation_accepts_u8_u16_and_float_samples() {
 
 #[test]
 fn absent_curves_and_matrix_use_identity_without_losing_offsets() {
-    let identity = Transform::from_pipeline(Pipeline::new(3, Vec::new()), TransformOptions::default()).gpu_matrix_shaper().unwrap();
+    let identity = GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, Vec::new()).unwrap(), TransformOptions::default()).unwrap()).unwrap();
     for rgb in [[0.0; 3], [1.0; 3], [0.001, 0.2, 0.8], [-2.0, 0.5, 2.0]] {
         for (actual, input) in sample_gpu(&identity, rgb).into_iter().zip(rgb) {
             assert!((actual - input.clamp(0.0, 1.0)).abs() < 1e-6);
         }
     }
     let matrix = Stage::Matrix { rows: 3, cols: 3, m: vec![0.8, 0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0, 0.6], offset: vec![0.01, 0.02, 0.03] };
-    let transform = Transform::from_pipeline(Pipeline::new(3, vec![matrix]), TransformOptions::default()).gpu_matrix_shaper().unwrap();
+    let transform = GpuMatrixShaper::from_transform(&Transform::from_pipeline(Pipeline::new(3, vec![matrix]).unwrap(), TransformOptions::default()).unwrap()).unwrap();
     let input = [0.1, 0.2, 0.3];
     let output = sample_gpu(&transform, input);
     for (actual, expected) in output.into_iter().zip([0.09, 0.16, 0.21]) {
@@ -175,23 +176,23 @@ fn absent_curves_and_matrix_use_identity_without_losing_offsets() {
 
 #[test]
 fn unsupported_clut_proof_and_non_rgb_transforms_retain_fallback() {
-    let identity_clut = Clut::sample(vec![2; 3], 3, |input, output| output.copy_from_slice(input));
-    let clut = Transform::from_pipeline(Pipeline::new(3, vec![Stage::Clut(identity_clut)]), TransformOptions::default());
-    assert!(clut.gpu_matrix_shaper().is_none());
+    let identity_clut = Clut::sample(vec![2; 3], 3, |input, output| output.copy_from_slice(input)).unwrap();
+    let clut = Transform::from_pipeline(Pipeline::new(3, vec![Stage::Clut(identity_clut)]).unwrap(), TransformOptions::default()).unwrap();
+    assert!(GpuMatrixShaper::from_transform(&clut).is_none());
     let srgb = Builtin::Srgb.profile();
     let lab = Transform::new(Builtin::LabD50.profile(), srgb, Intent::RelativeColorimetric, false).unwrap();
-    assert!(lab.gpu_matrix_shaper().is_none());
+    assert!(GpuMatrixShaper::from_transform(&lab).is_none());
     let gray = Transform::new(Builtin::GrayGamma22.profile(), srgb, Intent::RelativeColorimetric, false).unwrap();
-    assert!(gray.gpu_matrix_shaper().is_none());
+    assert!(GpuMatrixShaper::from_transform(&gray).is_none());
     let proof = Transform::proof(srgb, Builtin::DisplayP3.profile(), srgb, Intent::RelativeColorimetric, false, false).unwrap();
-    assert!(proof.gpu_matrix_shaper().is_none());
+    assert!(GpuMatrixShaper::from_transform(&proof).is_none());
 }
 
 #[test]
 fn malformed_matrix_storage_is_not_exposed_to_the_gpu() {
     for (coefficients, offsets) in [(vec![2.0; 8], vec![0.0; 3]), (vec![2.0; 9], vec![0.0; 2]), (vec![f64::INFINITY; 9], vec![0.0; 3])] {
         let transform =
-            Transform::from_pipeline(Pipeline::new(3, vec![Stage::Matrix { rows: 3, cols: 3, m: coefficients, offset: offsets }]), TransformOptions::default());
-        assert!(transform.gpu_matrix_shaper().is_none());
+            Transform::from_pipeline(Pipeline::new(3, vec![Stage::Matrix { rows: 3, cols: 3, m: coefficients, offset: offsets }]).unwrap(), TransformOptions::default()).unwrap();
+        assert!(GpuMatrixShaper::from_transform(&transform).is_none());
     }
 }

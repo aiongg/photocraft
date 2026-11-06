@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use photocraft_cms::{Builtin, Profile, Transform, TransformOptions};
+use craft::cms::{Builtin, Profile, Transform, TransformOptions};
 use photocraft_color::ColorMode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -245,8 +245,8 @@ impl SwatchConv {
 
     fn with(s: Option<&Session>) -> Self {
         let rgb = working(s, ColorMode::Rgb);
-        let opts = TransformOptions { intent: photocraft_cms::Intent::RelativeColorimetric, bpc: true, ..Default::default() };
-        let link = |src: &Profile| photocraft_cms::cached(src, &rgb, opts).ok();
+        let opts = TransformOptions { intent: craft::cms::Intent::RelativeColorimetric, bpc: true, ..Default::default() };
+        let link = |src: &Profile| craft::cms::cached(src, &rgb, opts).ok();
         SwatchConv { cmyk: link(&working(s, ColorMode::Cmyk)), lab: link(Builtin::LabD50.profile()), gray: link(&working(s, ColorMode::Grayscale)) }
     }
 
@@ -256,7 +256,7 @@ impl SwatchConv {
         let eval = |t: &Option<Arc<Transform>>, input: &[f32]| -> Option<[f32; 3]> {
             let t = t.as_ref()?;
             let mut o = [0.0f32; 16];
-            t.eval(input, &mut o);
+            t.eval(input, &mut o).expect("buffers match the transform's channel counts");
             Some([unit(o[0]), unit(o[1]), unit(o[2])])
         };
         match *c {

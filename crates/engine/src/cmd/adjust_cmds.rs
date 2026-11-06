@@ -10,7 +10,7 @@
 //! result through the selection like the other Image › Adjustments commands.
 
 use photocraft_algo::tone::{self, HdrToning, MatchColor, ShadowsHighlights};
-use photocraft_doc::adjust::{LutFormat, LutSource};
+use photocraft_doc::adjust::LutSource;
 use photocraft_doc::{Adjustment, Document, Layer, LayerContent, Rect};
 use photocraft_raster::{Surface, to_rgba};
 use serde_json::{Value, json};
@@ -19,7 +19,7 @@ use crate::commands::CommandSpec;
 use crate::{EngineError, Result, Session};
 
 /// Built-in Color Lookup looks `(id, label)`.
-pub use photocraft_cms::lutfile::BUILTIN as LOOKS;
+pub use craft::cms::lutfile::BUILTIN as LOOKS;
 
 /// Selective Color range keys in storage order.
 pub const RANGES: [&str; 9] = ["reds", "yellows", "greens", "cyans", "blues", "magentas", "whites", "neutrals", "blacks"];
@@ -112,7 +112,7 @@ pub fn lookup_from_params(p: &Value, base: Option<&Adjustment>) -> Result<Adjust
         _ => (String::new(), None, 0, false, false, None),
     };
     // The parsed table, its label and (for a file) the file as loaded, which a PSD save embeds.
-    let mut loaded: Option<(photocraft_cms::lutfile::LutFile, String, Option<LutSource>)> = None;
+    let mut loaded: Option<(craft::cms::lutfile::LutFile, String, Option<LutSource>)> = None;
     if let Some(id) = opt_str(CMD, p, "lut")? {
         if id == "none" || id.is_empty() {
             name.clear();
@@ -120,7 +120,7 @@ pub fn lookup_from_params(p: &Value, base: Option<&Adjustment>) -> Result<Adjust
             size = 0;
             source = None;
         } else {
-            let f = photocraft_cms::lutfile::builtin(id).ok_or_else(|| bad(CMD, format!("unknown look `{id}` (built-ins: {})", builtin_ids())))?;
+            let f = craft::cms::lutfile::builtin(id).ok_or_else(|| bad(CMD, format!("unknown look `{id}` (built-ins: {})", builtin_ids())))?;
             let label = f.title.clone();
             loaded = Some((f, label, None));
         }
@@ -128,12 +128,12 @@ pub fn lookup_from_params(p: &Value, base: Option<&Adjustment>) -> Result<Adjust
     let file_name = opt_str(CMD, p, "fileName")?;
     if let Some(text) = opt_str(CMD, p, "data")? {
         let file_name = file_name.unwrap_or("lut.cube");
-        let f = photocraft_cms::lutfile::parse(file_name, text.as_bytes()).map_err(|e| bad(CMD, e.0))?;
+        let f = photocraft_io::lut_file::parse(file_name, text.as_bytes()).map_err(|e| bad(CMD, e.0))?;
         loaded = Some((f, base_name(file_name), Some(lut_source(file_name, text.as_bytes().to_vec()))));
     }
     if let Some(path) = opt_str(CMD, p, "file")?.filter(|s| !s.is_empty()) {
         let bytes = read_file(path).ok_or_else(|| bad(CMD, format!("can't read {path}")))?;
-        let f = photocraft_cms::lutfile::parse(path, &bytes).map_err(|e| bad(CMD, format!("{path}: {}", e.0)))?;
+        let f = photocraft_io::lut_file::parse(path, &bytes).map_err(|e| bad(CMD, format!("{path}: {}", e.0)))?;
         loaded = Some((f, base_name(path), Some(lut_source(path, bytes))));
     }
     if let Some((f, label, src)) = loaded {
@@ -166,18 +166,14 @@ pub fn lookup_from_params(p: &Value, base: Option<&Adjustment>) -> Result<Adjust
     Ok(Adjustment::ColorLookup { name, lut, size, tetrahedral, dither, source })
 }
 
-/// A loaded LUT file, tagged with the format [`photocraft_cms::lutfile::parse`] read it as.
+/// A loaded LUT file, tagged with the format [`photocraft_io::lut_file::parse`] read it as.
 fn lut_source(file_name: &str, bytes: Vec<u8>) -> LutSource {
-    let format = match photocraft_cms::lutfile::Format::detect(file_name, &bytes) {
-        photocraft_cms::lutfile::Format::Cube => LutFormat::Cube,
-        photocraft_cms::lutfile::Format::ThreeDl => LutFormat::ThreeDl,
-        photocraft_cms::lutfile::Format::Look => LutFormat::Look,
-    };
+    let format = photocraft_io::lut_file::detect(file_name, &bytes);
     LutSource { format, bytes: std::sync::Arc::new(bytes) }
 }
 
 fn builtin_ids() -> String {
-    photocraft_cms::lutfile::BUILTIN.iter().map(|b| b.0).collect::<Vec<_>>().join(", ")
+    craft::cms::lutfile::BUILTIN.iter().map(|b| b.0).collect::<Vec<_>>().join(", ")
 }
 
 fn base_name(path: &str) -> String {
@@ -539,7 +535,7 @@ fn hdr_toning(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// The Color Lookup built-ins (id, label) for UIs and agents.
 fn list_looks(_: &mut Session, _: &Value) -> Result<Value> {
-    Ok(json!(photocraft_cms::lutfile::BUILTIN.iter().map(|(id, label)| json!({"id": id, "label": label})).collect::<Vec<_>>()))
+    Ok(json!(craft::cms::lutfile::BUILTIN.iter().map(|(id, label)| json!({"id": id, "label": label})).collect::<Vec<_>>()))
 }
 
 macro_rules! spec {

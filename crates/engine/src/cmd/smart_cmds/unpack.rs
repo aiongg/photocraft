@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use photocraft_algo::transform::Interp;
-use photocraft_cms::Intent;
+use craft::cms::Intent;
 use photocraft_color::BlendMode;
 use photocraft_doc::{Document, Group, Layer, LayerContent, LayerId, Metadata, SmartObject, SmartSource};
 use serde_json::{Value, json};

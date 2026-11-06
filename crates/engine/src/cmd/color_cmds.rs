@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
 
-use photocraft_cms::{Builtin, ColorSpace, GamutCheck, Intent, Lut3d, Profile, SampleKind, Transform};
+use craft::cms::{Builtin, ColorSpace, GamutCheck, Intent, Lut3d, Profile, SampleKind, Transform};
 use photocraft_color::{Color, ColorMode, PixelFormat, SampleType};
 use photocraft_doc::{DocId, Document, Duotone, Effect, Fill, FxPaint, Layer, LayerContent};
 use photocraft_raster::Surface;
@@ -134,7 +134,7 @@ impl Default for ColorSettings {
             working_rgb: Builtin::Srgb.id().into(),
             working_cmyk: Builtin::CoatedCmyk.id().into(),
             // Photoshop's default working gray is Dot Gain 20 %.
-            working_gray: Builtin::DotGain20Compat.id().into(),
+            working_gray: crate::extra_profiles::DOT_GAIN_20.id.into(),
             policy_rgb: Policy::Preserve,
             policy_cmyk: Policy::Preserve,
             policy_gray: Policy::Preserve,
@@ -281,7 +281,7 @@ impl ColorState {
                 // stay linear, as Photoshop keeps 32-bit documents in a linear version of the
                 // working space.
                 let linear_hdr =
-                    doc.depth == SampleType::F32 && (emb.same_colors(Builtin::LinearSrgb.profile()) || emb.same_colors(photocraft_cms::builtin::linear_gray()));
+                    doc.depth == SampleType::F32 && (emb.same_colors(Builtin::LinearSrgb.profile()) || emb.same_colors(craft::cms::builtin::linear_gray()));
                 if !mismatch || linear_hdr {
                     return merge(base, json!({"action": "kept"}));
                 }
@@ -330,7 +330,7 @@ impl ColorState {
         match embedded {
             Some(emb) => {
                 let linear_hdr =
-                    doc.depth == SampleType::F32 && (emb.same_colors(Builtin::LinearSrgb.profile()) || emb.same_colors(photocraft_cms::builtin::linear_gray()));
+                    doc.depth == SampleType::F32 && (emb.same_colors(Builtin::LinearSrgb.profile()) || emb.same_colors(craft::cms::builtin::linear_gray()));
                 if !self.settings.ask_on_mismatch || emb.same_colors(&working) || linear_hdr {
                     return None;
                 }
@@ -371,7 +371,7 @@ impl ColorState {
 
     /// Proofing state of a document (defaults: coated CMYK, relative colorimetric + BPC, off).
     pub fn proof(&self, doc: DocId) -> ProofView {
-        self.proofs.get(&doc).cloned().unwrap_or_else(|| ProofView { gamut_threshold: photocraft_cms::gamut::DEFAULT_THRESHOLD, ..Default::default() })
+        self.proofs.get(&doc).cloned().unwrap_or_else(|| ProofView { gamut_threshold: craft::cms::gamut::DEFAULT_THRESHOLD, ..Default::default() })
     }
 
     /// Borrow the document's proofing state without cloning its profile or allocating defaults.
@@ -381,7 +381,7 @@ impl ColorState {
     }
 
     pub(crate) fn proof_mut(&mut self, doc: DocId) -> &mut ProofView {
-        self.proofs.entry(doc).or_insert_with(|| ProofView { gamut_threshold: photocraft_cms::gamut::DEFAULT_THRESHOLD, ..Default::default() })
+        self.proofs.entry(doc).or_insert_with(|| ProofView { gamut_threshold: craft::cms::gamut::DEFAULT_THRESHOLD, ..Default::default() })
     }
 
     /// Transform from the canvas texture values (the composite, `CanvasDisplay::source`) to
@@ -429,7 +429,7 @@ impl ColorState {
             return Ok(lut);
         }
         let t = self.display_transform_for(doc, display)?;
-        Ok(Lut3d::from_transform(&t, size))
+        Lut3d::from_transform(&t, size).map_err(cms_err)
     }
 
     /// View › 32-bit Preview Options of `doc` when they change the display (a 32-bit document
@@ -463,7 +463,7 @@ impl ColorState {
     /// proof simulations beyond profile conversion, and transforms containing a CLUT retain
     /// the existing 3D LUT path. The shader applies the 32-bit preview before this transform,
     /// just as it does before the display LUT.
-    pub fn gpu_canvas_matrix_shaper_for(&self, doc: &Document, display: Option<u32>) -> Result<Option<photocraft_cms::GpuMatrixShaper>> {
+    pub fn gpu_canvas_matrix_shaper_for(&self, doc: &Document, display: Option<u32>) -> Result<Option<crate::GpuMatrixShaper>> {
         let proof = self.proof(doc.id);
         if proof.gamut_warning || (proof.enabled && proof.setup.kind != crate::proof_sim::ProofKind::Profile) {
             return Ok(None);
@@ -471,7 +471,8 @@ impl ColorState {
         if !proof.enabled && self.canvas_display_for(doc, display)?.transform.is_none() {
             return Ok(None);
         }
-        Ok(self.display_transform_for(doc, display)?.gpu_matrix_shaper())
+        let transform = self.display_transform_for(doc, display)?;
+        Ok(crate::GpuMatrixShaper::from_transform(&transform))
     }
 
     fn canvas_lut_with(&self, doc: &Document, size: usize, hdr: bool, on: Option<u32>) -> Result<Option<Vec<u8>>> {
@@ -479,7 +480,7 @@ impl ColorState {
         let pv = self.proof(doc.id);
         let display = self.canvas_display_for(doc, on)?;
         if !(pv.enabled || pv.gamut_warning || hdr && crate::proof_sim::hdr_active(self, doc)) {
-            return Ok(display.transform.as_ref().map(|t| Lut3d::from_transform(t, size).to_rgba8()));
+            return Ok(display.transform.as_ref().map(|t| Lut3d::from_transform(t, size).map(|l| l.to_rgba8()).map_err(cms_err)).transpose()?);
         }
         let lut = self.display_lut_with(doc, size, hdr, on)?;
         let mut bytes = lut.to_rgba8();
@@ -487,7 +488,7 @@ impl ColorState {
         let s = (size - 1) as f32;
         for (i, px) in bytes.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             let rgb = [(i % size) as f32 / s, ((i / size) % size) as f32 / s, (i / (size * size)) as f32 / s];
-            px[3] = if check.as_ref().is_some_and(|c| c.out_of_gamut(&rgb)) { 255 } else { 0 };
+            px[3] = if check.as_ref().is_some_and(|c| c.out_of_gamut(&rgb).unwrap_or(false)) { 255 } else { 0 };
         }
         Ok(Some(bytes))
     }
@@ -500,7 +501,7 @@ fn merge(mut a: Value, b: Value) -> Value {
     a
 }
 
-fn cms_err(e: photocraft_cms::CmsError) -> EngineError {
+fn cms_err(e: craft::cms::CmsError) -> EngineError {
     EngineError::Other(format!("colour management: {e}"))
 }
 
@@ -528,11 +529,11 @@ fn space_mode(cs: ColorSpace) -> Option<ColorMode> {
 
 /// Working (default) profile of a mode.
 pub fn working_profile(mode: ColorMode) -> Arc<Profile> {
-    Arc::new(photocraft_cms::builtin::default_for(mode_space(mode)).unwrap_or(Builtin::Srgb.profile()).clone())
+    Arc::new(crate::extra_profiles::default_for(mode_space(mode)).unwrap_or(Builtin::Srgb.profile()).clone())
 }
 
 /// Parses ICC bytes, caching by allocation so repeated lookups for the same document are free.
-pub fn profile_from_bytes(bytes: &Arc<Vec<u8>>) -> std::result::Result<Arc<Profile>, photocraft_cms::CmsError> {
+pub fn profile_from_bytes(bytes: &Arc<Vec<u8>>) -> std::result::Result<Arc<Profile>, craft::cms::CmsError> {
     type Cache = Mutex<Vec<(Weak<Vec<u8>>, Arc<Profile>)>>;
     static CACHE: std::sync::OnceLock<Cache> = std::sync::OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
@@ -585,8 +586,8 @@ pub fn resolve_profile(spec: &str, doc: Option<&Document>, mode: Option<ColorMod
         "document" => return doc.map(document_profile).ok_or(EngineError::NoDocument),
         _ => {}
     }
-    if let Some(b) = Builtin::from_id(spec) {
-        return Ok(Arc::new(b.profile().clone()));
+    if let Some(p) = crate::extra_profiles::from_id(spec) {
+        return Ok(Arc::new(p.clone()));
     }
     let lower = spec.to_ascii_lowercase();
     if lower.ends_with(".icc") || lower.ends_with(".icm") || spec.contains('/') || spec.contains('\\') {
@@ -594,7 +595,7 @@ pub fn resolve_profile(spec: &str, doc: Option<&Document>, mode: Option<ColorMod
         let bytes = crate::file_cmds::read_file(spec).map_err(|e| EngineError::Other(format!("cannot read profile `{spec}`: {e}")))?;
         return Profile::parse(&bytes).map(Arc::new).map_err(cms_err);
     }
-    let ids: Vec<&str> = Builtin::ALL.iter().map(|b| b.id()).collect();
+    let ids: Vec<&str> = crate::extra_profiles::all().iter().map(|b| b.0).collect();
     Err(EngineError::Other(format!("unknown profile `{spec}` (built-ins: {}, or a path to an .icc file)", ids.join(", "))))
 }
 
@@ -639,7 +640,7 @@ pub fn convert_surface(s: &Surface, from: ColorMode, to: PixelFormat, t: &Transf
     // Default (untouched) pixel.
     let dp = s.default_pixel();
     let mut dpo = vec![0.0f32; ds];
-    t.convert_f32(&dp, ss, &mut dpo, ds, true);
+    t.convert_f32(&dp, ss, &mut dpo, ds, true).expect("buffers match the transform's channel counts");
     let mut out = Surface::with_default(to, &dpo);
     // Convert every distinct tile once, in one parallel pass into a staging buffer, then store
     // them. Coordinates that share a tile (a filled background) share the converted one (#4531).
@@ -664,7 +665,7 @@ pub fn convert_surface(s: &Surface, from: ColorMode, to: PixelFormat, t: &Transf
         SampleType::U16 => SampleKind::U16,
         SampleType::F32 => SampleKind::F32,
     };
-    t.convert_bytes_many(kind, jobs, ss, ds, true);
+    t.convert_bytes_many(kind, jobs, ss, ds, true).expect("buffers match the transform's channel counts");
     let mut converted: Vec<Option<std::sync::Arc<photocraft_raster::Tile>>> = vec![None; distinct.len()];
     for (c, i) in tiles {
         if let Some(Some(tile)) = converted.get(i) {
@@ -687,7 +688,7 @@ fn convert_color(c: &mut Color, from: ColorMode, to: ColorMode, t: &Transform) {
     }
     let n = from.color_channels();
     let mut o = [0.0f32; 16];
-    t.eval(&c.c[..n], &mut o);
+    t.eval(&c.c[..n], &mut o).expect("buffers match the transform's channel counts");
     let m = to.color_channels();
     let mut nc = [0.0f32; 4];
     for (d, v) in nc.iter_mut().zip(&o[..m.min(4)]) {
@@ -905,7 +906,7 @@ pub fn gamut_mask(doc: &Document, setup: &ProofSetup, threshold: f32) -> Result<
         .px
         .iter()
         .map(|p| {
-            if p[3] > 0.0 && check.out_of_gamut(&p[..3]) {
+            if p[3] > 0.0 && check.out_of_gamut(&p[..3]).unwrap_or(false) {
                 count += 1;
                 255
             } else {
@@ -966,7 +967,7 @@ fn convert_to_profile(s: &mut Session, p: &Value) -> Result<Value> {
 
 fn profile_info(s: &mut Session, p: &Value) -> Result<Value> {
     let builtins: Vec<Value> =
-        Builtin::ALL.iter().map(|b| json!({ "id": b.id(), "description": b.description(), "colorSpace": format!("{:?}", b.profile().color_space) })).collect();
+        crate::extra_profiles::all().iter().map(|(id, description, p)| json!({ "id": id, "description": description, "colorSpace": format!("{:?}", p.color_space) })).collect();
     let doc = s.active().map(|d| d.doc.clone());
     let info = match p.get("profile").and_then(Value::as_str) {
         Some(spec) => {
@@ -1369,11 +1370,11 @@ mod tests {
         let mut proof = Builtin::LinearSrgb.profile().clone();
         proof.description = "Synthetic identity-matrix proof".into();
         proof.matrix = Some([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
-        proof.trc = Some([photocraft_cms::Curve::Identity, photocraft_cms::Curve::Identity, photocraft_cms::Curve::Identity]);
+        proof.trc = Some([craft::cms::Curve::Identity, craft::cms::Curve::Identity, craft::cms::Curve::Identity]);
         let proof = proof.with_encoded_bytes();
         let mut monitor = proof.clone();
         monitor.description = "Synthetic identity-matrix gamma monitor".into();
-        monitor.trc = Some(std::array::from_fn(|_| photocraft_cms::Curve::Gamma(2.2)));
+        monitor.trc = Some(std::array::from_fn(|_| craft::cms::Curve::Gamma(2.2)));
         let monitor = monitor.with_encoded_bytes();
         s.color.set_displays(Ok(vec![crate::display_color::Display {
             id: 1,
@@ -1389,7 +1390,7 @@ mod tests {
         for command in ["view.proofSetup.legacyMacintoshRgb", "view.proofSetup.colorBlindnessProtanopia", "view.proofSetup.colorBlindnessDeuteranopia"] {
             // These commands retain the previously selected custom profile.
             s.execute(command, json!({})).unwrap();
-            assert!(s.color.display_transform_for(&d, Some(1)).unwrap().gpu_matrix_shaper().is_some(), "fixture must exercise the shortcut");
+            assert!(crate::GpuMatrixShaper::from_transform(&s.color.display_transform_for(&d, Some(1)).unwrap()).is_some(), "fixture must exercise the shortcut");
             assert!(s.color.gpu_canvas_matrix_shaper_for(&d, Some(1)).unwrap().is_none(), "{command} must retain its simulation");
             assert!(s.color.gpu_canvas_lut_for(&d, 9, Some(1)).unwrap().is_some(), "{command} still has its LUT fallback");
         }
@@ -1411,13 +1412,13 @@ mod tests {
         let d = doc(&s).clone();
         let t = s.color.display_transform(&d).unwrap();
         let mut o = [0.0f32; 3];
-        t.eval(&[1.0, 1.0, 1.0], &mut o);
+        t.eval(&[1.0, 1.0, 1.0], &mut o).unwrap();
         assert!(o[0] < 0.97, "paper simulation: {o:?}");
         let lut = s.color.display_lut(&d, 17).unwrap();
-        assert_eq!(lut.data.len(), 17 * 17 * 17);
+        assert_eq!(lut.data().len(), 17 * 17 * 17);
         s.execute("view.proofColors", json!({"on": false})).unwrap();
         let t2 = s.color.display_transform(&d).unwrap();
-        t2.eval(&[1.0, 1.0, 1.0], &mut o);
+        t2.eval(&[1.0, 1.0, 1.0], &mut o).unwrap();
         assert!(o.iter().all(|v| (v - 1.0).abs() < 1e-3), "no proof: identity-ish {o:?}");
         // Saturated sRGB blue is outside coated CMYK; mid gray and white are inside.
         let r = s.execute("view.gamutWarning", json!({"on": true})).unwrap();
@@ -1437,7 +1438,7 @@ mod tests {
         assert_eq!(p.color_space, ColorSpace::Rgb);
         let t = s.color.display_transform(doc(&s)).unwrap();
         let mut o = [0.0f32; 3];
-        t.eval(&[0.5, 0.5, 0.5], &mut o);
+        t.eval(&[0.5, 0.5, 0.5], &mut o).unwrap();
         // The default working gray (Dot Gain 20 %-compatible, gamma 1.732) shows gray 0.5 as the
         // sRGB value of linear 0.5^1.732, as Photoshop does: lighter than sGray's 0.5.
         let want = photocraft_color::convert::linear_to_srgb(0.5f32.powf(1.732));
@@ -1555,7 +1556,7 @@ mod settings_tests {
         s.execute("edit.colorSettings", json!({"policyRgb": "convert"})).unwrap();
         let mut v2 = Builtin::Srgb.profile().clone();
         let trc = v2.trc.clone().unwrap();
-        let table = |c: &photocraft_cms::Curve| photocraft_cms::Curve::Table((0..1024).map(|i| c.eval64(f64::from(i) / 1023.0) as f32).collect());
+        let table = |c: &craft::cms::Curve| craft::cms::Curve::Table((0..1024).map(|i| c.eval64(f64::from(i) / 1023.0) as f32).collect());
         v2.trc = Some([table(&trc[0]), table(&trc[1]), table(&trc[2])]);
         v2.version = (2, 0x10);
         let bytes = v2.with_encoded_bytes().to_bytes();
@@ -1604,17 +1605,17 @@ mod settings_tests {
     fn input_only_p3() -> Profile {
         let p3 = Builtin::DisplayP3.profile();
         let t = Transform::new(p3, Builtin::LabD50.profile(), Intent::RelativeColorimetric, false).unwrap();
-        let clut = photocraft_cms::Clut::sample(vec![9; 3], 3, |inp, out| t.eval(inp, out));
-        let ident = || photocraft_cms::pipeline::Stage::Curves(vec![photocraft_cms::Curve::Identity; 3]);
-        let lut = photocraft_cms::profile::Lut {
-            kind: photocraft_cms::profile::LutKind::Ab,
+        let clut = craft::cms::Clut::sample(vec![9; 3], 3, |inp, out| t.eval(inp, out).unwrap()).unwrap();
+        let ident = || craft::cms::pipeline::Stage::Curves(vec![craft::cms::Curve::Identity; 3]);
+        let lut = craft::cms::profile::Lut {
+            kind: craft::cms::profile::LutKind::Ab,
             inputs: 3,
             outputs: 3,
-            stages: vec![ident(), photocraft_cms::pipeline::Stage::Clut(clut), ident()],
+            stages: vec![ident(), craft::cms::pipeline::Stage::Clut(clut), ident()],
         };
         let mut p = p3.clone();
-        p.class = photocraft_cms::ProfileClass::Input;
-        p.pcs = photocraft_cms::Pcs::Lab;
+        p.class = craft::cms::ProfileClass::Input;
+        p.pcs = craft::cms::Pcs::Lab;
         p.description = "Input-only P3".into();
         (p.matrix, p.trc) = (None, None);
         p.a2b = [Some(lut), None, None];

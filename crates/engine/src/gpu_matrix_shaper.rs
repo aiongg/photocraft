@@ -1,4 +1,11 @@
 //! Separable RGB display transforms without a coarse 3D interpolation near black.
+//!
+//! The colour-management library has no GPU form of a matrix/TRC transform, so this module
+//! derives one from a transform's public pipeline.
+
+use craft::cms::curve::Curve;
+use craft::cms::pipeline::Stage;
+use craft::cms::transform::Transform;
 
 /// RGB input curves, a 3×3 matrix with offsets, and RGB output curves for a GPU display
 /// transform. Values are floats independent of the document's pixel depth.
@@ -13,7 +20,7 @@
 /// Use unfiltered texture loads and manual interpolation if float filtering is unavailable.
 /// This representation covers SDR display output; input and output are clamped to `[0, 1]`.
 /// Construction validates all sizes and values; arbitrary CLUT/proofing chains retain the
-/// [`crate::Lut3d`] fallback.
+/// 3D LUT fallback.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GpuMatrixShaper {
     matrix: [[f32; 4]; 3],
@@ -26,6 +33,58 @@ impl GpuMatrixShaper {
     pub const INPUT_INTERVALS: usize = 4096;
     /// Output entries are spaced uniformly in the fourth root of the linear value.
     pub const OUTPUT_ENTRIES: usize = 4096;
+
+    /// A separable RGB transform for accurate GPU display conversion, when available.
+    ///
+    /// Returns `None` for other channel counts, CLUTs, proofing stages, or invalid table
+    /// data, so callers can keep their display-LUT fallback.
+    pub fn from_transform(transform: &Transform) -> Option<Self> {
+        if transform.inputs() != 3 || transform.outputs() != 3 {
+            return None;
+        }
+        let mut head = transform.pipeline().stages();
+        let mut output = None;
+        if let Some(Stage::InvCurves(cs)) = head.last()
+            && cs.len() == 3
+        {
+            output = Some(
+                cs.iter()
+                    .map(|c| {
+                        let inverse = c.inverse64_many();
+                        (0..Self::OUTPUT_ENTRIES)
+                            .map(|i| {
+                                let u = i as f64 / (Self::OUTPUT_ENTRIES - 1) as f64;
+                                inverse(u * u * u * u).clamp(0.0, 1.0) as f32
+                            })
+                            .collect::<Vec<f32>>()
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            head = &head[..head.len() - 1];
+            if matches!(head.last(), Some(Stage::Clamp01)) {
+                head = &head[..head.len() - 1];
+            }
+        }
+        let (curves, matrix): (&[Curve], _) = match head {
+            [] => (&[], None),
+            [Stage::Curves(cs)] if cs.len() == 3 => (cs, None),
+            [Stage::Matrix { rows, cols, m, offset }] => (&[], Some((*rows, *cols, m, offset))),
+            [Stage::Curves(cs), Stage::Matrix { rows, cols, m, offset }] if cs.len() == 3 => (cs, Some((*rows, *cols, m, offset))),
+            _ => return None,
+        };
+        let mut rows = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
+        if let Some((nr, nc, m, offset)) = matrix {
+            if nr != 3 || nc != 3 || m.len() != 9 || offset.len() != 3 {
+                return None;
+            }
+            for (row, (coefficients, offset)) in rows.iter_mut().zip(m.chunks_exact(3).zip(offset)) {
+                *row = [coefficients[0] as f32, coefficients[1] as f32, coefficients[2] as f32, *offset as f32];
+            }
+        }
+        let input: Vec<Vec<f32>> =
+            curves.iter().map(|c| (0..=Self::INPUT_INTERVALS).map(|i| c.eval64(i as f64 / Self::INPUT_INTERVALS as f64) as f32).collect()).collect();
+        Self::from_parts(rows, &input, output.as_deref())
+    }
 
     /// Row-major matrix: each row contains three RGB coefficients followed by its offset.
     pub fn matrix_rows(&self) -> [[f32; 4]; 3] {
@@ -42,7 +101,7 @@ impl GpuMatrixShaper {
         &self.output
     }
 
-    pub(crate) fn from_parts(matrix: [[f32; 4]; 3], input: &[Vec<f32>], output: Option<&[Vec<f32>]>) -> Option<Self> {
+    fn from_parts(matrix: [[f32; 4]; 3], input: &[Vec<f32>], output: Option<&[Vec<f32>]>) -> Option<Self> {
         if !matrix.iter().flatten().all(|v| v.is_finite()) {
             return None;
         }

@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use photocraft_cms::{Builtin, Profile, curve::Curve};
+use craft::cms::{Builtin, Profile, curve::Curve};
 use photocraft_color::{ColorMode, PixelFormat, SampleType};
 use photocraft_doc::{Document, Layer, LayerContent, Size};
 use photocraft_engine::display_color::Display;
@@ -203,7 +203,7 @@ fn gpu_display_shadows_match_independent_icc_reference_at_all_depths() {
 #[test]
 #[ignore = "manual 24 MP GPU timing; run with --release --ignored --nocapture"]
 fn compare_display_paths_24mp() {
-    use photocraft_cms::{Intent, Lut3d, Transform};
+    use craft::cms::{Intent, Lut3d, Transform};
     use photocraft_ui_egui::gpu_canvas::{GpuCanvas, ViewParams};
     use std::time::Instant;
 
@@ -215,17 +215,17 @@ fn compare_display_paths_24mp() {
     let source = Profile::parse(&source).expect("synthetic source");
     let monitor = Profile::parse(&monitor).expect("synthetic monitor");
     let transform = Transform::new(&source, &monitor, Intent::RelativeColorimetric, true).expect("display transform");
-    let lut = Lut3d::from_transform(&transform, 33).to_rgba8();
-    let shaper = transform.gpu_matrix_shaper().expect("matrix/shaper");
+    let lut = Lut3d::from_transform(&transform, 33).expect("lut").to_rgba8();
+    let shaper = photocraft_engine::GpuMatrixShaper::from_transform(&transform).expect("matrix/shaper");
 
     let mut prep_lut_ms = Vec::new();
     let mut prep_shaper_ms = Vec::new();
     for _ in 0..5 {
         let start = Instant::now();
-        std::hint::black_box(Lut3d::from_transform(&transform, 33).to_rgba8());
+        std::hint::black_box(Lut3d::from_transform(&transform, 33).expect("lut").to_rgba8());
         prep_lut_ms.push(start.elapsed().as_secs_f64() * 1000.0);
         let start = Instant::now();
-        std::hint::black_box(transform.gpu_matrix_shaper().expect("matrix/shaper"));
+        std::hint::black_box(photocraft_engine::GpuMatrixShaper::from_transform(&transform).expect("matrix/shaper"));
         prep_shaper_ms.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 

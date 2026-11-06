@@ -549,7 +549,7 @@ fn open_runs_as_a_job_and_cancel_adds_nothing() {
 fn an_open_that_asks_about_its_profile_holds_the_document_back() {
     let mut src = session(8, 8);
     let mut doc = (*src.active().unwrap().doc).clone();
-    doc.icc_profile = Some(photocraft_cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
+    doc.icc_profile = Some(craft::cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
     let bytes = Arc::new(photocraft_io::export(&doc, "x.png", &Default::default()).unwrap().bytes);
     src.close(0);
     let mut s = Session::new();

@@ -26,7 +26,7 @@ fn a_unit_after_a_range_bound_does_not_reset_the_range_to_its_fallback() {
 fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
     // #6323: a press condition installed in the system can be the CMYK working space, as in
     // Photoshop's Color Settings; each working-space menu lists only profiles of its space.
-    use photocraft_cms::{ColorSpace, ProfileClass};
+    use craft::cms::{ColorSpace, ProfileClass};
     let p = |path: &str, class, color_space| InstalledProfile { path: path.into(), description: path.to_uppercase(), class, color_space };
     let installed = [
         p("gracol.icc", ProfileClass::Output, ColorSpace::Cmyk),

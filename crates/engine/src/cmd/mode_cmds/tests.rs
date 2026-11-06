@@ -712,7 +712,7 @@ fn modes_round_trip_through_pcraft() {
 /// the displayed ink colours, through the destination profile. Grayscale drops the inks.
 #[test]
 fn duotone_to_colour_modes_keeps_the_ink_colours() {
-    use photocraft_cms::{Builtin, Transform};
+    use craft::cms::{Builtin, Transform};
     let configs = [
         json!({"type": "duotone"}),
         json!({"type": "monotone", "inks": [{"name": "Orange", "color": "#ff8000", "curve": [[0, 0], [100, 100]]}]}),
@@ -751,7 +751,7 @@ fn duotone_to_colour_modes_keeps_the_ink_colours() {
                         vec![gray[x as usize]]
                     } else {
                         let mut o = [0.0f32; 16];
-                        t.eval(&shown[x as usize][..3], &mut o);
+                        t.eval(&shown[x as usize][..3], &mut o).unwrap();
                         o[..target.color_channels()].to_vec()
                     };
                     // The display's gradient map samples the inks at 33 stops; dark CMYK

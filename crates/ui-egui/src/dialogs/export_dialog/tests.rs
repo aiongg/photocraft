@@ -663,7 +663,7 @@ fn exact_pixels_lock_aspect_and_leave_the_source() {
 
 #[test]
 fn profile_and_metadata_follow_the_existing_exporter() {
-    use photocraft_cms::Builtin;
+    use craft::cms::Builtin;
 
     let mut f = Map::new();
     f.insert("format".into(), json!("jpg"));
@@ -697,7 +697,7 @@ fn profile_and_metadata_follow_the_existing_exporter() {
     f.insert("metadata".into(), json!("none"));
     f.insert("embedProfile".into(), json!(false));
     let converted = export_document(&doc, &f, None).unwrap();
-    let parsed = photocraft_cms::Profile::parse(converted.icc_profile.as_deref().unwrap()).unwrap();
+    let parsed = craft::cms::Profile::parse(converted.icc_profile.as_deref().unwrap()).unwrap();
     assert!(parsed.same_colors(Builtin::Srgb.profile()), "Convert to sRGB replaces the document profile");
     let stripped = photocraft_io::export(&converted, "out.jpg", &settings(&f).io_options()).unwrap().bytes;
     assert!(!stripped.windows(b"ICC_PROFILE".len()).any(|w| w == b"ICC_PROFILE"));

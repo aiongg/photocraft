@@ -9,10 +9,9 @@ workspace = true
 
 [dependencies]
 toml = "1"
-craft = { workspace = true, features = ["settings", "ui", "ui-window-frame", "color", "draw", "imaging", "keymap", "menu", "platform-usage", "print", "quit", "theme-store", "window"] }
+craft = { workspace = true, features = ["cms", "settings", "ui", "ui-window-frame", "color", "draw", "imaging", "keymap", "menu", "platform-usage", "print", "quit", "theme-store", "window"] }
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
-photocraft-cms = { workspace = true }
 photocraft-raster = { workspace = true }
 photocraft-doc = { workspace = true }
 photocraft-compose = { workspace = true }

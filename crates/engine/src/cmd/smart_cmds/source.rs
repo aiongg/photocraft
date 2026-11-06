@@ -272,7 +272,7 @@ fn convert_source(src: &Document, fmt: PixelFormat, raster: impl FnOnce(PixelFor
     doc.layers = vec![Layer::new("source", LayerContent::Raster(raster(src.pixel_format())))];
     if gray {
         let gray_profile = crate::color_cmds::working_profile(ColorMode::Grayscale);
-        crate::color_cmds::convert_document(&mut doc, &gray_profile, photocraft_cms::Intent::RelativeColorimetric, true)?;
+        crate::color_cmds::convert_document(&mut doc, &gray_profile, craft::cms::Intent::RelativeColorimetric, true)?;
     }
     if linear {
         crate::image_cmds::change_depth(&mut doc, SampleType::F32);

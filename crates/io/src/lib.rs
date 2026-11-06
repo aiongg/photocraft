@@ -53,6 +53,7 @@ pub use gradient_bake::{Method as GradientMethod, bake as bake_gradient};
 mod duotone_map;
 mod kra;
 pub mod linked;
+pub mod lut_file;
 mod multichannel_map;
 mod ora;
 mod palette_map;

@@ -19,5 +19,5 @@ rustc-hash = { workspace = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
-photocraft-cms = { workspace = true }
+craft = { workspace = true, features = ["cms"] }
 serde_json = { workspace = true }
