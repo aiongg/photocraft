@@ -78,7 +78,7 @@ enum Press {
 }
 
 /// Consumes this frame's ⇧+ / ⇧− presses (⇧= on a US layout is `+`; on a German one
-/// `layout_keys::apply` has already turned ⇧+ and ⇧- into `+` and `-`) and ⇧⌥ letters, and
+/// the dispatcher's layout handling has turned ⇧+ and ⇧- into `+` and `-`) and ⇧⌥ letters, and
 /// applies them. Runs before the tool letters, which would otherwise take ⇧⌥M as M.
 pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let presses: Vec<Press> = ctx.input_mut(|i| {

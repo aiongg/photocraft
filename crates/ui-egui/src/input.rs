@@ -3,7 +3,8 @@ pub(super) mod blend_keys;
 pub(super) mod control_click;
 pub mod dialog_keys;
 pub mod hold_keys;
-pub(super) mod layout_keys;
+#[cfg(test)]
+mod layout_tests;
 pub mod nudge_bundle;
 pub(super) mod opacity_keys;
 pub(super) mod page_keys;

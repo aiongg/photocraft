@@ -59,12 +59,7 @@ impl PhotocraftApp {
             remove_trail: None,
             menu_cache: None,
             keymap: Default::default(),
-            key_router: craft::keymap::ui::KeyRouter::new(
-                craft::keymap::egui::Dispatcher::new()
-                    .with_repeat(true)
-                    .with_clipboard_events(true)
-                    .with_layout(craft::keymap::Layout::new().with_position_fallback(false)),
-            ),
+            key_router: craft::keymap::ui::KeyRouter::new(craft::keymap::egui::Dispatcher::new().with_repeat(true).with_clipboard_events(true)),
             move_preview: None,
             move_hover: None,
             move_distance: None,
@@ -255,9 +250,8 @@ impl eframe::App for PhotocraftApp {
         // While a text field of a floating panel's own window has the keyboard, the dock area
         // hands that window the text keys in this input and converts them there.
         if craft::ui::docking::typing_window(ctx).is_none() {
-            if !(ctx.text_edit_focused() || self.ui.text_edit.is_some()) {
-                shortcuts::swallowed_paste_keys(ctx, raw_input);
-            }
+            let typing = ctx.text_edit_focused() || self.ui.text_edit.is_some();
+            self.key_router.dispatcher().raw_input(ctx, raw_input, typing);
         }
         // Windows precision touchpads and some Linux Wayland compositors send pinches
         // as fractional Ctrl + wheel rather than a native Zoom event (#4566).

@@ -253,7 +253,11 @@ impl ShortcutKeymap {
                 let Ok(binding) = Binding::parse(text) else { continue };
                 match catalog.iter_mut().find(|b| b.command.id == *id) {
                     Some(b) => *b = b.clone().with_default(binding),
-                    None => catalog.push(Bindable::new(CommandRef::new(id), id, Scope::app()).with_default(binding)),
+                    None => {
+                        let bindable = Bindable::new(CommandRef::new(id), id, Scope::app()).with_default(binding);
+                        // Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L, ⌥⌘M, #8900).
+                        catalog.push(if crate::adjust_dialog::has_dialog(id) { bindable.with_alt_variant() } else { bindable });
+                    }
                 }
             }
             Keymap::new(catalog, Scopes::new(), Platform::current())

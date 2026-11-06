@@ -13,8 +13,7 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use craft::keymap::Active;
 
-use crate::input::shortcut_keymap::ShortcutKeymap;
-use crate::shortcuts::{key_matches, parse};
+use crate::shortcuts::parse;
 
 /// What a dispatched shortcut did (kept for tests and `ui.inspect`-style debugging).
 #[derive(Clone, Debug, PartialEq)]
@@ -66,11 +65,12 @@ pub fn owner(app: &PhotocraftApp, ctx: &egui::Context) -> KeyOwner {
     KeyRouter::owner(ctx, &key_gate(app))
 }
 
-/// Whether a focused control claimed ⌫ / Delete (the Curves graph deletes its selected point), so
-/// the shortcuts and the object keys leave them alone.
-pub fn delete_claimed(ctx: &egui::Context) -> bool {
-    let claimed = |key| craft::ui::behavior::KeyClaim::claimed(ctx, &KeyboardShortcut::new(egui::Modifiers::NONE, key));
-    claimed(Key::Delete) || claimed(Key::Backspace)
+/// Whether ⌫ / Delete belong to the canvas: no text field has them and no focused control claimed
+/// them (the Curves graph deletes its selected point), so the shortcuts and the object keys may
+/// take them.
+pub fn delete_keys_free(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+    use craft::ui::focus::key_owner::canvas_keys_free_for;
+    app.ui.text_edit.is_none() && [Key::Delete, Key::Backspace].iter().all(|k| canvas_keys_free_for(ctx, &KeyboardShortcut::new(egui::Modifiers::NONE, *k)))
 }
 
 /// [`KeyRouter::allows`] for the shortcut `sc` bound to command `id`, for tests that ask what an
@@ -121,44 +121,14 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, editing: b
                 ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
             }
             let id = clip_key_command(&app, delete_key_command(&app, id));
-            dispatch_as(&mut app, ctx, &id, false);
+            dispatch_as(&mut app, ctx, &id, hit.alt_variant);
             ran.set(true);
         },
     );
-    let mut ran = ran.get();
-    ran |= dispatch_last_settings(&mut cell.into_inner(), ctx, &keymap);
+    let ran = ran.get();
+    drop(cell);
     app.key_router = router;
     ran
-}
-
-/// Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L, ⌥⌘M,
-/// #8900), unless that key is bound to something else. The keymap has no binding for the ⌥ chord,
-/// so its press is still in egui's input after the routing.
-fn dispatch_last_settings(app: &mut PhotocraftApp, ctx: &egui::Context, keymap: &ShortcutKeymap) -> bool {
-    use craft::keymap::{Chord, CommandRef, Mods, egui::platform};
-    let events = ctx.input(|i| i.events.clone());
-    for (at, event) in events.iter().enumerate() {
-        let egui::Event::Key { key, pressed: true, modifiers, .. } = event else { continue };
-        if !modifiers.alt {
-            continue;
-        }
-        let plain = egui::Modifiers { alt: false, ..*modifiers };
-        let Some(found) =
-            keymap.table().iter().find(|(id, text)| crate::adjust_dialog::has_dialog(id) && parse(text).is_some_and(|sc| key_matches(&sc, *key, plain)))
-        else {
-            continue;
-        };
-        let Some(ckey) = craft::keymap::Key::from_egui(*key) else { continue };
-        let chord = Chord { mods: Mods::from_egui(modifiers, platform(ctx)), key: ckey };
-        let gate = key_gate(app);
-        if !KeyRouter::allows(ctx, KeyRouter::owner(ctx, &gate), &gate, &chord, &CommandRef::new(&found.0)) {
-            continue;
-        }
-        ctx.input_mut(|i| i.events.remove(at));
-        dispatch_as(app, ctx, &found.0, true);
-        return true;
-    }
-    false
 }
 
 /// Clear's key (Delete / Backspace) with nothing selected deletes the selected layers, of any
