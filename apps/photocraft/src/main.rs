@@ -522,7 +522,9 @@ fn main() -> eframe::Result {
             };
             #[cfg(not(target_os = "linux"))]
             let session = Session::new();
-            PhotocraftApp::install_type_reset_hooks(&cc.egui_ctx);
+            // Before the first pass: the craft runtime it installs must see every pass from the
+            // first (logic styles the context again with the saved theme).
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
             let mut app = PhotocraftApp::new(session, services);
             app.min_frame_ms = uncapped.then_some(1000.0 / 240.0);
             app.integrated_titlebar = cfg!(target_os = "macos");
