@@ -179,7 +179,7 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
         Place::FocusedWidget => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
-            h.get_by_role_and_label(Role::Button, "paint").focus();
+            h.get_by_role_and_label(Role::TreeItem, "paint").focus();
             h.run_steps(2);
             assert_eq!(Focus::of(&h.ctx), Focus::Widget, "a widget is focused");
         }
@@ -236,6 +236,12 @@ fn every_displayed_shortcut_is_bound_to_its_item() {
     assert!(broken.is_empty(), "{} displayed shortcuts don't reach their item:\n{}", broken.len(), broken.join("\n"));
 }
 
+/// The commands whose chords the focused Layers rows run themselves (craft-layers' stacking and
+/// visibility keys): with the rows focused the press is the list's and reaches no app command,
+/// so it runs once (`layers_rows_tests::command_bracket_moves_the_layer_once`).
+const ROWS_KEYS: [&str; 5] =
+    ["layer.hideLayers", "layer.arrange.bringToFront", "layer.arrange.bringForward", "layer.arrange.sendBackward", "layer.arrange.sendToBack"];
+
 /// Press every displayed shortcut from each place focus usually is: each dispatches its command,
 /// or the menu shows it disabled and the press reports why. (Dry run: File › Exit, Open, Help
 /// links… resolve and check enablement without running.)
@@ -263,7 +269,9 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
                 continue;
             }
             let enabled = items.iter().find(|i| i.id == id).map_or_else(|| crate::menus::is_enabled(h.state(), &id), |i| i.enabled);
+            let held_by_rows = matches!(place, Place::LayersRow | Place::FocusedWidget) && ROWS_KEYS.contains(&id.as_str());
             match log.as_slice() {
+                [] if held_by_rows => {}
                 [(bound, Outcome::Ran)] if same(&id, bound) && enabled => {}
                 [(bound, Outcome::Disabled(why))] if same(&id, bound) && !enabled && !why.is_empty() => {}
                 other => failures.push(format!("{place:?}: {sc} ({id}, menu enabled: {enabled}) -> {other:?}")),

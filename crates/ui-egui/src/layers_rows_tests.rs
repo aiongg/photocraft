@@ -143,7 +143,7 @@ fn clicks_on_row_parts() {
         ("the Background's lock indicator makes it a normal layer", locked, Part("Unlock Background"), |h| {
             let doc = &st(h).doc;
             assert!(doc.background().is_none());
-            assert!(!layer(h, "Background").locks.any());
+            assert!(!doc.layers[0].locks.any(), "the bottom layer, no longer the Background, is unlocked");
         }),
         (
             "a disabled effect keeps its row",
@@ -291,9 +291,6 @@ fn renaming_a_row_commits_on_enter() {
     assert_eq!(steps(&h), n + 1);
 }
 
-// Fails: one press moves the layer two places. The list's stacking key (the runtime routes the press
-// to the focused row as a move) and PhotoCraft's Layer › Arrange › Bring Forward shortcut (its
-// dispatcher reads the same press from egui, which the runtime leaves there) both run.
 /// Cmd+] with the rows focused moves the active layer up once per press: the list's stacking key
 /// and PhotoCraft's Layer › Arrange › Bring Forward share the chord, and one press runs one of them.
 #[test]

@@ -56,6 +56,15 @@ pub(crate) fn thumb(h: &Harness<'_, PhotocraftApp>, name: &str, part: LayerPart)
     thumb_on(h, name, name, part).unwrap_or_else(|| panic!("{name:?} shows no {part:?} thumbnail"))
 }
 
+/// A point on the name of the row of the layer named `name`, past its thumbnails: a press there
+/// takes the row itself, where one on a thumbnail is the thumbnail's.
+pub(crate) fn name_point(h: &Harness<'_, PhotocraftApp>, name: &str) -> Pos2 {
+    let at = row(h, name);
+    let parts = [LayerPart::Pixels, LayerPart::LayerMask, LayerPart::VectorMask, LayerPart::FrameShape, LayerPart::FrameContent];
+    let past = parts.into_iter().filter_map(|part| thumb_on(h, name, name, part)).map(|thumb| thumb.right()).fold(at.left(), f32::max);
+    Pos2::new(past + 16.0, at.center().y)
+}
+
 /// The rect of the fx badge on the row of the layer named `name`.
 pub(crate) fn fx_badge(h: &Harness<'_, PhotocraftApp>, name: &str) -> Rect {
     let node = h.get_by_role_and_label(Role::TreeItem, name).accesskit_node().locate().0;

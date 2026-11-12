@@ -349,6 +349,8 @@ fn dropping_onto_the_trash() {
             assert_eq!(past(h), steps + 1);
             h.state_mut().session.undo();
             h.run_steps(2);
+            // The undo targets the layer again: the trash reads Delete Layer Mask with the mask targeted.
+            target(h, LayerPart::LayerMask);
             let at = thumb(h, "Masked", LayerPart::LayerMask).center();
             let to = h.get_by_label("Delete Layer Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
@@ -387,7 +389,7 @@ fn dropping_onto_the_trash() {
         target(&mut h, part);
         let at = match from {
             Some(part) => thumb(&h, "Masked", part).center(),
-            None => crate::layers_panel_nodes::row(&h, "Masked").center(),
+            None => crate::layers_panel_nodes::name_point(&h, "Masked"),
         };
         let to = h.get_by_label(trash).rect().center();
         crate::layers_panel_nodes::drag(&mut h, at, to, Modifiers::NONE);

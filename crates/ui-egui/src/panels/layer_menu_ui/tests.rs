@@ -465,7 +465,9 @@ mod panel_menus {
             // A submenu opens under the pointer; the last item is the pick.
             for (i, item) in items.iter().enumerate() {
                 if i + 1 < items.len() {
-                    h.hover_at(h.get_by_label(item).rect().center());
+                    let at = h.get_by_label(item).rect().center();
+                    assert!(h.ctx.content_rect().contains(at), "{case}: {item} at {at:?} is in the window");
+                    h.hover_at(at);
                     h.run_steps(4);
                 } else {
                     pick(&mut h, item);
