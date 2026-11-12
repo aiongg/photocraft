@@ -14,15 +14,8 @@ impl PhotocraftApp {
             let mut live = std::collections::HashSet::new();
             let mut pending: Vec<_> = documents.iter().flat_map(|st| &st.doc.layers).collect();
             while let Some(layer) = pending.pop() {
-                live.insert((layer.id, mask_thumbs_ui::THUMB_LAYER));
                 if layer.mask.is_some() {
                     live.insert((layer.id, mask_thumbs_ui::THUMB_MASK));
-                }
-                if layer.vector_mask.is_some() {
-                    live.insert((layer.id, mask_thumbs_ui::THUMB_VECTOR));
-                }
-                if matches!(&layer.content, photocraft_doc::LayerContent::Smart(sm) if sm.filter_mask.is_some()) {
-                    live.insert((layer.id, mask_thumbs_ui::THUMB_SMART_MASK));
                 }
                 if let Some(children) = layer.children() {
                     pending.extend(children);
@@ -31,36 +24,8 @@ impl PhotocraftApp {
             // Native files can restore IDs: retain the union across all open documents, rather
             // than deleting an ID just because one document containing it was closed.
             self.thumbs.retain(|key, _| live.contains(key));
-            self.thumb_frames.retain(|id, _| live.contains(&(*id, mask_thumbs_ui::THUMB_LAYER)));
         }
         self.thumb_documents = documents.iter().map(|st| (st.doc.id, std::sync::Arc::downgrade(&st.doc))).collect();
-    }
-
-    /// Cached 64px thumbnail of a pixel-ish layer, letterboxed in a square, and the document
-    /// area it frames: the canvas, or with Clip Thumbnails to Layer Bounds the layer's pixels.
-    pub fn layer_thumb(&mut self, ctx: &egui::Context, doc: &Document, layer: &photocraft_doc::Layer) -> (egui::TextureId, photocraft_geom::Rect) {
-        let clip = self.session.prefs().interface.clip_thumbnails_to_layer_bounds;
-        // Key by content, not document revision: COW tiles change pointer only when their pixels
-        // change, so unrelated edits (e.g. painting another layer) don't rebuild this thumbnail.
-        let rev = layer.surface().map_or(0, surface_fingerprint) ^ (doc.size.width as u64) << 40 ^ u64::from(clip) << 63;
-        let key = (layer.id, mask_thumbs_ui::THUMB_LAYER);
-        if let Some((r, tex)) = self.thumbs.get(&key)
-            && *r == rev
-            && let Some(frame) = self.thumb_frames.get(&layer.id)
-        {
-            return (tex.id(), *frame);
-        }
-        let canvas = doc.bounds();
-        let frame = layer_thumb_frame(layer, canvas, clip);
-        let mut px = [0.0f32; 8];
-        let img = thumb_image(frame, 64, |x, y| {
-            let Some(s) = layer.surface() else { return [0.0; 4] };
-            let n = s.channels();
-            s.read_pixel(x, y, &mut px[..n]);
-            photocraft_raster::to_rgba(&s.format(), &px[..n])
-        });
-        self.thumb_frames.insert(layer.id, frame);
-        (self.store_thumb(ctx, key, rev, img), frame)
     }
 
     /// Drops the thumbnails of `doc`'s snapshots not in `live` (deleted ones). Those of closed

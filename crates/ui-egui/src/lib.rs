@@ -240,7 +240,6 @@ pub use panels::layer_props_ui;
 use panels::layer_reveal;
 pub use panels::layer_row_ui;
 use panels::layer_transfer;
-pub use panels::layer_tree_ui;
 pub use panels::layers_panel_ui;
 use panels::mask_props_ui;
 pub use panels::mask_thumbs_ui;
@@ -519,9 +518,6 @@ pub struct PhotocraftApp {
     pub fps: f32,
     pub(crate) last_frame_time: f64,
     thumbs: HashMap<(photocraft_doc::LayerId, u8), (u64, egui::TextureHandle)>,
-    /// The document area each layer thumbnail in `thumbs` frames (the canvas, or the layer's
-    /// bounds with Clip Thumbnails to Layer Bounds; #4281).
-    thumb_frames: HashMap<photocraft_doc::LayerId, photocraft_geom::Rect>,
     /// History snapshot thumbnails by (document, snapshot id), each with the snapshot document it
     /// shows (`snapshot_thumb`, #2966): made once, and again only when that is a different one (a
     /// preserved-ID reopen, or the first snapshot refreshed for a served font, #6087).
@@ -661,6 +657,11 @@ pub struct PhotocraftApp {
     pub(crate) hover_doc: Option<[f64; 2]>,
     /// Layer hovered in the Layers panel, outlined on the canvas.
     pub(crate) hover_layer: Option<photocraft_doc::LayerId>,
+    /// A layer whose row the Layers panel opens for renaming in its next pass (Layer › Rename
+    /// Layer, the row menu's Rename Layer…).
+    pub(crate) layers_rename: Option<photocraft_doc::LayerId>,
+    /// Select › Find Layers: the Layers panel's Name filter takes the focus in its next pass.
+    pub(crate) find_layers_focus: bool,
     /// Layer hovered on the canvas, highlighted in the Layers panel.
     pub(crate) canvas_hover_layer: Option<photocraft_doc::LayerId>,
     pub(crate) clone_preview: Option<crate::canvas::ClonePreviewCache>,

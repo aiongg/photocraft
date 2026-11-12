@@ -4,7 +4,6 @@
 use photocraft_doc::{Effect, Layer};
 use serde::{Deserialize, Serialize};
 
-use crate::{PhotocraftApp, widgets};
 
 /// The effect kinds the Effect filter picks from, in Photoshop's order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,19 +46,6 @@ impl EffectKind {
         }
     }
 
-    fn label(self) -> &'static str {
-        match self {
-            EffectKind::BevelEmboss => tl!("Bevel & Emboss"),
-            EffectKind::Stroke => tl!("Stroke"),
-            EffectKind::InnerShadow => tl!("Inner Shadow"),
-            EffectKind::InnerGlow => tl!("Inner Glow"),
-            EffectKind::Satin => tl!("Satin"),
-            EffectKind::Overlay => tl!("Overlay"),
-            EffectKind::OuterGlow => tl!("Outer Glow"),
-            EffectKind::DropShadow => tl!("Drop Shadow"),
-        }
-    }
-
     fn matches(self, e: &Effect) -> bool {
         matches!(
             (self, e),
@@ -87,9 +73,3 @@ pub fn parse(v: &serde_json::Value) -> Result<EffectKind, String> {
     EffectKind::ALL.into_iter().find(|k| k.id() == name).ok_or_else(|| format!("layerFilter.effect: unknown effect `{name}` (effects: {})", ids()))
 }
 
-/// The Effect filter's controls: the effect kind dropdown.
-pub fn controls(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let kinds: Vec<(EffectKind, &str)> = EffectKind::ALL.into_iter().map(|k| (k, k.label())).collect();
-    let width = ui.available_width().max(96.0);
-    widgets::dropdown(ui, "layer-filter-effect", tl!("Effect"), &mut app.ui.layer_filter_effect, &kinds, width);
-}

@@ -577,34 +577,6 @@ pub fn thumbnail_image(f: &Fill) -> Option<egui::ColorImage> {
     Some(egui::ColorImage::new([THUMB_PX as usize; 2], rgba))
 }
 
-/// Paints a gradient fill layer's inset thumbnail and fill marker into `rect`, over a
-/// checkerboard (opacity stops show through). Cached until its fill changes; `false` for other fills.
-pub fn paint_thumbnail(ui: &egui::Ui, layer: LayerId, f: &Fill, rect: Rect) -> bool {
-    if !matches!(f, Fill::Gradient { .. }) {
-        return false;
-    }
-    let ctx = ui.ctx();
-    let key = egui::Id::unique(("gradient-thumb", layer.0));
-    let cached: Option<(Fill, egui::TextureHandle)> = ctx.data(|d| d.get_temp(key));
-    let tex = match cached {
-        Some((cf, t)) if cf == *f => t,
-        _ => {
-            let Some(img) = thumbnail_image(f) else { return false };
-            let t = ctx.load_texture(format!("gradient-thumb-{}", layer.0), img, egui::TextureOptions::LINEAR);
-            ctx.data_mut(|d| d.insert_temp(key, (f.clone(), t.clone())));
-            t
-        }
-    };
-    if ui.is_rect_visible(rect) {
-        let p = ui.painter();
-        crate::solid_fill_ui::thumbnail_frame(ui, rect, |swatch| {
-            widgets::checker(p, swatch, 3.0);
-            p.image(tex.id(), swatch, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-        });
-    }
-    true
-}
-
 /// Options-bar swatch of the current gradient. Both live and classic modes use the same
 /// engine-owned preset (#1651). Clicking it opens the Gradient Editor window, as Photoshop's
 /// swatch does. Returns whether it was clicked.

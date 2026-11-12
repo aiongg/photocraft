@@ -2,7 +2,7 @@ use super::brush_controls::{
     brush_preset_chip, mixer_combination_dropdown, mixer_load_swatch, paint_mode_dropdown, smoothing_field, smoothing_options, tool_mode_dropdown,
 };
 use super::properties::{select_and_mask_button, selection_mode_buttons};
-use super::{BlendMode, Color32, PhotocraftApp, RichText, Sense, Tokens, Tool, Value, icons, json, starts_blend_group, vec2, widgets};
+use super::{BlendMode, PhotocraftApp, RichText, Sense, Tokens, Tool, Value, icons, json, starts_blend_group, vec2, widgets};
 use photocraft_paint::BrushSettings;
 
 /// The "Fill options" modal's open flag (temporary UI data, per context).
@@ -889,9 +889,6 @@ mod zoom_buttons_tests;
 #[cfg(test)]
 mod hand_tooltips_tests;
 
-/// Width of the Layers panel's Opacity and Fill fields, with room for their pop-up slider's ▾.
-pub(super) const LAYER_PCT_W: f32 = 66.0 + widgets::POPUP_ARROW_W;
-
 /// The `layer.setProps` edit of a Layers panel Opacity or Fill (`key`) field at `pct` percent. A
 /// drag of the pop-up slider (`drag`) coalesces into one history step, as in Photoshop.
 pub(super) fn pct_action(target: &Value, key: &str, pct: f32, drag: Option<u64>) -> (String, Value) {
@@ -901,42 +898,6 @@ pub(super) fn pct_action(target: &Value, key: &str, pct: f32, drag: Option<u64>)
         p["coalesce"] = json!(format!("layer-{key}-slider:{n}"));
     }
     ("layer.setProps".into(), p)
-}
-
-/// Photoshop's scrubby Opacity/Fill labels: drag horizontally to change the percentage without
-/// hitting the small number field. The unique drag ID coalesces every frame into one undo step.
-pub(super) fn scrub_pct_label(ui: &mut egui::Ui, text: &str, percent: &mut f32, max_w: f32) -> widgets::PopupFieldResponse {
-    // Elide to the room left in the row (full text on hover): a longer translation shrinks here
-    // instead of running over the fixed controls beside it (#3580).
-    let resp = widgets::elided_label_sensed(ui, text, max_w, Sense::click_and_drag()).on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
-    let key = resp.id.with("percent-label-drag");
-    if resp.drag_started() {
-        let stamp = ui.ctx().cumulative_pass_nr();
-        ui.data_mut(|d| d.insert_temp(key, (*percent, stamp)));
-    }
-    let mut out = widgets::PopupFieldResponse::default();
-    if resp.dragged()
-        && let Some((start, stamp)) = ui.data(|d| d.get_temp::<(f32, u64)>(key))
-        && let (Some(origin), Some(pos)) = (ui.input(|i| i.pointer.press_origin()), resp.interact_pointer_pos())
-    {
-        // Match DragValue's 0.5 percentage-point per screen point; do not jump on press.
-        let next = (start + (pos.x - origin.x) * 0.5).clamp(0.0, 100.0);
-        if next.is_finite() && next != *percent {
-            *percent = next;
-            out.changed = true;
-            out.drag = Some(stamp);
-        }
-    }
-    if resp.drag_stopped() {
-        ui.data_mut(|d| d.remove::<(f32, u64)>(key));
-    }
-    out
-}
-
-/// Width of `s` as [`label`] draws it (body text).
-pub(super) fn body_text_width(ui: &egui::Ui, s: &str) -> f32 {
-    let font = egui::TextStyle::Body.resolve(ui.style());
-    ui.painter().layout_no_wrap(s.to_string(), font, Color32::WHITE).size().x
 }
 
 /// Options-bar label: Photoshop writes "Size:" with a colon.

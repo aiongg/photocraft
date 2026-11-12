@@ -6,7 +6,6 @@ use photocraft_doc::{Layer, LayerContent, LayerId};
 use photocraft_engine::history_source_cmds::HistorySource;
 use serde_json::{Value, json};
 
-use crate::mask_thumbs_ui::MaskKind;
 use crate::state::Tool;
 use crate::theme::{self, Tokens};
 use crate::{PhotocraftApp, icons, widgets};
@@ -39,13 +38,12 @@ pub mod layer_filter_ui;
 pub mod layer_menu_ui;
 pub mod layer_props_ui;
 pub(super) mod layer_reveal;
-mod layer_row;
 pub mod layer_row_ui;
 pub(super) mod layer_transfer;
-pub mod layer_tree_ui;
 mod layers;
-mod layers_empty_menu;
 pub mod layers_panel_ui;
+mod layers_events;
+mod layers_tree;
 pub(super) mod mask_props_ui;
 pub mod mask_thumbs_ui;
 mod navigator;
@@ -87,22 +85,15 @@ pub(crate) use history::step_icon as history_step_icon;
 #[cfg(test)]
 use info::info_panel;
 pub(crate) use info::{SamplerReadouts, sampler_readouts};
-#[cfg(test)]
-use layer_drag::{background_drop_refused, layer_drop_payload};
 pub(crate) use layer_drag::{dropped_on, layer_drag_edge_scroll};
-#[cfg(test)]
-pub(crate) use layer_row::thumb_load_badge;
-#[cfg(test)]
-use layer_row::{layer_thumb_fit, paint_clipping_indicator};
 pub(crate) use layers::{blend_options, fx_button};
+pub(crate) use layers_tree::listed_filter;
 #[cfg(test)]
-use layers::{layers, opacity_row_layout, simple_lock_toggle};
+use layers::{layers, simple_lock_toggle};
 #[cfg(test)]
 use navigator::{NAV_ROW_H, navigator, navigator_zoom_drag_id, navigator_zoom_to};
 #[cfg(test)]
 pub(crate) use navigator::{last_navigator_controls, last_navigator_preview};
-#[cfg(test)]
-use options_bar::LAYER_PCT_W;
 pub use options_bar::options_bar;
 #[cfg(test)]
 use options_bar::options_bar_height;
@@ -1816,29 +1807,6 @@ mod group_drag_selection_tests {
         assert_eq!((r.top(), r.bottom()), (cell.top(), cell.bottom()));
         assert!((r.width() - 7.5).abs() < 1e-3, "{r:?}");
         assert!((uv.width() - 0.25).abs() < 1e-3 && (uv.height() - 1.0).abs() < 1e-3, "{uv:?}");
-    }
-}
-
-#[cfg(test)]
-mod opacity_row_layout_tests {
-    use super::*;
-
-    #[test]
-    fn opacity_label_yields_to_controls_in_narrow_layers_panel() {
-        let gap = 2.0;
-        let label = 62.0;
-        let (wide, visible) = opacity_row_layout(360.0, label, gap);
-        assert!(visible);
-        assert!(wide >= 100.0);
-        // The default dock width keeps the English label (the Layers dock at its 250 px minimum).
-        assert!(opacity_row_layout(255.0, 46.0, 8.0).1);
-        let (medium, visible) = opacity_row_layout(180.0, label, gap);
-        assert!(!visible, "the long label must not overlap the blend field");
-        assert!(medium + LAYER_PCT_W + gap <= 180.0);
-        let (narrow, visible) = opacity_row_layout(135.0, label, gap);
-        assert!(!visible);
-        assert!(narrow >= 40.0);
-        assert!(narrow + LAYER_PCT_W + gap <= 135.0);
     }
 }
 

@@ -32,6 +32,7 @@ pub(crate) use targets::adjustment_layer_active;
 #[cfg(test)]
 pub(crate) use thumbs::layer_thumb_frame;
 pub use thumbs::surface_fingerprint;
+pub(crate) use thumbs::layer_thumb_frame;
 
 impl PhotocraftApp {
     /// Creates a new application state managing the engine session and UI services; the session
@@ -117,7 +118,6 @@ impl PhotocraftApp {
             fps: 0.0,
             last_frame_time: 0.0,
             thumbs: HashMap::new(),
-            thumb_frames: HashMap::new(),
             snapshot_thumbs: HashMap::new(),
             thumb_documents: Vec::new(),
             bounds_cache: HashMap::new(),
@@ -159,6 +159,8 @@ impl PhotocraftApp {
             pcrop: Default::default(),
             hover_doc: None,
             hover_layer: None,
+            layers_rename: None,
+            find_layers_focus: false,
             canvas_hover_layer: None,
             clone_preview: None,
             info_sample: None,

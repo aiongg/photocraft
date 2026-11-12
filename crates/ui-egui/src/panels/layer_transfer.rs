@@ -41,10 +41,10 @@ fn clear(ctx: &egui::Context) {
     ctx.data_mut(|d| d.remove::<Transfer>(key()));
 }
 
-/// The layers `id` stands for: the selection when it is one of the selected layers, else itself.
-fn begin(app: &PhotocraftApp, ctx: &egui::Context, id: LayerId, grab: Option<[f64; 2]>) -> bool {
+/// Starts a transfer of `layers` from the active document; `grab` is the document point a Move
+/// drag grabbed.
+fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: Option<[f64; 2]>) -> bool {
     let Some(st) = app.session.active() else { return false };
-    let layers = if st.is_layer_selected(id) { st.selected_layers() } else { vec![id] };
     let label = match layers.as_slice() {
         [one] => st.doc.layer(*one).map_or_else(String::new, |l| l.name.clone()),
         many => crate::i18n::trn(crate::i18n::current(), many.len() as u64, "{n} layer", "{n} layers"),
@@ -57,9 +57,17 @@ fn begin(app: &PhotocraftApp, ctx: &egui::Context, id: LayerId, grab: Option<[f6
     true
 }
 
-/// A Layers panel row drag began on `layer`: it can be dropped on another document.
-pub fn begin_from_panel(app: &PhotocraftApp, ctx: &egui::Context, layer: LayerId) {
-    begin(app, ctx, layer, None);
+/// A Layers panel row drag of `layers` is under way (the panel's drag payload): they can be
+/// dropped on another document. Starts the transfer once per drag.
+pub fn begin_from_panel(app: &PhotocraftApp, ctx: &egui::Context, layers: &[LayerId]) {
+    if get(ctx).is_none() && !layers.is_empty() {
+        begin(app, ctx, layers.to_vec(), None);
+    }
+}
+
+/// The document a transfer under way started in.
+pub fn source(ctx: &egui::Context) -> Option<DocId> {
+    get(ctx).map(|t| t.source)
 }
 
 /// A Move-tool drag of whole layers (not a selection or a floating piece) under way.
@@ -116,7 +124,11 @@ fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize)
             st.floating = previous.map(|f| photocraft_engine::float_cmds::Floating { revision: st.revision, ..f });
         }
         let active = app.session.active().and_then(|st| st.active_layer).unwrap_or(active);
-        if !begin(app, ctx, active, Some(grab)) {
+        let layers = match app.session.active() {
+            Some(st) if st.is_layer_selected(active) => st.selected_layers(),
+            _ => vec![active],
+        };
+        if !begin(app, ctx, layers, Some(grab)) {
             return false;
         }
     }
@@ -130,8 +142,6 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
     if app.session.active_index() != Some(index) {
         app.session.set_active(index);
         app.jobs.focus = None;
-        // The Layers panel now lists the other document: its rows don't take the drag.
-        ctx.data_mut(|d| d.remove::<u64>(egui::Id::unique("layer-drag")));
     }
     if ctx.input(|i| i.pointer.any_released()) {
         drop(app, ctx, index, None);

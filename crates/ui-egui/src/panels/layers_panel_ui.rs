@@ -183,25 +183,6 @@ fn paint_flower_example(ui: &Ui, rect: egui::Rect) {
     painter.rect_stroke(rect, 0.0, Stroke::new(1.0, Color32::from_gray(92)), egui::StrokeKind::Inside);
 }
 
-/// Returns both the actual thumbnail width and the height allocated by the Layers
-/// row. Used by painting and by tests to keep the preference functional.
-pub(crate) fn thumbnail_geometry(size: LayerThumbnailSize, pro: bool) -> (f32, f32) {
-    let thumb: f32 = match size {
-        LayerThumbnailSize::None => 0.0,
-        LayerThumbnailSize::Small => 18.0,
-        LayerThumbnailSize::Medium => {
-            if pro {
-                24.0
-            } else {
-                34.0
-            }
-        }
-        LayerThumbnailSize::Large => 48.0,
-    };
-    let row = if thumb == 0.0 { 23.0 } else { (thumb + 8.0).max(if pro { 32.0 } else { 40.0 }) };
-    (thumb, row)
-}
-
 /// Content column of the Photoshop-style dialog, with fixed-size radio/preview
 /// slots rather than text labels that change the position of each thumbnail.
 fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
@@ -460,21 +441,6 @@ mod tests {
         assert!(flattened.doc.layers[0].surface().is_some());
         app.run("edit.undo", json!({})).unwrap();
         assert_eq!(app.session.active().unwrap().doc.layers.len(), count);
-    }
-
-    /// Thumbnail and row sizes grow from None to Large in both themes, with the rows at least as tall as the thumbnails.
-    #[test]
-    fn geometry_matches_four_real_panel_sizes() {
-        for pro in [false, true] {
-            let mut previous = -1.0;
-            for size in [LayerThumbnailSize::None, LayerThumbnailSize::Small, LayerThumbnailSize::Medium, LayerThumbnailSize::Large] {
-                let (thumb, row) = thumbnail_geometry(size, pro);
-                assert!(thumb > previous && row >= thumb, "{size:?}: {thumb}/{row}");
-                previous = thumb;
-            }
-        }
-        assert_eq!(thumbnail_geometry(LayerThumbnailSize::None, true), (0.0, 23.0));
-        assert_eq!(thumbnail_geometry(LayerThumbnailSize::Large, true), (48.0, 56.0));
     }
 
     /// Preferences saved before an option existed still load, with the default for the missing ones.

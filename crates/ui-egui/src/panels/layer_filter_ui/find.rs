@@ -6,17 +6,13 @@
 use serde_json::{Value, json};
 
 use super::FilterBy;
-use crate::{PhotocraftApp, widgets};
+use crate::PhotocraftApp;
 
 /// The egui memory flag: focus the Name field the next time it is drawn.
-fn focus_flag() -> egui::Id {
-    egui::Id::unique("layer-filter-find-focus")
-}
-
 /// Run `select.findLayers`: the engine checks `params` and lists the layers the Name text matches;
 /// then the Name filter is applied. Without a `name` the text is kept, and the Layers panel is
 /// shown with the field focused.
-pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Result<Value, String> {
+pub fn invoke(app: &mut PhotocraftApp, params: Value) -> Result<Value, String> {
     let given = params.get("name").is_some_and(|n| !n.is_null());
     // `run` keeps the Name text when no `name` is given ([`params_for_run`]) and applies the
     // reply's Name filter ([`apply`]).
@@ -33,9 +29,7 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Re
         }
         // A hidden filter row (Filter Options › Hide) stays hidden, as in Photoshop, and showing it
         // later doesn't put the caret in the field: only a drawn row takes the focus.
-        if app.ui.layers_panel_options.show_filters {
-            ctx.data_mut(|d| d.insert_temp(focus_flag(), true));
-        }
+        app.find_layers_focus = app.ui.layers_panel_options.show_filters;
     }
     Ok(reply)
 }
@@ -61,20 +55,3 @@ pub(crate) fn apply(app: &mut PhotocraftApp, reply: &Value) {
     }
 }
 
-/// The Name filter's text field, taking the focus with its text selected after [`invoke`]. The
-/// focus waits for a frame without a pointer press or release: egui drops the focus at the end of
-/// a frame in which the pointer was clicked elsewhere, as it is when the menu item is clicked.
-pub fn name_field(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let id = ui.scope_id().with("layer-filter-name");
-    let pending = ui.ctx().data(|d| d.get_temp::<bool>(focus_flag())).unwrap_or(false);
-    let clicking = ui.input(|i| i.pointer.any_pressed() || i.pointer.any_released() || i.pointer.any_down());
-    if pending && clicking {
-        ui.ctx().request_repaint();
-    } else if pending {
-        ui.ctx().data_mut(|d| d.remove_temp::<bool>(focus_flag()));
-        ui.memory_mut(|m| m.request_focus(id));
-        widgets::field_tab::select_all(ui.ctx(), id, &app.ui.layer_filter_name);
-    }
-    let width = ui.available_width().max(48.0);
-    widgets::text_field(ui, id, &mut app.ui.layer_filter_name, tl!("Search"), width, false);
-}

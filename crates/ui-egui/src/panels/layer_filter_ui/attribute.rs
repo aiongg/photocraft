@@ -10,7 +10,7 @@ use photocraft_geom::{Rect, TILE_SIZE, TileCoord};
 use photocraft_raster::Surface;
 use serde::{Deserialize, Serialize};
 
-use crate::{PhotocraftApp, widgets};
+use crate::PhotocraftApp;
 
 /// The attributes the Attribute filter picks from, in Photoshop's order: the nine attributes,
 /// then their opposites.
@@ -81,29 +81,6 @@ impl Attribute {
             Attribute::NoVectorMask => "noVectorMask",
             Attribute::NoLayerEffects => "noLayerEffects",
             Attribute::NoAdvancedBlending => "noAdvancedBlending",
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Attribute::Visible => tl!("Visible"),
-            Attribute::Locked => tl!("Locked"),
-            Attribute::Empty => tl!("Empty"),
-            Attribute::Linked => tl!("Linked"),
-            Attribute::Clipped => tl!("Clipped"),
-            Attribute::LayerMask => tl!("Layer Mask"),
-            Attribute::VectorMask => tl!("Vector Mask"),
-            Attribute::LayerEffects => tl!("Layer Effects"),
-            Attribute::AdvancedBlending => tl!("Advanced Blending"),
-            Attribute::NotVisible => tl!("Not Visible"),
-            Attribute::NotLocked => tl!("Not Locked"),
-            Attribute::NotEmpty => tl!("Not Empty"),
-            Attribute::NotLinked => tl!("Not Linked"),
-            Attribute::NotClipped => tl!("Not Clipped"),
-            Attribute::NoLayerMask => tl!("No Layer Mask"),
-            Attribute::NoVectorMask => tl!("No Vector Mask"),
-            Attribute::NoLayerEffects => tl!("No Layer Effects"),
-            Attribute::NoAdvancedBlending => tl!("No Adv. Blending"),
         }
     }
 
@@ -252,9 +229,3 @@ pub fn parse(v: &serde_json::Value) -> Result<Attribute, String> {
     Attribute::ALL.into_iter().find(|a| a.id() == name).ok_or_else(|| format!("layerFilter.attribute: unknown attribute `{name}` (attributes: {})", ids()))
 }
 
-/// The Attribute filter's controls: the attribute dropdown.
-pub fn controls(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let attributes: Vec<(Attribute, &str)> = Attribute::ALL.into_iter().map(|a| (a, a.label())).collect();
-    let width = ui.available_width().max(96.0);
-    widgets::dropdown(ui, "layer-filter-attribute", tl!("Attribute"), &mut app.ui.layer_filter_attribute, &attributes, width);
-}

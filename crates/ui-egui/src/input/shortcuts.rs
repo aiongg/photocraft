@@ -80,6 +80,11 @@ pub fn shortcut_label(app: &PhotocraftApp, command: &str) -> Option<String> {
     effective_shortcut(app, command, default_shortcut(command).as_deref()).map(|s| pretty(&s))
 }
 
+/// The command's effective shortcut as a chord, for framework components that show or bind it.
+pub fn chord(app: &PhotocraftApp, command: &str) -> Option<craft::keymap::Chord> {
+    effective_shortcut(app, command, default_shortcut(command).as_deref()).and_then(|s| craft::keymap::Chord::parse(&s).ok())
+}
+
 /// `label` (English, shown in the UI language) followed by the command's effective shortcut
 /// (`New document…     Ctrl+N`); bare `label` when the binding was removed.
 pub fn command_label(app: &PhotocraftApp, label: &str, command: &str) -> String {

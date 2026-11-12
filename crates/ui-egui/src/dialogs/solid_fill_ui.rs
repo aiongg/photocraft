@@ -4,13 +4,12 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use egui::{Color32, Rect, Stroke, StrokeKind, pos2, vec2};
 use photocraft_color::Color;
 use photocraft_doc::{DocId, Document, Fill, LayerContent, LayerId};
 use photocraft_engine::solid_fill_cmds as cmds;
 use serde_json::{Map, Value, json};
 
-use crate::{PhotocraftApp, color_picker_ui, theme::Tokens};
+use crate::{PhotocraftApp, color_picker_ui};
 
 pub(crate) struct Preview {
     document: DocId,
@@ -177,37 +176,6 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     let shown = Arc::new(photocraft_engine::mode_cmds::display_document(&doc).unwrap_or(doc));
     app.solid_fill_preview = Some(Preview { document: st.doc.id, revision: st.revision, dialog: d.id, layer, color, shown: shown.clone(), key });
     Some((shown, key))
-}
-
-/// Clean-room drawing of Photoshop's Solid Color thumbnail: an inset colour sample with the
-/// small fill marker underneath, rather than a raster thumbnail covering the whole tile.
-pub(crate) fn paint_thumbnail(ui: &egui::Ui, color: Color, rect: Rect) {
-    thumbnail_frame(ui, rect, |swatch| {
-        let [r, g, b, a] = color.to_rgba8();
-        crate::widgets::checker(ui.painter(), swatch, 3.0);
-        ui.painter().rect_filled(swatch, 0.0, Color32::from_rgba_unmultiplied(r, g, b, a));
-    });
-}
-
-/// Shared fill-layer thumbnail frame and marker, drawn around the inset contents.
-pub(crate) fn thumbnail_frame(ui: &egui::Ui, rect: Rect, contents: impl FnOnce(Rect)) {
-    let t = Tokens::get(ui.ctx());
-    let p = ui.painter();
-    p.rect_filled(rect, if t.pro { 0.0 } else { t.radius_sm }, t.field);
-    let size = rect.size() * 0.7;
-    let sample = Rect::from_center_size(rect.center() - vec2(0.0, size.y * 0.08), size);
-    let bar_height = (size.y * 0.17).max(2.0);
-    let swatch = Rect::from_min_max(sample.min, pos2(sample.right(), sample.bottom() - bar_height));
-    contents(swatch);
-    p.rect_stroke(sample, 0.0, Stroke::new(1.0, t.text), StrokeKind::Outside);
-    let y = swatch.bottom();
-    p.line_segment([pos2(sample.left(), y), pos2(sample.right(), y)], Stroke::new(1.0, t.text));
-    let x = sample.center().x;
-    p.add(egui::Shape::convex_polygon(
-        vec![pos2(x, y + 1.0), pos2(x - bar_height * 0.6, sample.bottom()), pos2(x + bar_height * 0.6, sample.bottom())],
-        t.text,
-        Stroke::NONE,
-    ));
 }
 
 #[cfg(test)]

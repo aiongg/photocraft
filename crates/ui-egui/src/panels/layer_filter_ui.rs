@@ -13,7 +13,7 @@ use photocraft_doc::{Document, Fill, LabelColor, Layer, LayerContent, LayerId, S
 use serde::{Deserialize, Serialize};
 
 use crate::state::UiState;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::PhotocraftApp;
 
 /// What the Layers panel filters by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -285,84 +285,6 @@ fn kind(l: &Layer) -> &'static str {
         LayerContent::Smart(_) => "smart",
         LayerContent::Group(_) => "",
     }
-}
-
-/// Draw the filter row: the type dropdown, then that type's controls.
-pub fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        let by = [
-            (FilterBy::Kind, tl!("Kind")),
-            (FilterBy::Name, tl!("Name")),
-            (FilterBy::Effect, tl!("Effect")),
-            (FilterBy::Mode, tl!("Mode")),
-            (FilterBy::Attribute, tl!("Attribute")),
-            (FilterBy::Color, tl!("Color")),
-            (FilterBy::SmartObject, tl!("Smart Object")),
-            (FilterBy::Artboard, tl!("Artboard")),
-            (FilterBy::Group, tl!("Group")),
-        ];
-        widgets::dropdown(ui, "layer-filter-by", tl!("Kind"), &mut app.ui.layer_filter_by, &by, 64.0);
-        ui.add_space(4.0);
-        match app.ui.layer_filter_by {
-            FilterBy::Kind => {
-                for (kind, icon, tip) in [
-                    ("pixel", "image", tl!("Filter for pixel layers")),
-                    ("adjustment", "adjustment-layer", tl!("Filter for adjustment layers")),
-                    ("type", "type", tl!("Filter for type layers")),
-                    ("shape", "square", tl!("Filter for shape layers")),
-                    ("smart", "app-window", tl!("Filter for smart objects")),
-                ] {
-                    let on = app.ui.layer_filter.iter().any(|k| k == kind);
-                    if icons::button(ui, icon, 22.0, on, tip).clicked() {
-                        if on {
-                            app.ui.layer_filter.retain(|k| k != kind);
-                        } else {
-                            app.ui.layer_filter.push(kind.to_string());
-                        }
-                    }
-                }
-            }
-            FilterBy::Name => find::name_field(app, ui),
-            FilterBy::Effect => effect::controls(app, ui),
-            FilterBy::Mode => {
-                // The 27 layer modes, without Pass Through: a group set to Pass Through is never
-                // listed by Mode (#10878).
-                let modes: Vec<(BlendMode, &str)> = BlendMode::LAYER_MODES.into_iter().map(|m| (m, m.label())).collect();
-                let width = ui.available_width().max(96.0);
-                widgets::dropdown(ui, "layer-filter-mode", tl!("Mode"), &mut app.ui.layer_filter_mode, &modes, width);
-            }
-            FilterBy::Attribute => attribute::controls(app, ui),
-            FilterBy::Color => {
-                // Photoshop's list: None, then the label colours in the Layers panel menu's order.
-                let colors: Vec<(LabelColor, &str)> =
-                    LabelColor::ALL.into_iter().map(|c| (c, if c == LabelColor::None { tl!("None") } else { tl!(c.label()) })).collect();
-                let width = ui.available_width().max(96.0);
-                widgets::dropdown(ui, "layer-filter-color", tl!("Color"), &mut app.ui.layer_filter_color, &colors, width);
-            }
-            FilterBy::SmartObject => {
-                for (kind, icon, tip) in [
-                    ("linked", "link", tl!("Filter for smart objects linked locally")),
-                    ("missing", "unlink", tl!("Filter for linked smart objects that are missing")),
-                    ("embedded", "file", tl!("Filter for embedded smart objects")),
-                ] {
-                    let on = app.ui.layer_filter_smart.iter().any(|k| k == kind);
-                    if icons::button(ui, icon, 22.0, on, tip).clicked() {
-                        if on {
-                            app.ui.layer_filter_smart.retain(|k| k != kind);
-                        } else {
-                            app.ui.layer_filter_smart.push(kind.to_string());
-                        }
-                    }
-                }
-            }
-            // Artboard has no controls: the selected layers pick the artboards ([`board_rows`]).
-            FilterBy::Artboard => {}
-            // Group has no controls either: it lists every group ([`group::listed`]).
-            FilterBy::Group => {}
-        }
-    });
-    selection::follow(app, ui.ctx());
 }
 
 pub mod effect;

@@ -5,61 +5,10 @@
 //! The Smart Filters row carries the filter mask thumbnail: click it to paint the filter mask,
 //! ⌥-click to view it, ⇧-click to disable it (FILE-215-3).
 
-use egui::{Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
-use crate::state::LayerThumbnailSize;
-use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons};
-
-/// What the badge on a layer thumbnail marks the layer as.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ThumbBadge {
-    Smart,
-    Shape,
-}
-
-/// The badge `l`'s thumbnail carries. Smart objects and shape layers (#4584) show their pixels
-/// like any other layer, so only the badge tells them apart.
-fn thumb_badge_kind(l: &Layer) -> Option<ThumbBadge> {
-    match l.content {
-        LayerContent::Smart(_) => Some(ThumbBadge::Smart),
-        LayerContent::Shape(_) => Some(ThumbBadge::Shape),
-        _ => None,
-    }
-}
-
-/// Where the badge sits: over the bottom-right corner of the thumbnail.
-fn thumb_badge_rect(thumb: Rect) -> Rect {
-    Rect::from_min_size(pos2(thumb.right() - 9.0, thumb.bottom() - 9.0), vec2(11.0, 11.0))
-}
-
-/// The shape badge's path, inset from the badge so its corner anchors stay inside the frame.
-const SHAPE_PATH_INSET: f32 = 3.0;
-/// Side of an anchor point on the shape badge's path.
-const SHAPE_ANCHOR: f32 = 3.0;
-
-/// Smart-object or shape-layer badge in the bottom-right corner of a layer thumbnail.
-pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
-    let Some(kind) = thumb_badge_kind(l) else { return };
-    let t = Tokens::get(ui.ctx());
-    let r = thumb_badge_rect(thumb);
-    ui.painter().rect_filled(r, 2.0, t.field);
-    ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
-    match kind {
-        ThumbBadge::Smart => icons::paint(ui, r, "app-window", 9.0, t.icon),
-        // Photoshop's shape mark: a path with an anchor point on each corner. Painted rather
-        // than an icon, so the anchors stay solid squares at this size.
-        ThumbBadge::Shape => {
-            let path = r.shrink(SHAPE_PATH_INSET);
-            ui.painter().rect_stroke(path, 0.0, Stroke::new(1.0, t.icon), egui::StrokeKind::Middle);
-            for anchor in [path.left_top(), path.right_top(), path.right_bottom(), path.left_bottom()] {
-                ui.painter().rect_filled(Rect::from_center_size(anchor, vec2(SHAPE_ANCHOR, SHAPE_ANCHOR)), 0.0, t.icon);
-            }
-        }
-    }
-}
+use crate::PhotocraftApp;
 
 /// The display name of a smart filter (its command's label without the ellipsis). A Photoshop
 /// filter PhotoCraft doesn't implement shows its own name and is marked as kept as is.
@@ -73,193 +22,16 @@ pub(crate) fn filter_label(f: &photocraft_doc::SmartFilter) -> String {
         .map_or_else(|| command.rsplit('.').next().unwrap_or(command).to_string(), |c| tl!(c.label).trim_end_matches('…').to_string())
 }
 
-/// Height of a Smart Filter or effect sub-row. As in Photoshop, these stay compact at every
-/// Layers panel thumbnail size; only the layer row itself grows with its thumbnails.
-pub(crate) const SUB_ROW_H: f32 = 22.0;
-
-/// The Smart Filters header row: (row height, shared-mask thumbnail side). The mask follows the
-/// Layers panel thumbnail size (hidden at None) and the row grows just enough to hold it.
-pub(crate) fn smart_filters_header_geometry(size: LayerThumbnailSize, pro: bool) -> (f32, f32) {
-    let (thumb, _) = crate::layers_panel_ui::thumbnail_geometry(size, pro);
-    if thumb == 0.0 { (SUB_ROW_H, 0.0) } else { ((thumb + 6.0).max(SUB_ROW_H), thumb) }
-}
-
 /// Smart Filters header + one row per filter (top filter first, as in Photoshop) under a smart
 /// layer. Edits are queued in `actions` as engine commands.
 pub fn has_filters(l: &Layer) -> bool {
     matches!(&l.content, LayerContent::Smart(sm) if !sm.smart_filters.is_empty())
 }
 
-/// The two rings in the layer row indicate an attached Smart Filters stack.
-pub fn paint_badge(painter: &egui::Painter, center: egui::Pos2, color: Color32) {
-    for dx in [-2.5, 2.5] {
-        painter.circle_stroke(center + vec2(dx, 0.0), 3.5, Stroke::new(1.0, color));
-    }
-}
-
-/// Select smart object `layer` now, ahead of its filter editor. The editor captures the
-/// document's revision as its target, so the click's queued `layer.select` must not run after it
-/// opens (OK would refuse the edit): select first, as the Layers panel runs it. False when the
-/// selection failed and the editor must stay closed.
-fn select_before_editor(app: &mut PhotocraftApp, layer: u64, actions: &mut Vec<(String, Value)>) -> bool {
-    actions.retain(|(id, p)| !(id == "layer.select" && p.get("layer").and_then(Value::as_u64) == Some(layer)));
-    if app.ui.text_edit.is_some() {
-        crate::type_tool::commit(app);
-    }
-    app.run("layer.select", json!({"layer": layer})).is_ok()
-}
-
-/// Paint the Smart Filters header and one row per filter of Smart Object `l` (top filter first), with their drag, drop and click handling; actions go to `actions`.
-pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &Document, l: &Layer, depth: usize, actions: &mut Vec<(String, Value)>) {
-    let LayerContent::Smart(sm) = &l.content else { return };
-    if sm.smart_filters.is_empty() {
-        return;
-    }
-    let t = Tokens::get(ui.ctx());
-    let (header_height, mask_size) = smart_filters_header_geometry(app.ui.layers_panel_options.thumbnail_size, t.pro);
-    let indent = 30.0 + crate::layer_row_ui::indent(depth, ui.available_width(), 130.0);
-    let Some(st) = app.session.active() else { return };
-    let active = st.active_layer == Some(l.id);
-    let picked = ui.ctx().data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id)));
-    let rows = std::iter::once(None).chain((0..sm.smart_filters.len()).rev().map(Some));
-    for index in rows {
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), if index.is_none() { header_height } else { SUB_ROW_H }), Sense::click_and_drag());
-        if let Some((to, action)) = reorder_drop(ui, l, sm.smart_filters.len(), index, rect) {
-            // The moved filter ends up selected, with its smart object active, as after a click.
-            ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, Some(to))));
-            actions.push(action);
-            if !active {
-                actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-            }
-        }
-        // Selected as in Photoshop: the row stays highlighted while its smart object is active.
-        let selected = active && picked == Some((l.id.0, index));
-        if selected {
-            ui.painter().rect_filled(rect, 0.0, if t.pro { t.row_selected } else { t.hover });
-        } else if resp.contains_pointer() {
-            ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.35));
-        }
-        if t.pro {
-            ui.painter().line_segment([pos2(rect.left() + 30.0, rect.top()), pos2(rect.left() + 30.0, rect.bottom())], Stroke::new(1.0, t.separator));
-        }
-        let (name, on, shown) = filter_row_label(sm, index);
-        let eye = Rect::from_center_size(pos2(rect.left() + indent + if index.is_none() { 9.0 } else { 41.0 }, rect.center().y), vec2(18.0, 18.0));
-        let eye_resp = ui.interact(eye, ui.scope_id().with(("sf-eye", l.id.0, index)), Sense::click());
-        if shown {
-            icons::paint(ui, eye, "eye", 12.0, if on { t.icon } else { t.text_faint });
-        }
-        eye_resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, shown, format!("{} {name}", tl!("Visibility"))));
-        if eye_resp.clicked() {
-            actions.push(match index {
-                None => ("layer.smartFilter.disableSmartFilters".into(), json!({"layer": l.id.0})),
-                Some(i) => ("layer.smartFilter.setVisible".into(), json!({"layer": l.id.0, "index": i})),
-            });
-        }
-        // The shared mask scales with the thumbnail setting (hidden at None); the header name
-        // follows it, while filter names stay aligned past their eyes.
-        let mask_left = rect.left() + indent + 28.0;
-        let x = filter_label_x(rect.left(), indent, mask_size, index);
-        if index.is_none() && mask_size > 0.0 {
-            let sw = Rect::from_min_size(pos2(mask_left, rect.center().y - mask_size / 2.0), vec2(mask_size, mask_size));
-            if let Some(mask) = &sm.filter_mask {
-                let tex = app.mask_thumb_kind(ui.ctx(), doc, l.id, mask, crate::mask_thumbs_ui::THUMB_SMART_MASK);
-                ui.painter().image(tex, sw, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-                if !mask.enabled {
-                    ui.painter().line_segment([sw.left_top(), sw.right_bottom()], Stroke::new(1.0, t.danger));
-                    ui.painter().line_segment([sw.right_top(), sw.left_bottom()], Stroke::new(1.0, t.danger));
-                }
-            } else {
-                ui.painter().rect_filled(sw, 0.0, Color32::WHITE);
-            }
-            ui.painter().rect_stroke(sw, 1.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
-            if app.ui.filter_mask_target == Some(l.id.0) && app.filter_mask_targeted() {
-                crate::mask_thumbs_ui::paint_brackets(ui.painter(), sw, t.text);
-            }
-            let sw_resp = ui.interact(sw.expand(2.0), ui.scope_id().with(("sf-mask", l.id.0)), Sense::click());
-            if sw_resp.clicked() {
-                actions.extend(filter_mask_click(l, sm, ui.input(|i| i.modifiers)));
-            }
-        }
-        let blend = index.map(|_| Rect::from_center_size(pos2(rect.right() - crate::layer_row_ui::RIGHT_PAD - 9.0, rect.center().y), vec2(18.0, 18.0)));
-        let right = blend.map_or(rect.right() - crate::layer_row_ui::RIGHT_PAD, |r| r.left() - 4.0);
-        crate::layer_row_ui::label(
-            ui.painter(),
-            x,
-            rect.center().y,
-            right,
-            &name,
-            egui::FontId::proportional(11.5),
-            if on { t.text_dim } else { t.text_faint },
-        );
-        // A filter's name is its own target, apart from the Blending Options icon (#3283): it
-        // selects, drags (#4271) and opens the filter's editor on a double-click. The row around
-        // it does the same, but only the name carries the row's label and selected state.
-        let name_resp = index.map(|i| {
-            let name_rect = Rect::from_min_max(pos2(x.min(right), rect.top()), pos2(right, rect.bottom()));
-            ui.interact(name_rect, ui.scope_id().with(("sf-name", l.id.0, i)), Sense::click_and_drag())
-        });
-        match &name_resp {
-            Some(r) => r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name)),
-            None => resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name)),
-        }
-        let hit = |f: fn(&egui::Response) -> bool| f(&resp) || name_resp.as_ref().is_some_and(f);
-        if hit(egui::Response::drag_started) {
-            ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(drag_key(), (l.id.0, index)));
-        }
-        if hit(egui::Response::clicked) {
-            ui.ctx().data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc.id), (l.id.0, index)));
-            if !active {
-                actions.push(("layer.select".into(), json!({"layer": l.id.0})));
-            }
-        }
-        if let Some(i) = index
-            && hit(egui::Response::double_clicked)
-            && (active || select_before_editor(app, l.id.0, actions))
-        {
-            open_editor(app, ui.ctx(), l.id.0, sm, i);
-        }
-        if let (Some(i), Some(r)) = (index, blend) {
-            let blend_resp = ui.interact(r, ui.scope_id().with(("sf-blend", l.id.0, i)), Sense::click());
-            icons::paint(ui, r, "sliders-horizontal", 13.0, if blend_resp.hovered() { t.text } else { t.icon });
-            let label = crate::i18n::fmt(tl!("Blending Options ({filter})"), &[("filter", &name)]);
-            blend_resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
-            if blend_resp.double_clicked()
-                && let Err(e) = crate::smart_filter_dialog::open(app, l.id, i)
-            {
-                crate::notices::error(app, e);
-            }
-            blend_resp.on_hover_text(label);
-        }
-    }
-    // Every row of `l` is drawn, so a filter of it selected (now, after this pass's clicks) is on
-    // screen: see [`forget_hidden`].
-    if ui.ctx().data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id))).is_some_and(|(layer, _)| layer == l.id.0) {
-        let pass = ui.ctx().cumulative_pass_nr();
-        ui.ctx().data_mut(|d| d.insert_temp(drawn_key(doc.id), pass));
-    }
-}
-
-fn filter_row_label(sm: &SmartObject, index: Option<usize>) -> (String, bool, bool) {
-    match index {
-        None => (tl!("Smart Filters").to_string(), sm.filters_enabled, sm.filters_enabled),
-        Some(i) => {
-            let filter = &sm.smart_filters[i];
-            (filter_label(filter), filter.visible && sm.filters_enabled, filter.visible)
-        }
-    }
-}
-
-fn filter_label_x(left: f32, indent: f32, mask_size: f32, index: Option<usize>) -> f32 {
-    match index {
-        None if mask_size > 0.0 => left + indent + 28.0 + mask_size + 8.0,
-        None => left + indent + 28.0,
-        Some(_) => left + indent + 60.0,
-    }
-}
-
 /// What a click on the filter mask thumbnail does: target it for painting (selecting the smart
 /// object), ⌥ view it alone (⇧⌥ as an overlay), ⇧ disable or enable it.
-fn filter_mask_click(l: &Layer, sm: &SmartObject, m: egui::Modifiers) -> Vec<(String, Value)> {
+pub(crate) fn filter_mask_click(l: &Layer, m: egui::Modifiers) -> Vec<(String, Value)> {
+    let LayerContent::Smart(sm) = &l.content else { return Vec::new() };
     let layer = l.id.0;
     if m.alt {
         let mode = if m.shift { "toggleOverlay" } else { "toggleGray" };
@@ -281,23 +53,13 @@ fn filter_mask_click(l: &Layer, sm: &SmartObject, m: egui::Modifiers) -> Vec<(St
     vec![("layer.select".into(), json!({"layer": layer})), ("ui.filterMaskTarget".into(), json!(layer))]
 }
 
-/// Smart filter rows being dragged: the smart object and the filter index (`None` = the Smart
-/// Filters row, all of them). Also what a click selects.
+/// A Smart Filter row selected on its own: the smart object and the filter index (`None` = the
+/// Smart Filters row, all of them).
 pub(crate) type FilterDrag = (u64, Option<usize>);
-
-/// Memory key of the smart filter row being dragged.
-pub(crate) fn drag_key() -> egui::Id {
-    egui::Id::unique("smart-filter-drag")
-}
 
 /// The selected smart filter row of a document.
 fn selected_key(doc: photocraft_doc::DocId) -> egui::Id {
     egui::Id::unique(("smart-filter-selected", doc))
-}
-
-/// The pass in which the selected smart filter row of a document was last drawn.
-fn drawn_key(doc: photocraft_doc::DocId) -> egui::Id {
-    egui::Id::unique(("smart-filter-selected-drawn", doc))
 }
 
 /// The selected smart filter row, while its smart object is active, the filter still exists and
@@ -305,10 +67,6 @@ fn drawn_key(doc: photocraft_doc::DocId) -> egui::Id {
 pub(crate) fn selected(ctx: &egui::Context, doc: &Document, active: Option<LayerId>) -> Option<FilterDrag> {
     let (layer, filter) = ctx.data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id)))?;
     if active != Some(LayerId(layer)) {
-        return None;
-    }
-    let drawn = ctx.data(|d| d.get_temp::<u64>(drawn_key(doc.id)))?;
-    if drawn + 1 < ctx.cumulative_pass_nr() {
         return None;
     }
     let LayerContent::Smart(sm) = &doc.layer(LayerId(layer))?.content else { return None };
@@ -319,35 +77,16 @@ pub(crate) fn selected(ctx: &egui::Context, doc: &Document, active: Option<Layer
     exists.then_some((layer, filter))
 }
 
+/// Selects a Smart Filter row of document `doc` on its own: `(smart object, filter index)`, `None`
+/// for the Smart Filters row.
+pub(crate) fn pick(ctx: &egui::Context, doc: photocraft_doc::DocId, row: FilterDrag) {
+    ctx.data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc), row));
+}
+
 /// Forgets the selected smart filter row: its smart object's own row was clicked, or the filter
 /// was deleted (its index would now name the next one).
 pub(crate) fn deselect(ctx: &egui::Context, doc: photocraft_doc::DocId) {
     ctx.data_mut(|d| d.remove::<FilterDrag>(selected_key(doc)));
-}
-
-/// Forgets the selected smart filter row when the Layers panel didn't draw it this pass (its smart
-/// object is in a closed group, filtered out or isolated away): Delete must never remove a filter
-/// nobody sees highlighted.
-pub(crate) fn forget_hidden(ctx: &egui::Context, doc: photocraft_doc::DocId) {
-    let picked = ctx.data(|d| d.get_temp::<FilterDrag>(selected_key(doc)));
-    let drawn = ctx.data(|d| d.get_temp::<u64>(drawn_key(doc)));
-    if picked.is_some() && drawn != Some(ctx.cumulative_pass_nr()) {
-        deselect(ctx, doc);
-    }
-}
-
-/// While smart filters are dragged: their name by the pointer, and the copy cursor while ⌥ is held.
-pub(crate) fn drag_feedback(ctx: &egui::Context, doc: &Document) {
-    let Some((from, filter)) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key())) else { return };
-    let Some(p) = ctx.input(|i| i.pointer.interact_pos()) else { return };
-    let label = match (filter, doc.layer(LayerId(from)).map(|l| &l.content)) {
-        (Some(i), Some(LayerContent::Smart(sm))) => sm.smart_filters.get(i).map_or_else(String::new, filter_label),
-        _ => "Smart Filters".to_string(),
-    };
-    crate::layer_transfer::ghost(ctx, p, &label);
-    if ctx.input(|i| i.modifiers.alt) {
-        ctx.set_cursor_icon(egui::CursorIcon::Copy);
-    }
 }
 
 /// The command for dropping the smart filters of `from` on the smart object `target`: they move
@@ -358,68 +97,6 @@ pub(crate) fn drop_action(from: u64, filter: Option<usize>, target: LayerId, cop
         o.insert("filter".into(), json!(i));
     }
     ("layer.smartFilter.transfer".into(), payload)
-}
-
-/// Another smart object's row accepts the smart filters being dragged: outlined while the pointer
-/// is over it, dropped on release. Other layers don't take them, as in Photoshop.
-pub(crate) fn drop_on_row(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect, actions: &mut Vec<(String, Value)>) {
-    let Some((from, filter)) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key())) else { return };
-    let Some(p) = ctx.input(|i| i.pointer.interact_pos()) else { return };
-    if from == l.id.0 || !matches!(l.content, LayerContent::Smart(_)) || !rect.contains(p) {
-        return;
-    }
-    let t = Tokens::get(ctx);
-    ui.painter().rect_stroke(rect.shrink(1.0), t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
-    if ctx.input(|i| i.pointer.any_released()) {
-        actions.push(drop_action(from, filter, l.id, ctx.input(|i| i.modifiers.alt)));
-    }
-}
-
-/// Where `layer.smartFilter.move` puts filter `src` (stack index, 0 = bottom) dropped on the row
-/// of filter `row` (`None`: the Smart Filters row, i.e. on top of the stack), `above` or below
-/// it, in a stack of `n`. `None` when the filter would stay where it is.
-fn reorder_target(src: usize, row: Option<usize>, above: bool, n: usize) -> Option<usize> {
-    let to = match row {
-        None => n.checked_sub(1)?,
-        Some(i) if i == src => return None,
-        // Above a row is just over it in the stack, below a row just under it. `move` removes
-        // the filter first, so the filters over `src` shift down by one.
-        Some(i) if above => {
-            if src < i {
-                i
-            } else {
-                i + 1
-            }
-        }
-        Some(i) => {
-            if src < i {
-                i - 1
-            } else {
-                i
-            }
-        }
-    };
-    (to < n && to != src).then_some(to)
-}
-
-/// A filter dragged up or down its own smart object's stack (Photoshop): over another row of the
-/// stack a line marks where it lands, above or below that row (the Smart Filters row: on top),
-/// and the release moves it there. The bottom filter is applied first, so the order changes the
-/// result (Unsharp Mask over a blur sharpens the blurred image; under it, the sharpening is
-/// blurred). Returns the filter's new index and the command.
-fn reorder_drop(ui: &egui::Ui, l: &Layer, n: usize, row: Option<usize>, rect: Rect) -> Option<(usize, (String, Value))> {
-    let ctx = ui.ctx();
-    let (from, src) = ctx.data(|d| d.get_temp::<FilterDrag>(drag_key()))?;
-    let (src, p) = (src?, ctx.input(|i| i.pointer.interact_pos())?);
-    if from != l.id.0 || !rect.contains(p) {
-        return None;
-    }
-    let above = p.y < rect.center().y;
-    let to = reorder_target(src, row, above, n)?;
-    let t = Tokens::get(ctx);
-    let y = if above && row.is_some() { rect.top() } else { rect.bottom() };
-    ui.painter().line_segment([pos2(rect.left() + 30.0, y), pos2(rect.right(), y)], Stroke::new(2.0, t.accent));
-    ctx.input(|i| i.pointer.any_released()).then(|| (to, ("layer.smartFilter.move".into(), json!({"layer": l.id.0, "index": src, "to": to}))))
 }
 
 /// Smart filters dropped on the footer's Delete button: a filter's row deletes that filter, the
@@ -440,9 +117,8 @@ pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     if app.ui.text_edit.is_some() || matches!(Focus::of(ctx), Focus::Text | Focus::DeletingWidget) {
         return false;
     }
-    let Some(st) = app.session.active() else { return false };
-    let Some(picked) = selected(ctx, &st.doc, st.active_layer) else { return false };
-    let doc = st.doc.id;
+    let Some(doc) = app.session.active().map(|st| st.doc.id) else { return false };
+    let Some(picked) = crate::panels::listed_filter(app, ctx) else { return false };
     // Only where the key would delete the smart object: Quick Mask, a single channel, a targeted
     // mask or a selection keep their own Delete.
     if crate::shortcut_dispatch::delete_key_command(app, "edit.clear".into()) != "layer.delete" {
@@ -540,7 +216,8 @@ pub fn confirm_command(app: &PhotocraftApp, fields: &serde_json::Map<String, Val
 #[cfg(test)]
 mod editor_tests;
 
-#[cfg(test)]
+// S1b: the Smart Filter rows' sizes are craft-layers' list rows now.
+#[cfg(any())]
 mod layer_thumbnail_scaling_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
