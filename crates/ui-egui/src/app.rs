@@ -29,8 +29,6 @@ mod window;
 pub(crate) use files::remember_new_document;
 pub(crate) use input::read_dropped;
 pub(crate) use targets::adjustment_layer_active;
-#[cfg(test)]
-pub(crate) use thumbs::layer_thumb_frame;
 pub use thumbs::surface_fingerprint;
 pub(crate) use thumbs::layer_thumb_frame;
 

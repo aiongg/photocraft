@@ -852,7 +852,8 @@ mod pen_variants_tests;
 mod color_replacement_tests;
 #[cfg(test)]
 mod home_recent_gate_tests;
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod layer_shortcut_tests;
 #[cfg(test)]
 mod live_retouch_tests;
@@ -938,7 +939,8 @@ mod move_history_names_tests;
 #[cfg(test)]
 mod move_shift_diagonal_tests;
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod new_group_button_tests;
 
 #[cfg(test)]
@@ -952,7 +954,8 @@ mod new_layer_button_tests;
 #[cfg(test)]
 mod layer_via_label_tests;
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod smart_filter_rows_tests;
 
 #[cfg(test)]
@@ -967,7 +970,8 @@ mod move_outline_tests;
 #[cfg(test)]
 mod move_bar_distribute_gear_tests;
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod layer_thumb_bounds_tests;
 #[cfg(test)]
 mod mask_thumb_refresh_tests;

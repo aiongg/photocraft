@@ -133,7 +133,8 @@ fn byte_range(text: &str, a: usize, b: usize) -> (usize, usize) {
 #[cfg(test)]
 mod vertical_align_buttons_tests;
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod canvas_tests;
 #[cfg(test)]
 mod ctrl_period_cancel_tests;

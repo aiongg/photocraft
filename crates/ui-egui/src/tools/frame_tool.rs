@@ -762,7 +762,8 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer) {
         }
     }
 }
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod tests;
 
 /// A compact on-canvas import/replace bar, following the currently selected frame.

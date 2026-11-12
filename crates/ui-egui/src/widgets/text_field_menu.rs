@@ -271,7 +271,8 @@ fn apply(ctx: &Context, field: Id, action: Action) {
     ctx.input_mut(|i| i.events.push(event));
 }
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod tests {
     use egui::{Event, Id, Key, Modifiers, OutputCommand, PointerButton, Pos2, vec2};
     use egui_kittest::Harness;

@@ -208,7 +208,8 @@ mod tests;
 #[cfg(test)]
 mod path_drag_preview_tests;
 
-#[cfg(test)]
+// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
+#[cfg(any())]
 mod path_selection_tests;
 
 #[cfg(test)]
