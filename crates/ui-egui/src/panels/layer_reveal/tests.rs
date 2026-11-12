@@ -61,32 +61,35 @@ fn in_view(h: &Harness<'static, PhotocraftApp>, r: Rect) -> bool {
     r.top() >= layers.top() + 26.0 && r.bottom() <= layers.bottom() - (crate::widgets::FOOTER_BAR + 1.0)
 }
 
+/// The row of `name` is drawn and in view: the list draws only the rows in view, so a row out of
+/// view has no node.
+fn shown(h: &Harness<'static, PhotocraftApp>, name: &str) -> bool {
+    row(h, name).is_some_and(|r| in_view(h, r))
+}
+
 fn expanded(app: &PhotocraftApp, group: LayerId) -> bool {
     matches!(&app.session.active().unwrap().doc.layer(group).unwrap().content, photocraft_doc::LayerContent::Group(g) if g.expanded)
 }
 
-// Fails until craft-layers scrolls a new active layer into view.
 #[test]
 fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
     for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
         let (app, inner, group, top, below_top) = tall_doc();
         let mut h = harness(app, theme);
-        let top_row = row(&h, "Stack 29").expect("top row drawn");
-        assert!(in_view(&h, top_row), "{theme:?}: the panel starts at the top");
+        assert!(shown(&h, "Stack 29"), "{theme:?}: the panel starts at the top");
         assert!(row(&h, "Deep inside").is_none(), "{theme:?}: hidden in its closed group");
 
         // Select › layer, Auto-Select, automation: all end in a new active layer.
         h.state_mut().run("layer.select", json!({"layer": inner.0})).unwrap();
         h.run_steps(4);
         assert!(expanded(h.state(), group), "{theme:?}: the parent group opened");
-        let r = row(&h, "Deep inside").expect("row listed once its group is open");
-        assert!(in_view(&h, r), "{theme:?}: scrolled into view: {r:?}");
-        assert!(!in_view(&h, row(&h, "Stack 29").unwrap()), "{theme:?}: the top scrolled away");
+        assert!(shown(&h, "Deep inside"), "{theme:?}: scrolled into view");
+        assert!(!shown(&h, "Stack 29"), "{theme:?}: the top scrolled away");
 
         // Back to the top layer: scrolls back up.
         h.state_mut().run("layer.select", json!({"layer": top.0})).unwrap();
         h.run_steps(4);
-        assert!(in_view(&h, row(&h, "Stack 29").unwrap()), "{theme:?}: scrolled back to the top");
+        assert!(shown(&h, "Stack 29"), "{theme:?}: scrolled back to the top");
 
         // A layer already in view doesn't move the list.
         let before = row(&h, "Stack 29").unwrap();
@@ -111,11 +114,11 @@ fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
         h.run_steps(4);
         h.state_mut().run("layer.select", json!({"layer": top.0})).unwrap();
         h.run_steps(4);
-        assert!(!in_view(&h, row(&h, "Deep inside").unwrap()));
+        assert!(!shown(&h, "Deep inside"));
         h.state_mut().run("edit.undo", json!({})).unwrap();
         h.run_steps(4);
         assert_eq!(h.state().session.active().unwrap().active_layer, Some(inner), "{theme:?}: undo made the inner layer active");
-        assert!(in_view(&h, row(&h, "Deep inside").unwrap()), "{theme:?}: undo revealed it");
+        assert!(shown(&h, "Deep inside"), "{theme:?}: undo revealed it");
     }
 }
 
@@ -137,7 +140,6 @@ fn reveal_survives_odd_documents() {
     h.run_steps(3);
 }
 
-// Fails until craft-layers keeps the list's scroll position per document.
 #[test]
 fn layers_scroll_position_survives_document_switches() {
     for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
