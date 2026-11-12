@@ -418,7 +418,6 @@ impl LayerTree for PhotoLayers<'_> {
                 }
                 let mut header = SubRow::new(tl!("Effects"));
                 header.on = l.effects.enabled;
-                header.icon = Some(IconId::new("sparkles"));
                 let items = l
                     .effects
                     .items
