@@ -281,7 +281,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| size_readout::show(ui, size_source.as_ref(), quality, format));
         });
     });
-    cancel |= modal.should_close();
+    cancel |= crate::window_keys::modal_should_close(ctx, &modal);
     p.quality = quality.min(MAX_QUALITY);
     p.format = format;
     // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.

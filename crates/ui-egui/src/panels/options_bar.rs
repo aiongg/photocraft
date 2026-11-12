@@ -708,7 +708,7 @@ fn crop_fill_help(ui: &mut egui::Ui) {
             close = true;
         }
     });
-    close |= modal.should_close();
+    close |= crate::window_keys::modal_should_close(ui.ctx(), &modal);
     if close {
         ui.data_mut(|d| d.insert_temp(help_id, false));
     }

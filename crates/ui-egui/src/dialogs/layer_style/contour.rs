@@ -488,7 +488,7 @@ pub(super) fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Str
     if let Some(name) = preset {
         set_param(f, &effect, &key, json!(name));
     }
-    if close.is_none() && modal.should_close() {
+    if close.is_none() && crate::window_keys::modal_should_close(&ctx, &modal) {
         close = Some(false);
     }
     if close.is_none() && naming.is_none() && !commit_name && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {

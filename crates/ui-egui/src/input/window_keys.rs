@@ -65,3 +65,9 @@ pub fn escape_this_pass(ctx: &Context) -> bool {
 pub fn escape_pressed(ctx: &Context) -> bool {
     ctx.input(|i| i.key_pressed(Key::Escape)) || window_cancel(ctx, Modifiers::NONE, false)
 }
+
+/// `egui::ModalResponse::should_close` with the window's Escape: egui's own check never sees an
+/// Escape the runtime took.
+pub fn modal_should_close<T>(ctx: &Context, modal: &egui::ModalResponse<T>) -> bool {
+    modal.should_close() || (modal.is_top_modal && !modal.any_popup_open && take_escape(ctx))
+}

@@ -75,7 +75,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             cancel = crate::widgets::secondary_button(ui, tl!("Cancel"), 84.0).clicked();
         });
     });
-    cancel |= modal.should_close();
+    cancel |= crate::window_keys::modal_should_close(ctx, &modal);
     p.bits = bits;
     // A focused button takes Enter as its click without consuming the key: Enter on Cancel cancels.
     if ok || (!cancel && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))) {

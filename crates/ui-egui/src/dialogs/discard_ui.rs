@@ -377,7 +377,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
         });
     });
-    if modal.should_close() {
+    if crate::window_keys::modal_should_close(ctx, &modal) {
         answer = Some(Answer::Cancel);
     }
     // Enter takes the default answer, unless Tab focused a button: that one took the Enter as a click.
