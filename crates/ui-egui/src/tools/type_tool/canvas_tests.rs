@@ -3029,7 +3029,9 @@ fn type_mask_shift_and_alt_replace_without_a_layer_row() {
         tool_event(app, ToolEvent::Up { x: 200.0, y: 300.0 }, Modifiers::NONE);
         super::insert(app, "I");
         let doc = app.session.active().unwrap().doc.clone();
-        let rows = crate::layer_tree_ui::panel_rows(app, &doc);
+        let st = app.session.active().unwrap();
+        let tree = crate::panels::layers_tree::PhotoLayers::new(app, st, &Default::default(), false, None);
+        let rows = craft::layers::ui::tree::LayerTree::children(&tree, None);
         assert_eq!(rows.len(), doc.layers.len() - 1, "the working text is not listed");
         tool_event(app, ToolEvent::Down { x: 1500.0, y: 800.0, pressure: 1.0 }, m);
         tool_event(app, ToolEvent::Up { x: 1500.0, y: 800.0 }, m);

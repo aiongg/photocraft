@@ -178,6 +178,5 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     Some((shown, key))
 }
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod tests;

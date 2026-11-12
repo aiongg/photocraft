@@ -43,7 +43,7 @@ pub(super) mod layer_transfer;
 mod layers;
 mod layers_events;
 pub mod layers_panel_ui;
-mod layers_tree;
+pub(crate) mod layers_tree;
 pub(super) mod mask_props_ui;
 pub mod mask_thumbs_ui;
 mod navigator;

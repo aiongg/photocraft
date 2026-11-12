@@ -271,8 +271,7 @@ fn apply(ctx: &Context, field: Id, action: Action) {
     ctx.input_mut(|i| i.events.push(event));
 }
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod tests {
     use egui::{Event, Id, Key, Modifiers, OutputCommand, PointerButton, Pos2, vec2};
     use egui_kittest::Harness;
@@ -281,7 +280,8 @@ mod tests {
 
     use super::open_on;
     use crate::PhotocraftApp;
-    use crate::layer_row_ui::{rename, start_rename};
+    use egui_kittest::kittest::by;
+    use photocraft_doc::LayerId;
 
     /// The app with a layer "Alpha" being renamed (its name selected, as a rename starts) and the
     /// Rectangular Marquee, whose canvas has a context menu of its own.
@@ -295,10 +295,10 @@ mod tests {
         });
         h.state_mut().ui.tool = crate::state::Tool::RectMarquee;
         h.run_steps(8);
-        let ctx = h.ctx.clone();
-        assert!(start_rename(&ctx, layer, "Alpha").is_none());
+        h.state_mut().layers_rename = Some(LayerId(layer));
         h.run_steps(4);
-        (h, Id::unique(("layer-rename-field", layer)))
+        let field = h.ctx.memory(|m| m.focused()).expect("the rename field has the focus");
+        (h, field)
     }
 
     fn button(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, button: PointerButton) {
@@ -342,8 +342,9 @@ mod tests {
         copied
     }
 
+    /// The text of the focused field: the rename's.
     fn text(h: &Harness<'_, PhotocraftApp>) -> String {
-        rename(&h.ctx).expect("still renaming").text
+        h.query(by().predicate(|n| n.is_focused())).and_then(|n| n.value()).expect("still renaming")
     }
 
     #[test]

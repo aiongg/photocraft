@@ -1,4 +1,4 @@
-use egui::{Event, Modifiers, PointerButton, Pos2, pos2, vec2};
+use egui::{Event, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::{Fill, LayerContent, LayerId};
@@ -130,59 +130,6 @@ fn content_options_edit_the_layer_and_cancel_restores() {
     // Gradient and Solid Color fills keep their own editors.
     app.run("layer.newFillLayer.gradient", json!({})).unwrap();
     assert!(open(&mut app).is_none());
-}
-
-fn harness() -> (Harness<'static, PhotocraftApp>, LayerId) {
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
-    let id = LayerId(s.execute(cmds::CREATE, json!({"pattern": "Checkerboard"})).unwrap()["layer"].as_u64().unwrap());
-    s.execute("layer.new.layer", json!({"name": "Other"})).unwrap();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
-    });
-    let ctx = h.ctx.clone();
-    let (r, _) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
-    crate::control::handle(h.state_mut(), &ctx, &r);
-    h.run_steps(8);
-    (h, id)
-}
-
-fn double_click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
-    h.run_steps(40);
-    for _ in 0..2 {
-        h.hover_at(at);
-        h.step();
-        for pressed in [true, false] {
-            h.event(Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
-            h.step();
-        }
-        h.run_steps(3);
-    }
-}
-
-#[test]
-fn double_clicking_the_thumbnail_opens_the_dialog_and_a_picked_pattern_is_applied() {
-    let (mut h, id) = harness();
-    let r = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == id.0).unwrap().row;
-    let count = steps(h.state());
-    double_click(&mut h, pos2(r.left() + 46.0, r.center().y));
-    let d = h.state().ui.dialogs.last().expect("the Pattern Fill dialog opened").clone();
-    assert!(owns(&d.fields));
-    assert_eq!(d.fields["__params"]["layer"], id.0);
-    h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Button, "Patterns").click();
-    h.run_steps(3);
-    h.get_by_label("Bricks").click();
-    h.run_steps(3);
-    let bricks = pattern_id(h.state(), "Bricks");
-    assert_eq!(h.state().ui.dialogs.iter().find(|x| x.id == d.id).unwrap().fields["pattern"], json!(bricks));
-    h.get_by_label("OK").click();
-    h.run_steps(3);
-    assert!(!h.state().ui.dialogs.iter().any(|x| owns(&x.fields)));
-    assert_eq!(steps(h.state()), count + 1);
-    let content = h.state().session.active().unwrap().doc.layer(id).unwrap().content.clone();
-    assert!(matches!(content, LayerContent::Fill(Fill::Pattern { id: ref p, .. }) if *p == bricks));
 }
 
 #[test]

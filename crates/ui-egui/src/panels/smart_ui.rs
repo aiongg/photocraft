@@ -213,8 +213,7 @@ pub fn confirm_command(app: &PhotocraftApp, fields: &serde_json::Map<String, Val
     Ok((command, params))
 }
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod editor_tests;
 
 // S1b: the Smart Filter rows' sizes are craft-layers' list rows now.

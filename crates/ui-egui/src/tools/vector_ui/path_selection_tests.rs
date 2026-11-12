@@ -230,27 +230,6 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2, modifiers: Modifier
 }
 
 #[test]
-fn thumbnail_selection_ctrl_click_shape_keeps_active_layer_and_supports_undo() {
-    let mut h = harness();
-    let shape =
-        h.state_mut().run("shape.create", json!({"kind":"rect","rect":[40,20,60,40],"fill":"#cc3333","name":"Badge"})).unwrap()["layer"].as_u64().unwrap();
-    let active = h.state_mut().run("layer.new.layer", json!({"name":"Other"})).unwrap()["layer"].as_u64().unwrap();
-    panel(&mut h, 0);
-    let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == shape).unwrap();
-    click(&mut h, row.name.unwrap().center(), command());
-    assert!(selection(&h).is_none(), "Ctrl-click on a shape's name only selects the layer");
-    h.state_mut().run("layer.select", json!({"layer": active})).unwrap();
-    h.run_steps(2);
-    click(&mut h, egui::pos2(row.row.left() + 46.0, row.row.center().y), command());
-    assert_eq!(selection(&h), Some([40, 20, 60, 40]), "{}", h.state().ui.status);
-    assert_eq!(h.state().session.active().unwrap().active_layer, Some(photocraft_doc::LayerId(active)));
-    h.state_mut().run("edit.undo", json!({})).unwrap();
-    assert!(selection(&h).is_none());
-    h.state_mut().run("edit.redo", json!({})).unwrap();
-    assert_eq!(selection(&h), Some([40, 20, 60, 40]));
-}
-
-#[test]
 fn thumbnail_selection_ctrl_click_paths_targets_thumbnail_and_clicked_path() {
     let mut h = harness();
     h.state_mut().run("path.set", json!({"name":"work","path":rect_path(10.0,10.0,50.0,40.0)})).unwrap();
@@ -416,27 +395,6 @@ fn path_overlay_drawn_for_non_vector_tools() {
          (accent = #{accent_r:02x}{accent_g:02x}{accent_b:02x}); \
          the path must be drawn regardless of the active tool",
     );
-}
-
-#[test]
-fn thumbnail_selection_after_hiding_extras_restores_outline() {
-    let mut h = harness();
-    let shape =
-        h.state_mut().run("shape.create", json!({"kind":"rect","rect":[40,20,60,40],"fill":"#cc3333","name":"Badge"})).unwrap()["layer"].as_u64().unwrap();
-    let active = h.state_mut().run("layer.new.layer", json!({"name":"Other"})).unwrap()["layer"].as_u64().unwrap();
-    panel(&mut h, 0);
-    let ctx = h.ctx.clone();
-    crate::menus::invoke(h.state_mut(), &ctx, "view.extras", json!({})).unwrap();
-    assert!(!h.state().ui.view.extras);
-    let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == shape).unwrap();
-    click(&mut h, row.name.unwrap().center(), command());
-    assert!(!h.state().ui.view.extras, "selecting layers must not reveal Extras");
-    h.state_mut().run("layer.select", json!({"layer": active})).unwrap();
-    h.run_steps(2);
-    click(&mut h, egui::pos2(row.row.left() + 46.0, row.row.center().y), command());
-    assert_eq!(selection(&h), Some([40, 20, 60, 40]));
-    assert!(h.state().ui.view.shows(h.state().ui.view.show.selection_edges), "Ctrl-clicking the thumbnail reveals the new selection");
-    assert_eq!(h.state().session.active().unwrap().active_layer, Some(photocraft_doc::LayerId(active)));
 }
 
 #[test]

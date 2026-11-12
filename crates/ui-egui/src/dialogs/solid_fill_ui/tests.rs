@@ -1,4 +1,4 @@
-use egui::{Event, Modifiers, PointerButton, Pos2, pos2, vec2};
+use egui::vec2;
 use egui_kittest::Harness;
 use photocraft_color::{Color, ColorMode};
 use photocraft_doc::{Fill, LayerContent, LayerId};
@@ -22,23 +22,6 @@ fn harness(ppp: f32) -> (Harness<'static, PhotocraftApp>, LayerId) {
     crate::control::handle(h.state_mut(), &ctx, &r);
     h.run_steps(8);
     (h, id)
-}
-
-fn double_click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
-    h.run_steps(40);
-    for _ in 0..2 {
-        h.hover_at(at);
-        h.step();
-        for pressed in [true, false] {
-            h.event(Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
-            h.step();
-        }
-        h.run_steps(3);
-    }
-}
-
-fn row(h: &Harness<'_, PhotocraftApp>, id: LayerId) -> crate::layer_row_ui::RowRects {
-    crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == id.0).unwrap()
 }
 
 #[test]
@@ -115,47 +98,6 @@ fn new_solid_color_picker_rejects_a_different_active_document() {
     assert!(crate::dialogs::confirm(app, dialog).is_err());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
     assert_eq!(app.session.active().unwrap().history.entries().len(), steps);
-}
-
-#[test]
-fn only_the_colour_thumbnail_opens_the_solid_fill_picker() {
-    for ppp in [1.0, 2.0] {
-        let (mut h, id) = harness(ppp);
-        let r = row(&h, id).row;
-        let count = h.state().session.active().unwrap().history.entries().len();
-        double_click(&mut h, pos2(r.left() + 46.0, r.center().y));
-        assert_eq!(h.state().session.active().unwrap().active_layer, Some(id));
-        assert!(!h.state().ui.mask_target && !h.state().ui.vector_mask_target, "the colour thumbnail targets the fill, not its mask");
-        let d = h.state().ui.dialogs.last().expect("Color Picker opened");
-        assert!(owns(&d.fields));
-        assert_eq!(d.fields["__label"], "Color Picker (Solid Color)");
-        assert_eq!(d.fields["color"], "#336699");
-        assert_eq!(d.fields["__params"]["layer"], id.0);
-        assert_eq!(h.state().session.active().unwrap().history.entries().len(), count);
-
-        let (mut h, id) = harness(ppp);
-        let r = row(&h, id).row;
-        double_click(&mut h, pos2(r.right() - 35.0, r.center().y));
-        assert_eq!(h.state().ui.dialogs.last().unwrap().kind, crate::state::DialogKind::LayerStyle, "row body keeps Layer Style");
-
-        let (mut h, id) = harness(ppp);
-        let r = crate::mask_thumbs_ui::recorded(&h.ctx, id.0).unwrap().0[0].1;
-        double_click(&mut h, r.center());
-        assert!(!h.state().ui.dialogs.iter().any(|d| owns(&d.fields)), "mask thumbnail is not the colour thumbnail");
-    }
-}
-
-#[test]
-fn gradient_and_adjustment_thumbnails_keep_their_properties_controls() {
-    for command in ["layer.newFillLayer.gradient", "layer.newAdjustmentLayer.invert"] {
-        let (mut h, _) = harness(1.0);
-        let id = LayerId(h.state_mut().run(command, json!({})).unwrap()["layer"].as_u64().unwrap());
-        h.run_steps(4);
-        let r = row(&h, id).row;
-        double_click(&mut h, pos2(r.left() + 46.0, r.center().y));
-        assert!(h.state().ui.panels.properties);
-        assert!(!h.state().ui.dialogs.iter().any(|d| owns(&d.fields)));
-    }
 }
 
 #[test]

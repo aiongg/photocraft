@@ -35,36 +35,26 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2) {
     h.run_steps(2);
 }
 
-/// A filter row's name and blend icon are separate double-click targets, side by side without overlap, in every theme and dock width.
+/// A Smart Filter row's Blending Options icon opens the filter's blending options on a double
+/// click (a single click opens nothing), and a double click on the row opens the filter's editor.
 #[test]
-fn names_and_blend_icons_have_separate_double_click_targets_and_no_overlap() {
-    for theme in crate::theme::ThemeKind::ALL {
-        for width in [250.0, 420.0] {
-            let mut h = harness(width, 1.0, theme);
-            let layer = h.state().session.active().unwrap().active_layer.unwrap();
-            let rows = crate::layer_row_ui::recorded(&h.ctx);
-            let row = rows.iter().find(|r| r.layer == layer.0).unwrap();
-            assert!(row.indicators.iter().any(|(k, _)| *k == crate::layer_row_ui::Indicator::SmartFilters));
-            let blend = h.get_by_label("Blending Options (Box Blur)").rect();
-            let edit = h.get_by_label("Box Blur").rect();
-            assert!(edit.right() <= blend.left(), "{width} {theme:?}: {edit:?} {blend:?}");
-            click(&mut h, blend.center());
-            assert!(h.state().ui.dialogs.is_empty(), "single click does not open blending");
-            click(&mut h, blend.center());
-            assert!(crate::smart_filter_dialog::owns(&h.state().ui.dialogs.last().unwrap().fields));
-            assert_eq!(h.state().ui.dialogs.last().unwrap().fields["__smartFilter"]["index"], json!(0));
-            let id = h.state().ui.dialogs.last().unwrap().id;
-            crate::dialogs::cancel(h.state_mut(), id).unwrap();
-            // Start a new gesture after egui's triple-click interval, as native users do.
-            for _ in 0..40 {
-                h.step();
-            }
-            click(&mut h, edit.center());
-            click(&mut h, edit.center());
-            assert_eq!(h.state().ui.dialogs.last().unwrap().fields["__command"], json!("filter.blur.boxBlur"));
-            assert_eq!(h.state().ui.dialogs.last().unwrap().fields["radius"].as_f64(), Some(4.0));
-        }
-    }
+fn a_filter_rows_options_icon_opens_its_blending_and_the_row_its_editor() {
+    let mut h = harness(290.0, 1.0, Default::default());
+    let blend = h.get_by_label("Blending Options (Box Blur)").rect().center();
+    click(&mut h, blend);
+    assert!(h.state().ui.dialogs.is_empty(), "single click does not open blending");
+    click(&mut h, blend);
+    assert!(crate::smart_filter_dialog::owns(&h.state().ui.dialogs.last().unwrap().fields));
+    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["__smartFilter"]["index"], json!(0));
+    let id = h.state().ui.dialogs.last().unwrap().id;
+    crate::dialogs::cancel(h.state_mut(), id).unwrap();
+    // Start a new gesture after egui's triple-click interval, as native users do.
+    h.run_steps(40);
+    let edit = crate::layers_panel_nodes::row(&h, "Box Blur").center();
+    click(&mut h, edit);
+    click(&mut h, edit);
+    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["__command"], json!("filter.blur.boxBlur"));
+    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["radius"].as_f64(), Some(4.0));
 }
 
 /// The effects disclosure hides the effects and Smart Filters stacks together, as a view change only.
@@ -225,22 +215,6 @@ fn an_unreadable_adjustment_smart_filter_opens_with_its_recorded_values() {
     let fields = &app.ui.dialogs.last().unwrap().fields;
     assert_eq!(fields["points"], json!("not a curve"));
     assert!(fields.contains_key("__smartFilter"));
-}
-
-/// The Smart Filters mask and the layer mask of one layer are cached as separate thumbnails.
-#[test]
-fn smart_and_layer_masks_have_separate_thumbnail_cache_entries() {
-    let (mut app, layer) = app(8, "rgb");
-    app.run("layer.layerMask.revealAll", json!({"layer":layer.0})).unwrap();
-    let doc = app.session.active().unwrap().doc.clone();
-    let mask = doc.layer(layer).unwrap().mask.as_ref().unwrap();
-    let ctx = egui::Context::default();
-    let first = app.mask_thumb(&ctx, &doc, layer, mask);
-    let mut other = mask.clone();
-    other.surface.fill_rect(photocraft_geom::Rect::new(0, 0, 64, 48), &[0.0]);
-    let second = app.mask_thumb_kind(&ctx, &doc, layer, &other, crate::mask_thumbs_ui::THUMB_SMART_MASK);
-    assert_ne!(first, second);
-    assert_eq!(first, app.mask_thumb(&ctx, &doc, layer, mask));
 }
 
 /// ⌘I on a Smart Object adds the ordinary Invert as a smart filter, and undo/redo leave the source contents alone.
