@@ -65,6 +65,7 @@ fn expanded(app: &PhotocraftApp, group: LayerId) -> bool {
     matches!(&app.session.active().unwrap().doc.layer(group).unwrap().content, photocraft_doc::LayerContent::Group(g) if g.expanded)
 }
 
+// Fails until craft-layers scrolls a new active layer into view.
 #[test]
 fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
     for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
@@ -135,6 +136,8 @@ fn reveal_survives_odd_documents() {
     h.state_mut().sync_views();
     h.run_steps(3);
 }
+
+// Fails until craft-layers keeps the list's scroll position per document.
 #[test]
 fn layers_scroll_position_survives_document_switches() {
     for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {

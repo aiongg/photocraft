@@ -57,6 +57,8 @@ fn none() -> (Vec<String>, Option<String>) {
     (Vec::new(), None)
 }
 
+// Fails until craft-layers deselects what a new filter hides: the List re-picks the row that takes a filtered-out
+// lead's place (craft-ui `follow_lead_source`).
 #[test]
 fn a_filter_that_hides_the_selected_layer_deselects_it_and_turning_it_off_keeps_that() {
     let mut h = harness();
@@ -127,6 +129,8 @@ fn a_layer_selected_while_the_filter_hides_it_stays_selected() {
     assert_eq!(selection(&h).0, ["Red"], "the filter only acts when it is applied");
 }
 
+// Fails until craft-layers deselects what a new filter hides: the List re-picks the row that takes a filtered-out
+// lead's place (craft-ui `follow_lead_source`).
 #[test]
 fn a_filter_set_through_the_control_channel_deselects_too() {
     let mut h = harness();
