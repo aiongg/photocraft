@@ -9,8 +9,7 @@
 //! The window intent carries no modifiers: they come from `ctx.input`, which still holds the
 //! modifier state of the pass.
 
-use craft::ui::runtime::keys::{Intents, with_window_intents};
-use craft_behavior::Intent;
+use craft::ui::runtime::keys::{Intent, Intents, with_window_intents};
 use egui::{Context, Key, Modifiers};
 
 fn rtl() -> bool {
