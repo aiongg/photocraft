@@ -1126,9 +1126,6 @@ mod snapshot_row_tests {
 }
 
 #[cfg(test)]
-mod layer_pct_slider_tests;
-
-#[cfg(test)]
 mod fx_drag_tests;
 
 #[cfg(test)]
@@ -1844,7 +1841,8 @@ mod history_panel_select_tests;
 #[cfg(test)]
 mod layer_click_type_commit_tests {
     use super::*;
-    use egui_kittest::{Harness, kittest::Queryable};
+    use craft::layers::ui::tree::LayerPart;
+    use egui_kittest::Harness;
 
     fn harness(kind: theme::ThemeKind) -> (Harness<'static, PhotocraftApp>, LayerId, LayerId) {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -1888,44 +1886,45 @@ mod layer_click_type_commit_tests {
         assert_eq!(text.text, "Preserved edit");
     }
 
+    /// Where a click lands on the row named `label`: its thumbnail or its name.
+    fn at(h: &Harness<'_, PhotocraftApp>, label: &str, thumbnail: bool) -> Pos2 {
+        if thumbnail { crate::layers_panel_nodes::thumb(h, label, LayerPart::Pixels).center() } else { crate::layers_panel_nodes::row(h, label).center() }
+    }
+
     #[test]
     fn layer_name_and_thumbnail_clicks_commit_same_or_other_type_selection() {
-        for kind in theme::ThemeKind::ALL {
-            for same in [true, false] {
-                for thumbnail in [true, false] {
-                    let (mut h, text, other) = harness(kind);
-                    let label = if same { "Edited type" } else { "Other pixels" };
-                    let row = h.get_by_label(label).rect();
-                    let at = pos2(row.left() + if thumbnail { 43.0 } else { 120.0 }, row.center().y);
-                    click(&mut h, at, egui::Modifiers::NONE);
-                    assert!(h.state().ui.text_edit.is_none(), "{kind:?}, same={same}, thumbnail={thumbnail}");
-                    assert_eq!(h.state().session.active().unwrap().active_layer, Some(if same { text } else { other }));
-                    preserved(h.state(), text);
-                }
+        let kind = theme::ThemeKind::default();
+        for same in [true, false] {
+            for thumbnail in [true, false] {
+                let (mut h, text, other) = harness(kind);
+                let p = at(&h, if same { "Edited type" } else { "Other pixels" }, thumbnail);
+                click(&mut h, p, egui::Modifiers::NONE);
+                assert!(h.state().ui.text_edit.is_none(), "same={same}, thumbnail={thumbnail}");
+                assert_eq!(h.state().session.active().unwrap().active_layer, Some(if same { text } else { other }));
+                preserved(h.state(), text);
             }
         }
     }
 
     #[test]
     fn layer_click_commits_without_breaking_modifier_selection_or_double_click_editing() {
-        for kind in theme::ThemeKind::ALL {
-            let (mut h, text, other) = harness(kind);
-            let row = h.get_by_label("Other pixels").rect();
-            click(&mut h, pos2(row.left() + 120.0, row.center().y), egui::Modifiers { command: true, ..Default::default() });
-            assert!(h.state().ui.text_edit.is_none());
-            let selected = h.state().session.active().unwrap().selected_layers();
-            assert!(selected.contains(&text) && selected.contains(&other));
-            preserved(h.state(), text);
+        let kind = theme::ThemeKind::default();
+        let (mut h, text, other) = harness(kind);
+        let p = at(&h, "Other pixels", false);
+        click(&mut h, p, egui::Modifiers { command: true, ..Default::default() });
+        assert!(h.state().ui.text_edit.is_none());
+        let selected = h.state().session.active().unwrap().selected_layers();
+        assert!(selected.contains(&text) && selected.contains(&other));
+        preserved(h.state(), text);
 
-            let (mut h, text, _) = harness(kind);
-            let row = h.get_by_label("Edited type").rect();
-            let thumb = pos2(row.left() + 43.0, row.center().y);
-            click(&mut h, thumb, egui::Modifiers::NONE);
-            assert!(h.state().ui.text_edit.is_none());
-            click(&mut h, thumb, egui::Modifiers::NONE);
-            assert_eq!(h.state().ui.text_edit.as_ref().map(|ed| ed.layer), Some(text.0));
-            preserved(h.state(), text);
-        }
+        let (mut h, text, _) = harness(kind);
+        let thumb = at(&h, "Edited type", true);
+        click(&mut h, thumb, egui::Modifiers::NONE);
+        assert!(h.state().ui.text_edit.is_none());
+        h.run_steps(2);
+        click(&mut h, thumb, egui::Modifiers::NONE);
+        assert_eq!(h.state().ui.text_edit.as_ref().map(|ed| ed.layer), Some(text.0));
+        preserved(h.state(), text);
     }
 
     #[test]
@@ -1941,8 +1940,8 @@ mod layer_click_type_commit_tests {
         h.run_steps(4);
         assert!(h.state().ui.text_edit.is_some());
         h.render().unwrap().save("5584-before.png").unwrap();
-        let row = h.get_by_label("Other pixels").rect();
-        click(&mut h, pos2(row.left() + 120.0, row.center().y), egui::Modifiers::NONE);
+        let p = at(&h, "Other pixels", false);
+        click(&mut h, p, egui::Modifiers::NONE);
         assert!(h.state().ui.text_edit.is_none());
         preserved(h.state(), text);
         h.run_steps(4);

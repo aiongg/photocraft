@@ -152,9 +152,5 @@ pub(crate) fn color_name(color: LabelColor) -> &'static str {
     crate::i18n::tr_ctx(crate::i18n::current(), "layerLabel", color.label())
 }
 
-// S1b: these open the old panel's egui menus; the entries stay PhotoCraft's, the menus are craft-layers'.
-#[cfg(any())]
-mod color_tests;
-
-#[cfg(any())]
+#[cfg(test)]
 mod tests;

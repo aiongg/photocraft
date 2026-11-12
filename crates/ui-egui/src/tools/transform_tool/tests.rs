@@ -685,7 +685,6 @@ fn only_one_click_waits_for_the_commit() {
 /// app: Free Transform on a layer, move it, then click another layer's row in the Layers panel.
 #[test]
 fn clicking_another_layer_row_applies_the_transform() {
-    use egui_kittest::kittest::{NodeT, Queryable};
     let app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
     let layer = app.session.active().unwrap().active_layer.unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |cc| {
@@ -700,8 +699,7 @@ fn clicking_another_layer_row_applies_the_transform() {
     t.quad = t.quad.map(|[x, y]| [x + 8.0, y]);
     h.state_mut().background_jobs = true;
     h.run_steps(2);
-    let row =
-        h.query_all_by_label("Background").find(|n| n.accesskit_node().role() == egui::accesskit::Role::Button).expect("the Background row").rect().center();
+    let row = crate::layers_panel_nodes::row(&h, "Background").center();
     h.hover_at(row);
     h.run_steps(1);
     h.drag_at(row);

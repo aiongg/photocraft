@@ -128,6 +128,5 @@ pub fn vector_thumb_image(doc: &Document, m: &VectorMask, side: usize) -> egui::
     egui::ColorImage::new([side, side], px)
 }
 
-// S1b: these click the old panel's mask thumbnails by their recorded rects.
-#[cfg(any())]
+#[cfg(test)]
 mod tests;

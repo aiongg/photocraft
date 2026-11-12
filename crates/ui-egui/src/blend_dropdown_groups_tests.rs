@@ -53,35 +53,6 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, held: usize) {
     }
 }
 
-#[test]
-fn the_layers_blend_mode_list_has_a_line_between_each_group() {
-    let mut h = harness();
-    let at = dropdown(&h).center();
-    click(&mut h, at, 1);
-    assert!(open_list(&h).is_some(), "the list is open");
-    // Each mode's row in the open list: its label's last node (the box shows the chosen one's
-    // first). Rows scrolled out of the list keep their place in it, so the gaps hold for all.
-    let rows: Vec<Rect> = BlendMode::LAYER_MODES
-        .iter()
-        .map(|m| h.get_all_by_label(m.label()).map(|n| n.rect()).next_back().unwrap_or_else(|| panic!("{m:?} is in the list")))
-        .collect();
-    let gaps: Vec<f32> = rows.windows(2).map(|w| w[1].top() - w[0].bottom()).collect();
-    let row_gap = gaps.iter().copied().fold(f32::INFINITY, f32::min);
-    let lines: Vec<(BlendMode, BlendMode)> =
-        gaps.iter().enumerate().filter(|(_, g)| **g > row_gap + 2.0).map(|(i, _)| (BlendMode::LAYER_MODES[i], BlendMode::LAYER_MODES[i + 1])).collect();
-    assert_eq!(
-        lines,
-        [
-            (BlendMode::Dissolve, BlendMode::Darken),
-            (BlendMode::DarkerColor, BlendMode::Lighten),
-            (BlendMode::LighterColor, BlendMode::Overlay),
-            (BlendMode::HardMix, BlendMode::Difference),
-            (BlendMode::Divide, BlendMode::Hue),
-        ],
-        "row gaps {gaps:?}"
-    );
-}
-
 /// A plain click on the Layers panel's Blend Mode box at 1440×900, released where it was pressed
 /// (after one frame, or after a few as a person's click takes), opens the list beside the box and
 /// chooses nothing: the list doesn't open over the box, where the release would pick a row

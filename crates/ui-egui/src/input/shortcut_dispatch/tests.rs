@@ -157,9 +157,9 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
             h.run_steps(2);
         }
         Place::LayersRow => {
-            h.get_by_role_and_label(Role::Button, "paint").scroll_to_me();
+            h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
-            let row = h.get_by_role_and_label(Role::Button, "paint").rect();
+            let row = crate::layers_panel_nodes::row(&h, "paint");
             click(h, row.center() + vec2(row.width() / 4.0, 0.0));
             assert_eq!(active_name(h), "paint");
         }
@@ -177,7 +177,7 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
             assert_eq!(Focus::of(&h.ctx), Focus::Text, "clicking a value field edits it");
         }
         Place::FocusedWidget => {
-            h.get_by_role_and_label(Role::Button, "paint").scroll_to_me();
+            h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
             h.get_by_role_and_label(Role::Button, "paint").focus();
             h.run_steps(2);

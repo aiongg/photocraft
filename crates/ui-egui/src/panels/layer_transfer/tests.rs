@@ -1,6 +1,5 @@
 //! #589: layers dragged onto another document's tab, then dropped on its canvas, are copied there.
 
-use egui::accesskit::Role;
 use egui::{Modifiers, PointerButton, Pos2, Rect, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -310,7 +309,7 @@ fn a_tab_hover_that_cannot_take_the_option_drag_back_keeps_the_move_going() {
 #[test]
 fn a_layers_panel_drag_onto_a_tab_drops_the_layer_where_it_is_released() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = crate::layers_panel_nodes::row(&h, "paint").center();
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[row, over_tab, drop], Modifiers::NONE);
@@ -325,7 +324,7 @@ fn a_layers_panel_drag_onto_a_tab_drops_the_layer_where_it_is_released() {
 #[test]
 fn shift_centres_the_copy_when_the_documents_differ_in_size() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = crate::layers_panel_nodes::row(&h, "paint").center();
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center() + vec2(80.0, 60.0);
     drag_along(&mut h, &[row, over_tab, drop], Modifiers::SHIFT);
@@ -357,7 +356,7 @@ fn a_move_tool_drag_onto_a_tab_copies_the_layer_under_the_pointer_and_leaves_the
 #[test]
 fn dropping_back_on_the_source_copies_nothing() {
     let (mut h, _) = harness();
-    let row = h.get_by_role_and_label(Role::Button, "paint").rect().center();
+    let row = crate::layers_panel_nodes::row(&h, "paint").center();
     let (dest_tab, source_tab) = (tab(&h, "dest-doc"), tab(&h, "source-doc"));
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[row, dest_tab, source_tab, drop], Modifiers::NONE);

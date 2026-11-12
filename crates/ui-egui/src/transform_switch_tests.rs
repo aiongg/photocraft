@@ -109,7 +109,8 @@ fn picking_another_layer_in_the_panel_applies_the_transform() {
         } else {
             transform_and_move(&mut h);
         }
-        h.get_by_label("Background").click();
+        let at = crate::layers_panel_nodes::row(&h, "Background").center();
+        crate::layers_panel_nodes::click(&mut h, at, egui::Modifiers::NONE);
         h.run_steps(4);
         assert!(h.state().ui.transform.is_none(), "placed {placed}");
         assert_eq!(h.state().session.active().unwrap().doc.layers.len(), 2, "placed {placed}");

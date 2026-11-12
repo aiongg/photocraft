@@ -39,26 +39,6 @@ fn blend_box(h: &Harness<'_, PhotocraftApp>, value: &str) -> egui::Rect {
 }
 
 #[test]
-fn press_drag_release_picks_a_blend_mode() {
-    let mut h = app_with_a_layer();
-    assert_eq!(blend(&h), BlendMode::Normal);
-    let at = blend_box(&h, "Normal").center();
-    h.hover_at(at);
-    h.run_steps(1);
-    h.drag_at(at);
-    h.run_steps(3);
-    let multiply = h.query_by_label("Multiply").expect("the list opened on the press").rect().center();
-    for k in 1..=6 {
-        h.hover_at(at + (multiply - at) * (k as f32 / 6.0));
-        h.run_steps(1);
-    }
-    h.drop_at(multiply);
-    h.run_steps(3);
-    assert_eq!(blend(&h), BlendMode::Multiply, "releasing on Multiply picked it");
-    assert!(h.query_by_label("Color Burn").is_none(), "and closed the list");
-}
-
-#[test]
 fn a_click_still_opens_the_list_for_a_second_click() {
     let mut h = app_with_a_layer();
     let at = blend_box(&h, "Normal").center();

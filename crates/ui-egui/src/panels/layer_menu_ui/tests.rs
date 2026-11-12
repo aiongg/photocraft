@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::json;
 
 #[test]
 fn mask_toggle_label_follows_history_and_selected_layer() {
@@ -52,55 +53,6 @@ fn mask_toggle_label_follows_history_and_selected_layer() {
     assert!(!crate::menus::is_enabled(&empty, toggle));
 }
 
-#[test]
-fn mask_toggle_context_menu_follows_the_clicked_layer_and_existing_translations() {
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    for language in ["en", "fr"] {
-        // English runs in every build; French needs the craft-i18n catalogs.
-        if language != "en" && !crate::i18n::needs_catalogs() {
-            continue;
-        }
-        let lang = crate::i18n::Lang::from_code(language).expect("registered language");
-        let _language = crate::i18n::language_scope(lang);
-        let mut s = photocraft_engine::Session::new();
-        s.execute("file.new", json!({"width": 10, "height": 10})).unwrap();
-        s.execute("layer.new.layer", json!({})).unwrap();
-        s.execute("layer.layerMask.revealAll", json!({})).unwrap();
-        let clicked = s.active().unwrap().active_layer.unwrap();
-        s.execute("layer.new.layer", json!({})).unwrap();
-        let other = s.active().unwrap().active_layer.unwrap();
-        s.execute("layer.layerMask.revealAll", json!({})).unwrap();
-        s.execute("layer.layerMask.enabled", json!({})).unwrap();
-        let app = crate::PhotocraftApp::new(s, Default::default());
-        // `other` stays the active layer with its mask disabled; the menu is opened over `clicked`,
-        // whose mask is enabled, and selects it first (a single-layer menu).
-        let mut h = Harness::builder().with_size(egui::vec2(400.0, 900.0)).build_ui_state(
-            move |ui, app| {
-                let st = app.session.active().unwrap();
-                let l = st.doc.layer(clicked).unwrap().clone();
-                let mut actions = Vec::new();
-                show(app, ui, &l, false, &mut actions);
-                for (id, params) in actions {
-                    crate::menus::invoke(app, ui.ctx(), &id, params).unwrap();
-                }
-            },
-            app,
-        );
-        h.run_steps(3);
-        let enabled_label = crate::i18n::tr(lang, "Enable Layer Mask");
-        let disabled_label = crate::i18n::tr(lang, "Disable Layer Mask");
-        // The label follows the mask of the clicked layer, not of the active one.
-        assert!(h.query_by_label(enabled_label).is_none());
-        h.get_by_label(disabled_label).click();
-        h.run_steps(3);
-        assert_eq!(h.state().session.active().unwrap().active_layer, Some(clicked));
-        assert!(!h.state().session.active().unwrap().doc.layer(clicked).unwrap().mask.as_ref().unwrap().enabled);
-        assert!(!h.state().session.active().unwrap().doc.layer(other).unwrap().mask.as_ref().unwrap().enabled);
-        h.get_by_label(enabled_label);
-    }
-}
-
 /// With several layers selected there is no single mask to toggle, apply or delete: the menu
 /// offers Add Layer Mask only, whatever the clicked layer has, and does not hit the active layer.
 #[test]
@@ -116,152 +68,6 @@ fn multi_selection_menu_has_no_per_layer_mask_items() {
     for single in ["layer.layerMask.enabled", "layer.layerMask.apply", "layer.layerMask.delete"] {
         assert!(!ids.contains(&single), "{single} acts on one layer, not on a selection");
     }
-}
-
-#[test]
-fn smart_object_context_menu_edits_the_clicked_layer() {
-    use crate::PhotocraftApp;
-    use egui::{Event, Modifiers, PointerButton, Pos2, pos2, vec2};
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, button: PointerButton) {
-        h.hover_at(at);
-        h.step();
-        for pressed in [true, false] {
-            h.event(Event::PointerButton { pos: at, button, pressed, modifiers: Modifiers::NONE });
-            h.step();
-        }
-        h.run_steps(3);
-    }
-
-    for ppp in [1.0, 2.0] {
-        let mut s = photocraft_engine::Session::new();
-        s.execute("file.new", json!({"width": 640, "height": 480})).unwrap();
-        s.execute("layer.new.layer", json!({"name": "Smart source"})).unwrap();
-        s.execute("paint.stroke", json!({"points": [[100, 100]], "size": 20})).unwrap();
-        let smart = s.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap()["layer"].as_u64().unwrap();
-        s.execute("layer.new.layer", json!({"name": "Other active layer"})).unwrap();
-        let mut h =
-            Harness::builder().with_size(vec2(1440.0, 900.0)).with_pixels_per_point(ppp).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                PhotocraftApp::new(s, crate::Services::default())
-            });
-        let ctx = h.ctx.clone();
-        let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
-        crate::control::handle(h.state_mut(), &ctx, &req);
-        h.run_steps(8);
-        let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == smart).expect("layer row drawn").row;
-        // Top-level Pro row: 6 pt padding, 28 pt eye column, 24 pt layer thumbnail.
-        let at = pos2(row.left() + 6.0 + 28.0 + 12.0, row.center().y);
-        click(&mut h, at, PointerButton::Secondary);
-        let at = h.get_by_label("Edit Contents").rect().center();
-        click(&mut h, at, PointerButton::Primary);
-        assert_eq!(h.state().session.active_index(), Some(1), "@{ppp}x: contents tab opens");
-        assert!(h.state().session.is_enabled("layer.smartObjects.saveContents"));
-        assert!(h.state().session.active().unwrap().doc.walk().iter().any(|(_, _, l)| l.name == "Smart source"));
-        h.state_mut().session.set_active(0);
-        assert_eq!(h.state().session.active().unwrap().active_layer, Some(photocraft_doc::LayerId(smart)));
-    }
-}
-
-/// #4575: right-clicking a layer-mask thumbnail opens Photoshop's mask menu, not the layer
-/// menu, and its selection items load the clicked layer's mask (not the active layer's).
-#[test]
-fn mask_thumbnail_context_menu_acts_on_the_clicked_mask() {
-    use crate::PhotocraftApp;
-    use egui::{Event, Modifiers, PointerButton, Pos2, vec2};
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, button: PointerButton) {
-        h.hover_at(at);
-        h.step();
-        for pressed in [true, false] {
-            h.event(Event::PointerButton { pos: at, button, pressed, modifiers: Modifiers::NONE });
-            h.step();
-        }
-        h.run_steps(3);
-    }
-
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 100, "height": 60})).unwrap();
-    s.execute("layer.new.layer", json!({"name": "Masked"})).unwrap();
-    s.execute("select.rect", json!({"x": 60, "y": 0, "width": 40, "height": 60})).unwrap();
-    s.execute("layer.layerMask.revealSelection", json!({})).unwrap();
-    let masked = s.active().unwrap().active_layer.unwrap();
-    // Another layer is active, and the selection doesn't overlap the mask.
-    s.execute("layer.new.layer", json!({"name": "Other active layer"})).unwrap();
-    s.execute("select.rect", json!({"x": 0, "y": 0, "width": 20, "height": 60})).unwrap();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
-    });
-    let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
-    crate::control::handle(h.state_mut(), &ctx, &req);
-    h.run_steps(8);
-    let (thumbs, _) = crate::mask_thumbs_ui::recorded(&h.ctx, masked.0).expect("mask thumbnail drawn");
-    let at = thumbs.iter().find(|(k, _)| *k == crate::mask_thumbs_ui::MaskKind::Pixel).unwrap().1.center();
-    click(&mut h, at, PointerButton::Secondary);
-    assert!(h.query_by_label("Blending Options…").is_none(), "the mask menu, not the layer menu");
-    for item in
-        ["Disable Layer Mask", "Delete Layer Mask", "Apply Layer Mask", "Subtract Mask from Selection", "Intersect Mask with Selection", "Select and Mask…"]
-    {
-        h.get_by_label(item);
-    }
-    let at = h.get_by_label("Add Mask to Selection").rect().center();
-    click(&mut h, at, PointerButton::Primary);
-    let st = h.state().session.active().unwrap();
-    assert_eq!(st.active_layer, Some(masked));
-    let sel = st.doc.selection.as_ref().expect("a selection");
-    assert!(sel.sample_channel(10, 30, 0) > 0.99, "the selection is kept");
-    assert!(sel.sample_channel(80, 30, 0) > 0.99, "the clicked layer's mask is added");
-    assert!(sel.sample_channel(40, 30, 0) < 0.01, "nothing else is selected");
-    // Mask Options…: Layer Mask Display Options (the rubylith's colour and opacity).
-    let (thumbs, _) = crate::mask_thumbs_ui::recorded(&h.ctx, masked.0).expect("mask thumbnail drawn");
-    let at = thumbs.iter().find(|(k, _)| *k == crate::mask_thumbs_ui::MaskKind::Pixel).unwrap().1.center();
-    click(&mut h, at, PointerButton::Secondary);
-    let at = h.get_by_label("Mask Options…").rect().center();
-    click(&mut h, at, PointerButton::Primary);
-    let d = h.state().ui.dialogs.last().expect("Mask Options… opens a dialog");
-    assert!(crate::channel_options_ui::owns(&d.fields) && d.fields["channel"] == json!("mask"), "{:?}", d.fields);
-    assert_eq!(d.fields["__label"], json!("Layer Mask Display Options…"));
-}
-
-#[test]
-fn a_long_layer_menu_stays_inside_a_short_window_and_scrolls() {
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 32, "height": 24})).unwrap();
-    s.execute("layer.new.layer", json!({"name": "Paint"})).unwrap();
-    let app = crate::PhotocraftApp::new(s, crate::Services::default());
-    let layer = {
-        let st = app.session.active().unwrap();
-        st.doc.layer(st.active_layer.unwrap()).unwrap().clone()
-    };
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
-    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 300.0));
-    let id = egui::Id::unique("layer-menu-probe");
-    let mut content = 0.0;
-    for _ in 0..4 {
-        let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
-        let mut out = ctx.run_ui(input, |ui| {
-            // Opened low in the window, like a right-click on a bottom Layers row.
-            egui::Area::new(id).order(egui::Order::Foreground).default_pos(egui::pos2(300.0, 250.0)).show(ui.ctx(), |ui| {
-                egui::Frame::menu(ui.style()).show(ui, |ui| {
-                    let start = ui.next_widget_position().y;
-                    show(&app, ui, &layer, false, &mut Vec::new());
-                    content = ui.min_rect().bottom() - start;
-                });
-            });
-        });
-        out.textures_delta.clear();
-    }
-    let rect = ctx.memory(|m| m.area_rect(id)).expect("the menu was shown");
-    assert!(screen.contains_rect(rect), "the menu moves up and stays inside the window: {rect:?}");
-    assert!(rect.height() < screen.height(), "{rect:?}");
-    let rows = entries(&layer, false, false).iter().flatten().count();
-    assert!(rows >= 15, "Photoshop's layer menu is long: {rows} rows");
-    assert!(content < rect.height() + 1.0, "the rows scroll inside the menu instead of running off the window");
 }
 
 #[test]
@@ -339,118 +145,6 @@ fn multi_selection_menu_rasterizes_the_selection() {
     }
     let label = entries(&smart, true, false).into_iter().flatten().find(|e| e.1 == "layer.rasterize.layer").unwrap().0;
     assert_eq!(label, "Rasterize Layers");
-}
-
-fn click(h: &mut egui_kittest::Harness<'_, crate::PhotocraftApp>, at: egui::Pos2, button: egui::PointerButton) {
-    h.hover_at(at);
-    h.step();
-    for pressed in [true, false] {
-        h.event(egui::Event::PointerButton { pos: at, button, pressed, modifiers: egui::Modifiers::NONE });
-        h.step();
-    }
-    h.run_steps(3);
-}
-
-/// A type layer, an ellipse and a rectangle; the type layer and the ellipse are selected (the
-/// ellipse active), the rectangle stays out. The Layers menu is opened by right-clicking the
-/// type row, which is selected but not the active layer. Returns `[type, ellipse, rectangle]`.
-fn open_multi_selection_menu() -> (egui_kittest::Harness<'static, crate::PhotocraftApp>, [u64; 3]) {
-    use crate::PhotocraftApp;
-    use egui::{PointerButton, pos2, vec2};
-
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 640, "height": 480})).unwrap();
-    let text = s.execute("type.create", json!({"text": "Hi", "size": 24, "x": 20, "y": 60})).unwrap()["layer"].as_u64().unwrap();
-    let shape = s.execute("shape.create", json!({"kind": "ellipse", "rect": [100, 100, 200, 160]})).unwrap()["layer"].as_u64().unwrap();
-    let other = s.execute("shape.create", json!({"kind": "rect", "rect": [300, 100, 380, 160]})).unwrap()["layer"].as_u64().unwrap();
-    s.execute("layer.select", json!({"layer": text})).unwrap();
-    s.execute("layer.select", json!({"layer": shape, "mode": "add"})).unwrap();
-    let mut h =
-        egui_kittest::Harness::builder().with_size(vec2(1440.0, 900.0)).with_pixels_per_point(1.0).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(
-            move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                PhotocraftApp::new(s, crate::Services::default())
-            },
-        );
-    let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
-    crate::control::handle(h.state_mut(), &ctx, &req);
-    h.run_steps(8);
-    let row = crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == text).expect("layer row drawn").row;
-    click(&mut h, pos2(row.left() + 6.0 + 28.0 + 12.0, row.center().y), PointerButton::Secondary);
-    (h, [text, shape, other])
-}
-
-/// The reported bug: right-click a layer inside a multi-layer selection, choose Rasterize, and
-/// only the clicked (or active) layer was converted.
-#[test]
-fn rasterize_from_the_menu_converts_every_selected_layer() {
-    use egui_kittest::kittest::Queryable;
-    let (mut h, [text, shape, other]) = open_multi_selection_menu();
-    let at = h.get_by_label("Rasterize Layers").rect().center();
-    click(&mut h, at, egui::PointerButton::Primary);
-    let doc = &h.state().session.active().unwrap().doc;
-    let raster = |id: u64| matches!(doc.layer(photocraft_doc::LayerId(id)).unwrap().content, photocraft_doc::LayerContent::Raster(_));
-    assert!(raster(text) && raster(shape), "both selected layers are rasterized");
-    assert!(!raster(other), "an unselected layer is left alone");
-    assert_eq!(h.state().session.active().unwrap().selected_layers().len(), 2, "the selection survives");
-}
-
-/// Group from Layers is offered for a multi-layer selection too (it used to be dropped from
-/// the menu then). As in Photoshop it asks in the New Group from Layers dialog first; OK puts
-/// every selected layer in one new group, leaving the rest alone.
-#[test]
-fn group_from_layers_groups_every_selected_layer() {
-    use egui_kittest::kittest::Queryable;
-    use photocraft_doc::LayerId;
-    let (mut h, [text, shape, other]) = open_multi_selection_menu();
-    let at = h.get_by_label("Group from Layers…").rect().center();
-    click(&mut h, at, egui::PointerButton::Primary);
-    let dialog = h.state().ui.dialogs.last().map(|d| (d.id, d.fields.clone())).expect("the New Group dialog opened");
-    assert!(crate::new_group_ui::owns(&dialog.1));
-    assert_eq!(dialog.1["__command"], "layer.new.groupFromLayers");
-    crate::dialogs::confirm(h.state_mut(), dialog.0).unwrap();
-    h.run_steps(2);
-    let doc = &h.state().session.active().unwrap().doc;
-    let groups: Vec<_> = doc.walk().into_iter().map(|(_, _, l)| l).filter(|l| l.is_group()).collect();
-    assert_eq!(groups.len(), 1);
-    let children: Vec<LayerId> = groups[0].children().unwrap().iter().map(|l| l.id).collect();
-    assert_eq!(children, vec![LayerId(text), LayerId(shape)], "both selected layers, in order");
-    assert!(doc.layers.iter().any(|l| l.id == LayerId(other)), "an unselected layer stays at the top level");
-}
-
-/// Items with no single target are greyed for a multi-layer selection (they used to run on
-/// whichever layer happened to be active, not the one right-clicked); the ones that act on the
-/// whole selection, including adding a mask, stay available.
-#[test]
-fn multi_selection_menu_greys_what_acts_on_one_layer() {
-    use egui_kittest::kittest::{NodeT, Queryable};
-    let (h, _) = open_multi_selection_menu();
-    for label in ["Blending Options…", "Copy Layer Style"] {
-        assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} works on one layer only");
-    }
-    for label in [
-        "Quick Export as PNG",
-        "Export As…",
-        "Add Layer Mask",
-        "Duplicate Layers…",
-        "Delete Layers",
-        "Group from Layers…",
-        "Convert to Smart Object",
-        "Rasterize Layers",
-        "Link Layers",
-        "Merge Layers",
-    ] {
-        assert!(!h.get_by_label(label).accesskit_node().is_disabled(), "{label} acts on the selection");
-    }
-    // Greyed here only for lack of something to act on: no style on the clipboard, no style to clear.
-    for label in ["Paste Layer Style", "Clear Layer Style"] {
-        assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} has nothing to do here");
-    }
-    // Whatever the clicked layer is, the menu has the same shape: no per-layer mask or Smart Object items.
-    for label in ["Disable Layer Mask", "Apply Layer Mask", "Delete Layer Mask", "Edit Contents", "Convert to Layers"] {
-        assert!(h.query_by_label(label).is_none(), "{label} is not offered for several layers");
-    }
 }
 
 /// Every entry of the multi-layer menu is either known to act on the selection or greyed by
@@ -608,16 +302,37 @@ fn every_entry_is_a_known_command() {
     }
 }
 
-/// #12324: right-clicking a pixel layer's thumbnail opens Photoshop's thumbnail menu; its Select Pixels
-/// loads the clicked layer's transparency, as a ⌘-click on the thumbnail does. The Background's
-/// thumbnail, with no transparency to load, keeps the layer menu.
-#[test]
-fn layer_thumbnail_context_menu_selects_the_clicked_layers_pixels() {
-    use crate::PhotocraftApp;
-    use egui::{Event, Modifiers, PointerButton, Pos2, vec2};
-    use egui_kittest::{Harness, kittest::Queryable};
+mod panel_menus {
+    //! Right-clicks in the Layers panel: the panel opens the menu PhotoCraft builds for the row or
+    //! thumbnail under the pointer, and PhotoCraft runs the picked item on the clicked layer (#4575,
+    //! #12324), or on the whole selection when the clicked row is one of several selected rows.
 
-    fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, button: PointerButton) {
+    use craft::layers::ui::tree::LayerPart;
+    use egui::{Event, Modifiers, PointerButton, Pos2};
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::{NodeT, Queryable};
+    use photocraft_doc::{LabelColor, Layer, LayerContent};
+    use photocraft_engine::Session;
+    use serde_json::json;
+
+    use crate::PhotocraftApp;
+    use crate::layers_panel_nodes::{layer_id, row, thumb};
+
+    type H = Harness<'static, PhotocraftApp>;
+
+    fn harness(s: Session) -> H {
+        let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(|cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            PhotocraftApp::new(s, crate::Services::default())
+        });
+        let ctx = h.ctx.clone();
+        let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
+        crate::control::handle(h.state_mut(), &ctx, &req);
+        h.run_steps(8);
+        h
+    }
+
+    fn press(h: &mut H, at: Pos2, button: PointerButton) {
         h.hover_at(at);
         h.step();
         for pressed in [true, false] {
@@ -627,43 +342,206 @@ fn layer_thumbnail_context_menu_selects_the_clicked_layers_pixels() {
         h.run_steps(3);
     }
 
-    let mut s = photocraft_engine::Session::new();
-    s.execute("file.new", json!({"width": 100, "height": 60})).unwrap();
-    let background = s.active().unwrap().active_layer.unwrap();
-    s.execute("layer.new.layer", json!({"name": "Painted"})).unwrap();
-    s.execute("select.rect", json!({"x": 60, "y": 0, "width": 40, "height": 60})).unwrap();
-    s.execute("edit.fill", json!({"color": "#b04020"})).unwrap();
-    let painted = s.active().unwrap().active_layer.unwrap();
-    // Another layer is active, and the current selection doesn't overlap the painted pixels.
-    s.execute("layer.new.layer", json!({"name": "Other active layer"})).unwrap();
-    s.execute("select.rect", json!({"x": 0, "y": 0, "width": 20, "height": 60})).unwrap();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
-    });
-    let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
-    crate::control::handle(h.state_mut(), &ctx, &req);
-    h.run_steps(8);
-    let thumb = |h: &Harness<'_, PhotocraftApp>, layer: photocraft_doc::LayerId| {
-        crate::layer_row_ui::recorded(&h.ctx).into_iter().find(|r| r.layer == layer.0).and_then(|r| r.thumbnail).expect("thumbnail drawn").center()
-    };
-
-    let at = thumb(&h, painted);
-    click(&mut h, at, PointerButton::Secondary);
-    assert!(h.query_by_label("Blending Options…").is_none(), "the thumbnail menu, not the layer menu");
-    for item in ["Small Thumbnails", "Clip Thumbnails to Layer Bounds"] {
-        h.get_by_label(item);
+    fn pick(h: &mut H, item: &str) {
+        let at = h.get_by_label(item).rect().center();
+        press(h, at, PointerButton::Primary);
     }
-    let at = h.get_by_label("Select Pixels").rect().center();
-    click(&mut h, at, PointerButton::Primary);
-    let st = h.state().session.active().unwrap();
-    let sel = st.doc.selection.as_ref().expect("a selection");
-    assert!(sel.sample_channel(80, 30, 0) > 0.99, "the clicked layer's pixels are selected");
-    assert!(sel.sample_channel(10, 30, 0) < 0.01, "the old selection is replaced");
 
-    let at = thumb(&h, background);
-    click(&mut h, at, PointerButton::Secondary);
-    assert!(h.query_by_label("Select Pixels").is_none(), "the Background has no pixels to load");
-    h.get_by_label("Blending Options…");
+    fn layer(h: &H, name: &str) -> Layer {
+        h.state().session.active().unwrap().doc.layer(layer_id(h.state(), name)).unwrap().clone()
+    }
+
+    fn active(h: &H) -> String {
+        let st = h.state().session.active().unwrap();
+        st.doc.layer(st.active_layer.unwrap()).unwrap().name.clone()
+    }
+
+    /// "Painted" (pixels at 60..100 × 0..60), "Masked" (a mask revealing 60..100) and a Smart
+    /// Object "Smart" under "Other", active, with a selection of 0..20 that overlaps neither.
+    fn stack() -> Session {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 100, "height": 60})).unwrap();
+        s.execute("layer.new.layer", json!({"name": "Smart"})).unwrap();
+        s.execute("paint.stroke", json!({"points": [[10, 10]], "size": 8})).unwrap();
+        let smart = s.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap()["layer"].as_u64().unwrap();
+        s.execute("layer.setProps", json!({"layer": smart, "name": "Smart"})).unwrap();
+        s.execute("layer.new.layer", json!({"name": "Painted"})).unwrap();
+        s.execute("select.rect", json!({"x": 60, "y": 0, "width": 40, "height": 60})).unwrap();
+        s.execute("edit.fill", json!({"color": "#b04020"})).unwrap();
+        s.execute("layer.new.layer", json!({"name": "Masked"})).unwrap();
+        s.execute("layer.layerMask.revealSelection", json!({})).unwrap();
+        s.execute("layer.new.layer", json!({"name": "Other"})).unwrap();
+        s.execute("layer.layerMask.revealAll", json!({})).unwrap();
+        s.execute("select.rect", json!({"x": 0, "y": 0, "width": 20, "height": 60})).unwrap();
+        s
+    }
+
+    /// A type layer "Hi", a shape "Ellipse" and a shape "Rect", with "Hi" and "Ellipse" selected.
+    fn two_selected() -> Session {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 640, "height": 480})).unwrap();
+        let text = s.execute("type.create", json!({"text": "Hi", "size": 24, "x": 20, "y": 60})).unwrap()["layer"].as_u64().unwrap();
+        s.execute("layer.setProps", json!({"layer": text, "name": "Hi"})).unwrap();
+        let shape = s.execute("shape.create", json!({"kind": "ellipse", "rect": [100, 100, 200, 160], "name": "Ellipse"})).unwrap()["layer"].as_u64().unwrap();
+        s.execute("shape.create", json!({"kind": "rect", "rect": [300, 100, 380, 160], "name": "Rect"})).unwrap();
+        s.execute("layer.select", json!({"layer": text})).unwrap();
+        s.execute("layer.select", json!({"layer": shape, "mode": "add"})).unwrap();
+        s
+    }
+
+    fn selected(h: &H, x: i32, y: i32) -> bool {
+        h.state().session.active().unwrap().doc.selection.as_ref().is_some_and(|s| s.sample_channel(x, y, 0) > 0.99)
+    }
+
+    #[derive(Clone, Copy)]
+    enum On {
+        Row(&'static str),
+        Thumb(&'static str, LayerPart),
+        Eye(&'static str),
+    }
+
+    #[test]
+    fn context_menu_picks_act_on_the_clicked_row() {
+        type Case = (&'static str, fn() -> Session, On, &'static [&'static str], fn(&mut H));
+        let cases: [Case; 9] = [
+            ("Smart Object thumbnail › Edit Contents", stack, On::Thumb("Smart", LayerPart::Pixels), &["Edit Contents"], |h| {
+                assert_eq!(h.state().session.active_index(), Some(1), "the contents tab opens");
+                h.state_mut().session.set_active(0);
+                assert_eq!(active(h), "Smart");
+            }),
+            ("pixel thumbnail › Select Pixels", stack, On::Thumb("Painted", LayerPart::Pixels), &["Select Pixels"], |h| {
+                assert!(selected(h, 80, 30), "the clicked layer's pixels are selected");
+                assert!(!selected(h, 10, 30), "the old selection is replaced");
+            }),
+            ("layer mask thumbnail › Add Mask to Selection", stack, On::Thumb("Masked", LayerPart::LayerMask), &["Add Mask to Selection"], |h| {
+                assert_eq!(active(h), "Masked");
+                assert!(selected(h, 10, 30), "the selection is kept");
+                assert!(selected(h, 80, 30), "the clicked layer's mask is added");
+                assert!(!selected(h, 40, 30), "nothing else is selected");
+            }),
+            ("layer mask thumbnail › Mask Options…", stack, On::Thumb("Masked", LayerPart::LayerMask), &["Mask Options…"], |h| {
+                let d = h.state().ui.dialogs.last().expect("Mask Options… opens a dialog");
+                assert!(crate::channel_options_ui::owns(&d.fields) && d.fields["channel"] == json!("mask"), "{:?}", d.fields);
+            }),
+            ("a row › Disable Layer Mask: the clicked layer's mask, not the active one's", stack, On::Row("Masked"), &["Disable Layer Mask"], |h| {
+                assert_eq!(active(h), "Masked");
+                assert!(!layer(h, "Masked").mask.unwrap().enabled);
+                assert!(layer(h, "Other").mask.unwrap().enabled);
+            }),
+            ("one of two selected rows › Rasterize Layers", two_selected, On::Row("Hi"), &["Rasterize Layers"], |h| {
+                let raster = |name| matches!(layer(h, name).content, LayerContent::Raster(_));
+                assert!(raster("Hi") && raster("Ellipse"), "both selected layers are rasterized");
+                assert!(!raster("Rect"), "an unselected layer is left alone");
+                assert_eq!(h.state().session.active().unwrap().selected_layers().len(), 2, "the selection survives");
+            }),
+            ("one of two selected rows › Group from Layers…", two_selected, On::Row("Hi"), &["Group from Layers…"], |h| {
+                let (id, fields) = h.state().ui.dialogs.last().map(|d| (d.id, d.fields.clone())).expect("the New Group dialog opened");
+                assert_eq!(fields["__command"], "layer.new.groupFromLayers");
+                crate::dialogs::confirm(h.state_mut(), id).unwrap();
+                h.run_steps(2);
+                let doc = &h.state().session.active().unwrap().doc;
+                let group = doc.walk().into_iter().map(|(_, _, l)| l).find(|l| l.is_group()).expect("a group");
+                let names: Vec<&str> = group.children().unwrap().iter().map(|l| l.name.as_str()).collect();
+                assert_eq!(names, ["Hi", "Ellipse"], "both selected layers, in order");
+            }),
+            ("one of two selected rows › Label Color › Blue colours both", two_selected, On::Row("Hi"), &["Label Color", "Blue"], |h| {
+                assert_eq!((layer(h, "Hi").label, layer(h, "Ellipse").label, layer(h, "Rect").label), (LabelColor::Blue, LabelColor::Blue, LabelColor::None));
+                assert_eq!(h.state().session.active().unwrap().selected_layers().len(), 2);
+            }),
+            ("the eye › a colour, without hiding the layer", stack, On::Eye("Painted"), &["Blue"], |h| {
+                let l = layer(h, "Painted");
+                assert!(l.visible);
+                assert_eq!((l.label, layer(h, "Other").label), (LabelColor::Blue, LabelColor::None));
+            }),
+        ];
+        for (case, doc, on, items, after) in cases {
+            let mut h = harness(doc());
+            let at = match on {
+                On::Row(name) => row(&h, name).center(),
+                On::Thumb(name, part) => thumb(&h, name, part).center(),
+                On::Eye(name) => crate::layers_panel_nodes::part(&h, &format!("Visibility {name}")).center(),
+            };
+            press(&mut h, at, PointerButton::Secondary);
+            // A submenu opens under the pointer; the last item is the pick.
+            for (i, item) in items.iter().enumerate() {
+                if i + 1 < items.len() {
+                    h.hover_at(h.get_by_label(item).rect().center());
+                    h.run_steps(4);
+                } else {
+                    pick(&mut h, item);
+                }
+            }
+            eprintln!("{case}");
+            after(&mut h);
+        }
+    }
+
+    /// The menus PhotoCraft builds for what was clicked: a thumbnail's (the Background's has no
+    /// pixels to load, so it keeps the layer menu), a mask's, and the selection's, which greys what
+    /// acts on one layer and leaves out the single-layer mask and Smart Object items.
+    #[test]
+    fn each_part_gets_its_own_menu() {
+        type Case = (&'static str, fn() -> Session, On, &'static [&'static str], &'static [&'static str], &'static [&'static str]);
+        let cases: [Case; 4] = [
+            (
+                "a pixel thumbnail",
+                stack,
+                On::Thumb("Painted", LayerPart::Pixels),
+                &["Select Pixels", "Small Thumbnails", "Clip Thumbnails to Layer Bounds"],
+                &[],
+                &["Blending Options…"],
+            ),
+            ("the Background's thumbnail: the layer menu", stack, On::Thumb("Background", LayerPart::Pixels), &[], &[], &["Select Pixels", "Small Thumbnails"]),
+            (
+                "a layer mask thumbnail",
+                stack,
+                On::Thumb("Masked", LayerPart::LayerMask),
+                &[
+                    "Disable Layer Mask",
+                    "Delete Layer Mask",
+                    "Apply Layer Mask",
+                    "Subtract Mask from Selection",
+                    "Intersect Mask with Selection",
+                    "Select and Mask…",
+                ],
+                &[],
+                &["Blending Options…"],
+            ),
+            (
+                "one of two selected rows",
+                two_selected,
+                On::Row("Hi"),
+                &[
+                    "Export As…",
+                    "Add Layer Mask",
+                    "Duplicate Layers…",
+                    "Delete Layers",
+                    "Convert to Smart Object",
+                    "Rasterize Layers",
+                    "Link Layers",
+                    "Merge Layers",
+                ],
+                &["Blending Options…", "Copy Layer Style", "Paste Layer Style", "Clear Layer Style"],
+                &["Disable Layer Mask", "Apply Layer Mask", "Delete Layer Mask", "Edit Contents", "Convert to Layers"],
+            ),
+        ];
+        for (case, doc, on, enabled, disabled, absent) in cases {
+            let mut h = harness(doc());
+            let at = match on {
+                On::Row(name) => row(&h, name).center(),
+                On::Thumb(name, part) => thumb(&h, name, part).center(),
+                On::Eye(_) => unreachable!(),
+            };
+            press(&mut h, at, PointerButton::Secondary);
+            for label in enabled.iter() {
+                assert!(!h.get_by_label(label).accesskit_node().is_disabled(), "{case}: {label} is offered");
+            }
+            for label in disabled.iter() {
+                assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{case}: {label} is greyed");
+            }
+            for label in absent.iter() {
+                assert!(h.query_by_label(label).is_none(), "{case}: {label} is not offered");
+            }
+        }
+    }
 }
