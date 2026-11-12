@@ -943,6 +943,8 @@ mod move_shift_diagonal_tests;
 #[cfg(test)]
 mod layers_footer_tests;
 #[cfg(test)]
+mod layers_rows_tests;
+#[cfg(test)]
 mod layers_thumbnail_tests;
 
 #[cfg(test)]
