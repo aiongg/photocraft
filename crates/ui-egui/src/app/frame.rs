@@ -88,7 +88,8 @@ impl PhotocraftApp {
         // A window bigger than its display (1440 × 900 on 1366 × 768) runs under the taskbar:
         // maximize it into the work area once (#315).
         work_area::fit_window(ctx);
-        discard_ui::guard_window_close(self, ctx);
+        // The runtime's close path, which asks PhotoCraft when the window was asked to close.
+        craft::ui::shell::embed::logic(ctx, || discard_ui::close_decision(self));
         // A zoom field being typed in: plays its alert, and notes a click on the pasteboard.
         crate::zoom_field::tick(self, ctx);
         // A colour swatch's Color Picker OK hands its colour back to the swatch widget.
@@ -364,6 +365,8 @@ impl PhotocraftApp {
         }
         palette::show(self, &ctx);
         dialogs::show(self, &ctx);
+        // The framework dialogs PhotoCraft keeps open, over its own.
+        self.framework_dialogs(ui);
         layers_panel_ui::show_dialog(self, &ctx);
         rasterize_prompt::run_pending(self, &ctx);
         jobs_ui::dialog(self, &ctx);

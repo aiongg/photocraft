@@ -59,6 +59,16 @@ static I18N: LazyLock<I18n> = LazyLock::new(|| {
     i18n
 });
 
+/// The same catalogs for the craft framework's components, which take their words from the
+/// framework's own craft-i18n through the `Host`.
+pub(crate) fn framework_i18n() -> &'static std::sync::Arc<craft::i18n::I18n> {
+    static FRAMEWORK: LazyLock<std::sync::Arc<craft::i18n::I18n>> = LazyLock::new(|| {
+        let offered: Vec<&str> = LANGUAGES.iter().map(|l| l.code).collect();
+        std::sync::Arc::new(craft::i18n::I18n::new(CRAFT_I18N, &offered).0)
+    });
+    &FRAMEWORK
+}
+
 /// One UI language PhotoCraft offers, when its catalogs are embedded: what the app needs beyond
 /// them. Its name and translations come from craft-i18n.
 pub struct LangInfo {

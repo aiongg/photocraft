@@ -88,8 +88,6 @@ impl Win {
             v.inner_rect = Some(inner);
             v.outer_rect = Some(Rect::from_min_max(inner.min + self.frame_offset, inner.max - self.frame_offset));
         }
-        // What `PhotocraftApp::raw_input_hook` does.
-        release_after_os_resize(&self.ctx, &mut input);
         let app = &mut self.app;
         let mut out = self.ctx.run_ui(input, |ui| {
             // What `ui_body` does first.
@@ -390,29 +388,6 @@ fn after_an_os_resize_the_edge_hovers_and_shows_its_cursor_again() {
     assert_eq!(out.platform_output.cursor_icon, CursorIcon::ResizeWest);
     // And the next press resizes again (it alternated before).
     assert!(w.gesture(&[p, p + vec2(6.0, 0.0)]).contains(&ViewportCommand::BeginResize(ResizeDirection::West)));
-}
-
-/// Where the OS does send the release of a resize (Windows), no second one is added: a
-/// release right after it could count as a click on what lies under the edge.
-#[test]
-fn a_release_the_os_sends_is_not_doubled() {
-    let mut w = Win::new(1000.0);
-    w.frame(vec![]);
-    let p = pos2(3.0, 300.0);
-    w.frame(vec![Event::PointerMoved(p)]);
-    w.frame(vec![button(p, true, egui::PointerButton::Primary)]);
-    w.frame(vec![Event::PointerMoved(p + vec2(6.0, 0.0))]);
-    // The release arrives with the next input.
-    let mut raw = RawInput { events: vec![button(p + vec2(6.0, 0.0), false, egui::PointerButton::Primary)], ..Default::default() };
-    release_after_os_resize(&w.ctx, &mut raw);
-    assert_eq!(raw.events.len(), 1, "{:?}", raw.events);
-    // Or it already arrived in an earlier input: egui has the button up, nothing to end.
-    let mut w = Win::new(1000.0);
-    w.frame(vec![]);
-    w.gesture(&[p, p + vec2(6.0, 0.0)]);
-    let mut raw = RawInput::default();
-    release_after_os_resize(&w.ctx, &mut raw);
-    assert!(raw.events.is_empty(), "{:?}", raw.events);
 }
 
 /// #5725: the window manager keeps the button release of an OS move just as of a resize, so

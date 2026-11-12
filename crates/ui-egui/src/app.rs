@@ -15,6 +15,7 @@ mod control;
 mod files;
 pub(crate) use files::ensure_memory_to_save;
 mod frame;
+pub(crate) mod framework;
 mod gpu;
 mod ime;
 mod input;
@@ -224,6 +225,7 @@ impl PhotocraftApp {
             held_record_again: None,
             held_insert_menu: None,
             allow_close: false,
+            framework: Default::default(),
             stylus: Default::default(),
             control_click: Default::default(),
             background_jobs: false,
@@ -264,6 +266,7 @@ impl eframe::App for PhotocraftApp {
     /// Drain the platform's optional WinTab queue before the frame's input is processed.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         let frame_start = gpu_canvas::now_ms();
+        self.framework_before_input(ctx);
         if let Some(tablet_poll) = self.services.tablet_poll.as_mut() {
             tablet_poll(raw_input.focused);
         }
@@ -294,9 +297,6 @@ impl eframe::App for PhotocraftApp {
         // A pen held still is no touch screen's press-and-hold right click (stylus.rs).
         let pen_down = self.stylus.pen_contacts.observe(&raw_input.events);
         stylus::pen_hold_is_no_right_click(ctx, pen_down);
-        if self.custom_titlebar {
-            titlebar::release_after_os_resize(ctx, raw_input);
-        }
         // The OS's moves and the control channel's (injected just above).
         let moves = raw_input.events.iter().filter(|e| matches!(e, egui::Event::PointerMoved(_))).count();
         self.perf.stage.start(frame_start, moves);

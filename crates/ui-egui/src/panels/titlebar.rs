@@ -11,6 +11,7 @@
 //! from the desktop's button layout. The shapes are drawn here, not read from the icon theme.
 
 use egui::{Color32, CursorIcon, Id, LayerId, Order, PointerButton, Pos2, Rect, ResizeDirection, Sense, Stroke, Ui, Vec2, ViewportCommand, pos2, vec2};
+use craft::ui::runtime::windows::{ResizeEdge, WindowAction, WindowHost};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -467,35 +468,37 @@ fn zones(w: Rect) -> [(Rect, ResizeDirection, CursorIcon); 8] {
     ]
 }
 
-fn resize_handed_off_id() -> Id {
-    Id::unique("titlebar-resize-handed-off")
+/// The OS starts moving or resizing the window with the held press, through the craft runtime's
+/// window host. The window manager keeps that press's release, so the runtime ends the press on
+/// the next input and shows the default cursor once the pointer moves again (#5725, #1581).
+fn os_action(ctx: &egui::Context, action: WindowAction) {
+    WindowHost::of(ctx).act(egui::ViewportId::ROOT, action);
 }
 
-/// An OS resize or move started at `pass`; `released` is the pass whose input ended the press
-/// ([`release_after_os_resize`]).
-#[derive(Clone, Copy, Debug)]
-struct HandOff {
-    pass: u64,
-    released: Option<u64>,
-}
-
-/// The OS took the press at this pass: [`release_after_os_resize`] ends it on the next input.
-fn hand_off(ctx: &egui::Context) {
-    let pass = ctx.cumulative_pass_nr();
-    ctx.data_mut(|d| d.insert_temp(resize_handed_off_id(), HandOff { pass, released: None }));
+/// The runtime's name for the edge `dir` resizes from.
+fn edge(dir: ResizeDirection) -> ResizeEdge {
+    match dir {
+        ResizeDirection::North => ResizeEdge::Top,
+        ResizeDirection::South => ResizeEdge::Bottom,
+        ResizeDirection::West => ResizeEdge::Left,
+        ResizeDirection::East => ResizeEdge::Right,
+        ResizeDirection::NorthWest => ResizeEdge::TopLeft,
+        ResizeDirection::NorthEast => ResizeEdge::TopRight,
+        ResizeDirection::SouthWest => ResizeEdge::BottomLeft,
+        ResizeDirection::SouthEast => ResizeEdge::BottomRight,
+    }
 }
 
 /// Move the window from this press. The window manager takes the press of an OS move as it does
 /// that of a resize and keeps its release, so egui kept the drag: every other move failed, and a
-/// resize right after one (#5725). The same hand-off ends it.
+/// resize right after one (#5725). The runtime ends it ([`os_action`]).
 ///
 /// A pen or touch press moves the window itself instead ([`PenDrag`], #7967).
 pub(crate) fn start_os_move(ctx: &egui::Context) {
     if start_pen_drag(ctx, PenDragKind::Move) {
         return;
     }
-    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
-    hand_off(ctx);
+    os_action(ctx, WindowAction::StartMove);
 }
 
 /// What a pen or touch press on the title bar or an edge does.
@@ -680,40 +683,6 @@ fn resized(r: Rect, dir: ResizeDirection, d: Vec2, min: Vec2) -> Rect {
     r
 }
 
-/// The compositor takes the button release of an OS resize or move (KDE Wayland, KWin on X11), so
-/// egui kept the edge pressed: the zones stopped hovering until the next click, every other resize
-/// (#1581, and #5725 for moves). End the press ourselves on the input after the hand-off, but only
-/// while egui still has it down and this input brings no release of its own: where the OS does send
-/// it (Windows), nothing is added, so no second release can turn into a click. Call from
-/// `raw_input_hook`.
-pub fn release_after_os_resize(ctx: &egui::Context, raw: &mut egui::RawInput) {
-    let Some(h) = ctx.data(|d| d.get_temp::<HandOff>(resize_handed_off_id())) else { return };
-    if h.released.is_some() || h.pass >= ctx.cumulative_pass_nr() {
-        return;
-    }
-    let os_released = raw.events.iter().any(|e| matches!(e, egui::Event::PointerButton { button: PointerButton::Primary, pressed: false, .. }));
-    if let Some(pos) = ctx.input(|i| i.pointer.latest_pos()).filter(|_| !os_released && ctx.input(|i| i.pointer.primary_down())) {
-        raw.events.push(egui::Event::PointerButton { pos, button: PointerButton::Primary, pressed: false, modifiers: ctx.input(|i| i.modifiers) });
-    }
-    let pass = ctx.cumulative_pass_nr();
-    ctx.data_mut(|d| d.insert_temp(resize_handed_off_id(), HandOff { released: Some(pass), ..h }));
-}
-
-/// The compositor owns the pointer during an OS resize: it sets its own cursor, and the button
-/// release goes to it, not to us. egui-winit only re-sends a cursor that changed, so afterwards the
-/// window kept the compositor's arrow until the next press (KDE Wayland, #1581). On the first
-/// pointer motion after the hand-off, show the default cursor for one frame so the resize cursor is
-/// sent again on the next.
-fn reshow_cursor_after_os_resize(ctx: &egui::Context) {
-    // Only motion after the press was ended means the compositor gave the pointer back.
-    let Some(HandOff { released: Some(pass), .. }) = ctx.data(|d| d.get_temp::<HandOff>(resize_handed_off_id())) else { return };
-    if pass < ctx.cumulative_pass_nr() && ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::PointerMoved(_)))) {
-        ctx.data_mut(|d| d.remove::<HandOff>(resize_handed_off_id()));
-        ctx.set_cursor_icon(CursorIcon::Default);
-        ctx.request_repaint();
-    }
-}
-
 /// Invisible resize zones along the window's edges, above everything else; a press in one starts
 /// an OS resize in that direction (a pen's or a finger's: a [`PenDrag`]). None while the window
 /// is maximized or full screen.
@@ -721,7 +690,6 @@ pub fn resize_zones(ui: &mut Ui) {
     let ctx = ui.ctx().clone();
     follow_pen_drag(&ctx);
     if maximized(&ctx) || ctx.input(|i| i.viewport().fullscreen.unwrap_or(false)) {
-        reshow_cursor_after_os_resize(&ctx);
         return;
     }
     let w = ctx.content_rect();
@@ -730,12 +698,9 @@ pub fn resize_zones(ui: &mut Ui) {
     for (i, (r, dir, cursor)) in zones(w).into_iter().enumerate() {
         let resp = zui.interact(r, Id::unique(("titlebar-resize", i)), Sense::drag()).on_hover_cursor(cursor);
         if resp.drag_started_by(PointerButton::Primary) && !start_pen_drag(&ctx, PenDragKind::Resize(dir)) {
-            ctx.send_viewport_cmd(ViewportCommand::BeginResize(dir));
-            hand_off(&ctx);
+            os_action(&ctx, WindowAction::StartResize(edge(dir)));
         }
     }
-    // After the zones, so its one-frame cursor wins over theirs.
-    reshow_cursor_after_os_resize(&ctx);
 }
 
 #[cfg(test)]

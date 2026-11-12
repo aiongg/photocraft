@@ -18,7 +18,8 @@
 //!
 //! Widgets read [`Tokens::get`] instead of hard-coding colours, so every theme applies everywhere.
 
-use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle, Visuals};
+use egui::{Color32, CornerRadius, FontData, FontFamily, FontId, Stroke, TextStyle, Visuals};
+use craft::ui::fonts::UiFonts;
 use photocraft_engine::prefs::UiFontSize;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -850,29 +851,30 @@ pub fn install_fonts(ctx: &egui::Context) {
     install_fonts_with(ctx, crate::cjk_fonts::Sources::system());
 }
 
-/// [`install_fonts`] with the CJK and other-script fallback fonts taken from `cjk` (tests swap the sources).
-pub fn install_fonts_with(ctx: &egui::Context, cjk: crate::cjk_fonts::Sources) {
-    // egui's default fonts stay last in the stack, for symbols and emoji Inter lacks.
-    let mut fonts = crate::egui_fonts::definitions();
+/// PhotoCraft's faces as the craft framework's font stack: Inter for the interface with its
+/// `medium` and `semibold` families, JetBrains Mono for numbers. The framework puts egui's default
+/// faces after them, for symbols Inter lacks.
+fn ui_fonts() -> UiFonts<'static> {
+    use craft::ui::fonts::{Family, FontRef, I18nScripts, SEMIBOLD};
+    let (proportional, monospace, medium, semibold) = (FontRef::proportional(), FontRef::monospace(), FontRef::named("medium"), FontRef::named(SEMIBOLD));
+    let mut faces: Vec<(String, FontData, Vec<FontRef>)> = Vec::new();
     // The bundled fonts are inflated on first use (photocraft_text::fonts). Should one ever fail
-    // to inflate (empty bytes), it is left out and egui's default fonts draw that text.
-    let add = |fonts: &mut FontDefinitions, name: &str, bytes: &'static [u8]| -> Option<String> {
-        if bytes.is_empty() {
-            log::error!("bundled font {name} is unavailable; using the default UI font");
-            return None;
-        }
-        fonts.font_data.insert(name.to_owned(), Arc::new(FontData::from_static(bytes)));
-        Some(name.to_owned())
+    // to inflate (empty bytes), it is left out and the next face draws that text.
+    let mut add = |name: &str, data: Option<FontData>, families: &[FontRef]| match data {
+        Some(data) => faces.push((name.to_owned(), data, families.to_vec())),
+        None => log::error!("bundled font {name} is unavailable; using the default UI font"),
     };
-    let inter = add(&mut fonts, "Inter", photocraft_text::fonts::INTER_REGULAR.as_slice());
-    let medium = add(&mut fonts, "Inter-Medium", photocraft_text::fonts::INTER_MEDIUM.as_slice());
-    let semibold = add(&mut fonts, "Inter-SemiBold", photocraft_text::fonts::INTER_SEMIBOLD.as_slice());
-    let mono = add(&mut fonts, "JetBrainsMono", photocraft_text::fonts::JETBRAINS_MONO_REGULAR.as_slice());
-    if let Some(inter) = inter {
-        fonts.families.entry(FontFamily::Proportional).or_default().insert(0, inter);
-    }
-    if let Some(mono) = mono {
-        fonts.families.entry(FontFamily::Monospace).or_default().insert(0, mono);
+    let bundled = |bytes: &'static [u8]| (!bytes.is_empty()).then(|| FontData::from_static(bytes));
+    // Each family's own face first, then Inter behind the named weights.
+    add("Inter-Medium", bundled(photocraft_text::fonts::INTER_MEDIUM.as_slice()), std::slice::from_ref(&medium));
+    add("Inter-SemiBold", bundled(photocraft_text::fonts::INTER_SEMIBOLD.as_slice()), std::slice::from_ref(&semibold));
+    add("JetBrainsMono", bundled(photocraft_text::fonts::JETBRAINS_MONO_REGULAR.as_slice()), std::slice::from_ref(&monospace));
+    add("Inter", bundled(photocraft_text::fonts::INTER_REGULAR.as_slice()), &[proportional.clone(), medium.clone(), semibold.clone()]);
+    let every = [proportional, monospace, medium, semibold];
+    // egui's monochrome emoji faces, which the framework's default faces leave out.
+    let egui_faces = crate::egui_fonts::definitions();
+    for name in ["NotoEmoji-Regular", "emoji-icon-font"] {
+        add(name, egui_faces.font_data.get(name).map(|data| (**data).clone()), &every);
     }
     // The optional craft-fonts input carries Japanese, Simplified Chinese, Korean, Arabic, Thai and
     // other faces. They are not registered into this static stack: `cjk_fonts` installs a
@@ -882,25 +884,30 @@ pub fn install_fonts_with(ctx: &egui::Context, cjk: crate::cjk_fonts::Sources) {
     // glyph once a broad face is discovered; see `cjk_fonts`.)
     // Served script fallbacks the web build has received (Arabic, Japanese…), after everything else.
     for (name, data) in crate::served_fonts::ui_faces() {
-        fonts.font_data.insert(name.clone(), data);
-        for family in [FontFamily::Proportional, FontFamily::Monospace] {
-            fonts.families.entry(family).or_default().push(name.clone());
-        }
+        add(&name, Some((*data).clone()), &every);
     }
-    // Named weights fall back to the default stack for missing glyphs.
-    let fallback: Vec<String> = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
-    for (fam, primary) in [("medium", medium), ("semibold", semibold)] {
-        let mut stack: Vec<String> = primary.into_iter().collect();
-        stack.extend(fallback.iter().cloned());
-        fonts.families.insert(FontFamily::Name(fam.into()), stack);
+    let fonts = UiFonts::new(&I18nScripts).family(Family::named("medium").weight(500)).family(Family::named(SEMIBOLD).weight(600));
+    faces.into_iter().fold(fonts, |fonts, (name, data, families)| fonts.app_face(&name, data, &families))
+}
+
+/// [`install_fonts`] with the CJK and other-script fallback fonts taken from `cjk` (tests swap the sources).
+/// The first install on a context installs the craft runtime too (`app/framework.rs`).
+pub fn install_fonts_with(ctx: &egui::Context, cjk: crate::cjk_fonts::Sources) {
+    let fonts = ui_fonts();
+    crate::app::framework::install(ctx, &fonts);
+    // Every face of the stack at Interface › UI Font Size, egui's default faces the framework
+    // adds included. The runtime's install takes no edited stack, so on the first install this
+    // replaces the stack it just installed.
+    let mut stack = fonts.stack();
+    for (name, data) in stack.flat_definitions().font_data {
+        let mut data = (*data).clone();
+        size_ui_font(ctx, &name, &mut data);
+        stack.replace(&name, data);
     }
-    let size = ui_font_size(ctx);
-    for (name, data) in &mut fonts.font_data {
-        size_ui_font(ctx, name, Arc::make_mut(data));
-    }
-    ctx.set_fonts(fonts);
+    stack.install(ctx);
     // egui keeps the first plugin of a type, so a re-install (language change) resets the
     // existing one. The new definitions land next pass: the plugin must not rescale before then.
+    let size = ui_font_size(ctx);
     if ctx
         .with_plugin::<UiFontSizePlugin, _>(|plugin| {
             plugin.applied = size;

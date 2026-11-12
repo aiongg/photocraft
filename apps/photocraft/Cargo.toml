@@ -68,9 +68,6 @@ objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std
 # The macOS menu bar (mac_menu.rs): a standalone native menu crate (from the tauri-apps org, but
 # not Tauri: no webview, no JS), AppKit menus behind a safe API (no GTK with default features off). Pinned exactly: review the diff before bumping.
 muda = { version = "=0.21.2", default-features = false }
-# Quit with `terminate:` from the main queue, outside winit's event handler (mac_window.rs).
-# Already in Cargo.lock (winit, objc2-app-kit); pinned exactly to the same version.
-dispatch2 = { version = "=0.3.1", default-features = false, features = ["std"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "=1.1.5", features = ["fs"] }

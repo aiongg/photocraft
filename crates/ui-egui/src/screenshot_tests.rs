@@ -545,6 +545,8 @@ fn actual_callback_fixture() -> ActualCallbackFixture {
     let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), services);
     app.run("file.new", serde_json::json!({"width": 32, "height": 32})).unwrap();
     let ctx = Context::default();
+    // `raw_input_hook` hands the craft runtime its frame input, as on the app's context.
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     for _ in 0..4 {
         actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
     }

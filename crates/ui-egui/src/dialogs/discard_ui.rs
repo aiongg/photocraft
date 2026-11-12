@@ -5,6 +5,7 @@
 //! once every affected document has been answered. Cancel at any point drops it. Documents are
 //! tracked by id, not tab index, so closing one elsewhere while the prompt is up can't retarget it.
 
+use craft::ui::shell::embed::CloseDecision;
 use egui::Key;
 use photocraft_doc::DocId;
 use serde_json::{Value, json};
@@ -136,31 +137,21 @@ impl PhotocraftApp {
     }
 }
 
-/// Called once per frame: holds back a window close request while there is unsaved work. Every
-/// way of leaving (File › Exit / Quit, the close button, the OS's quit event, `app.quit`) ends up
-/// here as a close request.
-pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if !ctx.input(|i| i.viewport().close_requested()) {
-        return;
-    }
+/// The close decision for the craft runtime's close path (`embed::logic`), asked when the window
+/// was asked to close: hold it while there is unsaved work. Every way of leaving (File › Exit /
+/// Quit, the close button, the OS's quit event, `app.quit`) ends up here as a close request. On
+/// `Close` the runtime leaves through the platform's own quit where there is one (macOS).
+pub fn close_decision(app: &mut PhotocraftApp) -> CloseDecision {
     if !app.allow_close && intercept(app, EXIT, &Value::Null) {
-        ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-        return;
+        return CloseDecision::Hold;
     }
     // A save or print worker must finish its external side effect before the process exits;
     // `jobs_ui` repeats the close after completion and keeps errors visible.
     if app.saving() || app.printing() {
-        ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
         app.jobs.close_after_saves = true;
-        return;
+        return CloseDecision::Hold;
     }
-    // Leaving: through the platform's own quit where there is one (see `Services::quit`), with
-    // the window left open for it to close.
-    if let Some(quit) = app.services.quit.as_mut() {
-        ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-        quit();
-    }
+    CloseDecision::Close
 }
 
 /// Moves on to the next document, or runs the parked action once none are left.

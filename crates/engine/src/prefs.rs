@@ -1369,6 +1369,9 @@ pub struct Preferences {
     /// The last choices of dialogs that remember them across restarts, by command id (Edit ›
     /// Fill…: `"edit.fill"` → its params). JSON owned by the shell.
     pub dialogs: BTreeMap<String, Value>,
+    /// The craft framework's settings sections (craft-host's `SectionStore`), by section key:
+    /// the remembered state of framework components. JSON owned by the shell.
+    pub sections: BTreeMap<String, Value>,
     /// The Brush Preset picker's remembered view: which card parts show (name, stroke, tip) and
     /// the footer slider's card scale, saved as the user changes them and restored at launch.
     /// JSON owned by the shell.

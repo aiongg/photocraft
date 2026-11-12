@@ -168,10 +168,15 @@ pub(super) fn display_scale(pref: prefs::UiScale, native: Option<f32>) -> f32 {
 }
 
 pub(super) fn sync_display_scale(app: &PhotocraftApp, ctx: &egui::Context) {
+    ctx.set_zoom_factor(interface_zoom(app.session.prefs().interface.ui_scale, ctx));
+}
+
+/// The zoom factor over the native pixels per point that gives `pref`'s scale. The craft runtime
+/// sets the same one before each frame (`app/framework.rs`).
+pub(crate) fn interface_zoom(pref: prefs::UiScale, ctx: &egui::Context) -> f32 {
     let native = ctx.native_pixels_per_point();
     let native_scale = native.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(1.0);
-    let scale = display_scale(app.session.prefs().interface.ui_scale, native);
-    ctx.set_zoom_factor(scale / native_scale);
+    display_scale(pref, native) / native_scale
 }
 
 /// Interface › Show Tooltips and Tools › Show Tooltips (either one off hides them): egui never

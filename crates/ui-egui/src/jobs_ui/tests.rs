@@ -728,13 +728,13 @@ fn a_running_save_shows_its_percentage_in_the_status_bar_and_tab_title() {
     }
 }
 
-/// One frame with the window's close button pressed; whether the guard cancelled the close.
+/// One frame with the window's close button pressed; whether the close path cancelled the close.
 fn press_window_close(app: &mut PhotocraftApp) -> bool {
     let mut info = egui::ViewportInfo::default();
     info.events.push(egui::ViewportEvent::Close);
     let mut input = egui::RawInput::default();
     input.viewports.insert(egui::ViewportId::ROOT, info);
-    let mut out = egui::Context::default().run_ui(input, |ui| crate::discard_ui::guard_window_close(app, ui.ctx()));
+    let mut out = crate::app::framework::close_path_frame(app, input);
     out.textures_delta.clear();
     out.viewport_output.remove(&egui::ViewportId::ROOT).is_some_and(|o| o.commands.iter().any(|c| matches!(c, egui::ViewportCommand::CancelClose)))
 }

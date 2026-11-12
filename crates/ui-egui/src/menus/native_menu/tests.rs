@@ -400,6 +400,8 @@ fn a_paste_key_equivalent_pastes_once() {
     for same_frame in [false, true] {
         let mut app = app(true);
         let ctx = egui::Context::default();
+        // `raw_input_hook` hands the craft runtime its frame input, as on the app's context.
+        PhotocraftApp::setup_context(&ctx, Default::default());
         app.run("select.rect", json!({"x": 0, "y": 0, "width": 8, "height": 4})).unwrap();
         app.run("edit.copy", json!({})).unwrap();
         let layers = |app: &PhotocraftApp| app.session.active().unwrap().doc.layer_count();
