@@ -14,7 +14,7 @@ craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45
 # The craft framework through its facade (`craft::ui::…`). Its `craft-ui` package shares the name of the
 # one above; nothing depends on both under that name. The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
-craft = { git = "https://github.com/aiongg/craft-libs", rev = "105127bb3b65baf9d7a7cdc1ff5799f1ff0e6eba" }
+craft = { git = "https://github.com/aiongg/craft-libs", rev = "89d2c11f689bab8a5cf01e869375f85660597863" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
@@ -210,20 +210,20 @@ opt-level = 3
 
 # Keep the complete egui family and native event bridge on reviewed fork commits.
 [patch.crates-io]
-ecolor = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-emath = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-epaint = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-epaint_default_fonts = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui-winit = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui-wgpu = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_glow = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_extras = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_kittest = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_system_font_provider = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-eframe = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_demo_lib = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
-egui_inspection = { git = "https://github.com/aiongg/egui.git", rev = "3f56db2d932d5ce35ff420f8679896b646be9e77" }
+ecolor = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+emath = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+epaint = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+epaint_default_fonts = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui-winit = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui-wgpu = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_glow = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_extras = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_kittest = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_system_font_provider = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+eframe = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_demo_lib = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
+egui_inspection = { git = "https://github.com/aiongg/egui.git", rev = "42e34e2acf5232928bc5f3fe092733d41b09cfe3" }
 winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }
 # craft-pdf's vendored Hayro trees: consumers patch the same craft-libs revision (crates/pdf README).
 hayro = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
