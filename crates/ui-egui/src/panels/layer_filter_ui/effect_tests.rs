@@ -1,14 +1,9 @@
 //! #10880: the Layers panel's Effect filter, against the cases measured in Photoshop.
 
-use egui::vec2;
-use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
-use photocraft_doc::Document;
 use serde_json::json;
 
 use super::effect::EffectKind;
 use super::{Filter, FilterBy};
-use crate::PhotocraftApp;
 use crate::state::UiState;
 
 /// One pixel layer per effect kind (the three overlays each on their own), "shadow off" whose
@@ -38,10 +33,7 @@ fn session() -> photocraft_engine::Session {
     s
 }
 
-/// The names `filter` lists, top to bottom.
-fn listed(doc: &Document, filter: &Filter) -> Vec<String> {
-    crate::layer_tree_ui::display_rows(doc, filter.active()).into_iter().filter(|(_, l)| filter.shows(l)).map(|(_, l)| l.name.clone()).collect()
-}
+use super::tests::listed;
 
 fn by_effect(effect: EffectKind) -> Filter {
     Filter::of(&UiState { layer_filter_by: FilterBy::Effect, layer_filter_effect: effect, ..UiState::default() })
@@ -71,7 +63,6 @@ fn each_effect_lists_the_layers_with_it_enabled() {
 fn effect_filters_at_once_with_bevel_and_emboss() {
     let f = Filter::of(&UiState { layer_filter_by: FilterBy::Effect, ..UiState::default() });
     assert_eq!(f.effect, EffectKind::BevelEmboss);
-    assert!(f.active(), "Effect filters as soon as it's picked");
 }
 
 #[test]
@@ -79,7 +70,7 @@ fn ui_set_picks_the_effect_by_id() {
     let mut ui = UiState::default();
     for effect in EffectKind::ALL {
         let f = super::patched(&ui, &json!({"by": "effect", "effect": effect.id()})).unwrap();
-        super::apply(&mut ui, f);
+        super::store(&mut ui, f);
         assert_eq!((ui.layer_filter_by, ui.layer_filter_effect), (FilterBy::Effect, effect));
     }
     let err = super::patched(&ui, &json!({"effect": "colorOverlay"})).unwrap_err();
@@ -95,34 +86,4 @@ fn saved_settings_without_the_effect_still_load() {
     saved.as_object_mut().unwrap().remove("layer_filter_effect");
     let ui: UiState = serde_json::from_value(saved).unwrap();
     assert_eq!(ui.layer_filter_effect, EffectKind::BevelEmboss);
-}
-
-/// The names of the rows the Layers panel drew, top to bottom.
-fn drawn(h: &Harness<'_, PhotocraftApp>) -> Vec<String> {
-    let doc = &h.state().session.active().unwrap().doc;
-    let mut rows = crate::layer_row_ui::recorded(&h.ctx);
-    rows.sort_by(|a, b| a.row.top().total_cmp(&b.row.top()));
-    rows.iter().filter_map(|r| doc.walk().into_iter().find(|(_, _, l)| l.id.0 == r.layer).map(|(_, _, l)| l.name.clone())).collect()
-}
-
-#[test]
-fn the_panel_filters_by_the_effect_picked_in_the_dropdown() {
-    let session = session();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 1200.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(session, crate::Services::default())
-    });
-    h.run_steps(8);
-    h.get_by_value("Kind").click();
-    h.run_steps(4);
-    h.query_all_by_label("Effect").last().expect("Effect in the open list").click();
-    h.run_steps(4);
-    assert_eq!(h.state().ui.layer_filter_by, FilterBy::Effect);
-    assert_eq!(drawn(&h), ["bevel"], "Bevel & Emboss at first");
-    h.get_by_value("Bevel & Emboss").click();
-    h.run_steps(4);
-    h.query_all_by_label("Drop Shadow").last().expect("Drop Shadow in the open list").click();
-    h.run_steps(4);
-    assert_eq!(h.state().ui.layer_filter_effect, EffectKind::DropShadow);
-    assert_eq!(drawn(&h), ["shadow"]);
 }

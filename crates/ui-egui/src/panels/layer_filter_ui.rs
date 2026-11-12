@@ -1,15 +1,11 @@
-//! The Layers panel's filter row (#5048): a filter-type dropdown, as in Photoshop, then the
-//! controls for that type. Kind toggles layer kinds, Name matches part of the layer name, Effect
-//! picks one effect kind (#10880), Mode picks one blend mode, Attribute one layer attribute or
-//! its opposite (#10881), Color one layer colour label (#5898), Smart Object toggles linked,
-//! missing and embedded smart objects, Artboard lists only the artboards that hold the selected
-//! layers, Group every group with its contents (#10883). The criteria live in `UiState`
-//! (`layer_filter*`), so the control channel can read and set them.
-
-use std::collections::HashSet;
+//! The Layers panel filter's criteria as `UiState` keeps them (`layer_filter*`) and the control
+//! channel reads and sets them (`ui.set {layerFilter}`). craft-layers' `LayerFilter` draws the
+//! filter row and decides what each type lists (`layers_tree::filter_of` converts); the types are
+//! Kind, Name, Effect (#10880), Mode, Attribute (#10881), Color (#5898), Smart Object, Artboard and
+//! Group (#10883).
 
 use photocraft_color::BlendMode;
-use photocraft_doc::{Document, Fill, LabelColor, Layer, LayerContent, LayerId, SmartSource};
+use photocraft_doc::LabelColor;
 use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
@@ -31,7 +27,7 @@ pub enum FilterBy {
     Group,
 }
 
-/// The filter criteria, copied out of `UiState` for one frame of the Layers panel.
+/// The filter criteria, copied out of `UiState`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Filter {
     pub by: FilterBy,
@@ -44,15 +40,6 @@ pub struct Filter {
     pub color: LabelColor,
     /// The Smart Object toggles that are on, from [`SMART`].
     pub smart: Vec<String>,
-    /// The linked files the Smart Object filter's Missing toggle lists
-    /// ([`photocraft_engine::Session::missing_links`]).
-    pub missing: HashSet<String>,
-    /// The rows the Artboard filter ([`board_rows`]) or the Group filter ([`group::listed`])
-    /// lists; empty lists every row under Artboard and none under Group.
-    pub board_rows: HashSet<LayerId>,
-    /// The empty layers the Attribute filter's Empty and Not Empty use
-    /// ([`attribute::empty_layers`]); `None` reads each layer's pixels.
-    pub empty: Option<std::sync::Arc<HashSet<LayerId>>>,
 }
 
 impl Filter {
@@ -66,122 +53,8 @@ impl Filter {
             attribute: ui.layer_filter_attribute,
             color: ui.layer_filter_color,
             smart: ui.layer_filter_smart.clone(),
-            missing: HashSet::new(),
-            board_rows: HashSet::new(),
-            empty: None,
         }
     }
-
-    /// Returns [`Filter::of`] for `app`'s settings, with the active document's missing linked
-    /// files while the panel filters by Smart Object, and `board_rows` set to the rows of the
-    /// artboards in `doc` that hold `selection` while it filters by Artboard, and `empty` set
-    /// while it filters by Empty or Not Empty. The Layers panel passes the document and the
-    /// selection it already read for the frame.
-    pub fn with_selection(app: &PhotocraftApp, doc: &Document, selection: &[LayerId]) -> Self {
-        let mut f = Self::of(&app.ui);
-        if f.by == FilterBy::SmartObject {
-            f.missing = app.session.missing_links();
-        }
-        if f.by == FilterBy::Artboard {
-            f.board_rows = board_rows(doc, selection);
-        }
-        if f.by == FilterBy::Group {
-            f.board_rows = group::listed(doc);
-        }
-        if f.by == FilterBy::Attribute {
-            f.empty = attribute::empty_layers(app, f.attribute);
-        }
-        f
-    }
-
-    /// Returns [`Filter::with_selection`] for the active document and its selected layers, or
-    /// [`Filter::of`] with no artboard rows when no document is open.
-    pub fn of_app(app: &PhotocraftApp) -> Self {
-        match app.session.active() {
-            Some(d) => Self::with_selection(app, &d.doc, &d.selected_layers()),
-            None => Self::of(&app.ui),
-        }
-    }
-
-    /// Whether the panel is filtered. Like Photoshop, Effect, Mode, Attribute and Color always
-    /// filter (by Bevel & Emboss, by Normal, by Visible and by no colour at first), and so does Group; Kind, Name and
-    /// Smart Object only once a toggle is on or some text is typed; Artboard only while some layers
-    /// are selected and each of them is in an artboard.
-    pub fn active(&self) -> bool {
-        match self.by {
-            FilterBy::Kind => !self.kinds.is_empty(),
-            FilterBy::Name => !self.name.trim().is_empty(),
-            FilterBy::Effect | FilterBy::Mode | FilterBy::Attribute | FilterBy::Color => true,
-            FilterBy::SmartObject => !self.smart.is_empty(),
-            FilterBy::Artboard => !self.board_rows.is_empty(),
-            FilterBy::Group => true,
-        }
-    }
-
-    /// Whether the panel lists the contents of closed groups: while it is filtered, except by
-    /// Group, which lists whole groups and keeps each one open or closed as it is (#10883).
-    pub fn show_all(&self) -> bool {
-        self.active() && self.by != FilterBy::Group
-    }
-
-    /// Whether `l` is listed under this filter.
-    pub fn shows(&self, l: &Layer) -> bool {
-        if !self.active() {
-            return true;
-        }
-        match self.by {
-            FilterBy::Kind => self.kinds.iter().any(|k| k == kind(l)),
-            FilterBy::Name => l.name.to_lowercase().contains(&self.name.trim().to_lowercase()),
-            FilterBy::Effect => self.effect.shows(l),
-            FilterBy::Mode => l.blend == self.mode,
-            FilterBy::Attribute => self.attribute.shows(l, self.empty.as_deref()),
-            FilterBy::Color => l.label == self.color,
-            FilterBy::SmartObject => {
-                let LayerContent::Smart(sm) = &l.content else { return false };
-                self.smart.iter().any(|k| match (k.as_str(), &sm.source) {
-                    ("linked", SmartSource::Linked { .. }) | ("embedded", SmartSource::Embedded { .. }) => true,
-                    ("missing", SmartSource::Linked { path }) => self.missing.contains(path),
-                    _ => false,
-                })
-            }
-            FilterBy::Artboard => self.board_rows.contains(&l.id),
-            FilterBy::Group => self.board_rows.contains(&l.id),
-        }
-    }
-}
-
-/// The Artboard filter's rows for `selection`: the artboards that hold the selected layers and
-/// every layer inside them. The set is empty when nothing is selected or a selected layer is in
-/// no artboard, and the panel is then not filtered. The panel lists these rows as its tree does: the contents of a closed
-/// group stay hidden until the group is opened (`layer_tree_ui::panel_rows` opens every group only
-/// for the types whose matches can sit in a closed group).
-pub fn board_rows(doc: &Document, selection: &[LayerId]) -> HashSet<LayerId> {
-    fn add(l: &Layer, rows: &mut HashSet<LayerId>) {
-        let mut pending = vec![l];
-        while let Some(layer) = pending.pop() {
-            rows.insert(layer.id);
-            pending.extend(layer.children().unwrap_or_default());
-        }
-    }
-    let selected: HashSet<LayerId> = selection.iter().copied().collect();
-    if selected.is_empty() {
-        return HashSet::new();
-    }
-    // Artboards are top-level groups ([`Document::artboard_of`]): each one's layers are walked once.
-    let (mut rows, mut held) = (HashSet::new(), 0);
-    for board in doc.layers.iter().filter(|l| l.artboard().is_some()) {
-        let mut inside = HashSet::new();
-        add(board, &mut inside);
-        let n = selected.iter().filter(|id| inside.contains(id)).count();
-        if n > 0 {
-            held += n;
-            rows.extend(inside);
-        }
-    }
-    if held < selected.len() {
-        return HashSet::new();
-    }
-    rows
 }
 
 /// The kinds the Kind filter toggles.
@@ -259,8 +132,8 @@ pub fn patched(current: &UiState, v: &serde_json::Value) -> Result<Filter, Strin
     Ok(f)
 }
 
-/// Store `f` as the Layers panel's filter.
-pub fn apply(ui: &mut UiState, f: Filter) {
+/// Write `f` into `ui`'s filter fields.
+fn store(ui: &mut UiState, f: Filter) {
     ui.layer_filter_by = f.by;
     ui.layer_filter = f.kinds;
     ui.layer_filter_name = f.name;
@@ -271,49 +144,49 @@ pub fn apply(ui: &mut UiState, f: Filter) {
     ui.layer_filter_smart = f.smart;
 }
 
-/// The kind filter's name for `l`'s content ("" for groups, which no kind matches).
-fn kind(l: &Layer) -> &'static str {
-    match &l.content {
-        LayerContent::Raster(_) => "pixel",
-        LayerContent::Adjustment(_) => "adjustment",
-        // A fill layer (Layer › New Fill Layer) matches no Kind button, as in the reference
-        // application, except a solid colour with a vector mask, which lists as a shape (#10878).
-        LayerContent::Fill(Fill::Solid(_)) if l.vector_mask.is_some() => "shape",
-        LayerContent::Fill(_) => "",
-        LayerContent::Text(_) => "type",
-        LayerContent::Shape(_) => "shape",
-        LayerContent::Smart(_) => "smart",
-        LayerContent::Group(_) => "",
+/// Store `f` as the Layers panel's filter; a change deselects what it hides ([`deselect_hidden`]).
+pub fn apply(app: &mut PhotocraftApp, f: Filter) {
+    let before = super::layers_tree::filter_of(&app.ui);
+    store(&mut app.ui, f);
+    deselect_hidden(app, &before);
+}
+
+/// When the panel's filter is no longer `before`, deselect the layers it hides, as the panel's
+/// own filter row does (#10879): the listed ones stay selected, one of them active. Like any layer
+/// selection this is no history step.
+pub(crate) fn deselect_hidden(app: &mut PhotocraftApp, before: &craft::layers::ui::filter::LayerFilter) {
+    let filter = super::layers_tree::filter_of(&app.ui);
+    if filter == *before {
+        return;
+    }
+    let Some(st) = app.session.active() else { return };
+    let Some(select) = filter.deselect_hidden(&super::layers_tree::PhotoLayers::new(app, st, &filter, false, None)) else { return };
+    let mut actions = Vec::new();
+    super::layers_events::selection_actions(select.change, &st.selected_layers(), &mut actions);
+    for (id, params) in actions {
+        let _ = app.run(&id, params);
     }
 }
 
 pub mod effect;
 pub mod find;
-mod group;
-pub mod selection;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod effect_tests;
 
 pub mod attribute;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod attribute_tests;
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod find_tests;
 #[cfg(test)]
 mod selection_tests;
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod tests;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod kind_mode_tests;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod group_tests;

@@ -47,10 +47,12 @@ pub(crate) fn params_for_run(app: &PhotocraftApp, params: Value) -> Value {
 }
 
 /// Apply the Name filter in a `select.findLayers` reply to the Layers panel: switch to Name and set
-/// the text when the reply has one. [`PhotocraftApp::run`] calls it after every Find Layers.
+/// the text when the reply has one, which deselects the layers it hides. [`PhotocraftApp::run`] calls it after every Find Layers.
 pub(crate) fn apply(app: &mut PhotocraftApp, reply: &Value) {
+    let before = crate::panels::layers_tree::filter_of(&app.ui);
     app.ui.layer_filter_by = FilterBy::Name;
     if let Some(name) = reply["layerFilter"]["name"].as_str() {
         app.ui.layer_filter_name = name.to_string();
     }
+    super::deselect_hidden(app, &before);
 }

@@ -81,7 +81,6 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if filter != before {
         layers_tree::store_filter(&mut app.ui, &filter);
     }
-    crate::layer_filter_ui::selection::follow(app, &ctx);
     if out.hovered.is_some() {
         app.hover_layer = out.hovered;
     }

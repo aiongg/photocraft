@@ -6,7 +6,7 @@ use egui_kittest::Harness;
 use photocraft_doc::LayerId;
 use serde_json::json;
 
-use super::{Filter, FilterBy};
+use super::FilterBy;
 use crate::PhotocraftApp;
 
 /// "LinkA", "Other" and "LinkB" over the Background, "Other" selected.
@@ -46,9 +46,7 @@ fn selected(h: &Harness<'_, PhotocraftApp>) -> Vec<LayerId> {
 
 /// The names the panel's filter lists, top to bottom.
 fn listed(h: &Harness<'_, PhotocraftApp>) -> Vec<String> {
-    let f = Filter::of_app(h.state());
-    let doc = &h.state().session.active().unwrap().doc;
-    crate::layer_tree_ui::display_rows(doc, f.active()).into_iter().filter(|(_, l)| f.shows(l)).map(|(_, l)| l.name.clone()).collect()
+    super::tests::listed_app(h.state())
 }
 
 fn find(h: &mut Harness<'_, PhotocraftApp>, params: serde_json::Value) -> serde_json::Value {

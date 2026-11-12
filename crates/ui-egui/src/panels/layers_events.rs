@@ -97,22 +97,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                 SelectionChange::Set(ids) if ids.len() == 1 => ids.first().copied(),
                 _ => None,
             };
-            match select.change {
-                SelectionChange::Set(ids) if ids.is_empty() => actions.push(("select.deselectLayers".into(), json!({}))),
-                SelectionChange::Set(ids) if ids.len() == 1 => {
-                    if let Some(id) = ids.first() {
-                        actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "replace"})));
-                    }
-                }
-                SelectionChange::Set(ids) => actions.push(("layer.select".into(), json!({"layers": ids.iter().map(|id| id.0).collect::<Vec<_>>()}))),
-                SelectionChange::Toggle(id) => actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "toggle"}))),
-                SelectionChange::Clear => {
-                    if !selection.is_empty() {
-                        actions.push(("select.deselectLayers".into(), json!({})));
-                    }
-                }
-                _ => {}
-            }
+            selection_actions(select.change, &selection, actions);
             let Some(id) = single else { return };
             let Some(l) = layer(&id) else { return };
             target_on_click(app, l, active == Some(id), select.part, actions);
@@ -571,6 +556,26 @@ fn menu_pick(app: &mut PhotocraftApp, ctx: &egui::Context, row: &Option<LayerRow
     } else {
         let _ = ctx;
         actions.push((command.to_string(), Value::Null));
+    }
+}
+
+/// The commands that make `change` the layer selection, `selected` being the layers selected now.
+pub(crate) fn selection_actions(change: SelectionChange<LayerId>, selected: &[LayerId], actions: &mut Vec<Action>) {
+    match change {
+        SelectionChange::Set(ids) if ids.is_empty() => actions.push(("select.deselectLayers".into(), json!({}))),
+        SelectionChange::Set(ids) if ids.len() == 1 => {
+            if let Some(id) = ids.first() {
+                actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "replace"})));
+            }
+        }
+        SelectionChange::Set(ids) => actions.push(("layer.select".into(), json!({"layers": ids.iter().map(|id| id.0).collect::<Vec<_>>()}))),
+        SelectionChange::Toggle(id) => actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "toggle"}))),
+        SelectionChange::Clear => {
+            if !selected.is_empty() {
+                actions.push(("select.deselectLayers".into(), json!({})));
+            }
+        }
+        _ => {}
     }
 }
 

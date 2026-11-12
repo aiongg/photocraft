@@ -1,11 +1,13 @@
-//! The Layers panel's Attribute filter (#10881): lists the layers with one attribute (visible,
-//! locked, empty, linked, clipped, masks, effects, advanced blending) or without it.
+//! The Layers panel's Attribute filter (#10881) as `UiState` and the control channel name its
+//! attributes, and the app data it needs: which layers are empty. craft-layers lists the layers
+//! with one attribute (visible, locked, empty, linked, clipped, masks, effects, advanced blending)
+//! or without it.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 
 use photocraft_color::SampleType;
-use photocraft_doc::{AdvancedBlending, Document, Layer, LayerContent, LayerId};
+use photocraft_doc::{Document, Layer, LayerContent, LayerId};
 use photocraft_geom::{Rect, TILE_SIZE, TileCoord};
 use photocraft_raster::Surface;
 use serde::{Deserialize, Serialize};
@@ -81,38 +83,6 @@ impl Attribute {
             Attribute::NoVectorMask => "noVectorMask",
             Attribute::NoLayerEffects => "noLayerEffects",
             Attribute::NoAdvancedBlending => "noAdvancedBlending",
-        }
-    }
-
-    /// Whether `l` is listed under this attribute. Each "Not …"/"No …" entry lists the layers
-    /// (and groups) its positive entry doesn't. `empty` is the document's empty layers
-    /// ([`empty_layers_of`]); without it, Empty reads `l`'s pixels without knowing the canvas, so a
-    /// layer with an opaque default pixel is never empty.
-    pub fn shows(self, l: &Layer, empty: Option<&HashSet<LayerId>>) -> bool {
-        match self {
-            Attribute::Visible => l.visible,
-            // Any lock counts, the Background's too.
-            Attribute::Locked => l.locks.any(),
-            // A pixel layer with no visible pixels; an empty group isn't listed.
-            Attribute::Empty => empty.map_or_else(|| is_empty(l, None), |set| set.contains(&l.id)),
-            Attribute::Linked => l.link_group.is_some(),
-            // The clipped layer, not its base.
-            Attribute::Clipped => l.clipped,
-            Attribute::LayerMask => l.mask.is_some(),
-            // A shape layer's outline is its vector mask.
-            Attribute::VectorMask => l.vector_mask.is_some() || matches!(l.content, LayerContent::Shape(_)),
-            // Also a layer whose only effect is turned off, unlike the Effect filter.
-            Attribute::LayerEffects => !l.effects.items.is_empty(),
-            Attribute::AdvancedBlending => advanced_blending(l),
-            Attribute::NotVisible => !Attribute::Visible.shows(l, empty),
-            Attribute::NotLocked => !Attribute::Locked.shows(l, empty),
-            Attribute::NotEmpty => !Attribute::Empty.shows(l, empty),
-            Attribute::NotLinked => !Attribute::Linked.shows(l, empty),
-            Attribute::NotClipped => !Attribute::Clipped.shows(l, empty),
-            Attribute::NoLayerMask => !Attribute::LayerMask.shows(l, empty),
-            Attribute::NoVectorMask => !Attribute::VectorMask.shows(l, empty),
-            Attribute::NoLayerEffects => !Attribute::LayerEffects.shows(l, empty),
-            Attribute::NoAdvancedBlending => !Attribute::AdvancedBlending.shows(l, empty),
         }
     }
 }
@@ -213,13 +183,6 @@ pub fn empty_layers(app: &PhotocraftApp, attribute: Attribute) -> Option<Arc<Has
     let set = Arc::new(empty_layers_of(&d.doc));
     *cache = Some((Arc::downgrade(&d.doc), set.clone()));
     Some(set)
-}
-
-/// Whether any Advanced Blending option is away from its default: a channel left out, Knockout,
-/// the four "as Group" / "Transparency Shapes" / "Hides Effects" switches, or a Blend If range.
-/// Fill opacity alone doesn't count.
-fn advanced_blending(l: &Layer) -> bool {
-    l.excluded_channels != 0 || l.advanced != AdvancedBlending::default() || !l.blend_if.is_default()
 }
 
 /// `layerFilter.attribute`: the attribute named by `v`, or an error listing the ids.

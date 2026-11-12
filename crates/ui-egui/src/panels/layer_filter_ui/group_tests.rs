@@ -3,7 +3,7 @@
 use photocraft_engine::Session;
 use serde_json::json;
 
-use super::{Filter, FilterBy};
+use super::FilterBy;
 use crate::PhotocraftApp;
 use crate::state::UiState;
 
@@ -40,24 +40,7 @@ fn group(s: &mut Session, name: &str, group_name: &str) {
     s.execute("layer.groupLayers", json!({"name": group_name})).unwrap();
 }
 
-fn set_expanded(s: &mut Session, name: &str, expanded: bool) {
-    let layer = id(s, name);
-    s.execute("layer.setExpanded", json!({"layer": layer, "expanded": expanded})).unwrap();
-}
-
-/// The rows the panel draws, top to bottom, two spaces per level: the rows and the filter the
-/// Layers panel uses for the frame.
-fn listed(app: &PhotocraftApp) -> Vec<String> {
-    let doc = &app.session.active().unwrap().doc;
-    let f = Filter::of_app(app);
-    crate::layer_tree_ui::panel_rows(app, doc).into_iter().filter(|(_, l)| f.shows(l)).map(|(depth, l)| format!("{}{}", "  ".repeat(depth), l.name)).collect()
-}
-
-/// The selected layers' names.
-fn selected(app: &PhotocraftApp) -> Vec<String> {
-    let st = app.session.active().unwrap();
-    st.selected_layers().iter().filter_map(|id| st.doc.layer(*id)).map(|l| l.name.clone()).collect()
-}
+use super::tests::listed_app as listed;
 
 /// Top Pixel · Outer { Inner { Deep } } · Background.
 fn nested() -> Session {
@@ -73,19 +56,7 @@ fn nested() -> Session {
 #[test]
 fn lists_nested_groups_with_their_contents_and_hides_loose_layers() {
     let app = app(nested());
-    assert!(Filter::of_app(&app).active(), "Group filters at once");
-    assert_eq!(listed(&app), ["Outer", "  Inner", "    Deep"]);
-}
-
-#[test]
-fn collapsed_groups_stay_collapsed() {
-    let mut app = app(nested());
-    set_expanded(&mut app.session, "Inner", false);
-    assert_eq!(listed(&app), ["Outer", "  Inner"], "a collapsed nested group hides its children");
-    set_expanded(&mut app.session, "Outer", false);
-    assert_eq!(listed(&app), ["Outer"], "a collapsed group hides everything inside");
-    set_expanded(&mut app.session, "Outer", true);
-    assert_eq!(listed(&app), ["Outer", "  Inner"], "each group keeps its own state");
+    assert_eq!(listed(&app), ["Outer", "Inner", "Deep"]);
 }
 
 #[test]
@@ -100,10 +71,8 @@ fn an_artboard_is_not_listed_but_its_groups_are() {
     add(&mut s, "GA child");
     group(&mut s, "GA child", "G in AB");
     s.execute("layer.setExpanded", json!({"all": true, "expanded": true})).unwrap();
-    let mut app = app(s);
-    assert_eq!(listed(&app), ["  G in AB", "    GA child", "Plain G", "  G child"]);
-    set_expanded(&mut app.session, "Artboard 1", false);
-    assert_eq!(listed(&app), ["Plain G", "  G child"], "a collapsed artboard hides the groups inside it");
+    let app = app(s);
+    assert_eq!(listed(&app), ["G in AB", "GA child", "Plain G", "G child"]);
 }
 
 #[test]
@@ -113,17 +82,6 @@ fn the_list_does_not_depend_on_the_selection() {
     let with_deep = listed(&app);
     app.session.execute("select.deselectLayers", json!({})).unwrap();
     assert_eq!(listed(&app), with_deep, "same list with nothing selected");
-}
-
-#[test]
-fn applying_it_keeps_a_selected_layer_in_a_group_and_deselects_a_loose_one() {
-    let mut app = app(nested());
-    select(&mut app.session, "Deep");
-    super::selection::deselect_hidden(&mut app);
-    assert_eq!(selected(&app), ["Deep"], "a listed layer stays selected");
-    select(&mut app.session, "Top Pixel");
-    super::selection::deselect_hidden(&mut app);
-    assert!(selected(&app).is_empty(), "a layer in no group is hidden, so it is deselected");
 }
 
 #[test]

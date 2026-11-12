@@ -2,9 +2,6 @@
 
 use std::collections::BTreeSet;
 
-use egui::vec2;
-use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use photocraft_doc::{BlendRange, Document, Group, Knockout, Layer, LayerContent, LayerMask, VectorMask};
 use serde_json::json;
 
@@ -119,10 +116,8 @@ fn rename_active(s: &mut photocraft_engine::Session, name: &str) {
 
 /// The names `attribute` lists.
 fn listed(doc: &Document, attribute: Attribute) -> BTreeSet<String> {
-    let mut filter = Filter::of(&UiState { layer_filter_by: FilterBy::Attribute, layer_filter_attribute: attribute, ..UiState::default() });
-    // As the panel does ([`Filter::of_app`]): Empty knows the canvas.
-    filter.empty = Some(std::sync::Arc::new(super::attribute::empty_layers_of(doc)));
-    crate::layer_tree_ui::display_rows(doc, filter.active()).into_iter().filter(|(_, l)| filter.shows(l)).map(|(_, l)| l.name.clone()).collect()
+    let filter = Filter::of(&UiState { layer_filter_by: FilterBy::Attribute, layer_filter_attribute: attribute, ..UiState::default() });
+    super::tests::listed(doc, &filter).into_iter().collect()
 }
 
 fn names(list: &[&str]) -> BTreeSet<String> {
@@ -222,26 +217,26 @@ fn the_empty_layers_are_found_once_per_document() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     app.ui.layer_filter_by = FilterBy::Attribute;
     app.ui.layer_filter_attribute = Attribute::Empty;
-    let first = Filter::of_app(&app).empty.expect("found for Empty");
+    let empty = |app: &PhotocraftApp| super::attribute::empty_layers(app, app.ui.layer_filter_attribute);
+    let first = empty(&app).expect("found for Empty");
     assert!(first.is_empty(), "the filled layer has pixels");
-    let again = Filter::of_app(&app).empty.unwrap();
+    let again = empty(&app).unwrap();
     assert!(std::sync::Arc::ptr_eq(&first, &again), "the same document reuses the result");
     // Selecting a layer moves the revision but changes no pixels.
     let id = app.session.active().unwrap().doc.layers[0].id;
     app.session.select_layer(id).unwrap();
-    assert!(std::sync::Arc::ptr_eq(&first, &Filter::of_app(&app).empty.unwrap()), "a selection reuses the result");
+    assert!(std::sync::Arc::ptr_eq(&first, &empty(&app).unwrap()), "a selection reuses the result");
     app.session.execute("paint.stroke", json!({"points": [[20, -10], [20, 40]], "size": 60, "erase": true, "brush": {"hardness": 1.0}})).unwrap();
-    let after = Filter::of_app(&app);
-    assert_eq!(after.empty.as_ref().map(|set| set.len()), Some(1), "an edit finds them again");
+    assert_eq!(empty(&app).map(|set| set.len()), Some(1), "an edit finds them again");
     let doc = &app.session.active().unwrap().doc;
-    assert!(doc.walk().into_iter().all(|(_, _, l)| after.shows(l)), "the erased layer is listed");
+    assert_eq!(super::tests::listed_app(&app).len(), doc.walk().len(), "the erased layer is listed");
     app.ui.layer_filter_attribute = Attribute::NotEmpty;
-    assert!(Filter::of_app(&app).empty.is_some(), "Not Empty uses them too");
+    assert!(empty(&app).is_some(), "Not Empty uses them too");
     // Another document, with no empty layer, gets its own result.
     app.session.execute("file.new", json!({"width": 40, "height": 30})).unwrap();
-    assert_eq!(Filter::of_app(&app).empty.map(|set| set.len()), Some(0), "the new document's layers");
+    assert_eq!(empty(&app).map(|set| set.len()), Some(0), "the new document's layers");
     app.ui.layer_filter_attribute = Attribute::Visible;
-    assert!(Filter::of_app(&app).empty.is_none(), "other attributes don't read pixels");
+    assert!(empty(&app).is_none(), "other attributes don't read pixels");
 }
 
 #[test]
@@ -264,7 +259,6 @@ fn each_opposite_lists_the_rest_groups_included() {
 fn attribute_filters_at_once_with_visible() {
     let f = Filter::of(&UiState { layer_filter_by: FilterBy::Attribute, ..UiState::default() });
     assert_eq!(f.attribute, Attribute::Visible);
-    assert!(f.active(), "Attribute filters as soon as it's picked");
 }
 
 #[test]
@@ -272,7 +266,7 @@ fn ui_set_picks_the_attribute_by_id() {
     let mut ui = UiState::default();
     for attribute in Attribute::ALL {
         let f = super::patched(&ui, &json!({"by": "attribute", "attribute": attribute.id()})).unwrap();
-        super::apply(&mut ui, f);
+        super::store(&mut ui, f);
         assert_eq!((ui.layer_filter_by, ui.layer_filter_attribute), (FilterBy::Attribute, attribute));
     }
     assert_eq!(Attribute::NoAdvancedBlending.id(), "noAdvancedBlending");
@@ -289,33 +283,4 @@ fn saved_settings_without_the_attribute_still_load() {
     saved.as_object_mut().unwrap().remove("layer_filter_attribute");
     let ui: UiState = serde_json::from_value(saved).unwrap();
     assert_eq!(ui.layer_filter_attribute, Attribute::Visible);
-}
-
-/// The names of the rows the Layers panel drew.
-fn drawn(h: &Harness<'_, PhotocraftApp>) -> BTreeSet<String> {
-    let doc = &h.state().session.active().unwrap().doc;
-    let rows = crate::layer_row_ui::recorded(&h.ctx);
-    rows.iter().filter_map(|r| doc.walk().into_iter().find(|(_, _, l)| l.id.0 == r.layer).map(|(_, _, l)| l.name.clone())).collect()
-}
-
-#[test]
-fn the_panel_filters_by_the_attribute_picked_in_the_dropdown() {
-    let session = session();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(session, crate::Services::default())
-    });
-    h.run_steps(8);
-    h.get_by_value("Kind").click();
-    h.run_steps(4);
-    h.query_all_by_label("Attribute").last().expect("Attribute in the open list").click();
-    h.run_steps(4);
-    assert_eq!(h.state().ui.layer_filter_by, FilterBy::Attribute);
-    assert!(!drawn(&h).contains("hidden"), "Visible at first");
-    h.get_by_value("Visible").click();
-    h.run_steps(4);
-    h.query_all_by_label("Not Visible").last().expect("Not Visible in the open list").click();
-    h.run_steps(4);
-    assert_eq!(h.state().ui.layer_filter_attribute, Attribute::NotVisible);
-    assert_eq!(drawn(&h), names(&["hidden", "hidden group"]));
 }

@@ -1,7 +1,7 @@
-//! The Layers panel's Effect filter (#10880): lists the layers with an enabled effect of one kind.
-//! Overlay covers Color, Gradient and Pattern Overlay, as in Photoshop.
+//! The Layers panel's Effect filter (#10880) as `UiState` and the control channel name its effect
+//! kinds; craft-layers lists the layers with an enabled effect of the kind. Overlay covers Color,
+//! Gradient and Pattern Overlay, as in Photoshop.
 
-use photocraft_doc::{Effect, Layer};
 use serde::{Deserialize, Serialize};
 
 /// The effect kinds the Effect filter picks from, in Photoshop's order.
@@ -43,25 +43,6 @@ impl EffectKind {
             EffectKind::OuterGlow => "outerGlow",
             EffectKind::DropShadow => "dropShadow",
         }
-    }
-
-    fn matches(self, e: &Effect) -> bool {
-        matches!(
-            (self, e),
-            (EffectKind::BevelEmboss, Effect::BevelEmboss(_))
-                | (EffectKind::Stroke, Effect::Stroke(_))
-                | (EffectKind::InnerShadow, Effect::InnerShadow(_))
-                | (EffectKind::InnerGlow, Effect::InnerGlow(_))
-                | (EffectKind::Satin, Effect::Satin(_))
-                | (EffectKind::Overlay, Effect::ColorOverlay { .. } | Effect::GradientOverlay { .. } | Effect::PatternOverlay { .. })
-                | (EffectKind::OuterGlow, Effect::OuterGlow(_))
-                | (EffectKind::DropShadow, Effect::DropShadow(_))
-        )
-    }
-
-    /// Whether `l` has an enabled effect of this kind; a turned-off one doesn't count.
-    pub fn shows(self, l: &Layer) -> bool {
-        l.effects.items.iter().any(|e| e.enabled() && self.matches(e))
     }
 }
 

@@ -3,7 +3,6 @@
 //! colour fill with a vector mask lists as a shape, and the Mode list has no Pass Through.
 
 use photocraft_color::BlendMode;
-use photocraft_doc::Document;
 use serde_json::json;
 
 use super::{Filter, FilterBy, KINDS};
@@ -23,9 +22,7 @@ fn make(s: &mut photocraft_engine::Session, cmd: &str, params: serde_json::Value
 }
 
 /// The names `filter` lists, top to bottom.
-fn listed(doc: &Document, filter: &Filter) -> Vec<String> {
-    crate::layer_tree_ui::display_rows(doc, filter.active()).into_iter().filter(|(_, l)| filter.shows(l)).map(|(_, l)| l.name.clone()).collect()
-}
+use super::tests::listed;
 
 fn kinds(kinds: &[&str]) -> Filter {
     Filter::of(&UiState { layer_filter_by: FilterBy::Kind, layer_filter: kinds.iter().map(|k| k.to_string()).collect(), ..UiState::default() })

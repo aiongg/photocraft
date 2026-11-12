@@ -405,7 +405,7 @@ impl ToolSet {
             app.ui.view.tile_grid = on;
         }
         if let Some(f) = self.layer_filter {
-            crate::layer_filter_ui::apply(&mut app.ui, f);
+            crate::layer_filter_ui::apply(app, f);
         }
         if let Some(m) = self.pen_mode {
             app.ui.tool_options.vector_mode = m;
