@@ -41,8 +41,8 @@ pub(super) mod layer_reveal;
 pub mod layer_row_ui;
 pub(super) mod layer_transfer;
 mod layers;
-pub mod layers_panel_ui;
 mod layers_events;
+pub mod layers_panel_ui;
 mod layers_tree;
 pub(super) mod mask_props_ui;
 pub mod mask_thumbs_ui;
@@ -87,9 +87,9 @@ use info::info_panel;
 pub(crate) use info::{SamplerReadouts, sampler_readouts};
 pub(crate) use layer_drag::{dropped_on, layer_drag_edge_scroll};
 pub(crate) use layers::{blend_options, fx_button};
-pub(crate) use layers_tree::listed_filter;
 #[cfg(test)]
 use layers::{layers, simple_lock_toggle};
+pub(crate) use layers_tree::listed_filter;
 #[cfg(test)]
 use navigator::{NAV_ROW_H, navigator, navigator_zoom_drag_id, navigator_zoom_to};
 #[cfg(test)]

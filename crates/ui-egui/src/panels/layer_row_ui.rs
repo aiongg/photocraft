@@ -130,7 +130,6 @@ pub fn panel_menu(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-
 // S1b: these drive the old panel's rows, rename field and drag zones; they move to craft-layers or to event-mapping tests.
 #[cfg(any())]
 mod tests;

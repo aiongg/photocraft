@@ -12,8 +12,8 @@ use photocraft_color::BlendMode;
 use photocraft_doc::{Document, Fill, LabelColor, Layer, LayerContent, LayerId, SmartSource};
 use serde::{Deserialize, Serialize};
 
-use crate::state::UiState;
 use crate::PhotocraftApp;
+use crate::state::UiState;
 
 /// What the Layers panel filters by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

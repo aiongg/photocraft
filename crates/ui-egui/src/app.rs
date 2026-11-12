@@ -29,8 +29,8 @@ mod window;
 pub(crate) use files::remember_new_document;
 pub(crate) use input::read_dropped;
 pub(crate) use targets::adjustment_layer_active;
-pub use thumbs::surface_fingerprint;
 pub(crate) use thumbs::layer_thumb_frame;
+pub use thumbs::surface_fingerprint;
 
 impl PhotocraftApp {
     /// Creates a new application state managing the engine session and UI services; the session

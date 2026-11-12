@@ -54,4 +54,3 @@ pub(crate) fn apply(app: &mut PhotocraftApp, reply: &Value) {
         app.ui.layer_filter_name = name.to_string();
     }
 }
-

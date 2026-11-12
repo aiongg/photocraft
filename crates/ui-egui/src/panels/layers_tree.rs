@@ -11,8 +11,8 @@ use craft::layers::ui::options::{LayersOptions, LayersSettings};
 use craft::layers::ui::panel::MenuTarget;
 use craft::layers::ui::thumbs::{LayerThumb, LayerThumbKind, ThumbContents};
 use craft::layers::ui::tree::{
-    LayerInfo, LayerKind, LayerLocks, LayerPart, LayerProperties, LayerRowKey, LayerSelection, LayerTree, LayersFooterState, MaskInfo, SubRow,
-    SubRowGroup, SubRows,
+    LayerInfo, LayerKind, LayerLocks, LayerPart, LayerProperties, LayerRowKey, LayerSelection, LayerTree, LayersFooterState, MaskInfo, SubRow, SubRowGroup,
+    SubRows,
 };
 use craft::theme::LabelColor as UiLabel;
 use craft::ui::contract::{Entry, ReorderMove};
@@ -118,9 +118,14 @@ pub(crate) fn filter_of(ui: &crate::state::UiState) -> LayerFilter {
     f.kinds = ui.layer_filter.iter().filter_map(|k| FilterKind::ALL.into_iter().find(|f| f.name() == k)).collect();
     f.name = ui.layer_filter_name.clone();
     f.mode = blend_key(ui.layer_filter_mode);
-    f.effect = EffectKind::ALL.into_iter().find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_effect.id())).unwrap_or_default();
-    f.attribute =
-        LayerAttribute::ALL.into_iter().find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_attribute.id())).unwrap_or_default();
+    f.effect = EffectKind::ALL
+        .into_iter()
+        .find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_effect.id()))
+        .unwrap_or_default();
+    f.attribute = LayerAttribute::ALL
+        .into_iter()
+        .find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_attribute.id()))
+        .unwrap_or_default();
     f.color = ui_label(ui.layer_filter_color);
     f.smart = ui
         .layer_filter_smart
@@ -186,13 +191,7 @@ pub(crate) struct PhotoLayers<'a> {
 }
 
 impl<'a> PhotoLayers<'a> {
-    pub(crate) fn new(
-        app: &'a PhotocraftApp,
-        st: &'a DocState,
-        filter: &LayerFilter,
-        foreign_drag: bool,
-        picked: Option<crate::smart_ui::FilterDrag>,
-    ) -> Self {
+    pub(crate) fn new(app: &'a PhotocraftApp, st: &'a DocState, filter: &LayerFilter, foreign_drag: bool, picked: Option<crate::smart_ui::FilterDrag>) -> Self {
         let working_text = app.ui.text_edit.as_ref().filter(|ed| ed.mask).map(|ed| ed.layer);
         let empty = match (filter.by, filter.attribute) {
             (FilterBy::Attribute, LayerAttribute::Empty | LayerAttribute::NotEmpty) => {
@@ -353,9 +352,8 @@ impl LayerTree for PhotoLayers<'_> {
             info.masks.push(MaskInfo::new(LayerPart::VectorMask, m.enabled, m.linked));
         }
         info.has_effects = !l.effects.items.is_empty();
-        info.warning = crate::layer_row_ui::unsupported_key(l).map(|key| {
-            crate::i18n::fmt(tl!("Not rendered: this adjustment ({key}) is kept as imported."), &[("key", key)])
-        });
+        info.warning = crate::layer_row_ui::unsupported_key(l)
+            .map(|key| crate::i18n::fmt(tl!("Not rendered: this adjustment ({key}) is kept as imported."), &[("key", key)]));
         info.thumb_loads_selection = !info.background;
         info
     }
@@ -594,9 +592,7 @@ fn menu_kind(tree: &PhotoLayers<'_>, target: &MenuTarget<LayerId>) -> MenuKind {
             match target.part {
                 Some(LayerPart::LayerMask) if l.mask.is_some() => MenuKind::Mask(*id),
                 // A pixel layer's thumbnail; not the Background's, which has no transparency to load.
-                Some(LayerPart::Pixels)
-                    if matches!(l.content, LayerContent::Raster(_)) && l.frame.is_none() && !tree.doc().is_background(*id) =>
-                {
+                Some(LayerPart::Pixels) if matches!(l.content, LayerContent::Raster(_)) && l.frame.is_none() && !tree.doc().is_background(*id) => {
                     MenuKind::Thumbnail
                 }
                 Some(LayerPart::LayerMask | LayerPart::VectorMask | LayerPart::FilterMask) => MenuKind::None,
@@ -784,9 +780,10 @@ impl ThumbSource<LayerThumb<LayerId>> for PhotoThumbs<'_> {
                 },
                 _ => ThumbRender::Blank,
             },
-            LayerThumbKind::VectorMask => l.vector_mask.as_ref().map_or(ThumbRender::Blank, |m| {
-                ThumbRender::Ready(crate::mask_thumbs_ui::vector_thumb_image(self.doc, m, request.side as usize))
-            }),
+            LayerThumbKind::VectorMask => l
+                .vector_mask
+                .as_ref()
+                .map_or(ThumbRender::Blank, |m| ThumbRender::Ready(crate::mask_thumbs_ui::vector_thumb_image(self.doc, m, request.side as usize))),
             _ => match &l.content {
                 LayerContent::Group(_) | LayerContent::Adjustment(_) | LayerContent::Text(_) if key.kind == LayerThumbKind::Pixels => ThumbRender::Blank,
                 LayerContent::Fill(Fill::Solid(color)) => {

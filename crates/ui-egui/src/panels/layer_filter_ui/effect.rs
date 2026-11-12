@@ -4,7 +4,6 @@
 use photocraft_doc::{Effect, Layer};
 use serde::{Deserialize, Serialize};
 
-
 /// The effect kinds the Effect filter picks from, in Photoshop's order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,4 +71,3 @@ pub fn parse(v: &serde_json::Value) -> Result<EffectKind, String> {
     let name = v.as_str().ok_or_else(|| format!("layerFilter.effect must be one of {}", ids()))?;
     EffectKind::ALL.into_iter().find(|k| k.id() == name).ok_or_else(|| format!("layerFilter.effect: unknown effect `{name}` (effects: {})", ids()))
 }
-

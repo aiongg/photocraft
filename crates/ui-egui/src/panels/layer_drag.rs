@@ -37,4 +37,3 @@ pub(crate) fn dropped_on(ui: &egui::Ui, button: &egui::Response) -> bool {
     ui.painter().rect_stroke(button.rect, t.radius_sm, Stroke::new(2.0, t.accent), StrokeKind::Inside);
     ui.ctx().input(|i| i.pointer.any_released())
 }
-

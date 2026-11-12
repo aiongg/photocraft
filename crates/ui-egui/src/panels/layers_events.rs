@@ -396,9 +396,9 @@ fn activate(
             }
         }
         LayerRowKey::Effects(id, index) => {
-            let kind = index.and_then(|i| doc.layer(id)?.effects.items.get(i).map(|e| e.label())).and_then(|label| {
-                crate::layer_style::KINDS.iter().find(|k| k.1 == label).map(|k| k.0)
-            });
+            let kind = index
+                .and_then(|i| doc.layer(id)?.effects.items.get(i).map(|e| e.label()))
+                .and_then(|label| crate::layer_style::KINDS.iter().find(|k| k.1 == label).map(|k| k.0));
             if active != Some(id) && app.run("layer.select", json!({"layer": id.0})).is_err() {
                 return;
             }

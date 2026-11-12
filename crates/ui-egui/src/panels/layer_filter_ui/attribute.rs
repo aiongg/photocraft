@@ -228,4 +228,3 @@ pub fn parse(v: &serde_json::Value) -> Result<Attribute, String> {
     let name = v.as_str().ok_or_else(|| format!("layerFilter.attribute must be one of {}", ids()))?;
     Attribute::ALL.into_iter().find(|a| a.id() == name).ok_or_else(|| format!("layerFilter.attribute: unknown attribute `{name}` (attributes: {})", ids()))
 }
-
