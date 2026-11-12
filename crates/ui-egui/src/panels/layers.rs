@@ -36,7 +36,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     use super::layers_tree::{self, PhotoLayers, PhotoThumbs};
 
     // A Move-way pick of a layer opens its groups only when the Move option says so (#11381).
-    let _ = crate::layer_reveal::track(app, ui.ctx());
+    let reveal = crate::layer_reveal::track(app, ui.ctx());
     let ctx = ui.ctx().clone();
     // A Layers panel row drag can be dropped on another document's tab (#589).
     if let Some(drag) = craft::ui::runtime::drag::active::<LayersDrag<LayerId>>(&ctx) {
@@ -60,7 +60,11 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .settings(&settings)
         .thumbnails(&thumbs, &source)
         .filter(Bind::bound(&mut filter))
-        .row_menu(|target| layers_tree::row_menu(&tree, target));
+        .row_menu(|target| layers_tree::row_menu(&tree, target))
+        .document(st.doc.id);
+    if let Some((id, groups)) = reveal {
+        panel = panel.reveal(id, groups);
+    }
     if let Some(key) = crate::shortcuts::chord(app, "layer.hideLayers") {
         panel = panel.visibility_key(key);
     }

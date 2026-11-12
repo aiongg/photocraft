@@ -1,13 +1,14 @@
 //! Reveal the active layer in the Layers panel (#152), like Photoshop: whenever the active
 //! layer changes, by whatever means (a click on the canvas with Auto-Select, Select › layer
-//! commands, ⌥[ / ⌥], undo, automation), its closed parent groups open (`layer.setExpanded`)
-//! and the panel scrolls just enough to show its row, unless the row is already in view.
+//! commands, ⌥[ / ⌥], undo, automation), its closed parent groups open and the panel scrolls
+//! just enough to show its row, unless the row is already in view. The panel does both
+//! (`LayersPanel::reveal`); this module decides when, and whether the groups open.
 //!
 //! Only a change of the active layer reveals: closing the group that holds it, or scrolling
 //! away, is left alone until the next change.
 
-use photocraft_doc::{LayerContent, LayerId};
-use serde_json::json;
+use craft::layers::ui::panel::Groups;
+use photocraft_doc::LayerId;
 
 use crate::PhotocraftApp;
 
@@ -20,9 +21,9 @@ fn seen_id() -> egui::Id {
 }
 
 /// Called once per Layers panel frame, before its rows are listed. When the active layer
-/// changed since the last frame, opens its closed parent groups and returns it: the row to
-/// scroll into view. The first frame of a document only records it.
-pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) -> Option<LayerId> {
+/// changed since the last frame, returns it with what its closed parent groups do: the panel's
+/// reveal for this pass. The first frame of a document only records it.
+pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) -> Option<(LayerId, Groups)> {
     let index = app.session.active_index()?;
     let active = app.session.active()?.active_layer;
     let now = Seen(index, active);
@@ -40,21 +41,10 @@ pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) -> Option<LayerId> {
     let id = active?;
     // Expand layer group on click (Move gear menu, #11381) governs a canvas click that picked this
     // layer the Move tool way (Auto-Select, or a ⌘-click from another tool); every other change
-    // opens the groups. The row still scrolls into view.
+    // opens the groups. The row (or its outermost closed group's) still scrolls into view.
     let move_pick = pick == Some(id);
-    let expand = !move_pick || app.ui.tool_options.move_expand_group_on_click;
-    for group in closed_ancestors(app, id).into_iter().filter(|_| expand) {
-        // A view change (no history step); a failure just leaves the group closed.
-        let _ = app.session.execute("layer.setExpanded", json!({"layer": group.0, "expanded": true}));
-    }
-    Some(id)
-}
-
-/// The groups containing `id` that are closed, outermost first.
-fn closed_ancestors(app: &PhotocraftApp, id: LayerId) -> Vec<LayerId> {
-    let Some(doc) = app.session.active().map(|s| &s.doc) else { return Vec::new() };
-    let Some(path) = doc.path_of(id) else { return Vec::new() };
-    (1..path.len()).filter_map(|n| doc.layer_at(path.get(..n)?)).filter(|l| matches!(&l.content, LayerContent::Group(g) if !g.expanded)).map(|l| l.id).collect()
+    let groups = if !move_pick || app.ui.tool_options.move_expand_group_on_click { Groups::Open } else { Groups::Keep };
+    Some((id, groups))
 }
 
 #[cfg(test)]
