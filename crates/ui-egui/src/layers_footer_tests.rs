@@ -367,7 +367,7 @@ fn dropping_onto_the_trash() {
             assert!(layer(h, "Masked").unwrap().vector_mask.is_some(), "Cancel keeps it");
             assert_eq!(past(h), steps);
             let at = thumb(h, "Masked", LayerPart::VectorMask).center();
-            let to = h.get_by_label("Delete Vector Mask").rect().center();
+            let to = h.get_by_role_and_label(egui::accesskit::Role::Button, "Delete Vector Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
             let id = trash_prompt(h, "Delete the vector mask?");
             crate::dialogs::confirm(h.state_mut(), id).unwrap();
