@@ -158,6 +158,7 @@ impl PhotocraftApp {
             hover_doc: None,
             hover_layer: None,
             layers_rename: None,
+            smart_filter_picks: HashMap::new(),
             find_layers_focus: false,
             canvas_hover_layer: None,
             clone_preview: None,

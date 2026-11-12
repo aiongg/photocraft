@@ -57,15 +57,12 @@ pub(crate) fn filter_mask_click(l: &Layer, m: egui::Modifiers) -> Vec<(String, V
 /// Smart Filters row, all of them).
 pub(crate) type FilterDrag = (u64, Option<usize>);
 
-/// The selected smart filter row of a document.
-fn selected_key(doc: photocraft_doc::DocId) -> egui::Id {
-    egui::Id::unique(("smart-filter-selected", doc))
-}
+/// The Smart Filter row each document has selected on its own.
+pub(crate) type FilterPicks = std::collections::HashMap<photocraft_doc::DocId, FilterDrag>;
 
-/// The selected smart filter row, while its smart object is active, the filter still exists and
-/// its row is on screen (drawn this pass or the last: the Layers panel may be closed).
-pub(crate) fn selected(ctx: &egui::Context, doc: &Document, active: Option<LayerId>) -> Option<FilterDrag> {
-    let (layer, filter) = ctx.data(|d| d.get_temp::<FilterDrag>(selected_key(doc.id)))?;
+/// The selected smart filter row, while its smart object is active and the filter still exists.
+pub(crate) fn selected(picks: &FilterPicks, doc: &Document, active: Option<LayerId>) -> Option<FilterDrag> {
+    let (layer, filter) = *picks.get(&doc.id)?;
     if active != Some(LayerId(layer)) {
         return None;
     }
@@ -79,14 +76,14 @@ pub(crate) fn selected(ctx: &egui::Context, doc: &Document, active: Option<Layer
 
 /// Selects a Smart Filter row of document `doc` on its own: `(smart object, filter index)`, `None`
 /// for the Smart Filters row.
-pub(crate) fn pick(ctx: &egui::Context, doc: photocraft_doc::DocId, row: FilterDrag) {
-    ctx.data_mut(|d| d.insert_temp::<FilterDrag>(selected_key(doc), row));
+pub(crate) fn pick(picks: &mut FilterPicks, doc: photocraft_doc::DocId, row: FilterDrag) {
+    picks.insert(doc, row);
 }
 
-/// Forgets the selected smart filter row: its smart object's own row was clicked, or the filter
-/// was deleted (its index would now name the next one).
-pub(crate) fn deselect(ctx: &egui::Context, doc: photocraft_doc::DocId) {
-    ctx.data_mut(|d| d.remove::<FilterDrag>(selected_key(doc)));
+/// Forgets the selected smart filter row: its smart object's own row was clicked, the filter was
+/// deleted (its index would now name the next one) or the panel's filter hides its row.
+pub(crate) fn deselect(picks: &mut FilterPicks, doc: photocraft_doc::DocId) {
+    picks.remove(&doc);
 }
 
 /// The command for dropping the smart filters of `from` on the smart object `target`: they move
@@ -118,7 +115,7 @@ pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
         return false;
     }
     let Some(doc) = app.session.active().map(|st| st.doc.id) else { return false };
-    let Some(picked) = crate::panels::listed_filter(app, ctx) else { return false };
+    let Some(picked) = crate::panels::listed_filter(app) else { return false };
     // Only where the key would delete the smart object: Quick Mask, a single channel, a targeted
     // mask or a selection keep their own Delete.
     if crate::shortcut_dispatch::delete_key_command(app, "edit.clear".into()) != "layer.delete" {
@@ -129,7 +126,7 @@ pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
         return false;
     }
     let (command, params) = trash_action(picked);
-    deselect(ctx, doc);
+    deselect(&mut app.smart_filter_picks, doc);
     if let Err(e) = app.run(&command, params) {
         app.ui.status = e;
         app.ui.status_error = true;

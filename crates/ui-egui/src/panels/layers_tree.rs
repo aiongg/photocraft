@@ -167,9 +167,9 @@ pub(crate) fn store_filter(ui: &mut crate::state::UiState, f: &LayerFilter) {
 }
 
 /// The Smart Filter row selected on its own, while its smart object is active and the row is listed.
-pub(crate) fn listed_filter(app: &PhotocraftApp, ctx: &egui::Context) -> Option<crate::smart_ui::FilterDrag> {
+pub(crate) fn listed_filter(app: &PhotocraftApp) -> Option<crate::smart_ui::FilterDrag> {
     let st = app.session.active()?;
-    let picked = crate::smart_ui::selected(ctx, &st.doc, st.active_layer);
+    let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
     PhotoLayers::new(app, st, &filter_of(&app.ui), false, picked).selected_filter()
 }
 

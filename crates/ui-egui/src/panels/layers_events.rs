@@ -76,7 +76,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
     let doc = st.doc.clone();
     let active = st.active_layer;
     let selection = st.selected_layers();
-    let picked = crate::smart_ui::selected(ctx, &doc, active);
+    let picked = crate::smart_ui::selected(&app.smart_filter_picks, &doc, active);
     let filter = layers_tree::filter_of(&app.ui);
     let (targets, picked) = {
         let tree = PhotoLayers::new(app, st, &filter, false, picked);
@@ -89,9 +89,9 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
             match &select.row {
                 Some(LayerRowKey::Filters(id, row)) => {
                     let index = row.and_then(|r| filter_index(id, r));
-                    crate::smart_ui::pick(ctx, doc.id, (id.0, index));
+                    crate::smart_ui::pick(&mut app.smart_filter_picks, doc.id, (id.0, index));
                 }
-                _ => crate::smart_ui::deselect(ctx, doc.id),
+                _ => crate::smart_ui::deselect(&mut app.smart_filter_picks, doc.id),
             }
             let single = match &select.change {
                 SelectionChange::Set(ids) if ids.len() == 1 => ids.first().copied(),
@@ -220,7 +220,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                 }
                 LayerDrop::SubRows(mv) if mv.group == SubRowGroup::SmartFilters => {
                     let (Some(from), Some(to)) = (filter_index(&mv.layer, mv.from), filter_index(&mv.layer, mv.to)) else { return };
-                    crate::smart_ui::pick(ctx, doc.id, (mv.layer.0, Some(to)));
+                    crate::smart_ui::pick(&mut app.smart_filter_picks, doc.id, (mv.layer.0, Some(to)));
                     actions.push(("layer.smartFilter.move".into(), json!({"layer": mv.layer.0, "index": from, "to": to})));
                     if active != Some(mv.layer) {
                         actions.push(("layer.select".into(), json!({"layer": mv.layer.0})));
@@ -250,7 +250,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                 _ => {}
             }
         }
-        LayersEvent::Footer(action) => footer(app, ctx, picked, action, actions),
+        LayersEvent::Footer(action) => footer(app, picked, action, actions),
         LayersEvent::FooterDrop { button, rows, .. } => {
             let layers: Vec<LayerId> = rows.iter().filter_map(|r| if let LayerRowKey::Layer(id) = r { Some(*id) } else { None }).collect();
             let layer_params = || if layers.len() == 1 && !selection.contains(&layers[0]) { json!({"layer": layers[0].0}) } else { json!({}) };
@@ -458,7 +458,7 @@ fn properties(app: &mut PhotocraftApp, targets: &[LayerId], edit: LayerPropertyE
 }
 
 /// A pick in the footer.
-fn footer(app: &mut PhotocraftApp, ctx: &egui::Context, picked: Option<crate::smart_ui::FilterDrag>, action: LayersFooterAction, actions: &mut Vec<Action>) {
+fn footer(app: &mut PhotocraftApp, picked: Option<crate::smart_ui::FilterDrag>, action: LayersFooterAction, actions: &mut Vec<Action>) {
     let Some(st) = app.session.active() else { return };
     let doc = st.doc.clone();
     let active = st.active_layer.and_then(|id| doc.layer(id));
@@ -490,7 +490,7 @@ fn footer(app: &mut PhotocraftApp, ctx: &egui::Context, picked: Option<crate::sm
             // A selected Smart Filter row is what Delete removes, as in Photoshop (#4751).
             if let Some(picked) = picked {
                 actions.push(crate::smart_ui::trash_action(picked));
-                crate::smart_ui::deselect(ctx, doc.id);
+                crate::smart_ui::deselect(&mut app.smart_filter_picks, doc.id);
                 return;
             }
             let delete = if app.ui.vector_mask_target && active.is_some_and(|l| l.vector_mask.is_some()) {

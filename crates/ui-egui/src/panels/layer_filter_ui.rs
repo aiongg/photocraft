@@ -152,15 +152,24 @@ pub fn apply(app: &mut PhotocraftApp, f: Filter) {
 }
 
 /// When the panel's filter is no longer `before`, deselect the layers it hides, as the panel's
-/// own filter row does (#10879): the listed ones stay selected, one of them active. Like any layer
-/// selection this is no history step.
+/// own filter row does (#10879): the listed ones stay selected, one of them active, and a Smart
+/// Filter row selected on its own stays so only while it is listed. Like any layer selection this
+/// is no history step.
 pub(crate) fn deselect_hidden(app: &mut PhotocraftApp, before: &craft::layers::ui::filter::LayerFilter) {
     let filter = super::layers_tree::filter_of(&app.ui);
     if filter == *before {
         return;
     }
     let Some(st) = app.session.active() else { return };
-    let Some(select) = filter.deselect_hidden(&super::layers_tree::PhotoLayers::new(app, st, &filter, false, None)) else { return };
+    let doc = st.doc.id;
+    let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
+    let pick_hidden = picked.is_some() && super::layers_tree::PhotoLayers::new(app, st, &filter, false, picked).selected_filter().is_none();
+    let select = filter.deselect_hidden(&super::layers_tree::PhotoLayers::new(app, st, &filter, false, None));
+    if pick_hidden {
+        crate::smart_ui::deselect(&mut app.smart_filter_picks, doc);
+    }
+    let Some(select) = select else { return };
+    let Some(st) = app.session.active() else { return };
     let mut actions = Vec::new();
     super::layers_events::selection_actions(select.change, &st.selected_layers(), &mut actions);
     for (id, params) in actions {

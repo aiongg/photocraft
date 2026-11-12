@@ -660,6 +660,8 @@ pub struct PhotocraftApp {
     /// A layer whose row the Layers panel opens for renaming in its next pass (Layer › Rename
     /// Layer, the row menu's Rename Layer…).
     pub(crate) layers_rename: Option<photocraft_doc::LayerId>,
+    /// The Smart Filter row selected on its own, per document ([`crate::smart_ui::selected`]).
+    pub(crate) smart_filter_picks: crate::smart_ui::FilterPicks,
     /// Select › Find Layers: the Layers panel's Name filter takes the focus in its next pass.
     pub(crate) find_layers_focus: bool,
     /// Layer hovered on the canvas, highlighted in the Layers panel.

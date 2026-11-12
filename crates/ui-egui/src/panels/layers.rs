@@ -52,7 +52,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let settings = layers_tree::settings(app);
     let mut filter = layers_tree::filter_of(&app.ui);
     let before = filter.clone();
-    let picked = crate::smart_ui::selected(&ctx, &st.doc, st.active_layer);
+    let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
     let tree = PhotoLayers::new(app, st, &filter, foreign, picked);
     let thumbs = Thumbnails::<LayerThumb<LayerId>>::in_context(&ctx, "photocraft-layer-thumbs", ThumbnailOptions::new());
     let source = PhotoThumbs::new(app, &st.doc);
