@@ -271,13 +271,14 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
             let by_position = physical_key
                 .filter(|p| POSITIONAL.contains(p))
                 .and_then(|p| table.iter().find(|(_, sc)| sc.modifiers.command && sc.logical_key == p && key_matches(sc, p, *modifiers)));
-            let bound = by_position.or_else(|| table.iter().find(|(_, sc)| key_matches(sc, *key, *modifiers))).map(|(id, _)| (id.clone(), false));
+            let bound =
+                by_position.or_else(|| table.iter().find(|(_, sc)| key_matches(sc, *key, *modifiers))).map(|(id, _)| (id.clone(), *key == Key::Tab, false));
             // Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L,
             // ⌥⌘M, #8900), unless that key is bound to something else.
             bound.or_else(|| {
                 let plain = egui::Modifiers { alt: false, ..*modifiers };
                 let last = modifiers.alt.then(|| table.iter().find(|(id, sc)| crate::adjust_dialog::has_dialog(id) && key_matches(sc, *key, plain))).flatten();
-                last.map(|(id, _)| (id.clone(), true))
+                last.map(|(id, _)| (id.clone(), false, true))
             })
         }
         _ => None,
@@ -289,7 +290,12 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
             i.events.remove(at);
             Some(hit)
         });
-        let Some((id, last)) = next else { break };
+        let Some((id, tab, last)) = next else { break };
+        if tab {
+            // egui already read this Tab as "focus the next widget" (Ctrl+Tab switches documents,
+            // #2340): the shortcut took it, so cancel that move.
+            ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
+        }
         let id = clip_key_command(app, delete_key_command(app, id));
         let owner = key_owner(app, ctx);
         dispatch_as(app, ctx, &id, last);

@@ -16,10 +16,11 @@ fn rtl() -> bool {
     crate::i18n::current().dir() == crate::i18n::Dir::Rtl
 }
 
-/// Offers the window's Cancel to `take` when the held modifiers match `mods` as egui's
-/// `consume_key` would (extra Shift and Alt ignored).
-fn window_cancel(ctx: &Context, mods: Modifiers, take: bool) -> bool {
-    if !ctx.input(|i| i.modifiers.matches_logically(mods)) {
+/// Offers the window's Cancel to `take`. With `mods`, only when the held modifiers match them as
+/// egui's `consume_key` would (extra Shift and Alt ignored); without, whatever is held, as egui's
+/// `key_pressed`.
+fn window_cancel(ctx: &Context, mods: Option<Modifiers>, take: bool) -> bool {
+    if mods.is_some_and(|mods| !ctx.input(|i| i.modifiers.matches_logically(mods))) {
         return false;
     }
     let mut seen = false;
@@ -46,13 +47,13 @@ pub fn take_escape(ctx: &Context) -> bool {
 
 /// Takes this pass's Escape when the held modifiers match `mods` logically.
 pub fn take_escape_with(ctx: &Context, mods: Modifiers) -> bool {
-    ctx.input_mut(|i| i.consume_key(mods, Key::Escape)) || window_cancel(ctx, mods, true)
+    ctx.input_mut(|i| i.consume_key(mods, Key::Escape)) || window_cancel(ctx, Some(mods), true)
 }
 
 /// Takes the window's Cancel only, for a reader that walks egui's events itself and already sees
 /// an Escape left there.
 pub fn take_window_escape(ctx: &Context) -> bool {
-    window_cancel(ctx, Modifiers::NONE, true)
+    window_cancel(ctx, Some(Modifiers::NONE), true)
 }
 
 /// Whether this pass had an Escape, taken by an earlier reader or not.
@@ -60,9 +61,10 @@ pub fn escape_this_pass(ctx: &Context) -> bool {
     escape_pressed(ctx) || ctx.data(|d| d.get_temp::<u64>(seen_id())) == Some(ctx.cumulative_pass_nr())
 }
 
-/// Whether this pass has an Escape no reader has taken yet, without taking it.
+/// Whether this pass has an Escape no reader has taken yet, whatever modifiers are held, without
+/// taking it.
 pub fn escape_pressed(ctx: &Context) -> bool {
-    ctx.input(|i| i.key_pressed(Key::Escape)) || window_cancel(ctx, Modifiers::NONE, false)
+    ctx.input(|i| i.key_pressed(Key::Escape)) || window_cancel(ctx, None, false)
 }
 
 /// `egui::ModalResponse::should_close` with the window's Escape: egui's own check never sees an
