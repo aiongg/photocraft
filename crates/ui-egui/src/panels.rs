@@ -1128,12 +1128,10 @@ mod snapshot_row_tests {
 #[cfg(test)]
 mod layer_pct_slider_tests;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod fx_drag_tests;
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod unsupported_marker_tests;
 
 #[cfg(test)]
@@ -1749,72 +1747,7 @@ mod layer_drag_edge_scroll_tests {
     }
 }
 
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
-mod group_drag_selection_tests {
-    use super::*;
-
-    #[test]
-    fn dragging_a_selected_layer_moves_the_complete_selection_into_a_group() {
-        let a = LayerId(10);
-        let b = LayerId(11);
-        let group = LayerId(20);
-        let payload = layer_drop_payload(a.0, group, "into", &[a, b]);
-        assert_eq!(payload, json!({"layers": [10, 11], "target": 20, "position": "into"}));
-        assert_eq!(payload.get("layer"), None, "batch drops must not also send a single layer");
-
-        // Above/below use the same batch route; engine preserves the document stack order.
-        assert_eq!(layer_drop_payload(b.0, group, "above", &[a, b])["position"], "above");
-        assert_eq!(layer_drop_payload(b.0, group, "below", &[a, b])["position"], "below");
-    }
-
-    #[test]
-    fn the_background_row_neither_moves_nor_takes_a_layer_below_it() {
-        let mut s = photocraft_engine::Session::new();
-        s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-        let bg = s.active().unwrap().doc.layers[0].id;
-        let a = LayerId(s.execute("layer.new.layer", json!({})).unwrap()["layer"].as_u64().unwrap());
-        let doc = &s.active().unwrap().doc;
-        let refused = |dragged: LayerId, target: LayerId, pos: &str, sel: &[LayerId], copy: bool| {
-            background_drop_refused(doc, &layer_drop_payload(dragged.0, target, pos, sel), target, pos, copy)
-        };
-        assert!(refused(bg, a, "above", &[bg], false));
-        assert!(refused(a, bg, "below", &[a], false));
-        assert!(refused(a, bg, "below", &[a], true));
-        assert!(refused(a, a, "above", &[bg, a], false), "the Background is among the dragged layers");
-        assert!(!refused(a, bg, "above", &[a], false));
-        assert!(!refused(bg, a, "above", &[bg], true), "⌥-dragging copies the Background above");
-        // Without a Background every drop is fine.
-        let mut s = photocraft_engine::Session::new();
-        s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-        s.execute("layer.new.layerFromBackground", json!({})).unwrap();
-        let l0 = s.active().unwrap().doc.layers[0].id;
-        let doc = &s.active().unwrap().doc;
-        assert!(!background_drop_refused(doc, &layer_drop_payload(l0.0, a, "above", &[l0]), a, "above", false));
-    }
-
-    #[test]
-    fn dragging_unselected_or_singular_row_remains_a_single_layer_move() {
-        let a = LayerId(10);
-        let b = LayerId(11);
-        let group = LayerId(20);
-        assert_eq!(layer_drop_payload(9, group, "into", &[a, b]), json!({"layer": 9, "target": 20, "position": "into"}));
-        assert_eq!(layer_drop_payload(a.0, group, "above", &[a]), json!({"layer": 10, "target": 20, "position": "above"}));
-        assert_eq!(layer_drop_payload(a.0, group, "below", &[]), json!({"layer": 10, "target": 20, "position": "below"}));
-    }
-
-    #[test]
-    fn layer_thumb_of_a_tall_document_fills_the_height() {
-        let cell = Rect::from_min_size(pos2(10.0, 20.0), vec2(30.0, 30.0));
-        let (r, uv) = layer_thumb_fit(cell, 100, 400);
-        assert_eq!((r.top(), r.bottom()), (cell.top(), cell.bottom()));
-        assert!((r.width() - 7.5).abs() < 1e-3, "{r:?}");
-        assert!((uv.width() - 0.25).abs() < 1e-3 && (uv.height() - 1.0).abs() < 1e-3, "{uv:?}");
-    }
-}
-
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod clipping_indicator_tests;
 
 #[cfg(test)]

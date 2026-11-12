@@ -216,51 +216,7 @@ pub fn confirm_command(app: &PhotocraftApp, fields: &serde_json::Map<String, Val
 #[cfg(test)]
 mod editor_tests;
 
-// S1b: the Smart Filter rows' sizes are craft-layers' list rows now.
-#[cfg(any())]
-mod layer_thumbnail_scaling_tests {
-    use super::*;
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    #[test]
-    fn sub_rows_stay_compact_while_the_smart_filter_mask_follows_thumbnail_setting() {
-        for setting in [LayerThumbnailSize::None, LayerThumbnailSize::Small, LayerThumbnailSize::Medium, LayerThumbnailSize::Large] {
-            let mut session = photocraft_engine::Session::new();
-            session.execute("file.new", json!({"width": 50, "height": 38})).unwrap();
-            session.execute("edit.fill", json!({"color": "#8A42B3"})).unwrap();
-            session.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
-            session.execute("filter.blur.gaussianBlur", json!({"radius": 3})).unwrap();
-            session.execute("filter.sharpen.unsharpMask", json!({"amount": 80, "radius": 1, "threshold": 0})).unwrap();
-            session.execute("layer.layerStyle.dropShadow", json!({"size": 2})).unwrap();
-            assert!(matches!(session.active().unwrap().doc.layers.last().unwrap().content, LayerContent::Smart(_)));
-            let mut h = Harness::builder().with_size(vec2(1440.0, 1400.0)).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                PhotocraftApp::new(session, crate::Services::default())
-            });
-            h.state_mut().ui.layers_panel_options.thumbnail_size = setting;
-            h.run_steps(8);
-            // Filter and effect rows keep Photoshop's compact height at every thumbnail size.
-            for label in ["Gaussian Blur", "Unsharp Mask", "Effects", "Drop Shadow"] {
-                let rect = h.get_by_label(label).rect();
-                assert!((rect.height() - SUB_ROW_H).abs() < 1.0, "{setting:?}: {label} was {rect:?}, expected {SUB_ROW_H}");
-            }
-            // Only the Smart Filters header grows, just enough for its shared-mask thumbnail.
-            let (header, mask) = smart_filters_header_geometry(setting, true);
-            let rect = h.get_by_label("Smart Filters").rect();
-            assert!((rect.height() - header).abs() < 1.0, "{setting:?}: Smart Filters was {rect:?}, expected {header}");
-            assert!(mask <= header - 6.0 || mask == 0.0, "{setting:?}: a {mask} mask must fit a {header} row");
-            assert_eq!(mask == 0.0, setting == LayerThumbnailSize::None, "{setting:?}: the mask hides only at None");
-            if let Some(dir) = std::env::var_os("PHOTOCRAFT_LAYERS_SNAPSHOTS") {
-                let dir = std::path::PathBuf::from(dir);
-                std::fs::create_dir_all(&dir).unwrap();
-                h.render().unwrap().save(dir.join(format!("layers-sub-rows-{setting:?}.png"))).unwrap();
-            }
-        }
-    }
-}
-
-// S1b: drives the old Layers panel (its row rects, rename field, filter bar or drag zones); rewritten against craft-layers' panel in S1b.
-#[cfg(any())]
+#[cfg(test)]
 mod tests {
     use photocraft_engine::Session;
 
@@ -284,10 +240,10 @@ mod tests {
         app.run("edit.fill", json!({"contents": "color", "color": "#ff0000"})).unwrap();
         app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
         app.run("filter.blur.gaussianBlur", json!({"radius": 2})).unwrap();
-        let (l, sm) = smart(&app);
-        let actions = super::filter_mask_click(&l, &sm, egui::Modifiers::NONE);
+        let (l, _) = smart(&app);
+        let actions = super::filter_mask_click(&l, egui::Modifiers::NONE);
         assert_eq!(actions.last().unwrap().0, "ui.filterMaskTarget");
-        assert!(super::filter_mask_click(&l, &sm, egui::Modifiers::ALT).is_empty(), "nothing to view yet");
+        assert!(super::filter_mask_click(&l, egui::Modifiers::ALT).is_empty(), "nothing to view yet");
         app.ui.filter_mask_target = Some(l.id.0);
         app.sync_views();
         assert!(app.filter_mask_targeted());
@@ -302,7 +258,7 @@ mod tests {
         let (l, sm) = smart(&app);
         assert_eq!(sm.filter_mask.as_ref().unwrap().value(4, 16), 0.0);
         assert!(l.mask.is_none(), "no layer mask");
-        assert_eq!(super::filter_mask_click(&l, &sm, egui::Modifiers::ALT)[0].1["mask"], "filter");
+        assert_eq!(super::filter_mask_click(&l, egui::Modifiers::ALT)[0].1["mask"], "filter");
         // Targeting a layer mask (or the pixels, `ui.maskTarget`) ends it.
         app.ui.mask_target = true;
         app.sync_views();
@@ -336,87 +292,6 @@ mod tests {
         app.run("view.layerMask", json!({"mode": "gray", "mask": "filter"})).unwrap();
         app.select_filter_mask_target(Some(id.0));
         assert!(photocraft_engine::mask_view_cmds::current(app.session.active().unwrap()).unwrap().filter, "a matching filter-mask view stays open");
-    }
-
-    /// A pixel layer, a shape layer and a smart object, in that order.
-    fn layers() -> [Layer; 3] {
-        let mut s = photocraft_engine::Session::new();
-        s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
-        // An empty layer can't become a smart object: fill it first.
-        s.execute("layer.new.layer", json!({})).unwrap();
-        s.execute("edit.fill", json!({"contents": "color", "color": "#336699"})).unwrap();
-        let smart = s.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap()["layer"].as_u64().unwrap();
-        let shape = s.execute("shape.create", json!({"kind": "rect", "rect": [8, 8, 40, 24], "fill": "#cc3333"})).unwrap()["layer"].as_u64().unwrap();
-        let pixel = s.execute("layer.new.layer", json!({})).unwrap()["layer"].as_u64().unwrap();
-        let doc = &s.active().unwrap().doc;
-        [pixel, shape, smart].map(|id| doc.layer(photocraft_doc::LayerId(id)).unwrap().clone())
-    }
-
-    /// Stack [A, B, C] (A at the bottom, drawn last): where a dragged filter lands.
-    #[test]
-    fn a_filter_dropped_above_or_below_a_row_lands_next_to_it() {
-        // A over C: [B, C, A]. A under C: [B, A, C].
-        assert_eq!(reorder_target(0, Some(2), true, 3), Some(2));
-        assert_eq!(reorder_target(0, Some(2), false, 3), Some(1));
-        // C under A: [C, A, B]. C over A: [A, C, B].
-        assert_eq!(reorder_target(2, Some(0), false, 3), Some(0));
-        assert_eq!(reorder_target(2, Some(0), true, 3), Some(1));
-        // The Smart Filters row: on top.
-        assert_eq!(reorder_target(0, None, false, 3), Some(2));
-        // Next to where it already is, or on itself: nothing to do.
-        assert_eq!(reorder_target(1, Some(2), false, 3), None);
-        assert_eq!(reorder_target(1, Some(0), true, 3), None);
-        assert_eq!(reorder_target(1, Some(1), true, 3), None);
-        assert_eq!(reorder_target(2, None, true, 3), None);
-        assert_eq!(reorder_target(0, None, true, 0), None);
-    }
-
-    #[test]
-    fn shape_layers_and_smart_objects_carry_a_thumbnail_badge() {
-        let [pixel, shape, smart] = layers();
-        assert_eq!(thumb_badge_kind(&pixel), None);
-        assert_eq!(thumb_badge_kind(&shape), Some(ThumbBadge::Shape), "#4584");
-        assert_eq!(thumb_badge_kind(&smart), Some(ThumbBadge::Smart));
-    }
-
-    /// The rects `thumb_badge` fills for `l` over `thumb`, with their colours.
-    fn filled(l: &Layer, thumb: Rect) -> Vec<(Rect, Color32)> {
-        let l = l.clone();
-        let mut h = egui_kittest::Harness::new_ui(move |ui| thumb_badge(ui, &l, thumb));
-        h.run();
-        let badge = thumb_badge_rect(thumb).expand(0.5);
-        let rects = h.output().shapes.iter().filter_map(|s| match &s.shape {
-            egui::Shape::Rect(r) if badge.contains_rect(r.rect) && r.fill != Color32::TRANSPARENT => Some((r.rect, r.fill)),
-            _ => None,
-        });
-        rects.collect()
-    }
-
-    /// #4584: a shape layer's thumbnail shows a path with four anchor points in its corner.
-    #[test]
-    fn shape_badge_paints_a_path_with_an_anchor_on_each_corner() {
-        let [pixel, shape, smart] = layers();
-        let thumb = Rect::from_min_size(pos2(20.0, 20.0), vec2(34.0, 34.0));
-        let t = Tokens::get(&egui::Context::default());
-        let frame = thumb_badge_rect(thumb);
-        assert!(frame.right() > thumb.right() && frame.bottom() > thumb.bottom(), "over the bottom-right corner");
-        assert!(filled(&pixel, thumb).is_empty(), "a pixel layer has no badge");
-
-        let drawn = filled(&shape, thumb);
-        assert!(drawn.contains(&(frame, t.field)), "the badge's frame");
-        let anchors: Vec<Rect> = drawn.iter().filter(|(_, c)| *c == t.icon).map(|(r, _)| *r).collect();
-        let path = frame.shrink(SHAPE_PATH_INSET);
-        let corners = [path.left_top(), path.right_top(), path.right_bottom(), path.left_bottom()];
-        assert_eq!(anchors.iter().map(Rect::center).collect::<Vec<_>>(), corners);
-        for a in &anchors {
-            assert_eq!(a.size(), vec2(SHAPE_ANCHOR, SHAPE_ANCHOR));
-            assert!(frame.shrink(1.0).contains_rect(*a), "inside the frame's border");
-        }
-
-        // The smart-object badge keeps its frame and draws no anchors.
-        let drawn = filled(&smart, thumb);
-        assert!(drawn.contains(&(frame, t.field)));
-        assert!(drawn.iter().all(|(_, c)| *c != t.icon));
     }
 
     /// #5689: an Image › Adjustments recorded on a smart object (Brightness/Contrast…) opens its

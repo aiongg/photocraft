@@ -43,6 +43,5 @@ fn release_chain(doc: &Document, upper: LayerId) -> Vec<LayerId> {
     out
 }
 
-// S1b: these read the old panel's row rects; the line's hit test is craft-layers' (`LayersEvent::ClipLine`).
-#[cfg(any())]
+#[cfg(test)]
 mod tests;
