@@ -5,14 +5,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use craft::behavior::IconId;
 use craft::layers::ui::filter::{EffectKind, FilterBy, FilterKind, LayerAttribute, LayerFilter, SmartKind, SmartSource};
 use craft::layers::ui::options::{LayersOptions, LayersSettings};
 use craft::layers::ui::panel::MenuTarget;
 use craft::layers::ui::thumbs::{LayerThumb, LayerThumbKind, ThumbContents};
 use craft::layers::ui::tree::{
     LayerInfo, LayerKind, LayerLocks, LayerPart, LayerProperties, LayerRowKey, LayerSelection, LayerTree, LayersFooterState, MaskInfo, SubRow, SubRowGroup,
-    SubRows,
+    SubRows, ThumbBadge,
 };
 use craft::theme::LabelColor as UiLabel;
 use craft::ui::contract::{Entry, ReorderMove};
@@ -343,8 +342,13 @@ impl LayerTree for PhotoLayers<'_> {
             });
             info.has_smart_filters = !sm.smart_filters.is_empty();
             info.smart_filters_enabled = sm.filters_enabled;
-            info.thumb_badge = Some(IconId::new("app_window"));
         }
+        // Smart objects and shape layers show their pixels as any layer does; only the badge tells them apart (#4584).
+        info.thumb_badge = match l.content {
+            LayerContent::Smart(_) => Some(ThumbBadge::SmartObject),
+            LayerContent::Shape(_) => Some(ThumbBadge::Shape),
+            _ => None,
+        };
         if let Some(m) = &l.mask {
             info.masks.push(MaskInfo::new(LayerPart::LayerMask, m.enabled, m.linked));
         }
