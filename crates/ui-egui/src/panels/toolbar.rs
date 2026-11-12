@@ -157,7 +157,7 @@ fn more_slot_flyout(app: &mut PhotocraftApp, ui: &mut egui::Ui, button: &egui::R
     }
     let pressed_outside =
         ui.input(|i| i.pointer.any_pressed() && i.pointer.press_origin().is_some_and(|p| !area.response.rect.contains(p) && !button.rect.contains(p)));
-    if pressed_outside || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if pressed_outside || crate::window_keys::escape_pressed(ui.ctx()) {
         ui.data_mut(|d| d.remove::<bool>(open_id));
     }
 }
@@ -428,7 +428,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                         i.pointer.any_pressed()
                                             && i.pointer.press_origin().is_some_and(|p| !area.response.rect.contains(p) && !resp.rect.contains(p))
                                     });
-                                    if pressed_outside || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                                    if pressed_outside || crate::window_keys::escape_pressed(ui.ctx()) {
                                         ui.data_mut(|d| d.remove::<(egui::Id, Rect)>(flyout_id));
                                     }
                                 }

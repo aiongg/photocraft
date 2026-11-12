@@ -219,7 +219,7 @@ pub(crate) fn before(ui: &Ui, id: Id, shown: &str, canon: &dyn Fn(&str) -> Optio
         ui.input(|i| i.raw.events.iter().any(|e| matches!(e, egui::Event::Key { key: Key::Escape, pressed: true, modifiers, .. } if modifiers.is_none())))
     };
     // Only the field that owns the keyboard takes Esc: any other must leave it to whoever wants it.
-    if owner && (ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) | raw_esc(ui)) {
+    if owner && (crate::window_keys::take_escape(ui.ctx()) | raw_esc(ui)) {
         forget_text(ui, id);
         return Guard { esc: true, veto: true, ..Default::default() };
     }

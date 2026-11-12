@@ -140,7 +140,7 @@ pub fn track(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if crate::menu_nav::is_open(ctx) || egui::Popup::is_any_open(ctx) {
         return;
     }
-    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape)) {
+    if crate::window_keys::take_escape(ctx) {
         app.ui.symmetry_transform = None;
     } else if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Enter)) {
         commit(app);

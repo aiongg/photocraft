@@ -10,8 +10,8 @@
 //! Breeze's (KDE) or a plain round set elsewhere, with the set of buttons and their side taken
 //! from the desktop's button layout. The shapes are drawn here, not read from the icon theme.
 
-use egui::{Color32, CursorIcon, Id, LayerId, Order, PointerButton, Pos2, Rect, ResizeDirection, Sense, Stroke, Ui, Vec2, ViewportCommand, pos2, vec2};
 use craft::ui::runtime::windows::{ResizeEdge, WindowAction, WindowHost};
+use egui::{Color32, CursorIcon, Id, LayerId, Order, PointerButton, Pos2, Rect, ResizeDirection, Sense, Stroke, Ui, Vec2, ViewportCommand, pos2, vec2};
 use serde_json::json;
 
 use crate::PhotocraftApp;

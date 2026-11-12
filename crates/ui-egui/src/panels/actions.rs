@@ -1878,7 +1878,8 @@ fn rename_field(app: &mut PhotocraftApp, ui: &mut egui::Ui, index: usize, rect: 
         app.ui.actions.renaming = Some(r);
         return None;
     }
-    let (enter, tab, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab), i.key_pressed(egui::Key::Escape)));
+    let (enter, tab) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab)));
+    let esc = crate::window_keys::escape_pressed(ui.ctx());
     if esc {
         None
     } else if enter || tab || te.lost_focus() || !te.has_focus() {

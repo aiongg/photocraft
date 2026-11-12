@@ -504,7 +504,7 @@ impl Keys {
         }
         let Some(focus) = self.focus else { return };
         let press = |k: Key| consume(Modifiers::NONE, k);
-        if press(Key::Escape) {
+        if crate::window_keys::take_escape(ctx) {
             self.focus = None;
         } else if press(Key::ArrowRight) {
             self.focus = Some((focus + 1) % n);

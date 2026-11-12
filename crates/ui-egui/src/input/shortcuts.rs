@@ -598,7 +598,7 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
             crate::transform_tool::commit(app);
             return true;
         }
-        if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+        if crate::window_keys::take_escape(ctx) {
             crate::transform_tool::cancel(app);
             return true;
         }
@@ -609,13 +609,13 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
             crate::cam_transform::commit(app);
             return true;
         }
-        if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+        if crate::window_keys::take_escape(ctx) {
             crate::cam_transform::cancel(app);
             return true;
         }
     }
     // A Properties Levels/Curves eyedropper: Esc disarms it.
-    if crate::layer_picker::armed(app).is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+    if crate::layer_picker::armed(app).is_some() && crate::window_keys::take_escape(ctx) {
         crate::layer_picker::cancel(app);
         return true;
     }
@@ -715,12 +715,12 @@ fn handle_pen_and_work_path_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
         crate::vector_ui::pen_enter(app);
         return true;
     }
-    if app.ui.pen.is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+    if app.ui.pen.is_some() && crate::window_keys::take_escape(ctx) {
         crate::vector_ui::pen_end(app);
         return true;
     }
     // A shape box handle drag: Esc drops it, the shapes keep their size (#11107).
-    if app.ui.shape_box.is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+    if app.ui.shape_box.is_some() && crate::window_keys::take_escape(ctx) {
         crate::shape_bounds_box::cancel(app);
         return true;
     }
@@ -807,7 +807,7 @@ fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
     if new_layer_without_dialog(app, ctx) {
         return true;
     }
-    if app.ui.type_path_drag.is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+    if app.ui.type_path_drag.is_some() && crate::window_keys::take_escape(ctx) {
         crate::type_path_placement::cancel(app);
         return true;
     }
@@ -833,19 +833,19 @@ fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
             crate::retouch_ui::remove_pending_commit(app);
             return true;
         }
-        if pressed(Key::Escape) {
+        if crate::window_keys::take_escape(ctx) {
             crate::retouch_ui::remove_pending_cancel(app);
             return true;
         }
     }
-    if app.ui.frame_tool.drag.is_some() && pressed(Key::Escape) {
+    if app.ui.frame_tool.drag.is_some() && crate::window_keys::take_escape(ctx) {
         crate::frame_tool::cancel(app);
         return true;
     }
     // Enter / Escape commit or cancel in-progress tool state (polygonal lasso, crop).
     if crate::lasso_ui::active(app) {
         let mods = ctx.input(|i| i.modifiers);
-        if ctx.input_mut(|i| i.consume_key(mods, Key::Escape)) {
+        if crate::window_keys::take_escape_with(ctx, mods) {
             app.drag = None;
             return true;
         }
@@ -873,7 +873,7 @@ fn handle_registry_and_tool_keys(app: &mut PhotocraftApp, ctx: &egui::Context, f
             && app.crop.default_frame
             && app.crop.drag.is_none()
             && !crate::crop_straighten::mode(app);
-        if !untouched && pressed(Key::Escape) {
+        if !untouched && crate::window_keys::take_escape(ctx) {
             app.ui.polygon.clear();
             app.ui.polygon_mode.clear();
             app.ui.polygon_doc = None;
@@ -912,14 +912,14 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         || crate::panels::toolbar::more_flyout_open(ctx);
     // Both full screen modes (with and without the menu bar) return to Standard, as in Photoshop
     // (#4116), through the menu command so the window and the Screen Mode check follow.
-    if !esc_taken && app.ui.view.screen_mode != "standard" && pressed(Key::Escape) {
+    if !esc_taken && app.ui.view.screen_mode != "standard" && crate::window_keys::take_escape(ctx) {
         if let Err(e) = crate::menus::invoke(app, ctx, "view.screenMode.standard", json!({})) {
             app.ui.status = e;
             app.ui.status_error = true;
         }
         return;
     }
-    if !esc_taken && app.session.active().is_some_and(|st| st.doc.selection.is_some()) && pressed(Key::Escape) {
+    if !esc_taken && app.session.active().is_some_and(|st| st.doc.selection.is_some()) && crate::window_keys::take_escape(ctx) {
         if let Err(e) = app.run("select.deselect", json!({})) {
             app.ui.status = e;
             app.ui.status_error = true;
@@ -940,7 +940,7 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let ds = &app.ui.direct_selection;
         let on_this_path = ds.target == Some(crate::direct_select::PathRef::Saved(index));
         let selected = on_this_path && (!ds.anchors.is_empty() || ds.segment.is_some());
-        if pressed(Key::Escape) {
+        if crate::window_keys::take_escape(ctx) {
             // The stage belongs to this path: choosing another one starts at the first Esc again.
             if selected || app.ui.direct_selection.escape_hidden != Some(index) {
                 if selected {

@@ -159,10 +159,7 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &Context) -> bool {
         }
     }
     if s.owner.is_some() {
-        if s.target != Some(target(app))
-            || ctx.input(|i| i.viewport().close_requested())
-            || ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
-        {
+        if s.target != Some(target(app)) || ctx.input(|i| i.viewport().close_requested()) || crate::window_keys::take_escape(ctx) {
             s.answer = Some(Ok(None));
         }
         if let Some(pending) = s.pending.as_ref().filter(|_| s.answer.is_none()) {
@@ -330,7 +327,7 @@ fn frame(ui: &mut egui::Ui, shared: &Shared, image: &ScreenImage, texture: &egui
         lock(shared).answer = Some(a);
         ctx.request_repaint_of(egui::ViewportId::ROOT);
     };
-    if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape) || i.pointer.secondary_released()) {
+    if ctx.input(|i| i.viewport().close_requested() || i.pointer.secondary_released()) || crate::window_keys::take_escape(&ctx) {
         answer(Ok(None));
         return;
     }

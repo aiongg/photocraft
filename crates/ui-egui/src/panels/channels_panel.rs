@@ -158,7 +158,8 @@ fn handle_alpha_double_click(ui: &mut egui::Ui, row: &mut RowInteractions<'_>, i
     if !edit.has_focus() && !edit.lost_focus() {
         edit.request_focus();
     }
-    let (enter, escape) = ui.input(|input| (input.key_pressed(egui::Key::Enter), input.key_pressed(egui::Key::Escape)));
+    let enter = ui.input(|input| input.key_pressed(egui::Key::Enter));
+    let escape = crate::window_keys::escape_pressed(ui.ctx());
     if escape || enter || edit.lost_focus() {
         row.ctx.data_mut(|data| data.remove::<String>(rename_id));
         if !escape && !text.trim().is_empty() && text != row.name {

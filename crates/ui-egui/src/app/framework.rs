@@ -141,8 +141,7 @@ impl PrefSections {
     fn sync(&self, session: &mut Session) {
         let mut t = self.0.lock().unwrap_or_else(PoisonError::into_inner);
         if std::mem::take(&mut t.written) {
-            let json: BTreeMap<String, Value> =
-                t.tables.iter().filter_map(|(key, table)| Some((key.clone(), serde_json::to_value(table).ok()?))).collect();
+            let json: BTreeMap<String, Value> = t.tables.iter().filter_map(|(key, table)| Some((key.clone(), serde_json::to_value(table).ok()?))).collect();
             if session.prefs().sections != json {
                 session.edit_prefs(|p| p.sections = json.clone());
             }

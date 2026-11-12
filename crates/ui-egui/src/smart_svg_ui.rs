@@ -322,8 +322,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
     });
     let owns_keys = modal.is_top_modal || ctx.memory(|memory| memory.top_modal_layer().is_none());
-    cancel |=
-        modal.should_close() || (owns_keys && !modal.any_popup_open && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)));
+    cancel |= modal.should_close() || (owns_keys && !modal.any_popup_open && crate::window_keys::take_escape(ctx));
     if stop || cancel {
         if stop && let Some(pending) = app.smart_svg.pending.as_ref() {
             app.smart_svg.editing.retain(|edit| edit.target.doc != pending.target.doc || edit.target.contents_id != pending.target.contents_id);

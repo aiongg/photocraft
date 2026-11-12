@@ -208,14 +208,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     hits.truncate(12);
                     let sel_id = egui::Id::unique("palette-sel");
                     let mut sel: usize = ui.data_mut(|d| d.get_temp(sel_id).unwrap_or(0));
-                    let (down, up, enter, esc) = ui.input(|i| {
-                        (
-                            i.key_pressed(egui::Key::ArrowDown),
-                            i.key_pressed(egui::Key::ArrowUp),
-                            i.key_pressed(egui::Key::Enter),
-                            i.key_pressed(egui::Key::Escape),
-                        )
-                    });
+                    let esc = crate::window_keys::escape_pressed(ui.ctx());
+                    let (down, up, enter) =
+                        ui.input(|i| (i.key_pressed(egui::Key::ArrowDown), i.key_pressed(egui::Key::ArrowUp), i.key_pressed(egui::Key::Enter)));
                     if down {
                         sel = (sel + 1).min(hits.len().saturating_sub(1));
                     }

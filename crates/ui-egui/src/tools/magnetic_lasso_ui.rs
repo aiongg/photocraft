@@ -426,7 +426,7 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
             close(app, false);
             return true;
         }
-        if pressed(Modifiers::NONE, Key::Escape) {
+        if crate::window_keys::take_escape(ctx) {
             cancel(app);
             return true;
         }

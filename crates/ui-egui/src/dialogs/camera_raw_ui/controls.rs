@@ -553,7 +553,7 @@ fn draw(app: &mut PhotocraftApp, ctx: &egui::Context, own_window: bool) {
     {
         d.show_before = !d.show_before;
     }
-    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if crate::window_keys::escape_pressed(ctx) {
         action = Some("cancel");
     }
     match action {

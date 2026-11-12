@@ -15,6 +15,8 @@ craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45
 # one above; nothing depends on both under that name. The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
 craft = { git = "https://github.com/aiongg/craft-libs", rev = "25fa5a699e2f58daa7b7537b95c19037b44e8fb0" }
+# `Intent`, which `craft::ui::runtime::keys::Intents::take` reads and the facade does not re-export. Same rev as `craft`.
+craft-behavior = { git = "https://github.com/aiongg/craft-libs", rev = "25fa5a699e2f58daa7b7537b95c19037b44e8fb0" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }

@@ -99,7 +99,12 @@ pub fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     let period = 0.530;
     let remaining = period - (elapsed % period);
     ctx.request_repaint_after(std::time::Duration::from_secs_f64(remaining.clamp(0.010, period)));
-    let events = ctx.input(|i| i.events.clone());
+    let mut events = ctx.input(|i| i.events.clone());
+    // The runtime hands a plain Escape to the window instead of egui's events (`window_keys`).
+    if crate::window_keys::take_window_escape(ctx) {
+        let modifiers = ctx.input(|i| i.modifiers);
+        events.push(egui::Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers });
+    }
     let vertical_flow = is_vertical(app, id);
     let mut handled = vec![false; events.len()];
     let mut primary_down = events

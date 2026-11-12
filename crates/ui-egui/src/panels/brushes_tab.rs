@@ -885,7 +885,7 @@ fn rename_bar(ui: &mut egui::Ui, st: &mut BrushesPanelState, acts: &mut Vec<Acti
             acts.push(Action::Rename(r.clone()));
             done = true;
         }
-        if clicked == Some(widgets::ButtonRole::Cancel) || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if clicked == Some(widgets::ButtonRole::Cancel) || crate::window_keys::escape_pressed(ui.ctx()) {
             done = true;
         }
     });

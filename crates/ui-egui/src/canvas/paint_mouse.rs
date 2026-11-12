@@ -264,6 +264,7 @@ pub fn track_right_press(response: &Response) {
     let id = right_pressed_id(response);
     let reach = right_click_reach(&response.ctx);
     let tracked = response.ctx.data(|d| d.get_temp::<Option<Pos2>>(id)).flatten();
+    let escape_this_pass = crate::window_keys::escape_this_pass(&response.ctx);
     let (pressed, released, held, origin, others, escape, far) = response.ctx.input(|i| {
         let right_press = |e: &egui::Event| matches!(e, egui::Event::PointerButton { button: PointerButton::Secondary, pressed: true, .. });
         // Where the button went down. With the release in the same frame, the pointer is
@@ -295,7 +296,7 @@ pub fn track_right_press(response: &Response) {
             .any(|b| i.pointer.button_down(b) || i.pointer.button_pressed(b));
         // The frame's own events: a shortcut, a closing popup or the HUD may already have
         // consumed this Escape from `events`, and it still cancels the press.
-        let escape = i.raw.events.iter().any(|e| matches!(e, egui::Event::Key { key: egui::Key::Escape, pressed: true, .. }));
+        let escape = escape_this_pass || i.raw.events.iter().any(|e| matches!(e, egui::Event::Key { key: egui::Key::Escape, pressed: true, .. }));
         let b = PointerButton::Secondary;
         (pressed, i.pointer.button_released(b), i.pointer.secondary_down(), origin, others, escape, far)
     });
@@ -493,7 +494,7 @@ pub fn show_picker(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // Escape and Enter close it once this frame's edits are in (a typed size applies), unless they
     // end a rename in its rename bar. Escape then reverts what was typed (#11816).
     let typing_done = app.ui.brush_picker_list.renaming.is_none();
-    let escape = typing_done && ctx.input(|i| i.key_pressed(egui::Key::Escape));
+    let escape = typing_done && crate::window_keys::escape_pressed(ctx);
     let key_close = escape || (typing_done && ctx.input(|i| i.key_pressed(egui::Key::Enter)));
     let screen = ctx.content_rect();
     // The picker's content size: the one its grip was dragged to, or the one it last closed with

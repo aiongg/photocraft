@@ -323,7 +323,7 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
         commit(app);
         return true;
     }
-    if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+    if crate::window_keys::take_escape(ctx) {
         cancel(app);
         return true;
     }

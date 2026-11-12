@@ -228,7 +228,7 @@ pub fn compass_visible(rotation: f32) -> bool {
 /// Draw the compass and handle a click / Escape / double-click reset. Returns true when the
 /// pointer over the compass should not start a rotate drag.
 pub fn overlay(app: &PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter, xf: &ViewXform, view: &mut View, response: &egui::Response) -> bool {
-    if app.ui.tool == crate::state::Tool::RotateView && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) && view.rotation != 0.0 {
+    if app.ui.tool == crate::state::Tool::RotateView && crate::window_keys::take_escape(ctx) && view.rotation != 0.0 {
         view.rotation = 0.0;
         ctx.data_mut(|d| d.remove::<RotateDrag>(id()));
     }

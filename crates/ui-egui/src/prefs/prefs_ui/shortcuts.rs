@@ -265,6 +265,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     if capture && tab == 0 && !selected.is_empty() {
         let (next_mods, pressed) = ui.input(|i| capture_key_press(capture_mods, i));
         capture_mods = next_mods;
+        // A plain Escape reaches the window as the runtime's Cancel, not as a key press (`window_keys`).
+        let pressed = pressed.or_else(|| crate::window_keys::take_escape(ui.ctx()).then_some((egui::Key::Escape, egui::Modifiers::NONE)));
         if let Some((key, m)) = pressed {
             ui.input_mut(|i| {
                 i.consume_key(m, key);

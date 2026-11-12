@@ -68,7 +68,7 @@ fn menu_id() -> egui::Id {
 /// Show the open menu. Escape or a click outside closes it.
 pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
     let Some(menu) = app.ui.layer_menu.clone() else { return };
-    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if crate::window_keys::escape_pressed(ctx) {
         app.ui.layer_menu = None;
         return;
     }

@@ -366,7 +366,7 @@ pub(crate) fn choose(app: &mut PhotocraftApp, ctx: &Context, item: Item) {
 
 pub(crate) fn show(app: &mut PhotocraftApp, ctx: &Context) {
     let Some([x, y]) = app.ui.brush_mode_menu else { return };
-    if !current_tool(app) || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if !current_tool(app) || crate::window_keys::escape_pressed(ctx) {
         let same_tool = current_tool(app);
         close(app);
         // Escape also consumes the release of a right-button gesture still in flight.

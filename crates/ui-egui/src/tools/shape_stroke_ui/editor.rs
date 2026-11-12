@@ -246,7 +246,7 @@ pub fn button(
     } else {
         None
     };
-    let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
+    let escape = crate::window_keys::escape_pressed(ui.ctx());
     let outside = popup.is_some_and(|p| p.response.clicked_elsewhere()) && !children.clicked && !response.clicked();
     // A command shortcut closes it, as it does egui's own popups (#9065).
     let close = outside || crate::menu_keys::popups_closed(ui.ctx()) || escape && !children.shown;

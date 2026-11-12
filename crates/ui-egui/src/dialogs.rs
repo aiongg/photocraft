@@ -783,9 +783,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // zooming the canvas under it.
         if interactive
             && outcome.is_none()
-            && (close_clicked
-                || modal.response.should_close()
-                || (modal.is_top_modal && !modal.any_popup_open && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))))
+            && (close_clicked || modal.response.should_close() || (modal.is_top_modal && !modal.any_popup_open && crate::window_keys::take_escape(ctx)))
         {
             outcome = Some(false);
         }

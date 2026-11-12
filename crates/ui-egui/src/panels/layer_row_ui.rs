@@ -460,7 +460,8 @@ pub fn rename_field(ui: &mut egui::Ui, layer: u64, rect: Rect) -> Option<(String
         store(&ctx, Some(r));
         return None;
     }
-    let (enter, tab, esc) = ctx.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab), i.key_pressed(egui::Key::Escape)));
+    let (enter, tab) = ctx.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Tab)));
+    let esc = crate::window_keys::escape_pressed(&ctx);
     if tab {
         let up = ctx.input(|i| i.modifiers.shift);
         ctx.data_mut(|d| d.insert_temp(next_rename_id(), (layer, up)));

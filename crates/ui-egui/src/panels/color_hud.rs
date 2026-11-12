@@ -168,14 +168,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         close(&mut app.ui);
         return;
     }
-    let (released, esc, pressed_left, hover) = ctx.input(|i| {
-        (
-            i.pointer.button_released(PointerButton::Secondary),
-            i.key_pressed(egui::Key::Escape),
-            i.pointer.button_pressed(PointerButton::Primary),
-            i.pointer.hover_pos(),
-        )
-    });
+    let esc = crate::window_keys::escape_pressed(ctx);
+    let (released, pressed_left, hover) =
+        ctx.input(|i| (i.pointer.button_released(PointerButton::Secondary), i.pointer.button_pressed(PointerButton::Primary), i.pointer.hover_pos()));
     if esc || (hud.hold && released) || pressed_left {
         close(&mut app.ui);
         return;

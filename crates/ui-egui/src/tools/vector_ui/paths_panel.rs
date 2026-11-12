@@ -233,7 +233,8 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let id = rename_id.with("field");
                     let te =
                         ui.put(field, egui::TextEdit::singleline(&mut edit.text).id(id).font(egui::FontId::proportional(12.0))).accessible_name(tl!("Name"));
-                    let (enter, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+                    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    let esc = crate::window_keys::escape_pressed(ui.ctx());
                     if !edit.focused {
                         te.request_focus();
                         // Like Photoshop, the whole name starts selected so typing replaces it.

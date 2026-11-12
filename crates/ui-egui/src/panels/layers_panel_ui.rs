@@ -263,7 +263,7 @@ fn options_body(ui: &mut Ui, draft: &mut LayersPanelOptions) {
 pub fn show_dialog(app: &mut PhotocraftApp, ctx: &Context) {
     let Some(mut dialog) = app.ui.layers_panel_dialog.take() else { return };
     let mut confirmed = false;
-    let mut cancelled = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+    let mut cancelled = crate::window_keys::escape_pressed(ctx);
     let title = match &dialog {
         LayersPanelDialog::PanelOptions(_) => tl!("Layers Panel Options"),
         LayersPanelDialog::NewLayer(_) => tl!("New Layer"),

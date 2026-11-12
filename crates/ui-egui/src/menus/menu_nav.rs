@@ -363,7 +363,7 @@ impl Nav {
                 egui::Popup::open_id(ctx, id);
             }
         };
-        if press(Key::Escape) {
+        if crate::window_keys::take_escape(ctx) {
             egui::Popup::close_all(ctx);
         } else if press(Key::ArrowDown) {
             self.step(level, true);

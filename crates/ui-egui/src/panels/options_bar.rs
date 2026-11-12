@@ -704,7 +704,7 @@ fn crop_fill_help(ui: &mut egui::Ui) {
             close = true;
         }
         // Esc closes the help only; `input/shortcuts.rs` leaves it to the modal (`fill_help_open`).
-        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        if crate::window_keys::take_escape(ui.ctx()) {
             close = true;
         }
     });

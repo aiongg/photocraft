@@ -303,7 +303,7 @@ fn snapshot_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, selected: Option<u6
                 let field = Rect::from_min_max(pos2(thumb.right() + 6.0, rect.center().y - 10.0), pos2(rect.right() - 6.0, rect.center().y + 10.0));
                 let r = ui.put(field, egui::TextEdit::singleline(text)).accessible_name(tl!("Name"));
                 if r.lost_focus() {
-                    if !ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    if !crate::window_keys::escape_pressed(ui.ctx()) {
                         cmd = Some(("history.renameSnapshot", json!({"snapshot": snap.id, "name": text.clone()})));
                     }
                     renaming = None;

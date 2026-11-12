@@ -343,7 +343,7 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     use egui::{Key, Modifiers};
     cancel_stale(app);
     let enter = |ctx: &egui::Context| ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
-    let esc = |ctx: &egui::Context| ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape));
+    let esc = crate::window_keys::take_escape;
     if app.distort.gallery.is_some() {
         if enter(ctx) {
             let _ = crate::gallery_ui::commit(app);

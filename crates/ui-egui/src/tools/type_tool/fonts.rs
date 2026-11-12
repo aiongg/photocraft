@@ -452,7 +452,7 @@ pub(crate) fn family_picker_in(
     let down = navigation_down && !composing;
     let up = navigation_up && !composing;
     let enter = key(egui::Key::Enter) && !composing;
-    let escape = key(egui::Key::Escape) && !composing;
+    let escape = owns_keys && crate::window_keys::take_escape(ui.ctx()) && !composing;
     let tab = owns_keys && ui.input(|i| i.key_pressed(egui::Key::Tab));
     if navigation_down || navigation_up {
         ui.memory_mut(|m| m.move_focus(egui::FocusDirection::None));

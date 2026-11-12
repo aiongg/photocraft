@@ -472,7 +472,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ctx.request_repaint();
         }
     });
-    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if crate::window_keys::escape_pressed(ctx) {
         action = Some("cancel");
     }
     match action {

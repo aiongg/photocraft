@@ -456,7 +456,7 @@ pub(crate) fn cancel_mixer_on_context_change(app: &mut PhotocraftApp, ctx: &egui
     }
     let changed = app.ui.tool != Tool::MixerBrush
         || app.live_stroke.as_ref().is_some_and(|live| !app.session.active().is_some_and(|st| st.doc.id == live.doc && st.revision == live.revision));
-    if changed || ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+    if changed || crate::window_keys::take_escape(ctx) {
         app.drag = None;
         app.live_stroke = None;
         return true;
