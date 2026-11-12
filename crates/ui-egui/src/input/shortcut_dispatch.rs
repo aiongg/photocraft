@@ -7,6 +7,8 @@
 //! is disabled in the current state reports why on the status bar instead of doing nothing
 //! silently, as the greyed menu item shows.
 
+use craft::ui::runtime::commands::ChromeCommand;
+use craft::ui::runtime::frame::ChromeToggle;
 use egui::{Key, KeyboardShortcut};
 use serde_json::json;
 
@@ -47,6 +49,24 @@ pub fn take_log(ctx: &egui::Context) -> Vec<(String, Outcome)> {
 /// (`tools.defaultColors` / `tools.swapColors`) and the fill keys are commands like any other, so
 /// their overrides apply. Held temporary tools (Space…) are not here: see [`crate::hold_keys`].
 pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
+    resolved(app).into_iter().map(|(id, _, sc)| (id, sc)).collect()
+}
+
+/// PhotoCraft's commands the craft runtime dispatches, with the runtime's command each one is:
+/// the chrome toggles (Tab, Shift+Tab). Their keys reach the runtime as keymap overrides
+/// (`app::framework`), the runtime's toggles run them (`run_framework_toggles`), and
+/// [`dispatch_pressed`] leaves them alone.
+pub(crate) const FRAMEWORK_OWNED: [(&str, ChromeCommand); 2] =
+    [("window.togglePanels", ChromeCommand::TogglePanels), ("window.toggle.dock", ChromeCommand::TogglePanelsKeepTools)];
+
+/// The binding texts [`bindings`] gives each command of [`FRAMEWORK_OWNED`], in its order.
+pub(crate) fn framework_owned_texts(app: &PhotocraftApp) -> [Vec<String>; 2] {
+    let table = resolved(app);
+    FRAMEWORK_OWNED.map(|(owned, _)| table.iter().filter(|(id, _, _)| id == owned).map(|(_, text, _)| text.clone()).collect())
+}
+
+/// [`bindings`] with each binding's text as the preferences and defaults write it.
+fn resolved(app: &PhotocraftApp) -> Vec<(String, String, KeyboardShortcut)> {
     let prefs = app.session.prefs();
     let action_ids: Vec<String> = app.session.actions.list.iter().map(|a| crate::actions::shortcut_id(&a.name)).collect();
     let actions = action_ids.iter().map(|id| (id.as_str(), prefs.shortcut(id, None).map(str::to_string)));
@@ -103,14 +123,15 @@ pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
         candidates.extend(prefs.alternates(id, main.as_deref()).into_iter().map(|k| (id, Some(k), user)));
     }
     candidates.sort_by_key(|(_, _, user)| !user);
-    let mut all: Vec<(String, KeyboardShortcut)> = Vec::new();
-    for (id, sc, _) in candidates {
-        let Some(sc) = sc.as_deref().and_then(parse) else { continue };
-        if !all.iter().any(|(_, b)| *b == sc) {
-            all.push((id.to_string(), sc));
+    let mut all: Vec<(String, String, KeyboardShortcut)> = Vec::new();
+    for (id, text, _) in candidates {
+        let Some(text) = text else { continue };
+        let Some(sc) = parse(&text) else { continue };
+        if !all.iter().any(|(_, _, b)| *b == sc) {
+            all.push((id.to_string(), text, sc));
         }
     }
-    all.sort_by_key(|(_, sc)| std::cmp::Reverse(sc.modifiers.shift as u8 + sc.modifiers.alt as u8 + sc.modifiers.command as u8));
+    all.sort_by_key(|(_, _, sc)| std::cmp::Reverse(sc.modifiers.shift as u8 + sc.modifiers.alt as u8 + sc.modifiers.command as u8));
     all
 }
 
@@ -241,21 +262,22 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
         return false;
     }
     const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
-    let table: Vec<(String, KeyboardShortcut)> =
-        bindings(app).into_iter().filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str()))).collect();
+    let table: Vec<(String, KeyboardShortcut)> = bindings(app)
+        .into_iter()
+        .filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str())) && !FRAMEWORK_OWNED.iter().any(|(owned, _)| owned == id))
+        .collect();
     let command = |e: &egui::Event| match e {
         egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
             let by_position = physical_key
                 .filter(|p| POSITIONAL.contains(p))
                 .and_then(|p| table.iter().find(|(_, sc)| sc.modifiers.command && sc.logical_key == p && key_matches(sc, p, *modifiers)));
-            let bound =
-                by_position.or_else(|| table.iter().find(|(_, sc)| key_matches(sc, *key, *modifiers))).map(|(id, _)| (id.clone(), *key == Key::Tab, false));
+            let bound = by_position.or_else(|| table.iter().find(|(_, sc)| key_matches(sc, *key, *modifiers))).map(|(id, _)| (id.clone(), false));
             // Photoshop: ⌥ added to an adjustment's own key opens it at its last settings (⌥⌘L,
             // ⌥⌘M, #8900), unless that key is bound to something else.
             bound.or_else(|| {
                 let plain = egui::Modifiers { alt: false, ..*modifiers };
                 let last = modifiers.alt.then(|| table.iter().find(|(id, sc)| crate::adjust_dialog::has_dialog(id) && key_matches(sc, *key, plain))).flatten();
-                last.map(|(id, _)| (id.clone(), false, true))
+                last.map(|(id, _)| (id.clone(), true))
             })
         }
         _ => None,
@@ -267,12 +289,7 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
             i.events.remove(at);
             Some(hit)
         });
-        let Some((id, tab, last)) = next else { break };
-        if tab {
-            // egui already read this Tab as "focus the next widget" (Photoshop's Tab hides the
-            // panels instead, #1313): the shortcut took it, so cancel that move.
-            ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
-        }
+        let Some((id, last)) = next else { break };
         let id = clip_key_command(app, delete_key_command(app, id));
         let owner = key_owner(app, ctx);
         dispatch_as(app, ctx, &id, last);
@@ -364,6 +381,21 @@ fn label(id: &str) -> String {
         .unwrap_or(id)
         .trim_end_matches('…')
         .to_string()
+}
+
+/// Runs the commands of the chrome toggles the craft runtime took from the keys since the last
+/// frame ([`FRAMEWORK_OWNED`]), as the shortcuts run theirs.
+pub(crate) fn run_framework_toggles(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    for toggle in std::mem::take(&mut app.framework.chrome_toggles) {
+        let command = match toggle {
+            ChromeToggle::Panels => ChromeCommand::TogglePanels,
+            ChromeToggle::PanelsKeepTools => ChromeCommand::TogglePanelsKeepTools,
+            _ => continue,
+        };
+        if let Some((id, _)) = FRAMEWORK_OWNED.iter().find(|(_, owned)| *owned == command) {
+            dispatch(app, ctx, id);
+        }
+    }
 }
 
 /// Run a shortcut's command like its menu item (dialogs included), or say why it can't run.

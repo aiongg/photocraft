@@ -571,12 +571,20 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     true
 }
 
+/// Whether the document canvas has the keys: no dialog, prompt or modal workspace holds them
+/// (Liquify's panel only while one of its controls has focus). The craft runtime is told through
+/// the canvas's registration (`canvas.rs`), so its Tab toggles the panels only then.
+pub(crate) fn canvas_has_keys(app: &PhotocraftApp, focus: crate::shortcut_dispatch::Focus) -> bool {
+    let liquify_focus =
+        (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && focus != crate::shortcut_dispatch::Focus::None;
+    !(liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() || app.smart_svg.modal_open() || app.save_options_open())
+}
+
 fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {
     use crate::shortcut_dispatch::{Focus, dispatch_pressed};
     // Dialogs (and Liquify's panel while one of its controls has focus) keep canvas zoom; a
     // focused text field keeps its keys.
-    let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && focus != Focus::None;
-    if liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() || app.smart_svg.modal_open() || app.save_options_open() {
+    if !canvas_has_keys(app, focus) {
         if focus != Focus::Text {
             nav_keys(app, ctx);
         }

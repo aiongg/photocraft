@@ -4,6 +4,7 @@
 //! update only their damage rectangle (`set_partial`). The wgpu compositor (M5) will replace this
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
+use craft::ui::runtime::focus::{KeepKeys, KeyUse, host_canvas};
 use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Rect as DRect;
@@ -2303,6 +2304,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let xf = ViewXform { zoom: display_view.zoom / ppp, center: display_view.center, ..target_xf }.pixel_aligned_for(app, ppp);
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
     let response = ui.allocate_rect(rect, Sense::click_and_drag());
+    if crate::shortcuts::canvas_has_keys(app, crate::shortcut_dispatch::Focus::of(&ctx)) {
+        // Inline type keeps Tab: it types a tab character.
+        let keys = if app.ui.text_edit.is_some() { KeyUse::CANVAS.with_keep(KeepKeys::Tab) } else { KeyUse::CANVAS };
+        host_canvas(&ctx, response.id, keys);
+    }
     crate::paint_mouse::track_right_press(&response);
     let stroke_dismissal = primary && crate::shape_stroke_ui::dismiss_from_canvas(app, &response);
     let painter = ui.painter_at(rect);

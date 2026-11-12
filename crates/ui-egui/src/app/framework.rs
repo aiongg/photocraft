@@ -13,11 +13,13 @@ use std::sync::{Arc, Mutex, PoisonError};
 use craft::host::target::{Backend, ShellInfo};
 use craft::host::{AppInfo, Host, SectionStore};
 use craft::i18n::Direction;
+use craft::keymap::Overrides;
 use craft::theme::{ModeChoice, ThemeId};
 use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
+use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
 use craft::ui::runtime::env::{RootEnv, Scale};
-use craft::ui::runtime::frame::{FrameInput, FrameOutput};
+use craft::ui::runtime::frame::{ChromeToggle, FrameInput, FrameOutput};
 use craft::ui::runtime::{InstallError, InstallSpec};
 use craft::ui::shell::embed;
 use craft::window::system::SystemWindows;
@@ -46,13 +48,28 @@ pub struct Framework {
     /// The UI language `host` speaks.
     lang: &'static str,
     pub dialogs: DialogHost,
+    /// The runtime's keymap overrides. The runtime rebuilds its keymap when the `Arc` changes, so
+    /// it is replaced only when the bindings it carries change.
+    overrides: Arc<Overrides>,
+    /// The preferences revision `overrides` was last checked against.
+    overrides_rev: Option<u64>,
+    /// The chrome toggles the runtime took from the keys since the last frame, for `logic`.
+    pub(crate) chrome_toggles: Vec<ChromeToggle>,
 }
 
 impl Default for Framework {
     fn default() -> Self {
         let sections = Arc::new(PrefSections::default());
         let lang = "en";
-        Framework { host: Arc::new(build_host(&sections, lang)), sections, lang, dialogs: DialogHost::new() }
+        Framework {
+            host: Arc::new(build_host(&sections, lang)),
+            sections,
+            lang,
+            dialogs: DialogHost::new(),
+            overrides: Arc::new(Overrides::new()),
+            overrides_rev: None,
+            chrome_toggles: Vec::new(),
+        }
     }
 }
 
@@ -79,12 +96,32 @@ impl Framework {
         }
         let rtl = i18n::framework_i18n().from_code(lang).is_some_and(|l| i18n::framework_i18n().rtl(l));
         let (theme, mode) = theme_of(theme);
-        let root = RootEnv::new()
+        let mut root = RootEnv::new()
             .theme(theme)
             .mode(mode)
             .scale(Scale::new(crate::prefs_ui::interface_zoom(session.prefs().interface.ui_scale, ctx)))
             .direction(if rtl { Direction::Rtl } else { Direction::Ltr });
-        FrameInput::new(root).host(Arc::clone(&self.host))
+        // Photoshop's Tab hides the panels, Shift+Tab all but the tools, over the canvas.
+        root.tab_toggles_chrome = true;
+        FrameInput::new(root).host(Arc::clone(&self.host)).commands(CommandInput::new().overrides(Arc::clone(&self.overrides)))
+    }
+
+    /// The runtime's keymap overrides from PhotoCraft's own bindings: the chrome commands it
+    /// dispatches for PhotoCraft (`shortcut_dispatch::FRAMEWORK_OWNED`) get PhotoCraft's keys for
+    /// them, and the pane moves are unbound, because PhotoCraft's own table binds F6 and Shift+F6
+    /// (Window › Color, Select › Modify › Feather) until those are a framework `CommandSet`.
+    fn set_overrides(&mut self, rev: u64, chrome: [Vec<String>; 2]) {
+        self.overrides_rev = Some(rev);
+        let mut overrides = Overrides::new();
+        for command in [NavCommand::NextPane, NavCommand::PreviousPane] {
+            overrides.insert(CommandRef::from(command).key(), Vec::new());
+        }
+        for ((_, command), texts) in crate::shortcut_dispatch::FRAMEWORK_OWNED.iter().zip(chrome) {
+            overrides.insert(CommandRef::from(*command).key(), texts);
+        }
+        if *self.overrides != overrides {
+            self.overrides = Arc::new(overrides);
+        }
     }
 }
 
@@ -108,10 +145,18 @@ pub(crate) fn theme_of(kind: ThemeKind) -> (ThemeId, ModeChoice) {
 
 impl PhotocraftApp {
     /// Before each frame (`raw_input_hook`): the runtime's output of the last frame, and its
-    /// input for this one. PhotoCraft fires no framework commands yet, so the output has nothing
-    /// for it.
+    /// input for this one. Of the output, PhotoCraft runs the chrome toggles (in `logic`).
     pub(crate) fn framework_before_input(&mut self, ctx: &egui::Context) {
-        embed::before_input(ctx, |_output: FrameOutput| self.framework.frame_input(&mut self.session, ctx, self.ui.theme));
+        // The bindings come from walking the whole command table: only after a preferences change.
+        let rev = self.session.prefs.rev();
+        if self.framework.overrides_rev != Some(rev) {
+            let chrome = crate::shortcut_dispatch::framework_owned_texts(self);
+            self.framework.set_overrides(rev, chrome);
+        }
+        embed::before_input(ctx, |output: FrameOutput| {
+            self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
+            self.framework.frame_input(&mut self.session, ctx, self.ui.theme)
+        });
     }
 
     /// After PhotoCraft's own dialogs (`ui_body`): the framework dialogs it keeps open.

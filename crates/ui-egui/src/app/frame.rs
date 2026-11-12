@@ -101,6 +101,7 @@ impl PhotocraftApp {
             #[cfg(not(target_arch = "wasm32"))]
             crate::dialogs::filter_preview_worker::discard_closed(self);
             if type_tool::in_ui_pass(ctx) {
+                crate::shortcut_dispatch::run_framework_toggles(self, ctx);
                 if self.fonts_ready {
                     shortcuts::handle(self, ctx);
                 } else {
