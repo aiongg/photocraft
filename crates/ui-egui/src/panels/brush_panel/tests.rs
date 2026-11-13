@@ -638,19 +638,6 @@ fn transfer_mixer_edits_use_the_brush_command_and_survive_real_tool_swaps() {
     );
 }
 
-fn toggle_value(app: &PhotocraftApp, section: usize) -> bool {
-    let brush = serde_json::to_value(&app.session.tools.brush).unwrap();
-    let path = match section {
-        8 => "/noise",
-        9 => "/wetEdges",
-        10 => "/buildUp",
-        11 => "/smoothing/enabled",
-        12 => "/protectTexture",
-        _ => panic!("not a checkbox-only row"),
-    };
-    brush.pointer(path).and_then(Value::as_bool).expect("the checkbox has a boolean brush setting")
-}
-
 #[test]
 fn pose_axes_window_routes_each_checkbox_through_a_minimal_command() {
     use egui::accesskit::{Role, Toggled};
@@ -1470,20 +1457,6 @@ fn brush_settings_hamburger_menu_actions() {
     assert!(!h.state().ui.panels.brush_settings);
 }
 
-/// The fill painted for the check box in `rect` in the last frame (the topmost filled rect there).
-fn box_fill(h: &Harness<'_, PhotocraftApp>, rect: egui::Rect) -> Option<Color32> {
-    h.output()
-        .shapes
-        .iter()
-        .filter_map(|c| match &c.shape {
-            egui::Shape::Rect(r) if (r.rect.min - rect.min).length() < 1.0 && (r.rect.max - rect.max).length() < 1.0 && r.fill != Color32::TRANSPARENT => {
-                Some(r.fill)
-            }
-            _ => None,
-        })
-        .next_back()
-}
-
 /// The shared check box (options bars, dialogs) does the same, and pressing its label counts.
 #[test]
 fn checkboxes_show_a_pressed_state_from_their_label() {
@@ -1669,42 +1642,43 @@ fn tip_geometry_edits_and_arrow_drag_route_only_changed_fields_through_the_brush
     assert_eq!(h.state().session.journal.len(), journal + 3, "one command per field edit and arrow gesture");
 }
 
-/// The panel's event families run the commands the events table names.
+/// Each event family of the section list, applied through the panel's own dispatch, runs its command
+/// and edits its state.
 #[test]
 fn panel_events_map_to_their_commands() {
-    use super::super::brush_settings_events::{EVENT_COMMANDS, apply_action, apply_section_events};
+    use super::super::brush_settings_events::{apply_action, apply_section_events};
     use craft::draw::ui::brush_settings::{BrushPanelAction, BrushSectionEvent};
-
-    // Every event family names its command once.
-    let commands: Vec<&str> = EVENT_COMMANDS.iter().map(|(_, command)| *command).collect();
-    assert!(commands.iter().all(|command| ["tools.setBrush", "brush.presets.update", "window.panel.brushes"].contains(command)));
 
     // A section's flag and lock edit only their own field and leave as one `tools.setBrush` of that field;
     // a switch keeps its options (Smoothing keeps its amount).
     let mut app = app();
     app.run("tools.setBrush", json!({"brush": {"smoothing": {"amount": 0.65, "pulledString": true}}})).unwrap();
-    let cases: [(usize, bool, Value); 4] = [
-        (1, false, json!({"shapeDynamics": {"enabled": true}})),
-        (3, true, json!({"locks": {"texture": true}})),
-        (8, false, json!({"noise": true})),
-        (11, false, json!({"smoothing": {"enabled": false}})),
+    let cases: [(BrushSectionEvent<usize>, Value); 4] = [
+        (BrushSectionEvent::enable(1, true), json!({"shapeDynamics": {"enabled": true}})),
+        (BrushSectionEvent::lock(3, true), json!({"locks": {"texture": true}})),
+        (BrushSectionEvent::switch(8, true), json!({"noise": true})),
+        (BrushSectionEvent::switch(11, false), json!({"smoothing": {"enabled": false}})),
     ];
-    for (section, lock, patch) in cases {
+    for (event, patch) in cases {
         let before = app.session.tools.brush.clone();
         let mut after = before.clone();
-        let field = if lock { section_lock(&mut after, section) } else { section_flag(&mut after, section) }.unwrap();
-        *field = !*field;
+        let mut shown = 0;
+        assert!(!apply_section_events(&mut after, &mut shown, vec![event]));
+        assert_eq!(shown, 0);
         commit(&mut app, &before, &after);
         let (command, params) = last_journal(&app).unwrap();
         assert_eq!((command.as_str(), &params["brush"]), ("tools.setBrush", &patch));
     }
     assert_eq!(app.session.tools.brush.smoothing.amount, 0.65);
 
-    // Select shows a pane and the Brushes link opens the Brushes panel: neither edits the brush.
+    // Select shows the pane and runs no command; the Brushes link asks to open the Brushes panel.
+    let journal = app.session.journal.len();
     let mut brush = app.session.tools.brush.clone();
-    assert!(apply_section_events(&mut brush, vec![BrushSectionEvent::OpenLink]));
-    assert!(!apply_section_events(&mut brush, vec![BrushSectionEvent::Select(2)]));
-    assert_eq!(brush, app.session.tools.brush);
+    let mut shown = 0;
+    assert!(!apply_section_events(&mut brush, &mut shown, vec![BrushSectionEvent::Select(2)]));
+    assert_eq!((shown, &brush), (2, &app.session.tools.brush));
+    assert!(apply_section_events(&mut brush, &mut shown, vec![BrushSectionEvent::OpenLink]));
+    assert_eq!((shown, app.session.journal.len()), (2, journal));
 
     // Reset keeps the colours, smoothing and locks.
     let mut brush = app.session.tools.brush.clone();

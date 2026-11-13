@@ -67,7 +67,7 @@ pub(super) fn brush_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(name) = out.body.flatten() {
         super::brush_panel::run_or_status(app, "brush.presets.setCurrent", serde_json::json!({ "name": name }));
     }
-    if apply_section_events(&mut brush, out.sections) {
+    if apply_section_events(&mut brush, &mut app.ui.brush_section, out.sections) {
         let _ = crate::menus::invoke(app, &ctx, "window.panel.brushes", serde_json::json!({}));
     }
     if let Some(action) = out.action {

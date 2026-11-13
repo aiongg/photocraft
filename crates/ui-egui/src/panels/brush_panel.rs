@@ -20,8 +20,7 @@ use photocraft_engine::paint;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::brush_preview;
-use crate::theme::{self, Tokens};
+use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons, widgets};
 
 pub use crate::brush_preview::{preview_pixels, preview_sig};

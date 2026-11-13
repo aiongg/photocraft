@@ -9,19 +9,8 @@ use serde_json::{Value, json};
 use super::brush_panel::{section_flag, section_lock};
 use crate::PhotocraftApp;
 
-/// The command each event family runs (the table the event tests drive). `Select` shows a pane
-/// and runs none: the shown section is the app's `brushSection` state.
-pub(crate) const EVENT_COMMANDS: &[(&str, &str)] = &[
-    ("Enable", "tools.setBrush"),
-    ("Lock", "tools.setBrush"),
-    ("Switch", "tools.setBrush"),
-    ("Reset", "tools.setBrush"),
-    ("OpenLink", "window.panel.brushes"),
-    ("UpdatePreset", "brush.presets.update"),
-];
-
-/// Applies the section list's events to `brush`; true when the "Brushes" link was clicked.
-pub(crate) fn apply_section_events(brush: &mut BrushSettings, events: Vec<BrushSectionEvent<usize>>) -> bool {
+/// Applies the section list's events: edits to `brush`, a clicked pane row to `shown`. True when the "Brushes" link was clicked.
+pub(crate) fn apply_section_events(brush: &mut BrushSettings, shown: &mut usize, events: Vec<BrushSectionEvent<usize>>) -> bool {
     let mut open_brushes = false;
     for event in events {
         match event {
@@ -35,6 +24,7 @@ pub(crate) fn apply_section_events(brush: &mut BrushSettings, events: Vec<BrushS
                     *lock = on;
                 }
             }
+            BrushSectionEvent::Select(key) => *shown = key,
             BrushSectionEvent::OpenLink => open_brushes = true,
             _ => {}
         }
