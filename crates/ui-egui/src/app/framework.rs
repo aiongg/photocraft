@@ -66,6 +66,9 @@ pub struct Framework {
     /// Whether the start's agreement ran: the suite's chosen fields over the preferences, once the
     /// suite's selection is read.
     started: bool,
+    /// How many times `theme_for` ran, for tests that count resolves.
+    #[cfg(test)]
+    pub(crate) theme_resolves: std::sync::atomic::AtomicUsize,
 }
 
 /// Why a theme can't show now.
@@ -138,12 +141,17 @@ fn mode_choice(mode: AppearanceMode) -> ModeChoice {
     }
 }
 
+/// PhotoCraft's theme in the dark mode when nobody chose one: Pro (Medium Gray).
+const DEFAULT_DARK: &str = "craft.artcraft";
+/// PhotoCraft's theme in the light mode when nobody chose one: Pro (Light).
+const DEFAULT_LIGHT: &str = "craft.pro";
+
 /// What PhotoCraft shows for each suite field nobody has chosen: Pro (Medium Gray) in the dark
 /// mode, Pro in the light, and the dark mode.
 fn defaults() -> AppDefaults {
     let theme = |id: &str| ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default());
     AppDefaults {
-        theme: ThemePair { light: theme("craft.pro"), dark: theme("craft.artcraft") },
+        theme: ThemePair { light: theme(DEFAULT_LIGHT), dark: theme(DEFAULT_DARK) },
         mode: ModeChoice::Dark,
         size: Size::default(),
         sizes: AppSizes::default(),
@@ -175,6 +183,8 @@ impl Default for Framework {
             synced: None,
             synced_rev: None,
             started: false,
+            #[cfg(test)]
+            theme_resolves: Default::default(),
         }
     }
 }
@@ -293,6 +303,8 @@ impl Framework {
     /// the runtime resolves its own. A theme the suite can't resolve shows as PhotoCraft's default
     /// for the mode.
     pub(crate) fn theme_for(&self, id: &ThemeId, dark: bool, ctx: &egui::Context) -> AppTheme {
+        #[cfg(test)]
+        self.theme_resolves.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if let Some(theme) = AppTheme::palette(id, dark) {
             return theme;
         }
@@ -309,6 +321,16 @@ impl Framework {
     #[cfg(test)]
     pub(crate) fn suite(&self) -> &SuiteClient {
         &self.suite
+    }
+
+    /// Whether `shown` is what [`theme_for`](Self::theme_for) gives for the slot id `slot` in
+    /// `shown`'s mode because the suite can't resolve it: the mode's default palette, and `slot`
+    /// a theme the suite doesn't know. Checked without resolving or copying a theme.
+    pub(crate) fn shows_fallback_for(&self, slot: &str, shown: &AppTheme) -> bool {
+        let default = if shown.is_dark() { DEFAULT_DARK } else { DEFAULT_LIGHT };
+        shown.id().as_str() == default
+            && shown.library().is_none()
+            && ThemeId::parse(slot).is_ok_and(|id| self.theme_availability(&id) == Err(ThemeUnavailable::Unknown))
     }
 
     /// Whether theme `id` can show now: the suite has it as a built-in or a loaded library theme.
