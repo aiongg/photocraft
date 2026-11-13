@@ -85,9 +85,7 @@ fn control_menu_invoke_preserves_svg_editor_choice_and_rejects_other_dialogs() {
     let ctx = egui::Context::default();
     for id in ["layer.duplicate", "image.imageSize", "edit.paste", "view.zoomIn"] {
         let (request, _) = crate::control::ControlRequest::new("ui.menu.invoke", json!({"id": id}));
-        let crate::control::Reply::Done(result) = crate::control::handle(&mut app, &ctx, &request) else {
-            panic!("blocked menu call must return immediately")
-        };
+        let crate::control::Reply::Done(result) = crate::control::handle(&mut app, &ctx, &request) else { panic!("blocked menu call must return immediately") };
         assert_eq!(result["ok"], false, "{id}: {result}");
         assert!(result.to_string().contains("modal dialog"));
         assert_eq!(authorizations.get(), 0);

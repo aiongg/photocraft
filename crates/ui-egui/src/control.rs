@@ -52,7 +52,6 @@ pub use inspect::inspect;
 #[cfg(test)]
 use params::screen_point;
 pub use params::{MAX_CLICKS, MAX_SCREEN_POINT, UI_SET_FIELDS};
-use params::{err, ok};
 
 /// Run a command the way automation does (script events off). Long commands may run as
 /// background jobs: by default the reply waits for the job's result (backward compatible); with

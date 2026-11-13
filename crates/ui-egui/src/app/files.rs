@@ -838,7 +838,6 @@ impl PhotocraftApp {
         self.saved_automation(doc, revision, &target, &warnings, false);
         Ok(reply(&target, &warnings))
     }
-
 }
 
 /// The New Document dialog's key in the preferences' `dialogs` map.
