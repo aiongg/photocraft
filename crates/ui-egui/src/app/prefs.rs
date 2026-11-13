@@ -34,9 +34,27 @@ impl PhotocraftApp {
 
     /// Saves `theme` as the theme of its mode's slot, and its mode as the appearance mode.
     pub(crate) fn save_theme(&mut self, theme: &theme::AppTheme) -> Result<(), String> {
-        let slot = if theme.is_dark() { "interface.darkTheme" } else { "interface.lightTheme" };
-        let mode = if theme.is_dark() { "dark" } else { "light" };
-        self.run("prefs.set", serde_json::json!({"values": {slot: theme.id().as_str(), "interface.appearanceMode": mode}})).map(drop)
+        self.save_theme_choice(theme.id(), theme.is_dark())
+    }
+
+    /// Saves theme `id` as the theme of the dark or light slot, and that mode as the appearance
+    /// mode: where every pick goes. The suite follows the preferences (`Framework::sync_theme`),
+    /// and loads a library theme picked this way.
+    fn save_theme_choice(&mut self, id: &craft::theme::ThemeId, dark: bool) -> Result<(), String> {
+        let slot = if dark { "interface.darkTheme" } else { "interface.lightTheme" };
+        let mode = if dark { "dark" } else { "light" };
+        self.run("prefs.set", serde_json::json!({"values": {slot: id.as_str(), "interface.appearanceMode": mode}})).map(drop)
+    }
+
+    /// Checks that theme `id` can show now, for `ui.set` and Window › Theme. A library theme
+    /// nothing picked yet is picked like an Appearance settings pick (`save_theme_choice`) and
+    /// refused as still loading; the suite's read of it shows it.
+    pub(crate) fn ready_theme(&mut self, id: &craft::theme::ThemeId, dark: bool) -> Result<(), String> {
+        let Err(why) = self.framework.theme_availability(id) else { return Ok(()) };
+        if why == super::framework::ThemeUnavailable::NotPicked {
+            self.save_theme_choice(id, dark)?;
+        }
+        Err(why.message(id))
     }
 
     pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {

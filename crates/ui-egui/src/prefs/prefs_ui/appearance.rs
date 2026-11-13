@@ -163,6 +163,10 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     ctx.set_theme(egui::ThemePreference::System);
     // The native service also covers Wayland sessions where winit has no system theme.
     let (id, dark) = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
+    // A library theme the suite is loading: the current look stays until the suite's read shows it.
+    if app.framework.theme_availability(&id) == Err(crate::app::framework::ThemeUnavailable::Loading) {
+        return;
+    }
     let selected = app.framework.theme_for(&id, dark, ctx);
     if app.ui.theme != selected {
         app.apply_theme(ctx, selected);
