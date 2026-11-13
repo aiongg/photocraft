@@ -67,7 +67,7 @@ fn histogram_follows_preview_and_view_changes_do_not_render_or_edit() {
 fn closing_the_camera_raw_window_cancels() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#808080"})).unwrap();
@@ -98,7 +98,7 @@ fn closing_the_camera_raw_window_cancels() {
 fn the_main_window_gaining_focus_or_a_click_raises_the_camera_raw_window() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     ctx.set_embed_viewports(false);
     // A multi-window backend for this thread: Camera Raw gets a window of its own, as on a desktop,
     // and the commands its window receives are recorded.
@@ -219,7 +219,7 @@ fn a_stale_worker_never_replaces_a_newer_synchronous_render() {
 #[test]
 fn a_dialog_edit_develops_off_the_ui_thread() {
     let (mut app, ctx) = worker_app();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let frame = |app: &mut PhotocraftApp| {
         ctx.run_ui(egui::RawInput::default(), |ui| show(app, ui.ctx())).textures_delta.clear();
     };
@@ -243,7 +243,7 @@ fn a_dialog_edit_develops_off_the_ui_thread() {
 #[test]
 fn a_worker_failure_is_reported_until_the_next_frame() {
     let (mut app, ctx) = worker_app();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let frame = |app: &mut PhotocraftApp| {
         ctx.run_ui(egui::RawInput::default(), |ui| show(app, ui.ctx())).textures_delta.clear();
     };

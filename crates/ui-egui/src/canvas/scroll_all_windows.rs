@@ -521,7 +521,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(4);
         assert!(!h.state().ui.tool_options.hand_scroll_all, "off by default");
         h.get_by_label("Scroll All Windows").click();
@@ -558,7 +558,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(4);
         h
     }

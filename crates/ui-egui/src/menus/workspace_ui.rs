@@ -580,7 +580,7 @@ mod tests {
     #[test]
     fn saved_workspace_keeps_host_menu_and_rail_hidden_in_the_rendered_ui() {
         let mut failures = Vec::new();
-        for theme in crate::theme::ThemeKind::ALL {
+        for theme in crate::theme::AppTheme::all() {
             for width in [800.0, 1200.0] {
                 let builder = egui_kittest::Harness::builder().with_size(egui::vec2(width, 800.0)).with_max_steps(64);
                 let mut h = builder.build_eframe(move |cc| {
@@ -774,7 +774,7 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
 
         for (size, scale) in [(vec2(760.0, 480.0), 1.0), (vec2(420.0, 360.0), 2.0)] {
-            for theme in crate::theme::ThemeKind::ALL {
+            for theme in crate::theme::AppTheme::all() {
                 let (mut app, _) = app();
                 app.run("file.new", json!({"width": 20, "height": 20, "depth": 32})).unwrap();
                 let mut h = Harness::builder().with_size(size).with_pixels_per_point(scale).build_ui_state(|ui, app| windows(app, ui.ctx()), app);

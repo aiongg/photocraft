@@ -195,7 +195,7 @@ mod title_tests {
         open_named(&mut app, "foo.psd");
         let texts = |app: &mut crate::PhotocraftApp| {
             let ctx = egui::Context::default();
-            crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+            crate::PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
             let mut out = ctx.run_ui(egui::RawInput::default(), |ui| super::title_bar(app, ui));
             out.textures_delta.clear();
             let mut texts = Vec::new();
@@ -217,7 +217,7 @@ mod title_tests {
             let mut app = app(custom);
             open_named(&mut app, "foo.psd");
             let ctx = egui::Context::default();
-            crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+            crate::PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
             let out = ctx.run_ui(egui::RawInput::default(), |ui| super::title_bar(&mut app, ui));
             let mut out = out;
             out.textures_delta.clear();
@@ -244,7 +244,7 @@ mod title_tests {
     fn sync_window_title_sends_only_on_change() {
         let mut app = app(true);
         let ctx = egui::Context::default();
-        crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        crate::PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         super::sync_window_title(&mut app, &ctx);
         assert_eq!(app.last_window_title, "PhotoCraft");
         let mut out = ctx.run_ui(egui::RawInput::default(), |_| {});
@@ -288,7 +288,7 @@ mod navigator_wheel_tests {
         app.sync_views();
         app.last_canvas_rect = Rect::from_min_size(Pos2::ZERO, vec2(80.0, 60.0));
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         for _ in 0..3 {
             frame(&mut app, &ctx, pos2(5.0, 5.0), 0.0);
         }
@@ -353,7 +353,7 @@ mod navigator_wheel_tests {
         // Animated Zoom off: a notch is one instant step, so one frame shows the whole ×1.1.
         app.session.edit_prefs(|p| p.general.animated_zoom = false);
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         crate::wheel_nav::configure(&ctx);
         frame(&mut app, &ctx, pos2(50.0, 55.0), 0.0);
         let center = app.ui.views[0].center;
@@ -429,7 +429,7 @@ mod navigator_wheel_tests {
         app.ui.views[0].zoom = 1.0;
         app.ui.views[0].fit_pending = false;
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         // The preview settles once the zoom row under it has been measured.
         for _ in 0..3 {
             frame(&mut app, &ctx, pos2(5.0, 5.0), 0.0);
@@ -483,7 +483,7 @@ mod navigator_wheel_tests {
         app.ui.views[0].zoom = 1.0;
         app.ui.views[0].fit_pending = false;
         let mut h = egui_kittest::Harness::builder().with_size(vec2(360.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| navigator(app, ui), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         let row = last_navigator_controls(&h.ctx).expect("the zoom row");
         assert!(row.height() <= NAV_ROW_H + 14.0, "one row (with the gap above it): {row:?}");
@@ -514,7 +514,7 @@ mod symmetry_theme_tests {
 
     #[test]
     fn brush_pencil_and_eraser_expose_symmetry_menu_in_every_theme() {
-        for kind in crate::theme::ThemeKind::ALL {
+        for kind in crate::theme::AppTheme::all() {
             for tool in [Tool::Brush, Tool::Pencil, Tool::Eraser] {
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
                 app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
@@ -545,7 +545,7 @@ mod info_panel_sampler_tests {
         app.run("view.colorSamplers.add", json!({"x": 5, "y": 6})).unwrap();
         app.run("view.colorSamplers.add", json!({"x": 40, "y": 30})).unwrap();
         let mut h = Harness::builder().with_size(vec2(340.0, 400.0)).build_ui_state(|ui, app: &mut PhotocraftApp| info_panel(app, ui), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(3);
         // Both points are listed, numbered, and read as white (RGB 255 / CMYK 0%).
         assert!(h.query_by_label("#1").is_some(), "point 1 is listed");
@@ -613,8 +613,8 @@ mod history_transform_tests {
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
         let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).build_ui_state(|ui, app: &mut PhotocraftApp| history(app, ui), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
-        h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
+        h.state_mut().ui.theme = crate::theme::AppTheme::pro_medium();
         h.run_steps(3);
         // Footer buttons are the only 26 pt squares; the bar lays them out right to left.
         let buttons = |h: &Harness<'static, PhotocraftApp>| {
@@ -778,8 +778,8 @@ mod snapshot_row_tests {
         app.run("history.newSnapshot", json!({})).unwrap();
         app.run("edit.fill", json!({"color": "#0000ff"})).unwrap();
         let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).build_ui_state(|ui, app: &mut PhotocraftApp| history(app, ui), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
-        h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
+        h.state_mut().ui.theme = crate::theme::AppTheme::pro_medium();
         h.run_steps(3);
         h
     }
@@ -926,8 +926,8 @@ mod snapshot_row_tests {
             app.run("history.newSnapshot", json!({})).unwrap();
         }
         let mut h = Harness::builder().with_size(vec2(300.0, 250.0)).build_ui_state(|ui, app: &mut PhotocraftApp| history(app, ui), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
-        h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
+        h.state_mut().ui.theme = crate::theme::AppTheme::pro_medium();
         h.run_steps(3);
         let view = h.ctx.input(|i| i.viewport_rect());
         let buttons: Vec<Rect> = h
@@ -974,8 +974,8 @@ mod snapshot_row_tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
-        h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
+        h.state_mut().ui.theme = crate::theme::AppTheme::pro_medium();
         h.run_steps(4);
         let mut buttons: Vec<Rect> = h
             .ctx
@@ -1029,8 +1029,8 @@ mod snapshot_row_tests {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
-            h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
+            h.state_mut().ui.theme = crate::theme::AppTheme::pro_medium();
             h.run_steps(4);
             let mut buttons: Vec<Rect> = h
                 .ctx
@@ -1259,7 +1259,7 @@ mod tool_flyout_drag_tests {
     fn flyout_press_drag_release_selects_the_row_without_long_press() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         frame(&mut app, &ctx, 0.0, vec![]);
         frame(&mut app, &ctx, 0.1, vec![]);
         let slot_index = TOOL_SECTIONS.iter().flat_map(|section| section.iter()).position(|slot| slot.contains(&Tool::Brush)).unwrap();
@@ -1305,7 +1305,7 @@ mod toolbar_hidden_tests {
     /// Clickable tool-sized buttons the toolbar drew in its last pass.
     fn tool_buttons(app: &mut PhotocraftApp) -> usize {
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         for time in [0.0, 0.1] {
             let mut out = ctx.run_ui(
                 egui::RawInput { time: Some(time), screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, vec2(1200.0, 1800.0))), ..Default::default() },
@@ -1376,7 +1376,7 @@ mod properties_card_tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
         h.run_steps(2);
         h.query_all_by_role(egui::accesskit::Role::SpinButton).next().unwrap().click();
         h.run_steps(1);
@@ -1402,13 +1402,13 @@ mod toolbar_tests {
     #[test]
     fn header_chevron_toggles_two_columns_in_every_layout() {
         for theme in [
-            crate::theme::ThemeKind::Pro,
-            crate::theme::ThemeKind::Studio,
-            crate::theme::ThemeKind::StudioLight,
-            crate::theme::ThemeKind::Classic,
-            crate::theme::ThemeKind::AdwaitaDark,
-            crate::theme::ThemeKind::SolarizedDark,
-            crate::theme::ThemeKind::BreezeDark,
+            crate::theme::AppTheme::pro(),
+            crate::theme::AppTheme::studio(),
+            crate::theme::AppTheme::studio_light(),
+            crate::theme::AppTheme::classic(),
+            crate::theme::AppTheme::adwaita_dark(),
+            crate::theme::AppTheme::solarized_dark(),
+            crate::theme::AppTheme::breeze_dark(),
         ] {
             let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
             let mut h = egui_kittest::Harness::builder().with_size(vec2(800.0, 1400.0)).build_ui_state(
@@ -1442,7 +1442,7 @@ mod toolbar_tests {
     /// #4653: every theme draws Edit Toolbar, Quick Mask and Screen Mode, not only Pro.
     #[test]
     fn every_theme_has_the_toolbar_controls() {
-        for kind in crate::theme::ThemeKind::ALL {
+        for kind in crate::theme::AppTheme::all() {
             let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
             let mut h = egui_kittest::Harness::builder().with_size(vec2(800.0, 1400.0)).build_ui_state(
                 |ui, app: &mut PhotocraftApp| {
@@ -1464,7 +1464,7 @@ mod toolbar_tests {
     // stayed stacked in one column; in two columns they sit side by side.
     #[test]
     fn quick_mask_and_screen_mode_follow_the_toolbar_columns() {
-        for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Classic] {
+        for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio(), crate::theme::AppTheme::classic()] {
             let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
             let mut h = egui_kittest::Harness::builder().with_size(vec2(800.0, 1400.0)).build_ui_state(
                 |ui, app: &mut PhotocraftApp| {
@@ -1525,7 +1525,7 @@ mod toolbar_tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
         h.run_steps(2);
         h
     }
@@ -1776,7 +1776,7 @@ mod properties_target_regressions {
         let mut h = Harness::builder().with_size(vec2(360.0, 650.0)).build_ui_state(
             move |ui, app: &mut PhotocraftApp| {
                 if !ready {
-                    PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
                     ready = true;
                     return;
                 }
@@ -1822,7 +1822,7 @@ mod navigator_animated_zoom_tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
         h.run_steps(4);
         for (label, direction) in [("Zoom In", 1), ("Zoom Out", -1), ("Zoom Out", -1)] {
             let before = &h.state().ui.views[0];
@@ -1846,7 +1846,7 @@ mod layer_click_type_commit_tests {
     use craft::layers::ui::tree::LayerPart;
     use egui_kittest::Harness;
 
-    fn harness(kind: theme::ThemeKind) -> (Harness<'static, PhotocraftApp>, LayerId, LayerId) {
+    fn harness(kind: theme::AppTheme) -> (Harness<'static, PhotocraftApp>, LayerId, LayerId) {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
         let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
@@ -1895,7 +1895,7 @@ mod layer_click_type_commit_tests {
 
     #[test]
     fn layer_name_and_thumbnail_clicks_commit_same_or_other_type_selection() {
-        let kind = theme::ThemeKind::default();
+        let kind = theme::AppTheme::default();
         for same in [true, false] {
             for thumbnail in [true, false] {
                 let (mut h, text, other) = harness(kind);
@@ -1911,7 +1911,7 @@ mod layer_click_type_commit_tests {
     #[test]
     #[ignore = "craft-layers: a double-click on a thumbnail reports no Activate (map_events drops ThumbClicked.clicks)"]
     fn layer_click_commits_without_breaking_modifier_selection_or_double_click_editing() {
-        let kind = theme::ThemeKind::default();
+        let kind = theme::AppTheme::default();
         let (mut h, text, other) = harness(kind);
         let p = at(&h, "Other pixels", false);
         click(&mut h, p, egui::Modifiers { command: true, ..Default::default() });
@@ -1933,11 +1933,11 @@ mod layer_click_type_commit_tests {
     #[test]
     #[ignore = "offscreen visual evidence for #5584"]
     fn layer_click_synthetic_visual_evidence() {
-        let (h, text, _) = harness(theme::ThemeKind::ProMedium);
+        let (h, text, _) = harness(theme::AppTheme::pro_medium());
         let mut app = h.into_state();
         app.ui.tool = Tool::Type;
         let mut h = Harness::builder().with_size(vec2(1280.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).wgpu().build_eframe(move |cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, theme::ThemeKind::ProMedium);
+            PhotocraftApp::setup_context(&cc.egui_ctx, theme::AppTheme::pro_medium());
             app
         });
         h.run_steps(4);

@@ -120,7 +120,7 @@ fn typed_columns_resize_the_document() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 1000, "height": 500, "resolution": 300})).unwrap();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let id = open(h.state_mut(), command).unwrap();
         set_unit(&mut h.state_mut().ui.dialog_mut(id).unwrap().fields, "width", "col");
         h.run_steps(3);
@@ -152,7 +152,7 @@ fn canvas_size_columns_are_whole_inches() {
         app.session.execute("prefs.set", json!({"path": "unitsAndRulers.columnWidth", "value": 360})).unwrap();
         app.session.execute("prefs.set", json!({"path": "unitsAndRulers.gutter", "value": 24})).unwrap();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let id = open(h.state_mut(), "image.canvasSize").unwrap();
         let f = &mut h.state_mut().ui.dialog_mut(id).unwrap().fields;
         set_unit(f, "width", "col");
@@ -235,7 +235,7 @@ fn canvas_extension_dropdown_is_named_for_its_setting() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": 100, "height": 50})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     open(h.state_mut(), "image.canvasSize").unwrap();
     h.run_steps(3);
     let labels: Vec<String> = h.query_all_by_role(Role::ComboBox).filter_map(|n| n.accesskit_node().label()).collect();
@@ -260,7 +260,7 @@ fn indexed_color_resamples_with_nearest_neighbor_only() {
     // The open list offers only Automatic and Nearest Neighbor.
     use egui_kittest::{Harness, kittest::Queryable};
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     open(h.state_mut(), "image.imageSize").unwrap();
     h.run_steps(3);
     let combo = h.query_all_by_role(egui::accesskit::Role::ComboBox).find(|n| n.value().as_deref() == Some("Nearest Neighbor (hard edges)"));
@@ -303,7 +303,7 @@ fn typed_zero_width_shows_the_applied_size() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": 4, "height": 4})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.imageSize").unwrap();
     h.run_steps(3);
     // The dialog opens on Width, selected (#2329): the typed 0 replaces the 4.
@@ -325,7 +325,7 @@ fn resample_off_dialog(unit: &str) -> (egui_kittest::Harness<'static, Photocraft
     let mut h = egui_kittest::Harness::builder()
         .with_size(egui::vec2(1400.0, 900.0))
         .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.imageSize").unwrap();
     let d = h.state_mut().ui.dialog_mut(id).unwrap();
     d.fields.insert("resample".into(), json!("none"));
@@ -349,7 +349,7 @@ fn traditional_point_size_drives_points_and_picas() {
     let mut h = egui_kittest::Harness::builder()
         .with_size(egui::vec2(1400.0, 900.0))
         .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.imageSize").unwrap();
     let d = h.state_mut().ui.dialog_mut(id).unwrap();
     d.fields.insert("resample".into(), json!("none"));
@@ -430,7 +430,7 @@ fn resample_on_resolution_keeps_the_physical_size() {
         let mut h = egui_kittest::Harness::builder()
             .with_size(egui::vec2(1400.0, 900.0))
             .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let id = open(h.state_mut(), "image.imageSize").unwrap();
         let d = h.state_mut().ui.dialog_mut(id).unwrap();
         d.fields.insert("resample".into(), json!("bicubic"));
@@ -457,7 +457,7 @@ fn resample_on_resolution_with_width_in_columns() {
         let mut h = egui_kittest::Harness::builder()
             .with_size(egui::vec2(1400.0, 900.0))
             .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let id = open(h.state_mut(), "image.imageSize").unwrap();
         let d = h.state_mut().ui.dialog_mut(id).unwrap();
         d.fields.insert("resample".into(), json!("bicubic"));
@@ -485,7 +485,7 @@ fn large_documents_in_physical_units_open_unchanged() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 40000, "height": 4, "resolution": 72})).unwrap();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let id = open(h.state_mut(), command).unwrap();
         h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("__unit".into(), json!("pt"));
         h.run_steps(3);
@@ -510,7 +510,7 @@ fn sizing_dialogs_open_on_width_selected() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         open(h.state_mut(), command).unwrap();
         h.run_steps(3);
         assert!(h.query_all_by_role(Role::SpinButton).next().expect("the Width field").is_focused(), "{command}: Width has focus");

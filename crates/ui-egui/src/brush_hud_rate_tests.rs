@@ -52,7 +52,7 @@ fn the_readout_shows_diameter_hardness_and_opacity() {
         },
         app,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let c = h.state().last_canvas_rect.center();
     let alt = Modifiers::ALT;

@@ -18,7 +18,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     h
 }
@@ -217,7 +217,7 @@ fn options_tab_moves_from_opacity_to_flow_without_a_caption_stop() {
 // the panel, on top of the panel's own border, so the borders doubled (three lines, not one).
 #[test]
 fn options_bar_has_a_single_full_width_border() {
-    for kind in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Classic] {
+    for kind in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::pro(), crate::theme::AppTheme::classic()] {
         let mut h = harness();
         PhotocraftApp::setup_context(&h.ctx, kind);
         h.run_steps(4);

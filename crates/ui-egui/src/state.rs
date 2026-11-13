@@ -505,7 +505,9 @@ pub struct UiState {
     pub views: Vec<View>,
     pub dialogs: Vec<Dialog>,
     pub windows: Vec<DocWindow>,
-    pub theme: crate::theme::ThemeKind,
+    /// The theme on screen, taken from the preferences and the suite each frame.
+    #[serde(skip)]
+    pub theme: crate::theme::AppTheme,
     pub workspace: String,
     pub palette_open: bool,
     pub dock_tabs: DockTabs,
@@ -695,7 +697,7 @@ impl Default for UiState {
             views: Vec::new(),
             dialogs: Vec::new(),
             windows: Vec::new(),
-            theme: crate::theme::ThemeKind::ProMedium,
+            theme: crate::theme::AppTheme::default(),
             workspace: "Essentials".into(),
             palette_open: false,
             dock_tabs: DockTabs::default(),

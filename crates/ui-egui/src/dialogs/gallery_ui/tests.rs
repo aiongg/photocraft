@@ -26,7 +26,7 @@ fn app() -> PhotocraftApp {
 #[test]
 fn zoom_shortcuts_zoom_the_preview_not_the_canvas() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     // Large enough that Fit in View is well under 100 % in a 1000 × 700 window.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.session.execute("file.new", json!({"width": 3000, "height": 2000})).unwrap();

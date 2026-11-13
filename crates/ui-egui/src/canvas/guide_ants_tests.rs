@@ -24,7 +24,7 @@ fn app() -> PhotocraftApp {
 /// The painted shapes' order in one frame: the indices of the guide lines and of the ants' meshes.
 fn painted(app: &mut PhotocraftApp, ppp: f32, zoom: f32, primary: bool) -> (Vec<usize>, Vec<usize>) {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     ctx.set_pixels_per_point(ppp);
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(700.0, 500.0));
     let view = View { zoom, center: [300.0, 200.0], doc_size: [600, 400], fit_pending: false, ..Default::default() };

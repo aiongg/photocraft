@@ -412,7 +412,7 @@ fn a_pressed_component_marks_itself_on_the_canvas() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(6);
     {
         let v = &mut h.state_mut().ui.views[0];

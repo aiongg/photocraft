@@ -2103,7 +2103,7 @@ fn replace_color_dialog_arms_the_eyedropper_button() {
     s.execute("file.new", json!({"width": 16, "height": 16})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     open(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     assert!(color_eyedropper_armed(h.state()), "armed as the dialog opens");
@@ -2127,7 +2127,7 @@ fn replace_color_result_swatch_sets_the_sliders() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     app.run("tools.setColors", json!({"foreground": "#cc3333"})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     // No shift yet: the Result is the sampled colour.
@@ -2166,7 +2166,7 @@ fn replace_color_localized_color_clusters() {
     s.execute("file.new", json!({"width": 40, "height": 10, "background": "#ff0000"})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 800.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), REPLACE_COLOR).unwrap();
     h.run_steps(3);
     let _ = h.get_by_label("Localized Color Clusters");
@@ -2204,7 +2204,7 @@ fn color_lookup_folder_menu_click_applies_pixels_and_undoes() {
     app.run("prefs.set", json!({"path": "fileHandling.lutFolder", "value": tmp.path().to_str().unwrap()})).unwrap();
     app.run("file.new", json!({"width": 4, "height": 4, "background": "#ff0000"})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(900.0, 800.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.adjustments.colorLookup").unwrap();
     h.run_steps(3);
     for _ in 0..500 {
@@ -2387,7 +2387,7 @@ fn indexed_matte_dropdown_and_picker_change_the_applied_edge_color() {
             .unwrap();
         let mut app = PhotocraftApp::new(session, crate::Services::default());
         let mut harness = Harness::builder().with_size(egui::vec2(900.0, 1000.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-        PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
         let id = open(harness.state_mut(), "image.mode.indexedColor").unwrap();
         harness.state_mut().ui.dialog_mut(id).unwrap().fields.insert("palette".into(), json!("exact"));
         harness.run_steps(3);
@@ -2425,7 +2425,7 @@ fn indexed_matte_cancel_keeps_the_previous_choice() {
     session.execute("file.new", json!({"width": 2, "height": 1, "depth": 32, "background": "transparent"})).unwrap();
     let mut app = PhotocraftApp::new(session, crate::Services::default());
     let mut harness = Harness::builder().with_size(egui::vec2(900.0, 1000.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), &mut app);
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     let id = open(harness.state_mut(), "image.mode.indexedColor").unwrap();
     harness.run_steps(3);
     harness.query_all_by_role(Role::ComboBox).find(|node| node.value().as_deref() == Some("None")).expect("Matte dropdown").click();

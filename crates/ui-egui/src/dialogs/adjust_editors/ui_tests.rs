@@ -736,7 +736,7 @@ fn gradient_map_drag_clamps_at_the_endpoints_and_reverse_keeps_stop_coordinates(
 #[test]
 fn gradient_map_stop_controls_fit_a_narrow_properties_panel_in_every_theme() {
     use crate::adjust_editors::{EditorCx, editor};
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for width in [240.0, 280.0] {
             let mut h = Harness::builder().with_size(vec2(width, 360.0)).build_ui_state(
                 |ui, values: &mut serde_json::Value| {

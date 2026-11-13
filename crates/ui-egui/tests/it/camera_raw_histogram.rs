@@ -4,7 +4,7 @@ use egui_kittest::{
     Harness,
     kittest::{NodeT, Queryable},
 };
-use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::ThemeKind};
+use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::AppTheme};
 use serde_json::{Value, json};
 
 fn invoke(h: &mut Harness<'_, PhotocraftApp>, params: Value) -> Value {
@@ -17,7 +17,7 @@ fn invoke(h: &mut Harness<'_, PhotocraftApp>, params: Value) -> Value {
 
 #[test]
 fn header_stays_fixed_and_resize_hover_scroll_before_do_not_rebuild_the_proxy() {
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, theme);
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -86,7 +86,7 @@ fn histogram_matches_visible_preview_at_all_supported_depths_and_cancel_commit_a
 
 #[test]
 fn settings_sections_group_existing_controls_without_rendering_or_document_edits() {
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         let mut h = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 900.0)).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, theme);
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());

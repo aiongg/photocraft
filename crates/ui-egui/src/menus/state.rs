@@ -127,7 +127,13 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     use photocraft_doc::{ColorMode, SampleType};
     if let Some(name) = id.strip_prefix("window.theme.").filter(|n| *n != "toggle") {
         let auto = app.session.prefs().interface.appearance_mode == photocraft_engine::prefs::AppearanceMode::Auto;
-        return Some(if name == "system" { auto } else { !auto && crate::theme::ThemeKind::from_name(name) == Some(app.ui.theme) });
+        let shown = |dark: bool, id: &str| app.ui.theme.is_dark() == dark && app.ui.theme.id().as_str() == id;
+        return Some(match (name.strip_prefix("dark."), name.strip_prefix("light.")) {
+            _ if name == "system" => auto,
+            (Some(id), _) => !auto && shown(true, id),
+            (_, Some(id)) => !auto && shown(false, id),
+            _ => false,
+        });
     }
     if let Some(c) = crate::view_cmds::checked(app, id) {
         return Some(c);

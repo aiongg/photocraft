@@ -54,7 +54,7 @@ fn the_target_dropdown_lists_group_then_layer() {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     let combo = h
         .get_all_by_role(Role::ComboBox)

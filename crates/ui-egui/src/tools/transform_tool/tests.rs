@@ -117,7 +117,7 @@ fn transform_bar_pins_warp_cancel_and_commit() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(6);
     let commit = h.get_by_label("Commit transform").rect();
     let cancel = h.get_by_label("Cancel transform").rect();
@@ -150,7 +150,7 @@ fn interpolation_selection_is_reused_for_the_next_transform() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     let ctx = h.ctx.clone();
     begin(h.state_mut(), &ctx).unwrap();
     h.run_steps(6);
@@ -193,7 +193,7 @@ fn free_transform_bar_buttons_follow_the_fields_on_a_wide_bar() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(6);
     let commit = h.get_by_label("Commit transform").rect();
     assert!(commit.right() < width * 0.7, "commit sits next to the fields, not at the far right: {commit:?}");
@@ -215,7 +215,7 @@ fn warp_bar_buttons_follow_the_fields_on_a_wide_bar() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(6);
     h.get_by_label("Switch between free transform and warp modes").click();
     h.run_steps(4);
@@ -339,7 +339,7 @@ pub(super) fn bar_harness(setup: impl FnOnce(&mut PhotocraftApp)) -> egui_kittes
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(6);
     h
 }

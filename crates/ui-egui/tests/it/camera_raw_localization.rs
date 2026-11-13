@@ -1,7 +1,7 @@
 //! Camera Raw labels and language changes through the real shared native/WASM shell.
 use egui::{accesskit::Role, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
-use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, i18n, theme::ThemeKind};
+use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, i18n, theme::AppTheme};
 use serde_json::json;
 
 #[test]
@@ -20,7 +20,7 @@ fn all_registered_languages_render_camera_raw_and_switch_without_resetting_view_
         let builder = if AWAITING_CENTRAL_FONT.iter().any(|(code, _)| *code == lang.code()) { builder.allow_missing_glyphs() } else { builder };
         let builder = if gpu { builder.wgpu() } else { builder };
         let mut h = builder.build_eframe(move |cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, ThemeKind::Pro);
+            PhotocraftApp::setup_context(&cc.egui_ctx, AppTheme::pro());
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
             app.run("file.new", json!({"width":64,"height":48})).unwrap();
             app.run("layer.new.layer", json!({})).unwrap();
@@ -30,7 +30,7 @@ fn all_registered_languages_render_camera_raw_and_switch_without_resetting_view_
         });
         h.run_steps(3);
         let ctx = h.ctx.clone();
-        h.state_mut().set_theme(&ctx, ThemeKind::Pro);
+        h.state_mut().set_theme(&ctx, AppTheme::pro());
         // Labels and retained state are under test, not the collapse animation.
         h.ctx.all_styles_mut(|style| style.animation_time = 0.0);
         h.state_mut().session.prefs.edit(|p| p.interface.language = lang.code().into());

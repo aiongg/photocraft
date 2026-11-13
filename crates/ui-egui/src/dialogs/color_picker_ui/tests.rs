@@ -34,7 +34,7 @@ fn picker(color: &str) -> Harness<'static, Map<String, Value>> {
         },
         f,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     h
 }
@@ -244,7 +244,7 @@ fn color_picker_opens_with_hex_focused_and_selected() {
 fn color_picker_dialog_hex_field_is_in_tab_order_and_confirms_typed_color() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = Harness::builder().with_size(vec2(760.0, 480.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     open(h.state_mut(), "foreground");
     h.run_steps(3);
     assert!(h.get_by_role(Role::TextInput).is_focused(), "hex field has focus in dialog frame");
@@ -425,7 +425,7 @@ fn side_buttons_and_keyboard_confirm_or_cancel_without_changing_the_other_color(
         for action in ["OK", "Cancel", "Enter", "Escape"] {
             let app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
             let mut h = Harness::builder().with_size(vec2(760.0, 480.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
             let original_fg = h.state().session.tools.foreground;
             let original_bg = h.state().session.tools.background;
             let id = open(h.state_mut(), target);

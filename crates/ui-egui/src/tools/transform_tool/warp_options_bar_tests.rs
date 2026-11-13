@@ -165,7 +165,7 @@ fn full_bar(warping: bool) -> Harness {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(6);
     h
 }

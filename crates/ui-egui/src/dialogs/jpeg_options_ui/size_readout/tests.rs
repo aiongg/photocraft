@@ -178,7 +178,7 @@ fn the_dialog_shows_the_size_it_will_write() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     super::super::park(h.state_mut(), "p.jpg".into(), false, "file.saveAs").unwrap();
     let src = Source::of(h.state()).unwrap();
     let quality = h.state().jpeg_options.as_ref().unwrap().quality;

@@ -235,7 +235,7 @@ mod tests {
     fn panel(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
         if ui.ctx().cumulative_pass_nr() == 0 {
             // Font definitions take effect on the next pass, before section headers draw.
-            PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+            PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
             return;
         }
         let state = app.session.active().unwrap();
@@ -262,7 +262,7 @@ mod tests {
     #[test]
     fn style_icons_edit_the_selected_layer_with_one_undo_step() {
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app());
-        PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, theme::AppTheme::pro_medium());
         h.run_steps(3);
         for (style, name) in STYLES.into_iter().skip(1) {
             let before = fill(h.state());
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn combined_strip_adds_only_the_clicked_kind_and_keeps_color_picker_working() {
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app());
-        PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, theme::AppTheme::pro_medium());
         h.run_steps(3);
         assert!(h.query_by_label("Color stops").is_none());
         assert!(h.query_by_label("Opacity stops").is_none());
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn opacity_numeric_edit_commits_once_and_undo_restores_the_gradient() {
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app());
-        PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, theme::AppTheme::pro_medium());
         h.run_steps(3);
         click_strip(&mut h, 0.0, 6.0);
         let before = fill(h.state());
@@ -350,7 +350,7 @@ mod tests {
         let mut app = app();
         app.run(cmds::STOP, json!({"action": "add", "kind": "opacity", "location": 0.5})).unwrap();
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app);
-        PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, theme::AppTheme::pro_medium());
         h.run_steps(3);
         assert!(h.get_all_by_label("Delete").next().unwrap().accesskit_node().is_disabled(), "two colors cannot be reduced further");
         click_strip(&mut h, 0.0, 6.0);
@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn controls_fit_a_narrow_panel_in_every_theme() {
         assert!(icons::exists("trash"), "the stop deletion button has an embedded icon");
-        for theme in theme::ThemeKind::ALL {
+        for theme in theme::AppTheme::all() {
             let mut h = Harness::builder().with_size(vec2(260.0, 820.0)).build_ui_state(panel, app());
             PhotocraftApp::setup_context(&h.ctx, theme);
             h.run_steps(3);
@@ -412,7 +412,7 @@ mod tests {
         app.run(cmds::STOP, json!({"action": "add", "location": 0.4})).unwrap();
         let id = app.session.active().unwrap().active_layer.unwrap();
         let mut h = Harness::builder().with_size(vec2(280.0, 800.0)).build_ui_state(panel, app);
-        PhotocraftApp::setup_context(&h.ctx, theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, theme::AppTheme::pro_medium());
         h.run_steps(3);
         let before = fill(h.state());
         let count = h.state().session.active().unwrap().history.past_len();

@@ -37,9 +37,9 @@ fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark_across_palettes() {
     app.run("prefs.set", json!({"values": {"interface.darkTheme": "studio", "interface.lightTheme": "classic"}})).unwrap();
     invoke(&mut app, &ctx, "window.theme.system", json!({})).unwrap();
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
-    assert_eq!(app.session.prefs().interface.dark_theme, DarkTheme::Studio);
-    assert_eq!(app.session.prefs().interface.light_theme, LightTheme::Classic);
-    assert_eq!(app.ui.theme, crate::theme::ThemeKind::Classic);
+    assert_eq!(app.session.prefs().interface.dark_theme, "craft.studio");
+    assert_eq!(app.session.prefs().interface.light_theme, "craft.classic");
+    assert_eq!(app.ui.theme, crate::theme::AppTheme::classic());
     for appearance in [egui::Theme::Dark, egui::Theme::Light] {
         app.services.system_theme = Some(Box::new(move |_| Some(appearance)));
         crate::prefs_ui::tick(&mut app, &ctx);
@@ -49,7 +49,7 @@ fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark_across_palettes() {
         assert_eq!(item.path, ["Window", "Theme"]);
         assert!(item.enabled);
         assert_eq!(item.checked, Some(true));
-        for kind in crate::theme::ThemeKind::ALL {
+        for kind in crate::theme::AppTheme::all() {
             assert_eq!(checked(&app, &format!("window.theme.{}", kind.id())), Some(false));
         }
     }
@@ -135,7 +135,7 @@ fn color_to_alpha_sits_in_filter_other_after_offset() {
 fn menu_bar_labels_have_horizontal_padding_and_open_menus() {
     use egui_kittest::{Harness, kittest::Queryable};
 
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for width in [640.0, 1440.0] {
             let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
             let mut harness = Harness::builder().with_size(egui::vec2(width, 200.0)).build_ui_state(
@@ -207,7 +207,7 @@ fn hovering_a_title_at_the_screen_edge_switches_the_open_menu() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     harness.get_by_label("File").click();
     harness.run_steps(3);
@@ -231,7 +231,7 @@ fn hovering_another_title_switches_the_open_menu() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     // Nothing open: hovering a title does not open it.
     harness.get_by_label("Image").hover();
@@ -260,7 +260,7 @@ fn an_open_menu_reuses_its_items_until_the_state_changes() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     assert!(harness.state().menu_cache.is_none(), "no menu open, nothing built");
     harness.get_by_label("File").click();
@@ -342,7 +342,7 @@ fn help_search_takes_typing_and_clicks_without_closing_the_menu() {
         let what = format!("custom title bar {custom}, document {doc}, scale {scale}");
         let mut h =
             Harness::builder().with_size(egui::vec2(1200.0 / scale, 800.0 / scale)).with_pixels_per_point(scale).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+                PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
                 app.custom_titlebar = custom;
                 if doc {
@@ -393,7 +393,7 @@ fn help_search_letters_are_not_mnemonics() {
     use egui::{Event, Key, Modifiers, PointerButton};
     use egui_kittest::{Harness, kittest::Queryable};
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
         PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
     });
     h.run_steps(4);
@@ -428,7 +428,7 @@ fn help_search_letters_are_not_mnemonics() {
 fn dropdown_items_have_room() {
     use egui_kittest::{Harness, kittest::Queryable};
 
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(
             |ui, app| {
@@ -463,7 +463,7 @@ fn menu_level_height_is_bounded_by_viewport() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     // Opening a top-level menu with many entries must not grow its popup past the viewport.
     use egui_kittest::kittest::Queryable;
@@ -491,7 +491,7 @@ fn tall_menu_scrolls_with_mouse_wheel_on_short_display() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     harness.get_by_label("Filter").click();
     harness.run_steps(3);

@@ -310,7 +310,7 @@ mod tests {
             let mut h = egui_kittest::Harness::builder().with_size(vec2(320.0, 400.0)).build_ui_state(
                 |ui, app: &mut PhotocraftApp| {
                     if ui.ctx().cumulative_pass_nr() == 0 {
-                        PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ALL[0]);
+                        PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro());
                         return;
                     }
                     let st = app.session.active().unwrap();

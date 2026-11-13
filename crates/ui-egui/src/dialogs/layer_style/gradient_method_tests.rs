@@ -34,7 +34,7 @@ fn method_picker_is_pending_until_confirm_and_survives_reopening() {
         },
         (app, pending_fields),
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     harness.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Method").click();
     harness.run_steps(2);

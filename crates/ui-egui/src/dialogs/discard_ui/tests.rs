@@ -214,7 +214,7 @@ fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) 
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(os);
     assert!(intercept(h.state_mut(), command, &Value::Null));
     h.run_steps(2);
@@ -552,7 +552,7 @@ fn command_d_answers_the_prompt_rather_than_deselecting() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(egui::os::OperatingSystem::Mac);
     assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
     h.run_steps(2);
@@ -714,7 +714,7 @@ fn saving_from_the_prompt_waits_for_a_background_save_then_closes() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(egui::os::OperatingSystem::Windows);
     assert!(intercept(h.state_mut(), "file.close", &Value::Null));
     h.run_steps(2);

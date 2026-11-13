@@ -228,7 +228,7 @@ fn every_effect_row_shows_a_checkbox() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(3);
     let boxes: Vec<egui::Rect> = h
         .output()
@@ -270,7 +270,7 @@ fn default_buttons_wrap_inside_the_page_column_with_long_labels() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
         h.run_steps(3);
         let reset = h.get_by_role_and_label(egui::accesskit::Role::Button, crate::i18n::tr(ru, "Reset to Default")).rect();
         let make = h.get_by_role_and_label(egui::accesskit::Role::Button, crate::i18n::tr(ru, "Make Default")).rect();
@@ -642,7 +642,7 @@ fn apply_rejects_non_object_params_before_running_commands() {
 #[test]
 fn body_keeps_invalid_params_and_renders_without_panicking() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     for bad in [json!(7), json!(null), json!("x")] {
         let mut fields = Map::new();
@@ -672,8 +672,8 @@ fn body_keeps_invalid_params_and_renders_without_panicking() {
 /// #2288: the selected effect row must dim again when its checkbox is cleared.
 #[test]
 fn disabled_effect_row_uses_muted_text_even_when_selected() {
-    for theme in crate::theme::ThemeKind::ALL {
-        let tokens = Tokens::for_kind(theme);
+    for theme in crate::theme::AppTheme::all() {
+        let tokens = theme.tokens();
         assert_eq!(fx_label_color(true, &tokens), tokens.text, "{theme:?}: checked");
         assert_eq!(fx_label_color(false, &tokens), tokens.text_dim, "{theme:?}: unchecked");
     }
@@ -682,7 +682,7 @@ fn disabled_effect_row_uses_muted_text_even_when_selected() {
 #[test]
 fn blending_page_renders_for_every_mode_and_odd_fields() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let mut layer = photocraft_doc::Layer::new("L", photocraft_doc::LayerContent::Adjustment(photocraft_doc::Adjustment::Invert));
     layer.advanced.knockout = photocraft_doc::Knockout::Deep;

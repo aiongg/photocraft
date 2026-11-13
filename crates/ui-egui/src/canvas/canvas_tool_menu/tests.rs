@@ -40,7 +40,7 @@ pub(crate) fn harness(mut app: PhotocraftApp) -> Harness<'static, PhotocraftApp>
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     h
 }
@@ -106,7 +106,7 @@ fn right_click_while_typing_opens_the_type_edit_menu_and_esc_keeps_the_edit() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     let center = h.state().last_canvas_rect.center();
     right_click(&mut h, center, Modifiers::NONE);
@@ -570,7 +570,7 @@ fn zoom_harness(animated: bool) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     let view = &mut h.state_mut().ui.views[0];
     view.zoom = 1.0;
@@ -1347,7 +1347,7 @@ fn shortcut_harness(mut app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     h
 }

@@ -14,7 +14,10 @@ use craft::host::target::{Backend, ShellInfo};
 use craft::host::{AppInfo, Host, SectionStore};
 use craft::i18n::Direction;
 use craft::keymap::Overrides;
-use craft::theme::{ModeChoice, ThemeId};
+use craft::theme::{
+    AppDefaults, AppSizes, Appearance, Contrast, Mode, ModeChoice, Resolved, Size, SuiteChoice, TextSize, ThemeDef, ThemeId, ThemePair, resolve,
+};
+use craft::theme_store::{SelectionChange, SuiteClient};
 use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
 use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
@@ -24,11 +27,12 @@ use craft::ui::runtime::{InstallError, InstallSpec};
 use craft::ui::shell::embed;
 use craft::window::system::SystemWindows;
 use photocraft_engine::Session;
+use photocraft_engine::prefs::{AppearanceMode, Preferences};
 use serde_json::Value;
 
 use super::PhotocraftApp;
 use crate::i18n;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 /// Installs the runtime on `ctx` with `fonts`, unless it is there already (a language change, or
 /// `setup_context` again for the same context).
@@ -55,6 +59,75 @@ pub struct Framework {
     overrides_rev: Option<u64>,
     /// The chrome toggles the runtime took from the keys since the last frame, for `logic`.
     pub(crate) chrome_toggles: Vec<ChromeToggle>,
+    /// The suite's theme selection, shared with the other Craft apps.
+    suite: SuiteClient,
+    /// The theme slots and mode as PhotoCraft's preferences and the suite last agreed on them.
+    synced: Option<ThemePrefs>,
+    /// The preferences revision the shown theme was last taken from.
+    theme_rev: Option<u64>,
+    /// The tokens of the last library theme resolved, by what they were resolved from.
+    resolved: Option<(ThemeDef, bool, AppTheme)>,
+}
+
+/// The preferences that choose the theme: the appearance mode and the theme id of each slot.
+#[derive(Clone, Debug, PartialEq)]
+struct ThemePrefs {
+    mode: AppearanceMode,
+    dark: String,
+    light: String,
+}
+
+impl ThemePrefs {
+    fn of(prefs: &Preferences) -> Self {
+        let i = &prefs.interface;
+        ThemePrefs { mode: i.appearance_mode, dark: i.dark_theme.clone(), light: i.light_theme.clone() }
+    }
+
+    /// What the suite shows: its chosen fields, else PhotoCraft's defaults.
+    fn of_suite(choice: &SuiteChoice) -> Self {
+        let defaults = defaults();
+        let shown = choice.with_defaults(&defaults);
+        ThemePrefs { mode: app_mode(shown.mode), dark: shown.theme.dark.as_str().to_owned(), light: shown.theme.light.as_str().to_owned() }
+    }
+
+    /// The suite fields that differ between `self` and `before`.
+    fn change_from(&self, before: &ThemePrefs) -> SelectionChange {
+        let id = |value: &str| ThemeId::parse(value).ok();
+        SelectionChange {
+            theme_dark: (self.dark != before.dark).then(|| id(&self.dark)).flatten(),
+            theme_light: (self.light != before.light).then(|| id(&self.light)).flatten(),
+            mode: (self.mode != before.mode).then(|| mode_choice(self.mode)),
+            ..SelectionChange::default()
+        }
+    }
+}
+
+fn app_mode(mode: ModeChoice) -> AppearanceMode {
+    match mode {
+        ModeChoice::System => AppearanceMode::Auto,
+        ModeChoice::Dark => AppearanceMode::Dark,
+        ModeChoice::Light => AppearanceMode::Light,
+    }
+}
+
+fn mode_choice(mode: AppearanceMode) -> ModeChoice {
+    match mode {
+        AppearanceMode::Auto => ModeChoice::System,
+        AppearanceMode::Dark => ModeChoice::Dark,
+        AppearanceMode::Light => ModeChoice::Light,
+    }
+}
+
+/// What PhotoCraft shows for each suite field nobody has chosen: Pro (Medium Gray) in the dark
+/// mode, Pro in the light, and the dark mode.
+fn defaults() -> AppDefaults {
+    let theme = |id: &str| ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default());
+    AppDefaults {
+        theme: ThemePair { light: theme("craft.pro"), dark: theme("craft.artcraft") },
+        mode: ModeChoice::Dark,
+        size: Size::default(),
+        sizes: AppSizes::default(),
+    }
 }
 
 impl Default for Framework {
@@ -69,6 +142,10 @@ impl Default for Framework {
             overrides: Arc::new(Overrides::new()),
             overrides_rev: None,
             chrome_toggles: Vec::new(),
+            suite: SuiteClient::memory(),
+            synced: None,
+            theme_rev: None,
+            resolved: None,
         }
     }
 }
@@ -87,7 +164,7 @@ fn build_host(sections: &Arc<PrefSections>, lang: &str) -> Host {
 
 impl Framework {
     /// The input for the coming frame, from PhotoCraft's preferences.
-    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: ThemeKind) -> FrameInput {
+    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: &AppTheme) -> FrameInput {
         self.sections.sync(session);
         let lang = i18n::current().code();
         if lang != self.lang {
@@ -95,15 +172,117 @@ impl Framework {
             self.host = Arc::new(build_host(&self.sections, lang));
         }
         let rtl = i18n::framework_i18n().from_code(lang).is_some_and(|l| i18n::framework_i18n().rtl(l));
-        let (theme, mode) = theme_of(theme);
         let mut root = RootEnv::new()
-            .theme(theme)
-            .mode(mode)
+            .theme(theme.id().clone())
+            .mode(if theme.is_dark() { ModeChoice::Dark } else { ModeChoice::Light })
             .scale(Scale::new(crate::prefs_ui::interface_zoom(session.prefs().interface.ui_scale, ctx)))
             .direction(if rtl { Direction::Rtl } else { Direction::Ltr });
         // Photoshop's Tab hides the panels, Shift+Tab all but the tools, over the canvas.
         root.tab_toggles_chrome = true;
+        if !theme.id().is_builtin()
+            && let Some(def) = self.suite.theme(theme.id())
+        {
+            root = root.library_theme(Arc::new(def));
+        }
         FrameInput::new(root).host(Arc::clone(&self.host)).commands(CommandInput::new().overrides(Arc::clone(&self.overrides)))
+    }
+
+    /// Opens the suite folder this machine shares with the other Craft apps, in place of the
+    /// in-memory suite the app starts with.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn open_suite(&mut self, ctx: &egui::Context) {
+        use craft::theme_store::{StoreOptions, SuiteDir, SuiteWatch};
+        let ctx = ctx.clone();
+        let options = StoreOptions::new(concat!("photocraft ", env!("CARGO_PKG_VERSION")));
+        self.suite = SuiteClient::new(SuiteWatch::open(&SuiteDir::resolve(false), options, move || ctx.request_repaint()));
+        self.synced = None;
+    }
+
+    /// Brings the preferences and the suite's selection together: a change made in the
+    /// preferences goes to the suite, a change another app made to the suite goes to the
+    /// preferences. At the start the suite's chosen fields win, and the preferences' own choices
+    /// fill the fields it has not chosen. Returns whether the theme on screen may need to change.
+    pub(crate) fn sync_theme(&mut self, session: &mut Session) -> bool {
+        let moved = self.suite.sync();
+        let mine = ThemePrefs::of(session.prefs());
+        let suite = ThemePrefs::of_suite(&self.suite.shown());
+        let agreed = match self.synced.take() {
+            None => {
+                let chosen = self.suite.accepted().suite.clone();
+                let blank = ThemePrefs::of_suite(&SuiteChoice::default());
+                let mut start = mine.clone();
+                let mut change = SelectionChange::default();
+                match &chosen.theme_dark {
+                    Some(id) => start.dark = id.as_str().to_owned(),
+                    None if mine.dark != blank.dark => change.theme_dark = ThemeId::parse(&mine.dark).ok(),
+                    None => {}
+                }
+                match &chosen.theme_light {
+                    Some(id) => start.light = id.as_str().to_owned(),
+                    None if mine.light != blank.light => change.theme_light = ThemeId::parse(&mine.light).ok(),
+                    None => {}
+                }
+                match chosen.mode {
+                    Some(mode) => start.mode = app_mode(mode),
+                    None if mine.mode != blank.mode => change.mode = Some(mode_choice(mine.mode)),
+                    None => {}
+                }
+                self.suite.change(change);
+                start
+            }
+            Some(agreed) if mine != agreed => {
+                self.suite.change(mine.change_from(&agreed));
+                mine.clone()
+            }
+            Some(agreed) if moved && suite != agreed => suite,
+            Some(agreed) => agreed,
+        };
+        if agreed != mine {
+            session.edit_prefs(|p| {
+                p.interface.appearance_mode = agreed.mode;
+                p.interface.dark_theme = agreed.dark.clone();
+                p.interface.light_theme = agreed.light.clone();
+            });
+        }
+        self.synced = Some(agreed);
+        let changed = moved || self.theme_rev != Some(session.prefs.rev());
+        self.theme_rev = Some(session.prefs.rev());
+        changed
+    }
+
+    /// The theme `id` shown in the dark or light mode: PhotoCraft's palette for it, else its
+    /// tokens resolved from the suite's definition. A theme the suite doesn't know shows as the
+    /// default theme.
+    pub(crate) fn theme_for(&mut self, id: &ThemeId, dark: bool) -> AppTheme {
+        if let Some(theme) = AppTheme::palette(id, dark) {
+            return theme;
+        }
+        let Some(def) = self.suite.theme(id) else { return AppTheme::default() };
+        if let Some((kept, kept_dark, theme)) = &self.resolved
+            && *kept_dark == dark
+            && *kept == def
+        {
+            return *theme;
+        }
+        let appearance = Appearance {
+            mode: if dark { Mode::Dark } else { Mode::Light },
+            contrast: Contrast::Standard,
+            size: Size::default(),
+            text_size: TextSize::default(),
+            reduced_motion: false,
+        };
+        let resolved: Resolved = resolve(&def, appearance, None);
+        let theme = AppTheme::resolved(id, dark, &resolved);
+        self.resolved = Some((def, dark, theme));
+        theme
+    }
+
+    /// The name of theme `id` for a menu: PhotoCraft's own name for its palettes, else the suite's.
+    pub(crate) fn theme_name(&self, id: &ThemeId, dark: bool) -> String {
+        AppTheme::palette_label(id.as_str(), dark)
+            .map(str::to_owned)
+            .or_else(|| self.suite.theme(id).map(|def| def.name))
+            .unwrap_or_else(|| id.as_str().to_owned())
     }
 
     /// The runtime's keymap overrides from PhotoCraft's own bindings: the chrome commands it
@@ -125,24 +304,6 @@ impl Framework {
     }
 }
 
-/// PhotoCraft's theme as the framework's theme and mode. Pro (Medium Gray), PhotoCraft's default
-/// dark theme, is the framework's ArtCraft dark, the suite default.
-pub(crate) fn theme_of(kind: ThemeKind) -> (ThemeId, ModeChoice) {
-    let id = match kind {
-        ThemeKind::ProMedium => "craft.artcraft",
-        ThemeKind::Pro | ThemeKind::ProLight => "craft.pro",
-        ThemeKind::ProLightGray => "craft.pro-light-gray",
-        ThemeKind::Studio | ThemeKind::StudioLight => "craft.studio",
-        ThemeKind::Classic => "craft.classic",
-        ThemeKind::SolarizedDark => "craft.solarized-dark",
-        ThemeKind::Adwaita | ThemeKind::AdwaitaDark => "craft.adwaita",
-        ThemeKind::BreezeLight | ThemeKind::BreezeDark => "craft.breeze",
-        ThemeKind::SoftLight | ThemeKind::SoftDark => "craft.soft",
-    };
-    let theme = ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default());
-    (theme, if kind.is_dark() { ModeChoice::Dark } else { ModeChoice::Light })
-}
-
 impl PhotocraftApp {
     /// Before each frame (`raw_input_hook`): the runtime's output of the last frame, and its
     /// input for this one. Of the output, PhotoCraft runs the chrome toggles (in `logic`).
@@ -153,9 +314,12 @@ impl PhotocraftApp {
             let chrome = crate::shortcut_dispatch::framework_owned_texts(self);
             self.framework.set_overrides(rev, chrome);
         }
+        if self.framework.sync_theme(&mut self.session) {
+            crate::prefs_ui::sync_appearance(self, ctx);
+        }
         embed::before_input(ctx, |output: FrameOutput| {
             self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
-            self.framework.frame_input(&mut self.session, ctx, self.ui.theme)
+            self.framework.frame_input(&mut self.session, ctx, &self.ui.theme)
         });
     }
 
@@ -222,16 +386,13 @@ pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -
 
 #[cfg(test)]
 mod tests {
-    /// Every PhotoCraft theme names a framework built-in, in its own mode; Pro (Medium Gray) is
-    /// ArtCraft dark.
+    /// Every theme PhotoCraft has a palette for names a framework built-in.
     #[test]
-    fn every_theme_maps_to_a_builtin_in_its_mode() {
+    fn every_palette_theme_is_a_builtin() {
         let builtins = craft::theme::builtins();
-        for kind in crate::theme::ThemeKind::ALL {
-            let (id, mode) = super::theme_of(kind);
-            assert!(builtins.iter().any(|t| t.id == id), "{kind:?}: {} is no built-in theme", id.as_str());
-            assert_eq!(mode, if kind.is_dark() { craft::theme::ModeChoice::Dark } else { craft::theme::ModeChoice::Light }, "{kind:?}");
+        for theme in crate::theme::AppTheme::all() {
+            assert!(builtins.iter().any(|t| t.id == *theme.id()), "{} is no built-in theme", theme.id().as_str());
         }
-        assert_eq!(super::theme_of(crate::theme::ThemeKind::ProMedium).0.as_str(), "craft.artcraft");
+        assert_eq!(crate::theme::AppTheme::pro_medium().id().as_str(), "craft.artcraft");
     }
 }

@@ -1,12 +1,12 @@
 //! Camera Raw navigation uses the real modal shell and never changes document history.
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
-use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::ThemeKind};
+use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::AppTheme};
 use serde_json::{Value, json};
 
 fn fixture(ppp: f32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 800.0)).with_pixels_per_point(ppp).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, ThemeKind::Pro);
+        PhotocraftApp::setup_context(&cc.egui_ctx, AppTheme::pro());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width":1200,"height":900})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();

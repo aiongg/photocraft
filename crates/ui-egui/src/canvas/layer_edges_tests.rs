@@ -43,7 +43,7 @@ fn assert_edges(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, primar
 
 fn context(ppp: f32) -> egui::Context {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     ctx.set_pixels_per_point(ppp);
     ctx
 }

@@ -652,7 +652,7 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let size = vec2(1000.0, 600.0);
         let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app: &mut PhotocraftApp| show(app, ui.ctx()), grey_layer());
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         open_with_a_constraint(h.state_mut(), &ctx);
         h.run_steps(2);

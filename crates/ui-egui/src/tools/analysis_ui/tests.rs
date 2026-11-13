@@ -315,7 +315,7 @@ fn ruler_bar(mut app: PhotocraftApp) -> egui_kittest::Harness<'static, Photocraf
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h
 }

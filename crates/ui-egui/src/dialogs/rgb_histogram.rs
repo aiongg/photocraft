@@ -169,7 +169,7 @@ fn mesh(rect: Rect, h: &RgbHistogram, t: &Tokens) -> Mesh {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
 
     fn color_at(mesh: &Mesh, point: egui::Pos2) -> Option<egui::Color32> {
         mesh.indices.as_chunks::<3>().0.iter().find_map(|triangle| {
@@ -211,8 +211,8 @@ mod tests {
     fn shared_scale_and_overlaps_are_exact_for_every_theme() {
         let h = RgbHistogram { channels: [[3; BINS], [2; BINS], [1; BINS]], ..Default::default() };
         let rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(256.0, 110.0));
-        for kind in ThemeKind::ALL {
-            let t = Tokens::for_kind(kind);
+        for kind in AppTheme::all() {
+            let t = kind.tokens();
             let m = mesh(rect, &h, &t);
             for (y, mask) in [(100.0, 7), (60.0, 3), (20.0, 1)] {
                 assert_eq!(color_at(&m, pos2(128.7, y)), Some(t.histogram_fill(mask)));
@@ -230,8 +230,8 @@ mod tests {
                 bins[mask * 30..mask * 30 + 10].fill(u64::from(mask & (1 << c) != 0));
             }
         }
-        for kind in ThemeKind::ALL {
-            let t = Tokens::for_kind(kind);
+        for kind in AppTheme::all() {
+            let t = kind.tokens();
             let m = mesh(rect, &h, &t);
             for mask in 1..=7 {
                 assert_eq!(color_at(&m, pos2((mask * 30 + 5) as f32 + 0.5, 95.0)), Some(t.histogram_fill(mask as u8)));
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn empty_and_bad_rectangles_draw_no_ribbons() {
-        let t = Tokens::for_kind(ThemeKind::Pro);
+        let t = AppTheme::pro().tokens();
         let h = RgbHistogram::default();
         assert!(mesh(Rect::from_min_max(pos2(0.0, 0.0), pos2(256.0, 100.0)), &h, &t).is_empty());
         assert!(mesh(Rect::NOTHING, &h, &t).is_empty());
@@ -308,7 +308,7 @@ mod tests {
             channel[121] = 100;
         }
         let original = h.clone();
-        let m = mesh(Rect::from_min_max(pos2(0.0, 0.0), pos2(256.0, 100.0)), &h, &Tokens::for_kind(ThemeKind::Pro));
+        let m = mesh(Rect::from_min_max(pos2(0.0, 0.0), pos2(256.0, 100.0)), &h, &AppTheme::pro().tokens());
         assert!(covers(&m, pos2(120.5, 85.0)), "isolated empty bin creates a full-height black stripe");
         assert!(!covers(&m, pos2(180.5, 85.0)), "a real empty tonal range must stay empty");
         assert_eq!(h, original, "display filtering must never change raw statistics");

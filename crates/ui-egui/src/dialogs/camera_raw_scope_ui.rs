@@ -101,7 +101,7 @@ pub(crate) struct ScopeView {
     pub(crate) revision: u64,
     pub(crate) overlay_tex: Option<TextureHandle>,
     pub(crate) overlay_detail: bool,
-    pub(crate) overlay_key: Option<(u64, bool, ClippingMode, crate::theme::ThemeKind)>,
+    pub(crate) overlay_key: Option<(u64, bool, ClippingMode, bool, egui::Color32, egui::Color32)>,
     pub(crate) floating_dragged: bool,
     pub(crate) geometry_requested: bool,
     pub(crate) sampler_drag: Option<usize>,
@@ -612,7 +612,7 @@ pub(crate) fn preview(ui: &mut egui::Ui, d: &mut CameraRawDialog, view: &mut Cam
     } else {
         ClippingMode::None
     };
-    let key = (d.preview_revision, d.show_before, mode, t.kind);
+    let key = (d.preview_revision, d.show_before, mode, t.dark, t.canvas, t.card);
     if mode != ClippingMode::None && d.detail.overlay(ui, rect, d.preview_revision, mode) {
         d.scope.overlay_key = Some(key);
         d.scope.overlay_detail = true;

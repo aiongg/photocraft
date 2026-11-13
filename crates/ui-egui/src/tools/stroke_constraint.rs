@@ -475,7 +475,7 @@ mod tests {
             },
             a,
         );
-        crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(4);
         let c = h.state().last_canvas_rect.center();
         let target = c + vec2(120.0, 90.0);

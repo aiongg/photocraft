@@ -7,10 +7,10 @@ use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 /// The real app (every panel on) in `theme`, with a document open when `document`.
-fn app(theme: ThemeKind, document: bool, auto_show: bool) -> Harness<'static, PhotocraftApp> {
+fn app(theme: AppTheme, document: bool, auto_show: bool) -> Harness<'static, PhotocraftApp> {
     let mut s = photocraft_engine::Session::new();
     if document {
         s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
@@ -49,7 +49,7 @@ fn click_home(h: &mut Harness<'static, PhotocraftApp>) {
 
 #[test]
 fn no_documents_with_auto_show_draws_only_the_home_content() {
-    let h = app(ThemeKind::Pro, false, true);
+    let h = app(AppTheme::pro(), false, true);
     assert!(h.query_by_label("New file").is_some(), "Home content");
     assert!(!chrome_shown(&h, "no documents, auto-show"), "no tool strip or dock under Home");
     assert!(h.query_by_label("No document").is_none(), "no status bar");
@@ -58,7 +58,7 @@ fn no_documents_with_auto_show_draws_only_the_home_content() {
 
 #[test]
 fn toggling_home_swaps_the_chrome_and_keeps_the_panel_prefs() {
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         let mut h = app(theme, true, true);
         let panels = h.state().ui.panels.clone();
         assert!(chrome_shown(&h, &format!("{theme:?}, document open, before Home")), "{theme:?}: chrome with a document");
@@ -79,7 +79,7 @@ fn toggling_home_swaps_the_chrome_and_keeps_the_panel_prefs() {
 
 #[test]
 fn tab_in_full_screen_does_not_bring_the_chrome_back_over_home() {
-    let mut h = app(ThemeKind::Pro, true, true);
+    let mut h = app(AppTheme::pro(), true, true);
     click_home(&mut h);
     h.state_mut().ui.view.screen_mode = "fullScreen".into();
     h.state_mut().ui.panels.full_screen_chrome = true;

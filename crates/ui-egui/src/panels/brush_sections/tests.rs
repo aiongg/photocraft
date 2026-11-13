@@ -33,7 +33,7 @@ fn section_harness_width(section: usize, width: f32, b: BrushSettings) -> Harnes
     let mut h = Harness::builder().with_size(vec2(width, 1100.0)).build_ui_state(
         move |ui, b: &mut BrushSettings| {
             if !ready {
-                crate::PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                crate::PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -48,7 +48,7 @@ fn section_harness_width(section: usize, width: f32, b: BrushSettings) -> Harnes
 #[test]
 fn pose_axes_controls_are_independent_and_below_each_tilt_in_all_themes() {
     use egui::accesskit::Toggled;
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         let b: BrushSettings = serde_json::from_value(serde_json::json!({"pose": {
             "enabled": true, "tiltX": 45.0, "tiltY": -18.0,
             "overrideTiltX": true, "overrideTiltY": false,
@@ -82,7 +82,7 @@ fn pose_axes_controls_are_independent_and_below_each_tilt_in_all_themes() {
 /// #3825: jitter is an amount, not a hue selector; it uses the themed amount track.
 #[test]
 fn hue_jitter_paints_an_amount_track_in_every_theme() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         let mut b = BrushSettings::default();
         b.color_dynamics.hue_jitter = 0.37;
         let mut h = section_harness(5, b.clone());
@@ -121,7 +121,7 @@ fn transfer_mixer_brush() -> BrushSettings {
     b
 }
 
-fn transfer_mixer_harness(kind: theme::ThemeKind, tool: Tool) -> Harness<'static, TransferState> {
+fn transfer_mixer_harness(kind: theme::AppTheme, tool: Tool) -> Harness<'static, TransferState> {
     let mut ready = false;
     let mut h = Harness::builder().with_size(vec2(340.0, 1400.0)).build_ui_state(
         move |ui, state: &mut TransferState| {
@@ -141,7 +141,7 @@ fn transfer_mixer_harness(kind: theme::ThemeKind, tool: Tool) -> Harness<'static
 /// #3825: Mixer-only blocks follow the tool, including sliders, minimums and Fade steps.
 #[test]
 fn transfer_mixer_controls_follow_the_tool_and_section_in_every_theme() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         let mut h = transfer_mixer_harness(kind, Tool::Brush);
         let before = h.state().brush.clone();
         for tool in Tool::ALL {
@@ -173,7 +173,7 @@ fn transfer_mixer_controls_follow_the_tool_and_section_in_every_theme() {
 
 #[test]
 fn transfer_mixer_controls_ignore_disabled_edits_and_keep_values_on_reactivation() {
-    let mut h = transfer_mixer_harness(theme::ThemeKind::ProMedium, Tool::Brush);
+    let mut h = transfer_mixer_harness(theme::AppTheme::pro_medium(), Tool::Brush);
     let before = h.state().brush.clone();
     for value in [41.0, 43.0, 339.0, 63.0, 67.0, 449.0] {
         let field = h.query_all_by_role(Role::SpinButton).find(|node| node.accesskit_node().numeric_value() == Some(value)).unwrap();
@@ -342,7 +342,7 @@ fn ellipse_widget_drags_angle_and_roundness() {
 
 #[test]
 fn spacing_row_has_one_label_and_a_shared_header_in_every_theme() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for enabled in [false, true] {
             let b = BrushSettings { spacing: 0.427, spacing_enabled: enabled, ..Default::default() };
             let mut h = section_harness(0, b.clone());
@@ -363,7 +363,7 @@ fn spacing_row_has_one_label_and_a_shared_header_in_every_theme() {
 }
 
 fn check_scatter_header(section: usize) {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for both_axes in [false, true] {
             let mut b = BrushSettings::default();
             b.scattering.scatter.jitter = 2.137;
@@ -517,7 +517,7 @@ fn tip_geometry_center(h: &Harness<'static, BrushSettings>) -> egui::Pos2 {
 
 #[test]
 fn tip_geometry_fields_precede_the_widget_and_labels_align_in_all_themes() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for width in [280.0, 340.0] {
             let b = BrushSettings { angle: -23.0, roundness: 0.473, ..Default::default() };
             let mut h = section_harness_width(0, width, b.clone());

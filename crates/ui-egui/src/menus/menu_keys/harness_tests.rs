@@ -21,7 +21,7 @@ fn bar() -> Harness<'static, PhotocraftApp> {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h
 }
@@ -402,7 +402,7 @@ fn a_command_shortcut_closes_an_open_menu_and_runs() {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h.state_mut().run("select.all", json!({})).unwrap();
     h.get_by_label("Edit").click();
@@ -655,7 +655,7 @@ fn alt_in_a_zoom_field_only_alerts() {
         },
         (app(), 100.0),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h.get_by_role(egui::accesskit::Role::SpinButton).click();
     h.run_steps(2);
@@ -692,7 +692,7 @@ fn bar_and_zoom_field(beep: fn()) -> Harness<'static, (PhotocraftApp, f32)> {
         },
         (app, 100.0),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h.get_by_role(egui::accesskit::Role::SpinButton).click();
     h.run_steps(2);

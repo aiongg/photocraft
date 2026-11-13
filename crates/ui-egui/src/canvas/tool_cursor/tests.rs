@@ -614,7 +614,7 @@ fn harness() -> Harness<'static, crate::PhotocraftApp> {
         },
         app,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h.event(Event::PointerMoved(h.state().last_canvas_rect.center()));
     h.run_steps(3);

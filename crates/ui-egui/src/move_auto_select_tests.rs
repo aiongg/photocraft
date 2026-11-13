@@ -132,7 +132,7 @@ fn every_theme_shows_the_auto_select_toggle() {
     // could not be turned off there.
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
-    for theme in [crate::theme::ThemeKind::ProMedium, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::studio()] {
         let (app, _, _) = app();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 60.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
@@ -158,7 +158,7 @@ fn every_theme_shows_the_transform_controls_toggle() {
     // a click on a layer never showed its box and handles there.
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let (app, _, _) = app();
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 60.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
@@ -186,7 +186,7 @@ fn every_theme_shows_the_type_options() {
     use egui_kittest::kittest::{NodeT, Queryable};
     // The font menus show "Loading fonts…" until the font scan is done (#3021): wait for it.
     let _ = photocraft_text::shared();
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let (mut app, _, _) = app();
         app.ui.tool = Tool::Type;
         let mut h = Harness::builder().with_size(egui::vec2(1600.0, 60.0)).build_ui_state(
@@ -215,7 +215,7 @@ fn every_theme_shows_the_gradient_options() {
     // mode, style, blend mode or opacity control.
     use egui_kittest::Harness;
     use egui_kittest::kittest::{NodeT, Queryable};
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let (mut app, _, _) = app();
         app.ui.tool = Tool::Gradient;
         // The blend Mode and Opacity are the Classic gradient's (#12007).

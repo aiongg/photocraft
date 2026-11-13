@@ -10,7 +10,7 @@ use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_doc::Document;
 use photocraft_ui_egui::i18n;
 use photocraft_ui_egui::served_fonts;
-use photocraft_ui_egui::theme::ThemeKind;
+use photocraft_ui_egui::theme::AppTheme;
 use photocraft_ui_egui::{FileDialogAnswer, FileDialogRequest, PhotocraftApp, Services};
 use wasm_bindgen::JsCast as _;
 
@@ -94,7 +94,7 @@ pub fn start() {
                 options,
                 Box::new(move |cc| {
                     PhotocraftApp::install_type_reset_hooks(&cc.egui_ctx);
-                    PhotocraftApp::setup_context(&cc.egui_ctx, ThemeKind::Pro);
+                    PhotocraftApp::setup_context(&cc.egui_ctx, AppTheme::pro());
                     let inbox: Inbox = Arc::default();
                     let place_inbox: PlaceInbox = Arc::default();
                     let served: Served = Arc::default();
@@ -107,7 +107,7 @@ pub fn start() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
                     listen_pen(&pen_target, app.stylus.feed.clone());
-                    app.set_theme(&cc.egui_ctx, ThemeKind::Pro);
+                    app.set_theme(&cc.egui_ctx, AppTheme::pro());
                     if let Some(rs) = cc.wgpu_render_state.clone()
                         && !force_cpu
                     {
@@ -477,7 +477,7 @@ impl eframe::App for WebShell {
             && let Some(error) = self.presets.error()
         {
             egui::Panel::top("browser_preset_storage").show(ui, |ui| {
-                let tokens = photocraft_ui_egui::theme::Tokens::for_kind(self.app.ui.theme);
+                let tokens = self.app.ui.theme.tokens();
                 // Put retry first so floating brush windows cannot cover the control.
                 ui.horizontal_wrapped(|ui| {
                     if self.database.is_some() && ui.button(i18n::t("Retry saving presets")).clicked() {

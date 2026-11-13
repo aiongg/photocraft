@@ -18,7 +18,7 @@ fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64, events: Vec<Ev
 fn setup() -> (PhotocraftApp, egui::Context, Pos2) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     frame(&mut app, &ctx, 0.0, vec![]);
     frame(&mut app, &ctx, 0.1, vec![]);
     let bx = if Tokens::get(&ctx).pro { 30.0 } else { 36.0 };

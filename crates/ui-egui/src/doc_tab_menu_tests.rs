@@ -41,7 +41,7 @@ fn probe(documents: usize, index: usize, has_path: bool) -> (Harness<'static, Pr
         },
         state,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     (h, requests)
 }

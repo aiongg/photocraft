@@ -256,7 +256,7 @@ fn the_options_bar_menu_sets_the_operation_and_merges() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     let open = |h: &mut egui_kittest::Harness<'_, PhotocraftApp>| {
         h.get_by_label("Path operations").click();
@@ -300,7 +300,7 @@ fn merge_is_disabled_with_fewer_than_two_components() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     h.get_by_label("Path operations").click();
     h.run_steps(3);
@@ -357,7 +357,7 @@ fn make_shape_turns_the_work_path_into_a_shape_layer() {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     assert!(h.get_by_label("Shape").accesskit_node().is_disabled(), "no path yet");
     square(h.state_mut(), 20.0, 20.0, 100.0);

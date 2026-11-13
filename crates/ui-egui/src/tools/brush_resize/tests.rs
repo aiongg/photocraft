@@ -86,7 +86,7 @@ fn canvas_drag_shows_the_circle_and_readout() {
         },
         a,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     let c = h.state().last_canvas_rect.center();
     let press = |h: &mut Harness<'static, PhotocraftApp>, pos: Pos2, pressed: bool| {
@@ -127,7 +127,7 @@ fn canvas(a: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         },
         a,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     h
 }

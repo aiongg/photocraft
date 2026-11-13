@@ -39,7 +39,7 @@ fn graphics_dropdowns_are_named_for_their_settings() {
     let obj = json!({"gpuBackend": "auto", "gpuAdapter": ""}).as_object().unwrap().clone();
     let mut h = Harness::builder()
         .with_size(vec2(700.0, 500.0))
-        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ALL[0]))
+        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::AppTheme::pro()))
         .build_ui_state(|ui, obj| gpu_status_rows(ui, None, None, obj), obj);
     h.run_steps(2);
     h.get_by_label("Advanced").click();
@@ -189,16 +189,16 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn appearance_resolves_both_saved_themes_and_follows_system() {
     let mut interface = prefs::Interface { appearance_mode: AppearanceMode::Auto, ..prefs::Interface::default() };
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::ProMedium);
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::ProLight);
-    interface.dark_theme = DarkTheme::Studio;
-    interface.light_theme = LightTheme::Classic;
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::Studio);
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::Classic);
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), AppTheme::pro_medium());
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), AppTheme::pro_light());
+    interface.dark_theme = "craft.studio";
+    interface.light_theme = "craft.classic";
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), AppTheme::studio());
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), AppTheme::classic());
     interface.appearance_mode = AppearanceMode::Dark;
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), ThemeKind::Studio);
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Light)), AppTheme::studio());
     interface.appearance_mode = AppearanceMode::Light;
-    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), ThemeKind::Classic);
+    assert_eq!(selected_theme(&interface, Some(egui::Theme::Dark)), AppTheme::classic());
 }
 
 #[test]
@@ -206,10 +206,10 @@ fn breeze_themes_are_chosen_by_preference_and_fix_the_matching_mode() {
     let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     for (id, kind, mode) in [
-        ("breezeLight", ThemeKind::BreezeLight, AppearanceMode::Light),
-        ("breezeDark", ThemeKind::BreezeDark, AppearanceMode::Dark),
-        ("softLight", ThemeKind::SoftLight, AppearanceMode::Light),
-        ("softDark", ThemeKind::SoftDark, AppearanceMode::Dark),
+        ("breezeLight", AppTheme::breeze_light(), AppearanceMode::Light),
+        ("breezeDark", AppTheme::breeze_dark(), AppearanceMode::Dark),
+        ("softLight", AppTheme::soft_light(), AppearanceMode::Light),
+        ("softDark", AppTheme::soft_dark(), AppearanceMode::Dark),
     ] {
         app.run("prefs.set", json!({"path": "interface.theme", "value": id})).unwrap();
         tick(&mut app, &ctx);
@@ -219,8 +219,8 @@ fn breeze_themes_are_chosen_by_preference_and_fix_the_matching_mode() {
         assert_eq!(app.ui.theme, kind, "{id}");
     }
     // The two slots are independent: choosing the dark one left the light choice alone.
-    assert_eq!(app.session.prefs().interface.light_theme, LightTheme::SoftLight);
-    assert_eq!(app.session.prefs().interface.dark_theme, DarkTheme::SoftDark);
+    assert_eq!(app.session.prefs().interface.light_theme, "craft.soft");
+    assert_eq!(app.session.prefs().interface.dark_theme, "craft.soft");
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn auto_uses_native_system_theme_when_egui_does_not_report_one() {
     app.run("prefs.set", json!({"path": "interface.appearanceMode", "value": "auto"})).unwrap();
     let ctx = egui::Context::default();
     tick(&mut app, &ctx);
-    assert_eq!(app.ui.theme, ThemeKind::ProLight);
+    assert_eq!(app.ui.theme, AppTheme::pro_light());
 }
 
 #[test]
@@ -239,12 +239,14 @@ fn appearance_button_cycles_modes_without_losing_theme_choices() {
     let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("prefs.set", json!({"values": {"interface.darkTheme": "studio", "interface.lightTheme": "classic"}})).unwrap();
-    for (mode, visible) in [(AppearanceMode::Auto, ThemeKind::Studio), (AppearanceMode::Light, ThemeKind::Classic), (AppearanceMode::Dark, ThemeKind::Studio)] {
+    for (mode, visible) in
+        [(AppearanceMode::Auto, AppTheme::studio()), (AppearanceMode::Light, AppTheme::classic()), (AppearanceMode::Dark, AppTheme::studio())]
+    {
         cycle_appearance(&mut app, &ctx);
         assert_eq!(app.session.prefs().interface.appearance_mode, mode);
         assert_eq!(app.ui.theme, visible);
-        assert_eq!(app.session.prefs().interface.dark_theme, DarkTheme::Studio);
-        assert_eq!(app.session.prefs().interface.light_theme, LightTheme::Classic);
+        assert_eq!(app.session.prefs().interface.dark_theme, "craft.studio");
+        assert_eq!(app.session.prefs().interface.light_theme, "craft.classic");
     }
 }
 
@@ -253,27 +255,27 @@ fn darken_and_lighten_interface_step_through_photoshops_brightnesses_and_stop_at
     let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     sync_appearance(&mut app, &ctx);
-    assert_eq!(app.ui.theme, ThemeKind::ProMedium, "Photoshop's default brightness");
+    assert_eq!(app.ui.theme, AppTheme::pro_medium(), "Photoshop's default brightness");
     let press = |app: &mut PhotocraftApp, id: &str| crate::menus::invoke(app, &ctx, id, json!({})).unwrap();
-    for expected in [ThemeKind::ProLightGray, ThemeKind::ProLight, ThemeKind::ProLight] {
+    for expected in [AppTheme::pro_light_gray(), AppTheme::pro_light(), AppTheme::pro_light()] {
         press(&mut app, "view.lightenInterface");
         assert_eq!(app.ui.theme, expected);
     }
     // Saved like a choice in Preferences › Interface: the light slot and the Light appearance.
     let i = &app.session.prefs().interface;
-    assert_eq!((i.appearance_mode, i.light_theme), (AppearanceMode::Light, LightTheme::ProLight));
-    for expected in [ThemeKind::ProLightGray, ThemeKind::ProMedium, ThemeKind::Pro, ThemeKind::Pro] {
+    assert_eq!((i.appearance_mode, i.light_theme.as_str()), (AppearanceMode::Light, "craft.pro"));
+    for expected in [AppTheme::pro_light_gray(), AppTheme::pro_medium(), AppTheme::pro(), AppTheme::pro()] {
         press(&mut app, "view.darkenInterface");
         assert_eq!(app.ui.theme, expected);
     }
     let i = &app.session.prefs().interface;
-    assert_eq!((i.appearance_mode, i.dark_theme), (AppearanceMode::Dark, DarkTheme::Pro));
+    assert_eq!((i.appearance_mode, i.dark_theme.as_str()), (AppearanceMode::Dark, "craft.pro"));
     // Another theme steps from the nearest brightness.
     for (theme, id, expected) in [
-        ("studio", "view.darkenInterface", ThemeKind::Pro),
-        ("studio", "view.lightenInterface", ThemeKind::ProLightGray),
-        ("classic", "view.darkenInterface", ThemeKind::ProMedium),
-        ("classic", "view.lightenInterface", ThemeKind::ProLight),
+        ("studio", "view.darkenInterface", AppTheme::pro()),
+        ("studio", "view.lightenInterface", AppTheme::pro_light_gray()),
+        ("classic", "view.darkenInterface", AppTheme::pro_medium()),
+        ("classic", "view.lightenInterface", AppTheme::pro_light()),
     ] {
         app.run("prefs.set", json!({"path": "interface.theme", "value": theme})).unwrap();
         sync_appearance(&mut app, &ctx);
@@ -301,17 +303,17 @@ fn ctrl_shift_f1_and_f2_darken_and_lighten_the_interface() {
         ctx.end_pass().textures_delta.clear();
     };
     press(&mut app, egui::Key::F1);
-    assert_eq!(app.ui.theme, ThemeKind::Pro);
+    assert_eq!(app.ui.theme, AppTheme::pro());
     press(&mut app, egui::Key::F2);
     press(&mut app, egui::Key::F2);
-    assert_eq!(app.ui.theme, ThemeKind::ProLightGray);
+    assert_eq!(app.ui.theme, AppTheme::pro_light_gray());
 }
 
 fn appearance_frame(app: &mut PhotocraftApp, ctx: &egui::Context, appearance: Option<egui::Theme>) {
     ctx.run_ui(egui::RawInput { system_theme: appearance, ..Default::default() }, |ui| tick(app, ui.ctx())).textures_delta.clear();
 }
 
-fn assert_palette(ctx: &egui::Context, kind: ThemeKind) {
+fn assert_palette(ctx: &egui::Context, kind: AppTheme) {
     let t = Tokens::get(ctx);
     assert_eq!(t.kind, kind);
     for style in [ctx.global_style(), ctx.style_of(egui::Theme::Light), ctx.style_of(egui::Theme::Dark)] {
@@ -327,7 +329,7 @@ fn assert_palette(ctx: &egui::Context, kind: ThemeKind) {
 
 #[test]
 fn auto_appearance_follows_live_changes_without_saving_resolved_palettes() {
-    for (dark, light) in [(ThemeKind::ProMedium, ThemeKind::StudioLight), (ThemeKind::SolarizedDark, ThemeKind::Adwaita)] {
+    for (dark, light) in [(AppTheme::pro_medium(), AppTheme::studio_light()), (AppTheme::solarized_dark(), AppTheme::adwaita())] {
         let (mut app, store) = app_with_store();
         let ctx = egui::Context::default();
         PhotocraftApp::setup_context(&ctx, Default::default());
@@ -374,17 +376,17 @@ fn manual_theme_tokens_and_global_styles_stay_fixed_across_os_changes() {
     let (mut app, store) = app_with_store();
     let ctx = egui::Context::default();
     PhotocraftApp::setup_context(&ctx, Default::default());
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         app.run("prefs.set", json!({"path": "interface.theme", "value": kind.id()})).unwrap();
         appearance_frame(&mut app, &ctx, Some(egui::Theme::Dark));
         let interface = app.session.prefs().interface.clone();
         let revision = app.session.prefs.rev();
         let saved = store.lock().unwrap().clone().unwrap();
-        assert_eq!(interface.appearance_mode, if Tokens::for_kind(kind).dark() { AppearanceMode::Dark } else { AppearanceMode::Light });
+        assert_eq!(interface.appearance_mode, if kind.tokens().dark() { AppearanceMode::Dark } else { AppearanceMode::Light });
         for appearance in [Some(egui::Theme::Dark), Some(egui::Theme::Light), Some(egui::Theme::Dark), None] {
             appearance_frame(&mut app, &ctx, appearance);
             assert_palette(&ctx, kind);
-            assert_eq!(Tokens::get(&ctx), Tokens::for_kind(kind));
+            assert_eq!(Tokens::get(&ctx), kind.tokens());
             assert_eq!(app.ui.theme, kind);
             assert_eq!(app.session.prefs().interface, interface);
             assert_eq!(app.session.prefs.rev(), revision);
@@ -400,15 +402,15 @@ fn auto_appearance_replaces_a_restored_egui_dark_pin() {
     ctx.set_theme(egui::ThemePreference::Dark);
     assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::Dark);
     appearance_frame(&mut app, &ctx, Some(egui::Theme::Light));
-    assert_palette(&ctx, ThemeKind::ProLight);
+    assert_palette(&ctx, AppTheme::pro_light());
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
     // A restored pin must also clear when the concrete PhotoCraft palette stays the same.
     ctx.set_theme(egui::ThemePreference::Dark);
     appearance_frame(&mut app, &ctx, Some(egui::Theme::Light));
     assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::System);
-    assert_palette(&ctx, ThemeKind::ProLight);
+    assert_palette(&ctx, AppTheme::pro_light());
     appearance_frame(&mut app, &ctx, Some(egui::Theme::Dark));
-    assert_palette(&ctx, ThemeKind::ProMedium);
+    assert_palette(&ctx, AppTheme::pro_medium());
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
 }
 
@@ -431,7 +433,7 @@ fn system_theme_menu_choice_stays_checked_as_the_appearance_changes() {
         assert_eq!(item("window.theme.system").checked, Some(true));
         assert!(item("window.theme.system").enabled);
         assert_eq!(item("window.theme.system").path, ["Window", "Theme"]);
-        for kind in ThemeKind::ALL {
+        for kind in AppTheme::all() {
             assert_eq!(item(&format!("window.theme.{}", kind.id())).checked, Some(false));
         }
         assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
@@ -442,13 +444,13 @@ fn system_theme_menu_choice_stays_checked_as_the_appearance_changes() {
     crate::menus::invoke(&mut app, &ctx, "window.theme.solarizedDark", json!({})).unwrap();
     for appearance in [Some(egui::Theme::Light), Some(egui::Theme::Dark)] {
         appearance_frame(&mut app, &ctx, appearance);
-        assert_palette(&ctx, ThemeKind::SolarizedDark);
+        assert_palette(&ctx, AppTheme::solarized_dark());
         let items = crate::menus::menu_items(&app);
         let item = |id: &str| items.iter().find(|i| i.id == id).unwrap();
         assert_eq!(item("window.theme.solarizedDark").checked, Some(true));
         assert_eq!(item("window.theme.system").checked, Some(false));
         assert_eq!(stored(&store)["interface"]["appearanceMode"], "dark");
-        assert_eq!(app.session.prefs().interface.light_theme, LightTheme::Adwaita);
+        assert_eq!(app.session.prefs().interface.light_theme, "craft.adwaita");
     }
 }
 
@@ -478,14 +480,14 @@ fn preferences_interface_offers_and_applies_sync_with_system() {
     assert_eq!(h.state().session.prefs().interface.dark_theme, interface.dark_theme);
     assert_eq!(h.state().session.prefs().interface.light_theme, interface.light_theme);
     assert_eq!(h.state().session.prefs().interface.theme, interface.theme);
-    assert_palette(&h.ctx, ThemeKind::Adwaita);
+    assert_palette(&h.ctx, AppTheme::adwaita());
     assert_eq!(stored(&store)["interface"]["appearanceMode"], "auto");
     let saved = store.lock().unwrap().clone().unwrap();
     let (mut restarted, reloaded) = app_with_saved(Some(saved.clone()));
     let fresh = egui::Context::default();
     PhotocraftApp::setup_context(&fresh, Default::default());
     appearance_frame(&mut restarted, &fresh, Some(egui::Theme::Dark));
-    assert_palette(&fresh, ThemeKind::SolarizedDark);
+    assert_palette(&fresh, AppTheme::solarized_dark());
     assert_eq!(restarted.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
     assert_eq!(restarted.session.prefs().interface.dark_theme, interface.dark_theme);
     assert_eq!(restarted.session.prefs().interface.light_theme, interface.light_theme);
@@ -509,11 +511,11 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     h.run_steps(2);
     h.get_by_label("Apply").click();
     h.run_steps(2);
-    assert_eq!(h.state().session.prefs().interface.favorite_themes, vec![SavedTheme::Classic]);
+    assert_eq!(h.state().session.prefs().interface.favorite_themes, vec!["craft.classic"]);
     assert!(h.query_by_label("Remove from favorites: Classic").is_some());
-    let (light, dark) = favorite_theme_groups(&[SavedTheme::Studio, SavedTheme::Classic, SavedTheme::Adwaita]);
-    assert_eq!(light, vec![ThemeKind::Classic, ThemeKind::Adwaita]);
-    assert_eq!(dark, vec![ThemeKind::Studio]);
+    let (light, dark) = favorite_theme_groups(&["craft.studio".to_string(), "craft.classic".to_string(), "craft.adwaita".to_string()]);
+    assert_eq!(light, ["craft.classic", "craft.adwaita"].map(|id| ThemeId::parse(id).unwrap()));
+    assert_eq!(dark, vec![ThemeId::parse("craft.studio").unwrap()]);
 }
 
 /// The favourite star badge overhangs its swatch; showing it on hover must not move the swatches
@@ -815,7 +817,7 @@ fn saving_keeps_preferences_another_instance_changed() {
     let (mut c, _) = app_with_saved(store.lock().unwrap().clone());
     tick(&mut c, &ctx);
     assert_eq!(c.session.prefs().performance.history_states, 30);
-    assert_eq!(c.session.prefs().interface.theme, Theme::Studio);
+    assert_eq!(c.session.prefs().interface.dark_theme, "craft.studio");
 }
 
 #[test]
@@ -953,7 +955,7 @@ fn intermediate_ui_scale_choices_can_be_applied_from_preferences() {
 fn ui_font_size_commands_follow_themes_and_dpi_and_reset_live() {
     let (mut app, _) = app_with_store();
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, ThemeKind::Pro);
+    PhotocraftApp::setup_context(&ctx, AppTheme::pro());
     let mut input = egui::RawInput::default();
     input.viewports.get_mut(&egui::ViewportId::ROOT).unwrap().native_pixels_per_point = Some(1.5);
     for (theme, scale, expected) in
@@ -1568,7 +1570,7 @@ fn a_saved_enable_animations_loads_and_leaves_egui_animating() {
         assert!(app.ui.status.is_empty(), "{value}: {}", app.ui.status);
         assert!(!app.session.prefs().interface.show_tooltips, "{value}: the rest of the file loads");
         assert_eq!(both(&ctx), [expected, expected], "{value}");
-        app.apply_theme(&ctx, crate::theme::ThemeKind::StudioLight);
+        app.apply_theme(&ctx, crate::theme::AppTheme::studio_light());
         tick(&mut app, &ctx);
         assert_eq!(both(&ctx), [expected, expected], "{value}: after a theme change");
         assert!(app.run("prefs.set", json!({"values": {"interface.enableAnimations": true}})).is_err());
@@ -1625,18 +1627,18 @@ fn preferences_persist_through_services_and_theme_follows() {
     tick(&mut app, &ctx);
     app.run("prefs.set", json!({"values": {"interface.theme": "studioLight", "performance.historyStates": 12}})).unwrap();
     tick(&mut app, &ctx);
-    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(app.ui.theme, AppTheme::studio_light());
     let saved = store.lock().unwrap().clone().unwrap();
     assert!(saved.contains("\"historyStates\": 12"));
     // A new app instance loads them.
     let (mut app2, store2) = app_with_saved(Some(saved));
     tick(&mut app2, &ctx);
     assert_eq!(app2.session.prefs().performance.history_states, 12);
-    assert_eq!(app2.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(app2.ui.theme, AppTheme::studio_light());
     // Picking a theme from the Window menu becomes the preference.
     crate::menus::invoke(&mut app2, &ctx, "window.theme.classic", json!({})).unwrap();
     tick(&mut app2, &ctx);
-    assert_eq!(app2.session.prefs().interface.theme, Theme::Classic);
+    assert_eq!(app2.session.prefs().interface.light_theme, "craft.classic");
     assert!(store2.lock().unwrap().as_ref().unwrap().contains("classic"));
 }
 
@@ -1731,7 +1733,7 @@ fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_value
     h.run_steps(4);
 
     assert_eq!(h.state().session.prefs().performance.history_states, 12);
-    assert_eq!(h.state().ui.theme, ThemeKind::StudioLight);
+    assert_eq!(h.state().ui.theme, AppTheme::studio_light());
     assert_eq!(h.ctx.fonts(|f| f.definitions().font_data["Inter"].tweak.scale), 16.0 / 12.0);
     assert!(!h.state().session.prefs().type_.smart_quotes, "hidden settings round-trip unchanged");
     let d = h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap();
@@ -1762,7 +1764,7 @@ fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_value
     let (mut restarted, _) = app_with_saved(Some(saved));
     tick(&mut restarted, &egui::Context::default());
     assert_eq!(restarted.session.prefs().performance.history_states, 22);
-    assert_eq!(restarted.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(restarted.ui.theme, AppTheme::studio_light());
     assert_eq!(restarted.session.prefs().interface.ui_font_size, prefs::UiFontSize::Large);
 }
 
@@ -1878,10 +1880,10 @@ fn preferences_apply_keeps_a_live_theme_change_made_while_open() {
     let ctx = egui::Context::default();
     for ok in [false, true] {
         let (mut app, store) = app_with_store();
-        app.set_theme(&ctx, ThemeKind::Studio);
+        app.set_theme(&ctx, AppTheme::studio());
         let id = open_preferences(&mut app, "interface");
         assert_eq!(app.ui.dialog_mut(id).unwrap().fields["values"]["interface"]["theme"], "studio");
-        app.set_theme(&ctx, ThemeKind::Classic);
+        app.set_theme(&ctx, AppTheme::classic());
         assert!(!preferences_changed(&app, &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields), "a change made elsewhere is not a dialog edit");
         app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
         assert!(preferences_changed(&app, &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields));
@@ -1895,8 +1897,8 @@ fn preferences_apply_keeps_a_live_theme_change_made_while_open() {
             assert!(!preferences_changed(&app, &d.fields));
         }
         let p = app.session.prefs();
-        assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::Classic, prefs::UiScale::P200), "ok: {ok}");
-        assert_eq!(app.ui.theme, ThemeKind::Classic);
+        assert_eq!((p.interface.light_theme.as_str(), p.interface.ui_scale), ("craft.classic", prefs::UiScale::P200), "ok: {ok}");
+        assert_eq!(app.ui.theme, AppTheme::classic());
         tick(&mut app, &ctx);
         let saved = stored(&store);
         assert_eq!((saved["interface"]["theme"].as_str(), saved["interface"]["uiScale"].as_str()), (Some("classic"), Some("200")));
@@ -1908,15 +1910,15 @@ fn preferences_apply_keeps_a_live_theme_change_made_while_open() {
 fn preferences_apply_prefers_the_dialog_edit_of_a_setting_changed_elsewhere() {
     let ctx = egui::Context::default();
     let (mut app, store) = app_with_store();
-    app.set_theme(&ctx, ThemeKind::Studio);
+    app.set_theme(&ctx, AppTheme::studio());
     let id = open_preferences(&mut app, "interface");
-    app.set_theme(&ctx, ThemeKind::Classic);
+    app.set_theme(&ctx, AppTheme::classic());
     app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["theme"] = json!("studioLight");
     apply(&mut app, id).unwrap();
-    assert_eq!(app.session.prefs().interface.theme, Theme::StudioLight);
+    assert_eq!(app.session.prefs().interface.light_theme, "craft.studio");
     // The dialog's value is the one shown (from the next frame) and saved, not only the one held.
     tick(&mut app, &ctx);
-    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(app.ui.theme, AppTheme::studio_light());
     assert_eq!(stored(&store)["interface"]["theme"].as_str(), Some("studioLight"));
 }
 
@@ -1926,17 +1928,17 @@ fn preferences_apply_prefers_the_dialog_edit_of_a_setting_changed_elsewhere() {
 fn preferences_apply_twice_keeps_each_live_change() {
     let ctx = egui::Context::default();
     let (mut app, store) = app_with_store();
-    app.set_theme(&ctx, ThemeKind::Studio);
+    app.set_theme(&ctx, AppTheme::studio());
     let id = open_preferences(&mut app, "interface");
-    app.set_theme(&ctx, ThemeKind::Classic);
+    app.set_theme(&ctx, AppTheme::classic());
     app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
     apply(&mut app, id).unwrap();
-    app.set_theme(&ctx, ThemeKind::StudioLight);
+    app.set_theme(&ctx, AppTheme::studio_light());
     app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("150");
     apply(&mut app, id).unwrap();
     let p = app.session.prefs();
-    assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::StudioLight, prefs::UiScale::P150));
-    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    assert_eq!((p.interface.light_theme.as_str(), p.interface.ui_scale), ("craft.studio", prefs::UiScale::P150));
+    assert_eq!(app.ui.theme, AppTheme::studio_light());
     tick(&mut app, &ctx);
     let saved = stored(&store);
     assert_eq!((saved["interface"]["theme"].as_str(), saved["interface"]["uiScale"].as_str()), (Some("studioLight"), Some("150")));
@@ -1948,15 +1950,15 @@ fn preferences_apply_twice_keeps_each_live_change() {
 fn preferences_apply_keeps_a_setting_changed_elsewhere_beside_a_dialog_theme_edit() {
     let ctx = egui::Context::default();
     let (mut app, store) = app_with_store();
-    app.set_theme(&ctx, ThemeKind::Studio);
+    app.set_theme(&ctx, AppTheme::studio());
     let id = open_preferences(&mut app, "interface");
     app.run("prefs.set", json!({"path": "performance.historyStates", "value": 30})).unwrap();
     app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["theme"] = json!("classic");
     apply(&mut app, id).unwrap();
     let p = app.session.prefs();
-    assert_eq!((p.interface.theme, p.performance.history_states), (Theme::Classic, 30));
+    assert_eq!((p.interface.light_theme.as_str(), p.performance.history_states), ("craft.classic", 30));
     tick(&mut app, &ctx);
-    assert_eq!(app.ui.theme, ThemeKind::Classic);
+    assert_eq!(app.ui.theme, AppTheme::classic());
     let saved = stored(&store);
     assert_eq!((saved["interface"]["theme"].as_str(), saved["performance"]["historyStates"].as_u64()), (Some("classic"), Some(30)));
 }
@@ -1967,14 +1969,14 @@ fn preferences_apply_keeps_a_setting_changed_elsewhere_beside_a_dialog_theme_edi
 fn preferences_without_a_base_commit_the_draft_as_it_is() {
     let ctx = egui::Context::default();
     let (mut app, _store) = app_with_store();
-    app.set_theme(&ctx, ThemeKind::Studio);
+    app.set_theme(&ctx, AppTheme::studio());
     let id = open_preferences(&mut app, "interface");
     app.ui.dialog_mut(id).unwrap().fields.remove("__base");
-    app.set_theme(&ctx, ThemeKind::Classic);
+    app.set_theme(&ctx, AppTheme::classic());
     app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
     apply(&mut app, id).unwrap();
     let p = app.session.prefs();
-    assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::Studio, prefs::UiScale::P200), "the draft's theme");
+    assert_eq!((p.interface.dark_theme.as_str(), p.interface.ui_scale), ("craft.studio", prefs::UiScale::P200), "the draft's theme");
 }
 
 #[test]

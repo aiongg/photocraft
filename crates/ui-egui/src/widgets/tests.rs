@@ -91,7 +91,7 @@ fn hue_stops_are_pure_and_evenly_spaced() {
 /// the plain knob (#7927).
 #[test]
 fn light_themes_draw_the_slider_knob_outline() {
-    use crate::theme::{ThemeKind, Tokens};
+    use crate::theme::{AppTheme, Tokens};
     fn rings(shape: &egui::Shape, out: &mut Vec<egui::Color32>) {
         match shape {
             egui::Shape::Vec(v) => v.iter().for_each(|s| rings(s, out)),
@@ -99,9 +99,9 @@ fn light_themes_draw_the_slider_knob_outline() {
             _ => {}
         }
     }
-    for kind in [ThemeKind::StudioLight, ThemeKind::Adwaita, ThemeKind::BreezeLight, ThemeKind::SoftLight, ThemeKind::Studio] {
+    for kind in [AppTheme::studio_light(), AppTheme::adwaita(), AppTheme::breeze_light(), AppTheme::soft_light(), AppTheme::studio()] {
         let ctx = egui::Context::default();
-        crate::theme::apply(&ctx, kind);
+        crate::theme::apply(&ctx, &kind);
         let mut v = 50.0;
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
             super::slider(ui, &mut v, 0.0..=100.0, None);
@@ -109,7 +109,7 @@ fn light_themes_draw_the_slider_knob_outline() {
         out.textures_delta.clear();
         let mut found = Vec::new();
         out.shapes.iter().for_each(|c| rings(&c.shape, &mut found));
-        let want: Vec<_> = Tokens::for_kind(kind).knob_outline().into_iter().collect();
+        let want: Vec<_> = kind.tokens().knob_outline().into_iter().collect();
         assert_eq!(found, want, "{kind:?}");
     }
 }
@@ -154,7 +154,7 @@ fn rounded_swatches_clip_their_checker_to_the_corners() {
         super::color_swatch(ui, egui::Color32::RED);
         super::color_swatch_button(ui, egui::Color32::from_rgba_unmultiplied(0, 0, 255, 128), "Blue");
     });
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     let tile = h.ctx.data(|d| d.get_temp::<egui::TextureHandle>(super::checker_tile_id())).expect("the tile is loaded once");
     let manager = h.ctx.tex_manager();
@@ -181,7 +181,7 @@ fn elided_label_never_exceeds_its_room() {
         let short = super::elided_label(ui, "Fill", 200.0);
         assert!(short.rect.width() < 60.0, "a short label is not padded: {}", short.rect.width());
     });
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
 }
 
@@ -202,8 +202,8 @@ fn drawn_texts(out: &egui::FullOutput) -> Vec<(String, egui::Rect, bool)> {
 fn section_labels_keep_glyph_bearings_inside_the_panel() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    for kind in crate::theme::ThemeKind::ALL {
-        crate::theme::apply(&ctx, kind);
+    for kind in crate::theme::AppTheme::all() {
+        crate::theme::apply(&ctx, &kind);
         for ppp in [1.0, 1.25, 2.0] {
             ctx.set_pixels_per_point(ppp);
             for label in ["Stroke", "\u{644}\u{6a9}\u{6cc}\u{631}", "Location"] {
@@ -230,7 +230,7 @@ fn section_labels_keep_glyph_bearings_inside_the_panel() {
 fn column_label_stays_inside_its_column() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    crate::theme::apply(&ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::theme::apply(&ctx, crate::theme::AppTheme::pro());
     // German "Canvas extension color": far wider than any column here.
     let long = "Farbe der Zeichenflächenerweiterung:";
     let mut col = egui::Rect::NOTHING;
@@ -266,10 +266,11 @@ fn column_label_stays_inside_its_column() {
 
 #[test]
 fn spectrum_popup_style_matches_main_menu_and_preserves_studio() {
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::ProMedium, crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::StudioLight] {
+    for kind in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::studio(), crate::theme::AppTheme::studio_light()]
+    {
         let ctx = egui::Context::default();
-        crate::theme::apply(&ctx, kind);
-        let tokens = crate::theme::Tokens::for_kind(kind);
+        crate::theme::apply(&ctx, &kind);
+        let tokens = crate::theme::kind.tokens();
         let mut out = ctx.run_ui(Default::default(), |ui| {
             let original_padding = ui.spacing().button_padding;
             let original_hover = ui.visuals().widgets.hovered.fg_stroke;
@@ -383,7 +384,7 @@ fn panel_footer_buttons_are_not_clipped_by_the_body() {
         },
         None,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     let (button, clip, body) = h.state().expect("the footer drew its button");
     assert!(button.bottom() > body.bottom(), "the bar really overruns the body, or this test proves nothing: {button:?} vs {body:?}");
@@ -403,7 +404,7 @@ fn text_field_is_a_boxed_input_whose_selection_colour_stays_local() {
         },
         (String::new(), egui::Color32::WHITE, egui::Color32::BLACK),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     assert_eq!(h.state().1, h.state().2, "the field's selection colour does not leak into its parent");
     h.get_by_role(Role::TextInput).click();
@@ -421,7 +422,7 @@ fn text_field_is_a_boxed_input_whose_selection_colour_stays_local() {
 fn text_field_text_ink_is_centred_in_its_box() {
     let _gpu = photocraft_testkit::gpu_lock();
     let scale = 4.0;
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for kind in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         // Digits and capitals: no descenders, so their ink should straddle the box's middle.
         for (text, mono) in [("A0F3C2", true), ("100", true), ("HEX", false)] {
             let mut h = Harness::builder().with_size(egui::vec2(160.0, 40.0)).with_pixels_per_point(scale).wgpu().build_ui_state(
@@ -456,7 +457,7 @@ fn text_field_text_ink_is_centred_in_its_box() {
 fn text_field_caps_a_huge_paste() {
     use egui::accesskit::Role;
     let mut h = Harness::new_ui_state(|ui, s: &mut String| drop(super::text_field(ui, egui::Id::unique("tf"), s, "Value", 140.0, false)), String::new());
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     h.get_by_role(Role::TextInput).click();
     h.run_steps(1);
@@ -476,7 +477,7 @@ fn text_field_bounds_an_oversized_existing_value() {
     use egui::accesskit::Role;
     let long = "9".repeat(super::TEXT_FIELD_LIMIT * 4);
     let mut h = Harness::new_ui_state(|ui, s: &mut String| drop(super::text_field(ui, egui::Id::unique("tf"), s, "Value", 140.0, false)), long.clone());
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     assert_eq!(*h.state(), long, "drawing alone leaves the caller's value alone");
     assert_eq!(h.get_by_role(Role::TextInput).value().map(|v| v.chars().count()), Some(super::TEXT_FIELD_LIMIT));
@@ -501,7 +502,7 @@ fn text_field_harness(text: &str, enabled: bool) -> Harness<'static, FieldState>
         },
         (text.to_owned(), egui::Rect::NOTHING, false),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     assert_eq!(h.state().1.size(), egui::vec2(140.0, super::TEXT_FIELD_H), "the state holds the field's box");
     h
@@ -591,7 +592,7 @@ fn text_field_trailing_arrow_keeps_its_click() {
         },
         ("hello".to_owned(), false, egui::Rect::NOTHING, false),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run();
     let pos = h.state().2.center();
     click_at(&mut h, pos, egui::PointerButton::Primary);
@@ -744,7 +745,7 @@ fn value_field_number_slot_is_centred_in_its_box() {
 fn value_field_digits_ink_is_centred_and_level_with_the_unit() {
     let _gpu = photocraft_testkit::gpu_lock();
     let scale = 4.0;
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for kind in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         let mut h = Harness::builder().with_size(egui::vec2(100.0, 40.0)).with_pixels_per_point(scale).wgpu().build_ui_state(
             |ui, s: &mut (f32, egui::Rect)| {
                 let field = super::value_field_in(ui, &mut s.0, 0.0..=100.0, "%", 80.0, 0.0, super::FieldOpts::default(), None);
@@ -780,7 +781,7 @@ fn value_field_digits_ink_is_centred_and_level_with_the_unit() {
 /// and a long number doesn't spill out of the box's left edge (#2823).
 #[test]
 fn themed_value_field_number_sits_inside_its_box_in_every_size() {
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for (w, h, v) in [(80.0, super::VALUE_FIELD_H, 50.0), (64.0, 18.0, 1600.5), (78.0, 22.0, 100.6)] {
             let mut harness = Harness::new_ui_state(
                 move |ui, s: &mut (f32, egui::Rect)| {
@@ -1035,7 +1036,7 @@ fn button_row(os: egui::os::OperatingSystem) -> (Vec<String>, f32, f32) {
         },
         false,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(os);
     *h.state_mut() = true;
     h.run();
@@ -1720,7 +1721,7 @@ fn dropdown_list_keeps_its_width_while_scrolling() {
         BlendMode::Normal,
     );
     // The app's theme strokes plain rows, which is what made hovered rows wider.
-    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run();
@@ -1752,7 +1753,7 @@ fn open_blend_modes(height: f32, down: f32) -> Harness<'static, photocraft_color
         },
         BlendMode::Normal,
     );
-    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run_steps(4);
@@ -2130,7 +2131,7 @@ fn open_grouped_modes(starts_group: fn(&usize) -> bool) -> (egui::Rect, Vec<egui
         },
         0,
     );
-    crate::theme::apply(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run_steps(4);

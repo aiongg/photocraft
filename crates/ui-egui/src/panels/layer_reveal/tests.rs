@@ -6,7 +6,7 @@ use photocraft_doc::LayerId;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 /// 30 layers above a closed group holding `inner` (near the bottom of the panel).
 fn tall_doc() -> (PhotocraftApp, LayerId, LayerId, LayerId, LayerId) {
@@ -28,7 +28,7 @@ fn tall_doc() -> (PhotocraftApp, LayerId, LayerId, LayerId, LayerId) {
     (app, inner, group, stack[29], stack[28])
 }
 
-fn harness(app: PhotocraftApp, theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(app: PhotocraftApp, theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -73,7 +73,7 @@ fn expanded(app: &PhotocraftApp, group: LayerId) -> bool {
 
 #[test]
 fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, inner, group, top, below_top) = tall_doc();
         let mut h = harness(app, theme);
         assert!(shown(&h, "Stack 29"), "{theme:?}: the panel starts at the top");
@@ -126,7 +126,7 @@ fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
 fn reveal_survives_odd_documents() {
     // No document, a document without layers in groups, a layer deleted between frames.
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let mut h = harness(app, ThemeKind::ProMedium);
+    let mut h = harness(app, AppTheme::pro_medium());
     h.run_steps(2);
     h.state_mut().run("file.new", json!({"width": 20, "height": 20})).unwrap();
     h.state_mut().sync_views();
@@ -142,7 +142,7 @@ fn reveal_survives_odd_documents() {
 
 #[test]
 fn layers_scroll_position_survives_document_switches() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, inner, _, _, _) = tall_doc();
         let mut h = harness(app, theme);
         h.state_mut().run("layer.select", json!({"layer": inner.0})).unwrap();

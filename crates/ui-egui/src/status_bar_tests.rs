@@ -6,7 +6,7 @@ use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::theme::{ThemeKind, Tokens};
+use crate::theme::{AppTheme, Tokens};
 
 const SIZE: egui::Vec2 = vec2(900.0, 200.0);
 
@@ -14,7 +14,7 @@ fn bottom_id() -> egui::Id {
     egui::Id::unique("status-bar-test-bottom")
 }
 
-fn harness(kind: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(kind: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 1080, "height": 1080, "resolution": 72, "background": "white"})).unwrap();
     app.sync_views();
@@ -37,9 +37,9 @@ fn harness(kind: ThemeKind) -> Harness<'static, PhotocraftApp> {
 
 #[test]
 fn status_bar_controls_sit_inside_the_bar_with_even_margins() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let h = harness(kind);
-        let t = Tokens::for_kind(kind);
+        let t = kind.tokens();
         let (bar_h, control_h) = crate::panels::status_bar_heights(&t);
         let margin = (bar_h - control_h) / 2.0;
         assert!(margin >= 3.0, "{kind:?}: margin {margin}");
@@ -88,7 +88,7 @@ fn begin_zoom_drag(h: &mut Harness<'_, PhotocraftApp>) -> egui::Pos2 {
 /// CursorPosition acknowledgement as a PointerMoved, then keep dragging in the same direction.
 #[test]
 fn fullscreen_status_zoom_wraps_without_turning_the_warp_into_a_value_change() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         for left in [true, false] {
             let mut h = harness(kind);
             fullscreen(&mut h, true);
@@ -121,7 +121,7 @@ fn fullscreen_status_zoom_wraps_without_turning_the_warp_into_a_value_change() {
 
 #[test]
 fn status_zoom_does_not_warp_for_windowed_scrubbing_or_hovering() {
-    for kind in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for kind in [AppTheme::pro_medium(), AppTheme::studio()] {
         let mut h = harness(kind);
         fullscreen(&mut h, true);
         h.hover_at(pos2(0.5, SIZE.y - 10.0));
@@ -141,7 +141,7 @@ fn status_zoom_does_not_warp_for_windowed_scrubbing_or_hovering() {
 
 #[test]
 fn fullscreen_status_zoom_keeps_typing_and_clears_a_pending_warp_on_release() {
-    let mut h = harness(ThemeKind::ProMedium);
+    let mut h = harness(AppTheme::pro_medium());
     fullscreen(&mut h, true);
     let start = begin_zoom_drag(&mut h);
     h.hover_at(pos2(0.5, start.y));
@@ -167,7 +167,7 @@ fn fullscreen_status_zoom_keeps_typing_and_clears_a_pending_warp_on_release() {
 
 #[test]
 fn fullscreen_status_zoom_preserves_shift_precision_and_recovers_from_the_minimum() {
-    let mut h = harness(ThemeKind::ProMedium);
+    let mut h = harness(AppTheme::pro_medium());
     fullscreen(&mut h, true);
     let start = begin_zoom_drag(&mut h);
     h.event(egui::Event::ModifiersChanged(egui::Modifiers::SHIFT));
@@ -201,7 +201,7 @@ fn fullscreen_status_zoom_preserves_shift_precision_and_recovers_from_the_minimu
 /// layout and does not make a Fit button appear.
 #[test]
 fn appearance_toggle_preserves_pro_layout_and_has_no_fit_button() {
-    let mut h = harness(ThemeKind::ProMedium);
+    let mut h = harness(AppTheme::pro_medium());
     assert!(h.query_by_label("Fit").is_none());
     assert!(Tokens::get(&h.ctx).pro);
 
@@ -214,7 +214,7 @@ fn appearance_toggle_preserves_pro_layout_and_has_no_fit_button() {
     crate::prefs_ui::tick(h.state_mut(), &ctx);
     h.run_steps(3);
     assert_eq!(h.state().session.prefs().interface.appearance_mode, photocraft_engine::prefs::AppearanceMode::Light);
-    assert_eq!(h.state().ui.theme, ThemeKind::ProLight);
+    assert_eq!(h.state().ui.theme, AppTheme::pro_light());
     assert!(Tokens::get(&h.ctx).pro);
     assert!(h.query_by_label("Fit").is_none(), "Fit button must not appear in light mode (#5016)");
 }
@@ -240,7 +240,7 @@ fn a_typed_zoom_leaves_nothing_for_the_next_zoom_and_lands_exactly() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, AppTheme::pro_medium());
         h.run_steps(3);
         for (typed, want) in [("1600", 16.0), ("200", 2.0), ("6400", 64.0)] {
             h.get_by_role(egui::accesskit::Role::SpinButton).click();
@@ -278,7 +278,7 @@ fn a_second_separator_in_the_zoom_field_opens_the_invalid_entry_message_and_appl
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, AppTheme::pro_medium());
         h.run_steps(3);
         let range = crate::zoom_levels::percent_range(&h.state().ui.views[0]);
         h.get_by_role(egui::accesskit::Role::SpinButton).click();

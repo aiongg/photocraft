@@ -840,7 +840,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
         h.run_steps(4);
         h.get_by_label("Swaps height and width").click();
         h.run_steps(2);

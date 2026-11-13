@@ -223,7 +223,7 @@ mod tests {
                 a
             },
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
         h.run_steps(4);
         for label in ["Sample Size:", "Sample:", "Show Sampling Ring"] {
             assert!(h.get_by_label(label).rect().is_positive(), "missing Eyedropper option {label}");

@@ -177,7 +177,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         let view = &mut h.state_mut().ui.views[0];
         view.zoom = 1.0;

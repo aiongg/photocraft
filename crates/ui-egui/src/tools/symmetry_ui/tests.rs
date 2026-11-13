@@ -164,11 +164,11 @@ fn menu_selects_all_modes_resets_positions_and_preserves_work_path_choice() {
 }
 #[test]
 fn overlays_follow_document_view_transforms_in_every_theme() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let mut app = app();
         app.run("paint.setSymmetry", json!({"mode":"dual"})).unwrap();
         let ctx = Context::default();
-        crate::theme::apply(&ctx, theme);
+        crate::theme::apply(&ctx, &theme);
         let xf =
             ViewXform { rect: Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0)), zoom: 1.7, center: [50.0, 40.0], rotation: 37.0, flip: true, aspect: 1.0 };
         let mut out = ctx.run_ui(RawInput { screen_rect: Some(xf.rect), ..Default::default() }, |ui| {

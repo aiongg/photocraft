@@ -38,7 +38,7 @@ fn home(path: &str) -> Harness<'static, (PhotocraftApp, bool)> {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.state_mut().1 = true;
     h.run_steps(3);
     h

@@ -151,7 +151,7 @@ fn radius_fields_are_named_for_their_corners() {
     let id = open(&mut app, Tool::Rectangle, [10.0, 20.0]).unwrap();
     let fields = app.ui.dialog_mut(id).unwrap().fields.clone();
     let mut h = Harness::builder().with_size(egui::vec2(520.0, 520.0)).build_ui_state(move |ui, fields| body(&app, ui, fields), fields);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     let labels: Vec<String> = h.query_all_by_role(Role::SpinButton).filter_map(|n| n.accesskit_node().label()).collect();
     // The visible rows are [top-left, top-right], [bottom-left, bottom-right]; the field for each

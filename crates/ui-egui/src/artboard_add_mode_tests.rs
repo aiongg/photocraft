@@ -176,7 +176,7 @@ fn the_add_new_artboard_button_toggles_the_mode_and_adds_no_board() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     assert!(!h.state().ui.artboard_tool.adding);
     h.get_by_label("Add New Artboard").click();

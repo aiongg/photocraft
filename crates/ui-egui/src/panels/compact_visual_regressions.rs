@@ -7,18 +7,18 @@ fn input_at_scale(screen: Rect, scale: f32) -> egui::RawInput {
     input
 }
 
-fn toolbar_harness(kind: theme::ThemeKind, scale: f32) -> egui_kittest::Harness<'static, PhotocraftApp> {
+fn toolbar_harness(kind: theme::AppTheme, scale: f32) -> egui_kittest::Harness<'static, PhotocraftApp> {
     toolbar_harness_sized(kind, scale, 360.0)
 }
 
-fn toolbar_harness_sized(kind: theme::ThemeKind, scale: f32, height: f32) -> egui_kittest::Harness<'static, PhotocraftApp> {
+fn toolbar_harness_sized(kind: theme::AppTheme, scale: f32, height: f32) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut ready = false;
     let mut harness = egui_kittest::Harness::builder().with_size(vec2(400.0, height)).with_pixels_per_point(scale).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 egui_extras::install_image_loaders(ui.ctx());
                 theme::install_fonts(ui.ctx());
-                theme::apply(ui.ctx(), kind);
+                theme::apply(ui.ctx(), &kind);
                 app.session.prefs.edit(|prefs| prefs.shortcuts.insert("window.togglePanels".into(), String::new()));
                 ready = true;
                 return;
@@ -34,7 +34,7 @@ fn toolbar_harness_sized(kind: theme::ThemeKind, scale: f32, height: f32) -> egu
 
 #[test]
 fn compact_toolbar_scrolls_to_and_activates_the_last_tool() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             let mut harness = toolbar_harness(kind, scale);
             harness.event(egui::Event::PointerMoved(pos2(25.0, 100.0)));
@@ -62,7 +62,7 @@ fn compact_toolbar_scrolls_to_and_activates_the_last_tool() {
 
 #[test]
 fn compact_toolbar_tab_reveals_and_activates_the_last_tool() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             let mut harness = toolbar_harness(kind, scale);
             // The supported shortcut preference clears the canvas Tab binding. From no
@@ -91,7 +91,7 @@ fn compact_toolbar_tab_reveals_and_activates_the_last_tool() {
 /// last row is Edit Toolbar), as Photoshop does, instead of at the bottom of the toolbar.
 #[test]
 fn tall_toolbar_keeps_the_colour_chips_under_the_tools() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         let harness = toolbar_harness_sized(kind, 1.0, 1600.0);
         let last = harness.get_by_label("Edit Toolbar…").rect();
         let swap = harness.get_by_label("Switch Foreground and Background Colors (X)").rect();
@@ -104,7 +104,7 @@ fn capture_compact_visual_fixtures() {
     let _gpu = photocraft_testkit::gpu_lock();
     let Some(directory) = std::env::var_os("CRAFT_UI_VISUAL_FIXTURES").map(std::path::PathBuf::from) else { return };
     std::fs::create_dir_all(&directory).unwrap();
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for (width, height) in [(800.0, 480.0), (1280.0, 720.0)] {
             for scale in [1.0, 1.5, 2.0] {
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -116,7 +116,7 @@ fn capture_compact_visual_fixtures() {
                         if !ready {
                             egui_extras::install_image_loaders(ui.ctx());
                             crate::theme::install_fonts(ui.ctx());
-                            crate::theme::apply(ui.ctx(), kind);
+                            crate::theme::apply(ui.ctx(), &kind);
                             ready = true;
                             return;
                         }
@@ -162,11 +162,11 @@ fn capture_compact_visual_fixtures() {
 /// right of the tools. They stay where they are in a window tall enough not to scroll.
 #[test]
 fn color_chips_stay_centred_when_the_tools_scroll() {
-    let chips = |kind: crate::theme::ThemeKind, double: bool, height: f32, scale: f32| {
+    let chips = |kind: crate::theme::AppTheme, double: bool, height: f32, scale: f32| {
         let ctx = egui::Context::default();
         egui_extras::install_image_loaders(&ctx);
         crate::theme::install_fonts(&ctx);
-        crate::theme::apply(&ctx, kind);
+        crate::theme::apply(&ctx, &kind);
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.session.tools.foreground = [1.0, 0.0, 1.0, 1.0];
         app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
@@ -192,7 +192,7 @@ fn color_chips_stay_centred_when_the_tools_scroll() {
                 .x
         })
     };
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for double in [false, true] {
             for scale in [1.0, 2.0] {
                 let (short, tall) = (chips(kind, double, 420.0, scale), chips(kind, double, 1400.0, scale));
@@ -204,13 +204,13 @@ fn color_chips_stay_centred_when_the_tools_scroll() {
 
 #[test]
 fn compact_toolbar_keeps_both_color_chips_visible() {
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for height in [480.0, 720.0] {
             for scale in [1.0, 1.5, 2.0] {
                 let ctx = egui::Context::default();
                 egui_extras::install_image_loaders(&ctx);
                 crate::theme::install_fonts(&ctx);
-                crate::theme::apply(&ctx, kind);
+                crate::theme::apply(&ctx, &kind);
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
                 app.session.tools.foreground = [1.0, 0.0, 1.0, 1.0];
                 app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
@@ -237,7 +237,7 @@ fn compact_toolbar_keeps_both_color_chips_visible() {
 
 #[test]
 fn tab_focus_reveals_the_final_narrow_tool_option() {
-    for kind in theme::ThemeKind::ALL {
+    for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             let mut ready = false;
             let mut harness = egui_kittest::Harness::builder().with_size(vec2(360.0, 120.0)).with_pixels_per_point(scale).build_ui_state(
@@ -245,7 +245,7 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
                     if !ready {
                         egui_extras::install_image_loaders(ui.ctx());
                         theme::install_fonts(ui.ctx());
-                        theme::apply(ui.ctx(), kind);
+                        theme::apply(ui.ctx(), &kind);
                         app.ui.tool = if Tokens::get(ui.ctx()).pro { Tool::Pencil } else { Tool::Brush };
                         app.session.prefs.edit(|prefs| prefs.shortcuts.insert("window.togglePanels".into(), String::new()));
                         ready = true;
@@ -305,12 +305,12 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
 
 #[test]
 fn a_wide_crop_options_bar_does_not_scroll() {
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             for mode in ["", crate::crop_size::WHR] {
                 let ctx = egui::Context::default();
                 crate::theme::install_fonts(&ctx);
-                crate::theme::apply(&ctx, kind);
+                crate::theme::apply(&ctx, &kind);
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
                 if !Tokens::get(&ctx).pro {
                     continue;
@@ -365,13 +365,13 @@ fn the_crop_ratio_fields_show_three_decimals() {
     // #6487: a 1.414 : 1 ratio reads 1.414 in the bar, not 1.4.
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    let Some(kind) = crate::theme::ThemeKind::ALL.into_iter().find(|k| {
+    let Some(kind) = crate::theme::AppTheme::all().into_iter().find(|k| {
         crate::theme::apply(&ctx, *k);
         Tokens::get(&ctx).pro
     }) else {
         return;
     };
-    crate::theme::apply(&ctx, kind);
+    crate::theme::apply(&ctx, &kind);
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.ui.tool = Tool::Crop;
     app.ui.tool_options.crop_ratio = "1.414:1".into();
@@ -399,13 +399,13 @@ fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
     // #7752: typing 16 over 4 gave 1:3, then 16:3 inside that 100 x 300 frame (100 x 18.75).
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    let Some(kind) = crate::theme::ThemeKind::ALL.into_iter().find(|k| {
+    let Some(kind) = crate::theme::AppTheme::all().into_iter().find(|k| {
         crate::theme::apply(&ctx, *k);
         Tokens::get(&ctx).pro
     }) else {
         return;
     };
-    crate::theme::apply(&ctx, kind);
+    crate::theme::apply(&ctx, &kind);
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.ui.tool = Tool::Crop;
@@ -442,7 +442,7 @@ fn the_narrow_options_bar_preference_shortens_the_bar() {
     assert_eq!(options_bar_height(false, true), 34.0);
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    crate::theme::apply(&ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::theme::apply(&ctx, crate::theme::AppTheme::pro());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 900.0));
     let run = |app: &mut PhotocraftApp| {
@@ -464,13 +464,13 @@ fn the_narrow_options_bar_preference_shortens_the_bar() {
 
 #[test]
 fn narrow_tool_options_can_scroll_to_the_last_control() {
-    for kind in crate::theme::ThemeKind::ALL {
+    for kind in crate::theme::AppTheme::all() {
         for width in [360.0, 800.0, 1280.0] {
             for scale in [1.0, 1.5, 2.0] {
                 let ctx = egui::Context::default();
                 egui_extras::install_image_loaders(&ctx);
                 crate::theme::install_fonts(&ctx);
-                crate::theme::apply(&ctx, kind);
+                crate::theme::apply(&ctx, &kind);
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
                 let (tool, last_label) = if Tokens::get(&ctx).pro { (Tool::Pencil, "Auto Erase") } else { (Tool::Brush, "Pressure for Opacity") };
                 app.ui.tool = tool;

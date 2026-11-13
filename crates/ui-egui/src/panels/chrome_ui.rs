@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn status_bar_says_when_layers_dont_fit_gpu_memory() {
         use egui_kittest::{Harness, kittest::Queryable};
-        for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+        for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
             let mut h = Harness::builder().with_size(vec2(1200.0, 700.0)).with_max_steps(64).build_eframe(move |cc| {
                 PhotocraftApp::setup_context(&cc.egui_ctx, theme);
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -383,7 +383,7 @@ mod tests {
     fn status_bar_shows_another_cpu_reason_before_gpu_memory_full() {
         use egui_kittest::{Harness, kittest::Queryable};
         let mut h = Harness::builder().with_size(vec2(1200.0, 700.0)).with_max_steps(64).build_eframe(|cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::Pro);
+            PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
             PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
         });
         h.state_mut().run("file.new", json!({"width": 800, "height": 600})).unwrap();
@@ -406,7 +406,7 @@ mod tests {
     fn gpu_memory_full_clears_when_the_budget_is_raised() {
         use egui_kittest::{Harness, kittest::Queryable};
         let mut h = Harness::builder().with_size(vec2(1200.0, 700.0)).with_max_steps(64).build_eframe(|cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::Pro);
+            PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
             PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
         });
         h.state_mut().run("file.new", json!({"width": 800, "height": 600})).unwrap();
@@ -431,7 +431,7 @@ mod tests {
     fn status_bar_updates_dimensions_after_a_ruler_preference_change() {
         use egui_kittest::{Harness, kittest::Queryable};
         let mut failures = Vec::new();
-        for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::ProMedium] {
+        for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::pro_medium()] {
             for width in [800.0, 1200.0] {
                 let builder = Harness::builder().with_size(vec2(width, 600.0)).with_max_steps(64);
                 let mut h = builder.build_eframe(move |cc| {

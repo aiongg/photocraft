@@ -41,7 +41,7 @@ fn color_panel_field_and_hue_strip_pick_on_press() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     let (o, w) = h.ctx.data(|d| d.get_temp::<(Pos2, f32)>(egui::Id::unique("test-origin"))).unwrap();
     let field_w = w - 38.0 - 14.0 - 16.0;
@@ -83,7 +83,7 @@ fn color_panel_ignores_secondary_and_middle_presses() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     let (o, w) = h.ctx.data(|d| d.get_temp::<(Pos2, f32)>(egui::Id::unique("test-origin"))).unwrap();
     let field_w = w - 38.0 - 14.0 - 16.0;
@@ -127,7 +127,7 @@ fn color_panel_hex_field_takes_a_typed_hex() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     type_hex(&mut h, "003300");
     assert_eq!(srgb_bytes(h.state().session.tools.foreground), [0x00, 0x33, 0x00]);
@@ -143,10 +143,10 @@ fn color_panel_hex_field_takes_a_typed_hex() {
 fn studio_color_chips_keep_default_and_swap_buttons_below() {
     use egui_kittest::kittest::Queryable;
     for (kind, two_columns) in [
-        (crate::theme::ThemeKind::Studio, false),
-        (crate::theme::ThemeKind::StudioLight, false),
-        (crate::theme::ThemeKind::Studio, true),
-        (crate::theme::ThemeKind::StudioLight, true),
+        (crate::theme::AppTheme::studio(), false),
+        (crate::theme::AppTheme::studio_light(), false),
+        (crate::theme::AppTheme::studio(), true),
+        (crate::theme::AppTheme::studio_light(), true),
     ] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.session.tools.foreground = [1.0, 0.0, 0.0, 1.0];
@@ -217,7 +217,7 @@ fn swap_and_default_colors_recolour_selected_type() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
         h.run_steps(2);
         h.get_by_label("Switch Foreground and Background Colors (X)").click();
         h.run_steps(2);
@@ -262,7 +262,7 @@ fn color_panel_hex_field_ignores_partial_input() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     let fg = h.state().session.tools.foreground;
     h.get_by_role(egui::accesskit::Role::TextInput).click();
@@ -403,7 +403,7 @@ fn docked_color_field_keeps_rgb_readout_at_compact_height() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     assert!(h.query_by_label("R").is_some(), "RGB readout stays visible when the group is short");
     assert!(h.query_by_role(egui::accesskit::Role::TextInput).is_some(), "hex field stays visible");
@@ -449,7 +449,7 @@ fn field_harness(app: PhotocraftApp) -> egui_kittest::Harness<'static, Photocraf
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(2);
     h
 }

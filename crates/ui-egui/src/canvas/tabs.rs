@@ -765,7 +765,7 @@ pub(super) fn dots(ctx: &egui::Context, t: &crate::theme::Tokens) -> Option<egui
     if t.bevel || t.canvas_dot == t.canvas {
         return None;
     }
-    let key = egui::Id::unique(("canvas-dots", format!("{:?}", t.kind)));
+    let key = egui::Id::unique(("canvas-dots", format!("{:?}", (t.dark, t.canvas, t.canvas_dot))));
     if let Some(tex) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(key)) {
         return Some(tex.id());
     }

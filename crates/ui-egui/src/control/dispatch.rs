@@ -253,7 +253,8 @@ struct UiSet {
     crop: CropSet,
     panels: PanelSet,
     view: ViewSet,
-    theme: Option<crate::theme::ThemeKind>,
+    /// The suite theme to show and whether it is the dark one.
+    theme: Option<(craft::theme::ThemeId, bool)>,
     brush: BrushSet,
     legacy_update: Option<crate::panel_docking::LegacyUpdate>,
 }
@@ -264,9 +265,12 @@ impl UiSet {
         let crop = CropSet::parse(app, p)?;
         let panels = PanelSet::parse(app, p)?;
         let view = ViewSet::parse(app, p)?;
-        let theme = theme_param(p)?;
+        let theme = theme_param(app, p)?;
         let brush = BrushSet::parse(app, p)?;
-        let bridge_pro = matches!(theme.unwrap_or(app.ui.theme), crate::theme::ThemeKind::Pro | crate::theme::ThemeKind::ProMedium);
+        let bridge_pro = match &theme {
+            Some((id, dark)) => *dark && matches!(id.as_str(), "craft.pro" | "craft.artcraft"),
+            None => app.ui.theme.is_dark() && matches!(app.ui.theme.id().as_str(), "craft.pro" | "craft.artcraft"),
+        };
         let legacy_update =
             crate::panel_docking::prepare_legacy_update(app, p, panels.panels.as_ref(), panels.dock_tabs.as_ref(), panels.dock.as_ref(), bridge_pro)?;
         Ok(Self { tools, crop, panels, view, theme, brush, legacy_update })
@@ -280,8 +284,9 @@ impl UiSet {
         self.tools.apply(app);
         self.crop.apply(app);
         self.panels.apply_options(app);
-        if let Some(k) = self.theme {
-            app.set_theme(ctx, k);
+        if let Some((id, dark)) = self.theme {
+            let theme = app.framework.theme_for(&id, dark);
+            app.set_theme(ctx, theme);
         }
         self.panels.apply_dock(app);
         if let Some(update) = self.legacy_update {
@@ -294,12 +299,14 @@ impl UiSet {
     }
 }
 
-fn theme_param(p: &Value) -> std::result::Result<Option<crate::theme::ThemeKind>, String> {
+/// `theme`: a suite theme id (shown in the mode on screen), or a name PhotoCraft used before theme ids.
+fn theme_param(app: &PhotocraftApp, p: &Value) -> std::result::Result<Option<(craft::theme::ThemeId, bool)>, String> {
     let Some(name) = str_param(p, "theme") else { return Ok(None) };
-    crate::theme::ThemeKind::from_name(name).map(Some).ok_or_else(|| {
-        let names: Vec<_> = crate::theme::ThemeKind::ALL.iter().map(|k| k.id()).collect();
-        format!("unknown theme `{name}` ({})", names.join(", "))
-    })
+    let (id, dark) = match photocraft_engine::prefs::theme_ids::legacy(name) {
+        Some((id, dark)) => (id, dark),
+        None => (name, app.ui.theme.is_dark()),
+    };
+    craft::theme::ThemeId::parse(id).map(|id| Some((id, dark))).map_err(|_| format!("unknown theme `{name}`"))
 }
 
 // -- tools: stroke, tool, gradient, eyedropper, Content-Aware Move, tile grid, layer filter --

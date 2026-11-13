@@ -662,7 +662,7 @@ fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, events: Vec<egui::Event>)
 #[test]
 fn zoom_shortcuts_zoom_the_preview_not_the_canvas() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let mut app = app_with_layer();
     open(&mut app, &ctx).unwrap();
     frame(&mut app, &ctx, Vec::new());
@@ -690,7 +690,7 @@ fn zoom_shortcuts_zoom_the_preview_not_the_canvas() {
 #[test]
 fn pinch_and_wheel_zoom_the_preview_about_the_pointer() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let mut app = app_with_layer();
     open(&mut app, &ctx).unwrap();
     let center = frame(&mut app, &ctx, Vec::new());

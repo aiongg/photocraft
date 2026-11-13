@@ -792,27 +792,20 @@ fn invoke_window_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str)
             Some(Ok(Value::Null))
         }
         "view.darkenInterface" | "view.lightenInterface" => {
-            Some(crate::prefs_ui::step_brightness(app, ctx, id == "view.lightenInterface").map(|()| json!({"theme": app.ui.theme.id()})))
+            Some(crate::prefs_ui::step_brightness(app, ctx, id == "view.lightenInterface").map(|()| json!({"theme": app.ui.theme.id().as_str()})))
         }
         "window.theme.system" => Some(app.run("prefs.set", json!({"path": "interface.appearanceMode", "value": "auto"})).map(|_| {
             crate::prefs_ui::sync_appearance(app, ctx);
             Value::Null
         })),
-        "window.theme.pro"
-        | "window.theme.proMedium"
-        | "window.theme.proLightGray"
-        | "window.theme.proLight"
-        | "window.theme.studio"
-        | "window.theme.studioLight"
-        | "window.theme.classic"
-        | "window.theme.solarizedDark"
-        | "window.theme.adwaita"
-        | "window.theme.adwaitaDark"
-        | "window.theme.breezeLight"
-        | "window.theme.breezeDark"
-        | "window.theme.softLight"
-        | "window.theme.softDark" => {
-            let theme = crate::theme::ThemeKind::from_name(&id["window.theme.".len()..]).unwrap_or_default();
+        // `window.theme.dark.<id>` and `window.theme.light.<id>`: a suite theme in a mode.
+        _ if id.starts_with("window.theme.dark.") || id.starts_with("window.theme.light.") => {
+            let (dark, name) = match id.strip_prefix("window.theme.dark.") {
+                Some(name) => (true, name),
+                None => (false, &id["window.theme.light.".len()..]),
+            };
+            let Ok(theme) = craft::theme::ThemeId::parse(name) else { return Some(Err(format!("unknown theme `{name}`"))) };
+            let theme = app.framework.theme_for(&theme, dark);
             app.set_theme(ctx, theme);
             Some(Ok(Value::Null))
         }

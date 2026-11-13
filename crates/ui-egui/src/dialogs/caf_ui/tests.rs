@@ -46,7 +46,7 @@ fn settings_dropdowns_are_named_for_their_visible_labels() {
     open(&mut app).unwrap();
     let mut h = Harness::builder()
         .with_size(egui::vec2(1000.0, 900.0))
-        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ALL[0]))
+        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::AppTheme::pro()))
         .build_ui_state(|ui, app: &mut PhotocraftApp| show(app, ui.ctx()), app);
     h.run_steps(2);
     // The Indicates dropdown lives inside a collapsed "Sampling Area Overlay" header.
@@ -332,7 +332,7 @@ fn a_stroke_keeps_its_points_from_before_the_drag_threshold() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         // The document view sits between the tool strip and the Preview panel, under the
         // title and the options bar; its centre shows the document's centre.

@@ -22,7 +22,7 @@ impl Default for State {
     }
 }
 
-fn sized_harness(size: Vec2, scale: f32, theme: crate::theme::ThemeKind) -> Harness<'static, State> {
+fn sized_harness(size: Vec2, scale: f32, theme: crate::theme::AppTheme) -> Harness<'static, State> {
     let mut h = Harness::builder().with_size(size).with_pixels_per_point(scale).build_ui_state(
         |ui, s: &mut State| {
             let _language = crate::i18n::language_scope(crate::i18n::Lang::EN);
@@ -42,7 +42,7 @@ fn sized_harness(size: Vec2, scale: f32, theme: crate::theme::ThemeKind) -> Harn
 }
 
 fn harness() -> Harness<'static, State> {
-    sized_harness(vec2(640.0, 800.0), 1.0, crate::theme::ThemeKind::ProMedium)
+    sized_harness(vec2(640.0, 800.0), 1.0, crate::theme::AppTheme::pro_medium())
 }
 
 fn click_at<S>(h: &mut Harness<'_, S>, pos: Pos2) {
@@ -254,7 +254,7 @@ fn tab_and_space_operate_the_opener_and_the_complete_style_target() {
 
 #[test]
 fn popup_is_content_sized_and_keeps_presets_inside_small_windows_in_all_themes() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for scale in [1.0, 2.0] {
             let mut h = sized_harness(vec2(720.0, 900.0), scale, theme);
             open(&mut h);
@@ -302,7 +302,7 @@ fn assert_bottom_sample_visible(h: &Harness<'_, State>) {
 
 #[test]
 fn adding_dash_controls_grows_the_popup_and_solid_shrinks_it_again() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let mut h = sized_harness(vec2(720.0, 1000.0), 2.0, theme);
         open(&mut h);
         let solid_height = h.state().popup.unwrap().height();
@@ -360,7 +360,7 @@ fn moving_the_editor_between_ui_roots_keeps_history_gestures_distinct() {
         },
         (0, State::default()),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(3);
     for (root, preset) in [(0, "Dashed"), (1, "Dotted")] {
         h.state_mut().0 = root;
@@ -395,7 +395,7 @@ fn properties_harness(mut params: Value, depth: u32) -> Harness<'static, crate::
         },
         app,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(4);
     h
 }
@@ -541,7 +541,7 @@ fn canvas_harness(properties: bool) -> Harness<'static, CanvasScene> {
         },
         CanvasScene { app, properties, show_controls: true },
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(4);
     h
 }

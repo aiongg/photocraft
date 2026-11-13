@@ -45,7 +45,7 @@ struct Win {
 impl Win {
     fn new(width: f32) -> Self {
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         let mut app = PhotocraftApp::new(Session::new(), crate::Services::default());
         app.custom_titlebar = true;
         let at = pos2(200.0, 100.0);

@@ -70,7 +70,7 @@ fn the_title_bar_close_box_cancels_like_cancel() {
         // The fonts are set up after the harness's first frame: the dialog appears after it.
         let dialogs = std::mem::take(&mut app.ui.dialogs);
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().ui.dialogs = dialogs;
         h.run_steps(4);
         assert!(h.state().filter_preview.is_some(), "the preview is on screen");
@@ -165,7 +165,7 @@ fn color_picker_has_inset_content_and_actions_at_the_right_edge() {
     for size in [egui::vec2(760.0, 480.0), egui::vec2(960.0, 640.0)] {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut h = Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         crate::color_picker_ui::open(h.state_mut(), "foreground");
         h.run_steps(4);
         let frame = rects(&h.ctx)[0];
@@ -195,7 +195,7 @@ fn layer_style_title_gutters_can_start_drags() {
     for point in 0..5 {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
         h.run_steps(3);
         let before = h.get_by_label("Layer Style").rect();
@@ -231,7 +231,7 @@ fn layer_style_buttons_stay_on_a_short_window() {
     app.run("file.new", serde_json::json!({"width": 64, "height": 64})).unwrap();
     app.run("layer.new.layer", serde_json::json!({})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(1435.0, 858.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     crate::layer_style::open(h.state_mut(), Some("bevelEmboss")).unwrap();
     h.run_steps(4);
     for label in ["OK", "Cancel"] {
@@ -246,7 +246,7 @@ fn dragging_the_title_bar_moves_the_dialog() {
 
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut harness = Harness::builder().with_size(egui::vec2(1400.0, 1100.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
     harness.run_steps(3);
     let before = harness.get_by_label("Layer Style").rect();
@@ -276,7 +276,7 @@ fn layer_style_on_bevel(size: egui::Vec2) -> egui_kittest::Harness<'static, Phot
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     crate::layer_style::open(h.state_mut(), Some("bevelEmboss")).expect("Layer Style opens");
     h.run_steps(4);
     assert!(h.query_by_label("Gloss Contour").is_some(), "the Bevel & Emboss page is showing");
@@ -288,7 +288,7 @@ fn layer_style_on_bevel(size: egui::Vec2) -> egui_kittest::Harness<'static, Phot
 fn enter_closes_an_alert_but_not_the_enter_that_opened_it() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 600.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     let alert = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>| {
         h.state_mut().ui.open_dialog(DialogKind::Error, json!({"message": crate::move_lock::MESSAGE}).as_object().cloned().unwrap_or_default())
@@ -404,7 +404,7 @@ fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'sta
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     crate::filter_dialog::open(h.state_mut(), command).unwrap();
     h.run_steps(4);
     h
@@ -544,7 +544,7 @@ fn fit_image_is_as_narrow_as_its_content() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     let d = crate::menus::invoke(h.state_mut(), &ctx, "file.automate.fitImage", json!({})).unwrap()["dialog"].as_u64().unwrap();
     h.run_steps(4);
@@ -590,7 +590,7 @@ fn file_info_multiline_fields_keep_enter_and_cancel_discards_edits() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         crate::menus::invoke(h.state_mut(), &ctx, "file.fileInfo", json!({})).unwrap();
         h.run_steps(4);

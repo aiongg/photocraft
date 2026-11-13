@@ -185,7 +185,7 @@ fn the_options_bar_sets_every_command_parameter() {
         },
         app(8),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     for label in ["Mode:", "Limits:", "Tolerance:", "Anti-alias", "Sampling: Continuous", "Sampling: Once", "Sampling: Background Swatch"] {
         assert!(h.get_by_label(label).rect().is_positive(), "missing Color Replacement option {label}");

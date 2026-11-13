@@ -72,7 +72,7 @@ fn harness((w, h, scale): (f32, f32, f32)) -> Harness<'static, PhotocraftApp> {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.all_styles_mut(|s| s.scroll_animation = egui::style::ScrollAnimation::none());
     h.run_steps(3);
     h
@@ -770,7 +770,7 @@ fn harness_dt(dt: f32) -> Harness<'static, PhotocraftApp> {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.all_styles_mut(|s| s.scroll_animation = egui::style::ScrollAnimation::none());
     h.run_steps(3);
     h

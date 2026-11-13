@@ -10,10 +10,10 @@ use crate::PhotocraftApp;
 use crate::color_panel_ui::{Model, hex_code, html_color, ramp_color};
 use crate::dock::Group;
 use crate::state::{ColorPanelMode, ColorRamp};
-use crate::theme::{ThemeKind, Tokens};
+use crate::theme::{AppTheme, Tokens};
 
 /// The Color tab of `kind` in `mode`, alone in a 300 x 400 pt panel that offers it 360 pt.
-fn color_tab(kind: ThemeKind, mode: ColorPanelMode, fg: [f32; 4]) -> Harness<'static, PhotocraftApp> {
+fn color_tab(kind: AppTheme, mode: ColorPanelMode, fg: [f32; 4]) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.tools.foreground = fg;
     app.ui.color_panel.mode = mode;
@@ -21,8 +21,8 @@ fn color_tab(kind: ThemeKind, mode: ColorPanelMode, fg: [f32; 4]) -> Harness<'st
 }
 
 /// The Color tab of `kind` for `app`, as [`color_tab`].
-fn color_tab_of(kind: ThemeKind, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let tab = Group::Color.tabs(Tokens::for_kind(kind).pro).iter().position(|name| *name == "Color").unwrap();
+fn color_tab_of(kind: AppTheme, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
+    let tab = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
     let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -152,7 +152,7 @@ fn copy_color_formats() {
 /// Every mode draws in every theme, and a click in it sets the colour.
 #[test]
 fn every_mode_works_in_every_theme() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         for mode in ColorPanelMode::ALL {
             let mut h = color_tab(kind, mode, [1.0, 0.0, 0.0, 1.0]);
             match mode {
@@ -181,7 +181,7 @@ fn every_mode_works_in_every_theme() {
 
 #[test]
 fn rgb_slider_track_sets_its_channel() {
-    let mut h = color_tab(ThemeKind::AdwaitaDark, ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::adwaita_dark(), ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
     let g = h.get_by_label("G").rect();
     press(&mut h, pos2(g.right() - 2.0, g.center().y), Modifiers::NONE);
     assert_eq!(bytes(h.state().session.tools.foreground), [0, 255, 0]);
@@ -193,7 +193,7 @@ fn rgb_slider_track_sets_its_channel() {
 /// Black has no hue or saturation of its own: typed H and S must stick while B is still 0.
 #[test]
 fn hsb_sliders_take_values_on_black() {
-    let mut h = color_tab(ThemeKind::Studio, ColorPanelMode::HsbSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::studio(), ColorPanelMode::HsbSliders, [0.0, 0.0, 0.0, 1.0]);
     for (field, typed) in [(0, "120"), (1, "100"), (2, "100")] {
         type_into(&mut h, egui::accesskit::Role::SpinButton, field, typed);
     }
@@ -202,7 +202,7 @@ fn hsb_sliders_take_values_on_black() {
 
 #[test]
 fn cmyk_sliders_keep_typed_values() {
-    let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::CmykSliders, [1.0, 1.0, 1.0, 1.0]);
+    let mut h = color_tab(AppTheme::pro(), ColorPanelMode::CmykSliders, [1.0, 1.0, 1.0, 1.0]);
     type_into(&mut h, egui::accesskit::Role::SpinButton, 0, "40");
     type_into(&mut h, egui::accesskit::Role::SpinButton, 3, "20");
     let shown: Vec<String> = h.query_all_by_role(egui::accesskit::Role::SpinButton).filter_map(|n| n.value()).collect();
@@ -212,7 +212,7 @@ fn cmyk_sliders_keep_typed_values() {
 
 #[test]
 fn web_sliders_snap_and_take_hex() {
-    let mut h = color_tab(ThemeKind::Classic, ColorPanelMode::WebColorSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::classic(), ColorPanelMode::WebColorSliders, [0.0, 0.0, 0.0, 1.0]);
     let r = h.get_by_label("R").rect();
     // 45% along the track snaps to 0x66 (102), the nearest web step.
     let x = r.left() + 4.0 + (r.width() - 8.0) * 0.45;
@@ -232,7 +232,7 @@ fn cube_modes_warn_when_the_colour_cannot_print() {
     // the chips, as the slider modes do; a click takes that colour.
     const GAMUT: &str = "Out of gamut for printing: click for the nearest printable color";
     for mode in [ColorPanelMode::HueCube, ColorPanelMode::BrightnessCube] {
-        let mut h = color_tab(ThemeKind::Classic, mode, [0.0, 1.0, 0.0, 1.0]);
+        let mut h = color_tab(AppTheme::classic(), mode, [0.0, 1.0, 0.0, 1.0]);
         let near = crate::color_picker_ui::out_of_gamut([0.0, 1.0, 0.0]).expect("pure green can't print");
         let alert = h.get_by_label(GAMUT).rect().center();
         press(&mut h, alert, Modifiers::NONE);
@@ -241,7 +241,7 @@ fn cube_modes_warn_when_the_colour_cannot_print() {
         h.run_steps(2);
         assert!(h.query_by_label(GAMUT).is_none(), "{mode:?}: the printable colour still warns");
         // A printable colour shows no alert.
-        let h = color_tab(ThemeKind::Classic, mode, [0.5, 0.5, 0.5, 1.0]);
+        let h = color_tab(AppTheme::classic(), mode, [0.5, 0.5, 0.5, 1.0]);
         assert!(h.query_by_label(GAMUT).is_none(), "{mode:?}");
         // CodeRabbit on #9154: with the background chip active, the click sets the background.
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -249,7 +249,7 @@ fn cube_modes_warn_when_the_colour_cannot_print() {
         app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
         app.ui.color_panel.mode = mode;
         app.ui.color_panel.background = true;
-        let mut h = color_tab_of(ThemeKind::Classic, app);
+        let mut h = color_tab_of(AppTheme::classic(), app);
         let alert = h.get_by_label(GAMUT).rect().center();
         press(&mut h, alert, Modifiers::NONE);
         let tools = &h.state().session.tools;
@@ -260,7 +260,7 @@ fn cube_modes_warn_when_the_colour_cannot_print() {
 
 #[test]
 fn ramp_picks_and_shift_click_cycles_and_alt_picks_the_other_colour() {
-    let mut h = color_tab(ThemeKind::BreezeDark, ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::breeze_dark(), ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
     let ramp: Rect = h.get_by_label("Color Ramp").rect();
     // The RGB Spectrum's top is white.
     press(&mut h, pos2(ramp.left() + 3.0, ramp.top() + 1.0), Modifiers::NONE);
@@ -288,7 +288,7 @@ fn ramp_picks_and_shift_click_cycles_and_alt_picks_the_other_colour() {
 /// colour under the pointer instead of drifting toward the background.
 #[test]
 fn current_colors_ramp_drag_keeps_its_ends() {
-    let mut h = color_tab(ThemeKind::BreezeDark, ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::breeze_dark(), ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
     h.state_mut().session.tools.background = [1.0, 1.0, 1.0, 1.0];
     h.state_mut().ui.color_panel.ramp = ColorRamp::CurrentColors;
     h.run_steps(2);
@@ -324,7 +324,7 @@ fn triangle_ignores_non_finite_points() {
 
 #[test]
 fn color_wheel_ring_sets_hue_and_triangle_sets_saturation_and_brightness() {
-    let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
+    let mut h = color_tab(AppTheme::pro(), ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
     let area = h.get_by_label("Color Wheel").rect();
     let (center, inner, outer) = crate::color_panel_ui::wheel_geometry(area);
     let mid = (inner + outer) / 2.0;
@@ -413,7 +413,7 @@ fn panel_menu_picks_the_mode_and_ramp() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::AdwaitaDark);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::adwaita_dark());
     h.run_steps(2);
     assert!(h.query_by_label("✔ Hue Cube").is_some(), "Hue Cube is the default");
     for mode in ColorPanelMode::ALL.into_iter().skip(1).chain([ColorPanelMode::HueCube, ColorPanelMode::WebColorSliders]) {
@@ -435,7 +435,7 @@ fn panel_menu_picks_the_mode_and_ramp() {
     assert_eq!(copied, ["3399cc"]);
     // Switching theme keeps the mode.
     let ctx = h.ctx.clone();
-    h.state_mut().set_theme(&ctx, ThemeKind::Pro);
+    h.state_mut().set_theme(&ctx, AppTheme::pro());
     h.run_steps(2);
     assert_eq!(h.state().ui.color_panel.mode, ColorPanelMode::WebColorSliders);
 }
@@ -476,7 +476,7 @@ fn web_only_reads_its_old_snake_case_key() {
 /// the Grayscale Ramp the fifth cell is drawn white, though its right edge rounds to CC.
 #[test]
 fn web_safe_ramp_picks_the_cell_it_draws() {
-    let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::pro(), ColorPanelMode::RgbSliders, [0.0, 0.0, 0.0, 1.0]);
     h.state_mut().ui.color_panel.ramp = ColorRamp::GrayscaleRamp;
     h.state_mut().ui.color_panel.web_safe_ramp = true;
     h.run_steps(2);
@@ -488,7 +488,7 @@ fn web_safe_ramp_picks_the_cell_it_draws() {
 /// A Web Color field takes two hex digits only: "+F" is not 0F.
 #[test]
 fn web_field_ignores_a_sign() {
-    let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::WebColorSliders, [0.0, 0.0, 0.0, 1.0]);
+    let mut h = color_tab(AppTheme::pro(), ColorPanelMode::WebColorSliders, [0.0, 0.0, 0.0, 1.0]);
     type_into(&mut h, egui::accesskit::Role::TextInput, 0, "+F");
     assert_eq!(bytes(h.state().session.tools.foreground), [0, 0, 0]);
 }
@@ -496,7 +496,7 @@ fn web_field_ignores_a_sign() {
 /// A click beside the Color Wheel (its area spans the panel) leaves the colour alone.
 #[test]
 fn color_wheel_ignores_clicks_beside_it() {
-    let mut h = color_tab(ThemeKind::Pro, ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
+    let mut h = color_tab(AppTheme::pro(), ColorPanelMode::ColorWheel, [0.0, 0.0, 1.0, 1.0]);
     let area = h.get_by_label("Color Wheel").rect();
     let (center, _, outer) = crate::color_panel_ui::wheel_geometry(area);
     let corner = area.left_top() + vec2(3.0, 3.0);
@@ -509,11 +509,11 @@ fn color_wheel_ignores_clicks_beside_it() {
 /// slider modes' ramp does, instead of running past the group's bottom into its scroll area.
 #[test]
 fn color_wheel_fits_the_default_color_group() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.ui.color_panel.mode = ColorPanelMode::ColorWheel;
         app.ui.theme = kind;
-        app.ui.dock_tabs.color = Group::Color.tabs(Tokens::for_kind(kind).pro).iter().position(|name| *name == "Color").unwrap();
+        app.ui.dock_tabs.color = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
         let mut h = Harness::builder().with_size(vec2(1440.0, 1200.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -545,7 +545,7 @@ fn color_tab_with_a_shape(mode: ColorPanelMode, background: bool) -> Harness<'st
     app.session.tools.background = [1.0, 0.0, 0.0, 1.0];
     app.ui.color_panel.mode = mode;
     app.ui.color_panel.background = background;
-    color_tab_of(ThemeKind::Studio, app)
+    color_tab_of(AppTheme::studio(), app)
 }
 
 /// Types `text` into the first slider field (Hue or Red) and commits it with Enter.

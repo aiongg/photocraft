@@ -697,7 +697,7 @@ fn jobs_cancel_during_the_write_reports_the_save_as_not_cancelled_and_it_finishe
 /// " - Saving 45%" to its document's tab title, in both tab strips; both go when it ends.
 #[test]
 fn a_running_save_shows_its_percentage_in_the_status_bar_and_tab_title() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         let mut h = app_harness();
         h.state_mut().run("prefs.set", json!({"values": {"interface.theme": theme.id()}})).unwrap();
         h.run_steps(2);

@@ -6,7 +6,7 @@ use egui_kittest::kittest::Queryable;
 
 use crate::PhotocraftApp;
 use crate::dock::Group;
-use crate::theme::{ThemeKind, Tokens};
+use crate::theme::{AppTheme, Tokens};
 
 fn left_top() -> egui::Id {
     egui::Id::unique("color-tab-test-origin")
@@ -14,10 +14,10 @@ fn left_top() -> egui::Id {
 
 /// The Color tab of `kind`, alone in a 300 pt wide panel, starting from a red foreground. `fill`
 /// is the group body height the dock offers, if any.
-fn color_tab(kind: ThemeKind, fill: Option<f32>) -> egui_kittest::Harness<'static, PhotocraftApp> {
+fn color_tab(kind: AppTheme, fill: Option<f32>) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.tools.foreground = [1.0, 0.0, 0.0, 1.0];
-    let tab = Group::Color.tabs(Tokens::for_kind(kind).pro).iter().position(|name| *name == "Color").unwrap();
+    let tab = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(300.0, 400.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -52,7 +52,7 @@ fn pick_at(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, y: f32) -> [f3
 
 #[test]
 fn every_theme_shows_the_same_spectrum_field() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let mut h = color_tab(kind, None);
         // Halfway down its 120 pt: no saturation, half brightness.
         let [r, g, b, _] = pick_at(&mut h, 60.0);
@@ -67,7 +67,7 @@ fn every_theme_shows_the_same_spectrum_field() {
 /// Every theme stretches the field over the dock group, as Photoshop's themes always did (#6000).
 #[test]
 fn every_theme_stretches_the_field_over_the_group() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let mut h = color_tab(kind, Some(380.0));
         // Far below a 120 pt field: only a stretched one picks here, and a dark grey.
         let [r, g, b, _] = pick_at(&mut h, 300.0);

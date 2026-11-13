@@ -340,7 +340,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 let state = app.session.active().unwrap();
@@ -375,7 +375,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 let state = app.session.active().unwrap();
@@ -413,7 +413,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -471,7 +471,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -527,7 +527,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             move |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -589,7 +589,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -638,7 +638,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -690,7 +690,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).with_step_dt(0.05).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 crate::field_wheel::begin_frame(ui.ctx());
@@ -782,7 +782,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(vec2(280.0, 900.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().cumulative_pass_nr() == 0 {
-                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                    PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                     return;
                 }
                 let state = app.session.active().unwrap();

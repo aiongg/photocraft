@@ -566,7 +566,7 @@ fn bounded_sessions_require_reuse_or_closing_a_document() {
 fn capture_smart_svg_visual_fixtures() {
     let Some(directory) = std::env::var_os("CRAFT_SMART_SVG_FIXTURES").map(std::path::PathBuf::from) else { return };
     std::fs::create_dir_all(&directory).unwrap();
-    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::StudioLight] {
+    for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio_light()] {
         let (mut app, _, _) = fixture();
         open(&mut app);
         let mut ready = false;
@@ -646,7 +646,7 @@ fn capture_embedded_vector_conversion_prompt() {
         move |ui, app: &mut PhotocraftApp| {
             let _language = crate::i18n::language_scope(lang);
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::Pro);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro());
                 ready = true;
                 return;
             }

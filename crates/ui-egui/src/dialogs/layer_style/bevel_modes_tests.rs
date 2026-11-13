@@ -24,7 +24,7 @@ fn highlight_and_shadow_modes_are_independent_dropdowns() {
         },
         (app, fields),
     );
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     harness.run_steps(3);
     let params = |h: &egui_kittest::Harness<'_, (PhotocraftApp, Map<String, Value>)>| h.state().1["effects"][0]["params"].clone();
     assert_eq!((params(&harness)["highlightBlend"].as_str(), params(&harness)["shadowBlend"].as_str()), (Some("Screen"), Some("Multiply")));

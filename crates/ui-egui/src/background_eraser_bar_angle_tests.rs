@@ -10,7 +10,7 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::state::{DialogKind, Tool};
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 const PRESSURE: &str = "Always use pressure for size";
 
@@ -19,7 +19,7 @@ fn bar(tool: Tool) -> Harness<'static, PhotocraftApp> {
     app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
     app.ui.tool = tool;
     let mut h = Harness::builder().with_size(vec2(1600.0, 300.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::pro_medium());
     h.run_steps(4);
     h
 }
@@ -242,7 +242,7 @@ fn wheel_steps_with_the_focus_stop_at_the_ends_without_the_alert() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::pro_medium());
     h.run_steps(4);
     type_angle(&mut h, "178");
     angle_field(&h).expect("the Angle field").click();

@@ -1105,7 +1105,7 @@ mod tests {
         // The fonts are set up after the harness's first frame: the window appears after it.
         let spell = app.ui.type_panels.spell.take();
         let mut h = egui_kittest::Harness::builder().with_size(vec2(1000.0, 700.0)).build_ui_state(|ui, app| windows(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().ui.type_panels.spell = spell;
         h.run_steps(3);
         if !crate::dialogs::CLOSE_BOX {
