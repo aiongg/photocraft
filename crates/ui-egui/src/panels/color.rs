@@ -32,14 +32,22 @@ pub(crate) fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 /// One edit of a colour: `tools.setColors` under the gesture's coalesce key, so a drag or a
-/// typed value is one history step; a new foreground recolours what is selected.
+/// typed value is one history step; a new foreground recolours what is selected. A colour equal
+/// to the current one runs nothing, so it leaves no empty history step.
 fn set_color(app: &mut PhotocraftApp, target: PanelTarget, event: &EditEvent<PickedColor>) {
     let Some(picked) = event.landed() else { return };
+    let c = picked.color;
+    let now = match target {
+        PanelTarget::Background => app.session.tools.background,
+        _ => app.session.tools.foreground,
+    };
+    if [c.r, c.g, c.b, c.a] == now {
+        return;
+    }
     let key = match event.id() {
         Some(id) => format!("color-panel-{}", id.0),
         None => format!("color-panel-set-{}", app.ui.alloc_id()),
     };
-    let c = picked.color;
     let mut params = json!({"coalesce": key});
     params[target_name(target)] = json!([c.r, c.g, c.b, c.a]);
     if let Err(e) = app.run("tools.setColors", params) {

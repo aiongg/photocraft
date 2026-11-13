@@ -105,7 +105,8 @@ fn field_gestures_recolour_the_selected_shape_in_separate_steps() {
 }
 
 /// A value typed into the readout's R, G or B field recolours the selected shape as one undo step
-/// per field, not one per keystroke; a sum applies when Enter commits it.
+/// per field, not one per keystroke; a sum applies when Enter commits it, and a value the field
+/// already holds adds no step.
 #[test]
 fn typing_an_rgb_value_recolours_the_selected_shape_in_one_step() {
     let (mut app, id) = app_with_a_shape(json!("#000000"));
@@ -117,7 +118,7 @@ fn typing_an_rgb_value_recolours_the_selected_shape_in_one_step() {
     };
     let before = steps(h.state());
     // The only spin buttons are R, G and B, in that order. (field, typed, commit with Enter, steps after, fill)
-    let cases = [(1, "128", false, 1, [0x00, 0x80, 0x00]), (2, "64", false, 2, [0x00, 0x80, 0x40]), (0, "2*64", true, 3, [0x80, 0x80, 0x40])];
+    let cases = [(1, "128", false, 1, [0x00, 0x80, 0x00]), (2, "64", false, 2, [0x00, 0x80, 0x40]), (0, "2*64", true, 3, [0x80, 0x80, 0x40]), (0, "128", false, 3, [0x80, 0x80, 0x40])];
     for (field, text, enter, steps_after, want) in cases {
         h.query_all_by_role(egui::accesskit::Role::SpinButton).nth(field).unwrap().click();
         h.run_steps(1);

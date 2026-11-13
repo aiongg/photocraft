@@ -2,6 +2,7 @@
 //! themes used to show HSB sliders only, then a short field with the sliders under it. The field
 //! takes the height its dock group gives it, less the readout, in every theme.
 
+use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
 
 use crate::PhotocraftApp;
@@ -9,7 +10,7 @@ use crate::dock::Group;
 use crate::theme::AppTheme;
 
 /// The height of the Hue Cube's field in the Color tab of `kind`, alone in a 300 pt wide group
-/// `height` tall; panics where the tab shows a channel slider.
+/// `height` tall; panics where the tab shows channel rows.
 fn field_height(kind: AppTheme, height: f32) -> f32 {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let tab = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
@@ -23,8 +24,9 @@ fn field_height(kind: AppTheme, height: f32) -> f32 {
     );
     PhotocraftApp::setup_context(&h.ctx, kind);
     h.run_steps(3);
-    for slider in ["Hue", "Saturation", "Brightness"] {
-        assert!(h.query_all_by_label(slider).next().is_none(), "{kind:?}: no {slider} slider (#6000)");
+    // The cube's hue strip is a slider named "Hue" too, so the channel rows are told by the others.
+    for channel in ["Red", "Green", "Blue", "Saturation", "Brightness"] {
+        assert!(h.query_all_by_role_and_label(Role::Slider, channel).next().is_none(), "{kind:?}: no {channel} channel row (#6000)");
     }
     h.get_by_label("Saturation and brightness").rect().height()
 }
