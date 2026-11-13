@@ -14,7 +14,7 @@ craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45
 # The craft framework through its facade (`craft::ui::…`). Its `craft-ui` package shares the name of the
 # one above; nothing depends on both under that name. The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
-craft = { git = "https://github.com/aiongg/craft-libs", rev = "49dc68ccebe36066754df1162b8c536a4bd514cf" }
+craft = { git = "https://github.com/aiongg/craft-libs", rev = "84683709fd5aceb9a2d78d3a53d7b87afbd9a0e2" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
