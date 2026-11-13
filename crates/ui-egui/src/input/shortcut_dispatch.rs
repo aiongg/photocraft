@@ -279,10 +279,8 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
         return false;
     }
     const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
-    let table: Vec<(String, KeyboardShortcut)> = bindings(app)
-        .into_iter()
-        .filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str())) && !runtime_owned(id))
-        .collect();
+    let table: Vec<(String, KeyboardShortcut)> =
+        bindings(app).into_iter().filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str())) && !runtime_owned(id)).collect();
     let command = |e: &egui::Event| match e {
         egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
             let by_position = physical_key

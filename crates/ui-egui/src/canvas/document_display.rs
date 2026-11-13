@@ -6,8 +6,8 @@ use craft::behavior::kurbo::{Point, Rect as Rect64, Size};
 use craft::behavior::{CanvasView, PixelSize};
 use craft::ui::canvas::{Canvas, CanvasOutput, Extent, NavigationOptions, RasterDisplay, RasterSource};
 use craft::ui::contract::{Bind, Props, Show, ShowContainer};
-use craft::ui::runtime::env::Label;
 use craft::ui::primitives::Checker;
+use craft::ui::runtime::env::Label;
 use craft::ui::runtime::focus::{KeyUse, host_canvas};
 use craft::ui::style::DataColor;
 use egui::{Color32, Pos2, Rect, Sense};
@@ -126,9 +126,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     }
     let xf = view_xform(&drawn);
     let target = view_xform(&given);
-    let picture = gpu_ok
-        .then(|| gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target, zoom: view.zoom, render_zoom: view.zoom }))
-        .flatten();
+    let picture =
+        gpu_ok.then(|| gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target, zoom: view.zoom, render_zoom: view.zoom })).flatten();
     match &picture {
         Some(picture) if picture.shows_document() && app.navigator_plain.contains(&doc.id) => {
             app.navigator_gpu.insert(doc.id, picture.params(&given));
@@ -165,7 +164,11 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let widget = egui::Id::unique(("pc-canvas-tools", idx, ctx.viewport_id()));
 
     let mut bound = given;
-    let mut canvas = Canvas::new(label.clone()).id_salt(("pc-canvas", idx)).view(Bind::bound(&mut bound)).document(Size::new(f64::from(size.width), f64::from(size.height))).navigation(navigation);
+    let mut canvas = Canvas::new(label.clone())
+        .id_salt(("pc-canvas", idx))
+        .view(Bind::bound(&mut bound))
+        .document(Size::new(f64::from(size.width), f64::from(size.height)))
+        .navigation(navigation);
     canvas = match ease {
         Some((from, anchor)) => canvas.ease_from(from, anchor),
         None if pass.jumped => canvas.jumped(),

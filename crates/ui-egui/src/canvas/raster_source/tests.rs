@@ -165,3 +165,110 @@ fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the
     assert_ne!(overlay, overlay_before, "the overlay shows the live preview");
     assert_eq!(composite, composite_before, "the composite shows the document");
 }
+
+/// The CPU canvas (no usable GPU; a flipped or pixel-aspect-corrected view, or a GPU fallback, on a GPU machine) shows
+/// a filter dialog's live preview. It showed the document unfiltered.
+#[test]
+fn the_composite_shows_a_filter_dialogs_preview() {
+    for (size, zoom) in [([64u32, 48u32], 1.0f32), ([2400, 2200], 0.25)] {
+        let mut app = app_with(size[0], size[1], "white");
+        app.background_jobs = false;
+        app.run("edit.fill", json!({"color": "#3399cc"})).unwrap();
+        app.ui.views.get_mut(0).expect("the view").zoom = zoom;
+        let ctx = egui::Context::default();
+        let first = PixelRect::new(0, 0, 1, 1);
+        let plain = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), first, 1).pixels;
+        crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
+        let shown = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), first, 1).pixels;
+        let preview = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the dialog's preview");
+        let (display, _) = crate::canvas::canvas_display(&app, &preview, None);
+        let expected = crate::canvas::display_image(display.as_deref(), &photocraft_compose::flatten(&preview));
+        assert_eq!(shown.first(), expected.pixels.first(), "{size:?}: the canvas shows the preview");
+        assert_ne!(shown, plain, "{size:?}: not the unfiltered document");
+    }
+}
+
+/// A preview that changes the canvas's dimensions (Image › Image Rotation › Arbitrary 90° on a 64×32 document) lies
+/// over its own area, centred on the document's, as the GPU canvas centres it; the channel view over it follows.
+#[test]
+fn a_size_changing_preview_lies_centred_on_the_document() {
+    let size = |w, h| photocraft_geom::Size::new(w, h);
+    assert_eq!(super::super::textures::preview_bounds(size(64, 32), size(64, 32), 1), DRect::new(0, 0, 64, 32));
+    assert_eq!(super::super::textures::preview_bounds(size(2401, 2200), size(1201, 1100), 2), DRect::new(0, 0, 2401, 2200), "a proxy");
+    assert_eq!(super::super::textures::preview_bounds(size(64, 32), size(32, 64), 1), DRect::new(16, -16, 48, 48), "rotated");
+    assert_eq!(super::super::textures::preview_bounds(size(64, 32), size(80, 40), 1), DRect::new(-8, -4, 72, 36), "canvas grown");
+    assert_eq!(super::super::textures::preview_bounds(size(4000, 2000), size(1000, 2000), 2), DRect::new(1000, -1000, 3000, 3000), "a rotated proxy");
+
+    let mut app = app_with(64, 32, "white");
+    app.background_jobs = false;
+    app.run("channel.new", json!({"name": "Alpha", "fill": "black"})).unwrap();
+    let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
+    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
+    d.fields.insert("angle".into(), json!(90.0));
+    d.fields.insert("__preview".into(), json!(true));
+    let ctx = egui::Context::default();
+    let bounds = |app: &mut PhotocraftApp| CompositePrep::new(app, &ctx, 0, None).unwrap().source(app).bounds();
+    let rotated = DRect::new(16, -16, 48, 48);
+    assert_eq!(bounds(&mut app), rotated, "centred on the document");
+    assert_eq!(OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app).bounds(), rotated, "the channel view over the preview");
+    // Preview off, then Cancel: the document again, unchanged.
+    let revision = app.session.active().unwrap().revision;
+    app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap().fields.insert("__preview".into(), json!(false));
+    assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "Preview off");
+    crate::dialogs::cancel(&mut app, id).unwrap();
+    assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "after Cancel");
+    assert_eq!(app.session.active().unwrap().revision, revision, "the document untouched");
+}
+
+/// #2078: a channel or mask view over the canvas shows the live stroke, not the committed channel over it, and a stroke
+/// dropped without committing shows the channel as it was. One row per view target.
+#[test]
+fn channel_views_show_live_strokes_and_drop_discarded_ones() {
+    let targets: [(&str, fn(&mut PhotocraftApp)); 5] = [
+        ("quick mask", |app| {
+            app.run("select.rect", json!({"x": 0, "y": 0, "width": 120, "height": 60})).unwrap();
+            app.run("select.editInQuickMaskMode", json!({})).unwrap();
+        }),
+        ("alpha", |app| {
+            app.run("channel.new", json!({"fill": "white"})).unwrap();
+        }),
+        ("red", |app| {
+            app.run("channel.target", json!({"channel": "red"})).unwrap();
+        }),
+        ("layer mask, gray", |app| {
+            app.run("layer.layerMask.revealAll", json!({})).unwrap();
+            app.run("view.layerMask", json!({"mode": "gray"})).unwrap();
+        }),
+        ("layer mask, overlay", |app| {
+            app.run("layer.layerMask.revealAll", json!({})).unwrap();
+            app.run("view.layerMask", json!({"mode": "overlay"})).unwrap();
+        }),
+    ];
+    let stroke = PixelRect::new(0, 24, 60, 36);
+    let rect = DRect::new(0, 24, 60, 36);
+    for (target, setup) in targets {
+        let mut app = app_with(120, 60, "white");
+        setup(&mut app);
+        app.run("tools.setColors", json!({"foreground": [0.0, 0.0, 0.0, 1.0]})).unwrap();
+        app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0, "smoothing": {"amount": 0.0}}})).unwrap();
+        app.ui.tool = crate::state::Tool::Brush;
+        let ctx = egui::Context::default();
+        let original = app.session.documents()[0].doc.clone();
+        let view = |app: &PhotocraftApp, doc: &Document| {
+            let st = &app.session.documents()[0];
+            crate::channel_view::render(doc, &st.channel_view, rect, 1, crate::channel_view::Look::default(), st.active_layer).unwrap()
+        };
+        let shown = |app: &mut PhotocraftApp| read(&OverlayPrep::new(app, &ctx, 0, None).unwrap().source(app), stroke, 1).pixels;
+        let m = egui::Modifiers::NONE;
+        crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, m);
+        crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, m);
+        let live = crate::canvas::display_doc(&mut app, 0).0;
+        let painted = shown(&mut app);
+        assert_eq!(painted, view(&app, &live), "{target}: the live stroke");
+        assert_ne!(painted, view(&app, &original), "{target}: the target was painted");
+        assert!(std::sync::Arc::ptr_eq(&original, &app.session.documents()[0].doc), "{target}: nothing committed");
+        app.drag = None;
+        app.live_stroke = None;
+        assert_eq!(shown(&mut app), view(&app, &original), "{target}: a dropped stroke shows the channel as it was");
+    }
+}

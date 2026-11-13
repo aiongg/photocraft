@@ -177,14 +177,14 @@ fn paused_menu_preview_keeps_the_requesting_gate_and_rejects_retargeting() {
 
     let context = h.ctx.clone();
     let checks = MENU_PREVIEW_CHECKS.load(Ordering::SeqCst);
-    assert!(canvas::ensure_texture(h.state_mut(), &context, 0, None).is_some());
+    canvas::navigator_texture(h.state_mut(), &context, 0);
     assert!(MENU_PREVIEW_CHECKS.load(Ordering::SeqCst) > checks, "the retained gate authorizes the real preview");
 
     let revision = h.state().session.active().unwrap().revision;
     let steps = h.state().session.actions.list[0].steps.clone();
     h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("mapPath".into(), json!("/outside/map.psd"));
     let denials = MENU_PREVIEW_DENIALS.load(Ordering::SeqCst);
-    canvas::ensure_texture(h.state_mut(), &context, 0, None);
+    canvas::navigator_texture(h.state_mut(), &context, 0);
     assert!(MENU_PREVIEW_DENIALS.load(Ordering::SeqCst) > denials, "the retained gate denies the edited path");
 
     h.state_mut().ui.dialog_mut(dialog).unwrap().fields.insert("__command".into(), json!("filter.distort.displace"));

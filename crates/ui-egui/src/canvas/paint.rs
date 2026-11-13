@@ -364,51 +364,51 @@ impl Beyond {
     pub(super) fn paint(&self, painter: &egui::Painter, xf: &ViewXform) {
         let canvas = xf.doc_rect(self.bounds);
         let (around, square, checker_id) = (&self.around, self.checker.map(|c| c.0), self.checker.map(|c| c.1));
-    // A turned view (Rotate View, or the Crop tool's default mode turning the image behind its
-    // box) draws each band as its turned quad: its screen bounding box would stretch the band's
-    // texture and spread the checkerboard past the band.
-    let turned = xf.rotation != 0.0;
-    let checker_uv = |p: Pos2, sq: f32| ((p - canvas.min) / (2.0 * sq)).to_pos2();
-    for &b in around {
-        if turned {
-            let q = doc_quad(xf, b);
+        // A turned view (Rotate View, or the Crop tool's default mode turning the image behind its
+        // box) draws each band as its turned quad: its screen bounding box would stretch the band's
+        // texture and spread the checkerboard past the band.
+        let turned = xf.rotation != 0.0;
+        let checker_uv = |p: Pos2, sq: f32| ((p - canvas.min) / (2.0 * sq)).to_pos2();
+        for &b in around {
+            if turned {
+                let q = doc_quad(xf, b);
+                match square.zip(checker_id) {
+                    Some((sq, id)) => textured_quad(painter, id, q, q.map(|p| checker_uv(p, sq))),
+                    None => {
+                        painter.add(egui::Shape::convex_polygon(q.to_vec(), Color32::WHITE, Stroke::NONE));
+                    }
+                }
+                continue;
+            }
+            let r = under_canvas(xf.doc_rect(b), canvas);
             match square.zip(checker_id) {
-                Some((sq, id)) => textured_quad(painter, id, q, q.map(|p| checker_uv(p, sq))),
+                Some((sq, id)) => {
+                    let uv = Rect::from_min_max(checker_uv(r.min, sq), checker_uv(r.max, sq));
+                    painter.image(id, r, uv, Color32::WHITE);
+                }
                 None => {
-                    painter.add(egui::Shape::convex_polygon(q.to_vec(), Color32::WHITE, Stroke::NONE));
+                    painter.rect_filled(r, 0.0, Color32::WHITE);
                 }
             }
-            continue;
         }
-        let r = under_canvas(xf.doc_rect(b), canvas);
-        match square.zip(checker_id) {
-            Some((sq, id)) => {
-                let uv = Rect::from_min_max(checker_uv(r.min, sq), checker_uv(r.max, sq));
-                painter.image(id, r, uv, Color32::WHITE);
+        for (b, t, tex) in &self.bands {
+            let part = |a: i32, o: i32, len: u32| (i64::from(a) - i64::from(o)) as f32 / len.max(1) as f32;
+            let (mut u0, mut u1) = (part(b.x0, t.x0, t.width()), part(b.x1, t.x0, t.width()));
+            if turned {
+                // The quad's corners are the band's own (flip included), so no swap.
+                let (v0, v1) = (part(b.y0, t.y0, t.height()), part(b.y1, t.y0, t.height()));
+                textured_quad(painter, tex.id(), doc_quad(xf, *b), [pos2(u0, v0), pos2(u1, v0), pos2(u1, v1), pos2(u0, v1)]);
+                continue;
             }
-            None => {
-                painter.rect_filled(r, 0.0, Color32::WHITE);
+            if xf.flip {
+                (u0, u1) = (u1, u0);
             }
+            let uv = Rect::from_min_max(pos2(u0, part(b.y0, t.y0, t.height())), pos2(u1, part(b.y1, t.y0, t.height())));
+            // The texture's edge texels stretch over the point under the canvas.
+            let (r, e) = (xf.doc_rect(*b), under_canvas(xf.doc_rect(*b), canvas));
+            let at = |p: Pos2| uv.min + (p - r.min) / r.size() * uv.size();
+            painter.image(tex.id(), e, Rect::from_min_max(at(e.min), at(e.max)), Color32::WHITE);
         }
-    }
-    for (b, t, tex) in &self.bands {
-        let part = |a: i32, o: i32, len: u32| (i64::from(a) - i64::from(o)) as f32 / len.max(1) as f32;
-        let (mut u0, mut u1) = (part(b.x0, t.x0, t.width()), part(b.x1, t.x0, t.width()));
-        if turned {
-            // The quad's corners are the band's own (flip included), so no swap.
-            let (v0, v1) = (part(b.y0, t.y0, t.height()), part(b.y1, t.y0, t.height()));
-            textured_quad(painter, tex.id(), doc_quad(xf, *b), [pos2(u0, v0), pos2(u1, v0), pos2(u1, v1), pos2(u0, v1)]);
-            continue;
-        }
-        if xf.flip {
-            (u0, u1) = (u1, u0);
-        }
-        let uv = Rect::from_min_max(pos2(u0, part(b.y0, t.y0, t.height())), pos2(u1, part(b.y1, t.y0, t.height())));
-        // The texture's edge texels stretch over the point under the canvas.
-        let (r, e) = (xf.doc_rect(*b), under_canvas(xf.doc_rect(*b), canvas));
-        let at = |p: Pos2| uv.min + (p - r.min) / r.size() * uv.size();
-        painter.image(tex.id(), e, Rect::from_min_max(at(e.min), at(e.max)), Color32::WHITE);
-    }
     }
 }
 

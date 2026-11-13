@@ -169,7 +169,7 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
         h.state_mut().session.authorize = None;
         let context = h.ctx.clone();
         PREVIEW_CHECKS.store(0, Ordering::SeqCst);
-        assert!(canvas::ensure_texture(h.state_mut(), &context, 0, None).is_some());
+        canvas::navigator_texture(h.state_mut(), &context, 0);
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the permitted real preview request is authorized: {command}");
         if command == "image.adjustments.levels" {
             assert!(dialogs::adjust_preview::display_doc(h.state_mut(), 0).is_some(), "the permitted adjustment preview is evaluated");
@@ -187,7 +187,7 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
             fields.insert("file".into(), json!("/outside/forbidden.cube"));
         }
         PREVIEW_CHECKS.store(0, Ordering::SeqCst);
-        canvas::ensure_texture(h.state_mut(), &context, 0, None);
+        canvas::navigator_texture(h.state_mut(), &context, 0);
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the changed actual request was refused before evaluation: {command}");
         assert_eq!(h.state().session.actions.list, original);
         assert_eq!(h.state().session.active().unwrap().revision, revision);

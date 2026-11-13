@@ -57,118 +57,6 @@ fn display_image_matches_egui_unmultiplied_conversion() {
 /// #7490: the inline (web) preview path composites and uploads each changed preview once, as
 /// the background worker does. It used to flatten and upload it twice and record it twice,
 /// so the frame's refresh time counted the preview twice.
-/// The CPU canvas (no usable GPU; a flipped or pixel-aspect-corrected view, or a GPU fallback,
-/// on a GPU machine) shows a filter dialog's live preview. It showed the document unfiltered.
-#[test]
-fn the_cpu_canvas_shows_a_filter_dialogs_preview() {
-    let pixels = |ctx: &egui::Context, id: egui::TextureId| {
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let egui::ImageData::Color(image) = &delta.set.get(&id).and_then(|d| d.last()).expect("the canvas texture was written").image;
-        let (size, px) = (image.size, image.pixels.clone());
-        delta.clear();
-        (size, px)
-    };
-    for (size, zoom) in [([64u32, 48u32], 1.0f32), ([2400, 2200], 0.25)] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.background_jobs = false;
-        app.run("file.new", json!({"width": size[0], "height": size[1], "background": "white"})).unwrap();
-        app.run("edit.fill", json!({"color": "#3399cc"})).unwrap();
-        app.ui.views.get_mut(0).expect("the view").zoom = zoom;
-        let ctx = egui::Context::default();
-        let (tex, _) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
-        let (_, plain) = pixels(&ctx, tex);
-        crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
-        let (tex, _) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
-        let (tex_size, shown) = pixels(&ctx, tex);
-        let preview = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the dialog's preview");
-        let (display, _) = canvas_display(&app, &preview, None);
-        let expected = display_image(display.as_deref(), &photocraft_compose::flatten(&preview));
-        assert_eq!(tex_size, expected.size, "{size:?}: the preview's own size (a proxy when zoomed out)");
-        assert_eq!(shown, expected.pixels, "{size:?}: the canvas shows the preview");
-        assert_ne!(shown.first(), plain.first(), "{size:?}: not the unfiltered document");
-    }
-    // A preview that changes the canvas's dimensions covers its own area, centred on the
-    // document's (as the GPU canvas centres it), rather than being stretched over it.
-    let size = |w, h| photocraft_geom::Size::new(w, h);
-    assert_eq!(preview_bounds(size(64, 32), size(64, 32), 1), DRect::new(0, 0, 64, 32));
-    assert_eq!(preview_bounds(size(2401, 2200), size(1201, 1100), 2), DRect::new(0, 0, 2401, 2200), "a proxy");
-    assert_eq!(preview_bounds(size(64, 32), size(32, 64), 1), DRect::new(16, -16, 48, 48), "rotated");
-    assert_eq!(preview_bounds(size(64, 32), size(80, 40), 1), DRect::new(-8, -4, 72, 36), "canvas grown");
-    assert_eq!(preview_bounds(size(4000, 2000), size(1000, 2000), 2), DRect::new(1000, -1000, 3000, 3000), "a rotated proxy");
-
-    // Image › Image Rotation › Arbitrary 90° on a 64×32 document: its 32×64 preview is drawn over
-    // the centred 32×64 area.
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.background_jobs = false;
-    app.run("file.new", json!({"width": 64, "height": 32, "background": "white"})).unwrap();
-    let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
-    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
-    d.fields.insert("angle".into(), json!(90.0));
-    d.fields.insert("__preview".into(), json!(true));
-    let ctx = egui::Context::default();
-    let t = ensure_texture_in_view(&mut app, &ctx, 0, None, None).unwrap();
-    let (size, _) = pixels(&ctx, t.texture);
-    assert_eq!(size, [32, 64], "the rotated preview's texture");
-    assert_eq!(t.bounds, DRect::new(16, -16, 48, 48), "centred on the document");
-    let centre = |r: DRect| (r.x0 + r.x1, r.y0 + r.y1);
-    assert_eq!(centre(t.bounds), centre(app.session.active().unwrap().doc.bounds()), "the same centre, so the view's pan holds");
-    // Preview off, then Cancel: the document again, unchanged.
-    let revision = app.session.active().unwrap().revision;
-    app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap().fields.insert("__preview".into(), json!(false));
-    let t = ensure_texture_in_view(&mut app, &ctx, 0, None, None).unwrap();
-    assert_eq!(t.bounds, DRect::new(0, 0, 64, 32), "Preview off");
-    crate::dialogs::cancel(&mut app, id).unwrap();
-    let t = ensure_texture_in_view(&mut app, &ctx, 0, None, None).unwrap();
-    assert_eq!(t.bounds, DRect::new(0, 0, 64, 32), "after Cancel");
-    assert_eq!(app.session.active().unwrap().revision, revision, "the document untouched");
-    assert_eq!(app.session.active().unwrap().doc.size, photocraft_geom::Size::new(64, 32));
-}
-
-/// A channel overlay drawn from a size-changing preview covers the preview's own area, as the
-/// image does, not the document's: a 90° rotation of a 64×32 document shows a 32×64 overlay.
-#[test]
-fn a_channel_overlay_follows_a_size_changing_preview() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.background_jobs = false;
-    app.run("file.new", json!({"width": 64, "height": 32, "background": "white"})).unwrap();
-    app.run("channel.new", json!({"name": "Alpha", "fill": "black"})).unwrap();
-    let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
-    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
-    d.fields.insert("angle".into(), json!(90.0));
-    d.fields.insert("__preview".into(), json!(true));
-    let ctx = egui::Context::default();
-    for rotation in [0.0f32, 30.0] {
-        let view = View { zoom: 4.0, center: [32.0, 16.0], rotation, ..app.ui.views[0].clone() };
-        let mut output = ctx.run_ui(Default::default(), |ui| {
-            canvas_view(&mut app, ui, 0, Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0)), view.clone(), true);
-        });
-        output.textures_delta.clear();
-        let overlay = crate::channel_view::ensure(&mut app, &ctx, 0, None).expect("the channel overlay");
-        let mesh = output
-            .shapes
-            .iter()
-            .find_map(|s| match &s.shape {
-                egui::Shape::Mesh(m) if m.texture_id == overlay => Some(m.clone()),
-                _ => None,
-            })
-            .expect("the overlay is painted");
-        // The quad's sides, in screen points: the two shortest distances from a corner (the
-        // third is the diagonal; a rotated view turns the quad, not its side lengths).
-        let v: Vec<Pos2> = mesh.vertices.iter().map(|v| v.pos).collect();
-        let mut d: Vec<f32> = v[1..4].iter().map(|p| v[0].distance(*p)).collect();
-        d.sort_by(f32::total_cmp);
-        let (short, long) = (d[0], d[1]);
-        // Which side is the width: the one along the view's x axis turned by the rotation.
-        let along = |p: Pos2| {
-            let r = rotation.to_radians();
-            ((p - v[0]).x * r.cos() + (p - v[0]).y * r.sin()).abs()
-        };
-        let width = v[1..4].iter().map(|p| along(*p)).fold(0.0f32, f32::max);
-        assert!((long / short - 2.0).abs() < 0.01, "rotation {rotation}: sides {short}×{long}, the preview's 1:2");
-        assert!((width - short).abs() < 0.5, "rotation {rotation}: the short side ({short}) runs across the view (width {width})");
-    }
-}
-
 #[test]
 fn inline_filter_preview_is_composited_and_recorded_once() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -801,6 +689,8 @@ fn windows_uses_a_visible_crosshair() {
 }
 
 use super::*;
+use craft::ui::canvas::RasterSource;
+use craft::ui::primitives::Revision;
 
 /// #569: displays 1 (sRGB) and 4 (Display P3) side by side, and a document filled with an
 /// sRGB colour.
@@ -819,45 +709,37 @@ fn app_on_two_displays() -> PhotocraftApp {
 }
 
 #[test]
-#[ignore = "manual texture-retention measurement on six 6 MP documents"]
-fn closed_canvas_memory_measurement() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = egui::Context::default();
-    ctx.input_mut(|i| i.max_texture_side = 8192);
-    for cycle in 1..=6 {
-        app.run("file.new", json!({"width":3000,"height":2000})).unwrap();
-        ensure_texture(&mut app, &ctx, 0, None).unwrap();
-        // Drain uploaded image deltas just as a renderer does; count live texture owners.
-        ctx.tex_manager().write().take_delta().clear();
-        app.run("file.close", json!({})).unwrap();
-        let bytes: usize = ctx.tex_manager().read().allocated().map(|(_, m)| m.bytes_used()).sum();
-        println!("closed cycle={cycle} texture_bytes={bytes} rss={:?}", photocraft_testkit::perf::current_rss_bytes());
-    }
-}
-
-#[test]
-fn closed_documents_release_navigator_but_keep_open_document_textures() {
+fn closed_documents_release_navigator_and_canvas_records() {
     let mut app = app_on_two_displays();
     let ctx = egui::Context::default();
     let first = app.session.active().unwrap().doc.clone();
-    let a = ensure_texture(&mut app, &ctx, 0, Some(1)).unwrap().0;
+    composite_revision(&mut app, &ctx, 0, Some(1));
     // The same handle ownership as navigator_texture, without requiring a GPU adapter.
     let tex = ctx.load_texture("navigator-test", egui::ColorImage::filled([64, 64], egui::Color32::WHITE), TextureOptions::LINEAR);
     let nav = tex.id();
     app.navigator_textures.insert(first.id, (std::sync::Arc::downgrade(&first), 0, 0, tex));
     app.run("file.new", json!({"width":32,"height":32})).unwrap();
     let other = app.session.active().unwrap().doc.id;
-    let b = ensure_texture(&mut app, &ctx, 1, Some(1)).unwrap().0;
+    composite_revision(&mut app, &ctx, 1, Some(1));
     drop(app.session.close(0));
     app.sync_views();
-    assert!(ctx.tex_manager().read().meta(a).is_none());
     assert!(ctx.tex_manager().read().meta(nav).is_none());
-    assert!(ctx.tex_manager().read().meta(b).is_some());
     assert!(app.canvases.keys().all(|(id, _)| *id == other));
+    assert!(app.raster_logs.keys().all(|(id, _)| *id == other), "the closed document's canvas records go");
+    assert!(!app.raster_logs.is_empty(), "the open document's stay");
     assert!(app.navigator_textures.is_empty());
-    app.session.add_document((*first).clone(), None);
-    app.sync_views();
-    assert_ne!(ensure_texture(&mut app, &ctx, 1, Some(1)).unwrap().0, a, "reopening a preserved ID creates a fresh texture");
+}
+
+/// The revision of document `idx`'s canvas composite on `output` this pass, recorded as shown, as a display draws it.
+fn composite_revision(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Revision {
+    let prep = CompositePrep::new(app, ctx, idx, output).expect("an open document");
+    prep.source(app).revision()
+}
+
+/// How many document pixels document 0's canvas composite redraws since it showed `seen`; `None` for all of them.
+fn redrawn_since(app: &mut PhotocraftApp, ctx: &egui::Context, seen: Revision) -> Option<i64> {
+    let prep = CompositePrep::new(app, ctx, 0, None).expect("an open document");
+    prep.source(app).damage(seen).map(|r| i64::from(r.width()) * i64::from(r.height()))
 }
 
 #[test]
@@ -884,216 +766,6 @@ fn only_themes_with_a_dot_pattern_tile_the_canvas_surround() {
     assert!(!tiles(&ctx, ThemeKind::Pro));
     assert!(!tiles(&ctx, ThemeKind::ProMedium));
     assert_eq!(uploaded(&ctx), 1, "only Studio's dots were uploaded");
-}
-
-#[test]
-fn closed_documents_release_cpu_canvas_textures() {
-    let mut app = app_on_two_displays();
-    let ctx = egui::Context::default();
-    let original = app.session.active().unwrap().doc.clone();
-    for cycle in 0..12 {
-        if cycle > 0 {
-            app.session.add_document((*original).clone(), None);
-            app.sync_views();
-        }
-        let a = ensure_texture(&mut app, &ctx, 0, Some(1)).unwrap().0;
-        let b = ensure_texture(&mut app, &ctx, 0, Some(4)).unwrap().0;
-        assert_ne!(a, b);
-        app.run("file.close", json!({})).unwrap();
-        assert!(app.canvases.is_empty(), "closed canvas metadata retained at cycle {cycle}");
-        assert!(ctx.tex_manager().read().meta(a).is_none(), "first display texture retained");
-        assert!(ctx.tex_manager().read().meta(b).is_none(), "second display texture retained");
-    }
-}
-
-#[test]
-fn cpu_canvas_textures_are_per_display() {
-    // Two windows of one document on different displays: each has its own texture of
-    // monitor values, and drawing them in turn re-renders neither.
-    let mut app = app_on_two_displays();
-    let ctx = egui::Context::default();
-    let id = app.session.documents()[0].doc.id;
-    let a = ensure_texture(&mut app, &ctx, 0, Some(1)).unwrap().0;
-    let b = ensure_texture(&mut app, &ctx, 0, Some(4)).unwrap().0;
-    assert_ne!(a, b);
-    app.perf.last_refresh = "";
-    for _ in 0..3 {
-        assert_eq!(ensure_texture(&mut app, &ctx, 0, Some(1)).unwrap().0, a);
-        assert_eq!(ensure_texture(&mut app, &ctx, 0, Some(4)).unwrap().0, b);
-    }
-    assert_eq!(app.perf.last_refresh, "", "no re-render");
-    let doc = app.session.documents()[0].doc.clone();
-    assert!(canvas_display(&app, &doc, Some(1)).0.unwrap().is_identity());
-    assert!(!canvas_display(&app, &doc, Some(4)).0.unwrap().is_identity());
-    assert_ne!(app.canvases[&(id, 1)].tex_preview_key, app.canvases[&(id, 4)].tex_preview_key);
-    // An edit updates both.
-    app.run("edit.fill", json!({"color": "#2060c0"})).unwrap();
-    ensure_texture(&mut app, &ctx, 0, Some(1));
-    ensure_texture(&mut app, &ctx, 0, Some(4));
-    let rev = app.session.documents()[0].revision;
-    assert_eq!((app.canvases[&(id, 1)].tex_revision, app.canvases[&(id, 4)].tex_revision), (rev, rev));
-}
-
-#[test]
-fn cpu_canvas_shows_crisp_pixels_when_zoomed_in() {
-    // #4810: above 100% the CPU canvas shows each pixel as a square, like the GPU canvas's
-    // sharp nearest filter; below 100% it still filters. Both the first upload and a
-    // damage-rect update carry the sampling, since the renderer takes it from each delta.
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    app.run("file.new", json!({"width": 2, "height": 2})).unwrap();
-    let ctx = egui::Context::default();
-    let tex = ensure_texture(&mut app, &ctx, 0, None).unwrap().0;
-    let uploads = |ctx: &egui::Context| {
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let seen = delta.set.get(&tex).into_iter().flatten().map(|d| (d.pos.is_some(), d.options)).collect::<Vec<_>>();
-        delta.clear();
-        seen
-    };
-    let crisp = TextureOptions { magnification: egui::TextureFilter::Nearest, ..TextureOptions::LINEAR };
-    assert_eq!(uploads(&ctx), vec![(false, crisp)]);
-    app.run("select.rect", json!({"x": 0, "y": 0, "width": 1, "height": 1})).unwrap();
-    ensure_texture(&mut app, &ctx, 0, None).unwrap();
-    uploads(&ctx);
-    app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
-    assert_eq!(ensure_texture(&mut app, &ctx, 0, None).unwrap().0, tex);
-    assert_eq!(uploads(&ctx), vec![(true, crisp)], "a partial update keeps the crisp sampling");
-}
-
-/// A device that allows smaller textures than MAX_TEXTURE (2048 on some older GPUs and WebGL
-/// contexts, and on the fallback adapter the GPU tests sometimes get under load): the canvas
-/// texture is reduced to fit it. A 2600 px document was uploaded at full size, which egui
-/// asserts on and the backend can't create.
-#[test]
-fn cpu_canvas_texture_fits_the_device_limit() {
-    for (side, (w, h), want) in [(2048, (2600, 1700), [1300, 850]), (2048, (5000, 2000), [1666, 666]), (8192, (5000, 2000), [2500, 1000])] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.run("file.new", json!({"width": w, "height": h})).unwrap();
-        let ctx = egui::Context::default();
-        ctx.input_mut(|i| i.max_texture_side = side);
-        let (tex, _) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let sizes: Vec<_> = delta.set.get(&tex).into_iter().flatten().map(|d| d.image.size()).collect();
-        delta.clear();
-        assert_eq!(sizes, vec![want], "{w}x{h} on a {side} px device");
-    }
-}
-
-#[test]
-fn cpu_canvas_of_a_reduced_document_stays_bilinear() {
-    // Over MAX_TEXTURE the texture holds one texel per `factor` pixels: a texel is not a
-    // document pixel, so showing it as a square would draw blocks that aren't in the image.
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    app.run("file.new", json!({"width": MAX_TEXTURE + 1, "height": 2})).unwrap();
-    let ctx = egui::Context::default();
-    let (tex, scale) = ensure_texture(&mut app, &ctx, 0, None).unwrap();
-    assert!(scale < 1.0);
-    let mut delta = ctx.tex_manager().write().take_delta();
-    let uploads: Vec<_> = delta.set.get(&tex).into_iter().flatten().map(|d| d.options).collect();
-    delta.clear();
-    assert_eq!(uploads, vec![TextureOptions::LINEAR]);
-}
-
-/// #7568: a document over the texture limit was drawn from one reduced texture, so at 100 %
-/// it was magnified and blurred. The view now gets the part in sight at one texel per
-/// document pixel, about the window's size, whatever the device's limit.
-#[test]
-fn cpu_canvas_detail_plan_shows_large_documents_at_full_resolution() {
-    let size = [12000, 8000];
-    // A 1920×1080 view in the middle (`visible_doc_rect` adds 2 px around it).
-    let screen = DRect::new(4998, 2998, 6922, 4082);
-    for limit in [16384, 8192, 4096, 2048] {
-        let side = clamp_texture_side(limit);
-        assert!(texture_factor(size, side) > 1, "the whole document is reduced on a {limit} px device");
-        for zoom in [1.0, 2.0, 8.0] {
-            let plan = detail_plan(size, side, zoom, screen).unwrap_or_else(|| panic!("{limit} px device at {zoom}"));
-            assert_eq!(plan.factor, 1, "one texel per document pixel at {zoom} on a {limit} px device");
-            assert!(plan.region.contains_rect(&screen), "{plan:?}");
-            assert!(plan.region.width() <= 1924 + 2 * 256 && plan.region.height() <= 1084 + 2 * 256, "about the view's size: {plan:?}");
-            assert!(plan.region.width() < side && plan.region.height() < side, "{plan:?}");
-        }
-    }
-    // A small pan reuses the region (no new composite).
-    assert_eq!(detail_plan(size, 4096, 1.0, screen), detail_plan(size, 4096, 1.0, screen.translate(8, -8)));
-    // A window wider than a small device's limit coarsens rather than exceed it.
-    let wide = DRect::new(0, 0, 3000, 2000);
-    let plan = detail_plan(size, 2048, 1.0, wide).unwrap();
-    assert_eq!(plan.factor, 2);
-    assert!(plan.region.width() / 2 < 2048 && plan.region.contains_rect(&wide), "{plan:?}");
-    // Zoomed out a little: finer than the reduced whole, as fine as the screen.
-    let plan = detail_plan(size, 4096, 0.4, DRect::new(0, 0, 4800, 2700)).unwrap();
-    assert_eq!(plan.factor, 2);
-    // Zoomed out far enough, the reduced whole is as fine as the screen: nothing to add.
-    let whole = DRect::new(0, 0, 12000, 8000);
-    assert_eq!(detail_plan(size, 4096, 0.25, whole), None);
-    assert_eq!(detail_plan(size, 4096, 1.0 / 3.0, whole), None, "a detail as large as the document would not fit");
-    // A document that fits is uploaded whole at full resolution.
-    assert_eq!(detail_plan([4000, 3000], 4096, 1.0, screen), None);
-    // Nothing of the document in view, or a broken zoom.
-    assert_eq!(detail_plan(size, 4096, 1.0, DRect::new(-500, -500, -10, -10)), None);
-    for zoom in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-        assert_eq!(detail_plan(size, 4096, zoom, screen), None, "{zoom}");
-    }
-    assert_eq!(detail_plan([0, 0], 4096, 1.0, screen), None);
-    assert_eq!(detail_plan([u32::MAX, 8], 4096, 1.0, screen), None);
-}
-
-#[test]
-fn cpu_canvas_detail_shows_a_large_documents_own_pixels_at_100_percent() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    app.run("file.new", json!({"width": 3 * MAX_TEXTURE, "height": 8})).unwrap();
-    app.run("select.rect", json!({"x": 101, "y": 0, "width": 1, "height": 8})).unwrap();
-    app.run("edit.fill", json!({"color": "#000000"})).unwrap();
-    app.run("select.deselect", json!({})).unwrap();
-    let ctx = egui::Context::default();
-    ctx.input_mut(|i| i.max_texture_side = 16384);
-    let uploads = |ctx: &egui::Context, tex: egui::TextureId| {
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let seen: Vec<_> = delta.set.get(&tex).into_iter().flatten().map(|d| (d.pos, d.options, d.image.clone())).collect();
-        delta.clear();
-        seen
-    };
-    let row = |image: &egui::ImageData| {
-        let egui::ImageData::Color(image) = image;
-        (image.size, image.pixels.clone())
-    };
-    let view = InView { visible: DRect::new(0, 0, 1000, 8), zoom: 1.0, key: 1 };
-    let t = ensure_texture_in_view(&mut app, &ctx, 0, None, Some(view)).unwrap();
-    assert!(t.scale < 1.0, "the whole document is reduced");
-    let (detail, area) = t.detail.expect("a detail texture at 100 %");
-    assert_eq!(area, [0.0, 0.0, 1024.0, 8.0]);
-    let crisp = TextureOptions { magnification: egui::TextureFilter::Nearest, ..TextureOptions::LINEAR };
-    let up = uploads(&ctx, detail);
-    assert_eq!(up.len(), 1);
-    let (pos, options, image) = &up[0];
-    assert_eq!((*pos, *options), (None, crisp));
-    let (size, px) = row(image);
-    assert_eq!(size, [1024, 8]);
-    assert_eq!((px[100], px[101], px[102]), (Color32::WHITE, Color32::BLACK, Color32::WHITE), "the 1 px line stays 1 px");
-    // Unchanged: nothing is composited again, and a small pan keeps the region.
-    let panned = InView { visible: DRect::new(4, 0, 1004, 8), ..view };
-    assert_eq!(ensure_texture_in_view(&mut app, &ctx, 0, None, Some(panned)).unwrap().detail, Some((detail, area)));
-    assert!(uploads(&ctx, detail).is_empty());
-    // The Navigator's call (no view) leaves the view's detail alone.
-    ensure_texture(&mut app, &ctx, 0, None).unwrap();
-    assert_eq!(app.canvases.values().map(|c| c.detail.len()).sum::<usize>(), 1);
-    // An edit in view updates just its texels.
-    app.run("select.rect", json!({"x": 300, "y": 0, "width": 1, "height": 8})).unwrap();
-    ensure_texture_in_view(&mut app, &ctx, 0, None, Some(view)).unwrap();
-    uploads(&ctx, detail);
-    app.run("edit.fill", json!({"color": "#000000"})).unwrap();
-    assert_eq!(ensure_texture_in_view(&mut app, &ctx, 0, None, Some(view)).unwrap().detail.map(|d| d.0), Some(detail));
-    let up = uploads(&ctx, detail);
-    assert_eq!(up.len(), 1);
-    let (pos, options, image) = &up[0];
-    assert_eq!(*options, crisp);
-    let [x, y] = pos.expect("a partial update");
-    let (size, px) = row(image);
-    assert!(y == 0 && x < 300 && x + size[0] > 300, "the edit's texels: {x} {size:?}");
-    assert_eq!((px[299 - x], px[300 - x]), (Color32::WHITE, Color32::BLACK));
-    // Zoomed out, the reduced texture is enough: the detail goes.
-    let far = InView { zoom: 0.25, ..view };
-    assert!(ensure_texture_in_view(&mut app, &ctx, 0, None, Some(far)).unwrap().detail.is_none());
-    assert!(app.canvases.values().all(|c| c.detail.is_empty()));
 }
 
 #[test]
@@ -2024,186 +1696,6 @@ fn alt_with_a_painting_tool_samples_the_foreground_instead_of_painting() {
     assert!(!alt_samples(Tool::Eraser, alt), "⌥ with the Eraser is not the Eyedropper");
 }
 
-/// #2078: the opaque mask-view texture must show the live stroke, not cover it with
-/// the committed mask until the mouse is released.
-#[test]
-fn mask_view_uploads_each_live_stroke_before_release() {
-    for depth in [8, 16, 32] {
-        for mode in ["gray", "overlay"] {
-            for (width, factor) in [(120u32, 1u32), (513, 3)] {
-                let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-                app.run("file.new", json!({"width": width, "height": 60, "depth": depth})).unwrap();
-                app.run("layer.layerMask.revealAll", json!({})).unwrap();
-                app.run("view.layerMask", json!({"mode": mode})).unwrap();
-                app.run("tools.setColors", json!({"foreground": [0.0, 0.0, 0.0, 1.0]})).unwrap();
-                app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0, "smoothing": {"amount": 0.0}}})).unwrap();
-                app.ui.tool = Tool::Brush;
-                let ctx = egui::Context::default();
-                ctx.input_mut(|i| i.max_texture_side = 256);
-                let tex = crate::channel_view::ensure(&mut app, &ctx, 0, None).unwrap();
-                ctx.tex_manager().write().take_delta().clear();
-                let revision = app.session.documents()[0].revision;
-                let steps = app.session.documents()[0].history.past_len();
-                let layer = app.session.documents()[0].active_layer.unwrap();
-                let original = app.session.documents()[0].doc.layer(layer).unwrap().clone();
-                tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
-                for x in [30.0, 50.0, 70.0] {
-                    tool_event(&mut app, ToolEvent::Move { x, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
-                    let shown = display_doc(&mut app, 0).0;
-                    assert!(shown.layer(layer).unwrap().mask.as_ref().unwrap().value(x as i32, 30) < 0.1);
-                    assert_eq!(crate::channel_view::ensure(&mut app, &ctx, 0, None), Some(tex));
-                    let mut delta = ctx.tex_manager().write().take_delta();
-                    let uploads = delta.set.get(&tex).unwrap_or_else(|| panic!("{depth}-bit {mode}: live mask texture must upload before release at {x}"));
-                    assert_eq!(uploads.len(), 1);
-                    let upload = &uploads[0];
-                    let pos = upload.pos.expect("only the damaged region is uploaded");
-                    let egui::ImageData::Color(image) = &upload.image;
-                    assert!(image.pixels.len() < (width.div_ceil(factor) * 60u32.div_ceil(factor)) as usize, "the whole mask is not uploaded");
-                    let f = factor as i32;
-                    let r = DRect::new(pos[0] as i32 * f, pos[1] as i32 * f, (pos[0] + image.size[0]) as i32 * f, (pos[1] + image.size[1]) as i32 * f)
-                        .intersect(&shown.bounds());
-                    let expected = crate::channel_view::render(
-                        &shown,
-                        &app.session.documents()[0].channel_view,
-                        r,
-                        factor,
-                        crate::channel_view::Look::default(),
-                        app.session.documents()[0].active_layer,
-                    )
-                    .unwrap();
-                    assert_eq!(image.pixels, expected, "uploaded mask values match the live stroke");
-                    delta.clear();
-                    assert_eq!(app.session.documents()[0].revision, revision);
-                    assert_eq!(app.session.documents()[0].history.past_len(), steps);
-                    assert_eq!(app.session.documents()[0].doc.layer(layer).unwrap(), &original);
-                    crate::channel_view::ensure(&mut app, &ctx, 0, None);
-                    assert!(ctx.tex_manager().write().take_delta().set.is_empty(), "idle frame does not upload");
-                }
-                tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 30.0 }, egui::Modifiers::NONE);
-                let st = &app.session.documents()[0];
-                assert_eq!(st.history.past_len(), steps + 1);
-                assert!(st.doc.layer(layer).unwrap().mask.as_ref().unwrap().value(50, 30) < 0.1);
-                assert_eq!(st.doc.layer(layer).unwrap().content, original.content);
-                crate::channel_view::ensure(&mut app, &ctx, 0, None);
-                let mut delta = ctx.tex_manager().write().take_delta();
-                // The commit takes the live stroke's pixels, which the texture already shows: at
-                // most a partial upload, never the whole mask again.
-                assert!(delta.set.get(&tex).is_none_or(|u| u.iter().all(|u| u.pos.is_some())), "commit keeps its partial upload");
-                delta.clear();
-                app.session.undo();
-                assert_eq!(app.session.documents()[0].doc.layer(layer).unwrap(), &original);
-                crate::channel_view::ensure(&mut app, &ctx, 0, None);
-                let mut delta = ctx.tex_manager().write().take_delta();
-                let upload = &delta.set.get(&tex).unwrap()[0];
-                let egui::ImageData::Color(image) = &upload.image;
-                let st = &app.session.documents()[0];
-                // Undo redraws only the tiles the stroke changed (#9329): a partial upload of them.
-                let f = factor as i32;
-                let pos = upload.pos.expect("undo uploads only the changed tiles, not the whole mask");
-                let r = DRect::new(pos[0] as i32 * f, pos[1] as i32 * f, (pos[0] + image.size[0]) as i32 * f, (pos[1] + image.size[1]) as i32 * f)
-                    .intersect(&st.doc.bounds());
-                // It covers the stroke's span (x 10..70 along y 30, size 12), so it
-                // proves coverage and not only values.
-                assert!(r.contains_rect(&DRect::new(10, 26, 70, 34)), "undo covers the stroke: {r:?}");
-                assert_eq!(
-                    image.pixels,
-                    crate::channel_view::render(&st.doc, &st.channel_view, r, factor, crate::channel_view::Look::default(), st.active_layer).unwrap(),
-                    "undo restores the shown mask"
-                );
-                delta.clear();
-            }
-        }
-    }
-}
-
-#[test]
-fn channel_views_show_live_targets_and_discarded_strokes() {
-    for target in ["quickMask", "alpha", "red"] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.run("file.new", json!({"width": 120, "height": 60})).unwrap();
-        match target {
-            "quickMask" => {
-                app.run("select.rect", json!({"x": 0, "y": 0, "width": 120, "height": 60})).unwrap();
-                app.run("select.editInQuickMaskMode", json!({})).unwrap();
-            }
-            "alpha" => {
-                app.run("channel.new", json!({"fill": "white"})).unwrap();
-            }
-            _ => {
-                app.run("channel.target", json!({"channel": "red"})).unwrap();
-            }
-        }
-        app.run("tools.setColors", json!({"foreground": [0.0, 0.0, 0.0, 1.0]})).unwrap();
-        app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0, "smoothing": {"amount": 0.0}}})).unwrap();
-        app.ui.tool = Tool::Brush;
-        let ctx = egui::Context::default();
-        let tex = crate::channel_view::ensure(&mut app, &ctx, 0, None).unwrap();
-        ctx.tex_manager().write().take_delta().clear();
-        let original = app.session.documents()[0].doc.clone();
-        let steps = app.session.documents()[0].history.past_len();
-        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
-        tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
-        let shown = display_doc(&mut app, 0).0;
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let upload = &delta.set.get(&tex).expect("live channel upload")[0];
-        let pos = upload.pos.expect("partial channel upload");
-        let egui::ImageData::Color(image) = &upload.image;
-        let r = DRect::new(pos[0] as i32, pos[1] as i32, (pos[0] + image.size[0]) as i32, (pos[1] + image.size[1]) as i32);
-        assert_eq!(
-            image.pixels,
-            crate::channel_view::render(
-                &shown,
-                &app.session.documents()[0].channel_view,
-                r,
-                1,
-                crate::channel_view::Look::default(),
-                app.session.documents()[0].active_layer
-            )
-            .unwrap(),
-            "{target}"
-        );
-        assert_ne!(
-            image.pixels,
-            crate::channel_view::render(
-                &original,
-                &app.session.documents()[0].channel_view,
-                r,
-                1,
-                crate::channel_view::Look::default(),
-                app.session.documents()[0].active_layer
-            )
-            .unwrap(),
-            "target was painted"
-        );
-        delta.clear();
-        assert_eq!(app.session.documents()[0].history.past_len(), steps);
-        assert!(std::sync::Arc::ptr_eq(&original, &app.session.documents()[0].doc));
-        // Dropping a preview without committing must restore its texture, even though the
-        // document revision did not change. There is no committed damage rectangle to use.
-        app.drag = None;
-        app.live_stroke = None;
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let upload = &delta.set.get(&tex).unwrap()[0];
-        assert!(upload.pos.is_none(), "discarding a preview refreshes the view");
-        let egui::ImageData::Color(image) = &upload.image;
-        assert_eq!(
-            image.pixels,
-            crate::channel_view::render(
-                &original,
-                &app.session.documents()[0].channel_view,
-                original.bounds(),
-                1,
-                crate::channel_view::Look::default(),
-                app.session.documents()[0].active_layer
-            )
-            .unwrap()
-        );
-        delta.clear();
-    }
-}
-
 /// The held drag shows true mixed paint while Alt sampling remains separate from painting.
 #[test]
 fn mixer_drag_shows_actual_mixed_paint_before_release_and_alt_never_paints() {
@@ -2452,14 +1944,12 @@ fn paste_into_refreshes_only_the_pasted_area() {
     app.run("select.rect", json!({"x": 40, "y": 40, "width": 100, "height": 100})).unwrap();
     app.run("edit.copy", json!({})).unwrap();
     app.run("select.rect", json!({"x": 500, "y": 400, "width": 90, "height": 60})).unwrap();
-    ensure_texture(&mut app, &ctx, 0, None).expect("a texture");
+    let seen = composite_revision(&mut app, &ctx, 0, None);
     let rev = app.session.active().unwrap().revision;
-    app.perf.last_refresh_px = 0;
     app.run("edit.pasteSpecial.pasteInto", json!({})).unwrap();
     assert!(app.session.active().unwrap().revision >= rev + 2, "several revisions");
-    ensure_texture(&mut app, &ctx, 0, None).expect("a texture");
-    let px = app.perf.last_refresh_px;
-    assert!(px > 0 && px < 800 * 600 / 4, "refreshed {px} px of {}", 800 * 600);
+    let px = redrawn_since(&mut app, &ctx, seen);
+    assert!(px.is_some_and(|px| px > 0 && px < 800 * 600 / 4), "redraws {px:?} px of {}", 800 * 600);
 }
 
 /// The Move tool's Auto-Select pick is its own revision that changes no pixels: the drag
@@ -2481,46 +1971,41 @@ fn auto_select_move_is_still_bounded() {
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;
     let active = app.session.active().unwrap().active_layer;
-    ensure_texture(&mut app, &ctx, 0, None).expect("a texture");
+    let seen = composite_revision(&mut app, &ctx, 0, None);
     let rev = app.session.active().unwrap().revision;
     let m = egui::Modifiers::NONE;
     tool_event(&mut app, ToolEvent::Down { x: 120.0, y: 120.0, pressure: 1.0 }, m);
     assert_ne!(app.session.active().unwrap().active_layer, active, "Auto-Select picked the red layer");
     assert_eq!(app.session.active().unwrap().revision, rev + 1, "the pick is one revision");
     tool_event(&mut app, ToolEvent::Move { x: 150.0, y: 130.0, pressure: 1.0 }, m);
-    app.perf.last_refresh_px = 0;
-    ensure_texture(&mut app, &ctx, 0, None).expect("a texture");
-    let px = app.perf.last_refresh_px;
-    assert!(px > 0 && px < 800 * 600 / 4, "refreshed {px} px of {}", 800 * 600);
+    let px = redrawn_since(&mut app, &ctx, seen);
+    assert!(px.is_some_and(|px| px > 0 && px < 800 * 600 / 4), "redraws {px:?} px of {}", 800 * 600);
     tool_event(&mut app, ToolEvent::Up { x: 150.0, y: 130.0 }, m);
 }
 
 #[test]
-fn live_stroke_uses_pen_tilt_and_updates_a_reduced_texture_partially() {
-    // Pen tilt drives the size; the preview must use the tilt the commit gets. The document
-    // is wider than MAX_TEXTURE, so the CPU texture is reduced (factor 2) and each step
-    // must update only the reduced pixels it touched.
+fn live_stroke_uses_pen_tilt_and_redraws_partially() {
+    // Pen tilt drives the size; the preview must use the tilt the commit gets, and each step
+    // redraws only the pixels it touched.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = egui::Context::default();
-    ctx.input_mut(|i| i.max_texture_side = 8192);
     app.run("file.new", json!({"width": 4097, "height": 90, "background": "transparent"})).unwrap();
     let tilt = json!({"size": 30, "hardness": 1.0, "spacing": 0.05, "shapeDynamics": {"enabled": true, "size": {"control": "penTilt"}}});
     app.run("tools.setBrush", json!({ "brush": tilt })).unwrap();
     app.ui.tool = Tool::Brush;
-    assert_eq!(ensure_texture(&mut app, &ctx, 0, None).map(|t| t.1), Some(0.5));
+    let mut seen = composite_revision(&mut app, &ctx, 0, None);
     let m = egui::Modifiers::NONE;
     app.stylus.feed.set(Some(crate::stylus::PenSample { pressure: 1.0, tilt_x: 60.0, tilt_y: 0.0, rotation: 0.0, eraser: false }));
     tool_event(&mut app, ToolEvent::Down { x: 100.0, y: 45.0, pressure: 1.0 }, m);
     for x in [300.0, 600.0, 900.0] {
         tool_event(&mut app, ToolEvent::Move { x, y: 45.0, pressure: 1.0 }, m);
-        ensure_texture(&mut app, &ctx, 0, None);
-        assert_eq!(app.perf.last_refresh, "rect");
-        assert!(app.perf.last_refresh_px < 4097 * 90 / 4, "{}", app.perf.last_refresh_px);
+        let px = redrawn_since(&mut app, &ctx, seen);
+        assert!(px.is_some_and(|px| px < 4097 * 90 / 4), "step to {x} redraws {px:?} px");
+        seen = composite_revision(&mut app, &ctx, 0, None);
     }
     let shown = display_doc(&mut app, 0).0;
     tool_event(&mut app, ToolEvent::Up { x: 900.0, y: 45.0 }, m);
-    ensure_texture(&mut app, &ctx, 0, None);
-    assert_eq!(app.perf.last_refresh, "rect", "the commit refreshes only the stroke");
+    assert!(redrawn_since(&mut app, &ctx, seen).is_some(), "the commit redraws only the stroke");
     let doc = app.session.documents()[0].doc.clone();
     let (a, b) = (doc.layers[0].surface().unwrap(), shown.layers[0].surface().unwrap());
     // 60° tilt shrinks the dab well below 30 px: the preview shows that size, as committed.
@@ -2542,20 +2027,19 @@ fn drag_frames(smoothing: f32, xs: &[f64]) -> (std::sync::Arc<Document>, std::sy
     // Catch-up on Stroke End starts off (#11887); these tests draw the catch-up tail.
     app.session.tools.brush.smoothing.catch_up_on_end = true;
     app.ui.tool = Tool::Brush;
-    ensure_texture(&mut app, &ctx, 0, None);
+    let mut seen = composite_revision(&mut app, &ctx, 0, None);
     let m = egui::Modifiers::NONE;
     tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 40.0, pressure: 1.0 }, m);
     for &x in xs {
         tool_event(&mut app, ToolEvent::Move { x, y: 40.0 + (x / 7.0).sin() * 8.0, pressure: 1.0 }, m);
-        ensure_texture(&mut app, &ctx, 0, None);
+        seen = composite_revision(&mut app, &ctx, 0, None);
     }
     let live = display_doc(&mut app, 0).0;
     let last = *xs.last().unwrap();
     tool_event(&mut app, ToolEvent::Up { x: last, y: 40.0 + (last / 7.0).sin() * 8.0 }, m);
     let (next, key) = display_doc(&mut app, 0);
     assert_eq!(key, 0, "the frame after release shows the committed document");
-    ensure_texture(&mut app, &ctx, 0, None);
-    let partial = app.perf.last_refresh == "rect";
+    let partial = redrawn_since(&mut app, &ctx, seen).is_some();
     (live, next, partial, app)
 }
 
@@ -3256,45 +2740,6 @@ fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
         let shadow =
             (0..64).flat_map(|y| (0..64).map(move |x| (x, y))).filter(|&(x, y)| !block(x, y) && without.get(x, y)[0] - with.get(x, y)[0] > 0.05).count();
         assert!(shadow > 20, "placed {placed}: the Drop Shadow is previewed ({shadow} px)");
-    }
-}
-
-#[test]
-fn wheel_anchor_is_the_pointer_over_the_image_and_the_nearest_image_point_off_it() {
-    let rect = Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0));
-    for (rotation, flip) in [(0.0, false), (30.0, false), (90.0, true)] {
-        let xf = ViewXform { rect, zoom: 0.5, center: [400.0, 300.0], flip, rotation, aspect: 1.0 };
-        let inside = xf.to_screen(100.0, 200.0);
-        assert_eq!(wheel_anchor(&xf, inside, [800, 600]), inside);
-        for (p, want) in [((-300.0, -200.0), [0.0, 0.0]), ((1200.0, 300.0), [800.0, 300.0]), ((400.0, 900.0), [400.0, 600.0])] {
-            let a = xf.to_doc(wheel_anchor(&xf, xf.to_screen(p.0, p.1), [800, 600]));
-            assert!((a[0] - want[0]).abs() < 0.01 && (a[1] - want[1]).abs() < 0.01, "rot {rotation}: {p:?} -> {a:?}");
-        }
-    }
-    let p = pos2(5.0, 5.0);
-    let xf = ViewXform { rect, zoom: 1.0, center: [400.0, 300.0], flip: false, rotation: 0.0, aspect: 1.0 };
-    assert_eq!(wheel_anchor(&xf, p, [0, 0]), p, "no document: the pointer");
-}
-
-#[test]
-fn zoom_about_centres_the_clicked_point_with_the_preference() {
-    let rect = Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0));
-    let p = pos2(600.0, 200.0);
-    for ppp in [1.0f32, 2.0] {
-        // `View::zoom` is physical; the transform works in points.
-        let xf = ViewXform { rect, zoom: 1.0 / ppp, center: [400.0, 300.0], flip: false, rotation: 0.0, aspect: 1.0 };
-        let doc = xf.to_doc(p);
-        // Off: the document point under the pointer stays under it.
-        let mut view = View { zoom: 1.0, center: [400.0, 300.0], ..Default::default() };
-        zoom_about(&mut view, &xf, p, 2.0, false, ppp);
-        let after = ViewXform { rect, zoom: 2.0 / ppp, center: view.center, flip: false, rotation: 0.0, aspect: 1.0 };
-        let s = after.to_screen(doc[0] as f32, doc[1] as f32);
-        assert!((s - p).length() < 0.5, "ppp {ppp}: {s:?} vs {p:?}");
-        // On: the clicked point is the view centre.
-        let mut view = View { zoom: 1.0, center: [400.0, 300.0], ..Default::default() };
-        zoom_about(&mut view, &xf, p, 2.0, true, ppp);
-        assert!((view.center[0] - doc[0] as f32).abs() < 0.5, "ppp {ppp}: {:?}", view.center);
-        assert!((view.center[1] - doc[1] as f32).abs() < 0.5, "ppp {ppp}: {:?}", view.center);
     }
 }
 
