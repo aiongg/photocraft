@@ -22,7 +22,7 @@ fn field_height(kind: AppTheme, height: f32) -> f32 {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, kind);
+    PhotocraftApp::setup_context(&h.ctx, kind.clone());
     h.run_steps(3);
     // The cube's hue strip is a slider named "Hue" too, so the channel rows are told by the others.
     for channel in ["Red", "Green", "Blue", "Saturation", "Brightness"] {
