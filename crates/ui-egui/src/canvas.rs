@@ -4,6 +4,8 @@
 //! update only their damage rectangle (`set_partial`). The wgpu compositor (M5) will replace this
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
+use craft::behavior::CanvasView;
+use craft::behavior::kurbo::Point;
 use craft::ui::runtime::commands::EditCommand;
 use craft::ui::runtime::focus::{EditSet, KeepKeys, KeyUse, host_canvas};
 use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
@@ -31,6 +33,7 @@ mod drag;
 mod filter_preview;
 mod gesture;
 pub mod gpu_canvas;
+mod gpu_picture;
 pub mod guide_select;
 pub mod layer_pick_ui;
 pub mod move_ui;
@@ -81,14 +84,17 @@ use cursors::{brush_tip_centre, eyedropper_ring, preview_locator_cursor, visible
 pub(crate) use display::GPU_OUTPUT;
 use display::texture_key;
 pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
-use display::{checker, hdr_preview, sync_display_lut};
+use display::checker;
+#[cfg(test)]
+use display::sync_display_lut;
 pub use drag::{Drag, DragDocument, fixed_size_px, marquee_corners, marquee_px, marquee_readout, readout_in, size_readout, square_px};
 pub(crate) use drag::{angle_readout, doc_box_corners, draw_readout, draw_value_readout};
 #[cfg(test)]
 pub(crate) use drag::{marquee_drag_ants, marquee_preview_px};
 #[cfg(test)]
 pub(crate) use filter_preview::committed_filter_preview;
-use filter_preview::{ensure_adjust_proxy, ensure_proxy_preview, filter_preview_display_doc};
+#[cfg(test)]
+use filter_preview::filter_preview_display_doc;
 pub(crate) use filter_preview::{ensure_filter_preview, filter_channel_preview, filter_preview_factor};
 #[cfg(test)]
 pub(crate) use gesture::constrained_polygon_point;
@@ -102,10 +108,11 @@ pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navig
 use paint::draw_tool_state;
 pub(crate) use paint::{clip_line, marching_ants_line_shapes, marching_ants_mapped};
 use paint::{
-    draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_gpu_view, paint_mapped_image_at,
+    draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_mapped_image_at,
     pattern_xf,
 };
 pub(crate) use raster_source::SourceLog;
+use gpu_picture::{GpuRequest, gpu_picture};
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};
@@ -135,6 +142,7 @@ pub(crate) use textures::{DetailPlan, damage_since, effect_reach, ensure_texture
 pub use textures::{MAX_TEXTURE, ensure_texture};
 #[cfg(test)]
 use textures::{clamp_texture_side, preview_bounds, texture_factor};
+#[cfg(test)]
 use textures::{ensure_gpu, redraw_focus};
 pub use tool_input::{ToolEvent, selection_drag_kind, tool_event};
 pub(crate) use tool_input::{command_guide_at, command_moves_layer, event_tool};
@@ -405,8 +413,6 @@ fn paint_canvas(
         Vec::new()
     };
     let drop_shadow = drop_shadow && !beyond && !app.ui.view.pattern_preview;
-    // Live adjustment previews on big documents use a downsampled proxy (see proxy.rs), unless
-    // Preferences › Performance › Low Resolution Previews is off.
     let mut on_gpu = false;
     // A flipped or pixel-aspect-corrected view draws through the CPU path (the GPU canvas shader
     // has no mirroring or non-square pixels). Rotation stays on the GPU: it is a view uniform.
@@ -418,87 +424,26 @@ fn paint_canvas(
             crate::render_path::view_cpu(app, doc.id.0);
         }
     }
-    if app.gpu.is_some()
-        && gpu_ok
-        && let Some((k, key, preview_size)) =
-            ensure_adjust_proxy(app, idx, render_zoom).or_else(|| ensure_filter_preview(app, idx, ctx)).or_else(|| ensure_proxy_preview(app, idx, render_zoom))
-    {
+    let picture = if gpu_ok {
+        gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target_xf, zoom: view.zoom, render_zoom })
+    } else {
+        None
+    };
+    if let Some(picture) = picture {
         on_gpu = true;
-        app.navigator_gpu.remove(&doc.id);
-        let original_size = [doc.size.width.div_ceil(k), doc.size.height.div_ceil(k)];
-        let shown = filter_preview_display_doc(app, doc, key);
-        let params = crate::gpu_canvas::ViewParams {
-            doc: key,
-            doc_size: preview_size,
-            zoom: view.zoom * k as f32 / ppp,
-            // A size-changing preview grows around the old image center; keep the view's pan.
-            center: [
-                xf.center[0] / k as f32 + (preview_size[0] as f32 - original_size[0] as f32) / 2.0,
-                xf.center[1] / k as f32 + (preview_size[1] as f32 - original_size[1] as f32) / 2.0,
-            ],
-            rotation: if view.rotation.is_finite() { view.rotation.to_radians() } else { 0.0 },
-            shadow: {
-                let t = crate::theme::Tokens::get(ctx);
-                !t.bevel && !t.pro && drop_shadow
-            },
-            pixel_grid: false,
-            view_key: egui::Id::unique(("pc-canvas-proxy", ctx.viewport_id(), idx)).value(),
-            display: sync_display_lut(app, &shown, key, output),
-            output: output.unwrap_or(0),
-            hdr: hdr_preview(app, doc),
-            offset: [0.0, 0.0],
-        };
-        paint_gpu_view(painter, rect, params, &pattern);
-    } else if gpu_ok && viewport_pages::show(app, ctx, idx, &xf, view.zoom) {
-        // Too large for the document's texture set: the pages in view, rendered in the background.
-        on_gpu = true;
-        app.perf.gpu = true;
-        let key = viewport_pages::stream_key(doc.id.0);
-        let params = crate::gpu_canvas::ViewParams {
-            doc: key,
-            doc_size: [doc.size.width, doc.size.height],
-            zoom: point_zoom,
-            center: xf.center,
-            rotation: if view.rotation.is_finite() { view.rotation.to_radians() } else { 0.0 },
-            shadow: {
-                let t = crate::theme::Tokens::get(ctx);
-                !t.bevel && !t.pro && drop_shadow
-            },
-            pixel_grid,
-            view_key: egui::Id::unique(("pc-canvas-pages", ctx.viewport_id(), doc.id.0)).value(),
-            display: sync_display_lut(app, doc, key, output),
-            output: output.unwrap_or(0),
-            hdr: hdr_preview(app, doc),
-            offset: [0.0, 0.0],
-        };
-        paint_gpu_view(painter, rect, params, &pattern);
-    } else if gpu_ok && ensure_gpu(app, ctx, idx, redraw_focus(&target_xf, &xf)) {
-        on_gpu = true;
-        app.perf.gpu = true;
         // Shadow, checkerboard, document and pixel grid in one custom shader (gpu_canvas.rs).
-        let params = crate::gpu_canvas::ViewParams {
-            doc: doc.id.0,
-            doc_size: [doc.size.width, doc.size.height],
-            zoom: point_zoom,
-            center: xf.center,
-            rotation: if view.rotation.is_finite() { view.rotation.to_radians() } else { 0.0 },
-            shadow: {
-                let t = crate::theme::Tokens::get(ctx);
-                !t.bevel && !t.pro && drop_shadow
-            },
-            pixel_grid,
-            view_key: egui::Id::unique(("pc-canvas", ctx.viewport_id(), idx)).value(),
-            display: sync_display_lut(app, doc, doc.id.0, output),
-            output: output.unwrap_or(0),
-            hdr: hdr_preview(app, doc),
-            offset: [0.0, 0.0],
-        };
-        if app.navigator_plain.contains(&doc.id) {
-            app.navigator_gpu.insert(doc.id, params);
-        } else {
-            app.navigator_gpu.remove(&doc.id);
+        let t = crate::theme::Tokens::get(ctx);
+        let picture = picture.framed(!t.bevel && !t.pro && drop_shadow, pixel_grid);
+        let canvas_view = CanvasView::new(rect, Point::new(f64::from(xf.center[0]), f64::from(xf.center[1])), f64::from(point_zoom))
+            .rotation(f64::from(view.rotation));
+        if picture.shows_document() {
+            if app.navigator_plain.contains(&doc.id) {
+                app.navigator_gpu.insert(doc.id, picture.params(&canvas_view));
+            } else {
+                app.navigator_gpu.remove(&doc.id);
+            }
         }
-        paint_gpu_view(painter, rect, params, &pattern);
+        picture.paint(painter, &canvas_view);
     } else {
         app.navigator_gpu.remove(&doc.id);
         // A document too large for one full-resolution texture also gets the part in view at
