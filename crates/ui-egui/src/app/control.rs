@@ -84,17 +84,30 @@ impl PhotocraftApp {
         });
     }
 
-    /// The synthetic input every waiting reply was queued behind has been processed.
-    pub(super) fn reply_input_processed(&mut self) {
+    /// Answers the replies waiting on injected input once the window host has run it, or fails
+    /// them when it withdrew the input.
+    pub(super) fn poll_input(&mut self, ctx: &egui::Context) {
         if let Some(channel) = self.control.as_mut() {
-            channel.input_processed();
+            channel.poll_input(&WindowHost::of(ctx));
         }
     }
 
-    /// The synthetic input was dropped: fail the replies waiting on it.
-    pub(super) fn reply_input_cancelled(&mut self, reason: &str) {
-        if let Some(channel) = self.control.as_mut() {
-            channel.input_cancelled(reason);
+    /// The active document injected input is queued for now.
+    pub(crate) fn input_target(&self) -> crate::InputTarget {
+        crate::InputTarget { document: self.session.active().map(|_| self.session.active_generation()) }
+    }
+
+    /// Before the frame's input: injected input queued for another active document (a switch away
+    /// and back included) is withdrawn, so it cannot land in the wrong document; the window host
+    /// withdraws it itself when the focus changed.
+    pub(super) fn withdraw_stale_input(&mut self, ctx: &egui::Context) {
+        let Some(queued) = self.input_queued_for else { return };
+        let host = WindowHost::of(ctx);
+        if host.injected_idle() {
+            self.input_queued_for = None;
+        } else if queued != self.input_target() {
+            host.withdraw_injected(egui::ViewportId::ROOT);
+            self.input_queued_for = None;
         }
     }
 

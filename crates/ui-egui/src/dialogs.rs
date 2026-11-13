@@ -1074,7 +1074,7 @@ pub(crate) fn confirm_preflight(app: &mut PhotocraftApp, id: u64) -> Result<(), 
     if crate::layer_style::color_picker::has_child(app, id) {
         return Err("confirm or cancel the Layer Style color picker first".into());
     }
-    // A control request installs the session gate; synthetic input sets `automation_input`.
+    // A control request installs the session gate; a pass carrying injected input sets `automation_input`.
     // Either way the handler's own file access is judged before it runs, as its command would be.
     if (app.automation_input || app.session.authorize.is_some())
         && let Some(d) = app.ui.dialogs.iter().find(|d| d.id == id)

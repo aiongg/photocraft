@@ -417,9 +417,8 @@ impl eframe::App for WebShell {
         // A tap reaches eframe as Pointer Events and Touch Events: keep one press per tap, or the
         // twin press closes the menu the first one opened (#2095).
         photocraft_ui_egui::touch_twins::drop_twins(ctx, raw_input);
-        // The browser build has no TCP control server, so `inject_synthetic` finds an empty
-        // queue, but the clipboard key mapping (`Event::PasteImage`), legacy pinch, pen-hold and
-        // titlebar normalization live in the app hook and must run here too.
+        // The clipboard key mapping (`Event::PasteImage`), legacy pinch, pen-hold and titlebar
+        // normalization live in the app hook and must run here too.
         eframe::App::raw_input_hook(&mut self.app, ctx, raw_input);
     }
 

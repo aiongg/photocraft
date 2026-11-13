@@ -56,15 +56,6 @@ pub const UI_SET_FIELDS: [&str; 49] = [
     "histogramRefresh",
 ];
 
-/// Most clicks one `ui.click` may queue (#982). Each click is a press and a release that the app
-/// feeds in its own frame before replying, so `count` sizes both the input queue and the wait;
-/// the same ceiling as the steps of one batch request.
-pub const MAX_CLICKS: u64 = 256;
-
-/// Largest `ui.click` / `ui.move` coordinate, in screen points either way (#9137). Far beyond any
-/// display, yet small enough that egui's pointer delta between two such points stays finite.
-pub const MAX_SCREEN_POINT: f64 = 1e6;
-
 pub(super) fn ok(v: Value) -> Reply {
     Reply::from_result(Ok(v))
 }
@@ -156,12 +147,10 @@ pub(super) fn whole_object<T: serde::Serialize + serde::de::DeserializeOwned>(
     serde_json::from_value(v.clone()).map(Some).map_err(|e| format!("{field}: {e}"))
 }
 
-/// The buttons `ui.pointer` and `ui.click` accept (`right` and `secondary` are the same one).
+/// The buttons `ui.pointer` accepts (`right` and `secondary` are the same one).
 pub(super) const BUTTONS: [&str; 4] = ["left", "right", "secondary", "middle"];
 
-/// The modifier flags `ui.key` reads, top-level or under `modifiers`; `ui.pointer` adds `space`.
-pub(super) const KEY_MODIFIERS: [&str; 4] = ["shift", "alt", "command", "ctrl"];
-
+/// The modifier flags `ui.pointer` reads, top-level or under `modifiers`; `space` is the momentary pan.
 pub(super) const POINTER_MODIFIERS: [&str; 5] = ["shift", "alt", "command", "ctrl", "space"];
 
 /// A synthetic input method's params (or one nested object, named `what`): an object whose keys

@@ -1,12 +1,12 @@
 use super::services::{ExportSettings, FormatChoices, SAVE_OPTIONS_OPEN, SaveKind, Services, plain_raster, saved_revision_after_write};
 use super::{
-    DocId, Document, HashMap, PhotocraftApp, Session, SyntheticTarget, Tool, UiState, Value, actions, analysis_ui, brush_panel, brush_picker, camera_raw_ui,
-    canvas, dds_options_ui, delete_layer_prompt, dialogs, discard_ui, distort_ui, dock, field_wheel, file_open, gpu_canvas, gpu_status, gradient_ui,
-    histogram_panel, i18n, jobs_ui, jpeg_options_ui, json, kys_import, last_brush, layers_panel_ui, mask_thumbs_ui, mask_trash_prompt, monitor_status,
-    native_menu, notices, open_prompt, paint_mouse, palette, panel_docking, panels, prefs_ui, preset_files_ui, preset_panels, rasterize_prompt, screen_picker,
-    shape_stroke_ui, shortcuts, single_line_drag, smart_svg_ui, state, stroke_trace, stylus, targa_options_ui, text_field_menu, theme, tiff_options_ui,
-    timeline_ui, titlebar, tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, type_transform, updates_ui, vector_ui, view_cmds, wheel_nav,
-    wide_angle_ui, widgets, work_area, workspace_ui,
+    DocId, Document, HashMap, PhotocraftApp, Session, Tool, UiState, Value, actions, analysis_ui, brush_panel, brush_picker, camera_raw_ui, canvas,
+    dds_options_ui, delete_layer_prompt, dialogs, discard_ui, distort_ui, dock, field_wheel, file_open, gpu_canvas, gpu_status, gradient_ui, histogram_panel,
+    i18n, jobs_ui, jpeg_options_ui, json, kys_import, last_brush, layers_panel_ui, mask_thumbs_ui, mask_trash_prompt, monitor_status, native_menu, notices,
+    open_prompt, paint_mouse, palette, panel_docking, panels, prefs_ui, preset_files_ui, preset_panels, rasterize_prompt, screen_picker, shape_stroke_ui,
+    shortcuts, single_line_drag, smart_svg_ui, state, stroke_trace, stylus, targa_options_ui, text_field_menu, theme, tiff_options_ui, timeline_ui, titlebar,
+    tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, type_transform, updates_ui, vector_ui, view_cmds, wheel_nav, wide_angle_ui, widgets,
+    work_area, workspace_ui,
 };
 
 mod clipboard;
@@ -134,10 +134,8 @@ impl PhotocraftApp {
             adjust_preview: None,
             live_adjust_preview: None,
             levels_clipping: None,
-            synthetic: Vec::new(),
-            synthetic_batch: None,
-            synthetic_reinject: false,
-            synthetic_snapshot: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            input_queued_for: None,
             automation_input: false,
             programmatic_playback: false,
             run_depth: 0,
@@ -290,14 +288,16 @@ impl eframe::App for PhotocraftApp {
         if cfg!(any(target_os = "windows", target_os = "linux")) && self.session.prefs().enhanced_controls.zoom_with_trackpad_pinch {
             wheel_nav::fold_legacy_pinch(ctx, raw_input);
         }
-        self.inject_synthetic(ctx, raw_input);
-        // After the control channel's own events (`ui.type`) join the OS's, before any widget.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.withdraw_stale_input(ctx);
+        // Before any widget. Injected input joins in the framework's input hook, after this one; a
+        // control request is shorter than the cap.
         widgets::cap_text_events(&mut raw_input.events);
         self.control_click.normalize(&mut raw_input.events, cfg!(target_os = "macos"));
         // A pen held still is no touch screen's press-and-hold right click (stylus.rs).
         let pen_down = self.stylus.pen_contacts.observe(&raw_input.events);
         stylus::pen_hold_is_no_right_click(ctx, pen_down);
-        // The OS's moves and the control channel's (injected just above).
+        // The OS's moves.
         let moves = raw_input.events.iter().filter(|e| matches!(e, egui::Event::PointerMoved(_))).count();
         self.perf.stage.start(frame_start, moves);
     }

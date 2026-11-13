@@ -5,6 +5,7 @@ use super::{
     theme, tiff_options_ui, timeline_ui, titlebar, tool_cursor, tool_memory, transform_tool, type_panels_ui, type_tool, updates_ui, vector_ui, view_cmds,
     wide_angle_ui, work_area, workspace_ui,
 };
+use craft::ui::runtime::windows::WindowHost;
 
 impl PhotocraftApp {
     /// Close this frame's stage record (`frame_stages`): keep it if it was slow, and hand it to
@@ -54,9 +55,11 @@ impl PhotocraftApp {
     pub fn logic_frame(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.cap_frame_rate();
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
-        // Caps Lock state read from the OS once per frame (see `Services::caps_lock`): the canvas
-        // cursor block needs it before the frame renders. `None` (Wayland/web) keeps `false`.
-        self.caps_lock = self.services.caps_lock.as_mut().is_some_and(|f| f());
+        // Caps Lock once per frame: the state injected input holds (`ui.capsLock`), else the OS's
+        // (`Services::caps_lock`); the canvas cursor block needs it before the frame renders.
+        // `None` (Wayland/web) keeps `false`.
+        let services = &mut self.services;
+        self.caps_lock = WindowHost::of(ctx).injected_caps_lock().unwrap_or_else(|| services.caps_lock.as_mut().is_some_and(|f| f()));
         tool_cursor::set_wayland(ctx, self.services.is_wayland);
         if !self.styled {
             Self::setup_context(ctx, self.ui.theme.clone());
@@ -160,8 +163,8 @@ impl PhotocraftApp {
         // A hidden host runs no UI pass: a queued (or re-queued) capture asks for one. An issued
         // capture's own `Screenshot` command forces its paint; asking again would spin a hidden
         // window while a slow readback is in flight. Synthetic input queued during hidden ticks
-        // needs the same wake: its events sit in eframe's preserved input until a UI pass.
-        if capture_unissued || self.synthetic_batch.is_some() || !self.synthetic.is_empty() {
+        // needs the same wake: its steps wait for UI passes.
+        if capture_unissued || !WindowHost::of(ctx).injected_idle() {
             ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaintWhileHidden);
         }
         self.poll_file_dialog(ctx, Some(frame));
@@ -188,17 +191,14 @@ impl PhotocraftApp {
         // only this phase counts toward settling.
         #[cfg(not(target_arch = "wasm32"))]
         self.note_capture_pass(&ctx);
-        // A real UI pass consumes the one in-flight synthetic batch (see `inject_synthetic`).
-        self.begin_synthetic_pass(&ctx);
+        // A pass whose input carries an injected step acts for the automation client.
+        self.automation_input = WindowHost::of(&ctx).injected_pass();
         self.hover_layer = None;
         // The contextual task bar reports itself again if this frame draws it (#10890).
         self.ui.task_bar_shown = None;
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
         // Fonts registered via set_fonts only take effect next frame; named families would panic now.
         if !self.fonts_ready {
-            // egui consumed this pass's input without PhotoCraft handling it: keep the synthetic
-            // batch for the next pass instead of losing the step.
-            self.defer_synthetic_pass();
             ctx.request_repaint();
             self.automation_input = false;
             // No editor was drawn this pass: end its IME context rather than keep a stale owner.
@@ -231,21 +231,10 @@ impl PhotocraftApp {
         if !drawn {
             return;
         }
-        // This pass handled its input: the in-flight synthetic batch is delivered once and the
-        // next step may be injected on the next frame.
-        self.finish_synthetic_pass();
-        // Synthetic input is injected one press/release step per frame: keep frames coming until
-        // the queue is empty, then release control replies waiting on it.
-        // Only a pass that reached the end of the UI and delivered the in-flight batch counts as
-        // settled input; an early-returning pass keeps the batch (and the waiting replies).
-        let input_queued = !self.synthetic.is_empty() || self.synthetic_batch.is_some();
-        if input_queued {
-            ctx.request_repaint();
-        }
+        // The window host injects one step per pass and asks for the next pass itself; once it has
+        // run every step, the replies waiting on them are answered.
         #[cfg(not(target_arch = "wasm32"))]
-        if !input_queued {
-            self.reply_input_processed();
-        }
+        self.poll_input(&ctx);
         // A menu or dialog can start a filter after `jobs_ui::tick` ran in this frame. Keep
         // polling it even when the platform would otherwise put the event loop to sleep.
         jobs_ui::keep_polling(self, &ctx);
@@ -295,8 +284,6 @@ impl PhotocraftApp {
                     screen_picker::cancel(&ctx);
                 }
             });
-            // This pass handled its input (the modal above ran): deliver the synthetic batch.
-            self.finish_synthetic_pass();
             self.automation_input = false;
             type_tool::sync_ime(self, &ctx);
             gpu_status::check_window(self, &ctx);
