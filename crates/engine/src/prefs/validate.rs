@@ -1,9 +1,9 @@
 use super::shortcuts::normalize_shortcut;
 use super::{
-    AppearanceMode, Ask, CanvasBorder, CanvasColor, CheckerColors, CheckerSize, ColorPicker, DarkTheme, ExportLocation, ExportMetadata, FontPreview,
-    GpuBackend, Interpolation, LightTheme, LineStyle, LinuxDisplayServer, LogDestination, LogDetail, OtherCursor, PaintingCursor, PlaybackPerformance,
+    AppearanceMode, Ask, CanvasBorder, CanvasColor, CheckerColors, CheckerSize, ColorPicker, ExportLocation, ExportMetadata, FontPreview,
+    GpuBackend, Interpolation, LineStyle, LinuxDisplayServer, LogDestination, LogDetail, OtherCursor, PaintingCursor, PlaybackPerformance,
     PointSize, PressureCurve, QuickExportFormat, RawColorSpace, RawDemosaic, RawDepth, RawSharpen, RenderingMode, RightClickPaint, TabletInput, TextEngine,
-    Theme, TypeUnit, UiFontSize, UiScale, Unit, Value,
+    TypeUnit, UiFontSize, UiScale, Unit, Value,
 };
 
 /// Preferences dialog sections in Photoshop's order: (id, title).
@@ -69,10 +69,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
     Some(match path {
         "general.colorPicker" => ColorPicker::NAMES,
         "general.imageInterpolation" => Interpolation::NAMES,
-        "interface.theme" => Theme::NAMES,
         "interface.appearanceMode" => AppearanceMode::NAMES,
-        "interface.darkTheme" => DarkTheme::NAMES,
-        "interface.lightTheme" => LightTheme::NAMES,
         "interface.canvasColor" => CanvasColor::NAMES,
         "interface.canvasBorder" => CanvasBorder::NAMES,
         "interface.uiScale" => UiScale::NAMES,
@@ -218,18 +215,22 @@ pub(super) fn set_path(root: &mut Value, path: &str, value: Value) -> std::resul
 
 /// Validate one value for `path` before it is stored (choices, ranges, colours).
 pub(super) fn check_value(path: &str, v: &Value) -> std::result::Result<(), String> {
+    if matches!(path, "interface.darkTheme" | "interface.lightTheme") && !v.as_str().is_some_and(super::theme_ids::is_id) {
+        return Err(format!("`{path}` must be a theme id"));
+    }
     if path == "interface.favoriteThemes" {
         let items = v.as_array().ok_or("`interface.favoriteThemes` must be a list of theme ids")?;
-        if items.len() > Theme::NAMES.len() {
+        if items.len() > super::theme_ids::MAX_FAVORITES {
             return Err("`interface.favoriteThemes` contains too many themes".into());
         }
-        let mut seen = Vec::with_capacity(items.len());
+        let mut seen: Vec<String> = Vec::with_capacity(items.len());
         for item in items {
-            let theme = item.as_str().and_then(Theme::parse).ok_or_else(|| format!("unknown favorite theme `{item}`"))?;
-            if seen.contains(&theme) {
-                return Err(format!("duplicate favorite theme `{}`", theme.name()));
+            let id = item.as_str().filter(|s| super::theme_ids::is_id(s)).ok_or_else(|| format!("unknown favorite theme `{item}`"))?;
+            let id = super::theme_ids::id_of(id);
+            if seen.contains(&id) {
+                return Err(format!("duplicate favorite theme `{id}`"));
             }
-            seen.push(theme);
+            seen.push(id);
         }
     }
     if matches!(path, "performance.renderingMode" | "performance.memoryUsagePercent") && v.is_null() {

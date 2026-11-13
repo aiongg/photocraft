@@ -56,10 +56,7 @@ choice!(TypeUnit { Points = "points", Pixels = "pixels", Millimeters = "mm" } de
 choice!(PointSize { PostScript = "postScript", Traditional = "traditional" } default PostScript);
 choice!(Interpolation { BicubicAutomatic = "bicubicAutomatic", Nearest = "nearestNeighbor", Bilinear = "bilinear", Bicubic = "bicubic", BicubicSmoother = "bicubicSmoother", BicubicSharper = "bicubicSharper", PreserveDetails = "preserveDetails" } default BicubicAutomatic);
 choice!(ColorPicker { Adobe = "adobe", System = "system" } default Adobe);
-choice!(Theme { Pro = "pro", ProMedium = "proMedium", ProLightGray = "proLightGray", ProLight = "proLight", Studio = "studio", StudioLight = "studioLight", Classic = "classic", SolarizedDark = "solarizedDark", Adwaita = "adwaita", AdwaitaDark = "adwaitaDark", BreezeLight = "breezeLight", BreezeDark = "breezeDark", SoftDark = "softDark", SoftLight = "softLight" } default ProMedium);
 choice!(AppearanceMode { Auto = "auto", Dark = "dark", Light = "light" } default Dark);
-choice!(DarkTheme { Pro = "pro", ProMedium = "proMedium", Studio = "studio", SolarizedDark = "solarizedDark", AdwaitaDark = "adwaitaDark", BreezeDark = "breezeDark", SoftDark = "softDark" } default ProMedium);
-choice!(LightTheme { ProLight = "proLight", ProLightGray = "proLightGray", StudioLight = "studioLight", Classic = "classic", Adwaita = "adwaita", BreezeLight = "breezeLight", SoftLight = "softLight" } default ProLight);
 choice!(CanvasColor { Default = "default", Black = "black", DarkGray = "darkGray", MediumGray = "mediumGray", LightGray = "lightGray", Custom = "custom" } default Default);
 choice!(CanvasBorder { DropShadow = "dropShadow", Line = "line", None = "none" } default DropShadow);
 choice!(UiScale { Auto = "auto", P75 = "75", P80 = "80", P85 = "85", P90 = "90", P95 = "95", P100 = "100", P105 = "105", P110 = "110", P115 = "115", P120 = "120", P125 = "125", P150 = "150", P175 = "175", P200 = "200", P250 = "250", P300 = "300" } default Auto);
@@ -337,13 +334,16 @@ impl Default for General {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Interface {
-    /// Legacy single-theme preference, retained for old automation and saved settings.
-    pub theme: Theme,
     pub appearance_mode: AppearanceMode,
-    pub dark_theme: DarkTheme,
-    pub light_theme: LightTheme,
-    /// Theme shortcuts shown in the appearance button's context menu.
-    pub favorite_themes: Vec<Theme>,
+    /// The theme id of the dark slot (`craft.artcraft`, a library theme's id, ...); a name saved before theme ids reads as its id.
+    #[serde(deserialize_with = "theme_ids::theme")]
+    pub dark_theme: String,
+    /// The theme id of the light slot.
+    #[serde(deserialize_with = "theme_ids::theme")]
+    pub light_theme: String,
+    /// Theme ids shown in the appearance button's context menu.
+    #[serde(deserialize_with = "theme_ids::themes")]
+    pub favorite_themes: Vec<String>,
     /// Pasteboard colour in standard screen mode (`canvasCustomColor` when "custom").
     pub canvas_color: CanvasColor,
     pub canvas_custom_color: String,
@@ -391,10 +391,9 @@ pub struct Interface {
 impl Default for Interface {
     fn default() -> Self {
         Self {
-            theme: Theme::ProMedium,
             appearance_mode: AppearanceMode::Dark,
-            dark_theme: DarkTheme::ProMedium,
-            light_theme: LightTheme::ProLight,
+            dark_theme: "craft.artcraft".into(),
+            light_theme: "craft.pro".into(),
             favorite_themes: Vec::new(),
             canvas_color: CanvasColor::Default,
             canvas_custom_color: "#282828".into(),
@@ -534,6 +533,8 @@ pub use shortcuts::{
 use store::read_lenient;
 pub use store::{InvalidPref, PREFS_VERSION, PrefsStore, read_section};
 pub use validate::{HIDDEN_UNTIL_IMPLEMENTED, LINUX_ONLY, SECTIONS, choices, gpu_adapter_matches, is_color, is_hidden, parse_hex, range};
+#[path = "prefs/theme_ids.rs"]
+pub mod theme_ids;
 use validate::{check_value, get_path, keyed, set_path};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1464,6 +1465,17 @@ impl Preferences {
             }
             _ => value,
         };
+        if path == "interface.theme" {
+            // The pre-id single-theme preference: a legacy name picks the slot of its mode.
+            let (id, dark) = value.as_str().and_then(theme_ids::legacy).ok_or_else(|| format!("unknown theme `{value}`"))?;
+            if dark {
+                self.interface.dark_theme = id.into();
+            } else {
+                self.interface.light_theme = id.into();
+            }
+            self.interface.appearance_mode = if dark { AppearanceMode::Dark } else { AppearanceMode::Light };
+            return Ok(());
+        }
         check_value(path, &value)?;
         let mut root = self.to_json();
         set_path(&mut root, path, value)?;
@@ -1635,19 +1647,12 @@ impl Session {
         // appearance instead of silently switching established users to Auto.
         if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
             && !interface.contains_key("appearanceMode")
-            && let Some(theme) = interface.get("theme").and_then(Value::as_str).and_then(Theme::parse)
+            && let Some((id, dark)) = interface.get("theme").and_then(Value::as_str).and_then(theme_ids::legacy)
         {
-            let (mode, slot) = match theme {
-                Theme::Pro | Theme::ProMedium | Theme::Studio | Theme::SolarizedDark | Theme::AdwaitaDark | Theme::BreezeDark | Theme::SoftDark => {
-                    ("dark", "darkTheme")
-                }
-                Theme::StudioLight | Theme::ProLightGray | Theme::ProLight | Theme::Classic | Theme::Adwaita | Theme::BreezeLight | Theme::SoftLight => {
-                    ("light", "lightTheme")
-                }
-            };
+            let (mode, slot) = if dark { ("dark", "darkTheme") } else { ("light", "lightTheme") };
             interface.insert("appearanceMode".into(), json!(mode));
             // A partially migrated file may already contain a newer theme selection (#5139).
-            interface.entry(slot).or_insert_with(|| json!(theme.name()));
+            interface.entry(slot).or_insert_with(|| json!(id));
         }
         // The Serbian interface catalog was `sr`; since the catalogs moved to craft-i18n it is
         // `sr-latn`, the same Latin text. A saved `sr` loads as `sr-latn` and is saved that way next.
@@ -1746,68 +1751,6 @@ impl Session {
         }
         if next.actions.create_single_history_state != self.prefs().actions.create_single_history_state && crate::actions_cmds::history_policy_in_use(self) {
             return Err("cannot change action history settings during playback".into());
-        }
-        // Old `prefs.set interface.theme` clients (by path or inside a section object) still
-        // select a visible theme.
-        if path == "interface.theme" || next.interface.theme != self.prefs().interface.theme {
-            match next.interface.theme {
-                Theme::Pro => {
-                    next.interface.dark_theme = DarkTheme::Pro;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::ProMedium => {
-                    next.interface.dark_theme = DarkTheme::ProMedium;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::Studio => {
-                    next.interface.dark_theme = DarkTheme::Studio;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::StudioLight => {
-                    next.interface.light_theme = LightTheme::StudioLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::ProLightGray => {
-                    next.interface.light_theme = LightTheme::ProLightGray;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::ProLight => {
-                    next.interface.light_theme = LightTheme::ProLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::Classic => {
-                    next.interface.light_theme = LightTheme::Classic;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::Adwaita => {
-                    next.interface.light_theme = LightTheme::Adwaita;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::SolarizedDark => {
-                    next.interface.dark_theme = DarkTheme::SolarizedDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::AdwaitaDark => {
-                    next.interface.dark_theme = DarkTheme::AdwaitaDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::BreezeDark => {
-                    next.interface.dark_theme = DarkTheme::BreezeDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::BreezeLight => {
-                    next.interface.light_theme = LightTheme::BreezeLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-                Theme::SoftDark => {
-                    next.interface.dark_theme = DarkTheme::SoftDark;
-                    next.interface.appearance_mode = AppearanceMode::Dark;
-                }
-                Theme::SoftLight => {
-                    next.interface.light_theme = LightTheme::SoftLight;
-                    next.interface.appearance_mode = AppearanceMode::Light;
-                }
-            }
         }
         self.prefs.edit(|p| *p = next);
         Ok(color_changed)
