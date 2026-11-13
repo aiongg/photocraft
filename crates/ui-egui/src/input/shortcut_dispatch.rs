@@ -235,7 +235,7 @@ fn key_owner(app: &PhotocraftApp, ctx: &egui::Context) -> (bool, usize, bool, bo
     let distort = app.distort.active() || app.distort.gallery.is_some();
     (
         crate::menu_nav::is_open(ctx),
-        app.ui.dialogs.len(),
+        app.dialog_count(),
         app.discard.is_some(),
         distort,
         app.ui.text_edit.is_some(),

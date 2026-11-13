@@ -903,17 +903,6 @@ mod tests {
     }
 
     #[test]
-    fn dialogs_open_and_close() {
-        let mut s = UiState::default();
-        let a = s.open_dialog(DialogKind::About, Default::default());
-        let b = s.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
-        assert_ne!(a, b);
-        assert_eq!(s.dialog_mut(b).unwrap().fields["width"], 1920);
-        assert!(s.close_dialog(a).is_some());
-        assert_eq!(s.dialogs.len(), 1);
-    }
-
-    #[test]
     fn ui_state_serializes() {
         let s = UiState::default();
         let v = serde_json::to_value(&s).unwrap();

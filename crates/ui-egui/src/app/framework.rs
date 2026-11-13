@@ -408,7 +408,11 @@ impl PhotocraftApp {
     pub fn close_dialog(&mut self, id: u64) -> Option<Dialog> {
         let at = self.ui.dialogs.iter().position(|d| d.id == id)?;
         self.framework.dialogs.close_beside(stack_id(id));
-        Some(self.ui.dialogs.remove(at))
+        let closed = self.ui.dialogs.remove(at);
+        // Closing a dialog also closes the ones opened over it: the two lists never part.
+        let host = &self.framework.dialogs;
+        self.ui.dialogs.retain(|d| host.stack().ids().any(|s| s == stack_id(d.id)));
+        Some(closed)
     }
 
     /// Closes PhotoCraft's own dialogs for which `keep` is false, each as [`close_dialog`](Self::close_dialog) does.
@@ -423,6 +427,11 @@ impl PhotocraftApp {
     /// take no input.
     pub fn dialog_open(&self) -> bool {
         !self.framework.dialogs.stack().is_empty()
+    }
+
+    /// How many dialogs are open, PhotoCraft's own and framework ones.
+    pub fn dialog_count(&self) -> usize {
+        self.framework.dialogs.stack().ids().count()
     }
 }
 
