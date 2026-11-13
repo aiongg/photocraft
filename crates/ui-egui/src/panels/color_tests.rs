@@ -86,7 +86,11 @@ fn field_gestures_recolour_the_selected_shape_in_separate_steps() {
     // (gesture, from, to): a click where from == to.
     let gestures = [("the click", at(0.05, 0.1), at(0.05, 0.1)), ("a drag", at(0.3, 0.3), at(0.9, 0.8)), ("the next drag", at(0.7, 0.4), at(0.3, 0.9))];
     for (n, (gesture, from, to)) in gestures.into_iter().enumerate() {
-        if from == to { click(&mut h, from) } else { drag(&mut h, from, to) }
+        if from == to {
+            click(&mut h, from)
+        } else {
+            drag(&mut h, from, to)
+        }
         assert!(takes_foreground(h.state()), "{gesture}");
         assert_eq!(steps(h.state()), before + n + 1, "{gesture} is one step");
     }
