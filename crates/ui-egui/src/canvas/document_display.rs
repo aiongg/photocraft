@@ -48,21 +48,43 @@ pub(crate) fn view_xform(view: &CanvasView) -> ViewXform {
     }
 }
 
-/// The id of document `idx`'s canvas in `viewport`, under which the canvas keeps its zoom ease.
-pub(crate) fn canvas_id(idx: usize, viewport: egui::ViewportId) -> egui::Id {
-    egui::Id::unique(("pc-canvas", idx, viewport))
+/// Where a document canvas is shown: document `idx` in `viewport`, in document window `window` (Window › New Window,
+/// a floating document) or in the main document area (`None`). One document can show in both in one viewport, so the
+/// window is part of the canvas's identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct CanvasHost {
+    pub idx: usize,
+    pub viewport: egui::ViewportId,
+    pub window: Option<u64>,
 }
 
-/// The id of PhotoCraft's tool widget over document `idx`'s canvas in `viewport`.
-pub(crate) fn tool_widget(idx: usize, viewport: egui::ViewportId) -> egui::Id {
-    egui::Id::unique(("pc-canvas-tools", idx, viewport))
+impl CanvasHost {
+    /// Document `idx`'s canvas in the main window's document area.
+    pub(crate) fn main(idx: usize) -> Self {
+        Self { idx, viewport: egui::ViewportId::ROOT, window: None }
+    }
+
+    /// Document `idx`'s canvas as it is drawn now: in `ctx`'s viewport, in the document window being drawn, if any.
+    pub(crate) fn drawn(app: &PhotocraftApp, ctx: &egui::Context, idx: usize) -> Self {
+        Self { idx, viewport: ctx.viewport_id(), window: app.drawing_window }
+    }
+
+    /// The canvas's id, under which it keeps its zoom ease.
+    pub(crate) fn canvas_id(self) -> egui::Id {
+        egui::Id::unique(("pc-canvas", self))
+    }
+
+    /// The id of PhotoCraft's tool widget over the canvas.
+    pub(crate) fn tool_widget(self) -> egui::Id {
+        egui::Id::unique(("pc-canvas-tools", self))
+    }
 }
 
-/// The zoom (device pixels per document pixel at `ppp`) and centre document view `idx` shows on its canvas in
-/// `viewport`: the view on screen of the canvas's zoom ease while one runs, else `view`'s own. For the mapping and the
-/// panels that read the view outside the canvas's pass.
-pub(crate) fn shown_camera(ctx: Option<&egui::Context>, idx: usize, viewport: egui::ViewportId, view: &View, ppp: f32) -> (f32, [f32; 2]) {
-    match ctx.and_then(|ctx| easing_view(ctx, canvas_id(idx, viewport))) {
+/// The zoom (device pixels per document pixel at `ppp`) and centre the document view shows on `host`'s canvas: the
+/// view on screen of the canvas's zoom ease while one runs, else `view`'s own. For the mapping and the panels that
+/// read the view outside the canvas's pass.
+pub(crate) fn shown_camera(ctx: Option<&egui::Context>, host: CanvasHost, view: &View, ppp: f32) -> (f32, [f32; 2]) {
+    match ctx.and_then(|ctx| easing_view(ctx, host.canvas_id())) {
         Some(eased) => ((eased.zoom * f64::from(ppp)) as f32, [eased.center.x as f32, eased.center.y as f32]),
         None => (view.zoom, view.center),
     }
@@ -91,7 +113,7 @@ pub(crate) fn navigation(app: &PhotocraftApp) -> NavigationOptions {
 /// One document view's canvas this pass.
 pub(crate) struct CanvasPass<'a> {
     pub ctx: &'a egui::Context,
-    pub idx: usize,
+    pub host: CanvasHost,
     pub doc: &'a std::sync::Arc<Document>,
     /// The display the canvas is on (`None`: the main window's).
     pub output: Option<u32>,
@@ -111,14 +133,14 @@ enum Prepared {
     Cpu(CompositePrep),
 }
 
-/// Shows document `pass.idx` in a framework `Canvas` over `pass.rect` through `view`: the canvas folds the wheel,
+/// Shows document `pass.host.idx` in a framework `Canvas` over `pass.rect` through `view`: the canvas folds the wheel,
 /// pinch, page keys, view commands and the Overscroll clamp into the view, eases PhotoCraft's own eased zooms, and its
 /// body draws the document's picture. `view` is the view after the canvas's pass; the view the canvas shows is
 /// returned.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, pass: &CanvasPass<'_>) -> CanvasView {
-    let (ctx, idx, doc, output, rect, ppp) = (pass.ctx, pass.idx, pass.doc, pass.output, pass.rect, pass.ppp);
+    let (ctx, idx, doc, output, rect, ppp) = (pass.ctx, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
     let given = view.canvas_view(rect, ppp, pass.flip, pass.aspect);
-    let id = canvas_id(idx, ctx.viewport_id());
+    let id = pass.host.canvas_id();
     // A discrete zoom eases from the view it was asked for in.
     let from = view.zoom_from.map_or(given, |(zoom, center)| View { zoom, center, ..view.clone() }.canvas_view(rect, ppp, pass.flip, pass.aspect));
     let ease = view.zoom_animating.then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
@@ -188,7 +210,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let overlay = overlay.map(|prep| prep.source(app));
     let bounds = gpu.as_ref().map(GpuPicture::bounds).or_else(|| composite.as_ref().map(|c| c.bounds())).unwrap_or_else(|| doc.bounds());
     let mapping = (bounds != doc.bounds()).then(|| placement(bounds));
-    let widget = tool_widget(idx, ctx.viewport_id());
+    let widget = pass.host.tool_widget();
 
     let mut bound = given;
     let mut canvas = Canvas::new(label.clone())

@@ -188,9 +188,19 @@ fn a_channel_view_draws_its_own_picture() {
     assert_eq!(composite[6], Color32::WHITE, "the composite stays the document's");
 }
 
+/// The proxy preview is the GPU canvas's: without a GPU a large document's adjustment previews through the CPU proxy,
+/// and the layer path shows nothing (`adjust_preview::cheap`).
 #[test]
 fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the_document() {
-    let mut app = app_with(2400, 2200, "#808080");
+    let _gpu = photocraft_testkit::gpu_lock();
+    let rs = match std::panic::catch_unwind(|| egui_kittest::wgpu::create_render_state(crate::gpu_canvas::wgpu_setup(), Default::default())) {
+        Ok(rs) => rs,
+        Err(error) if std::env::var_os("PHOTOCRAFT_REQUIRE_GPU_TESTS").is_some() => std::panic::resume_unwind(error),
+        Err(_) => return,
+    };
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.set_wgpu(rs);
+    app.run("file.new", json!({"width": 2400, "height": 2200, "background": "#808080"})).unwrap();
     let st = app.session.active().unwrap();
     assert!(crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(&app)) > 1, "large enough for a proxy preview");
     // Only the red channel shows: an opaque view over the composite.

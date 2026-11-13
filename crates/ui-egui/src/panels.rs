@@ -323,7 +323,8 @@ mod navigator_wheel_tests {
         v.zoom = 2.0;
         pass(&mut app, 0.1);
         let painted = pass(&mut app, 0.15);
-        let (zoom, center) = crate::canvas::document_display::shown_camera(Some(&ctx), 0, egui::ViewportId::ROOT, &app.ui.views[0], app.canvas_ppp());
+        let (zoom, center) =
+            crate::canvas::document_display::shown_camera(Some(&ctx), crate::canvas::document_display::CanvasHost::main(0), &app.ui.views[0], app.canvas_ppp());
         assert!(zoom > 1.0 && zoom < 2.0, "the canvas eases: {zoom}");
         let preview = last_navigator_preview(&ctx).unwrap();
         let scale = preview.width() / 200.0;

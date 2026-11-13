@@ -90,7 +90,7 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         let view = pass(&mut app, view, 0.1);
         let view = pass(&mut app, view, 0.15);
         let ppp = ctx.pixels_per_point();
-        let shown = super::document_display::shown_camera(Some(&ctx), 0, egui::ViewportId::ROOT, &view, ppp).0;
+        let shown = super::document_display::shown_camera(Some(&ctx), super::document_display::CanvasHost::main(0), &view, ppp).0;
         assert!(shown > 1.0 && shown < 2.0, "{tool:?}: the canvas's ease is between the endpoints, {shown}");
         assert_eq!(view.zoom, 2.0, "{tool:?}: the requested zoom stays the target");
     }

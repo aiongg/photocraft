@@ -477,8 +477,8 @@ fn populated_canvas_keeps_a_real_opacity_edit_after_floating_and_redocking() {
             crate::panels::title_bar(app, ui);
             crate::panels::options_bar(app, ui);
             crate::panels::toolbar(app, ui);
+            // The dock's canvas tile draws the document area, as in the app's docking layout.
             crate::panels::dock_area(app, ui);
-            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,
     );
