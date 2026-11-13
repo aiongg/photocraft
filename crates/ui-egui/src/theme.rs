@@ -18,7 +18,7 @@
 //!
 //! Widgets read [`Tokens::get`] instead of hard-coding colours, so every theme applies everywhere.
 
-use craft::theme::{ColorToken, ThemeId};
+use craft::theme::{ColorToken, ThemeDef, ThemeId};
 use craft::ui::fonts::UiFonts;
 use egui::{Color32, CornerRadius, FontData, FontFamily, FontId, Stroke, TextStyle, Visuals};
 use photocraft_engine::prefs::UiFontSize;
@@ -141,10 +141,24 @@ impl Palette {
 /// The theme on screen: a suite theme in the mode shown, with the tokens PhotoCraft draws it with.
 /// The themes PhotoCraft has palettes for (see [`AppTheme::all`]) keep them; any other suite theme
 /// (a library theme, `craft.graphite`) takes its tokens from craft-theme's resolved tokens.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct AppTheme {
     id: ThemeId,
     tokens: Tokens,
+    /// The definition the tokens were resolved from, which the runtime resolves its own from;
+    /// `None` for a theme shown with PhotoCraft's palette.
+    library: Option<Arc<ThemeDef>>,
+}
+
+impl PartialEq for AppTheme {
+    fn eq(&self, other: &Self) -> bool {
+        let same_library = match (&self.library, &other.library) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b) || a == b,
+            (None, None) => true,
+            _ => false,
+        };
+        self.id == other.id && self.tokens == other.tokens && same_library
+    }
 }
 
 impl Default for AppTheme {
@@ -157,7 +171,7 @@ impl Default for AppTheme {
 impl From<Palette> for AppTheme {
     fn from(palette: Palette) -> Self {
         let (id, _) = palette.theme();
-        AppTheme { id: ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default()), tokens: Tokens::for_palette(palette) }
+        AppTheme { id: ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default()), tokens: Tokens::for_palette(palette), library: None }
     }
 }
 
@@ -202,9 +216,9 @@ impl AppTheme {
         Palette::of(id, dark).map(Self::from)
     }
 
-    /// Suite theme `id` shown in the dark or light mode with the tokens craft-theme resolved for it.
-    pub fn resolved(id: &ThemeId, dark: bool, resolved: &craft::theme::Resolved) -> Self {
-        AppTheme { id: id.clone(), tokens: Tokens::from_resolved(&resolved.tokens, dark) }
+    /// Suite theme `def` shown in the dark or light mode with the tokens craft-theme resolved from it.
+    pub fn resolved(def: Arc<ThemeDef>, dark: bool, resolved: &craft::theme::Resolved) -> Self {
+        AppTheme { id: def.id.clone(), tokens: Tokens::from_resolved(&resolved.tokens, dark), library: Some(def) }
     }
 
     /// The name PhotoCraft's Appearance settings give a theme it has a palette for.
@@ -214,6 +228,11 @@ impl AppTheme {
 
     pub fn id(&self) -> &ThemeId {
         &self.id
+    }
+
+    /// The suite definition of a theme PhotoCraft has no palette for.
+    pub fn library(&self) -> Option<&Arc<ThemeDef>> {
+        self.library.as_ref()
     }
 
     pub fn tokens(&self) -> Tokens {
