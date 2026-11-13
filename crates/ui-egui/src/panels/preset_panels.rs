@@ -20,9 +20,11 @@ use crate::theme::Tokens;
 
 mod panels;
 
-pub use super::preset_browser::{patterns_panel, styles_panel};
 pub(crate) use super::preset_browser::pattern_picker;
-pub use panels::{clone_sample_point, clone_source_panel, finish_custom_shape, gradients_panel, select_tool_preset, shape_picker, shapes_panel, tool_presets_panel, windows};
+pub use super::preset_browser::{patterns_panel, styles_panel};
+pub use panels::{
+    clone_sample_point, clone_source_panel, finish_custom_shape, gradients_panel, select_tool_preset, shape_picker, shapes_panel, tool_presets_panel, windows,
+};
 #[cfg(test)]
 use panels::{new_tool_preset_params, tool_id};
 

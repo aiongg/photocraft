@@ -4,12 +4,12 @@
 
 use craft::ui::contract::{Bind, DropZone, Show as _};
 use craft::ui::list::ThumbAspect;
-use craft::ui::tile_grid::TileZoom;
 use craft::ui::patterns::presets::{
     DefaultOpen, PresetBrowser, PresetEvent, PresetFooterEvent, PresetFooterOptions, PresetPicker, PresetReorder, PresetRow, PresetState,
 };
 use craft::ui::primitives::ContentPainterCx;
 use craft::ui::primitives::textures::TextureCache;
+use craft::ui::tile_grid::TileZoom;
 use egui::{Color32, ColorImage, Pos2, Rect, pos2};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -39,8 +39,10 @@ pub(crate) struct PresetPanel {
     rename_new: bool,
 }
 
-pub(crate) const PATTERNS: PresetPanel = PresetPanel { id: "patterns", label: "Patterns", prefix: "pattern.presets", new_params: || json!({}), rename_new: false };
-pub(crate) const STYLES: PresetPanel = PresetPanel { id: "styles", label: "Styles", prefix: "style.presets", new_params: || json!({"name": "Style"}), rename_new: true };
+pub(crate) const PATTERNS: PresetPanel =
+    PresetPanel { id: "patterns", label: "Patterns", prefix: "pattern.presets", new_params: || json!({}), rename_new: false };
+pub(crate) const STYLES: PresetPanel =
+    PresetPanel { id: "styles", label: "Styles", prefix: "style.presets", new_params: || json!({"name": "Style"}), rename_new: true };
 
 /// A folder of a panel: its name and its presets as (key, name).
 pub(crate) struct Folder {
@@ -301,8 +303,9 @@ fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, names
     for event in events {
         let selected = app.ui.presets_ui.selected.get(panel.id).cloned();
         let Some(act) = panel_act(panel, &event).or_else(|| act(panel, &event, rows, selected.as_deref())) else { continue };
-        if let PresetEvent::Select { key: PresetKey::Item(key), .. } | PresetEvent::Activate { key: PresetKey::Item(key), .. } | PresetEvent::DropAt { key: PresetKey::Item(key), .. } =
-            &event
+        if let PresetEvent::Select { key: PresetKey::Item(key), .. }
+        | PresetEvent::Activate { key: PresetKey::Item(key), .. }
+        | PresetEvent::DropAt { key: PresetKey::Item(key), .. } = &event
         {
             app.ui.presets_ui.selected.insert(panel.id.into(), key.clone());
         }
