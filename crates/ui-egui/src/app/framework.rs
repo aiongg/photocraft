@@ -61,6 +61,8 @@ pub struct Framework {
     suite: SuiteClient,
     /// The theme slots and mode as PhotoCraft's preferences and the suite last agreed on them.
     synced: Option<ThemePrefs>,
+    /// The preferences' rev `synced` was taken at: with no suite move since, nothing to sync.
+    synced_rev: Option<u64>,
     /// Whether the start's agreement ran: the suite's chosen fields over the preferences, once the
     /// suite's selection is read.
     started: bool,
@@ -78,7 +80,7 @@ pub(crate) enum ThemeUnavailable {
 }
 
 impl ThemeUnavailable {
-    /// The refusal for theme `id`.
+    /// The message for theme `id`: a refusal for an unknown one, a note for one still loading.
     pub(crate) fn message(self, id: &ThemeId) -> String {
         match self {
             ThemeUnavailable::Loading | ThemeUnavailable::NotPicked => format!("theme `{id}` is still loading"),
@@ -171,6 +173,7 @@ impl Default for Framework {
             chrome_toggles: Vec::new(),
             suite: SuiteClient::memory(),
             synced: None,
+            synced_rev: None,
             started: false,
         }
     }
@@ -218,6 +221,7 @@ impl Framework {
         let options = StoreOptions::new(concat!("photocraft ", env!("CARGO_PKG_VERSION")));
         self.suite = SuiteClient::new(SuiteWatch::open(&SuiteDir::resolve(false), options, move || ctx.request_repaint()));
         self.synced = None;
+        self.synced_rev = None;
         self.started = false;
     }
 
@@ -225,11 +229,15 @@ impl Framework {
     /// preferences goes to the suite, a change another app made to the suite goes to the
     /// preferences. At the start, once the suite's selection is read, the suite's chosen fields
     /// win and the preferences' own choices fill the fields it has not chosen; until then the
-    /// preferences show. Returns whether the theme on screen may need to change.
+    /// preferences show. Runs only when the suite moved or the preferences changed. Returns
+    /// whether the theme on screen may need to change.
     pub(crate) fn sync_theme(&mut self, session: &mut Session) -> bool {
         let moved = self.suite.sync();
+        if !moved && self.synced_rev == Some(session.prefs.rev()) {
+            return false;
+        }
         let mine = ThemePrefs::of(session.prefs());
-        let suite = ThemePrefs::of_suite(&self.suite.shown());
+        let suite = moved.then(|| ThemePrefs::of_suite(&self.suite.shown()));
         let previous = self.synced.take();
         let agreed = match &previous {
             _ if !self.suite.selection_read() => mine.clone(),
@@ -261,8 +269,10 @@ impl Framework {
                 self.suite.change(mine.change_from(agreed));
                 mine.clone()
             }
-            Some(agreed) if moved && suite != *agreed => suite,
-            Some(agreed) => agreed.clone(),
+            Some(agreed) => match suite {
+                Some(suite) if suite != *agreed => suite,
+                _ => agreed.clone(),
+            },
             None => mine.clone(),
         };
         if agreed != mine {
@@ -274,29 +284,40 @@ impl Framework {
         }
         let changed = moved || previous.as_ref() != Some(&agreed);
         self.synced = Some(agreed);
+        self.synced_rev = Some(session.prefs.rev());
         changed
     }
 
     /// The theme `id` to show in the dark or light mode: PhotoCraft's palette for it, else its
     /// tokens resolved from the suite's definition under the root's contrast, size and sizes, as
-    /// the runtime resolves its own. A theme the suite doesn't know shows as the default theme.
+    /// the runtime resolves its own. A theme the suite can't resolve shows as PhotoCraft's default
+    /// for the mode.
     pub(crate) fn theme_for(&self, id: &ThemeId, dark: bool, ctx: &egui::Context) -> AppTheme {
         if let Some(theme) = AppTheme::palette(id, dark) {
             return theme;
         }
-        let Some(def) = self.suite.theme(id) else { return AppTheme::default() };
+        let Some(def) = self.suite.theme(id) else {
+            let defaults = defaults().theme;
+            return AppTheme::palette(if dark { &defaults.dark } else { &defaults.light }, dark).unwrap_or_default();
+        };
         let root = base_root().mode(if dark { ModeChoice::Dark } else { ModeChoice::Light });
         let resolved = resolve_sized(&def, root.appearance(ctx), None, &root.sizes);
         AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
+    /// The suite, for tests that put themes in its library.
+    #[cfg(test)]
+    pub(crate) fn suite(&self) -> &SuiteClient {
+        &self.suite
+    }
+
     /// Whether theme `id` can show now: the suite has it as a built-in or a loaded library theme.
     pub(crate) fn theme_availability(&self, id: &ThemeId) -> Result<(), ThemeUnavailable> {
-        if self.suite.theme(id).is_some() {
+        if self.suite.has_theme(id) {
             Ok(())
         } else if self.suite.is_loading(id) {
             Err(ThemeUnavailable::Loading)
-        } else if self.suite.preview(id).is_some() {
+        } else if self.suite.in_library(id) {
             Err(ThemeUnavailable::NotPicked)
         } else {
             Err(ThemeUnavailable::Unknown)
@@ -341,7 +362,7 @@ impl PhotocraftApp {
             self.framework.set_overrides(rev, chrome);
         }
         if self.framework.sync_theme(&mut self.session) {
-            crate::prefs_ui::sync_appearance(self, ctx);
+            crate::prefs_ui::show_selected_theme(self, ctx);
         }
         embed::before_input(ctx, |output: FrameOutput| {
             self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));

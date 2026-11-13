@@ -36,13 +36,18 @@ pub fn pasteboard_color(app: &PhotocraftApp) -> Option<Color32> {
 /// The suite theme and mode the preferences show: the slot of the appearance mode, which `Auto`
 /// takes from the system.
 pub(super) fn selected_theme(interface: &prefs::Interface, system: Option<egui::Theme>) -> (ThemeId, bool) {
+    let (slot, dark) = selected_slot(interface, system);
+    (ThemeId::parse(slot).unwrap_or_else(|_| ThemeId::suite_default()), dark)
+}
+
+/// The theme id the mode shows, as the preferences hold it, and whether that mode is dark.
+fn selected_slot(interface: &prefs::Interface, system: Option<egui::Theme>) -> (&str, bool) {
     let light = match interface.appearance_mode {
         AppearanceMode::Light => true,
         AppearanceMode::Dark => false,
         AppearanceMode::Auto => system == Some(egui::Theme::Light),
     };
-    let slot = if light { &interface.light_theme } else { &interface.dark_theme };
-    (ThemeId::parse(slot).unwrap_or_else(|_| ThemeId::suite_default()), !light)
+    (if light { &interface.light_theme } else { &interface.dark_theme }, !light)
 }
 
 pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -55,11 +60,7 @@ pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
         app.ui.status = e;
         return;
     }
-    let (id, dark) = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
-    let selected = app.framework.theme_for(&id, dark, ctx);
-    if app.ui.theme != selected {
-        app.apply_theme(ctx, selected);
-    }
+    sync_appearance(app, ctx);
 }
 
 /// Darken Interface (⇧⌘F1, `lighter` false) and Lighten Interface (⇧⌘F2): the next of
@@ -157,11 +158,23 @@ pub(super) fn sync_tooltips(app: &PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// Resolve the saved appearance mode without changing it or either theme slot.
+/// Shows the theme the saved appearance mode and slots select, without changing them, when it
+/// isn't the one on screen. Runs every frame, so it only compares the slot's id and the mode.
 pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A restored or embedding-supplied pin must not suppress native appearance events.
     ctx.set_theme(egui::ThemePreference::System);
     // The native service also covers Wayland sessions where winit has no system theme.
+    let (slot, dark) = selected_slot(&app.session.prefs().interface, system_theme(app, ctx));
+    if slot == app.ui.theme.id().as_str() && dark == app.ui.theme.is_dark() {
+        return;
+    }
+    show_selected_theme(app, ctx);
+}
+
+/// Resolves the theme the saved appearance mode and slots select and shows it when it differs
+/// from the one on screen: also after the suite moved (`Framework::sync_theme`), when a library
+/// theme's definition may have changed under the same id.
+pub(crate) fn show_selected_theme(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let (id, dark) = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
     // A library theme the suite is loading: the current look stays until the suite's read shows it.
     if app.framework.theme_availability(&id) == Err(crate::app::framework::ThemeUnavailable::Loading) {

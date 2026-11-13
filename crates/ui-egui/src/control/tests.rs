@@ -1365,6 +1365,36 @@ fn ui_set_theme_takes_ids_and_pre_id_names_and_refuses_unknown_themes() {
     }
 }
 
+/// `ui.set {theme}` with a library theme the suite has in its library but hasn't loaded picks it
+/// for the slot and answers ok with a note; the look stays until the suite's read shows it.
+#[test]
+fn ui_set_theme_picks_a_library_theme_the_suite_has_not_loaded() {
+    use craft::theme_store::{
+        Op,
+        testing::{SAMPLE_THEME_ID, SAMPLE_THEME_JSON},
+    };
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    app.framework.suite().watch().request(Op::Import { bytes: std::sync::Arc::from(SAMPLE_THEME_JSON.as_bytes()), as_copy: false });
+    app.framework.sync_theme(&mut app.session);
+    let before = app.ui.theme.clone();
+
+    let r = call(&mut app, &ctx, "ui.set", json!({"theme": SAMPLE_THEME_ID}));
+    assert_eq!(r["ok"], true, "{r}");
+    assert!(r.to_string().contains("still loading"), "{r}");
+    assert_eq!(app.session.prefs().interface.dark_theme, SAMPLE_THEME_ID);
+    crate::prefs_ui::sync_appearance(&mut app, &ctx);
+    assert_eq!(app.ui.theme, before, "the look stays while the suite loads the theme");
+
+    for _ in 0..4 {
+        if app.framework.sync_theme(&mut app.session) {
+            crate::prefs_ui::show_selected_theme(&mut app, &ctx);
+        }
+    }
+    assert_eq!(app.ui.theme.id().as_str(), SAMPLE_THEME_ID);
+    assert!(app.ui.theme.is_dark());
+}
+
 #[test]
 fn ui_window_open_rejects_an_unknown_document_index() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

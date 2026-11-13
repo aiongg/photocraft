@@ -46,15 +46,32 @@ impl PhotocraftApp {
         self.run("prefs.set", serde_json::json!({"values": {slot: id.as_str(), "interface.appearanceMode": mode}})).map(drop)
     }
 
-    /// Checks that theme `id` can show now, for `ui.set` and Window › Theme. A library theme
-    /// nothing picked yet is picked like an Appearance settings pick (`save_theme_choice`) and
-    /// refused as still loading; the suite's read of it shows it.
-    pub(crate) fn ready_theme(&mut self, id: &craft::theme::ThemeId, dark: bool) -> Result<(), String> {
-        let Err(why) = self.framework.theme_availability(id) else { return Ok(()) };
-        if why == super::framework::ThemeUnavailable::NotPicked {
-            self.save_theme_choice(id, dark)?;
+    /// Refuses theme `id` for `ui.set` and Window › Theme when the suite doesn't know it.
+    pub(crate) fn check_theme(&self, id: &craft::theme::ThemeId) -> Result<(), String> {
+        match self.framework.theme_availability(id) {
+            Err(why @ super::framework::ThemeUnavailable::Unknown) => Err(why.message(id)),
+            _ => Ok(()),
         }
-        Err(why.message(id))
+    }
+
+    /// Picks theme `id` for the dark or light slot (one [`check_theme`](Self::check_theme)
+    /// passed): shown now when the suite has it, else saved like an Appearance settings pick, and
+    /// the suite's read of it shows it. Returns the note for a theme still loading.
+    pub(crate) fn pick_theme(&mut self, ctx: &egui::Context, id: &craft::theme::ThemeId, dark: bool) -> Option<String> {
+        let Err(why) = self.framework.theme_availability(id) else {
+            let theme = self.framework.theme_for(id, dark, ctx);
+            self.set_theme(ctx, theme);
+            return None;
+        };
+        if let Err(e) = self.save_theme_choice(id, dark) {
+            self.ui.status = e;
+        }
+        // The suite takes the pick now, so the slot reads as loading from this frame on and the
+        // current look stays until the suite's read shows the theme.
+        if self.framework.sync_theme(&mut self.session) {
+            crate::prefs_ui::show_selected_theme(self, ctx);
+        }
+        Some(why.message(id))
     }
 
     pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {
