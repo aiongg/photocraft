@@ -2,6 +2,7 @@
 //! the strip, keeps whole titles on the tabs it shows, and moves the rest into a » menu (whole
 //! app, real tree).
 
+use egui::accesskit::Role;
 use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -32,6 +33,12 @@ fn strip(h: &Harness<'_, PhotocraftApp>) -> TabStrip {
     h.state().tab_strip.clone().expect("the strip is drawn")
 }
 
+/// Whether the strip shows a tab titled `title`. The document's canvas and its picture carry the title too.
+fn tab_shown(h: &Harness<'_, PhotocraftApp>, title: &str) -> bool {
+    let title = title.to_owned();
+    h.query_by(move |n| !matches!(n.role(), Role::Canvas | Role::Image) && n.label().as_deref() == Some(title.as_str())).is_some()
+}
+
 fn has_menu(h: &Harness<'_, PhotocraftApp>) -> bool {
     h.query_by_label("More documents").is_some()
 }
@@ -49,7 +56,7 @@ fn overflowing_tabs_stay_on_the_strip_and_the_rest_move_to_the_menu() {
     // The active document is the first thing the fit keeps: its tab is on the strip, not behind
     // the menu, however many tabs are open (#1276).
     let title = pro_tab_title(h.state(), h.state().session.active_index().unwrap());
-    assert!(h.query_by_label(&title).is_some(), "the active tab is on the strip: {title}");
+    assert!(tab_shown(&h, &title), "the active tab is on the strip: {title}");
 }
 
 #[test]
@@ -59,7 +66,7 @@ fn the_active_document_brings_its_tab_onto_the_strip() {
         h.state_mut().session.set_active(pick);
         h.run_steps(2);
         let title = pro_tab_title(h.state(), pick);
-        assert!(h.query_by_label(&title).is_some(), "tab {pick} is focused on the strip: {title}");
+        assert!(tab_shown(&h, &title), "tab {pick} is focused on the strip: {title}");
     }
 }
 
@@ -70,7 +77,7 @@ fn tabs_that_fit_keep_their_natural_widths_and_no_menu() {
     assert_eq!(s.tabs.len(), 3, "every tab stays on the strip when they fit");
     assert!(h.query_by_label("More documents").is_none(), "no overflow menu when the tabs fit");
     for i in 0..3 {
-        assert!(h.query_by_label(&pro_tab_title(h.state(), i)).is_some(), "tab {i} is on the strip");
+        assert!(tab_shown(&h, &pro_tab_title(h.state(), i)), "tab {i} is on the strip");
     }
 }
 
@@ -85,7 +92,7 @@ fn studio_tabs_overflow_into_the_same_menu() {
     assert!(has_menu(&h), "the Studio strip carries a » menu too");
     let active = h.state().session.active_index().unwrap();
     let name = h.state().session.documents()[active].doc.name.clone();
-    assert!(h.query_by_label(&name).is_some(), "the active tab is on the strip: {name}");
+    assert!(tab_shown(&h, &name), "the active tab is on the strip: {name}");
 }
 
 #[test]
@@ -99,7 +106,7 @@ fn saved_document_tabs_track_file_identity() {
         let pro = crate::theme::Tokens::get(&h.ctx).pro;
         let app = h.state();
         let label = if pro { pro_tab_title(app, 1) } else { "My saved image.psd".into() };
-        assert!(h.query_by_label(&label).is_some(), "saved tab in {theme:?}: {label}");
+        assert!(tab_shown(&h, &label), "saved tab in {theme:?}: {label}");
         assert_eq!(app.session.active().unwrap().doc.name, "My saved image.psd");
         h.state_mut().session.set_active(0);
         h.run_steps(2);
@@ -108,7 +115,7 @@ fn saved_document_tabs_track_file_identity() {
         h.state_mut().run("layer.new.layer", json!({})).unwrap();
         h.run_steps(2);
         let label = if pro { pro_tab_title(h.state(), 1) } else { "My saved image.psd".into() };
-        assert!(h.query_by_label(&label).is_some());
+        assert!(tab_shown(&h, &label));
         assert_eq!(h.state().session.active().unwrap().doc.name, "My saved image.psd");
         assert!(h.state().session.active().unwrap().is_dirty());
     }

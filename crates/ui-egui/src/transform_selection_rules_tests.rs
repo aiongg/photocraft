@@ -238,6 +238,7 @@ fn a_refused_handle_press_on_the_canvas_reaches_no_move_tool() {
         view.fill_pending = false;
         let rect = egui::Rect::from_min_size(Pos2::ZERO, vec2(300.0, 300.0));
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut frame = |app: &mut PhotocraftApp, events: Vec<Event>| {
             let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
             let mut out = ctx.run_ui(input, |ui| {

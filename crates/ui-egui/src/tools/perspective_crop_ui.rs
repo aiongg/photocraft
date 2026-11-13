@@ -609,11 +609,16 @@ mod tests {
         a.ui.perspective_crop = Some([[40.0, 10.0], [100.0, 10.0], [100.0, 40.0], [40.0, 40.0]]);
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
+                // The harness runs its first frame before `setup_context` installs the runtime.
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
                 let v = app.ui.views[0].clone();
                 crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
             },
             a,
         );
+        crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
         h.run_steps(2);
         let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
         let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 400.0));
@@ -731,12 +736,17 @@ mod tests {
         }];
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 400.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
+                // The harness runs its first frame before `setup_context` installs the runtime.
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
                 let v = app.ui.views[0].clone();
                 let rect = egui::Rect::from_min_size(egui::pos2(100.0, 0.0), egui::vec2(600.0, 400.0));
                 crate::canvas::canvas_view(app, ui, 0, rect, v, true);
             },
             a,
         );
+        crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
         h.run_steps(2);
         let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
         // Pressed a point inside the left edge (the scrollbars sit right and bottom), slipping two

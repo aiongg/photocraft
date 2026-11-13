@@ -304,6 +304,7 @@ mod tests {
     /// and with a dialog open over the canvas when `dialog` is set.
     fn drag_on_canvas_with(option: bool, shift: bool, sticky_shift: bool, in_window: bool, dialog: bool) -> ([f32; 2], [f32; 2], [f32; 2]) {
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 2000, "height": 1500})).unwrap();
         app.run("file.new", json!({"width": 1000, "height": 750})).unwrap();
@@ -407,6 +408,7 @@ mod tests {
     #[test]
     fn with_overscroll_off_the_other_windows_follow_the_clamped_center() {
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 2000, "height": 1500})).unwrap();
         app.run("file.new", json!({"width": 1000, "height": 750})).unwrap();
@@ -455,6 +457,7 @@ mod tests {
     #[test]
     fn a_flick_panning_glide_moves_the_other_windows_too() {
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 2000, "height": 1500})).unwrap();
         app.run("file.new", json!({"width": 1000, "height": 750})).unwrap();

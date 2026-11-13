@@ -685,11 +685,16 @@ fn space_on_the_canvas_moves_the_frame_not_the_view() {
     a.ui.views = vec![view.clone()];
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
     let space = |pressed| Event::Key { key: Key::Space, physical_key: None, pressed, repeat: false, modifiers: Modifiers::NONE };
@@ -745,11 +750,16 @@ fn a_handle_held_past_the_canvas_edge_scrolls_the_view() {
     a.ui.extras.rulers = false;
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
     // The right edge's middle handle: document (100, 25).
@@ -800,12 +810,17 @@ fn a_press_beside_the_canvas_does_not_scroll_it_for_a_crop_drag() {
     // The canvas takes the left 400 points; the rest stands in for a panel.
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 400.0));
             crate::canvas::canvas_view(app, ui, 0, rect, v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
     let p = pos2(500.0, 100.0);
@@ -847,12 +862,17 @@ fn a_held_click_at_the_canvas_edge_draws_no_frame_and_does_not_scroll() {
     // has room past it.
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::pos2(100.0, 0.0), egui::vec2(600.0, 400.0));
             crate::canvas::canvas_view(app, ui, 0, rect, v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     let frame = h.state().ui.crop_rect;
     assert!(h.state().crop.default_frame, "{frame:?}");
@@ -914,12 +934,17 @@ fn a_scrollbar_drag_past_the_canvas_edge_does_not_scroll_for_a_crop_drag() {
     // The window is taller than the canvas, so the pointer can leave it below the bottom bar.
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 500.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 400.0));
             crate::canvas::canvas_view(app, ui, 0, rect, v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     assert!(h.state().ui.view.shows_scrollbars());
     let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };

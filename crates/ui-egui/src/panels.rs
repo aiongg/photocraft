@@ -293,7 +293,7 @@ mod navigator_wheel_tests {
         let ctx = egui::Context::default();
         PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         let screen = Rect::from_min_size(Pos2::ZERO, vec2(430.0, 460.0));
-        let mut pass = |app: &mut PhotocraftApp, time: f64| {
+        let pass = |app: &mut PhotocraftApp, time: f64| {
             let mut out = ctx.run_ui(RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() }, |ui| {
                 let view = app.ui.views[0].clone();
                 app.ui.views[0] = crate::canvas::canvas_view(app, ui, 0, canvas, view, true);

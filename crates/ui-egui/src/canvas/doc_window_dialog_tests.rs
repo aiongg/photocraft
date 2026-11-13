@@ -50,7 +50,9 @@ impl DocumentWindow {
         view.center = [size.width as f32 / 2.0, size.height as f32 / 2.0];
         view.fit_pending = false;
         view.fill_pending = false;
-        Self { ctx: egui::Context::default(), screen: Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0)), window, view }
+        let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
+        Self { ctx, screen: Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0)), window, view }
     }
 
     fn frame(&mut self, app: &mut PhotocraftApp, events: Vec<Event>) {
