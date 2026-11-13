@@ -23,12 +23,9 @@ pub struct ViewXform {
 impl ViewXform {
     /// The main canvas's mapping for the active document as last laid out (inside the rulers).
     pub fn active(app: &PhotocraftApp) -> Option<Self> {
-        let v = app.ui.views.get(app.session.active_index()?)?;
-        let (zoom, center) = if v.zoom_easing || (v.zoom_animating && app.session.prefs().general.animated_zoom) {
-            v.display_camera.unwrap_or((v.zoom, v.center))
-        } else {
-            (v.zoom, v.center)
-        };
+        let idx = app.session.active_index()?;
+        let v = app.ui.views.get(idx)?;
+        let (zoom, center) = super::document_display::shown_camera(app.canvas_ctx.as_ref(), idx, egui::ViewportId::ROOT, v, app.canvas_ppp());
         Some(
             Self {
                 rect: crate::rulers::content_rect(app, app.last_canvas_rect),

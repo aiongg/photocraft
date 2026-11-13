@@ -20,11 +20,10 @@ pub(super) fn fit_layers(app: &mut PhotocraftApp) -> Result<Value, String> {
     let ppp = app.canvas_ppp();
     let points = ((area.x - 40.0) / b.width().max(1) as f32).min((area.y - 40.0) / b.height().max(1) as f32);
     let v = &mut app.ui.views[i];
+    v.request_zoom_animation(app.session.prefs().general.animated_zoom);
     v.zoom = crate::zoom_levels::clamp(points * ppp, size);
     v.center = [(b.x0 + b.x1) as f32 / 2.0, (b.y0 + b.y1) as f32 / 2.0];
     v.fit_pending = false;
-    v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-    v.zoom_anchor = None;
     Ok(json!({"zoom": v.zoom, "bounds": [b.x0, b.y0, b.x1, b.y1]}))
 }
 
@@ -41,7 +40,7 @@ pub(crate) fn float_window(app: &mut PhotocraftApp, doc: usize, offset: usize, f
     let mut view = app.ui.views.get(doc).cloned().unwrap_or_default();
     view.zoom_animating = false;
     view.zoom_anchor = None;
-    view.display_camera = None;
+    view.zoom_from = None;
     view.fit_pending = offset > 0 || view.fit_pending;
     // A floating window draws the document's own view from now on (`tabs::extra_windows`).
     if floating && let Some(v) = app.ui.views.get_mut(doc) {
@@ -128,8 +127,8 @@ pub(super) fn arrange(app: &mut PhotocraftApp, k: &str, p: &Value) -> Result<Val
             let rotation = if crop { 0.0 } else { src.rotation };
             let apply = |v: &mut crate::state::View, doc: usize, cropped: bool| {
                 if zoom {
-                    v.zoom = crate::zoom_levels::clamp(src.zoom, sizes.get(doc).copied().unwrap_or(v.doc_size));
                     v.request_zoom_animation(animated_zoom);
+                    v.zoom = crate::zoom_levels::clamp(src.zoom, sizes.get(doc).copied().unwrap_or(v.doc_size));
                 }
                 if loc {
                     v.center = src.center;

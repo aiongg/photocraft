@@ -115,14 +115,13 @@ pub fn fit_artboard(app: &mut PhotocraftApp) -> Result<Value, String> {
     let v = &mut app.ui.views[i];
     // Leave room for the name above the board. The area is in egui points; the stored zoom is
     // device pixels per document pixel.
+    v.request_zoom_animation(app.session.prefs().general.animated_zoom);
     v.zoom = ((area.x - 60.0) / b.width().max(1) as f32).min((area.y - 80.0) / b.height().max(1) as f32) * ppp;
     v.zoom = crate::zoom_levels::clamp(v.zoom, size);
     // Widen before adding: a board near ±2^30, or one whose far edge saturated at i32::MAX,
     // overflows an i32 sum (#981).
     v.center = [((f64::from(b.x0) + f64::from(b.x1)) / 2.0) as f32, ((f64::from(b.y0) + f64::from(b.y1)) / 2.0) as f32];
     v.fit_pending = false;
-    v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-    v.zoom_anchor = None;
     Ok(json!({"zoom": v.zoom, "artboard": id.0, "bounds": [b.x0, b.y0, b.x1, b.y1]}))
 }
 

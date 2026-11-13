@@ -808,9 +808,8 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
             if widgets::secondary_button(ui, "100%", 0.0).on_hover_text(tl!("Zoom current window to 1:1")).clicked()
                 && let Some(i) = app.session.active_index()
             {
-                app.ui.views[i].zoom = 1.0;
                 app.ui.views[i].request_zoom_animation(app.session.prefs().general.animated_zoom);
-                app.ui.views[i].zoom_anchor = None;
+                app.ui.views[i].zoom = 1.0;
                 app.ui.views[i].fit_pending = false;
                 app.ui.views[i].fill_pending = false;
             }
@@ -855,9 +854,8 @@ fn tool_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens, 
             if widgets::secondary_button(ui, "100%", 0.0).on_hover_text(tl!("Zoom current window to 1:1")).clicked()
                 && let Some(i) = app.session.active_index()
             {
-                app.ui.views[i].zoom = 1.0;
                 app.ui.views[i].request_zoom_animation(app.session.prefs().general.animated_zoom);
-                app.ui.views[i].zoom_anchor = None;
+                app.ui.views[i].zoom = 1.0;
                 app.ui.views[i].fit_pending = false;
                 app.ui.views[i].fill_pending = false;
             }

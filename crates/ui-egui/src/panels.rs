@@ -282,51 +282,55 @@ mod navigator_wheel_tests {
     use super::*;
     use egui::{Event, Modifiers, MouseWheelUnit, RawInput, TouchPhase};
 
-    /// The painted viewport follows the camera visible on the canvas, including preference changes.
+    /// The painted viewport follows the view on the canvas: the canvas's zoom ease while one runs, read from the
+    /// canvas in the same pass.
     #[test]
-    fn navigator_viewport_follows_the_displayed_camera_during_animation() {
+    fn navigator_viewport_follows_the_canvas_zoom_ease() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
+        app.run("prefs.set", json!({"values": {"general.animatedZoom": true}})).unwrap();
         app.sync_views();
-        app.last_canvas_rect = Rect::from_min_size(Pos2::ZERO, vec2(80.0, 60.0));
+        let v = &mut app.ui.views[0];
+        v.fit_pending = false;
+        v.zoom = 1.0;
+        v.center = [100.0, 50.0];
+        // Small enough that the outline stays inside the preview at both zooms.
+        let canvas = Rect::from_min_size(Pos2::ZERO, vec2(80.0, 60.0));
+        app.last_canvas_rect = canvas;
         let ctx = egui::Context::default();
         PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
-        for _ in 0..3 {
-            frame(&mut app, &ctx, pos2(5.0, 5.0), 0.0);
-        }
-        for (animating, enabled, displayed) in [
-            (true, true, Some((2.0, [70.0, 40.0]))),
-            (true, true, Some((3.0, [110.0, 50.0]))),
-            (false, true, Some((2.0, [70.0, 40.0]))),
-            (true, false, Some((2.0, [70.0, 40.0]))),
-            (true, true, None),
-        ] {
-            app.run("prefs.set", json!({"values": {"general.animatedZoom": enabled}})).unwrap();
-            let v = &mut app.ui.views[0];
-            v.zoom = 4.0;
-            v.center = [140.0, 60.0];
-            v.zoom_animating = animating;
-            v.display_camera = displayed;
-            let mut out = ctx.run_ui(RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(430.0, 460.0))), ..Default::default() }, |ui| {
-                navigator(&mut app, ui)
+        let screen = Rect::from_min_size(Pos2::ZERO, vec2(430.0, 460.0));
+        let mut pass = |app: &mut PhotocraftApp, time: f64| {
+            let mut out = ctx.run_ui(RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() }, |ui| {
+                let view = app.ui.views[0].clone();
+                app.ui.views[0] = crate::canvas::canvas_view(app, ui, 0, canvas, view, true);
+                navigator(app, ui);
             });
-            let painted = out
-                .shapes
+            out.textures_delta.clear();
+            out.shapes
                 .iter()
                 .find_map(|s| match &s.shape {
                     egui::Shape::Rect(r) if r.stroke.color == Color32::from_rgb(255, 84, 84) => Some(r.rect),
                     _ => None,
                 })
-                .expect("Navigator viewport outline");
-            let (zoom, center) = if animating && enabled { displayed.unwrap_or((4.0, [140.0, 60.0])) } else { (4.0, [140.0, 60.0]) };
-            let preview = last_navigator_preview(&ctx).unwrap();
-            let scale = preview.width() / 200.0;
-            let expected_center = preview.min + vec2(center[0], center[1]) * scale;
-            let expected_size = vec2(80.0 / app.ui.view.display_aspect(), 60.0) * (app.canvas_ppp() / zoom * scale);
-            assert!((painted.center() - expected_center).length() < 0.01, "{animating}/{enabled}/{displayed:?}: {painted:?}");
-            assert!((painted.size() - expected_size).length() < 0.01, "{animating}/{enabled}/{displayed:?}: {painted:?}");
-            out.textures_delta.clear();
+                .expect("Navigator viewport outline")
+        };
+        for time in [0.0, 0.02, 0.04] {
+            pass(&mut app, time);
         }
+        let v = &mut app.ui.views[0];
+        v.request_zoom_animation(true);
+        v.zoom = 2.0;
+        pass(&mut app, 0.1);
+        let painted = pass(&mut app, 0.15);
+        let (zoom, center) = crate::canvas::document_display::shown_camera(Some(&ctx), 0, egui::ViewportId::ROOT, &app.ui.views[0], app.canvas_ppp());
+        assert!(zoom > 1.0 && zoom < 2.0, "the canvas eases: {zoom}");
+        let preview = last_navigator_preview(&ctx).unwrap();
+        let scale = preview.width() / 200.0;
+        let expected_center = preview.min + vec2(center[0], center[1]) * scale;
+        let expected_size = vec2(canvas.width() / app.ui.view.display_aspect(), canvas.height()) * (app.canvas_ppp() / zoom * scale);
+        assert!((painted.center() - expected_center).length() < 0.01, "{painted:?} vs {expected_center:?}");
+        assert!((painted.size() - expected_size).length() < 0.01, "{painted:?} vs {expected_size:?}");
     }
 
     fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, pointer: Pos2, wheel: f32) {
@@ -443,9 +447,8 @@ mod navigator_wheel_tests {
         assert!((c[0] - 100.0).abs() < 1.0 && (c[1] - 50.0).abs() < 1.0, "the view follows the pointer: {c:?}");
         // Finishing direct navigation during an existing zoom must snap to the new target.
         let v = &mut app.ui.views[0];
-        v.zoom = 2.0;
         v.request_zoom_animation(true);
-        v.display_camera = Some((1.5, c));
+        v.zoom = 2.0;
         v.zoom_anchor = Some(([50.0, 25.0], [200.0, 150.0]));
         // ⌘/Ctrl-drag: the rectangle fills the canvas (`last_canvas_rect`, 800 × 600 pt).
         drag(&mut app, &ctx, Modifiers::COMMAND, [50.0, 25.0], [100.0, 50.0]);
@@ -469,7 +472,7 @@ mod navigator_wheel_tests {
         );
         assert!(v.zoom > 1.0 && !v.fit_pending);
         assert!(!v.zoom_animating && v.zoom_anchor.is_none(), "direct navigation cancels the old transition");
-        assert_eq!(v.display_camera, Some((v.zoom, v.center)), "the selected rectangle is displayed immediately");
+        assert_eq!(v.zoom_from, None, "the selected rectangle is displayed immediately, with no glide");
         assert!(ctx.data(|d| d.get_temp::<Pos2>(navigator_zoom_drag_id())).is_none(), "the drag is over");
     }
 
@@ -1832,7 +1835,7 @@ mod navigator_animated_zoom_tests {
             h.run_steps(2);
             let view = &h.state().ui.views[0];
             assert_eq!(view.zoom, zoom, "{label}");
-            assert_eq!(view.display_camera, Some((view.zoom, view.center)), "{label}");
+            assert_eq!(view.zoom_from, None, "{label}: no glide");
             assert!(!view.zoom_animating && view.zoom_anchor.is_none(), "{label}");
             assert!(!view.fit_pending, "{label}");
         }
