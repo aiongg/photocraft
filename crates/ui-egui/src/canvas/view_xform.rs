@@ -25,7 +25,8 @@ impl ViewXform {
     pub fn active(app: &PhotocraftApp) -> Option<Self> {
         let idx = app.session.active_index()?;
         let v = app.ui.views.get(idx)?;
-        let (zoom, center) = super::document_display::shown_camera(app.canvas_ctx.as_ref(), idx, egui::ViewportId::ROOT, v, app.canvas_ppp());
+        let (zoom, center) =
+            super::document_display::shown_camera(app.canvas_ctx.as_ref(), super::document_display::CanvasHost::main(idx), v, app.canvas_ppp());
         Some(
             Self {
                 rect: crate::rulers::content_rect(app, app.last_canvas_rect),

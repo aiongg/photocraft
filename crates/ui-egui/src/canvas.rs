@@ -1937,10 +1937,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // P-15 replaces this with the framework's ToolHost. PhotoCraft's tools run before the canvas shows, so this pass's
     // input is in this pass's picture, on the response egui gives the tool widget from the last pass's layout; the
     // canvas body places the widget (`document_display::show`).
-    let widget = document_display::tool_widget(idx, ctx.viewport_id());
+    let host = document_display::CanvasHost::drawn(app, &ctx, idx);
+    let widget = host.tool_widget();
     let response = ctx.read_response(widget).unwrap_or_else(|| ui.interact(rect, widget.with("unplaced"), Sense::hover()));
     // The tools map through the view on screen: the canvas's zoom ease, unless a press stops it this pass.
-    let (zoom, center) = if pointer_here { (view.zoom, view.center) } else { document_display::shown_camera(Some(&ctx), idx, ctx.viewport_id(), &view, ppp) };
+    let (zoom, center) = if pointer_here { (view.zoom, view.center) } else { document_display::shown_camera(Some(&ctx), host, &view, ppp) };
     let xf = ViewXform { rect, zoom: zoom / ppp, center, flip, rotation: view.rotation, aspect }.shown(app, ppp);
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
     crate::paint_mouse::track_right_press(&response);
@@ -2153,7 +2154,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             ctx.request_repaint();
         }
     }
-    let pass = document_display::CanvasPass { ctx: &ctx, idx, doc: &doc, output, rect, ppp, flip, aspect, keys, jumped: pointer_here };
+    let pass = document_display::CanvasPass { ctx: &ctx, host, doc: &doc, output, rect, ppp, flip, aspect, keys, jumped: pointer_here };
     let shown = document_display::show(app, ui, &mut view, &pass);
     let display_view = View { zoom: (shown.zoom * f64::from(ppp)) as f32, center: [shown.center.x as f32, shown.center.y as f32], ..view.clone() };
     let xf = document_display::view_xform(&shown);

@@ -94,7 +94,8 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Visible-area rectangle.
     let v = app.ui.views[idx].clone();
     let canvas = app.last_canvas_rect;
-    let (zoom, center) = crate::canvas::document_display::shown_camera(Some(ui.ctx()), idx, egui::ViewportId::ROOT, &v, app.canvas_ppp());
+    let (zoom, center) =
+        crate::canvas::document_display::shown_camera(Some(ui.ctx()), crate::canvas::document_display::CanvasHost::main(idx), &v, app.canvas_ppp());
     let point_zoom = (zoom / app.canvas_ppp()).max(1e-6);
     // Pixel aspect correction shows fewer document columns across the same canvas width.
     let vw = canvas.width() / point_zoom / app.ui.view.display_aspect() * s;
