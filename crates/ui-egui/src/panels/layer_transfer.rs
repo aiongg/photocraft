@@ -211,7 +211,7 @@ fn target_at(app: &PhotocraftApp, p: egui::Pos2) -> Option<(usize, Option<[f64; 
                 rotation: view.rotation,
                 aspect: app.ui.view.display_aspect(),
             }
-            .shown(ppp);
+            .shown(app, ppp);
             Some((d, Some(xf.to_doc(p))))
         }),
         None => Some((app.session.active_index()?, crate::canvas::ViewXform::active(app).map(|xf| xf.to_doc(p)))),

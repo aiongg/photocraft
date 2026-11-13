@@ -26,3 +26,22 @@ fn active_transform_uses_the_same_alignment_without_changing_saved_pan() {
         assert_eq!(app.ui.views[0].center, before);
     }
 }
+
+/// Default Crop slides the view under its frame with fractional pointer distances: the mapping stays continuous, as
+/// the canvas shows it; Classic Crop moves the frame and keeps the alignment.
+#[test]
+fn crop_image_movement_keeps_its_continuous_camera_mapping() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.ui.tool = Tool::Crop;
+    let xf = ViewXform {
+        rect: Rect::from_min_size(pos2(40.0, 100.0), vec2(523.0, 471.0)),
+        zoom: 1.0,
+        center: [1500.0, 1000.0],
+        flip: false,
+        rotation: 0.0,
+        aspect: 1.0,
+    };
+    assert_eq!(xf.shown(&app, 1.0).center, xf.center);
+    app.ui.tool_options.crop_shield.classic_mode = true;
+    assert_pixel_edges(xf.shown(&app, 1.0), 1.0);
+}

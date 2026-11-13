@@ -185,7 +185,7 @@ fn a_tiled_selection_drag_that_returns_to_its_source_still_moves_there() {
         rotation: view.rotation,
         aspect: 1.0,
     }
-    .shown(ppp);
+    .shown(h.state(), ppp);
     let grab = source_xf.to_screen(8.0, 10.0);
     let moved = source_xf.to_screen(13.0, 10.0);
     assert!(cells[0].1.contains(moved), "release {moved:?} is outside source cell {:?}", cells[0].1);

@@ -48,6 +48,12 @@ pub(crate) fn view_xform(view: &CanvasView) -> ViewXform {
     }
 }
 
+/// Whether PhotoCraft's tool moves the view with the pointer this pass: the Crop tool in its default mode slides the
+/// view under a fixed frame. The canvas then shows the view unaligned, and so does PhotoCraft's own mapping.
+pub(crate) fn view_follows_pointer(app: &PhotocraftApp) -> bool {
+    crate::crop_mode::moves_image(app)
+}
+
 /// The user's navigation choices from Preferences (General, Tools, Enhanced Controls).
 pub(crate) fn navigation(app: &PhotocraftApp) -> NavigationOptions {
     let p = app.session.prefs();
@@ -151,6 +157,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let theme = crate::theme::Tokens::get(ctx);
     let shadow = border == photocraft_engine::prefs::CanvasBorder::DropShadow && !theme.bevel && !theme.pro && !pattern && beyond.is_none();
     let navigation = navigation(app);
+    let follows_pointer = view_follows_pointer(app);
 
     let app: &PhotocraftApp = app;
     let (gpu, composite) = match prepared {
@@ -168,7 +175,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .id_salt(("pc-canvas", idx))
         .view(Bind::bound(&mut bound))
         .document(Size::new(f64::from(size.width), f64::from(size.height)))
-        .navigation(navigation);
+        .navigation(navigation)
+        .view_follows_pointer(follows_pointer);
     canvas = match ease {
         Some((from, anchor)) => canvas.ease_from(from, anchor),
         None if pass.jumped => canvas.jumped(),
