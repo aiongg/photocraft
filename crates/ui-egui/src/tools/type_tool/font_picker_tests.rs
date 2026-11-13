@@ -1676,7 +1676,7 @@ fn options_bar_hover_previews_with_the_character_picker_also_shown() {
 
     let theme = crate::theme::AppTheme::pro();
     let mut h = Harness::builder().with_size(vec2(1600.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+        PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
         app.ui.theme = theme;
         app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
@@ -1724,7 +1724,7 @@ fn capture_font_field_gpu_visual_fixtures() {
                     },
                     "Inter".to_string(),
                 );
-                crate::PhotocraftApp::setup_context(&h.ctx, theme);
+                crate::PhotocraftApp::setup_context(&h.ctx, theme.clone());
                 h.run_steps(4);
                 let stem = format!("{phase}-{}-{width}-{scale}x", theme.id());
                 h.render().unwrap().save(directory.join(format!("{stem}-closed.png"))).unwrap();

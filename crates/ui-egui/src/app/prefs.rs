@@ -25,14 +25,18 @@ impl PhotocraftApp {
 impl PhotocraftApp {
     /// Shows `theme` and saves it as the theme of its mode, which becomes the appearance mode.
     pub fn set_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {
-        let slot = if theme.is_dark() { "interface.darkTheme" } else { "interface.lightTheme" };
-        let mode = if theme.is_dark() { "dark" } else { "light" };
-        let values = serde_json::json!({"values": {slot: theme.id().as_str(), "interface.appearanceMode": mode}});
-        if let Err(e) = self.run("prefs.set", values) {
+        if let Err(e) = self.save_theme(&theme) {
             self.ui.status = e;
         } else {
             self.apply_theme(ctx, theme);
         }
+    }
+
+    /// Saves `theme` as the theme of its mode's slot, and its mode as the appearance mode.
+    pub(crate) fn save_theme(&mut self, theme: &theme::AppTheme) -> Result<(), String> {
+        let slot = if theme.is_dark() { "interface.darkTheme" } else { "interface.lightTheme" };
+        let mode = if theme.is_dark() { "dark" } else { "light" };
+        self.run("prefs.set", serde_json::json!({"values": {slot: theme.id().as_str(), "interface.appearanceMode": mode}})).map(drop)
     }
 
     pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {

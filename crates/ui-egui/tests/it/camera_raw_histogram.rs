@@ -18,10 +18,11 @@ fn invoke(h: &mut Harness<'_, PhotocraftApp>, params: Value) -> Value {
 #[test]
 fn header_stays_fixed_and_resize_hover_scroll_before_do_not_rebuild_the_proxy() {
     for theme in AppTheme::all() {
+        let shown = theme.clone();
         let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).build_eframe(move |cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+            PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-            app.set_theme(&cc.egui_ctx, theme);
+            app.set_theme(&cc.egui_ctx, shown);
             app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
             app.run("layer.new.layer", json!({})).unwrap();
             app.run("edit.fill", json!({"color": "#708090"})).unwrap();
@@ -88,7 +89,7 @@ fn histogram_matches_visible_preview_at_all_supported_depths_and_cancel_commit_a
 fn settings_sections_group_existing_controls_without_rendering_or_document_edits() {
     for theme in AppTheme::all() {
         let mut h = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 900.0)).build_eframe(move |cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+            PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
             app.set_theme(&cc.egui_ctx, theme);
             app.run("file.new", json!({"width":64,"height":48})).unwrap();

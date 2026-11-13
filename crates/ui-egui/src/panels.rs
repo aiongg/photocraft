@@ -523,7 +523,7 @@ mod symmetry_theme_tests {
                 app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
                 app.ui.tool = tool;
                 let mut h = Harness::builder().with_size(vec2(1600.0, 300.0)).build_ui_state(|ui, app| options_bar(app, ui), app);
-                PhotocraftApp::setup_context(&h.ctx, kind);
+                PhotocraftApp::setup_context(&h.ctx, kind.clone());
                 h.run_steps(4);
                 assert!(h.query_by_label("Set painting symmetry options").is_some(), "missing symmetry menu in {:?} for {:?}", kind, tool);
             }
@@ -1863,7 +1863,7 @@ mod layer_click_type_commit_tests {
         let mut h = Harness::builder().with_size(vec2(360.0, 650.0)).with_step_dt(1.0 / 60.0).build_ui_state(
             move |ui, app: &mut PhotocraftApp| {
                 if !ready {
-                    PhotocraftApp::setup_context(ui.ctx(), kind);
+                    PhotocraftApp::setup_context(ui.ctx(), kind.clone());
                     ready = true;
                     return;
                 }
@@ -1901,7 +1901,7 @@ mod layer_click_type_commit_tests {
         let kind = theme::AppTheme::default();
         for same in [true, false] {
             for thumbnail in [true, false] {
-                let (mut h, text, other) = harness(kind);
+                let (mut h, text, other) = harness(kind.clone());
                 let p = at(&h, if same { "Edited type" } else { "Other pixels" }, thumbnail);
                 click(&mut h, p, egui::Modifiers::NONE);
                 assert!(h.state().ui.text_edit.is_none(), "same={same}, thumbnail={thumbnail}");
@@ -1914,7 +1914,7 @@ mod layer_click_type_commit_tests {
     #[test]
     fn layer_click_commits_without_breaking_modifier_selection_or_double_click_editing() {
         let kind = theme::AppTheme::default();
-        let (mut h, text, other) = harness(kind);
+        let (mut h, text, other) = harness(kind.clone());
         let p = at(&h, "Other pixels", false);
         click(&mut h, p, egui::Modifiers { command: true, ..Default::default() });
         assert!(h.state().ui.text_edit.is_none());

@@ -38,7 +38,7 @@ fn harness(kind: AppTheme) -> Harness<'static, PhotocraftApp> {
 #[test]
 fn status_bar_controls_sit_inside_the_bar_with_even_margins() {
     for kind in AppTheme::all() {
-        let h = harness(kind);
+        let h = harness(kind.clone());
         let t = kind.tokens();
         let (bar_h, control_h) = crate::panels::status_bar_heights(&t);
         let margin = (bar_h - control_h) / 2.0;
@@ -90,7 +90,7 @@ fn begin_zoom_drag(h: &mut Harness<'_, PhotocraftApp>) -> egui::Pos2 {
 fn fullscreen_status_zoom_wraps_without_turning_the_warp_into_a_value_change() {
     for kind in AppTheme::all() {
         for left in [true, false] {
-            let mut h = harness(kind);
+            let mut h = harness(kind.clone());
             fullscreen(&mut h, true);
             let start = begin_zoom_drag(&mut h);
             let edge = pos2(if left { 0.5 } else { SIZE.x - 0.5 }, start.y);

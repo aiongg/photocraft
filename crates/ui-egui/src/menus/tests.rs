@@ -30,7 +30,7 @@ fn showing_grid_restores_hidden_extras() {
 
 #[test]
 fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark_across_palettes() {
-    use photocraft_engine::prefs::{AppearanceMode, DarkTheme, LightTheme};
+    use photocraft_engine::prefs::AppearanceMode;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = egui::Context::default();
     app.services.system_theme = Some(Box::new(|_| Some(egui::Theme::Light)));
@@ -50,13 +50,14 @@ fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark_across_palettes() {
         assert!(item.enabled);
         assert_eq!(item.checked, Some(true));
         for kind in crate::theme::AppTheme::all() {
-            assert_eq!(checked(&app, &format!("window.theme.{}", kind.id())), Some(false));
+            assert_eq!(checked(&app, &kind.command()), Some(false));
         }
     }
-    invoke(&mut app, &ctx, "window.theme.studio", json!({})).unwrap();
+    let studio = crate::theme::AppTheme::studio().command();
+    invoke(&mut app, &ctx, &studio, json!({})).unwrap();
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Dark);
     assert_eq!(checked(&app, "window.theme.system"), Some(false));
-    assert_eq!(checked(&app, "window.theme.studio"), Some(true));
+    assert_eq!(checked(&app, &studio), Some(true));
 }
 
 #[test]
@@ -144,7 +145,7 @@ fn menu_bar_labels_have_horizontal_padding_and_open_menus() {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&harness.ctx, theme);
+            PhotocraftApp::setup_context(&harness.ctx, theme.clone());
             harness.run_steps(3);
 
             let font = egui::TextStyle::Button.resolve(&harness.ctx.global_style());

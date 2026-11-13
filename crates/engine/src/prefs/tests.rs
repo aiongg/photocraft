@@ -179,6 +179,31 @@ fn appearance_choices_validate_and_legacy_theme_still_selects() {
     }
 }
 
+/// Names PhotoCraft saved before theme ids, in any spelling `ui.set` took, read as ids: in the
+/// slots, the favorites and the theme command ids of saved shortcuts and menu customizations.
+/// Old clients still read the single theme: the id the appearance mode shows.
+#[test]
+fn pre_id_theme_names_read_as_ids_where_they_were_saved() {
+    let mut s = Session::new();
+    let saved = json!({
+        "interface": {"appearanceMode": "dark", "darkTheme": "Pro (Medium Gray)", "lightTheme": "gnome", "favoriteThemes": ["breezeDark"]},
+        "shortcuts": {"window.theme.proMedium": "F9"},
+        "alternateShortcuts": {"window.theme.studioLight": ["F10"]},
+        "menus": {"colors": {"window.theme.classic": "red"}, "hidden": ["window.theme.pro"]}
+    });
+    s.load_prefs_json(&saved.to_string()).unwrap();
+    let p = s.prefs();
+    assert_eq!((p.interface.dark_theme.as_str(), p.interface.light_theme.as_str()), ("craft.artcraft", "craft.adwaita"));
+    assert_eq!(p.interface.favorite_themes, ["craft.breeze"]);
+    assert!(p.shortcuts.contains_key("window.theme.dark.craft.artcraft"), "{:?}", p.shortcuts);
+    assert!(p.alternate_shortcuts.contains_key("window.theme.light.craft.studio"), "{:?}", p.alternate_shortcuts);
+    assert!(p.menus.colors.contains_key("window.theme.light.craft.classic"), "{:?}", p.menus.colors);
+    assert_eq!(p.menus.hidden, ["window.theme.dark.craft.pro"]);
+    assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.artcraft"));
+    s.execute("prefs.set", json!({"path": "interface.appearanceMode", "value": "light"})).unwrap();
+    assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.adwaita"));
+}
+
 #[test]
 fn favorite_themes_persist_and_reject_invalid_lists() {
     let mut s = Session::new();

@@ -70,7 +70,7 @@ fn every_theme_shows_the_same_tool_options() {
         let reference = controls(&options_bar(AppTheme::pro_medium(), tool));
         assert!(reference.len() > 2, "{tool:?}: the Pro bar has options: {reference:?}");
         for theme in AppTheme::all() {
-            let found = controls(&options_bar(theme, tool));
+            let found = controls(&options_bar(theme.clone(), tool));
             let missing: Vec<&String> = reference.iter().filter(|c| !found.contains(c)).collect();
             assert!(missing.is_empty(), "{theme:?} {tool:?}: the options bar lacks {missing:?}; it shows {found:?}");
         }
@@ -82,7 +82,7 @@ fn every_theme_shows_the_crop_options() {
     // The issue's example: in Adwaita the Crop tool had no ratio, Clear, overlay or Delete Cropped
     // Pixels controls, only "Drag a crop box · …".
     for theme in AppTheme::all() {
-        let mut h = options_bar(theme, Tool::Crop);
+        let mut h = options_bar(theme.clone(), Tool::Crop);
         assert!(h.query_by_label_contains("Drag a crop box").is_none(), "{theme:?}: the hint replaced the options");
         assert!(h.state().ui.tool_options.crop_delete);
         h.get_by_label("Delete Cropped Pixels").click();
@@ -114,12 +114,12 @@ fn controls_in_order(h: &Harness<'_, PhotocraftApp>) -> Vec<(String, egui::Rect)
 fn every_theme_puts_opacity_right_after_mode() {
     for tool in [Tool::Brush, Tool::Eraser, Tool::Pencil, Tool::CloneStamp] {
         for theme in AppTheme::all() {
-            let found = controls_in_order(&options_bar(theme, tool));
+            let found = controls_in_order(&options_bar(theme.clone(), tool));
             let names: Vec<&str> = found.iter().map(|(l, _)| l.as_str()).collect();
             let mode = names.iter().position(|l| *l == "Mode").unwrap_or_else(|| panic!("{theme:?} {tool:?}: no Mode control in {names:?}"));
             assert_eq!(names.get(mode + 1), Some(&"Opacity"), "{theme:?} {tool:?}: Opacity follows Mode in {names:?}");
             assert!(found[mode].1.right() <= found[mode + 1].1.left(), "{theme:?} {tool:?}: Mode and Opacity don't overlap: {found:?}");
-            if matches!(tool, Tool::Brush | Tool::Eraser) && !crate::theme::theme.tokens().pro {
+            if matches!(tool, Tool::Brush | Tool::Eraser) && !theme.tokens().pro {
                 let size = names.iter().position(|l| *l == "Size").unwrap_or_else(|| panic!("{theme:?} {tool:?}: no Size control in {names:?}"));
                 assert_eq!(names.get(size + 1), Some(&"Hardness"), "{theme:?} {tool:?}: Hardness stays right after Size: {names:?}");
                 assert!(size + 1 < mode, "{theme:?} {tool:?}: Size and Hardness come before Mode: {names:?}");
@@ -133,9 +133,9 @@ fn every_theme_puts_opacity_right_after_mode() {
 /// there and enabled in Brush mode.
 #[test]
 fn the_eraser_hardness_field_follows_its_mode_outside_pro() {
-    for theme in AppTheme::all().into_iter().filter(|k| !crate::theme::k.tokens().pro) {
+    for theme in AppTheme::all().into_iter().filter(|k| !k.tokens().pro) {
         for (mode, enabled) in [("brush", true), ("pencil", false), ("block", false)] {
-            let mut h = options_bar(theme, Tool::Eraser);
+            let mut h = options_bar(theme.clone(), Tool::Eraser);
             h.state_mut().ui.tool_options.eraser_mode = mode.into();
             h.run_steps(3);
             let disabled: Vec<bool> = h

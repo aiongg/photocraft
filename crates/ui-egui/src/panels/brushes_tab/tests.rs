@@ -14,7 +14,7 @@ fn dragging_a_brush_shows_its_tip_preview() {
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
             app.session.edit_prefs(|p| p.general.auto_show_home_screen = false);
             app.ui.tool = crate::Tool::Brush;
-            app.run("prefs.set", json!({"path": "interface.theme", "value": theme.id()})).unwrap();
+            app.save_theme(&theme).unwrap();
             app.ui.panels.brush_settings = mode != 2;
             app.ui.brush_tab = 1;
             app.ui.brushes_panel.view = if mode == 1 { BrushesView::Grid } else { BrushesView::List };
@@ -24,8 +24,9 @@ fn dragging_a_brush_shows_its_tip_preview() {
             let name = app.session.tools.presets[0].name.clone();
             let brush = app.session.tools.brush.clone();
             let presets = app.session.tools.presets.clone();
+            let shown = theme.clone();
             let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                PhotocraftApp::setup_context(&cc.egui_ctx, shown);
                 app
             });
             h.run_steps(4);

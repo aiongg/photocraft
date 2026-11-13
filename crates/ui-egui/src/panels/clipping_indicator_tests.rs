@@ -73,7 +73,7 @@ fn adjustment_scope_control_fits_compact_properties_before_scrolling() {
             for (kind, editor_control) in
                 [("Hue/Saturation", "Colorize"), ("Curves", "Edit points to modify the curve"), ("Selective Color", "Relative"), ("Color Lookup", "Dither")]
             {
-                let mut h = adjustment_harness(kind, 8, theme, scale, false);
+                let mut h = adjustment_harness(kind, 8, theme.clone(), scale, false);
                 let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(250.0, 160.0));
                 let rect = h.get_by_label("Clip to layer below").rect();
                 assert!(viewport.contains_rect(rect), "{theme:?}, {scale}x, {kind}: {rect:?}");
@@ -128,7 +128,7 @@ fn write_adjustment_scope_preview() {
     let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../log/adjustment-scope");
     std::fs::create_dir_all(&output).unwrap();
     for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
-        let mut h = adjustment_harness("Hue/Saturation", 8, theme, 2.0, true);
+        let mut h = adjustment_harness("Hue/Saturation", 8, theme.clone(), 2.0, true);
         // egui 0.37 completes screenshots through a one-shot callback.
         let captured = std::sync::Arc::new(std::sync::Mutex::new(None));
         let slot = captured.clone();

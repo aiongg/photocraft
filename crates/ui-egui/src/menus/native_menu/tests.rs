@@ -218,8 +218,8 @@ fn themes_move_to_the_app_menus_appearance() {
     let themes = ids(children);
     assert_eq!(themes.last().map(String::as_str), Some("window.theme.toggle"));
     assert!(themes.contains(&"[Dark Theme]".to_string()) && themes.contains(&"[Light Theme]".to_string()));
-    assert_eq!(l.bar.find("window.theme.classic").unwrap().checked, Some(true));
-    assert_eq!(l.bar.find("window.theme.pro").unwrap().checked, Some(false));
+    assert_eq!(l.bar.find(&crate::theme::AppTheme::classic().command()).unwrap().checked, Some(true));
+    assert_eq!(l.bar.find(&crate::theme::AppTheme::pro().command()).unwrap().checked, Some(false));
     assert_eq!(l.bar.find("window.theme.toggle").unwrap().label, "Next Appearance Mode");
     assert_eq!(l.bar.find("window.theme.system").unwrap().label, "Sync with system");
     assert_eq!(l.bar.find("window.theme.system").unwrap().checked, Some(false));
@@ -231,7 +231,7 @@ fn themes_move_to_the_app_menus_appearance() {
         let automatic = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto");
         assert_eq!(automatic.bar.find("window.theme.system").unwrap().checked, Some(true));
         for kind in crate::theme::AppTheme::all() {
-            assert_eq!(automatic.bar.find(&format!("window.theme.{}", kind.id())).unwrap().checked, Some(false));
+            assert_eq!(automatic.bar.find(&kind.command()).unwrap().checked, Some(false));
         }
     }
 }

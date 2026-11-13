@@ -38,6 +38,8 @@ blake3 = { version = "1.8", default-features = false, features = ["pure"] }
 photocraft-codecs = { workspace = true }
 flate2 = { workspace = true }
 craft-print = { workspace = true }
+# `craft::theme::ThemeId`: the theme ids the appearance preferences hold.
+craft = { workspace = true }
 
 # Photoshop `.kys` shortcut sets (`edit.keyboardShortcuts` `importKys`); already in the tree
 # through photocraft-ui-egui and usvg.

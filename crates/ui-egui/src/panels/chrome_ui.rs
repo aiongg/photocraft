@@ -351,7 +351,7 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
         for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
             let mut h = Harness::builder().with_size(vec2(1200.0, 700.0)).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
                 app.ui.theme = theme;
                 app
@@ -434,11 +434,12 @@ mod tests {
         for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::pro_medium()] {
             for width in [800.0, 1200.0] {
                 let builder = Harness::builder().with_size(vec2(width, 600.0)).with_max_steps(64);
+                let shown = theme.clone();
                 let mut h = builder.build_eframe(move |cc| {
-                    PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                    PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
                     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-                    app.run("prefs.set", json!({"path": "interface.theme", "value": theme.id()})).unwrap();
-                    app.ui.theme = theme;
+                    app.save_theme(&shown).unwrap();
+                    app.ui.theme = shown;
                     app
                 });
                 h.state_mut().run("file.new", json!({"width": 1920, "height": 1080, "resolution": 72})).unwrap();

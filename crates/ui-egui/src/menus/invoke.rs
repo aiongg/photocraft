@@ -805,7 +805,7 @@ fn invoke_window_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str)
                 None => (false, &id["window.theme.light.".len()..]),
             };
             let Ok(theme) = craft::theme::ThemeId::parse(name) else { return Some(Err(format!("unknown theme `{name}`"))) };
-            let theme = app.framework.theme_for(&theme, dark);
+            let theme = app.framework.theme_for(&theme, dark, ctx);
             app.set_theme(ctx, theme);
             Some(Ok(Value::Null))
         }

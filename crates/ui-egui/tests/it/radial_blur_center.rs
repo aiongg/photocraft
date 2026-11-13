@@ -206,7 +206,7 @@ fn hostile_coordinates_are_bounded_before_drawing() {
 fn diagram_and_sliders_fit_every_theme_and_amount_changes_the_rays() {
     for theme in AppTheme::all() {
         for width in [560.0, 1000.0] {
-            let mut h = themed_harness(theme, vec2(width, 800.0));
+            let mut h = themed_harness(theme.clone(), vec2(width, 800.0));
             click(&mut h, 0.25, 0.75);
             let diagram = h.get_by_role_and_label(Role::Slider, "Center").rect();
             let viewport = Rect::from_min_size(Pos2::ZERO, vec2(width, 800.0));

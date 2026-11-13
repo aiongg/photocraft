@@ -10,16 +10,15 @@ use crate::{
 /// The app with a recorded Smart Object, in a `width`-point dock and the given theme, ready to click.
 fn harness(width: f32, scale: f32, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let (app, _) = app(8, "rgb");
+    let id = theme.id().clone();
     let mut h =
         Harness::builder().with_size(vec2(1200.0, 850.0)).with_pixels_per_point(scale).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, theme);
             app
         });
     let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new(
-        "ui.set",
-        json!({"theme":theme.id(),"dockWidth":width,"dock":{"collapsed":["color","properties","history","navigator"]}}),
-    );
+    let (req, _rx) =
+        crate::control::ControlRequest::new("ui.set", json!({"theme":id,"dockWidth":width,"dock":{"collapsed":["color","properties","history","navigator"]}}));
     crate::control::handle(h.state_mut(), &ctx, &req);
     h.run_steps(5);
     h

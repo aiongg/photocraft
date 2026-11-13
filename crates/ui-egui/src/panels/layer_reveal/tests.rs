@@ -39,7 +39,7 @@ fn harness(app: PhotocraftApp, theme: AppTheme) -> Harness<'static, PhotocraftAp
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, theme);
+    PhotocraftApp::setup_context(&h.ctx, theme.clone());
     h.state_mut().ui.theme = theme;
     h.run_steps(4);
     h
