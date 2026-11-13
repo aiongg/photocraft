@@ -14,6 +14,9 @@ use super::view_xform::ViewXform;
 use super::{Document, PhotocraftApp, viewport_pages};
 use crate::gpu_canvas::ViewParams;
 
+#[cfg(test)]
+mod tests;
+
 /// What [`gpu_picture`] chooses from: document `idx` as a canvas shows it.
 pub(crate) struct GpuRequest<'a> {
     pub ctx: &'a egui::Context,

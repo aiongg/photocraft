@@ -20,6 +20,9 @@ use super::{DRect, Document, PhotocraftApp};
 /// detail textures may each lag a few passes behind.
 const LOG_LEN: usize = 8;
 
+#[cfg(test)]
+mod tests;
+
 /// What a source's picture showed at one [`Revision`]: the state [`damage_since`] compares.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Shown {
