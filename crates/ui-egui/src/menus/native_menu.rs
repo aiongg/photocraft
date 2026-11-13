@@ -751,7 +751,12 @@ pub fn run(app: &mut PhotocraftApp, ctx: &egui::Context) {
         if !crate::menus::modal_allows(app, &id) {
             continue;
         }
-        if let Err(e) = crate::menus::invoke(app, ctx, &id, serde_json::json!({})) {
+        let result = match crate::shortcut_dispatch::fire_view_owned(ctx, &id) {
+            Some(true) => Ok(serde_json::Value::Null),
+            Some(false) => Err("no document view".to_string()),
+            None => crate::menus::invoke(app, ctx, &id, serde_json::json!({})),
+        };
+        if let Err(e) = result {
             app.ui.status = e;
             app.ui.status_error = true;
         }
