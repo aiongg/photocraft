@@ -8,8 +8,7 @@ use craft::ui::canvas::AppPaint;
 
 use super::display::{hdr_preview, sync_display_lut};
 use super::filter_preview::{ensure_adjust_proxy, ensure_filter_preview, ensure_proxy_preview, filter_preview_display_doc};
-use super::paint::paint_gpu_view;
-use super::textures::{ensure_gpu, preview_bounds, redraw_focus, visible_doc_rect};
+use super::textures::{ensure_gpu, preview_bounds, redraw_focus};
 use super::view_xform::ViewXform;
 use super::{DRect, Document, PhotocraftApp, viewport_pages};
 use crate::gpu_canvas::ViewParams;
@@ -46,6 +45,7 @@ enum Shows {
 /// The GPU canvas's picture of one document this pass: everything of its [`ViewParams`] but the view, which a canvas
 /// gives when it paints. The caller checks `gpu_canvas::gpu_view_ok` first: the shader draws no mirrored or
 /// non-square-pixel view.
+#[derive(Clone)]
 pub(crate) struct GpuPicture {
     params: ViewParams,
     shows: Shows,
@@ -57,10 +57,6 @@ pub(crate) struct GpuPicture {
     /// Where the picture lies in the document, in document pixels: a preview's own area (`preview_bounds`), else the
     /// document's bounds.
     bounds: DRect,
-    /// The document's own size, which View › Pattern Preview tiles.
-    doc_size: [u32; 2],
-    /// View › Pattern Preview is on: copies of the picture around it, from the same texture.
-    pattern: bool,
 }
 
 /// The GPU canvas's picture of document `req.idx`, after bringing its texture up to date this pass: a live preview
@@ -68,7 +64,6 @@ pub(crate) struct GpuPicture {
 /// `None` when the GPU canvas cannot show it (no GPU canvas, a device fault), and the CPU canvas draws it.
 pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Option<GpuPicture> {
     let (ctx, idx, doc, output) = (req.ctx, req.idx, req.doc, req.output);
-    let pattern = app.ui.view.pattern_preview;
     let doc_size = [doc.size.width, doc.size.height];
     let base = |doc_key: u64, size: [u32; 2], view_key: u64, display: u8, hdr: Option<[f32; 2]>| ViewParams {
         doc: doc_key,
@@ -76,13 +71,10 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
         zoom: 1.0,
         center: [0.0, 0.0],
         rotation: 0.0,
-        shadow: false,
-        pixel_grid: false,
         view_key,
         display,
         output: output.unwrap_or(0),
         hdr,
-        offset: [0.0, 0.0],
     };
     // Live adjustment previews on big documents use a downsampled proxy (see proxy.rs), unless Preferences ›
     // Performance › Low Resolution Previews is off.
@@ -100,9 +92,9 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
         let params = base(key, preview_size, view_key, display, hdr_preview(app, doc));
         let growth = [(preview_size[0] as f32 - reduced[0] as f32) / 2.0, (preview_size[1] as f32 - reduced[1] as f32) / 2.0];
         let bounds = preview_bounds(doc.size, photocraft_geom::Size::new(preview_size[0], preview_size[1]), k);
-        return Some(GpuPicture { params, shows: Shows::Preview, k, growth, bounds, doc_size, pattern });
+        return Some(GpuPicture { params, shows: Shows::Preview, k, growth, bounds });
     }
-    let plain = |params: ViewParams, shows: Shows| GpuPicture { params, shows, k: 1, growth: [0.0, 0.0], bounds: doc.bounds(), doc_size, pattern };
+    let plain = |params: ViewParams, shows: Shows| GpuPicture { params, shows, k: 1, growth: [0.0, 0.0], bounds: doc.bounds() };
     if viewport_pages::show(app, ctx, idx, req.xf, req.zoom) {
         app.perf.gpu = true;
         let key = viewport_pages::stream_key(doc.id.0);
@@ -120,18 +112,8 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
 }
 
 impl GpuPicture {
-    /// The same picture with the shader's own drop shadow and pixel grid (a preview's texels are no document
-    /// pixels, so it never gets the grid). A framework canvas draws both itself, around and over the picture.
-    #[must_use]
-    pub(crate) fn framed(mut self, shadow: bool, pixel_grid: bool) -> Self {
-        self.params.shadow = shadow;
-        self.params.pixel_grid = pixel_grid && self.shows != Shows::Preview;
-        self
-    }
-
     /// Where the picture lies in the document, in document pixels: a reduced or size-changing preview's own area, else
     /// the document's bounds.
-    #[allow(dead_code, reason = "the document display of the framework Canvas body places it")]
     pub(crate) fn bounds(&self) -> DRect {
         self.bounds
     }
@@ -153,29 +135,15 @@ impl GpuPicture {
         }
     }
 
-    /// Paints the picture through `view` (its `rect` is the canvas rect the paint callback clips to), with its
-    /// Pattern Preview copies.
-    pub(crate) fn paint(&self, painter: &egui::Painter, view: &CanvasView) {
-        let copies = if self.pattern {
-            let xf = ViewXform {
-                rect: view.rect,
-                zoom: view.zoom as f32,
-                center: [view.center.x as f32, view.center.y as f32],
-                flip: view.flip_x,
-                rotation: view.rotation as f32,
-                aspect: view.aspect as f32,
-            };
-            let v = visible_doc_rect(&xf);
-            crate::pattern_preview::copies([v.x0, v.y0, v.x1, v.y1].map(f64::from), self.doc_size)
-        } else {
-            Vec::new()
-        };
-        paint_gpu_view(painter, view.rect, self.params(view), &copies);
-    }
-
-    /// The picture as the app's paint of a framework `RasterDisplay`.
-    #[allow(dead_code, reason = "the document display of the framework Canvas body paints it")]
+    /// The picture as the app's paint of a framework `RasterDisplay`, which calls it once for the document and once
+    /// for each View › Pattern Preview copy, with the view shifted to the copy. Each call is its own draw, keyed by
+    /// its place in the pass, so the copies reuse the same few uniform buffers as the view pans.
     pub(crate) fn into_paint<'a>(self) -> AppPaint<'a, CanvasView> {
-        AppPaint::new(move |cx, view| self.paint(&cx.painter, &view))
+        let mut n = 0u64;
+        AppPaint::new(move |cx, view| {
+            let key = if n == 0 { self.params.view_key } else { egui::Id::unique((self.params.view_key, "copy", n)).value() };
+            n += 1;
+            crate::gpu_canvas::GpuCanvas::paint(&cx.painter, view.rect, ViewParams { view_key: key, ..self.params(&view) });
+        })
     }
 }

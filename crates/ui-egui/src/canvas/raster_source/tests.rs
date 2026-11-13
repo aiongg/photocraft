@@ -88,7 +88,7 @@ fn composite_damage_since_the_shown_revision_follows_each_event() {
             Want::Everything,
         ),
     ];
-    check_damage(setup, |app, ctx, since| pass(&PhotoComposite::new(app, ctx, 0, None).unwrap(), since), &cases);
+    check_damage(setup, |app, ctx, since| pass(&CompositePrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn overlay_damage_since_the_shown_revision_follows_each_event() {
             Want::Everything,
         ),
     ];
-    check_damage(setup, |app, ctx, since| pass(&ChannelOverlay::new(app, ctx, 0, None).unwrap(), since), &cases);
+    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn read_reduces_from_the_region_origin() {
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
     app.run("select.deselect", json!({})).unwrap();
     let ctx = egui::Context::default();
-    let source = PhotoComposite::new(&mut app, &ctx, 0, None).unwrap();
+    let source = CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app);
     let (red, blue) = (Color32::from_rgb(255, 0, 0), Color32::from_rgb(0, 0, 255));
     assert_eq!(read(&source, PixelRect::new(1, 0, 3, 2), 2).pixels, vec![red]);
     assert_eq!(read(&source, PixelRect::new(0, 0, 4, 1), 1).pixels, vec![blue, red, red, blue]);
@@ -135,12 +135,12 @@ fn a_channel_view_draws_its_own_picture() {
     let mut app = app_with(8, 4, "#ffffff");
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 4, "height": 4})).unwrap();
     let ctx = egui::Context::default();
-    assert!(ChannelOverlay::new(&mut app, &ctx, 0, None).is_none(), "the plain composite has no overlay");
+    assert!(OverlayPrep::new(&mut app, &ctx, 0, None).is_none(), "the plain composite has no overlay");
     app.run("select.editInQuickMaskMode", json!({})).unwrap();
-    let px = read(&ChannelOverlay::new(&mut app, &ctx, 0, None).unwrap(), PixelRect::new(0, 0, 8, 1), 1).pixels;
+    let px = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
     assert_eq!(Color32::WHITE.blend(px[0]), Color32::WHITE, "selected: nothing over the composite");
     assert_eq!(px[6], Color32::from_rgba_premultiplied(128, 0, 0, 128), "masked: the rubylith");
-    let composite = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), PixelRect::new(0, 0, 8, 1), 1).pixels;
+    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
     assert_eq!(composite[6], Color32::WHITE, "the composite stays the document's");
 }
 
@@ -155,13 +155,13 @@ fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the
     view.set_color_visible(2, false);
     let ctx = egui::Context::default();
     let at = PixelRect::new(0, 0, 1, 1);
-    let overlay_before = read(&ChannelOverlay::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
-    let composite_before = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    let overlay_before = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
+    let composite_before = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
     let id = crate::adjust_dialog::open(&mut app, "image.adjustments.levels").unwrap();
     app.ui.dialog_mut(id).unwrap().fields.insert("inBlack".into(), json!(100));
     assert!(crate::adjust_preview::display_doc(&mut app, 0).is_some(), "the adjustment previews");
-    let overlay = read(&ChannelOverlay::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
-    let composite = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    let overlay = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
+    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
     assert_ne!(overlay, overlay_before, "the overlay shows the live preview");
     assert_eq!(composite, composite_before, "the composite shows the document");
 }

@@ -4,16 +4,12 @@ use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, Tokens
 use crate::theme::AppTheme;
 use craft::theme::ThemeId;
 
-/// The GPU canvas colours from Preferences › Transparency & Gamut.
+/// The GPU canvas's gamut warning colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
     let t = &app.session.prefs().transparency_and_gamut;
-    let [l, d] = t.colors();
     let f = |c: [u8; 3]| c.map(|v| v as f32 / 255.0);
     let g = prefs::parse_hex(&t.gamut_warning_color).unwrap_or([128; 3]);
     crate::gpu_canvas::CanvasStyle {
-        checker_square: t.square().unwrap_or(0.0),
-        checker_light: f(l),
-        checker_dark: f(d),
         gamut_color: f(g),
         gamut_opacity: t.gamut_warning_opacity as f32 / 100.0,
     }
