@@ -144,14 +144,11 @@ fn main() {
         {
             eprintln!("{method}: {v}");
         }
-        // The harness doesn't call raw_input_hook: feed queued synthetic input step by step.
-        loop {
-            let step = harness.state_mut().take_synthetic_step();
-            if step.is_empty() {
+        // The window host injects queued input one step per pass (the runtime's input hook).
+        let host = craft::ui::runtime::windows::WindowHost::of(&ctx);
+        for _ in 0..4 * craft::automation::synthetic::MAX_CLICKS {
+            if host.injected_idle() {
                 break;
-            }
-            for e in step {
-                harness.event(e);
             }
             harness.step();
         }

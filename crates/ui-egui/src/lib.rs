@@ -550,25 +550,13 @@ pub struct PhotocraftApp {
     pub(crate) live_adjust_preview: Option<adjust_preview::LiveAdjust>,
     /// The Levels dialog's Alt-drag clipping display over the canvas.
     pub(crate) levels_clipping: Option<levels_clipping::Cache>,
-    /// Synthetic input events queued by automation (`ui.click`, `ui.key`, …), injected next frame.
-    pub(crate) synthetic: Vec<egui::Event>,
-    /// The one synthetic batch currently being delivered.
-    ///
-    /// eframe preserves input appended by `raw_input_hook` across hidden (`update_logic_only`)
-    /// ticks, so draining another step every hidden tick would deliver several host iterations
-    /// as one burst. At most one batch is ever in flight; the next step waits for a pass.
-    synthetic_batch: Option<Vec<egui::Event>>,
-    /// A pass consumed the batch but returned before handling input (fonts not ready): put the
-    /// same events back on the next hook so the step is not lost. Cleared as soon as they are
-    /// re-appended, so two hidden ticks cannot deliver the same step twice.
-    synthetic_reinject: bool,
-    /// Document/focus identity the batch was created for. A batch queued against one document is
-    /// cancelled, not replayed, after the active document (including a switch away and back) or
-    /// the focus changes; an edit in the same document does not cancel it.
-    synthetic_snapshot: Option<SyntheticTarget>,
-    /// True only while a frame is processing synthetic automation input. It
-    /// makes shortcut- and dialog-triggered commands pass the same policy as
-    /// direct control calls.
+    /// The active document injected input was queued for (`ui.click`, `ui.key`, …), while it is
+    /// queued: a switch of the active document withdraws it (`withdraw_stale_input`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) input_queued_for: Option<InputTarget>,
+    /// True only while a pass's input carries injected automation input
+    /// (`WindowHost::injected_pass`). It makes shortcut- and dialog-triggered commands pass the
+    /// same policy as direct control calls.
     pub(crate) automation_input: bool,
     /// The direct control-command route keeps Actions playback synchronous and dialog-free.
     pub(crate) programmatic_playback: bool,
@@ -782,13 +770,13 @@ pub struct PhotocraftApp {
     live_tokens: theme::live::LiveTokens,
 }
 
-/// The state a synthetic input batch was queued for.
+/// The active document injected input was queued for.
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SyntheticTarget {
+struct InputTarget {
     /// The active document's generation: it changes on every switch of the active document, a
-    /// switch away and back included, and not on an edit, so an edit does not cancel a queued step.
+    /// switch away and back included, and not on an edit, so an edit does not withdraw the input.
     document: Option<u64>,
-    focus: Option<egui::Id>,
 }
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
 use super::METHODS;
 use super::inspect::inspect;
 use super::params::{
-    BUTTONS, KEY_MODIFIERS, MAX_CLICKS, MAX_SCREEN_POINT, POINTER_MODIFIERS, UI_SET_FIELDS, bool_field, err, f32_field, f32_range, input_choice,
-    input_modifiers, input_number, input_object, merged_object, modifiers_from, num_field, ok, screen_point, uint_field, whole_object,
+    BUTTONS, POINTER_MODIFIERS, UI_SET_FIELDS, bool_field, err, f32_field, f32_range, input_choice, input_modifiers, input_number, input_object, merged_object,
+    modifiers_from, num_field, ok, screen_point, uint_field, whole_object,
 };
 use super::{ControlRequest, DialogKind, PhotocraftApp, Reply, SHELL_DIALOG, Tool, ToolEvent, Value, json, run_waiting, tool_event};
 use photocraft_engine::jobs::{CancelReport, JobId};
@@ -1171,73 +1171,26 @@ fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u6
     run_waiting(app, wait_param(&req.params), |app| if apply { crate::prefs_ui::apply(app, id) } else { crate::dialogs::confirm(app, id) })
 }
 
-// ---- synthetic input: pointer events, clicks, keys, text ----
+// ---- synthetic input: pointer events, clicks, moves, wheel, keys, text, Caps Lock ----
 
+/// `ui.pointer` drives the tool host in document coordinates; the window methods go to craft-automation's
+/// synthetic input, which the window host injects pass by pass. Their document points map through the main
+/// canvas's view.
 fn input_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
-    let p = &req.params;
-    Some(match req.method.as_str() {
-        "ui.pointer" => pointer(app, ctx, p),
-        "ui.click" | "ui.move" => click(app, ctx, p, req.method == "ui.click"),
-        "ui.key" => key(app, ctx, p),
-        "ui.type" => {
-            let Some(text) = str_param(p, "text") else { return Some(err("missing `text`")) };
-            app.synthetic.push(egui::Event::Text(text.to_string()));
-            ctx.request_repaint();
+    if req.method == "ui.pointer" {
+        return Some(pointer(app, ctx, &req.params));
+    }
+    let view = crate::canvas::ViewXform::active(app);
+    let map = move |at: egui::Pos2| view.map(|xf| xf.to_screen(at.x, at.y));
+    let host = craft::ui::runtime::windows::WindowHost::of(ctx);
+    let queued = craft::automation::synthetic::input_method(&req.method, &req.params, &host, egui::ViewportId::ROOT, &map)?;
+    Some(match queued {
+        Ok(()) => {
+            app.input_queued_for = Some(app.input_target());
             Reply::AfterInput
         }
-        _ => return None,
+        Err(e) => err(e),
     })
-}
-
-fn click(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value, click: bool) -> Reply {
-    let fields: &[&str] = if click { &["x", "y", "button", "count"] } else { &["x", "y"] };
-    let parsed = (|| -> std::result::Result<_, String> {
-        let p = input_object(p, None, fields)?;
-        // Screen coordinates in points (as reported by ui.inspect window size).
-        let range = Some((-MAX_SCREEN_POINT, MAX_SCREEN_POINT));
-        let x = input_number(&p, "x", "x", range)?.unwrap_or(0.0) as f32;
-        let y = input_number(&p, "y", "y", range)?.unwrap_or(0.0) as f32;
-        let button = match input_choice(&p, "button", "button", &BUTTONS)?.unwrap_or("left") {
-            "right" | "secondary" => egui::PointerButton::Secondary,
-            "middle" => egui::PointerButton::Middle,
-            _ => egui::PointerButton::Primary,
-        };
-        let clicks = if click { uint_field(&p, "count")?.unwrap_or(1) } else { 0 };
-        if clicks > MAX_CLICKS {
-            return Err(format!("`count` must be at most {MAX_CLICKS} (got {clicks})"));
-        }
-        Ok((egui::pos2(x, y), button, clicks))
-    })();
-    let (pos, button, clicks) = match parsed {
-        Ok(parsed) => parsed,
-        Err(e) => return err(e),
-    };
-    app.synthetic.push(egui::Event::PointerMoved(pos));
-    for _ in 0..clicks {
-        app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: true, modifiers: Default::default() });
-        app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: false, modifiers: Default::default() });
-    }
-    ctx.request_repaint();
-    Reply::AfterInput
-}
-
-fn key(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
-    let parsed = (|| -> std::result::Result<_, String> {
-        let p = input_object(p, None, &["key", "modifiers", "shift", "alt", "command", "ctrl"])?;
-        let Some(name) = input_choice(&p, "key", "key", &[])? else { return Err("missing `key`".into()) };
-        let key = egui::Key::from_name(name).ok_or_else(|| format!("unknown key `{name}`"))?;
-        // Modifier flags may be top-level or grouped under "modifiers".
-        Ok((key, input_modifiers(&p, &KEY_MODIFIERS)?))
-    })();
-    let (key, m) = match parsed {
-        Ok(parsed) => parsed,
-        Err(e) => return err(e),
-    };
-    let modifiers = modifiers_from(&m);
-    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers });
-    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers });
-    ctx.request_repaint();
-    Reply::AfterInput
 }
 
 /// Simulated pen tilt/rotation of one `ui.pointer` event.
