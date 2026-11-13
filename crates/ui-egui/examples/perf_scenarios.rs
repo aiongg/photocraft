@@ -942,7 +942,7 @@ fn full_canvas_layer_scenarios(b: &mut Bench, sz: &Sizes) {
 }
 
 /// #1015, #9330: a huge document with one painted layer, zoomed out: times only the reduced CPU
-/// composite `canvas::ensure_texture` draws when the document is too large for GPU textures.
+/// composite the canvas draws when the document is too large for GPU textures.
 fn huge_document_scenarios(b: &mut Bench, sz: &Sizes) {
     let name = "zoomed-out reduced composite of the huge document with one painted layer";
     if !b.wanted(name) {
@@ -1442,7 +1442,7 @@ fn algorithm_scenarios(b: &mut Bench, sz: &Sizes) {
 }
 
 /// #4017: File > New at 10 × 5 m, 200 ppi (3.1 GP), and the first refresh of the canvas that
-/// draws a document too large for GPU textures (the reduced CPU canvas, `canvas::ensure_texture`).
+/// draws a document too large for GPU textures (the reduced CPU canvas).
 fn huge_new_scenario(b: &mut Bench, sz: &Sizes) {
     let name = "new 3 GP document + first reduced canvas refresh";
     if !b.wanted(name) {

@@ -9,10 +9,7 @@ pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
     let t = &app.session.prefs().transparency_and_gamut;
     let f = |c: [u8; 3]| c.map(|v| v as f32 / 255.0);
     let g = prefs::parse_hex(&t.gamut_warning_color).unwrap_or([128; 3]);
-    crate::gpu_canvas::CanvasStyle {
-        gamut_color: f(g),
-        gamut_opacity: t.gamut_warning_opacity as f32 / 100.0,
-    }
+    crate::gpu_canvas::CanvasStyle { gamut_color: f(g), gamut_opacity: t.gamut_warning_opacity as f32 / 100.0 }
 }
 
 /// Pasteboard colour from Preferences › Interface (`None` = the theme's default canvas).

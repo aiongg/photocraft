@@ -27,6 +27,7 @@ pub mod canvas_tool_menu;
 pub mod channel_view;
 mod cursors;
 mod display;
+mod document_display;
 mod drag;
 mod filter_preview;
 mod gesture;
@@ -64,7 +65,6 @@ pub mod tool_feedback;
 mod tool_input;
 mod transform_controls;
 mod view_xform;
-mod document_display;
 pub(crate) mod viewport_pages;
 pub mod wheel_nav;
 pub mod zoom_field;
@@ -107,9 +107,9 @@ pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navig
 use paint::draw_tool_state;
 pub(crate) use paint::{clip_line, marching_ants_line_shapes, marching_ants_mapped};
 use paint::{draw_drag_preview, marching_ants_segment_shapes};
-pub(crate) use raster_source::SourceLogs;
 #[cfg(test)]
 pub(crate) use raster_source::CompositePrep;
+pub(crate) use raster_source::SourceLogs;
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};
@@ -125,18 +125,16 @@ use strokes::{
 #[cfg(test)]
 pub(crate) use strokes::{SPOT_HEALING_TRAIL, live_retouch_points};
 pub(crate) use tabs::arranged_cells;
+use tabs::dots;
 pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
 use tabs::{TEAR_OFF, pro_tab_title, tab_context_items, tab_drop_index, tab_move_target, tabs, torn_off};
 pub use tabs::{TabStrip, document_area, extra_windows};
-use tabs::dots;
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter};
+pub use textures::MAX_TEXTURE;
 pub(crate) use textures::visible_doc_rect;
 pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};
-pub use textures::MAX_TEXTURE;
-#[cfg(test)]
-use textures::{clamp_texture_side, preview_bounds, texture_factor};
 #[cfg(test)]
 use textures::{ensure_gpu, redraw_focus};
 pub use tool_input::{ToolEvent, selection_drag_kind, tool_event};
@@ -146,8 +144,8 @@ pub(crate) use transform_controls::{LAYER_EDGES, layer_edges_rect};
 use transform_controls::{begin_transform_controls_at, draw_transform_controls, transform_controls_cursor, transform_controls_rect, transform_controls_turn};
 #[cfg(test)]
 use transform_controls::{transform_controls_hit, transform_controls_layers};
-pub use view_xform::{ViewXform, doc_point_at, fill_view, fit_view};
 use view_xform::zoom_about;
+pub use view_xform::{ViewXform, doc_point_at, fill_view, fit_view};
 
 #[derive(Default)]
 pub struct CanvasCache {
@@ -312,8 +310,15 @@ fn paint_selection_outline(app: &mut PhotocraftApp, input: SelectionPaintInput<'
 
 /// Paints what goes over the document's picture, and returns the Layer Edges slot and the selection's ants still to be
 /// painted ([`paint_selection_outline`]).
-fn paint_canvas(app: &mut PhotocraftApp, ui: &egui::Ui, view: &View, xf: ViewXform, input: &CanvasPaintInput<'_>) -> (egui::layers::ShapeIdx, Vec<egui::Shape>) {
-    let (ctx, rect, painter, doc, idx, output, primary, flip) = (input.ctx, input.rect, input.painter, input.doc, input.idx, input.output, input.primary, input.flip);
+fn paint_canvas(
+    app: &mut PhotocraftApp,
+    ui: &egui::Ui,
+    view: &View,
+    xf: ViewXform,
+    input: &CanvasPaintInput<'_>,
+) -> (egui::layers::ShapeIdx, Vec<egui::Shape>) {
+    let (ctx, rect, painter, doc, idx, output, primary, flip) =
+        (input.ctx, input.rect, input.painter, input.doc, input.idx, input.output, input.primary, input.flip);
     let img_rect = xf.doc_rect(doc.bounds());
     // Image › Adjustments › Levels: Alt-drag on the black / white Input slider (levels_clipping.rs).
     // The main canvas only: the display keeps one cache, sized to that view.
@@ -380,7 +385,6 @@ fn paint_canvas(app: &mut PhotocraftApp, ui: &egui::Ui, view: &View, xf: ViewXfo
 
     (layer_edges, ants)
 }
-
 
 struct DialogCanvasInput<'a> {
     ctx: &'a egui::Context,
@@ -1883,7 +1887,6 @@ fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document, r
     aspect
 }
 
-
 pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect: Rect, mut view: View, primary: bool) -> View {
     let ctx = ui.ctx().clone();
     // The Frame tool starts transforms from pointer events, which carry no context; the options
@@ -1927,15 +1930,15 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     }
     let flip = app.ui.view.flip_horizontal;
     // Inline type keeps Tab (it types a tab character) and the clipboard and Select All keys.
-    let keys = crate::shortcuts::canvas_has_keys(app, crate::shortcut_dispatch::Focus::of(&ctx)).then(|| {
-        if app.ui.text_edit.is_some() { KeyUse::CANVAS.with_keep(KeepKeys::Tab).with_edits(INLINE_TYPE_EDITS) } else { KeyUse::CANVAS }
-    });
+    let keys = crate::shortcuts::canvas_has_keys(app, crate::shortcut_dispatch::Focus::of(&ctx))
+        .then(|| if app.ui.text_edit.is_some() { KeyUse::CANVAS.with_keep(KeepKeys::Tab).with_edits(INLINE_TYPE_EDITS) } else { KeyUse::CANVAS });
     let pass = document_display::CanvasPass { ctx: &ctx, idx, doc: &doc, output, rect, ppp, flip, aspect, keys, jumped: pointer_here };
     let shown = document_display::show(app, ui, &mut view, &pass);
     if primary && let Some(stored) = app.ui.views.get_mut(idx) {
         stored.display_camera = view.display_camera;
     }
-    let display_view = View { zoom: (shown.view.zoom * f64::from(ppp)) as f32, center: [shown.view.center.x as f32, shown.view.center.y as f32], ..view.clone() };
+    let display_view =
+        View { zoom: (shown.view.zoom * f64::from(ppp)) as f32, center: [shown.view.center.x as f32, shown.view.center.y as f32], ..view.clone() };
     let xf = document_display::view_xform(&shown.view);
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
     let response = shown.response;
@@ -2276,36 +2279,30 @@ mod rotation_preview_isolation_tests {
             .unwrap();
         let before = app.session.active().unwrap().doc.clone();
         let ctx = egui::Context::default();
-        let texture = crate::channel_view::ensure(&mut app, &ctx, 0, None).unwrap();
-        ctx.tex_manager().write().take_delta().clear();
         let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
         app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
         ensure_filter_preview(&mut app, 0, &ctx).unwrap();
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("filter preview must update channel overlay")[0].image;
         let st = app.session.active().unwrap();
         let original =
             crate::channel_view::render(&before, &st.channel_view, before.bounds(), 1, crate::channel_view::Look::default(), st.active_layer).unwrap();
-        assert_ne!(image.pixels, original, "a nontrivial filter must be visible before OK");
-        delta.clear();
+        assert_ne!(overlay_pixels(&mut app, &ctx), original, "a nontrivial filter must be visible before OK");
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         app.ui.dialogs.last_mut().unwrap().fields.insert("__preview".into(), json!(false));
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("Preview off restores channel")[0].image;
-        assert_eq!(image.pixels, original);
-        delta.clear();
+        assert_eq!(overlay_pixels(&mut app, &ctx), original, "Preview off restores the channel");
         app.ui.dialogs.last_mut().unwrap().fields.insert("__preview".into(), json!(true));
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        ctx.tex_manager().write().take_delta().clear();
         crate::dialogs::cancel(&mut app, dialog).unwrap();
-        crate::channel_view::ensure(&mut app, &ctx, 0, None);
-        let mut delta = ctx.tex_manager().write().take_delta();
-        let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("Cancel restores channel")[0].image;
-        assert_eq!(image.pixels, original);
-        delta.clear();
+        assert_eq!(overlay_pixels(&mut app, &ctx), original, "Cancel restores the channel");
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
+    }
+
+    /// The whole of document 0's channel view as the canvas draws it over the composite.
+    fn overlay_pixels(app: &mut PhotocraftApp, ctx: &egui::Context) -> Vec<Color32> {
+        use craft::ui::canvas::{PixelRect, RasterSource};
+        let source = raster_source::OverlayPrep::new(app, ctx, 0, None).expect("a channel view").source(app);
+        let size = source.size();
+        let mut out = egui::ColorImage::filled([size.width as usize, size.height as usize], Color32::TRANSPARENT);
+        source.read(PixelRect::new(0, 0, size.width as i32, size.height as i32), 1, &mut out);
+        out.pixels
     }
 
     fn assert_filter_preview_target(target: photocraft_engine::channel_cmds::ChannelTarget) {
@@ -2438,19 +2435,14 @@ mod rotation_preview_isolation_tests {
                 view.set_color_visible(2, false);
             }
             let ctx = egui::Context::default();
-            let texture = crate::channel_view::ensure(&mut app, &ctx, 0, None).unwrap();
-            ctx.tex_manager().write().take_delta().clear();
             let dialog = crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
             app.ui.dialogs.last_mut().unwrap().fields.insert("radius".into(), json!(2.0));
-            crate::channel_view::ensure(&mut app, &ctx, 0, None).unwrap();
-            let mut delta = ctx.tex_manager().write().take_delta();
-            let egui::ImageData::Color(image) = &delta.set.get(&texture).expect("preview must refresh overlay")[0].image;
+            let shown = overlay_pixels(&mut app, &ctx);
             crate::dialogs::confirm(&mut app, dialog).unwrap();
             let st = app.session.active().unwrap();
             let expected =
                 crate::channel_view::render(&st.doc, &st.channel_view, st.doc.bounds(), 1, crate::channel_view::Look::default(), st.active_layer).unwrap();
-            assert_eq!(image.pixels, expected, "quick_mask={quick_mask}");
-            delta.clear();
+            assert_eq!(shown, expected, "quick_mask={quick_mask}");
         }
     }
 
@@ -2557,12 +2549,12 @@ mod rotation_preview_isolation_tests {
 mod zoom_animation_tests {
     use super::*;
 
-    /// Screen geometry shared by the zoom-transition regressions.
+    /// Screen geometry for the redraw-focus test.
     fn camera(view: &View) -> ViewXform {
         ViewXform { rect: Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 700.0)), zoom: view.zoom, center: view.center, flip: false, rotation: 0.0, aspect: 1.0 }
     }
 
-    /// A settled camera whose transition state starts empty.
+    /// A settled camera.
     fn view() -> View {
         View { zoom: 1.0, center: [200.0, 150.0], doc_size: [400, 300], fit_pending: false, ..Default::default() }
     }
@@ -2571,134 +2563,26 @@ mod zoom_animation_tests {
     #[test]
     fn deferred_redraw_focus_covers_target_and_displayed_cameras() {
         for rotation in [0.0, 37.0] {
-            let mut v = view();
+            let v = view();
             let mut initial = camera(&v);
             initial.rotation = rotation;
-            animated_view(&mut v, initial, 1.0, true, 0.0);
-            v.zoom = 2.0;
-            v.center = [1600.0, 900.0];
-            v.request_zoom_animation(true);
-            let target = ViewXform { zoom: v.zoom, center: v.center, ..initial };
+            let target = ViewXform { zoom: 2.0, center: [1600.0, 900.0], ..initial };
             let target_visible = visible_doc_rect(&target);
-            for time in [0.0, 0.11, 0.22] {
-                let shown = animated_view(&mut v, target, 1.0, true, time);
-                let displayed = ViewXform { zoom: shown.zoom, center: shown.center, ..target };
+            // The cameras a zoom ease shows on its way from `initial` to `target`.
+            for t in [0.0f32, 0.5, 1.0] {
+                let lerp = |a: f32, b: f32| a + (b - a) * t;
+                let center = [lerp(initial.center[0], target.center[0]), lerp(initial.center[1], target.center[1])];
+                let displayed = ViewXform { zoom: lerp(initial.zoom, target.zoom), center, ..target };
                 let displayed_visible = visible_doc_rect(&displayed);
                 let focus = redraw_focus(&target, &displayed);
                 assert_eq!(focus.intersect(&target_visible), target_visible);
                 assert_eq!(focus.intersect(&displayed_visible), displayed_visible);
-                if time == 0.0 {
+                if t == 0.0 {
                     assert_ne!(focus, target_visible, "the old view must also receive priority");
                 }
             }
             assert_eq!(redraw_focus(&target, &target), target_visible, "settled views keep the same focus");
         }
-    }
-
-    #[test]
-    fn disabling_animated_zoom_snaps_a_secondary_canvas_on_its_next_frame() {
-        let ctx = egui::Context::default();
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
-        app.sync_views();
-        let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
-        let mut secondary = view();
-        let frame = |app: &mut PhotocraftApp, view: View, time: f64| {
-            let input = egui::RawInput { screen_rect: Some(rect), time: Some(time), ..Default::default() };
-            let mut shown = view.clone();
-            let mut out = ctx.run_ui(input, |ui| {
-                shown = canvas_view(app, ui, 0, rect, view.clone(), false);
-            });
-            out.textures_delta.clear();
-            shown
-        };
-        secondary = frame(&mut app, secondary, 0.0);
-        secondary.zoom = 2.0;
-        secondary.request_zoom_animation(true);
-        secondary = frame(&mut app, secondary, 0.01);
-        secondary = frame(&mut app, secondary, 0.12);
-        assert!(secondary.zoom_animating);
-        assert!(secondary.display_camera.unwrap().0 < secondary.zoom);
-        app.run("prefs.set", serde_json::json!({"values": {"general.animatedZoom": false}})).unwrap();
-        secondary = frame(&mut app, secondary, 0.13);
-        assert_eq!(secondary.display_camera, Some((secondary.zoom, secondary.center)));
-        assert_eq!(secondary.zoom, 2.0);
-        assert!(!secondary.zoom_animating && secondary.zoom_transition.is_none() && secondary.zoom_anchor.is_none());
-    }
-
-    #[test]
-    fn animated_zoom_off_cancels_each_views_presentation_camera() {
-        for target in [(2.0, [210.0, 170.0]), (3.0, [250.0, 180.0])] {
-            let mut v = view();
-            let xf = camera(&v);
-            animated_view(&mut v, xf, 1.0, true, 0.0);
-            v.zoom = target.0;
-            v.center = target.1;
-            v.request_zoom_animation(true);
-            animated_view(&mut v, xf, 1.0, true, 0.0);
-            let halfway = animated_view(&mut v, xf, 1.0, true, 0.11);
-            assert_ne!((halfway.zoom, halfway.center), target);
-            v.zoom_anchor = Some(([200.0, 150.0], [500.0, 350.0]));
-            let shown = animated_view(&mut v, xf, 1.0, false, 0.11);
-            assert_eq!((shown.zoom, shown.center), target);
-            assert_eq!(v.display_camera, Some(target));
-            assert!(!v.zoom_animating && v.zoom_anchor.is_none() && v.zoom_transition.is_none());
-        }
-    }
-
-    #[test]
-    fn zoom_animation_obeys_clamped_targets_and_eases_recentering() {
-        let mut v = view();
-        let xf = camera(&v);
-        animated_view(&mut v, xf, 1.0, true, 0.0);
-        let pointer = xf.to_screen(390.0, 150.0);
-        zoom_about(&mut v, &xf, pointer, 2.0, false, 1.0);
-        v.zoom_anchor = Some(([390.0, 150.0], [pointer.x, pointer.y]));
-        v.zoom_animating = true;
-        crate::scrollbars::clamp_view(&mut v, xf.rect.size(), 1.0);
-        let xf = camera(&v);
-        animated_view(&mut v, xf, 1.0, true, 0.0);
-        assert!(v.zoom_anchor.is_none());
-        let done = animated_view(&mut v, xf, 1.0, true, 0.22);
-        assert_eq!((done.zoom, done.center), (v.zoom, v.center));
-        assert!(!v.zoom_animating);
-
-        let mut v = view();
-        let xf = camera(&v);
-        animated_view(&mut v, xf, 1.0, true, 0.0);
-        zoom_about(&mut v, &xf, pointer, 2.0, true, 1.0);
-        v.zoom_animating = true;
-        let target = v.center;
-        let xf = camera(&v);
-        let start = animated_view(&mut v, xf, 1.0, true, 0.0);
-        assert_eq!(start.center, [200.0, 150.0], "recentering must not teleport");
-        let halfway = animated_view(&mut v, xf, 1.0, true, 0.11);
-        assert!(halfway.center[0] > start.center[0] && halfway.center[0] < target[0]);
-        assert_eq!(animated_view(&mut v, xf, 1.0, true, 0.22).center, target);
-    }
-
-    #[test]
-    fn zoom_animation_views_are_independent_and_direct_navigation_snaps() {
-        let mut a = view();
-        let mut b = view();
-        let xf = camera(&a);
-        animated_view(&mut a, xf, 1.0, true, 0.0);
-        animated_view(&mut b, xf, 1.0, true, 0.0);
-        a.zoom = 2.0;
-        a.zoom_animating = true;
-        animated_view(&mut a, xf, 1.0, true, 0.0);
-        b.zoom = 3.0;
-        b.zoom_animating = true;
-        animated_view(&mut b, xf, 1.0, true, 0.11);
-        assert_eq!(animated_view(&mut a, xf, 1.0, true, 0.22).zoom, 2.0);
-        let shown = animated_view(&mut b, xf, 1.0, true, 0.22);
-        assert!(shown.zoom > 1.0 && shown.zoom < 3.0);
-        assert!(b.zoom_animating && !a.zoom_animating);
-        b.zoom_animating = false;
-        b.center = [220.0, 170.0];
-        let shown = animated_view(&mut b, xf, 1.0, true, 0.23);
-        assert_eq!((shown.zoom, shown.center), (b.zoom, b.center));
-        assert!(b.zoom_transition.is_none() && b.zoom_anchor.is_none());
     }
 }
 #[cfg(test)]

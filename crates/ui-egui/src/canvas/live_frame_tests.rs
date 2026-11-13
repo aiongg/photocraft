@@ -70,6 +70,7 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         v.center = [32.0, 32.0];
         v.doc_size = [64, 64];
         let ctx = egui::Context::default();
+        PhotocraftApp::setup_context(&ctx, Default::default());
         let rect = Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0));
         let mut pass = |app: &mut PhotocraftApp, view: View, time: f64| {
             let mut shown = view.clone();
