@@ -211,6 +211,9 @@ pub struct View {
     /// The zoom and centre the canvas showed last pass: a discrete zoom eases from there.
     #[serde(skip)]
     pub(crate) display_camera: Option<(f32, [f32; 2])>,
+    /// The canvas's zoom ease ran last pass: `display_camera` is part way to the camera above.
+    #[serde(skip)]
+    pub(crate) zoom_easing: bool,
 }
 
 impl View {
@@ -237,6 +240,7 @@ impl Default for View {
             zoom_animating: false,
             zoom_anchor: None,
             display_camera: None,
+            zoom_easing: false,
         }
     }
 }

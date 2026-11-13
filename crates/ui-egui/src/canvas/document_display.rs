@@ -221,7 +221,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         view.set_from(&next, ppp);
     }
     let shown_view = output.space.map_or(given, |space| space.view);
-    view.display_camera = Some(((shown_view.zoom * f64::from(ppp)) as f32, [shown_view.center.x as f32, shown_view.center.y as f32]));
+    // PhotoCraft keeps its camera unaligned: the canvas's eased view while a zoom eases, else the view it settled on.
+    let camera = match output.space {
+        Some(space) if space.easing() => space.view,
+        Some(space) => space.target(),
+        None => given,
+    };
+    view.display_camera = Some(((camera.zoom * f64::from(ppp)) as f32, [camera.center.x as f32, camera.center.y as f32]));
+    view.zoom_easing = output.space.is_some_and(|space| space.easing());
     let response = shown.inner.unwrap_or_else(|| ui.interact(rect, widget, Sense::click_and_drag()));
     Shown { output, view: shown_view, response }
 }

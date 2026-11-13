@@ -24,6 +24,8 @@ enum Want {
     Covers(PixelRect),
     /// The source cannot tell: the display reads everything.
     Everything,
+    /// The display reads this rectangle again: a region holding it, or everything.
+    Redraws(PixelRect),
 }
 
 type Step = fn(&mut PhotocraftApp);
@@ -59,6 +61,11 @@ fn check_damage(setup: fn() -> PhotocraftApp, run: fn(&mut PhotocraftApp, &egui:
                 assert_eq!(d.intersect(&bounds), d, "{event}: {d:?} leaves the document");
             }
             Want::Everything => assert_eq!(damage, None, "{event}"),
+            Want::Redraws(r) => {
+                if let Some(d) = damage {
+                    assert_eq!(d.intersect(r), *r, "{event}: {d:?} misses {r:?}");
+                }
+            }
         }
         assert_eq!(unknown, None, "{event}: a revision the source never handed out");
     }
@@ -108,6 +115,43 @@ fn overlay_damage_since_the_shown_revision_follows_each_event() {
                 app.run("view.layerMask", json!({"mode": "gray"})).unwrap();
             },
             Want::Everything,
+        ),
+    ];
+    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
+}
+
+/// A spot channel's edits and the picture under it redraw the overlay that prints it.
+#[test]
+fn overlay_damage_after_a_spot_edit_covers_the_ink() {
+    // A cyan spot inked everywhere, over white.
+    let setup = || {
+        let mut app = app_with(16, 8, "white");
+        app.run("select.all", json!({})).unwrap();
+        app.run("channel.newSpot", json!({"color": "#00ffff", "solidity": 0})).unwrap();
+        app
+    };
+    let all = PixelRect::new(0, 0, 16, 8);
+    let cases: [(&str, Step, Want); 3] = [
+        (
+            "the spot's colour",
+            |app| {
+                app.run("channel.options", json!({"channel": 0, "color": "#ff00ff"})).unwrap();
+            },
+            Want::Redraws(all),
+        ),
+        (
+            "the spot's solidity",
+            |app| {
+                app.run("channel.options", json!({"channel": 0, "solidity": 100})).unwrap();
+            },
+            Want::Redraws(all),
+        ),
+        (
+            "a fill under the spot",
+            |app| {
+                app.run("edit.fill", json!({"color": "#808080"})).unwrap();
+            },
+            Want::Redraws(all),
         ),
     ];
     check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
