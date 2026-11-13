@@ -669,12 +669,23 @@ fn tab_in_full_screen_shows_and_hides_the_chrome_and_leaving_restores_the_panels
     assert!(v.get("full_screen_chrome").is_none());
 }
 
+/// #6000: the Color tab lays itself out in every theme (its field takes the group's height), and
+/// only the Color tab: Swatches, Gradients and Patterns stay in the dock's scroll area.
+#[test]
+fn color_tab_lays_itself_out_in_both_tab_orders() {
+    for pro in [false, true] {
+        for (tab, name) in Group::Color.tabs(pro).iter().enumerate() {
+            assert_eq!(Group::Color.scrolls_itself(pro, tab), *name == "Color", "{name} (pro {pro})");
+        }
+    }
+}
+
 /// #2726: the Navigator sizes its own preview to the group (no outer scroll area, so no scroll
 /// fade over the thumbnail), keeping the document's aspect, with the zoom controls below it.
 #[test]
 fn navigator_preview_fills_its_group_and_keeps_aspect() {
-    assert!(Group::Navigator.scrolls_itself(0), "the Navigator tab lays itself out");
-    assert!(!Group::Navigator.scrolls_itself(1) && !Group::Navigator.scrolls_itself(2), "Histogram and Info still scroll");
+    assert!(Group::Navigator.scrolls_itself(false, 0), "the Navigator tab lays itself out");
+    assert!(!Group::Navigator.scrolls_itself(false, 1) && !Group::Navigator.scrolls_itself(false, 2), "Histogram and Info still scroll");
     for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
         let mut sizes = Vec::new();
         for tall in [150.0, 260.0, 420.0] {

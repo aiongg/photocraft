@@ -403,7 +403,7 @@ fn actions_list_grows_with_panel_and_keeps_footer_visible() {
         rect.top()
     };
     assert!(bottom(700.0) - bottom(300.0) > 350.0, "list uses the additional panel height instead of stopping at 320 px");
-    assert!(crate::dock::Group::History.scrolls_itself(1));
+    assert!(crate::dock::Group::History.scrolls_itself(false, 1));
 }
 
 /// #7646: an action's function key can take Shift and Command, as in Photoshop's Action
