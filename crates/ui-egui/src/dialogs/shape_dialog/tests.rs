@@ -246,7 +246,7 @@ fn agents_click_set_and_confirm_over_the_control_channel() {
     let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
         let (req, _rx) = crate::control::ControlRequest::new(method, params);
         match crate::control::handle(app, &ctx, &req) {
-            crate::control::Outcome::Done(v) => v,
+            crate::control::Reply::Done(v) => v,
             _ => panic!("deferred"),
         }
     };

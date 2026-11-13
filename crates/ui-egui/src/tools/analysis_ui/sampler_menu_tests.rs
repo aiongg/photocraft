@@ -5,7 +5,7 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 
 use crate::canvas_tool_menu::{SAMPLER_DELETE, SAMPLER_MENU};
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::{PhotocraftApp, Tool};
 
 /// A 200 x 100 document with the Color Sampler and samplers at (20, 20) and (120, 60).
@@ -20,7 +20,7 @@ fn app() -> (PhotocraftApp, egui::Context) {
 
 fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (req, _rx) = ControlRequest::new(method, params);
-    let Outcome::Done(v) = handle(app, ctx, &req) else { panic!("{method} replies at once") };
+    let Reply::Done(v) = handle(app, ctx, &req) else { panic!("{method} replies at once") };
     v
 }
 

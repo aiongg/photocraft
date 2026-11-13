@@ -763,13 +763,13 @@ mod tests {
     /// `app.save` writes the document directly: both must see the dragged box too.
     #[test]
     fn control_commands_mid_drag_see_the_dragged_box() {
-        use crate::control::{ControlRequest, Outcome, handle};
+        use crate::control::{ControlRequest, Reply, handle};
         use std::cell::RefCell;
         use std::rc::Rc;
         let call = |app: &mut PhotocraftApp, method: &str, params: serde_json::Value| {
             let (req, _rx) = ControlRequest::new(method, params);
             match handle(app, &egui::Context::default(), &req) {
-                Outcome::Done(v) => v,
+                Reply::Done(v) => v,
                 _ => panic!("{method}: expected an immediate reply"),
             }
         };

@@ -2,7 +2,7 @@
 //! centred 48-point cells; Classic Mode and Straighten keep their existing look.
 
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_overlay::{self, CropOverlay, OverlayShow, Polyline};
 use photocraft_ui_egui::crop_ui;
 use photocraft_ui_egui::state::Tool;
@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) {
     let (request, _rx) = ControlRequest::new(method, params.clone());
-    assert!(matches!(handle(app, ctx, &request), Outcome::Done(_)), "{method} {params}");
+    assert!(matches!(handle(app, ctx, &request), Reply::Done(_)), "{method} {params}");
 }
 
 fn app(classic: bool, show: OverlayShow) -> (PhotocraftApp, egui::Context) {

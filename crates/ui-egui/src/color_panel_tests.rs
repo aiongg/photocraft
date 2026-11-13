@@ -448,7 +448,7 @@ fn control_sets_the_mode_ramp_and_web_safe_ramp() {
     let call = |app: &mut PhotocraftApp, params: serde_json::Value| {
         let (req, _rx) = crate::control::ControlRequest::new("ui.set", params);
         match crate::control::handle(app, &ctx, &req) {
-            crate::control::Outcome::Done(v) => v["ok"] == true,
+            crate::control::Reply::Done(v) => v["ok"] == true,
             _ => panic!("expected an immediate reply"),
         }
     };

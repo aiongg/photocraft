@@ -6,7 +6,7 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, Shape, Vec2, access
 use egui_kittest::{Harness, kittest::Queryable};
 use photocraft_ui_egui::{
     PhotocraftApp,
-    control::{ControlRequest, Outcome, handle},
+    control::{ControlRequest, Reply, handle},
     dialogs, filter_dialog, i18n,
     theme::ThemeKind,
 };
@@ -40,7 +40,7 @@ fn control(h: &mut Harness<'_, PhotocraftApp>, method: &str, params: Value) {
     let ctx = h.ctx.clone();
     let (request, _rx) = ControlRequest::new(method, params);
     let result = handle(h.state_mut(), &ctx, &request);
-    assert!(matches!(result, Outcome::Done(v) if v["ok"] == true), "{method} succeeds");
+    assert!(matches!(result, Reply::Done(v) if v["ok"] == true), "{method} succeeds");
     h.run_steps(3);
 }
 

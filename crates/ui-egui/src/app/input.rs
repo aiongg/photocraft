@@ -25,11 +25,11 @@ pub(crate) fn read_dropped(_f: &dyn egui::DroppedFile) -> Result<Vec<u8>, String
 impl PhotocraftApp {
     /// The document/focus identity the in-flight synthetic batch was queued for.
     fn synthetic_target(&self, ctx: &egui::Context) -> SyntheticTarget {
-        SyntheticTarget { document: self.document_identity(), focus: ctx.memory(|m| m.focused()) }
+        SyntheticTarget { document: self.session.active().map(|_| self.session.active_generation()), focus: ctx.memory(|m| m.focused()) }
     }
 
     fn synthetic_target_matches(&self, ctx: &egui::Context) -> bool {
-        self.synthetic_snapshot.is_some_and(|queued| queued.matches(self.synthetic_target(ctx)))
+        self.synthetic_snapshot.is_some_and(|queued| queued == self.synthetic_target(ctx))
     }
 
     /// Put at most one queued synthetic batch into this pass's input.
@@ -104,16 +104,13 @@ impl PhotocraftApp {
 
     /// Drop the in-flight batch and fail the replies waiting on it.
     fn cancel_synthetic(&mut self, reason: &str) {
-        let pending = self.synthetic_batch.take().is_some() || !self.synthetic.is_empty();
+        self.synthetic_batch = None;
         self.synthetic.clear();
         self.synthetic_snapshot = None;
         self.synthetic_reinject = false;
         self.automation_input = false;
-        if pending || !self.input_waiters.is_empty() {
-            for w in self.input_waiters.drain(..) {
-                let _ = w.send(serde_json::json!({"ok": false, "error": format!("input cancelled: {reason}")}));
-            }
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.reply_input_cancelled(reason);
     }
 
     /// Next step of queued synthetic input (automation): events up to and including the first

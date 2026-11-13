@@ -282,7 +282,7 @@ fn menu_opens_the_dialog_and_params_skip_it() {
 /// A live control-channel target change must not redirect an admitted Fill, even after Reset.
 #[test]
 fn open_fill_retains_its_target_when_ui_set_changes_mask_target() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     for mask in [true, false] {
         let mut app = app();
         app.run(COMMAND, json!({"contents": "white"})).unwrap();
@@ -291,7 +291,7 @@ fn open_fill_retains_its_target_when_ui_set_changes_mask_target() {
         let ctx = egui::Context::default();
         let id = crate::menus::invoke(&mut app, &ctx, COMMAND, json!({})).unwrap()["dialog"].as_u64().unwrap();
         let (request, _) = ControlRequest::new("ui.set", json!({"maskTarget": !mask}));
-        let Outcome::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.set should finish immediately") };
+        let Reply::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.set should finish immediately") };
         assert_eq!(reply["ok"], true, "{reply}");
         assert_eq!(app.ui.mask_target, !mask);
         let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
@@ -318,7 +318,7 @@ fn open_fill_retains_its_target_when_ui_set_changes_mask_target() {
 /// Refuse a different document through window.open, or a different layer in the same document.
 #[test]
 fn open_fill_and_stroke_refuse_a_different_document_or_layer() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     for command in [COMMAND, crate::stroke_ui::COMMAND] {
         for change in ["document", "layer"] {
             let mut app = app();
@@ -338,7 +338,7 @@ fn open_fill_and_stroke_refuse_a_different_document_or_layer() {
             fields.insert("location".into(), json!("inside"));
             if change == "document" {
                 let (request, _) = ControlRequest::new("ui.window.open", json!({"document": 1}));
-                let Outcome::Done(_) = handle(&mut app, &ctx, &request) else { panic!("window.open should finish immediately") };
+                let Reply::Done(_) = handle(&mut app, &ctx, &request) else { panic!("window.open should finish immediately") };
                 assert_eq!(app.session.active_index(), Some(1), "the real control path changed the document while the dialog stayed open");
             } else {
                 app.session.select_layer(other_layer).unwrap();

@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::state::{DialogKind, Tool};
 use crate::tools::brush_refusal::brush_refusal_alert_tests::{alerts, app, refused, steps, stroke};
 
@@ -60,11 +60,11 @@ fn the_alert_is_listed_and_confirmed_over_the_control_channel() {
     let mut app = app(Tool::CloneStamp);
     stroke(&mut app);
     let (inspect, _rx) = ControlRequest::new("ui.inspect", json!({}));
-    let Outcome::Done(inspect) = handle(&mut app, &ctx, &inspect) else { panic!("ui.inspect replies at once") };
+    let Reply::Done(inspect) = handle(&mut app, &ctx, &inspect) else { panic!("ui.inspect replies at once") };
     let dialog = &inspect["result"]["dialogs"][0];
     assert_eq!(dialog["fields"]["message"], MESSAGE, "{inspect}");
     let (confirm, _rx) = ControlRequest::new("ui.dialog.confirm", json!({"dialog": dialog["id"]}));
-    assert!(matches!(handle(&mut app, &ctx, &confirm), Outcome::Done(v) if v["ok"] == true));
+    assert!(matches!(handle(&mut app, &ctx, &confirm), Reply::Done(v) if v["ok"] == true));
     assert!(alerts(&app).is_empty());
 }
 

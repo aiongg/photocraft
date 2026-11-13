@@ -3295,7 +3295,7 @@ mod multi_channel_ui_tests {
         let ctx = egui::Context::default();
         let set = |app: &mut PhotocraftApp, p: serde_json::Value| {
             let (req, _) = crate::control::ControlRequest::new("ui.set", p);
-            assert!(matches!(crate::control::handle(app, &ctx, &req), crate::control::Outcome::Done(v) if v["ok"] != false));
+            assert!(matches!(crate::control::handle(app, &ctx, &req), crate::control::Reply::Done(v) if v["ok"] != false));
         };
         for colors in [vec![0], vec![0, 2]] {
             for add in [false, true] {

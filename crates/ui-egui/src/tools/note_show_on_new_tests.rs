@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use super::{PhotocraftApp, Tool, ToolEvent, json};
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 
 /// Open a document with the Note tool active and no notes yet.
 fn note_tool() -> (PhotocraftApp, egui::Context) {
@@ -104,7 +104,7 @@ fn rejected_note_creation_does_not_change_visibility_or_selection() {
     }));
     app.automation_input = true;
     let (request, _reply) = ControlRequest::new("ui.pointer", json!({"events": [{"kind": "down", "x": 130, "y": 70}, {"kind": "up", "x": 130, "y": 70}]}));
-    let Outcome::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.pointer should reply immediately") };
+    let Reply::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.pointer should reply immediately") };
 
     assert_eq!(reply["ok"], true);
     assert_eq!(denials.get(), 1);

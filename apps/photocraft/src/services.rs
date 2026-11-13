@@ -1,6 +1,5 @@
 //! Native platform services: file dialogs (rfd), filesystem, codecs.
 
-use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_doc::Document;
 use photocraft_format::RecoveryStore;
 use photocraft_ui_egui::{FileDialogAnswer, FileDialogReply, FileDialogRequest, Recoverable, Services};
@@ -778,10 +777,6 @@ pub fn native(automation: Option<photocraft_automation::AuthorizedWorkspace>) ->
         automation_save,
         automation_command,
         automation_authorize,
-        encode_png: Some(Box::new(|w, h, rgba| {
-            let img = Image::from_u8(w, h, ChannelLayout::Rgba, rgba.to_vec()).map_err(|e| e.to_string())?;
-            photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &EncodeOptions::default()).map_err(|e| e.to_string())
-        })),
         inbox: None,
         open_url: Some(Box::new(|url: &str| open::that(url).map_err(|e| e.to_string()))),
         beep: Some(platform_beep),

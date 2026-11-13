@@ -566,7 +566,7 @@ fn save_for_web_authorizes_before_opening_a_picker() {
                 crate::dialogs::confirm(&mut app, id).unwrap_err()
             } else {
                 let (request, _) = crate::control::ControlRequest::new("ui.dialog.confirm", json!({"dialog": id}));
-                let crate::control::Outcome::Done(reply) = crate::control::handle(&mut app, &ctx, &request) else { panic!("expected immediate denial") };
+                let crate::control::Reply::Done(reply) = crate::control::handle(&mut app, &ctx, &request) else { panic!("expected immediate denial") };
                 assert_eq!(reply["ok"], false);
                 reply["error"].as_str().unwrap().to_string()
             };

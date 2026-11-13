@@ -10,7 +10,7 @@ use super::PenPath;
 use super::add_anchor_options_bar_tests::harness;
 use crate::PhotocraftApp;
 use crate::canvas::ViewXform;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::state::{Tool, ToolOptions};
 
 const GEAR: &str = "Set additional pen and path options";
@@ -118,7 +118,7 @@ fn the_setting_is_saved_inspected_and_reset() {
     let inspect = |app: &mut PhotocraftApp| {
         let (req, _rx) = ControlRequest::new("ui.inspect", json!({}));
         match handle(app, &ctx, &req) {
-            Outcome::Done(v) => v["result"]["toolOptions"]["pen_rubber_band"].clone(),
+            Reply::Done(v) => v["result"]["toolOptions"]["pen_rubber_band"].clone(),
             _ => panic!("ui.inspect: expected an immediate reply"),
         }
     };

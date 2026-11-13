@@ -29,6 +29,9 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         dialogs.push(json!({"id": SHELL_DIALOG, "kind": kind, "title": crate::workspace_ui::title(kind), "fields": fields}));
     }
     dialogs.extend(crate::discard_ui::inspect(app));
+    if let Value::Array(hosted) = craft::automation::dialogs::inspect(&app.framework.dialogs) {
+        dialogs.extend(hosted);
+    }
     // Last frame's task bar rect, unless the bar can't show now (hidden by `ui.set` before the
     // next draw).
     let task_bar_rect = app.ui.task_bar_shown.filter(|_| crate::crop_task_bar::eligible(app));
@@ -137,42 +140,4 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "histogram": crate::histogram_panel::inspect(app),
         "cameraRaw": app.camera_raw.as_ref().map(|d| d.describe(&app.ui.camera_raw_scope, &app.ui.camera_raw_preview)),
     })
-}
-
-pub fn save_screenshot(app: &mut PhotocraftApp, image: &egui::ColorImage, path: Option<&str>) -> Value {
-    let [w, h] = image.size;
-    let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-    save_screenshot_rgba(app, w, h, &rgba, path)
-}
-
-/// Encode already-flattened RGBA pixels. The capture lifecycle uses this after dropping the
-/// retained [`egui::ColorImage`], so the encoder's input copy and the retained image do not
-/// overlap in memory (see `PhotocraftApp::finish_captures`).
-pub fn save_screenshot_rgba(app: &mut PhotocraftApp, w: usize, h: usize, rgba: &[u8], path: Option<&str>) -> Value {
-    let png = match app.services.encode_png.as_ref() {
-        Some(enc) => enc(w as u32, h as u32, rgba),
-        None => Err("no PNG encoder configured".into()),
-    };
-    let Some(path) = path else {
-        return match png {
-            Ok(bytes) => json!({
-                "ok": true,
-                "result": {
-                    "base64": base64::engine::general_purpose::STANDARD.encode(bytes),
-                    "mime": "image/png",
-                    "width": w,
-                    "height": h,
-                }
-            }),
-            Err(error) => json!({"ok": false, "error": error}),
-        };
-    };
-    let result = png.and_then(|bytes| match app.services.automation_write.as_mut() {
-        Some(write) => write(path, &bytes),
-        None => Err("automation write authority is not configured".into()),
-    });
-    match result {
-        Ok(()) => json!({"ok": true, "result": {"path": path, "width": w, "height": h}}),
-        Err(e) => json!({"ok": false, "error": e}),
-    }
 }

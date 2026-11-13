@@ -13,7 +13,7 @@
 use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::canvas::{ToolEvent, ViewXform, tool_event};
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_ui;
 use serde_json::{Value, json};
 
@@ -54,7 +54,7 @@ fn crop_app(s: Setup) -> PhotocraftApp {
 fn pointer(app: &mut PhotocraftApp, params: Value) {
     let ctx = egui::Context::default();
     let (req, _rx) = ControlRequest::new("ui.pointer", params);
-    let Outcome::Done(v) = handle(app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
+    let Reply::Done(v) = handle(app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
     assert_eq!(v["ok"], true, "{v}");
 }
 

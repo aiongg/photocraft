@@ -34,7 +34,7 @@ fn app() -> PhotocraftApp {
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let (req, _rx) = control::ControlRequest::new(method, params);
     match control::handle(app, &egui::Context::default(), &req) {
-        control::Outcome::Done(v) => v,
+        control::Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

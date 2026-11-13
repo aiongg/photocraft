@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 use super::{Item, current, enabled, engine_call, items, labels, pattern_stamp_choices, pattern_stamp_pick};
 use crate::PhotocraftApp;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::state::Tool;
 
 /// The reference application's Pattern Stamp Mode list, top to bottom.
@@ -65,7 +65,7 @@ fn app(layer: bool) -> PhotocraftApp {
 fn call(app: &mut PhotocraftApp, ctx: &Context, method: &str, params: Value) -> Value {
     let (req, _rx) = ControlRequest::new(method, params);
     match handle(app, ctx, &req) {
-        Outcome::Done(v) => v,
+        Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

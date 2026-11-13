@@ -160,7 +160,7 @@ fn undo_steps_back_through_the_transform_not_the_document() {
 fn execute(h: &mut Harness<'static, PhotocraftApp>, command: &str) -> bool {
     let ctx = h.ctx.clone();
     let (req, _rx) = crate::control::ControlRequest::new("engine.execute", json!({"command": command}));
-    let crate::control::Outcome::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &req) else {
+    let crate::control::Reply::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &req) else {
         panic!("{command}: expected an immediate reply");
     };
     h.run_steps(2);

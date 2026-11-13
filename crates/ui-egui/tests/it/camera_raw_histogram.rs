@@ -11,7 +11,7 @@ fn invoke(h: &mut Harness<'_, PhotocraftApp>, params: Value) -> Value {
     let ctx = h.ctx.clone();
     let (request, _) = control::ControlRequest::new("ui.menu.invoke", json!({"id": "filter.cameraRaw", "params": params}));
     let outcome = control::handle(h.state_mut(), &ctx, &request);
-    assert!(matches!(outcome, control::Outcome::Done(_)), "dialog control failed");
+    assert!(matches!(outcome, control::Reply::Done(_)), "dialog control failed");
     control::inspect(h.state(), &ctx)["cameraRaw"].clone()
 }
 

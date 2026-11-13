@@ -1,4 +1,4 @@
-use super::{Outcome, PhotocraftApp, Value, json};
+use super::{PhotocraftApp, Reply, Value, json};
 
 /// The fields `ui.set` reads. Anything else is rejected before a field is applied, and every
 /// field's value is validated before the first one is applied, so a typo, an unknown field, a
@@ -65,12 +65,12 @@ pub const MAX_CLICKS: u64 = 256;
 /// display, yet small enough that egui's pointer delta between two such points stays finite.
 pub const MAX_SCREEN_POINT: f64 = 1e6;
 
-pub(super) fn ok(v: Value) -> Outcome {
-    Outcome::Done(json!({"ok": true, "result": v}))
+pub(super) fn ok(v: Value) -> Reply {
+    Reply::Done(json!({"ok": true, "result": v}))
 }
 
-pub(super) fn err(e: impl std::fmt::Display) -> Outcome {
-    Outcome::Done(json!({"ok": false, "error": e.to_string()}))
+pub(super) fn err(e: impl std::fmt::Display) -> Reply {
+    Reply::Done(json!({"ok": false, "error": e.to_string()}))
 }
 
 /// A `ui.set` boolean field: `Ok(None)` when absent, an error when present with another type.

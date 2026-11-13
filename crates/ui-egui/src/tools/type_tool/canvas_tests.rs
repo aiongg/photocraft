@@ -1527,7 +1527,7 @@ fn temporary_type_transform_noop_cancel_and_stale_capture() {
 
 #[test]
 fn temporary_type_transform_control_roundtrip_and_input_safety() {
-    use crate::control::{ControlRequest, Outcome};
+    use crate::control::{ControlRequest, Reply};
     let initial = Affine::translate(400.0, 350.0);
     let (mut app, id) = transform_app(true, false, initial);
     // A document selection must not restrict a text-layer transformation.
@@ -1537,7 +1537,7 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
     let ctx = egui::Context::default();
     let call = |app: &mut PhotocraftApp, params| {
         let (req, _) = ControlRequest::new("ui.pointer", params);
-        let Outcome::Done(result) = crate::control::handle(app, &ctx, &req) else { panic!("expected immediate pointer reply") };
+        let Reply::Done(result) = crate::control::handle(app, &ctx, &req) else { panic!("expected immediate pointer reply") };
         assert_eq!(result["ok"], true, "{result}");
     };
     call(&mut app, json!({"command": true, "events": [{"kind": "down", "x": a[0], "y": a[1]}]}));

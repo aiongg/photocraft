@@ -1134,7 +1134,7 @@ fn a_control_request_never_writes_the_sidecar() {
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     let commit = json!({"id": "filter.cameraRaw", "params": {"ui": {"set": {"contrast": 15}, "commit": true}}});
     let (req, _rx) = crate::control::ControlRequest::new("ui.menu.invoke", commit);
-    let crate::control::Outcome::Done(reply) = crate::control::handle(&mut app, &ctx, &req) else { panic!("expected a reply") };
+    let crate::control::Reply::Done(reply) = crate::control::handle(&mut app, &ctx, &req) else { panic!("expected a reply") };
     assert_eq!(reply["ok"], true, "{reply}");
     assert!(app.camera_raw.is_none(), "committed");
     assert!(written.lock().unwrap().is_empty(), "no sidecar from a control request");

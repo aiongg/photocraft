@@ -71,7 +71,7 @@ impl Driver {
                 let params = json!({"dialog":self.dialog()?,"field":event.get("field"),"value":event.get("value")});
                 let (req, _rx) = control::ControlRequest::new("ui.dialog.set", params);
                 match control::handle(&mut self.app, &self.ctx, &req) {
-                    control::Outcome::Done(v) if v.get("ok") == Some(&json!(true)) => {}
+                    control::Reply::Done(v) if v.get("ok") == Some(&json!(true)) => {}
                     _ => return Err("ui.dialog.set failed".into()),
                 }
             }

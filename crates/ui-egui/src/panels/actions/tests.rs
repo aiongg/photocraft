@@ -2230,7 +2230,7 @@ fn a_step_dialog_keeps_its_continuation_token() {
     for token in [second_token.clone(), Value::Null, json!("invalid"), json!({"action": "Second", "from": 1})] {
         let (request, _) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": first, "field": RESUME, "value": token}));
         let response = crate::control::handle(&mut app, &egui::Context::default(), &request);
-        assert!(matches!(response, crate::control::Outcome::Done(ref v) if v["error"].as_str().is_some_and(|e| e.contains("read-only"))));
+        assert!(matches!(response, crate::control::Reply::Done(ref v) if v["error"].as_str().is_some_and(|e| e.contains("read-only"))));
         assert_eq!(app.ui.dialog_mut(first).unwrap().fields[RESUME], first_token);
         assert_eq!(app.ui.dialog_mut(second).unwrap().fields[RESUME], second_token);
         assert_eq!(app.paused_playbacks.paused.len(), 2);

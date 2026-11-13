@@ -553,7 +553,7 @@ fn changing_workspace_during_a_drag_cancels_the_stale_gesture() {
 fn control_set(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Value {
     let (request, _) = crate::control::ControlRequest::new("ui.set", params);
     match crate::control::handle(app, ctx, &request) {
-        crate::control::Outcome::Done(value) => value,
+        crate::control::Reply::Done(value) => value,
         _ => panic!("ui.set must reply synchronously"),
     }
 }

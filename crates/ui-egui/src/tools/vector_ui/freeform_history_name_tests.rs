@@ -203,13 +203,13 @@ fn history_name_is_validated_before_mutation_and_defaults_are_preserved() {
 /// Drives the control channel to check release-only commits, including a selected endpoint start.
 #[test]
 fn control_pointer_strokes_commit_only_on_release_with_the_freeform_label() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     let ctx = egui::Context::default();
     for mode in ["path", "shape"] {
         let mut app = app(mode);
         let call = |app: &mut PhotocraftApp, params| {
             let (req, _rx) = ControlRequest::new("ui.pointer", params);
-            let Outcome::Done(reply) = handle(app, &ctx, &req) else { panic!("expected pointer reply") };
+            let Reply::Done(reply) = handle(app, &ctx, &req) else { panic!("expected pointer reply") };
             assert_eq!(reply["ok"], true, "{reply}");
         };
         for offset in [0.0, 90.0] {

@@ -313,7 +313,7 @@ fn a_ui_pointer_click_changes_nothing() {
         for p in [[70.3, 50.7], [55.17, 41.9], [83.01, 59.33], [150.3, 50.7], [10.9, 90.1]] {
             let ev = json!([{"kind": "down", "x": p[0], "y": p[1]}, {"kind": "up", "x": p[0], "y": p[1]}]);
             let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"events": ev}));
-            let crate::control::Outcome::Done(v) = crate::control::handle(&mut app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
+            let crate::control::Reply::Done(v) = crate::control::handle(&mut app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
             assert_eq!(v["ok"], true, "{v}");
             assert_eq!((app.ui.crop_rect, app.ui.crop_angle), (rect, angle), "click at {p:?}, frame at {deg}°");
             assert_eq!(crate::crop_ui::is_enabled(&app, "edit.undo"), None, "click at {p:?}, frame at {deg}°: a box Undo step");
@@ -714,7 +714,7 @@ fn ui_pointer_drives_the_default_mode_in_press_coordinates() {
             {"kind": "up", "x": pts[1][0], "y": pts[1][1]},
         ]);
         let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"events": ev}));
-        let crate::control::Outcome::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
+        let crate::control::Reply::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("ui.pointer didn't finish") };
         assert_eq!(v["ok"], true, "{v}");
     };
     pointer(&mut app, [[70.0, 50.0], [80.0, 55.0]]);

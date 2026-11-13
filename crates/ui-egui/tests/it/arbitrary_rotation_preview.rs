@@ -3,7 +3,7 @@
 
 use egui_kittest::kittest::Queryable;
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ fn harness() -> Option<Harness> {
 fn control(h: &mut Harness, method: &str, params: Value) -> Value {
     let ctx = h.ctx.clone();
     let (req, _rx) = ControlRequest::new(method, params);
-    let Outcome::Done(value) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} did not finish") };
+    let Reply::Done(value) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} did not finish") };
     assert_eq!(value["ok"], true, "{method}: {value}");
     h.run_steps(4);
     value["result"].clone()

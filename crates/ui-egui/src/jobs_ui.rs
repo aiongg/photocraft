@@ -21,7 +21,6 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
 
 use egui::{Color32, Rect, RichText, Sense, Stroke, vec2};
 use photocraft_doc::DocId;
@@ -29,7 +28,7 @@ use photocraft_engine::jobs::{CancelRefused, JobCtx, JobEvent, JobId, JobInfo, J
 use serde_json::{Value, json};
 
 use crate::theme::Tokens;
-use crate::{ControlResponse, ExportSettings, PhotocraftApp, SaveFileFn, notices};
+use crate::{ExportSettings, PhotocraftApp, SaveFileFn, notices};
 
 /// Delay before the modal progress dialog appears (quick jobs finish without it).
 pub const DIALOG_DELAY_MS: f64 = 250.0;
@@ -160,8 +159,6 @@ pub struct SaveJob {
 /// The shell's job bookkeeping.
 #[derive(Default)]
 pub struct JobsUi {
-    /// Control replies waiting for a job to end.
-    pub(crate) waiters: Vec<(JobId, Sender<ControlResponse>)>,
     /// Background opens, in tab order.
     pub opens: Vec<OpenTab>,
     /// Sets of files opened together that still have members opening (see [`OpenOrder`]).
@@ -592,21 +589,17 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
     {
         beep();
     }
-    // Control requests waiting on this job.
-    let reply = match &e.outcome {
-        JobOutcome::Done(v) if cancelled_batch => json!({"ok": false, "error": "cancelled", "result": v}),
-        JobOutcome::Done(v) => json!({"ok": true, "result": v}),
-        JobOutcome::Failed(err) => json!({"ok": false, "error": err}),
-        JobOutcome::Cancelled => json!({"ok": false, "error": "cancelled"}),
-    };
-    app.jobs.waiters.retain(|(job, tx)| {
-        if *job == e.id {
-            let _ = tx.send(reply.clone());
-            false
-        } else {
-            true
-        }
-    });
+    // Control requests waiting on this job; a cancelled batch reports the files it finished.
+    #[cfg(not(target_arch = "wasm32"))]
+    app.reply_job(
+        e.id,
+        &match &e.outcome {
+            JobOutcome::Done(v) if cancelled_batch => json!({"ok": false, "error": "cancelled", "result": v}),
+            JobOutcome::Done(v) => json!({"ok": true, "result": v}),
+            JobOutcome::Failed(err) => json!({"ok": false, "error": err}),
+            JobOutcome::Cancelled => json!({"ok": false, "error": "cancelled"}),
+        },
+    );
     // A Free Transform commit's session ends with its job (then reported like any job).
     crate::transform_tool::on_job_event(app, &e);
     if crate::prefs_ui::on_recovery_event(app, &e) {

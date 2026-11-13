@@ -45,7 +45,7 @@ fn toggle(h: &mut Harness) {
     let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id": "view.patternPreview"}));
     let ctx = h.ctx.clone();
     let response = photocraft_ui_egui::control::handle(h.state_mut(), &ctx, &request);
-    assert!(matches!(response, photocraft_ui_egui::control::Outcome::Done(_)));
+    assert!(matches!(response, photocraft_ui_egui::control::Reply::Done(_)));
 }
 
 fn near(a: [u8; 3], b: [u8; 3]) -> bool {

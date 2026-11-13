@@ -346,10 +346,10 @@ fn move_controls_fixture() -> (Harness<'static, PhotocraftApp>, [LayerId; 2]) {
 
 fn move_pointer(h: &mut Harness<'static, PhotocraftApp>, control: bool, kind: &str, [x, y]: [f32; 2]) {
     if control {
-        use crate::control::{ControlRequest, Outcome};
+        use crate::control::{ControlRequest, Reply};
         let (request, _) = ControlRequest::new("ui.pointer", json!({"events": [{"kind": kind, "x": x, "y": y}]}));
         let ctx = h.ctx.clone();
-        let Outcome::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &request) else { panic!("expected pointer reply") };
+        let Reply::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &request) else { panic!("expected pointer reply") };
         assert_eq!(reply["ok"], true, "{reply}");
     } else {
         let xf = ViewXform::active(h.state()).unwrap();

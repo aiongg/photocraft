@@ -25,7 +25,7 @@
 //! `--hover-at X,Y` leaves the pointer there without a click, for what a tool shows under it (the
 //! brush outline, the Clone Source overlay).
 
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::Value;
 
@@ -139,7 +139,7 @@ fn main() {
         let label = format!("{method} {}", params.get("command").and_then(Value::as_str).unwrap_or(""));
         let (req, _rx) = ControlRequest::new(&method, params);
         let outcome = handle(harness.state_mut(), &ctx, &req);
-        if let Outcome::Done(v) = &outcome
+        if let Reply::Done(v) = &outcome
             && v.get("ok") == Some(&Value::Bool(false))
         {
             eprintln!("{method}: {v}");
@@ -185,7 +185,7 @@ fn main() {
         harness.step();
     }
     let (req, _rx) = ControlRequest::new("ui.inspect", Value::Null);
-    if let Outcome::Done(v) = handle(harness.state_mut(), &ctx, &req) {
+    if let Reply::Done(v) = handle(harness.state_mut(), &ctx, &req) {
         println!("perf: {}", v["result"]["perf"]["timings"]);
     }
     println!(

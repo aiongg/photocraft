@@ -196,7 +196,7 @@ fn control_requests_wait_for_jobs_unless_asked_not_to() {
     let ctx = h.ctx.clone();
     let (req, _rx) = crate::ControlRequest::new("engine.execute", json!({"command": "filter.blur.gaussianBlur", "params": {"radius": 2}}));
     let job = match crate::control::handle(h.state_mut(), &ctx, &req) {
-        crate::control::Outcome::AfterJob(job) => job,
+        crate::control::Reply::AfterJob(job) => JobId(job),
         _ => panic!("expected a deferred reply"),
     };
     assert!(h.state().session.jobs().iter().any(|j| j.id == job) || h.state().session.jobs_with_recent().iter().any(|j| j.id == job));
@@ -210,13 +210,13 @@ fn control_requests_wait_for_jobs_unless_asked_not_to() {
 
     // `wait: false` replies with the job id at once.
     let (req, _rx) = crate::ControlRequest::new("engine.execute", json!({"command": "filter.blur.gaussianBlur", "params": {"radius": 2}, "wait": false}));
-    let crate::control::Outcome::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!("expected an immediate reply") };
+    let crate::control::Reply::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!("expected an immediate reply") };
     let id = v["result"]["job"].as_u64().unwrap();
     let (req, _rx) = crate::ControlRequest::new("jobs.cancel", json!({"job": id}));
-    let crate::control::Outcome::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!() };
+    let crate::control::Reply::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!() };
     assert_eq!(v["ok"], true, "{v}");
     let (req, _rx) = crate::ControlRequest::new("jobs.cancel", json!({"job": 99999}));
-    let crate::control::Outcome::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!() };
+    let crate::control::Reply::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!() };
     assert_eq!(v["ok"], false);
 }
 
@@ -271,10 +271,10 @@ fn menu_and_dialog_requests_wait_for_jobs_unless_asked_not_to() {
     };
     // The job a request started: deferred while waiting, `{job, pending}` at once otherwise.
     // Lets it land and checks the filter's result.
-    let land = |h: &mut Harness<'static, PhotocraftApp>, what: &str, outcome: crate::control::Outcome, wait: bool| {
+    let land = |h: &mut Harness<'static, PhotocraftApp>, what: &str, outcome: crate::control::Reply, wait: bool| {
         let job = match (outcome, wait) {
-            (crate::control::Outcome::AfterJob(job), true) => job,
-            (crate::control::Outcome::Done(v), false) => {
+            (crate::control::Reply::AfterJob(job), true) => JobId(job),
+            (crate::control::Reply::Done(v), false) => {
                 assert_eq!(v["result"]["pending"], true, "{what}: {v}");
                 JobId(v["result"]["job"].as_u64().unwrap())
             }
@@ -288,7 +288,7 @@ fn menu_and_dialog_requests_wait_for_jobs_unless_asked_not_to() {
         let before = steps(&h);
         let outcome = control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.blurMore", "wait": wait}));
         land(&mut h, "Blur More", outcome, wait);
-        let crate::control::Outcome::Done(v) = control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.gaussianBlur"})) else { panic!("dialog") };
+        let crate::control::Reply::Done(v) = control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.gaussianBlur"})) else { panic!("dialog") };
         let dialog = v["result"]["dialog"].as_u64().expect("Gaussian Blur opens its dialog");
         control(&mut h, "ui.dialog.set", json!({"dialog": dialog, "field": "radius", "value": 3}));
         let outcome = control(&mut h, "ui.dialog.confirm", json!({"dialog": dialog, "wait": wait}));
@@ -637,7 +637,7 @@ fn old_file(test: &str) -> String {
 fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value) -> Value {
     let (req, _rx) = crate::ControlRequest::new(method, params);
     let ctx = h.ctx.clone();
-    let crate::control::Outcome::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!("{method} replies at once") };
+    let crate::control::Reply::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!("{method} replies at once") };
     v
 }
 
@@ -974,7 +974,7 @@ fn printing_keeps_drawing_and_reports_only_the_final_spooler_result() {
         assert!(h.state().session.job(id).is_some(), "Esc cannot retract a submitted job");
         let (request, _) = crate::control::ControlRequest::new("jobs.cancel", json!({"job": id.0}));
         let ctx = h.ctx.clone();
-        let crate::control::Outcome::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &request) else { panic!("cancel replies immediately") };
+        let crate::control::Reply::Done(reply) = crate::control::handle(h.state_mut(), &ctx, &request) else { panic!("cancel replies immediately") };
         assert_eq!(reply["result"]["cancelled"], 0, "control must not falsely report cancellation: {reply}");
         let st = h.state_mut().session.active_mut().unwrap();
         st.saved_revision = st.revision;

@@ -11,7 +11,7 @@
 
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::canvas::ViewXform;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_mode::kept_inside;
 use photocraft_ui_egui::crop_ui::{angle, center, corners};
 use serde_json::{Value, json};
@@ -53,7 +53,7 @@ fn app(frame: [f64; 4]) -> (PhotocraftApp, egui::Context) {
 /// Runs one control-channel request, which must succeed.
 fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) {
     let (req, _rx) = ControlRequest::new(method, params.clone());
-    assert!(matches!(handle(app, ctx, &req), Outcome::Done(_)), "{method} {params}");
+    assert!(matches!(handle(app, ctx, &req), Reply::Done(_)), "{method} {params}");
 }
 
 /// The point 500 px right of the frame's centre turned `deg` degrees clockwise about it: a press

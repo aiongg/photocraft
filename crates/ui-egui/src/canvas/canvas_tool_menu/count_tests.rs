@@ -5,7 +5,7 @@
 use serde_json::{Value, json};
 
 use super::*;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 
 /// A 64 × 48 document with a second pixel layer (active) and one count marker at 20,20.
 fn app() -> (PhotocraftApp, egui::Context) {
@@ -21,7 +21,7 @@ fn app() -> (PhotocraftApp, egui::Context) {
 pub(crate) fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (req, _rx) = ControlRequest::new(method, params);
     match handle(app, ctx, &req) {
-        Outcome::Done(v) => v,
+        Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

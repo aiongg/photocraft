@@ -3,7 +3,7 @@
 use photocraft_engine::Session;
 use photocraft_geom::Rect;
 use photocraft_ui_egui::canvas::{ToolEvent, tool_event};
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::{Value, json};
 use std::time::Instant;
@@ -11,8 +11,8 @@ use std::time::Instant;
 fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Result<(), Box<dyn std::error::Error>> {
     let (request, _) = ControlRequest::new("ui.menu.invoke", params);
     match handle(app, ctx, &request) {
-        Outcome::Done(value) if value.get("ok") != Some(&Value::Bool(false)) => Ok(()),
-        Outcome::Done(value) => Err(format!("control failed: {value}").into()),
+        Reply::Done(value) if value.get("ok") != Some(&Value::Bool(false)) => Ok(()),
+        Reply::Done(value) => Err(format!("control failed: {value}").into()),
         _ => Err("expected an inline workspace response".into()),
     }
 }
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for app in &mut apps {
         let (request, _) = ControlRequest::new("ui.inspect", Value::Null);
-        let Outcome::Done(state) = handle(app, &ctx, &request) else { return Err("expected inline state".into()) };
+        let Reply::Done(state) = handle(app, &ctx, &request) else { return Err("expected inline state".into()) };
         if state.pointer("/result/distort/liquify/maxDisplacement").and_then(Value::as_f64).is_none_or(|value| value <= 0.0) {
             return Err("the benchmark did not deform the Liquify field".into());
         }
