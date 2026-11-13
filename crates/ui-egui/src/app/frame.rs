@@ -54,6 +54,9 @@ impl PhotocraftApp {
     /// Shared logic body. A wrapping host owns the final reset tail after its own work.
     pub fn logic_frame(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.cap_frame_rate();
+        // Shortcuts run in this phase: a pass whose input carries an injected step acts for the
+        // automation client here too.
+        self.automation_input = WindowHost::of(ctx).injected_pass();
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
         // Caps Lock once per frame: the state injected input holds (`ui.capsLock`), else the OS's
         // (`Services::caps_lock`); the canvas cursor block needs it before the frame renders.
@@ -213,6 +216,12 @@ impl PhotocraftApp {
         crate::render_path::frame(self);
         // Every frame that started its stage record closes it, whichever way `ui_body` returns.
         let drawn = self.ui_body(ui);
+        // What an injected step changed is the target of the rest of its request: only a change
+        // between passes withdraws queued input (`withdraw_stale_input`).
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.input_queued_for.is_some() && WindowHost::of(&ctx).injected_pass() {
+            self.input_queued_for = Some(self.input_target());
+        }
         let ui_ms = gpu_canvas::now_ms() - t0;
         // A GPU measurement lands a frame or two after the refresh it belongs to. Refreshes
         // carry them out, but the last refresh before the app settles has none following it, so
