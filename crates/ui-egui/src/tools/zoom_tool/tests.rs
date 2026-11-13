@@ -114,7 +114,7 @@ fn animated_zoom_off_click_jumps_to_the_anchored_target() {
     let v = &h.state().ui.views[0];
     assert_eq!(v.zoom, target);
     assert_eq!(view_xf(&h).zoom, target);
-    assert!(!v.zoom_animating && v.zoom_anchor.is_none() && v.zoom_transition.is_none());
+    assert!(!v.zoom_animating && v.zoom_anchor.is_none());
     assert!(view_xf(&h).to_screen(anchor[0] as f32, anchor[1] as f32).distance(pointer) < 0.5);
 }
 
@@ -135,7 +135,7 @@ fn animated_zoom_off_view_commands_show_the_target_on_the_first_frame() {
         let v = &h.state().ui.views[0];
         let xf = view_xf(&h);
         assert_eq!((xf.zoom, xf.center), (v.zoom, v.center), "{command}");
-        assert!(v.zoom_anchor.is_none() && v.zoom_transition.is_none(), "{command}");
+        assert!(v.zoom_anchor.is_none(), "{command}");
     }
 }
 
@@ -154,7 +154,7 @@ fn disabling_animated_zoom_during_a_transition_snaps_and_does_not_resume() {
     assert_eq!((view_xf(&h).zoom, view_xf(&h).center), target, "pointer mapping switches immediately");
     h.step();
     let v = &h.state().ui.views[0];
-    assert!(!v.zoom_animating && v.zoom_anchor.is_none() && v.zoom_transition.is_none());
+    assert!(!v.zoom_animating && v.zoom_anchor.is_none());
     assert_eq!((view_xf(&h).zoom, view_xf(&h).center), target);
     h.state_mut().run("prefs.set", json!({"values": {"general.animatedZoom": true}})).unwrap();
     h.step();

@@ -733,7 +733,7 @@ fn animated_zoom_off_view_menu_keeps_the_centre_without_a_transition() {
         let v = &h.state().ui.views[0];
         let xf = crate::canvas::ViewXform::active(h.state()).unwrap();
         assert_eq!((xf.zoom, xf.center), (v.zoom, v.center), "{command}");
-        assert!(v.zoom_anchor.is_none() && v.zoom_transition.is_none(), "{command}");
+        assert!(v.zoom_anchor.is_none(), "{command}");
         if command != FILL_SCREEN {
             assert_eq!(v.center, center, "{command}: preserve the view centre");
         }

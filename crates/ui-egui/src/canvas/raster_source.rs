@@ -91,6 +91,12 @@ pub(crate) struct SourceLogs {
 }
 
 impl SourceLogs {
+    /// The revision and preview key (display key folded in) of the composite the canvas showed last.
+    #[cfg(test)]
+    pub(crate) fn composite_seen(&self) -> Option<(u64, u64)> {
+        self.composite.entries.back().map(|(_, shown)| (shown.revision, shown.key))
+    }
+
     /// The pictures that showed a preview `was_preview` tells count as the committed document from now on, so the
     /// commit's damage refreshes only what it changed ([`super::textures::shown_as_document`]). The composite's keys
     /// carry the display's key `display_key`; the channel view's are raw.
