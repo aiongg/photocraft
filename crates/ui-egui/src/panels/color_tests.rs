@@ -22,6 +22,11 @@ fn color_tab(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp
 }
 
 /// The Hue Cube's field.
+/// The foreground (0) or background (1) well: the pair's wells are radio buttons.
+fn well<'a>(h: &'a egui_kittest::Harness<'_, PhotocraftApp>, i: usize) -> egui_kittest::Node<'a> {
+    h.query_all_by_role(egui::accesskit::Role::RadioButton).nth(i).expect("a well")
+}
+
 fn field(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Rect {
     h.get_by_label("Saturation and brightness").rect()
 }
@@ -144,7 +149,7 @@ fn background_edits_recolour_nothing() {
     app.session.tools.background = [0.0, 0.0, 0.0, 1.0];
     let mut h = color_tab(app);
     let before = steps(h.state());
-    h.get_by_label("Background color").click();
+    well(&h, 1).click();
     h.run_steps(2);
     let f = field(&h);
     // The field's top-left: no saturation, full brightness.
@@ -226,14 +231,14 @@ fn swap_and_default_colors_recolour_selected_type() {
 fn a_click_on_the_edited_well_opens_its_color_picker() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = color_tab(app);
-    for (well, target) in [("Background color", "background"), ("Foreground color", "foreground")] {
+    for (i, well_name, target) in [(1, "Background color", "background"), (0, "Foreground color", "foreground")] {
         h.state_mut().ui.dialogs.clear();
-        h.get_by_label(well).click();
+        well(&h, i).click();
         h.run_steps(2);
-        assert!(h.state().ui.dialogs.is_empty(), "{well}: the first click only makes it the edited well");
-        h.get_by_label(well).click();
+        assert!(h.state().ui.dialogs.is_empty(), "{well_name}: the first click only makes it the edited well");
+        well(&h, i).click();
         h.run_steps(2);
-        let [d] = h.state().ui.dialogs.as_slice() else { panic!("{well}: one Color Picker") };
+        let [d] = h.state().ui.dialogs.as_slice() else { panic!("{well_name}: one Color Picker") };
         assert_eq!(d.fields.get("__colorPicker").and_then(Value::as_str), Some(target));
     }
 }
