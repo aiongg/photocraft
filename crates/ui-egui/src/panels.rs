@@ -1181,11 +1181,11 @@ mod swatch_type_tests {
     use super::*;
     use egui_kittest::Harness;
 
-    /// The Color field only acts on an edit. Its h/s/v round trip isn't exact for every colour
-    /// (#D8452E isn't), and writing it back every frame would recolour selected type the moment it
-    /// was selected.
+    /// The Color panel only acts on an edit. A colour's round trip through the panel's models isn't
+    /// exact for every colour (#D8452E isn't), and writing it back every frame would recolour
+    /// selected type the moment it was selected.
     #[test]
-    fn idle_color_field_leaves_the_foreground_and_selected_type_alone() {
+    fn idle_color_panel_leaves_the_foreground_and_selected_type_alone() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 200})).unwrap();
         let id = app.run("type.create", json!({"text": "Hello world", "size": 40, "x": 20, "y": 100, "color": "#ffffff"})).unwrap()["layer"].as_u64().unwrap();
@@ -1204,7 +1204,7 @@ mod swatch_type_tests {
             resize: None,
             preedit: None,
         });
-        let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| color_field(app, ui), app);
+        let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::panels::color::panel(app, ui), app);
         h.run_steps(4);
         assert_eq!(h.state().session.tools.foreground, fg);
         let st = h.state().session.active().unwrap();
