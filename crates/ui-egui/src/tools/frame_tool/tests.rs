@@ -200,7 +200,7 @@ fn frame_creation_handles_render_at_native_scales() {
     let _guard = photocraft_testkit::gpu_lock();
     let out = std::path::PathBuf::from(out);
     std::fs::create_dir_all(&out).unwrap();
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for (width, height) in [(1280.0, 720.0), (800.0, 480.0)] {
             for scale in [1.0, 2.0] {
                 let mut app = app();

@@ -177,7 +177,7 @@ fn held_z_menu_keeps_its_existing_pressed_point_anchor() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(4);
         h.event(egui::Event::Key { key: egui::Key::Z, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
         h.step();

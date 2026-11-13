@@ -1,6 +1,8 @@
 use super::dialogs::open_preferences;
-use super::fields::{choice_label, color_of, preference_matches};
-use super::{AppearanceMode, Color32, DarkTheme, LightTheme, Map, PhotocraftApp, RichText, SavedTheme, Sense, ThemeKind, Tokens, Value, json, prefs, vec2};
+use super::fields::{color_of, preference_matches};
+use super::{AppearanceMode, Color32, Map, PhotocraftApp, RichText, Sense, Tokens, Value, json, prefs, vec2};
+use crate::theme::AppTheme;
+use craft::theme::ThemeId;
 
 /// The GPU canvas colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {
@@ -31,33 +33,16 @@ pub fn pasteboard_color(app: &PhotocraftApp) -> Option<Color32> {
     })
 }
 
-pub(super) fn selected_theme(interface: &prefs::Interface, system: Option<egui::Theme>) -> ThemeKind {
+/// The suite theme and mode the preferences show: the slot of the appearance mode, which `Auto`
+/// takes from the system.
+pub(super) fn selected_theme(interface: &prefs::Interface, system: Option<egui::Theme>) -> (ThemeId, bool) {
     let light = match interface.appearance_mode {
         AppearanceMode::Light => true,
         AppearanceMode::Dark => false,
         AppearanceMode::Auto => system == Some(egui::Theme::Light),
     };
-    if light {
-        match interface.light_theme {
-            LightTheme::StudioLight => ThemeKind::StudioLight,
-            LightTheme::ProLightGray => ThemeKind::ProLightGray,
-            LightTheme::ProLight => ThemeKind::ProLight,
-            LightTheme::Classic => ThemeKind::Classic,
-            LightTheme::Adwaita => ThemeKind::Adwaita,
-            LightTheme::BreezeLight => ThemeKind::BreezeLight,
-            LightTheme::SoftLight => ThemeKind::SoftLight,
-        }
-    } else {
-        match interface.dark_theme {
-            DarkTheme::Pro => ThemeKind::Pro,
-            DarkTheme::ProMedium => ThemeKind::ProMedium,
-            DarkTheme::Studio => ThemeKind::Studio,
-            DarkTheme::SolarizedDark => ThemeKind::SolarizedDark,
-            DarkTheme::AdwaitaDark => ThemeKind::AdwaitaDark,
-            DarkTheme::BreezeDark => ThemeKind::BreezeDark,
-            DarkTheme::SoftDark => ThemeKind::SoftDark,
-        }
-    }
+    let slot = if light { &interface.light_theme } else { &interface.dark_theme };
+    (ThemeId::parse(slot).unwrap_or_else(|_| ThemeId::suite_default()), !light)
 }
 
 pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -70,56 +55,47 @@ pub(crate) fn cycle_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
         app.ui.status = e;
         return;
     }
-    let selected = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
+    let (id, dark) = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
+    let selected = app.framework.theme_for(&id, dark);
     if app.ui.theme != selected {
         app.apply_theme(ctx, selected);
     }
 }
 
-/// Photoshop's four interface brightnesses, darkest first.
-const BRIGHTNESSES: [ThemeKind; 4] = [ThemeKind::Pro, ThemeKind::ProMedium, ThemeKind::ProLightGray, ThemeKind::ProLight];
+/// Photoshop's four interface brightnesses, darkest first: the suite theme id and whether it is
+/// shown dark.
+const BRIGHTNESSES: [(&str, bool); 4] = [("craft.pro", true), ("craft.artcraft", true), ("craft.pro-light-gray", false), ("craft.pro", false)];
 
 /// Darken Interface (⇧⌘F1, `lighter` false) and Lighten Interface (⇧⌘F2): the next of
 /// Photoshop's four brightnesses from the theme on screen, stopping at either end, as in
 /// Photoshop. Another theme steps from the nearest brightness: Medium Gray for a dark one, Light
 /// Gray for a light one. The choice is saved like picking it in Preferences › Interface.
 pub(crate) fn step_brightness(app: &mut PhotocraftApp, ctx: &egui::Context, lighter: bool) -> Result<(), String> {
-    let current = app.ui.theme;
-    let at = BRIGHTNESSES.iter().position(|k| *k == current).unwrap_or(if crate::theme::Tokens::for_kind(current).dark() { 1 } else { 2 });
+    let current = (app.ui.theme.id().as_str(), app.ui.theme.is_dark());
+    let at = BRIGHTNESSES.iter().position(|k| *k == current).unwrap_or(if current.1 { 1 } else { 2 });
     let next = if lighter { (at + 1).min(BRIGHTNESSES.len() - 1) } else { at.saturating_sub(1) };
-    let Some(&kind) = BRIGHTNESSES.get(next) else { return Ok(()) };
-    if kind == current {
+    let Some(&(id, dark)) = BRIGHTNESSES.get(next) else { return Ok(()) };
+    if (id, dark) == current {
         return Ok(());
     }
-    app.run("prefs.set", json!({"path": "interface.theme", "value": kind.id()}))?;
+    let slot = if dark { "interface.darkTheme" } else { "interface.lightTheme" };
+    let mode = if dark { "dark" } else { "light" };
+    app.run("prefs.set", json!({"values": {slot: id, "interface.appearanceMode": mode}}))?;
     sync_appearance(app, ctx);
     Ok(())
 }
 
-pub(super) const LIGHT_THEME_OPTIONS: &[(&str, ThemeKind)] = &[
-    ("proLight", ThemeKind::ProLight),
-    ("proLightGray", ThemeKind::ProLightGray),
-    ("studioLight", ThemeKind::StudioLight),
-    ("classic", ThemeKind::Classic),
-    ("adwaita", ThemeKind::Adwaita),
-    ("breezeLight", ThemeKind::BreezeLight),
-    ("softLight", ThemeKind::SoftLight),
-];
+/// The suite themes the Light Theme row offers, in PhotoCraft's order.
+pub(super) const LIGHT_THEME_OPTIONS: &[&str] =
+    &["craft.pro", "craft.pro-light-gray", "craft.studio", "craft.classic", "craft.adwaita", "craft.breeze", "craft.soft"];
 
-pub(super) const DARK_THEME_OPTIONS: &[(&str, ThemeKind)] = &[
-    ("proMedium", ThemeKind::ProMedium),
-    ("pro", ThemeKind::Pro),
-    ("studio", ThemeKind::Studio),
-    ("solarizedDark", ThemeKind::SolarizedDark),
-    ("adwaitaDark", ThemeKind::AdwaitaDark),
-    ("breezeDark", ThemeKind::BreezeDark),
-    ("softDark", ThemeKind::SoftDark),
-];
+/// The suite themes the Dark Theme row offers, in PhotoCraft's order.
+pub(super) const DARK_THEME_OPTIONS: &[&str] =
+    &["craft.artcraft", "craft.pro", "craft.studio", "craft.solarized-dark", "craft.adwaita", "craft.breeze", "craft.soft"];
 
-pub(super) fn favorite_theme_groups(favorites: &[SavedTheme]) -> (Vec<ThemeKind>, Vec<ThemeKind>) {
-    let group = |options: &[(&str, ThemeKind)]| {
-        options.iter().filter_map(|(id, kind)| SavedTheme::parse(id).filter(|theme| favorites.contains(theme)).map(|_| *kind)).collect()
-    };
+/// The favorite themes of each row, as the theme and whether it is the dark one.
+pub(super) fn favorite_theme_groups(favorites: &[String]) -> (Vec<ThemeId>, Vec<ThemeId>) {
+    let group = |options: &[&str]| options.iter().filter(|id| favorites.iter().any(|f| f == *id)).filter_map(|id| ThemeId::parse(id).ok()).collect();
     (group(LIGHT_THEME_OPTIONS), group(DARK_THEME_OPTIONS))
 }
 
@@ -134,20 +110,25 @@ pub(crate) fn appearance_context_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui
     if !light.is_empty() || !dark.is_empty() {
         ui.separator();
     }
-    for kind in light {
-        if ui.selectable_label(app.ui.theme == kind, tl!(kind.label())).clicked() {
-            app.set_theme(ui.ctx(), kind);
-            ui.close();
-        }
+    for id in light {
+        favorite_item(app, ui, &id, false);
     }
     if has_light && !dark.is_empty() {
         ui.separator();
     }
-    for kind in dark {
-        if ui.selectable_label(app.ui.theme == kind, tl!(kind.label())).clicked() {
-            app.set_theme(ui.ctx(), kind);
-            ui.close();
-        }
+    for id in dark {
+        favorite_item(app, ui, &id, true);
+    }
+}
+
+/// One favorite theme in the appearance button's menu.
+fn favorite_item(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &ThemeId, dark: bool) {
+    let shown = app.ui.theme.id() == id && app.ui.theme.is_dark() == dark;
+    let name = app.framework.theme_name(id, dark);
+    if ui.selectable_label(shown, tl!(&name)).clicked() {
+        let theme = app.framework.theme_for(id, dark);
+        app.set_theme(ui.ctx(), theme);
+        ui.close();
     }
 }
 
@@ -195,7 +176,8 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A restored or embedding-supplied pin must not suppress native appearance events.
     ctx.set_theme(egui::ThemePreference::System);
     // The native service also covers Wayland sessions where winit has no system theme.
-    let selected = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
+    let (id, dark) = selected_theme(&app.session.prefs().interface, system_theme(app, ctx));
+    let selected = app.framework.theme_for(&id, dark);
     if app.ui.theme != selected {
         app.apply_theme(ctx, selected);
     }
@@ -205,11 +187,11 @@ pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// outlined when chosen. The name is the tooltip and the accessible label. A star badge on its
 /// corner adds the theme to (or removes it from) the favourites listed by the appearance
 /// button's menu; it shows while the swatch is hovered, and stays for a favourite.
-fn theme_swatch(ui: &mut egui::Ui, kind: ThemeKind, id: &str, selected: &mut String, favorites: &mut Vec<SavedTheme>) {
+fn theme_swatch(ui: &mut egui::Ui, dark: bool, id: &str, selected: &mut String, favorites: &mut Vec<String>) {
     const BADGE: f32 = 7.0;
     let t = Tokens::get(ui.ctx());
-    let p = Tokens::for_kind(kind);
-    let label = tl!(&choice_label(id)).to_string();
+    let p = ThemeId::parse(id).ok().and_then(|id| AppTheme::palette(&id, dark)).unwrap_or_default().tokens();
+    let label = tl!(AppTheme::palette_label(id, dark).unwrap_or(id)).to_string();
     let on = selected.as_str() == id;
     let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 26.0), Sense::click());
     let painter = ui.painter();
@@ -229,8 +211,7 @@ fn theme_swatch(ui: &mut egui::Ui, kind: ThemeKind, id: &str, selected: &mut Str
     if resp.on_hover_text(&label).clicked() {
         *selected = id.to_string();
     }
-    let Some(theme) = SavedTheme::parse(id) else { return };
-    let favorite = favorites.contains(&theme);
+    let favorite = favorites.iter().any(|f| f == id);
     let center = rect.right_top() + vec2(-3.0, 3.0);
     let badge = egui::Rect::from_center_size(center, vec2(BADGE * 2.0, BADGE * 2.0));
     if !(favorite || ui.rect_contains_pointer(rect.union(badge))) {
@@ -247,22 +228,22 @@ fn theme_swatch(ui: &mut egui::Ui, kind: ThemeKind, id: &str, selected: &mut Str
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{action}: {label}")));
     if response.clicked() {
         if favorite {
-            favorites.retain(|saved| *saved != theme);
+            favorites.retain(|saved| saved != id);
         } else {
-            favorites.push(theme);
+            favorites.push(id.to_owned());
         }
     }
 }
 
 /// A grid row of theme swatches, marked Active when the appearance mode shows this family.
-fn theme_row(ui: &mut egui::Ui, title: &str, active: bool, selected: &mut String, favorites: &mut Vec<SavedTheme>, options: &[(&str, ThemeKind)]) {
+fn theme_row(ui: &mut egui::Ui, title: &str, dark: bool, active: bool, selected: &mut String, favorites: &mut Vec<String>, options: &[&str]) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(tl!(title)).color(t.text_dim));
     ui.horizontal(|ui| {
         // Room for the favourite star badges on the swatch corners.
         ui.spacing_mut().item_spacing.x = 6.0;
-        for (id, kind) in options {
-            theme_swatch(ui, *kind, id, selected, favorites);
+        for id in options {
+            theme_swatch(ui, dark, id, selected, favorites);
         }
         if active {
             ui.add_space(6.0);
@@ -305,14 +286,14 @@ pub(super) fn appearance_rows(ui: &mut egui::Ui, obj: &mut Map<String, Value>, s
     }
     let light_active = mode == "light" || (mode == "auto" && system == Some(egui::Theme::Light));
     obj.insert("appearanceMode".into(), json!(mode));
-    let mut light = obj.get("lightTheme").and_then(Value::as_str).unwrap_or("studioLight").to_string();
-    let mut dark = obj.get("darkTheme").and_then(Value::as_str).unwrap_or("proMedium").to_string();
-    let mut favorites: Vec<SavedTheme> = obj.get("favoriteThemes").cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
+    let mut light = obj.get("lightTheme").and_then(Value::as_str).unwrap_or("craft.pro").to_string();
+    let mut dark = obj.get("darkTheme").and_then(Value::as_str).unwrap_or("craft.artcraft").to_string();
+    let mut favorites: Vec<String> = obj.get("favoriteThemes").cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
     if rows.light {
-        theme_row(ui, "Light Theme", light_active, &mut light, &mut favorites, LIGHT_THEME_OPTIONS);
+        theme_row(ui, "Light Theme", false, light_active, &mut light, &mut favorites, LIGHT_THEME_OPTIONS);
     }
     if rows.dark {
-        theme_row(ui, "Dark Theme", !light_active, &mut dark, &mut favorites, DARK_THEME_OPTIONS);
+        theme_row(ui, "Dark Theme", true, !light_active, &mut dark, &mut favorites, DARK_THEME_OPTIONS);
     }
     obj.insert("lightTheme".into(), json!(light));
     obj.insert("darkTheme".into(), json!(dark));

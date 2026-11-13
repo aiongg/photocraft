@@ -8,17 +8,17 @@ use photocraft_ui_egui::{
     PhotocraftApp,
     control::{ControlRequest, Reply, handle},
     dialogs, filter_dialog, i18n,
-    theme::ThemeKind,
+    theme::AppTheme,
 };
 use serde_json::{Map, Value, json};
 
 const COMMAND: &str = "filter.blur.radialBlur";
 
 fn harness() -> Harness<'static, PhotocraftApp> {
-    themed_harness(ThemeKind::Pro, vec2(1000.0, 800.0))
+    themed_harness(AppTheme::pro(), vec2(1000.0, 800.0))
 }
 
-fn themed_harness(theme: ThemeKind, size: Vec2) -> Harness<'static, PhotocraftApp> {
+fn themed_harness(theme: AppTheme, size: Vec2) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.run("paint.stroke", json!({"points": [[8, 8, 1]], "size": 4, "color": "#ff8000"})).unwrap();
@@ -204,7 +204,7 @@ fn hostile_coordinates_are_bounded_before_drawing() {
 
 #[test]
 fn diagram_and_sliders_fit_every_theme_and_amount_changes_the_rays() {
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         for width in [560.0, 1000.0] {
             let mut h = themed_harness(theme, vec2(width, 800.0));
             click(&mut h, 0.25, 0.75);

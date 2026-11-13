@@ -108,7 +108,7 @@ fn typing_replaces_the_selected_name_and_enter_confirms() {
     use egui_kittest::kittest::Queryable;
     let (app, _, _) = app();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     open(h.state_mut(), NEW_GROUP);
     h.run_steps(4);
     for label in ["OK", "Cancel"] {

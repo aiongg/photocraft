@@ -287,7 +287,7 @@ fn control_edits_preview_at_once() {
 #[test]
 fn the_dialog_shows_the_colour_while_the_picker_is_open() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_max_steps(64).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let (fill, picker) = fill_with_picker(h.state_mut());
     h.run_steps(3);
     h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#336699"));

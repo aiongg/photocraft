@@ -9,9 +9,9 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
-fn bar(theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn bar(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 200, "height": 100, "background": "white"})).unwrap();
     app.ui.tool = Tool::Pencil;
@@ -37,7 +37,7 @@ const CLASSIC: [(&str, &str); 2] = [
 
 #[test]
 fn the_pro_bar_shows_both_toggles_with_the_reference_tooltips() {
-    let h = bar(ThemeKind::ProMedium);
+    let h = bar(AppTheme::pro_medium());
     for (label, tip) in PRO {
         assert_eq!(h.query_all_by_label(label).count(), 1, "{label} exists once");
         assert_eq!(description(&h, label).as_deref(), Some(tip), "{label} tooltip");
@@ -46,7 +46,7 @@ fn the_pro_bar_shows_both_toggles_with_the_reference_tooltips() {
 
 #[test]
 fn the_pro_toggles_edit_the_pencils_own_flags_and_brush_get_sees_them() {
-    let mut h = bar(ThemeKind::ProMedium);
+    let mut h = bar(AppTheme::pro_medium());
     let flags = |h: &Harness<'static, PhotocraftApp>| (h.state().session.tools.brush.pressure_opacity, h.state().session.tools.brush.pressure_size);
     assert_eq!(flags(&h), (false, false), "both off on a fresh Pencil");
     h.get_by_label("Always use pressure for opacity").click();
@@ -61,7 +61,7 @@ fn the_pro_toggles_edit_the_pencils_own_flags_and_brush_get_sees_them() {
 
 #[test]
 fn the_brush_keeps_its_own_pressure_flags() {
-    let mut h = bar(ThemeKind::ProMedium);
+    let mut h = bar(AppTheme::pro_medium());
     let flags = |h: &Harness<'static, PhotocraftApp>| (h.state().session.tools.brush.pressure_opacity, h.state().session.tools.brush.pressure_size);
     let toggle = |h: &mut Harness<'static, PhotocraftApp>, label: &str| {
         h.get_by_label(label).click();
@@ -124,7 +124,7 @@ fn the_brush_keeps_its_own_pressure_flags() {
 
 #[test]
 fn the_other_themes_show_the_labelled_toggles() {
-    let mut h = bar(ThemeKind::Classic);
+    let mut h = bar(AppTheme::classic());
     // The switches are unnamed nodes: their tooltips are the descriptions in the bar.
     let tips: Vec<String> =
         h.query_all(by().predicate(|n| n.description().is_some())).filter_map(|n| n.accesskit_node().description().map(|d| d.to_string())).collect();
@@ -160,7 +160,7 @@ fn width(app: &PhotocraftApp, x: i32, y: i32) -> usize {
 
 #[test]
 fn pressure_for_size_narrows_a_low_pressure_pencil_stroke() {
-    let mut h = bar(ThemeKind::ProMedium);
+    let mut h = bar(AppTheme::pro_medium());
     let app = h.state_mut();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 13.0, "pressureSize": true, "smoothing": {"amount": 0.0}}})).unwrap();

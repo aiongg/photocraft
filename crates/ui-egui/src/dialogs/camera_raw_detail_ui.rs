@@ -18,7 +18,7 @@ pub(crate) enum Coverage {
 }
 
 type DetailResult = Result<(u64, Surface), String>;
-type OverlayKey = (u64, bool, PixelRect, crate::camera_raw_scope_ui::ClippingMode, crate::theme::ThemeKind);
+type OverlayKey = (u64, bool, PixelRect, crate::camera_raw_scope_ui::ClippingMode, bool, egui::Color32, egui::Color32);
 
 pub(crate) struct DetailPreview {
     source: Surface,
@@ -236,7 +236,7 @@ impl DetailPreview {
         }
         let Some((r, original, crop, _display_key)) = self.crop else { return false };
         let t = crate::theme::Tokens::get(ui.ctx());
-        let key = (r, original, crop, mode, t.kind);
+        let key = (r, original, crop, mode, t.dark, t.canvas, t.card);
         if self.overlay_key != Some(key) {
             let surface = if original {
                 &self.source

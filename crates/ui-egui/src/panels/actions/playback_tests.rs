@@ -226,7 +226,7 @@ fn the_dialog_shows_the_reference_layout() {
     use egui_kittest::{Harness, kittest::Queryable};
     let app = app_with("step", 9, true);
     let mut h = Harness::builder().with_size(egui::vec2(520.0, 420.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     playback::open_dialog(h.state_mut()).unwrap();
     h.run_steps(3);
     for label in ["Performance", "Accelerated", "Step by Step", "Pause For:", "seconds", "History", "Create a single history state", "OK", "Cancel"] {

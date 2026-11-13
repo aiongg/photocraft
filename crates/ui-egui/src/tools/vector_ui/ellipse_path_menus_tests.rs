@@ -140,7 +140,7 @@ fn options_bar_shows_the_three_buttons_and_greys_the_entries_without_a_shape() {
         },
         app(),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     let x = |h: &Harness<'_, PhotocraftApp>, l: &str| h.get_by_label(l).rect().min.x;
     let order = [x(&h, "Path operations"), x(&h, "Path alignment"), x(&h, "Path arrangement")];

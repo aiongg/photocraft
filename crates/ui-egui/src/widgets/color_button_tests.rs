@@ -18,7 +18,7 @@ fn harness<T: 'static>(value: T, swatch: fn(&mut Ui, &mut T) -> Response) -> Har
         },
         (app, value, false),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     h
 }

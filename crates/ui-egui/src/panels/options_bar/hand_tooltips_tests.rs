@@ -22,7 +22,7 @@ fn hand_bar() -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.state_mut().ui.tool = Tool::Hand;
     h.run_steps(4);
     h

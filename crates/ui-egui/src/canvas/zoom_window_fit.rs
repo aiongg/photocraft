@@ -421,7 +421,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(4);
         assert!(!h.state().session.prefs().general.zoom_resizes_windows);
         h.get_by_label("Resize Windows to Fit").click();

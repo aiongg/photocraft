@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// The app with a recorded Smart Object, in a `width`-point dock and the given theme, ready to click.
-fn harness(width: f32, scale: f32, theme: crate::theme::ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(width: f32, scale: f32, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let (app, _) = app(8, "rgb");
     let mut h =
         Harness::builder().with_size(vec2(1200.0, 850.0)).with_pixels_per_point(scale).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
@@ -121,7 +121,7 @@ fn stored_after_confirming_unedited(mode: &str, command: &str, recorded: &serde_
     let index = sm.smart_filters.len() - 1;
     assert_eq!(sm.smart_filters[index].command, command);
     let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
     let dialog = h.state().ui.dialogs.last().unwrap().id;
@@ -523,7 +523,7 @@ fn recorded(app: &PhotocraftApp, id: u64) -> photocraft_doc::SmartObject {
 fn edit_first_filter(app: PhotocraftApp, id: u64) -> (Harness<'static, PhotocraftApp>, u64) {
     let sm = recorded(&app, id);
     let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, id, &sm, 0);
     let dialog = h.state().ui.dialogs.last().unwrap().id;

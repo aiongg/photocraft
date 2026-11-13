@@ -1173,7 +1173,7 @@ fn dragging_the_border_between_arranged_documents_resizes_them() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let area = h.state().last_canvas_rect;
     let n = h.state().session.documents().len();
@@ -1214,7 +1214,7 @@ fn every_arranged_tile_has_rulers() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let right = h.state().last_canvas_rect.center().x;
     // Ruler labels are 9 pt text: some lie in each half of the document area.
@@ -1257,7 +1257,7 @@ fn a_press_on_a_dialog_over_an_arranged_tile_keeps_the_active_document() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let active = h.state().session.active_index().unwrap();
     let rect = h.state().last_canvas_rect;
@@ -1393,7 +1393,7 @@ fn grabbing_the_border_inside_the_active_document_drags_it_without_painting() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let area = h.state().last_canvas_rect;
     let n = h.state().session.documents().len();

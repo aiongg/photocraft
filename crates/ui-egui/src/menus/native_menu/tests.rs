@@ -209,7 +209,7 @@ fn an_imported_kys_set_owns_the_system_keys_it_binds() {
 #[test]
 fn themes_move_to_the_app_menus_appearance() {
     let mut a = app(false);
-    a.ui.theme = crate::theme::ThemeKind::Classic;
+    a.ui.theme = crate::theme::AppTheme::classic();
     let l = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto");
     let app_menu = l.bar.menu(MenuRole::App).unwrap();
     let Some(Node::Submenu { children, .. }) = app_menu.children.iter().find(|n| matches!(n, Node::Submenu { label, .. } if label == "Appearance")) else {
@@ -226,11 +226,11 @@ fn themes_move_to_the_app_menus_appearance() {
     let window = ids(&l.bar.menu(MenuRole::Window).unwrap().children);
     assert!(!window.iter().any(|id| id.starts_with("window.theme.") || id == "[Theme]"), "{window:?}");
     a.session.prefs.edit(|p| p.interface.appearance_mode = photocraft_engine::prefs::AppearanceMode::Auto);
-    for palette in [crate::theme::ThemeKind::Classic, crate::theme::ThemeKind::ProMedium] {
+    for palette in [crate::theme::AppTheme::classic(), crate::theme::AppTheme::pro_medium()] {
         a.ui.theme = palette;
         let automatic = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto");
         assert_eq!(automatic.bar.find("window.theme.system").unwrap().checked, Some(true));
-        for kind in crate::theme::ThemeKind::ALL {
+        for kind in crate::theme::AppTheme::all() {
             assert_eq!(automatic.bar.find(&format!("window.theme.{}", kind.id())).unwrap().checked, Some(false));
         }
     }

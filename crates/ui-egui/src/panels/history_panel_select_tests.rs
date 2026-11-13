@@ -22,7 +22,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -108,7 +108,7 @@ fn new_history_steps_scroll_the_current_state_into_view() {
     let mut h = Harness::builder().with_size(vec2(280.0, 120.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -133,7 +133,7 @@ fn long_harness() -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(280.0, 220.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }

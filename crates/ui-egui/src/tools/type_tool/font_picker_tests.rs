@@ -335,7 +335,7 @@ fn hovering_a_font_row_moves_no_other_row() {
     let mut h = harness();
     // The app's theme: its hovered and selected buttons draw a stroke (egui's default style
     // would hide the jump).
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run();
     open(&mut h);
     let rows = |h: &Harness<'static, State>| -> Vec<Rect> { (0..8).map(|i| h.get_by_label(&format!("Family {i:02}")).rect()).collect() };
@@ -803,7 +803,7 @@ fn options_bar_hover_previews_on_canvas_without_committing() {
     // Opening the menu on the current family (#9197) paints rows that load their font samples
     // over a few frames, more than the default four steps.
     let mut h = Harness::builder().with_size(vec2(900.0, 700.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
         PreviewApp { app: PhotocraftApp::new(photocraft_engine::Session::new(), Services::default()) }
     });
     h.state_mut().app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
@@ -1674,7 +1674,7 @@ fn options_bar_hover_previews_with_the_character_picker_also_shown() {
     use photocraft_doc::LayerContent;
     use serde_json::json;
 
-    let theme = crate::theme::ThemeKind::Pro;
+    let theme = crate::theme::AppTheme::pro();
     let mut h = Harness::builder().with_size(vec2(1600.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, theme);
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
@@ -1713,7 +1713,7 @@ fn capture_font_field_gpu_visual_fixtures() {
     let _gpu = photocraft_testkit::gpu_lock();
     std::fs::create_dir_all(&directory).unwrap();
     let phase = std::env::var("FONT_FIELD_FIXTURE_PHASE").unwrap_or_else(|_| "after".into());
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for scale in [1.0, 2.0] {
             for width in [140.0, 170.0] {
                 let mut h = Harness::builder().with_size(vec2(420.0, 560.0)).with_pixels_per_point(scale).wgpu().build_ui_state(

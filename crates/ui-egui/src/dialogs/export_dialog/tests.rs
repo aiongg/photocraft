@@ -883,7 +883,7 @@ fn preview_cache_tracks_working_profiles_but_prefers_embedded_profiles() {
         let revision = st.revision;
         let key = egui::Id::unique(("export-preview", st.doc.id.0, revision, None::<u64>));
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+        PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         let draw = |app: &mut PhotocraftApp, fields: &mut Map<String, Value>| {
             let mut output = ctx.run_ui(Default::default(), |ui| body(app, ui, fields));
             output.textures_delta.clear();

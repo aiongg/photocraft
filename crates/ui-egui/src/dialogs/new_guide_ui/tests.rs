@@ -166,7 +166,7 @@ fn position_tab_and_shift_tab_select_all_in_new_and_edit_dialogs() {
                 crate::guide_select::select(&mut app, true, 0);
             }
             let mut h = Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
             let d = if editing { open_edit(h.state_mut()).unwrap() } else { open(h.state_mut(), &ctx) };
             h.run_steps(3);
             h.key_press_modifiers(modifiers, egui::Key::Tab);
@@ -196,7 +196,7 @@ fn focusing_and_recolouring_preserve_the_exact_guide_position() {
             crate::guide_select::select(&mut app, true, 0);
             let history = app.session.active().unwrap().history.past_len();
             let mut h = Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
             let d = open_edit(h.state_mut()).unwrap();
             if rulers == "pixels" {
                 assert_eq!(h.state_mut().ui.dialog_mut(d).unwrap().fields["position"], "13 px");
@@ -233,7 +233,7 @@ fn retyping_the_rounded_readout_is_an_intentional_position_edit() {
     app.run(COMMAND, json!({"orientation": "vertical", "position": 12.5})).unwrap();
     crate::guide_select::select(&mut app, true, 0);
     let mut h = Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     let d = open_edit(h.state_mut()).unwrap();
     h.run_steps(3);
     h.get_by_label("Position").click();

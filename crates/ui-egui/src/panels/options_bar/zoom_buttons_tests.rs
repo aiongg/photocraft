@@ -15,7 +15,7 @@ fn zoom_bar() -> Harness<'static, PhotocraftApp> {
     // The bar's fonts are installed after the first frame, so it starts on a tool without "100%".
     app.ui.tool = Tool::Move;
     let mut h = Harness::builder().with_size(vec2(1600.0, 300.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.state_mut().ui.tool = Tool::Zoom;
     h.run_steps(4);
     h

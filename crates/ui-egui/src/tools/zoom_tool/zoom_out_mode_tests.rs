@@ -34,7 +34,7 @@ fn harness(tool: Tool, zoom_in: bool, scrubby: bool) -> Harness<'static, Photocr
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
     v.zoom = 1.0;
@@ -236,7 +236,7 @@ fn options_bar() -> Harness<'static, PhotocraftApp> {
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 crate::theme::install_fonts(ui.ctx());
-                crate::theme::apply(ui.ctx(), crate::theme::ThemeKind::ALL[0]);
+                crate::theme::apply(ui.ctx(), crate::theme::AppTheme::pro());
                 ready = true;
                 return;
             }

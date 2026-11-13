@@ -933,7 +933,7 @@ mod tests {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.state_mut().1 = true;
         h.run_steps(2);
 
@@ -967,7 +967,7 @@ mod tests {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.state_mut().1 = true;
         h.run_steps(2);
 
@@ -989,7 +989,7 @@ mod tests {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.state_mut().1 = true;
         h.run_steps(2);
 
@@ -1010,7 +1010,7 @@ mod tests {
                 clicked = true;
             }
         });
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.run_steps(2);
         assert!(h.query_by_label("Open…").is_some());
         let _ = clicked;

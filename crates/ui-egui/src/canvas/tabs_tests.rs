@@ -8,12 +8,12 @@ use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 use super::{TabStrip, pro_tab_title};
 
 /// A real app window with `docs` documents named "ch1-pNN.png".
-fn harness(docs: usize, theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(docs: usize, theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, theme);
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -38,7 +38,7 @@ fn has_menu(h: &Harness<'_, PhotocraftApp>) -> bool {
 
 #[test]
 fn overflowing_tabs_stay_on_the_strip_and_the_rest_move_to_the_menu() {
-    let h = harness(14, ThemeKind::Pro);
+    let h = harness(14, AppTheme::pro());
     assert_eq!(h.state().session.documents().len(), 14);
     let s = strip(&h);
     assert!(s.tabs.len() < 14, "some tabs must overflow into the menu: {} shown", s.tabs.len());
@@ -54,7 +54,7 @@ fn overflowing_tabs_stay_on_the_strip_and_the_rest_move_to_the_menu() {
 
 #[test]
 fn the_active_document_brings_its_tab_onto_the_strip() {
-    let mut h = harness(14, ThemeKind::Pro);
+    let mut h = harness(14, AppTheme::pro());
     for pick in [0, 13, 7] {
         h.state_mut().session.set_active(pick);
         h.run_steps(2);
@@ -65,7 +65,7 @@ fn the_active_document_brings_its_tab_onto_the_strip() {
 
 #[test]
 fn tabs_that_fit_keep_their_natural_widths_and_no_menu() {
-    let h = harness(3, ThemeKind::Pro);
+    let h = harness(3, AppTheme::pro());
     let s = strip(&h);
     assert_eq!(s.tabs.len(), 3, "every tab stays on the strip when they fit");
     assert!(h.query_by_label("More documents").is_none(), "no overflow menu when the tabs fit");
@@ -76,7 +76,7 @@ fn tabs_that_fit_keep_their_natural_widths_and_no_menu() {
 
 #[test]
 fn studio_tabs_overflow_into_the_same_menu() {
-    let h = harness(14, ThemeKind::Studio);
+    let h = harness(14, AppTheme::studio());
     let s = strip(&h);
     assert!(s.tabs.len() < 14, "{} shown", s.tabs.len());
     for (_, r) in &s.tabs {
@@ -90,7 +90,7 @@ fn studio_tabs_overflow_into_the_same_menu() {
 
 #[test]
 fn saved_document_tabs_track_file_identity() {
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         let mut h = harness(2, theme);
         h.state_mut().services.export = Some(Box::new(|_, _, _| Ok((vec![1], Vec::new()))));
         h.state_mut().services.write = Some(Box::new(|_, _| Ok(())));
@@ -123,7 +123,7 @@ fn ctrl() -> egui::Modifiers {
 /// around at either end, as in Photoshop. Plain Tab still hides the panels instead.
 #[test]
 fn ctrl_tab_cycles_through_the_document_tabs() {
-    let mut h = harness(3, ThemeKind::Pro);
+    let mut h = harness(3, AppTheme::pro());
     let active = |h: &Harness<'_, PhotocraftApp>| h.state().session.active_index();
     assert_eq!(active(&h), Some(2), "the last new document is active");
     let press = |h: &mut Harness<'_, PhotocraftApp>, shift: bool| {
@@ -152,7 +152,7 @@ fn ctrl_tab_cycles_through_the_document_tabs() {
 
 #[test]
 fn ctrl_tab_records_a_relative_document_switch() {
-    let mut h = harness(2, ThemeKind::Pro);
+    let mut h = harness(2, AppTheme::pro());
     h.state_mut().run("actions.record", json!({"name": "Switch"})).unwrap();
     h.key_press_modifiers(ctrl(), egui::Key::Tab);
     h.run_steps(2);
@@ -164,7 +164,7 @@ fn ctrl_tab_records_a_relative_document_switch() {
 /// One document: Ctrl+Tab stays on it quietly; a focused widget or text field doesn't keep the key.
 #[test]
 fn ctrl_tab_with_one_document_or_a_focused_field() {
-    let mut h = harness(1, ThemeKind::Pro);
+    let mut h = harness(1, AppTheme::pro());
     h.key_press_modifiers(ctrl(), egui::Key::Tab);
     h.run_steps(2);
     assert_eq!(h.state().session.active_index(), Some(0));
@@ -181,7 +181,7 @@ fn ctrl_tab_with_one_document_or_a_focused_field() {
 
 #[test]
 fn quick_mask_mode_names_the_quick_mask_in_the_tab() {
-    let mut h = harness(1, ThemeKind::Pro);
+    let mut h = harness(1, AppTheme::pro());
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     assert_eq!(pro_tab_title(h.state(), 0), "ch1-p01.png @ 100% (Layer 1, RGB/8)*");
     h.state_mut().run("select.editInQuickMaskMode", json!({"on": true})).unwrap();
@@ -208,7 +208,7 @@ fn elided_on_strip(h: &Harness<'_, PhotocraftApp>) -> bool {
 /// checked, as Photoshop's does.
 #[test]
 fn crowded_tabs_keep_their_whole_names_and_the_menu_lists_every_document() {
-    for theme in [ThemeKind::Pro, ThemeKind::Studio] {
+    for theme in [AppTheme::pro(), AppTheme::studio()] {
         let mut h = harness(14, theme);
         let s = strip(&h);
         assert!(s.tabs.len() > 1 && s.tabs.len() < 14, "{theme:?}: {} shown", s.tabs.len());
@@ -241,7 +241,7 @@ fn crowded_tabs_keep_their_whole_names_and_the_menu_lists_every_document() {
 /// in the same place however many tabs fit before it.
 #[test]
 fn the_overflow_button_is_pinned_to_the_right_end() {
-    for theme in [ThemeKind::Pro, ThemeKind::Studio] {
+    for theme in [AppTheme::pro(), AppTheme::studio()] {
         let at = |docs: usize| {
             let h = harness(docs, theme);
             let s = strip(&h);

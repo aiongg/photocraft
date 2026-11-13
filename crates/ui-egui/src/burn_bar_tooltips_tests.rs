@@ -26,7 +26,7 @@ fn bar(tool: Tool, lang: Lang, width: f32, scale: f32, narrow: bool) -> Harness<
         .with_size(vec2(width / scale, 300.0))
         .with_pixels_per_point(scale)
         .with_step_dt(1.0 / 60.0)
-        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ProMedium))
+        .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::AppTheme::pro_medium()))
         .build_ui_state(
             move |ui, app| {
                 let _language = crate::i18n::language_scope(lang);
@@ -183,7 +183,7 @@ fn render_tooltips_for_visual_inspection() {
     let out = std::env::var_os("PHOTOCRAFT_TOOLTIP_IMAGES").map(std::path::PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join("photocraft-12670"));
     let lang = std::env::var("PHOTOCRAFT_TOOLTIP_LANGUAGE").ok().and_then(|code| Lang::from_code(&code)).unwrap_or(Lang::EN);
     std::fs::create_dir_all(&out).unwrap();
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for tool in [Tool::Burn, Tool::Dodge] {
             for (i, (role, label, tip)) in CONTROLS.into_iter().enumerate() {
                 let mut h = bar(tool, lang, 1000.0, 1.0, false);

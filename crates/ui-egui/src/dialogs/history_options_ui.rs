@@ -98,7 +98,7 @@ mod tests {
     fn the_dialog_draws_the_checkboxes_in_photoshops_order() {
         use egui_kittest::{Harness, kittest::Queryable};
         let mut h = Harness::builder().with_size(egui::vec2(700.0, 400.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app());
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         open(h.state_mut());
         h.run_steps(3);
         h.get_by_label("History Options");

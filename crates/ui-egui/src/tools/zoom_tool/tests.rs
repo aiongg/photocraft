@@ -34,7 +34,7 @@ fn harness(scrubby: bool, ppp: f32) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h
 }
@@ -209,7 +209,7 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
     };
     let renderer = egui_kittest::wgpu::WgpuTestRenderer::from_render_state(rs);
     let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_pixels_per_point(1.0).renderer(renderer).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.set_wgpu(cc.wgpu_render_state.clone().unwrap());
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();

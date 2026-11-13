@@ -16,13 +16,13 @@ fn app(tool: Tool) -> PhotocraftApp {
     app
 }
 
-fn options_bar(tool: Tool, theme: crate::theme::ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn options_bar(tool: Tool, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut ready = false;
     let mut h = Harness::builder().with_size(vec2(1400.0, 60.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 crate::theme::install_fonts(ui.ctx());
-                crate::theme::apply(ui.ctx(), theme);
+                crate::theme::apply(ui.ctx(), &theme);
                 ready = true;
                 return;
             }
@@ -61,8 +61,8 @@ fn type_opacity(h: &mut Harness<'_, PhotocraftApp>, text: &str) -> f32 {
 /// Pencil and Eraser fields take 1-100 whole numbers in Photoshop too.
 #[test]
 fn the_brush_opacity_field_takes_whole_numbers_from_1_to_100() {
-    use crate::theme::ThemeKind;
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    use crate::theme::AppTheme;
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         for tool in [Tool::Brush, Tool::Pencil, Tool::Eraser] {
             let mut h = options_bar(tool, theme);
             for (typed, want) in [("0", 0.01), ("-10", 0.01), ("150", 1.0), ("45", 0.45), ("33.7", 0.34)] {
@@ -132,7 +132,7 @@ fn double_zero_sets_the_pencil_to_100_percent() {
 /// whole percent in 1-100 the field can hold.
 #[test]
 fn the_opacity_field_shows_outside_values_as_whole_percents() {
-    let mut h = options_bar(Tool::Brush, crate::theme::ThemeKind::ProMedium);
+    let mut h = options_bar(Tool::Brush, crate::theme::AppTheme::pro_medium());
     for (stored, shown) in [(0.337, 34.0), (0.0, 1.0), (0.004, 1.0)] {
         h.state_mut().session.tools.brush.opacity = stored;
         h.run_steps(2);

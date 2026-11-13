@@ -20,7 +20,7 @@ fn text_sizes(ctx: &egui::Context) -> Vec<egui::Vec2> {
 fn ui_font_sizes_scale_shaping_and_row_height_without_accumulating() {
     let ctx = egui::Context::default();
     install_fonts(&ctx);
-    apply(&ctx, ThemeKind::Pro);
+    apply(&ctx, &AppTheme::pro());
     let original = text_sizes(&ctx);
     let definitions = ctx.fonts(|f| f.definitions().clone());
     for size in [UiFontSize::Tiny, UiFontSize::Small, UiFontSize::Medium, UiFontSize::Large, UiFontSize::Tiny, UiFontSize::Small] {
@@ -43,9 +43,9 @@ fn ui_font_sizes_scale_shaping_and_row_height_without_accumulating() {
 // as its track while the pointer is on it, so the thumb disappeared when it was grabbed.
 #[test]
 fn scrollbar_thumb_stays_more_visible_than_its_track_in_every_theme() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let ctx = egui::Context::default();
-        apply(&ctx, kind);
+        apply(&ctx, &kind);
         for theme in [egui::Theme::Dark, egui::Theme::Light] {
             let scroll = ctx.style_of(theme).spacing.scroll;
             if !scroll.floating {
@@ -73,7 +73,7 @@ fn saved_ui_font_size_survives_first_frame_install() {
     ctx.run_ui(Default::default(), |ui| {
         assert!(!medium_bound(ui.ctx()), "egui's defaults are active in the first frame");
         install_fonts(ui.ctx());
-        apply(ui.ctx(), ThemeKind::Pro);
+        apply(ui.ctx(), &AppTheme::pro());
         set_ui_font_size(ui.ctx(), UiFontSize::Medium);
     })
     .textures_delta
@@ -110,70 +110,14 @@ fn saved_ui_font_size_survives_first_frame_install() {
 }
 
 #[test]
-fn pro_light_gray_and_light_themes() {
-    // #2661: Photoshop's third and fourth brightness levels, with the Pro layout.
-    for (kind, panel, id, label) in [(ThemeKind::ProLightGray, 184, "proLightGray", "Pro (Light Gray)"), (ThemeKind::ProLight, 240, "proLight", "Pro (Light)")]
-    {
-        let t = Tokens::for_kind(kind);
-        assert!(t.pro && !t.dark() && !t.bevel && kind.is_pro(), "{kind:?}");
-        assert_eq!((t.kind, t.card, t.chrome), (kind, Color32::from_gray(panel), Color32::from_gray(panel)));
-        assert_eq!((kind.id(), kind.label()), (id, label));
-        assert_eq!(ThemeKind::from_name(id), Some(kind));
-        assert_eq!(ThemeKind::from_name(label), Some(kind));
-        assert!(ThemeKind::ALL.contains(&kind));
-        // Text stays readable (WCAG AA for body text, 3:1 for dim and faint labels and icons).
-        for bg in [t.card, t.chrome, t.dock, t.field, t.hover, t.row_selected, t.tab_strip] {
-            assert!(contrast(t.text, bg) >= 4.5, "{kind:?} text on {bg:?}: {}", contrast(t.text, bg));
-            assert!(contrast(t.icon, bg) >= 3.0, "{kind:?} icon on {bg:?}");
-            assert!(contrast(t.text_dim, bg) >= 3.0, "{kind:?} dim text on {bg:?}");
-        }
-        assert!(contrast(t.text_faint, t.card) >= 2.0, "{kind:?} faint text");
-        assert!(contrast(t.accent_text, t.card) >= 3.0, "{kind:?} accent text");
-    }
-    // The four Pro levels step from darkest to lightest, as in Photoshop.
-    let cards = [ThemeKind::Pro, ThemeKind::ProMedium, ThemeKind::ProLightGray, ThemeKind::ProLight].map(|k| Tokens::for_kind(k).card.r());
-    assert!(cards.windows(2).all(|w| w[0] < w[1]), "{cards:?}");
-    assert!(!ThemeKind::Studio.is_pro() && !ThemeKind::StudioLight.is_pro() && !ThemeKind::Classic.is_pro());
-    assert_eq!(ThemeKind::from_name("light gray"), Some(ThemeKind::ProLightGray));
-    assert_eq!(ThemeKind::from_name("lightest"), Some(ThemeKind::ProLight));
-}
-
-#[test]
-fn field_selection_is_grey_only_for_the_monochrome_pro_themes() {
-    // #3789: a text field's selection is a subtle grey in the monochrome Pro themes, not a
-    // second blue accent; coloured themes keep their accent.
-    assert_eq!(Tokens::for_kind(ThemeKind::Pro).field_selection(), Color32::from_gray(96));
-    assert_eq!(Tokens::for_kind(ThemeKind::ProLight).field_selection(), Color32::from_gray(201));
-    assert_eq!(Tokens::for_kind(ThemeKind::Studio).field_selection(), Tokens::for_kind(ThemeKind::Studio).accent_soft);
-    assert_eq!(Tokens::for_kind(ThemeKind::Classic).field_selection(), Tokens::for_kind(ThemeKind::Classic).accent_soft);
-}
-
-#[test]
-fn theme_names_parse() {
-    assert_eq!(ThemeKind::from_name("Classic"), Some(ThemeKind::Classic));
-    assert_eq!(ThemeKind::from_name("studio (light)"), Some(ThemeKind::StudioLight));
-    assert_eq!(ThemeKind::from_name("dark"), Some(ThemeKind::Pro));
-    assert_eq!(ThemeKind::from_name("light"), Some(ThemeKind::ProLight));
-    assert_eq!(ThemeKind::from_name("studio"), Some(ThemeKind::Studio));
-    assert_eq!(ThemeKind::from_name("Pro (Medium Gray)"), Some(ThemeKind::ProMedium));
-    assert_eq!(ThemeKind::from_name("Solarized Dark"), Some(ThemeKind::SolarizedDark));
-    assert_eq!(ThemeKind::from_name("solarized"), Some(ThemeKind::SolarizedDark));
-    let m = Tokens::for_kind(ThemeKind::ProMedium);
-    assert!(m.pro && m.dark() && m.kind == ThemeKind::ProMedium && m.card == Color32::from_rgb(83, 83, 83));
-    let s = Tokens::for_kind(ThemeKind::SolarizedDark);
-    assert!(s.dark() && !s.bevel && s.kind == ThemeKind::SolarizedDark && s.card == Color32::from_rgb(7, 54, 66));
-    assert_eq!(ThemeKind::from_name("neon"), None);
-}
-
-#[test]
 fn every_palette_keeps_complete_egui_styles_when_the_os_changes() {
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let ctx = egui::Context::default();
-        ctx.run_ui(egui::RawInput { system_theme: Some(egui::Theme::Dark), ..Default::default() }, |ui| apply(ui.ctx(), kind)).textures_delta.clear();
+        ctx.run_ui(egui::RawInput { system_theme: Some(egui::Theme::Dark), ..Default::default() }, |ui| apply(ui.ctx(), &kind)).textures_delta.clear();
         let expected = ctx.global_style();
         for appearance in [Some(egui::Theme::Light), Some(egui::Theme::Dark), None] {
             ctx.run_ui(egui::RawInput { system_theme: appearance, ..Default::default() }, |_| {}).textures_delta.clear();
-            assert_eq!(Tokens::get(&ctx), Tokens::for_kind(kind));
+            assert_eq!(Tokens::get(&ctx), kind.tokens());
             assert_eq!(ctx.global_style(), expected, "{kind:?} changed with {appearance:?}");
             assert_eq!(ctx.style_of(egui::Theme::Light), expected);
             assert_eq!(ctx.style_of(egui::Theme::Dark), expected);
@@ -186,27 +130,9 @@ fn applying_a_palette_clears_a_pinned_native_appearance_preference() {
     for pinned in [egui::Theme::Light, egui::Theme::Dark] {
         let ctx = egui::Context::default();
         ctx.set_theme(pinned);
-        apply(&ctx, ThemeKind::ProMedium);
+        apply(&ctx, &AppTheme::pro_medium());
         assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::System);
     }
-}
-
-#[test]
-fn studio_dark_keeps_square_colour_chips() {
-    assert!(!Tokens::for_kind(ThemeKind::Studio).round_chips);
-    // Only the dark variant changes; the light palette retains its layout.
-    assert!(Tokens::for_kind(ThemeKind::StudioLight).round_chips);
-    assert!(!Tokens::for_kind(ThemeKind::Pro).round_chips);
-}
-
-#[test]
-fn studio_text_contrast_is_high() {
-    let t = Tokens::for_kind(ThemeKind::Studio);
-    let p = Tokens::for_kind(ThemeKind::Pro);
-    assert!(p.pro && !t.pro);
-    let lum = |c: Color32| 0.2126 * c.r() as f32 + 0.7152 * c.g() as f32 + 0.0722 * c.b() as f32;
-    assert!(lum(t.text) - lum(t.card) > 180.0);
-    assert!(lum(t.text_dim) - lum(t.card) > 90.0);
 }
 
 /// WCAG 2 contrast ratio, the measure libadwaita's own palette is held to.
@@ -224,8 +150,8 @@ fn contrast(a: Color32, b: Color32) -> f32 {
 /// contrast against the panels sliders sit on (#7927); the dark ones keep the plain knob.
 #[test]
 fn light_themes_outline_the_slider_knob() {
-    for kind in ThemeKind::ALL {
-        let t = Tokens::for_kind(kind);
+    for kind in AppTheme::all() {
+        let t = kind.tokens();
         // The Pro layouts keep their dark ring (it rims a grey knob), Classic its bevelled knob.
         if t.pro || t.bevel {
             continue;
@@ -240,20 +166,17 @@ fn light_themes_outline_the_slider_knob() {
             None => assert!(t.dark(), "{kind:?}: a light theme without a knob outline"),
         }
     }
-    assert_eq!(Tokens::for_kind(ThemeKind::Pro).knob_outline(), Some(Color32::from_gray(40)), "Pro is unchanged");
-    for kind in [ThemeKind::StudioLight, ThemeKind::Adwaita, ThemeKind::BreezeLight, ThemeKind::SoftLight] {
-        assert!(Tokens::for_kind(kind).knob_outline().is_some(), "{kind:?}");
+    assert_eq!(AppTheme::pro().tokens().knob_outline(), Some(Color32::from_gray(40)), "Pro is unchanged");
+    for kind in [AppTheme::studio_light(), AppTheme::adwaita(), AppTheme::breeze_light(), AppTheme::soft_light()] {
+        assert!(kind.tokens().knob_outline().is_some(), "{kind:?}");
     }
 }
 
 #[test]
-fn adwaita_themes_parse_and_meet_text_contrast() {
-    for kind in [ThemeKind::Adwaita, ThemeKind::AdwaitaDark] {
-        assert_eq!(ThemeKind::from_name(kind.id()), Some(kind));
-        assert_eq!(ThemeKind::from_name(kind.label()), Some(kind));
-        let t = Tokens::for_kind(kind);
-        assert_eq!(t.kind, kind);
-        assert_eq!(t.dark(), kind == ThemeKind::AdwaitaDark);
+fn adwaita_themes_meet_text_contrast() {
+    for kind in [AppTheme::adwaita(), AppTheme::adwaita_dark()] {
+        let t = kind.tokens();
+        assert_eq!(t.dark(), kind == AppTheme::adwaita_dark());
         assert!(!t.pro && !t.bevel, "{kind:?} uses the Studio layout");
         // AA body text (4.5:1) on every surface that carries labels.
         for surface in [t.chrome, t.dock, t.card, t.field] {
@@ -262,19 +185,14 @@ fn adwaita_themes_parse_and_meet_text_contrast() {
         }
         assert!(contrast(t.primary_text, t.primary_bg) >= 3.0, "{kind:?}: suggested-action button label");
     }
-    assert_eq!(ThemeKind::from_name("gnome dark"), Some(ThemeKind::AdwaitaDark));
 }
 
 #[test]
-fn soft_themes_parse_and_hold_text_contrast() {
-    for (kind, alias) in [(ThemeKind::SoftDark, "soft dark"), (ThemeKind::SoftLight, "Soft_Light")] {
-        assert_eq!(ThemeKind::from_name(kind.id()), Some(kind));
-        assert_eq!(ThemeKind::from_name(kind.label()), Some(kind));
-        assert_eq!(ThemeKind::from_name(alias), Some(kind));
-        assert!(ThemeKind::ALL.contains(&kind));
-        let t = Tokens::for_kind(kind);
-        assert_eq!(t.kind, kind);
-        assert_eq!(t.dark(), kind == ThemeKind::SoftDark);
+fn soft_themes_hold_text_contrast() {
+    for kind in [AppTheme::soft_dark(), AppTheme::soft_light()] {
+        assert!(AppTheme::all().contains(&kind));
+        let t = kind.tokens();
+        assert_eq!(t.dark(), kind == AppTheme::soft_dark());
         assert!(!t.pro && !t.bevel);
         // Soft means no extremes: surfaces stay off black and white.
         for c in [t.chrome, t.canvas, t.dock, t.card, t.field] {
@@ -302,20 +220,11 @@ fn soft_themes_parse_and_hold_text_contrast() {
 }
 
 #[test]
-fn breeze_themes_parse_and_meet_text_contrast() {
-    for (kind, aliases) in [
-        (ThemeKind::BreezeLight, ["breeze", "Breeze Light", "breeze_light", "kde", "plasma"]),
-        (ThemeKind::BreezeDark, ["breeze dark", "Breeze Dark", "breeze_dark", "kde dark", "plasma-dark"]),
-    ] {
-        assert_eq!(ThemeKind::from_name(kind.id()), Some(kind));
-        assert_eq!(ThemeKind::from_name(kind.label()), Some(kind));
-        for alias in aliases {
-            assert_eq!(ThemeKind::from_name(alias), Some(kind), "{alias}");
-        }
-        assert!(ThemeKind::ALL.contains(&kind));
-        let t = Tokens::for_kind(kind);
-        assert_eq!(t.kind, kind);
-        assert_eq!(t.dark(), kind == ThemeKind::BreezeDark);
+fn breeze_themes_meet_text_contrast() {
+    for kind in [AppTheme::breeze_light(), AppTheme::breeze_dark()] {
+        assert!(AppTheme::all().contains(&kind));
+        let t = kind.tokens();
+        assert_eq!(t.dark(), kind == AppTheme::breeze_dark());
         assert!(!t.pro && !t.bevel, "{kind:?} uses the Studio layout");
         // The design intent, not exact values (the palette is an adaptation and may be tuned):
         // the canvas is the most recessed surface, then the dock and the cards, and controls

@@ -41,7 +41,7 @@ fn the_alert_has_one_button_ok() {
     app.run("layer.lockLayers", json!({"all": true})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 600.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
     // The press after the fonts are set up: the harness draws its first frame at build.
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     stroke(h.state_mut());
     h.run_steps(2);
     assert!(h.query_by_label(WANT).is_some(), "the message is shown");

@@ -1437,7 +1437,7 @@ fn shape_colour_picker_stays_put_while_dragging() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let label = h.query_all(egui_kittest::kittest::by().label("Fill").include_labels()).next().expect("the Fill label").rect();
     // The swatch is right of its label.
@@ -1501,7 +1501,7 @@ fn shape_options_bar_edits_the_selected_shape() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     let click_fill = |h: &mut egui_kittest::Harness<'_, PhotocraftApp>| {
         let label = h.query_all(egui_kittest::kittest::by().label("Fill:").include_labels()).next().expect("the Fill label").rect();
@@ -1565,7 +1565,7 @@ fn path_selection_options_bar_edits_the_selected_shape() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     let click_fill = |h: &mut egui_kittest::Harness<'_, PhotocraftApp>| {
         let label = h.query_all(egui_kittest::kittest::by().label("Fill:").include_labels()).next().expect("the Fill label").rect();

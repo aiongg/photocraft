@@ -4,7 +4,7 @@ use egui_kittest::{
     kittest::{NodeT, Queryable},
 };
 
-fn harness(adjustment: bool, theme: crate::theme::ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(adjustment: bool, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut session = photocraft_engine::Session::new();
     session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
     let command = if adjustment { "layer.newAdjustmentLayer.curves" } else { "layer.new.layer" };
@@ -40,7 +40,7 @@ fn mask(h: &Harness<'_, PhotocraftApp>) -> photocraft_doc::LayerMask {
 
 #[test]
 fn pixel_mask_properties_follow_target_for_raster_and_adjustment_in_both_themes() {
-    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         for adjustment in [false, true] {
             let mut h = harness(adjustment, theme);
             assert!(h.query_all_by_label("Density").next().is_some(), "{theme:?}, adjustment={adjustment}");
@@ -82,7 +82,7 @@ fn drag(h: &mut Harness<'_, PhotocraftApp>, field: usize, fractions: &[f32]) {
 
 #[test]
 fn mask_slider_drags_preview_live_and_undo_as_separate_gestures() {
-    let mut h = harness(true, crate::theme::ThemeKind::Pro);
+    let mut h = harness(true, crate::theme::AppTheme::pro());
     let before = h.state().session.active().unwrap().history.past_len();
     drag(&mut h, 0, &[1.0, 0.8, 0.6, 0.5]);
     assert!((mask(&h).density - 0.5).abs() < 0.01);
@@ -106,7 +106,7 @@ fn mask_slider_drags_preview_live_and_undo_as_separate_gestures() {
 /// drawing the knob for them never writes the value back.
 #[test]
 fn typed_and_stepped_feather_stays_exact() {
-    let mut h = harness(false, crate::theme::ThemeKind::Pro);
+    let mut h = harness(false, crate::theme::AppTheme::pro());
     h.query_all_by_role(egui::accesskit::Role::SpinButton).nth(1).unwrap().click();
     h.run_steps(1);
     h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
@@ -127,7 +127,7 @@ fn typed_and_stepped_feather_stays_exact() {
 
 #[test]
 fn uncommitted_mask_number_stays_with_its_layer() {
-    let mut h = harness(false, crate::theme::ThemeKind::Studio);
+    let mut h = harness(false, crate::theme::AppTheme::studio());
     let first = h.state().session.active().unwrap().active_layer.unwrap();
     h.query_all_by_role(egui::accesskit::Role::SpinButton).next().unwrap().click();
     h.run_steps(1);
@@ -168,7 +168,7 @@ fn vector_mask_properties_edit_density_and_feather() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     assert!(h.query_all_by_label("Density").next().is_some(), "the vector mask section is shown");
     assert!(h.query_all_by_label("Feather").next().is_some());
@@ -182,7 +182,7 @@ fn vector_mask_properties_edit_density_and_feather() {
 /// shape stays a shape.
 #[test]
 fn shape_properties_edit_density_and_feather() {
-    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         let mut session = photocraft_engine::Session::new();
         session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         let id = session.execute("shape.create", json!({"kind": "rect", "rect": [16, 16, 32, 32]})).unwrap()["layer"].as_u64().unwrap();
@@ -256,7 +256,7 @@ fn row(h: &Harness<'_, PhotocraftApp>, of_mask: bool) -> Vec<f32> {
 
 #[test]
 fn refine_row_offers_select_and_mask_color_range_and_invert() {
-    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         for adjustment in [false, true] {
             let mut h = harness(adjustment, theme);
             for label in ["Refine", "Select and Mask…", "Color Range…", "Invert"] {
@@ -272,7 +272,7 @@ fn refine_row_offers_select_and_mask_color_range_and_invert() {
 
 #[test]
 fn refine_invert_inverts_the_mask_and_leaves_the_layer_alone() {
-    let mut h = harness(false, crate::theme::ThemeKind::Pro);
+    let mut h = harness(false, crate::theme::AppTheme::pro());
     let gradient = |target: &str| json!({"from": [0, 0], "to": [63, 0], "colors": ["#000000", "#ffffff"], "target": target});
     // Pixels and mask both vary, so inverting the wrong surface shows up either way (#1137).
     h.state_mut().session.execute("paint.gradient", gradient("pixels")).unwrap();
@@ -295,14 +295,14 @@ fn refine_invert_inverts_the_mask_and_leaves_the_layer_alone() {
 #[test]
 fn refine_row_opens_the_select_and_mask_workspace_and_color_range_dialog() {
     // Select and Mask… opens Photoshop's workspace on the targeted mask.
-    let mut h = harness(false, crate::theme::ThemeKind::Pro);
+    let mut h = harness(false, crate::theme::AppTheme::pro());
     h.get_by_label("Select and Mask…").click();
     h.run_steps(3);
     assert!(h.state().ui.dialogs.is_empty(), "a workspace, not a dialog");
     let w = h.state().distort.describe()["selectAndMask"].clone();
     assert_eq!(w["settings"]["output"].as_str(), Some("layerMask"), "it refines the mask: {w}");
     // Color Range… opens its own dialog.
-    let mut h = harness(false, crate::theme::ThemeKind::Pro);
+    let mut h = harness(false, crate::theme::AppTheme::pro());
     assert!(h.state().ui.dialogs.is_empty());
     h.get_by_label("Color Range…").click();
     h.run_steps(3);
@@ -312,7 +312,7 @@ fn refine_row_opens_the_select_and_mask_workspace_and_color_range_dialog() {
 }
 
 /// A Studio-layout theme's floating Properties card, with no mask targeted.
-fn card_harness(new_layer: bool, theme: crate::theme::ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn card_harness(new_layer: bool, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut session = photocraft_engine::Session::new();
     session.execute("file.new", json!({"width": 64, "height": 64, "background": "white"})).unwrap();
     if new_layer {
@@ -336,7 +336,7 @@ fn card_harness(new_layer: bool, theme: crate::theme::ThemeKind) -> Harness<'sta
 
 #[test]
 fn floating_properties_card_shows_document_properties_for_the_background() {
-    for theme in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::BreezeDark] {
+    for theme in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::breeze_dark()] {
         let h = card_harness(false, theme);
         assert!(h.query_all_by_label("Document").next().is_some(), "{theme:?}: Document properties in the card");
     }
@@ -344,7 +344,7 @@ fn floating_properties_card_shows_document_properties_for_the_background() {
 
 #[test]
 fn floating_properties_card_shows_pixel_layer_properties() {
-    for theme in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::BreezeDark] {
+    for theme in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::breeze_dark()] {
         let h = card_harness(true, theme);
         assert!(h.query_all_by_label("Opacity").next().is_some(), "{theme:?}: layer controls in the card");
         assert!(h.query_all_by_label("Document").next().is_none());

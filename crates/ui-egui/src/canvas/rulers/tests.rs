@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn ruler_ticks_labels_and_pointer_stay_out_of_the_origin_corner() {
     let mut failures = Vec::new();
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for (zoom, flip, rotation, width) in [(1.0, false, 0.0, 560.0), (1.0, false, 0.0, 800.0), (0.25, true, 0.0, 560.0), (2.0, false, 30.0, 560.0)] {
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
             app.run("file.new", json!({"width": 256, "height": 128})).unwrap();
@@ -266,7 +266,7 @@ fn canvas_harness(rulers: bool) -> AppHarness {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
     (v.zoom, v.center, v.fit_pending) = (1.0, [200.0, 150.0], false);
@@ -762,7 +762,7 @@ fn tool_canvas_harness(tool: crate::state::Tool) -> egui_kittest::Harness<'stati
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
     v.zoom = 1.0;

@@ -23,25 +23,36 @@ impl PhotocraftApp {
 }
 
 impl PhotocraftApp {
-    pub fn set_theme(&mut self, ctx: &egui::Context, kind: theme::ThemeKind) {
-        if let Err(e) = self.run("prefs.set", serde_json::json!({"path": "interface.theme", "value": kind.id()})) {
+    /// Shows `theme` and saves it as the theme of its mode, which becomes the appearance mode.
+    pub fn set_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {
+        let slot = if theme.is_dark() { "interface.darkTheme" } else { "interface.lightTheme" };
+        let mode = if theme.is_dark() { "dark" } else { "light" };
+        let values = serde_json::json!({"values": {slot: theme.id().as_str(), "interface.appearanceMode": mode}});
+        if let Err(e) = self.run("prefs.set", values) {
             self.ui.status = e;
         } else {
-            self.apply_theme(ctx, kind);
+            self.apply_theme(ctx, theme);
         }
     }
 
-    pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, kind: theme::ThemeKind) {
+    pub(crate) fn apply_theme(&mut self, ctx: &egui::Context, theme: theme::AppTheme) {
         // Color and Swatches trade indices between Pro and Studio layouts.
-        if let Some(selected) = dock::Group::Color.tabs(theme::Tokens::for_kind(self.ui.theme).pro).get(self.ui.dock_tabs.color)
-            && let Some(tab) = dock::Group::Color.tabs(theme::Tokens::for_kind(kind).pro).iter().position(|name| name == selected)
+        if let Some(selected) = dock::Group::Color.tabs(self.ui.theme.is_pro()).get(self.ui.dock_tabs.color)
+            && let Some(tab) = dock::Group::Color.tabs(theme.is_pro()).iter().position(|name| name == selected)
         {
             self.ui.dock_tabs.color = tab;
         }
-        self.ui.theme = kind;
+        self.ui.theme = theme;
         panel_docking::sync_visibility(self);
-        theme::apply(ctx, kind);
+        theme::apply(ctx, &self.ui.theme);
         self.checker = None;
+    }
+
+    /// Follows the theme selection the suite's folder holds, shared with the other Craft apps, in
+    /// place of the in-memory selection the app starts with. The desktop app calls it at startup.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open_suite(&mut self, ctx: &egui::Context) {
+        self.framework.open_suite(ctx);
     }
 }
 
@@ -50,13 +61,13 @@ impl PhotocraftApp {
     /// replacement Context) before the first `run_ui` so the very first frame renders and the
     /// Type reset begin/end pass markers exist; otherwise `logic` does it and the first frame is
     /// skipped, with the begin-pass marker necessarily starting on the following pass.
-    pub fn setup_context(ctx: &egui::Context, kind: theme::ThemeKind) {
+    pub fn setup_context(ctx: &egui::Context, theme: theme::AppTheme) {
         Self::install_type_reset_hooks(ctx);
         ctx.add_plugin(tool_cursor::CursorLifecycle);
         ctx.add_plugin(single_line_drag::SingleLineDrag::default());
         theme::install_fonts(ctx);
         egui_extras::install_image_loaders(ctx);
-        theme::apply(ctx, kind);
+        theme::apply(ctx, &theme);
         // Right-click in any text field: its Cut / Copy / Paste menu (text_field_menu.rs).
         ctx.add_plugin(text_field_menu::TextFieldMenu);
         // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; PhotoCraft zooms the canvas instead

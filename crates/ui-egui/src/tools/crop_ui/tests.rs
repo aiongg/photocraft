@@ -1769,7 +1769,7 @@ fn swap_button_harness(mut a: PhotocraftApp, ratio: &str, rect: [f64; 4]) -> egu
         },
         a,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(4);
     h
 }

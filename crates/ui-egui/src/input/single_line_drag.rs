@@ -90,7 +90,7 @@ mod tests {
     /// A context set up as the app sets it up (fonts, theme, plugins).
     fn ctx() -> Context {
         let ctx = Context::default();
-        crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        crate::PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
         ctx
     }
 

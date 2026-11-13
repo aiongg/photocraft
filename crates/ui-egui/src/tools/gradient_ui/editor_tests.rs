@@ -20,7 +20,7 @@ fn editor(layer: bool) -> (Harness<'static, PhotocraftApp>, Sink) {
         Sink::Preset
     };
     let mut h = Harness::builder().with_size(vec2(1000.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| editor_window(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run_steps(2);
     h.state_mut().ui.panels.gradient_editor = true;
     h.run_steps(4);

@@ -139,7 +139,7 @@ fn the_stop_dialog_shows_its_buttons_and_enter_answers_the_default_only_once_sho
     for (allow, button) in [(true, Some("Continue")), (true, Some("Stop")), (false, None)] {
         let app = stop_app(allow, true);
         let mut h = Harness::builder().with_size(vec2(900.0, 600.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         play(h.state_mut(), &json!({"action": "Stop Test"})).unwrap();
         // The Enter that started the play arrives with the dialog's first frame: it answers nothing.
         h.key_press(egui::Key::Enter);

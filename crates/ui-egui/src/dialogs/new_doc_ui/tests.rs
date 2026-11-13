@@ -107,7 +107,7 @@ fn tiny_size_in_inches_is_not_changed_by_showing_it() {
         },
         (app, f),
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     let p = command_params(&h.state().1);
     assert_eq!((p["width"].as_u64(), p["height"].as_u64()), (Some(1), Some(1)));
@@ -335,7 +335,7 @@ mod dialog {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         h
@@ -468,7 +468,7 @@ mod dialog {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut h =
             Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         h

@@ -252,7 +252,7 @@ fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftA
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
     h
 }
@@ -573,7 +573,7 @@ fn harness(tab: usize, section: usize) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h
 }
@@ -1039,7 +1039,7 @@ fn app_harness_with_language(lang: crate::i18n::Lang) -> Harness<'static, Photoc
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.run_steps(4);
     h
 }
@@ -1260,7 +1260,7 @@ fn hand_tool_offers_scale_buttons_and_requests_the_right_view() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);
 
     h.get_by_label("100%").click();
@@ -1299,7 +1299,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let has = |h: &Harness<'static, PhotocraftApp>, v: f64| h.query_all_by_role(Role::SpinButton).any(|n| n.accesskit_node().numeric_value() == Some(v));
     assert!(has(&h, 100.0) && has(&h, 50.0));

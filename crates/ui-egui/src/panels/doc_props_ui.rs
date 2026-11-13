@@ -342,7 +342,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(3);
         let st = h.state().session.active().unwrap();
         assert_eq!((st.doc.size.width, st.doc.size.height), (1, 1));
@@ -375,7 +375,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(3);
         let centres = letter_centres(&h);
         let at = |l: &str| centres.iter().find(|(s, _)| s == l).map(|(_, x)| *x).unwrap_or_else(|| panic!("no {l} label in {centres:?}"));

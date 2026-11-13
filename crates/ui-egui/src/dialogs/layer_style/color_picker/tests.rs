@@ -1,5 +1,5 @@
 use super::*;
-use crate::{canvas, dialogs, layer_style, theme::ThemeKind};
+use crate::{canvas, dialogs, layer_style, theme::AppTheme};
 use egui::{Key, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use std::sync::Arc;
@@ -213,7 +213,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::pro_medium());
     h.run_steps(4);
     h
 }

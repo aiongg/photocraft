@@ -462,7 +462,7 @@ fn painted_ants(app: &mut PhotocraftApp) -> Vec<egui::Rect> {
 /// [`painted_ants`] for the document at `idx`.
 fn painted_ants_of(app: &mut PhotocraftApp, idx: usize) -> Vec<egui::Rect> {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0));
     let view = crate::state::View { zoom: 2.0, center: [50.0, 30.0], doc_size: [100, 60], fit_pending: false, ..Default::default() };
     let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
@@ -756,7 +756,7 @@ fn red_eye_click_corrects_a_pupil_and_a_miss_adds_an_unchanged_state() {
 
 #[test]
 fn red_eye_options_bar_shows_pupil_size_and_darken() {
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
     use egui::vec2;
     use egui_kittest::kittest::Queryable;
     let mut app = app();
@@ -770,7 +770,7 @@ fn red_eye_options_bar_shows_pupil_size_and_darken() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::studio());
     h.run_steps(4);
     h.get_by_label("Pupil Size");
     h.get_by_label("Darken Amount");
@@ -1083,7 +1083,7 @@ fn art_history_is_in_the_y_flyout() {
 
 #[test]
 fn art_history_options_bar_defaults() {
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
     use egui::vec2;
     use egui_kittest::kittest::Queryable;
     let mut app = app();
@@ -1097,7 +1097,7 @@ fn art_history_options_bar_defaults() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::studio());
     h.run_steps(4);
     h.get_by_label("Style");
     h.get_by_label("Area");
@@ -1167,7 +1167,7 @@ fn history_brush_opacity_and_flow_reach_the_painted_pixels() {
 
 #[test]
 fn history_brush_options_bar_shows_source_name() {
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
     use egui::vec2;
     use egui_kittest::kittest::Queryable;
     let mut app = app();
@@ -1181,7 +1181,7 @@ fn history_brush_options_bar_shows_source_name() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::studio());
     h.run_steps(4);
     h.get_by_label("Paints from the document's opening state");
 

@@ -473,7 +473,7 @@ fn smart_filter_levels_show_no_display() {
 
 fn dialog_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h
 }
 

@@ -117,7 +117,7 @@ fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftA
     let mut harness = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -184,7 +184,7 @@ fn a_fresh_launch_draws_the_native_groups_beside_the_protected_canvas() {
     assert!(h.state().ui.docking.is_none(), "a refused command leaves the default");
 
     let mut studio = crate::PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    studio.ui.theme = crate::theme::ThemeKind::Studio;
+    studio.ui.theme = crate::theme::AppTheme::studio();
     let layout = legacy(&studio);
     let window = layout.floating.first().expect("Studio floats Properties");
     assert_eq!((window.id, window.panels().cloned().collect::<Vec<_>>()), (PROPERTIES_WINDOW, vec!["properties".to_string(), "adjustments".into()]));
@@ -285,7 +285,7 @@ fn shared_layout_keeps_panel_identity_across_themes_and_respects_workspace_lock(
     let mut app = app();
     app.run("window.panel.move", json!({"panel":"color","anchor":"layers"})).unwrap();
     let layout = app.ui.docking.clone();
-    app.ui.theme = crate::theme::ThemeKind::Studio;
+    app.ui.theme = crate::theme::AppTheme::studio();
     assert_eq!(app.ui.docking, layout);
     app.session.prefs.edit(|prefs| prefs.workspace_locked = true);
     assert!(app.run("window.panel.float", json!({"panel":"color"})).is_err());
@@ -301,7 +301,7 @@ fn capture_custom_panel_docking_visual_fixtures() {
     let _gpu = photocraft_testkit::gpu_lock();
     let Some(directory) = std::env::var_os("CRAFT_UI_DOCKING_FIXTURES").map(std::path::PathBuf::from) else { return };
     std::fs::create_dir_all(&directory).unwrap();
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for width in [800.0, 1280.0] {
             for scale in [1.0, 1.5, 2.0] {
                 let mut app = app();
@@ -343,8 +343,8 @@ fn floating_group_titles_are_opaque_in_studio_themes() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).wgpu().build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::Studio);
-                app.ui.theme = crate::theme::ThemeKind::Studio;
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::studio());
+                app.ui.theme = crate::theme::AppTheme::studio();
                 ready = true;
                 return;
             }
@@ -455,7 +455,7 @@ fn splitting_a_short_column_keeps_the_layers_footer_visible_and_usable() {
 fn populated_canvas_keeps_a_real_opacity_edit_after_floating_and_redocking() {
     let _gpu = photocraft_testkit::gpu_lock();
     let mut app = app();
-    app.ui.theme = crate::theme::ThemeKind::Studio;
+    app.ui.theme = crate::theme::AppTheme::studio();
     app.run("file.new", json!({"width":480,"height":360})).unwrap();
     app.run("layer.new.layer", json!({"name":"Docking sample"})).unwrap();
     app.run("select.rect", json!({"x":80,"y":70,"width":250,"height":160})).unwrap();
@@ -470,7 +470,7 @@ fn populated_canvas_keeps_a_real_opacity_edit_after_floating_and_redocking() {
     let mut h = builder.build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::Studio);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::studio());
                 ready = true;
                 return;
             }
@@ -560,10 +560,10 @@ fn control_set(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> V
 
 #[test]
 fn current_main_hidden_tabs_migrate_by_name_and_selected_identity() {
-    for theme in [crate::theme::ThemeKind::ProMedium, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::studio()] {
         let mut app = app();
         app.ui.theme = theme;
-        let pro = matches!(theme, crate::theme::ThemeKind::Pro | crate::theme::ThemeKind::ProMedium);
+        let pro = matches!(theme.id().as_str(), "craft.pro" | "craft.artcraft") && theme.is_dark();
         let color = Group::Color.tabs(pro).iter().position(|name| *name == "Color").unwrap();
         let swatches = Group::Color.tabs(pro).iter().position(|name| *name == "Swatches").unwrap();
         app.ui.dock.hide_tab(Group::Color, swatches, pro);
@@ -587,7 +587,7 @@ fn current_main_hidden_tabs_migrate_by_name_and_selected_identity() {
 #[test]
 fn legacy_control_updates_authoritative_custom_visibility_and_selection_atomically() {
     let mut app = app();
-    app.ui.theme = crate::theme::ThemeKind::ProMedium;
+    app.ui.theme = crate::theme::AppTheme::pro_medium();
     app.run("window.panel.float", json!({"panel":"properties"})).unwrap();
     let ctx = egui::Context::default();
     assert_eq!(control_set(&mut app, &ctx, json!({"dockTabs":{"layers":1}}))["ok"], true);
@@ -718,7 +718,7 @@ fn customized_panel_menus_and_rail_remain_reachable_after_float_and_restore() {
     let mut menu = Harness::builder().build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
             }
             panel_menu(app, ui, "swatches");
@@ -755,7 +755,7 @@ fn actions_panel_menu_includes_load_and_save_actions() {
     let mut menu = Harness::builder().build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
             }
             panel_menu(app, ui, "actions");
@@ -779,7 +779,7 @@ fn channels_panel_menu_opens_new_spot_and_adds_a_channel() {
     let mut menu = Harness::builder().with_size(vec2(260.0, 420.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
             }
             panel_menu(app, ui, "channels");
@@ -868,7 +868,7 @@ fn floating_group_grip_redocks_all_tabs_as_one_atomic_move() {
 #[test]
 fn mixed_theme_and_legacy_selection_projects_the_selected_panel_in_the_new_theme() {
     let mut app = app();
-    app.ui.theme = crate::theme::ThemeKind::ProMedium;
+    app.ui.theme = crate::theme::AppTheme::pro_medium();
     app.run("window.panel.float", json!({"panel":"properties"})).unwrap();
     let ctx = egui::Context::default();
     assert_eq!(control_set(&mut app, &ctx, json!({"theme":"studio","dockTabs":{"color":0}}))["ok"], true);
@@ -896,7 +896,7 @@ fn the_dock_can_be_as_wide_as_the_window_allows() {
 fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     let saved: Value = serde_json::from_str(include_str!("../../../tests/fixtures/main-docking-workspace.json")).unwrap();
     let mut app = app();
-    app.ui.theme = crate::theme::ThemeKind::ProMedium;
+    app.ui.theme = crate::theme::AppTheme::pro_medium();
     crate::dock::apply(&mut app, &saved);
     assert!(app.ui.docking.is_none() && app.ui.docking_returns.is_empty() && app.ui.docking_collapsed.is_empty());
     let workspace = legacy_workspace(&app);
@@ -1018,7 +1018,7 @@ fn dock_only_frames_never_leak_into_the_standard_layout() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -1063,7 +1063,7 @@ fn the_toolbar_side_toggle_works_in_every_interface_theme() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -1071,8 +1071,8 @@ fn the_toolbar_side_toggle_works_in_every_interface_theme() {
         },
         app(),
     );
-    for kind in crate::theme::ThemeKind::ALL {
-        crate::theme::apply(&h.ctx, kind);
+    for kind in crate::theme::AppTheme::all() {
+        crate::theme::apply(&h.ctx, &kind);
         h.state_mut().ui.panels.toolbar_side = ToolbarSide::Left;
         h.run_steps(2);
         // The header's chevron carries the toolbar's label; its screen X is the panel's side.
@@ -1112,7 +1112,7 @@ fn moving_the_toolbar_persists_without_the_dock() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -1129,7 +1129,7 @@ fn moving_the_toolbar_persists_without_the_dock() {
 }
 
 /// A dock-edge harness: draw only the dock column, as the dock-edge frame layout does.
-fn dock_panel_harness(app: PhotocraftApp, size: egui::Vec2, theme: crate::theme::ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn dock_panel_harness(app: PhotocraftApp, size: egui::Vec2, theme: crate::theme::AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut ready = false;
     let mut harness = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
@@ -1148,7 +1148,7 @@ fn dock_panel_harness(app: PhotocraftApp, size: egui::Vec2, theme: crate::theme:
 
 /// [`dock_panel_harness`] in the Pro Medium theme.
 fn dock_edge_harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftApp> {
-    dock_panel_harness(app, size, crate::theme::ThemeKind::ProMedium)
+    dock_panel_harness(app, size, crate::theme::AppTheme::pro_medium())
 }
 
 /// The dock-edge handle resizes the dock and keeps the new width after release; a locked
@@ -1219,7 +1219,7 @@ fn disabling_the_ui_cancels_a_dock_edge_drag() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -1363,7 +1363,7 @@ fn ui_set_dock_width_queues_and_scales_every_column_when_drawn() {
         columns.push(Column::new(vec![craft_ui::docking::Group::new(vec![extra.to_owned()], 0)], 180.0));
     }
     app.ui.docking = Some(Workspace::new(layout));
-    let mut h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::ThemeKind::ProMedium);
+    let mut h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::AppTheme::pro_medium());
     // As in `ui_set_dock_width_scales_every_column`: the extra column comes up to its 220-point
     // minimum and the rest of the change is shared equally.
     let share = (520.0 - end_columns(h.state())[0].width - 220.0) / 2.0;
@@ -1400,7 +1400,7 @@ fn a_narrow_window_keeps_the_canvas_minimum() {
     }
     app.ui.docking = Some(Workspace::new(layout));
     app.ui.panels.rail = true;
-    let h = dock_panel_harness(app, vec2(700.0, 600.0), crate::theme::ThemeKind::ProMedium);
+    let h = dock_panel_harness(app, vec2(700.0, 600.0), crate::theme::AppTheme::pro_medium());
     let panel = crate::panels::dock_panel_width(&h.ctx);
     let toolbar = crate::panels::toolbar::toolbar_width(h.state().ui.theme.is_pro(), h.state().ui.panels.toolbar_double);
     let canvas = 700.0 - panel - toolbar;
@@ -1427,7 +1427,7 @@ fn an_empty_dock_keeps_the_parent_layout_for_toolbar_and_canvas() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -1462,7 +1462,7 @@ fn an_empty_dock_still_draws_studio_floating_properties() {
         };
         app.ui.docking = Some(Workspace::new(layout));
         app.ui.panels.rail = rail;
-        let h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::ThemeKind::Studio);
+        let h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::AppTheme::studio());
         assert!(dock_is_empty(h.state()), "rail={rail}: the dock is empty");
         assert!(show_dock_calls(&h.ctx) > 0, "rail={rail}: the docking pass must still run for floating windows");
         let rect = floating_rect(&h, "properties");
@@ -1547,7 +1547,7 @@ fn an_iconic_only_dock_keeps_its_narrow_panel() {
     }
     app.ui.docking = Some(workspace);
     assert!((dock_width(&app) - 36.0).abs() < 0.5, "an unset iconic width displays 36 points, got {}", dock_width(&app));
-    let h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::ThemeKind::ProMedium);
+    let h = dock_panel_harness(app, vec2(1280.0, 800.0), crate::theme::AppTheme::pro_medium());
     let rail = if h.state().ui.panels.rail { 36.0 } else { 0.0 };
     let drawn = crate::panels::dock_panel_width(&h.ctx);
     assert!((drawn - (36.0 + rail)).abs() < 2.0, "the iconic panel is its 36 points plus the rail ({rail}), got {drawn}");
@@ -1922,7 +1922,7 @@ fn an_idle_expanded_dock_uses_its_stored_width_not_the_gesture_minimum() {
 fn release_only_position_updates_model_and_actual_geometry_on_that_frame() {
     for dir in [crate::direction::Dir::Ltr, crate::direction::Dir::Rtl] {
         let _direction = crate::direction::direction_scope(dir);
-        for theme in [crate::theme::ThemeKind::ProMedium, crate::theme::ThemeKind::Classic] {
+        for theme in [crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::classic()] {
             for rail in [false, true] {
                 let mut app = app_with_columns(&[400.0], false);
                 app.ui.panels.rail = rail;
@@ -1958,7 +1958,7 @@ fn narrow_dock_harness(width: f32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(width, 600.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::ProMedium);
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::AppTheme::pro_medium());
                 ready = true;
                 return;
             }
@@ -2153,7 +2153,7 @@ fn multiple_iconic_columns_disable_resizing_below_their_combined_minimum() {
 fn constrained_composed_layout_reserves_the_canvas_with_or_without_a_rail() {
     for dir in [crate::direction::Dir::Ltr, crate::direction::Dir::Rtl] {
         let _direction = crate::direction::direction_scope(dir);
-        for theme in [crate::theme::ThemeKind::ProMedium, crate::theme::ThemeKind::Classic] {
+        for theme in [crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::classic()] {
             for rail in [false, true] {
                 let mut app = app_with_columns(&[290.0, 220.0], false);
                 app.ui.panels.rail = rail;

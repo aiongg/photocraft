@@ -154,7 +154,7 @@ fn value_fields_are_named_for_the_visible_solidity_or_opacity_caption() {
     let labels = |f: Map<String, Value>, body: fn(&mut egui::Ui, &mut Map<String, Value>)| -> Vec<String> {
         let mut h = Harness::builder()
             .with_size(egui::vec2(520.0, 300.0))
-            .with_context_setup(|ctx| crate::PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ALL[0]))
+            .with_context_setup(|ctx| crate::PhotocraftApp::setup_context(ctx, crate::theme::AppTheme::pro()))
             .build_ui_state(&body, f);
         h.run_steps(2);
         h.query_all_by_role(Role::SpinButton).filter_map(|n| n.accesskit_node().label()).collect()

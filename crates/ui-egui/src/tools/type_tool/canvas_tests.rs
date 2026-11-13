@@ -362,7 +362,7 @@ fn make_harness_with(builder: egui_kittest::HarnessBuilder<PhotocraftApp>, ppp: 
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h
 }
@@ -399,7 +399,7 @@ fn the_caret_reads_on_white_and_on_black() {
     };
     let mut h =
         Harness::builder().with_size(vec2(400.0, 300.0)).build_ui_state(move |ui, app: &mut PhotocraftApp| super::draw_overlay(app, ui.painter(), &xf), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run();
     // Vertical line segments are the caret (the frame and underline run sideways).
     let caret: Vec<(f32, egui::Color32)> = h
@@ -688,7 +688,7 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     let steps = h.state().session.active().unwrap().history.entries().len();
     let mut last = 20.0;
@@ -722,7 +722,7 @@ fn options_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h
 }
@@ -1686,7 +1686,7 @@ fn temporary_type_transform_visual_evidence() {
     let _gpu = photocraft_testkit::gpu_lock();
     let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/issue-1091");
     std::fs::create_dir_all(&out).unwrap();
-    for (index, theme) in crate::theme::ThemeKind::ALL.into_iter().enumerate() {
+    for (index, theme) in crate::theme::AppTheme::all().into_iter().enumerate() {
         let (app, _) = transform_app(false, false, Affine::translate(450.0, 350.0));
         let mut h = make_harness(if index == 0 { 2.0 } else { 1.0 }, app, true);
         let ctx = h.ctx.clone();
@@ -2765,7 +2765,7 @@ fn quick_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     h
 }
@@ -3064,7 +3064,7 @@ fn justify_buttons_are_greyed_on_point_text() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         for tip in justify {
             assert_eq!(!h.get_by_label(tip).accesskit_node().is_disabled(), enabled, "{tip} on {}", if paragraph { "paragraph text" } else { "point text" });
@@ -3087,7 +3087,7 @@ fn justify_buttons_are_greyed_on_point_text() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     assert!(h.get_by_label("Justify all").accesskit_node().is_disabled(), "one of the formatted layers is point text");
 }
@@ -3197,7 +3197,7 @@ fn box_overlay(text: &str, height: u32, turn: f64) -> (Vec<egui::Shape>, Pos2) {
     let corner = xf.to_screen(p.x as f32, p.y as f32);
     let mut h =
         Harness::builder().with_size(vec2(800.0, 600.0)).build_ui_state(move |ui, app: &mut PhotocraftApp| super::draw_overlay(app, ui.painter(), &xf), app);
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro_medium());
     h.run();
     (h.output().shapes.iter().map(|s| s.shape.clone()).collect(), corner)
 }
@@ -3537,7 +3537,7 @@ fn justify_buttons_work_on_area_type() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     for tip in ["Justify last left", "Justify last centered", "Justify last right", "Justify all"] {
         assert!(!h.get_by_label(tip).accesskit_node().is_disabled(), "{tip} on area type");

@@ -60,7 +60,7 @@ fn dialogs_preview_cancel_and_commit() {
         let cmd = format!("image.adjustments.{kind}");
         let mut harness =
             Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-        PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
         let id = open(harness.state_mut(), &cmd).unwrap();
         harness.run_steps(3);
         let before = harness.state().session.active().unwrap().revision;
@@ -98,7 +98,7 @@ fn color_balance_dialog() -> (Harness<'static, PhotocraftApp>, u64) {
         .with_size(egui::vec2(1200.0, 900.0))
         .with_step_dt(1.0 / 60.0)
         .build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.adjustments.colorBalance").unwrap();
     let d = h.state_mut().ui.dialog_mut(id).unwrap();
     for (k, v) in [("shadows", json!([10, 0, 0])), ("midtones", json!([40, -30, 20])), ("highlights", json!([0, 0, -15])), ("preserveLuminosity", json!(false))]
@@ -185,7 +185,7 @@ fn color_balance_dialog_gestures_match_photoshop() {
 fn levels_alt_reset_restores_defaults() {
     use egui_kittest::kittest::Queryable;
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), "image.adjustments.levels").unwrap();
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("inBlack".into(), json!(30));
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("gamma".into(), json!(1.3));
@@ -233,7 +233,7 @@ fn curves_dialog_fits_its_graph_and_controls() {
             continue;
         }
         let _language = crate::i18n::language_scope(crate::i18n::Lang::from_code(language).unwrap());
-        for theme in crate::theme::ThemeKind::ALL {
+        for theme in crate::theme::AppTheme::all() {
             for size in [egui::vec2(1280.0, 900.0), egui::vec2(900.0, 720.0)] {
                 let mut h = Harness::builder().with_size(size).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
                 PhotocraftApp::setup_context(&h.ctx, theme);
@@ -337,7 +337,7 @@ fn curves_graph_never_pushes_the_dialog_off_a_short_window() {
 #[test]
 fn cancel_leaves_the_document_untouched() {
     let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-    PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
     let id = open(harness.state_mut(), "image.adjustments.curves").unwrap();
     harness.run_steps(2);
     harness.state_mut().ui.dialog_mut(id).unwrap().fields.insert("points".into(), json!([[0, 255], [255, 0]]));
@@ -383,7 +383,7 @@ fn gradient_map_dialog_handles_preview_without_committing_until_ok() {
 #[test]
 fn curves_pencil_drag_draws_the_map_and_confirm_applies_it() {
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let steps = h.state().session.active().unwrap().history.past_len();
     let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
     let fields = &mut h.state_mut().ui.dialog_mut(id).unwrap().fields;
@@ -414,7 +414,7 @@ fn curves_pencil_drag_draws_the_map_and_confirm_applies_it() {
 fn curves_pointer_drag_previews_until_confirm_and_cancel_preserves_document() {
     for confirm in [false, true] {
         let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let original = h.state().session.active().unwrap().doc.clone();
         let steps = h.state().session.active().unwrap().history.past_len();
         let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
@@ -491,7 +491,7 @@ fn levels_white_point_eyedropper_sets_the_channel_input_whites() {
 fn curves_picker_controls_arm_and_disable_by_document_mode() {
     let harness = |app| {
         let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         open(h.state_mut(), "image.adjustments.curves").unwrap();
         h.run_steps(3);
         h
@@ -1081,7 +1081,7 @@ fn photo_filter_keeps_only_preserve_luminosity_from_its_last_ok() {
 #[test]
 fn photo_filter_reopens_with_the_choice_its_colour_implies() {
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let cmd = "image.adjustments.photoFilter";
     let mode = dialog_mem("photoFilter").with(crate::adjust_editors::PHOTO_FILTER_MODE);
     let id = open(h.state_mut(), cmd).unwrap();
@@ -1324,7 +1324,7 @@ fn selective_dialog() -> (Harness<'static, PhotocraftApp>, u64) {
         .with_size(egui::vec2(1200.0, 900.0))
         .with_step_dt(1.0 / 60.0)
         .build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), selective_app());
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let id = open(h.state_mut(), SELECTIVE).unwrap();
     h.run_steps(3);
     (h, id)

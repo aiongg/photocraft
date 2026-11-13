@@ -66,7 +66,7 @@ fn harness_stepped(app: PhotocraftApp, properties: bool, step_dt: f32) -> Harnes
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(3);
     h
 }

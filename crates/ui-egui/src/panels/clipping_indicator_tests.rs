@@ -8,7 +8,7 @@ use serde_json::json;
 use crate::PhotocraftApp;
 
 /// Open one real adjustment editor inside a 250×160 scrollable Properties panel.
-fn adjustment_harness(kind: &str, depth: u32, theme: crate::theme::ThemeKind, scale: f32, gpu: bool) -> Harness<'static, PhotocraftApp> {
+fn adjustment_harness(kind: &str, depth: u32, theme: crate::theme::AppTheme, scale: f32, gpu: bool) -> Harness<'static, PhotocraftApp> {
     let mut session = photocraft_engine::Session::new();
     session.execute("file.new", json!({"width": 16, "height": 8, "depth": depth})).unwrap();
     session.execute("edit.fill", json!({"color": "#b04020"})).unwrap();
@@ -68,7 +68,7 @@ fn scroll_to_adjustment_control(h: &mut Harness<'_, PhotocraftApp>, label: &str)
 /// Scope starts on-screen; the editor and visibility remain reachable by scrolling.
 #[test]
 fn adjustment_scope_control_fits_compact_properties_before_scrolling() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             for (kind, editor_control) in
                 [("Hue/Saturation", "Colorize"), ("Curves", "Edit points to modify the curve"), ("Selective Color", "Relative"), ("Color Lookup", "Dither")]
@@ -94,7 +94,7 @@ fn sample(h: &mut Harness<'_, PhotocraftApp>, x: i32) -> Vec<f32> {
 #[test]
 fn panel_adjustment_clips_to_selected_layer_and_scope_undoes_at_all_depths() {
     for depth in [8, 16, 32] {
-        let mut h = adjustment_harness("Hue/Saturation", depth, crate::theme::ThemeKind::Pro, 1.0, false);
+        let mut h = adjustment_harness("Hue/Saturation", depth, crate::theme::AppTheme::pro(), 1.0, false);
         let id = h.state().session.active().unwrap().active_layer.unwrap();
         h.state_mut().run("layer.setAdjustment", json!({"layer": id.0, "saturation": -100})).unwrap();
         h.run_steps(4);
@@ -127,7 +127,7 @@ fn write_adjustment_scope_preview() {
     let phase = std::env::var("PHOTOCRAFT_EVIDENCE_PHASE").unwrap_or_else(|_| "after".into());
     let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../log/adjustment-scope");
     std::fs::create_dir_all(&output).unwrap();
-    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         let mut h = adjustment_harness("Hue/Saturation", 8, theme, 2.0, true);
         // egui 0.37 completes screenshots through a one-shot callback.
         let captured = std::sync::Arc::new(std::sync::Mutex::new(None));

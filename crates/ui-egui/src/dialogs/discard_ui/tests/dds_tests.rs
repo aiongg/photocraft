@@ -35,7 +35,7 @@ fn dds_app(to: &str) -> (Prompted, Writes) {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(egui::os::OperatingSystem::Windows);
     (h, writes)
 }

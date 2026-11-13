@@ -449,13 +449,13 @@ mod tests {
             output.textures_delta.clear();
             (response.unwrap(), output.shapes)
         }
-        for theme in crate::theme::ThemeKind::ALL {
+        for theme in crate::theme::AppTheme::all() {
             for selected in [false, true] {
                 for enabled in [false, true] {
                     let old = egui::Context::default();
                     let new = egui::Context::default();
                     for ctx in [&old, &new] {
-                        crate::theme::apply(ctx, theme);
+                        crate::theme::apply(ctx, &theme);
                         egui_extras::install_image_loaders(ctx);
                     }
                     let mut center = egui::Pos2::ZERO;

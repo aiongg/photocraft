@@ -32,7 +32,7 @@ fn harness(command: Option<&str>, rotation: f32) -> Harness<'static, PhotocraftA
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
     (v.zoom, v.center, v.rotation, v.fit_pending) = (4.0, [200.0, 150.0], rotation, false);

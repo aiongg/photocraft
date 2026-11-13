@@ -9,13 +9,13 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 fn bar(tool: Tool) -> Harness<'static, PhotocraftApp> {
-    bar_in(tool, ThemeKind::ProMedium)
+    bar_in(tool, AppTheme::pro_medium())
 }
 
-fn bar_in(tool: Tool, theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn bar_in(tool: Tool, theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
     app.ui.tool = tool;
@@ -84,12 +84,12 @@ const BRUSH_CLASSIC: [(&str, &str); 6] = [
 
 #[test]
 fn the_brush_has_the_reference_tooltips_in_other_themes_too() {
-    let h = bar_in(Tool::Brush, ThemeKind::Classic);
+    let h = bar_in(Tool::Brush, AppTheme::classic());
     for (label, tip) in BRUSH_CLASSIC {
         let found = descriptions(&h, label);
         assert!(found.iter().any(|d| d == tip), "{label}: {found:?}");
     }
-    let h = bar_in(Tool::Eraser, ThemeKind::Classic);
+    let h = bar_in(Tool::Eraser, AppTheme::classic());
     for (label, tip) in BRUSH_CLASSIC {
         assert!(!descriptions(&h, label).iter().any(|d| d == tip), "{label} changed on the Eraser");
     }

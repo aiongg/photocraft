@@ -337,7 +337,7 @@ fn path_overlay_drawn_for_non_vector_tools() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(6);
     // Fit the view so document coordinates map predictably to screen pixels.
     {
@@ -440,7 +440,7 @@ fn a_hidden_work_path_stays_hidden_when_another_tile_is_clicked() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         let area = h.state().last_canvas_rect;
         let at = egui::pos2(area.left() + area.width() / 4.0, area.center().y);

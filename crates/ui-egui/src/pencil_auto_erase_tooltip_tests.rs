@@ -8,11 +8,11 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 const TIP: &str = "Draws background color over foreground colors";
 
-fn bar(theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn bar(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
     app.ui.tool = Tool::Pencil;
@@ -24,7 +24,7 @@ fn bar(theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
 
 #[test]
 fn auto_erase_has_the_reference_tooltip() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Classic] {
+    for theme in [AppTheme::pro_medium(), AppTheme::classic()] {
         let mut h = bar(theme);
         // Hovering the checkbox's label shows it.
         h.get_by_label("Auto Erase").hover();

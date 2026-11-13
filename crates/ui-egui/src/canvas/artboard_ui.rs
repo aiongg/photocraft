@@ -460,7 +460,7 @@ mod tests {
         let layer = app.session.active().unwrap().doc.layer(id).unwrap().clone();
         let mut h = Harness::builder()
             .with_size(egui::vec2(520.0, 420.0))
-            .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::ThemeKind::ALL[0]))
+            .with_context_setup(|ctx| PhotocraftApp::setup_context(ctx, crate::theme::AppTheme::pro()))
             .build_ui_state(move |ui, app: &mut PhotocraftApp| properties(app, ui, &layer), app);
         h.run_steps(2);
         let labels: Vec<String> = h.query_all_by_role(Role::SpinButton).filter_map(|n| n.accesskit_node().label()).collect();

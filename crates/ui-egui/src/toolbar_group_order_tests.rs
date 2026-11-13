@@ -113,7 +113,7 @@ fn frame(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64, events: Vec<eg
 fn pointer_alt_click_steps_the_healing_and_brush_slots_in_the_new_order() {
     let mut app = app();
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     frame(&mut app, &ctx, 0.0, vec![]);
     frame(&mut app, &ctx, 0.1, vec![]);
     let bx = if crate::theme::Tokens::get(&ctx).pro { 30.0 } else { 36.0 };

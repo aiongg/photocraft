@@ -552,7 +552,7 @@ fn renders_photoshops_layout() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     for label in [
         "Remember Settings",
@@ -611,7 +611,7 @@ fn panning_shows_the_hand() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     // Click Invert, then move over the image.
     h.get_by_label("Invert").click();
@@ -664,7 +664,7 @@ fn greyed_controls_explain_themselves() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     for (label, why) in [("Object Aware", "segmentation model"), ("Refine Hair", "hair detection")] {
         assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} is greyed");
@@ -840,7 +840,7 @@ fn resize_harness(tool: &str) -> (egui_kittest::Harness<'static, PhotocraftApp>,
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     (h, egui::Pos2::new(LEFT_W + 300.0, BAR_H + TAB_H + 300.0))
 }
@@ -1267,7 +1267,7 @@ fn marching_ants_without_a_selection_draw_nothing() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let w = h.state().distort.select_mask.as_ref().unwrap();
     let outline = w.preview.ants.as_ref().and_then(|a| a.outline.as_ref());
@@ -1316,7 +1316,7 @@ fn ants_harness(ppp: f32, step_dt: f32) -> Option<(GpuHarness, f64)> {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     // The canvas's clock runs a few frames before the dialog opens, so a clock of the dialog's
     // own, started when it opens, would be out of phase with it.
     h.run_steps(3);

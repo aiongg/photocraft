@@ -180,7 +180,7 @@ fn options_bar_picks_the_slice_style() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let fields = |h: &Harness<'static, PhotocraftApp>| {
         h.query_all_by_role(Role::SpinButton)

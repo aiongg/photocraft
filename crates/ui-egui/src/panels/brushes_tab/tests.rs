@@ -9,7 +9,7 @@ use super::*;
 
 #[test]
 fn dragging_a_brush_shows_its_tip_preview() {
-    for theme in crate::theme::ThemeKind::ALL {
+    for theme in crate::theme::AppTheme::all() {
         for mode in 0..3 {
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
             app.session.edit_prefs(|p| p.general.auto_show_home_screen = false);
@@ -67,7 +67,7 @@ fn dragging_a_brush_to_the_list_edge_scrolls_the_list() {
     let name = app.session.tools.presets[0].name.clone();
     let (w, h_px) = (1200.0, 520.0);
     let mut h = Harness::builder().with_size(vec2(w, h_px)).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
         app
     });
     h.run_steps(4);
@@ -347,7 +347,7 @@ fn the_brushes_tab_grid_is_centred_past_its_indent() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(6);
     rows_are_centred(&h, PANEL_LIST.indent, 2);
 }
@@ -421,7 +421,7 @@ fn the_preview_slider_scales_the_previews_not_the_brush_size() {
             let size = app.session.tools.brush.size;
             let name = app.session.tools.presets[0].name.clone();
             let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ALL[0]);
+                PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
                 app
             });
             h.run_steps(4);

@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::*;
 use crate::panel_docking::probe;
-use crate::theme::ThemeKind;
+use crate::theme::AppTheme;
 
 #[test]
 fn bad_stored_values_are_sanitised() {
@@ -38,7 +38,7 @@ fn app_with_layers() -> (PhotocraftApp, photocraft_doc::LayerId, photocraft_doc:
     (app, pixel, adj)
 }
 
-fn harness(app: PhotocraftApp, size: egui::Vec2, theme: ThemeKind) -> Harness<'static, PhotocraftApp> {
+fn harness(app: PhotocraftApp, size: egui::Vec2, theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     // 60 fps steps, so two clicks a frame apart count as a double-click.
     let mut h = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
@@ -88,7 +88,7 @@ fn drag(h: &mut Harness<'static, PhotocraftApp>, from: Pos2, to: Pos2) {
 
 #[test]
 fn switching_layer_kinds_keeps_the_layers_panel_still() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, pixel, adj) = app_with_layers();
         let mut h = harness(app, vec2(1200.0, 800.0), theme);
         assert!(probe::panel_rect(&h.ctx, "layers").is_some(), "{theme:?}: Layers drawn");
@@ -112,7 +112,7 @@ fn dragging_the_splitter_resizes_and_survives_a_ui_state_round_trip() {
     let (mut app, _, _) = app_with_layers();
     // CodeRabbit on #9606: the Color panel's options ride the same frames and preferences.
     app.ui.color_panel.mode = crate::state::ColorPanelMode::HsbSliders;
-    let mut h = harness(app, vec2(1200.0, 800.0), ThemeKind::ProMedium);
+    let mut h = harness(app, vec2(1200.0, 800.0), AppTheme::pro_medium());
     let props = rect_of(&h, Group::Properties);
     let color = rect_of(&h, Group::Color);
     let split = probe::hit_rect(&h.ctx, &craft_ui::docking::Hit::Divider(craft_ui::docking::Divider::Group("properties".into())))
@@ -128,7 +128,7 @@ fn dragging_the_splitter_resizes_and_survives_a_ui_state_round_trip() {
     let saved = serde_json::to_value(&h.state().ui).unwrap();
     let (mut app2, _, _) = app_with_layers();
     app2.ui = serde_json::from_value(saved).unwrap();
-    let h2 = harness(app2, vec2(1200.0, 800.0), ThemeKind::ProMedium);
+    let h2 = harness(app2, vec2(1200.0, 800.0), AppTheme::pro_medium());
     assert_eq!(drawn(&h2).0, drawn(&h).0);
 
     // Remembered in the preferences once the mouse is up, and restored at the next launch.
@@ -154,7 +154,7 @@ fn dragging_the_splitter_resizes_and_survives_a_ui_state_round_trip() {
 #[test]
 fn reset_workspace_restores_the_default_layout_and_new_workspaces_keep_theirs() {
     let (app, _, _) = app_with_layers();
-    let mut h = harness(app, vec2(1200.0, 800.0), ThemeKind::ProMedium);
+    let mut h = harness(app, vec2(1200.0, 800.0), AppTheme::pro_medium());
     let ctx = h.ctx.clone();
     h.state_mut().ui.dock.heights.insert(Group::Properties, 120.0);
     h.state_mut().ui.dock.set_collapsed(Group::Color, true);
@@ -174,7 +174,7 @@ fn reset_workspace_restores_the_default_layout_and_new_workspaces_keep_theirs() 
 
 #[test]
 fn a_single_tab_click_expands_a_collapsed_panel() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         for tab_index in [0, 1] {
             let (mut app, _, _) = app_with_layers();
             app.ui.dock_tabs.color = 0;
@@ -199,7 +199,7 @@ fn dragging_a_reordered_tab_onto_another_group_moves_that_panel() {
     let (mut app, _, _) = app_with_layers();
     // Gradients (original tab 2) drawn first: Gradients | Color | Swatches | Patterns.
     app.ui.dock.tab_order.insert(Group::Color, vec!["Gradients".into()]);
-    let mut h = harness(app, vec2(1200.0, 800.0), ThemeKind::ProMedium);
+    let mut h = harness(app, vec2(1200.0, 800.0), AppTheme::pro_medium());
     let tab = |h: &Harness<'static, PhotocraftApp>, panel: &str| probe::tab_rect(&h.ctx, panel).unwrap_or_else(|| panic!("{panel} tab drawn"));
     assert!(tab(&h, "gradients").left() < tab(&h, "color").left());
     let (source, destination) = (tab(&h, "gradients").center(), tab(&h, "layers").center());
@@ -216,7 +216,7 @@ fn dragging_a_reordered_tab_onto_another_group_moves_that_panel() {
 
 #[test]
 fn tiny_windows_do_not_panic() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         for (w, ht) in [(40.0, 30.0), (300.0, 80.0), (600.0, 200.0), (2000.0, 120.0)] {
             let (mut app, _, _) = app_with_layers();
             app.ui.panels.history = true;
@@ -360,7 +360,8 @@ fn right_click_tab(h: &mut Harness<'static, PhotocraftApp>, panel: &str) {
 fn panel_tab_context_menu_closes_one_tab_or_its_group() {
     use egui_kittest::kittest::Queryable;
 
-    for (theme, g, window) in [(ThemeKind::ProMedium, Group::Properties, "window.panel.properties"), (ThemeKind::Studio, Group::Layers, "window.panel.layers")]
+    for (theme, g, window) in
+        [(AppTheme::pro_medium(), Group::Properties, "window.panel.properties"), (AppTheme::studio(), Group::Layers, "window.panel.layers")]
     {
         let pro = is_pro(theme);
         let names = g.tabs(pro);
@@ -424,8 +425,8 @@ fn studio_properties_card_shows_the_adjustments_tab() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
-    h.state_mut().ui.theme = ThemeKind::Studio;
+    PhotocraftApp::setup_context(&h.ctx, AppTheme::studio());
+    h.state_mut().ui.theme = AppTheme::studio();
     h.run_steps(3);
     let ctx = h.ctx.clone();
     crate::menus::invoke(h.state_mut(), &ctx, "window.panel.adjustments", json!({})).unwrap();
@@ -454,7 +455,7 @@ fn studio_properties_card_shows_the_adjustments_tab() {
     assert!(h.query_by_label("Adjustments").is_none() && h.query_by_label("Reset to defaults").is_some());
 }
 
-fn is_pro(theme: ThemeKind) -> bool {
+fn is_pro(theme: AppTheme) -> bool {
     theme.is_pro()
 }
 
@@ -462,11 +463,11 @@ fn is_pro(theme: ThemeKind) -> bool {
 fn theme_switch_keeps_the_selected_color_group_panel() {
     use egui_kittest::kittest::Queryable;
 
-    for theme in ThemeKind::ALL {
+    for theme in AppTheme::all() {
         for (tab, name) in Group::Color.tabs(true).iter().enumerate() {
             let (mut app, _, _) = app_with_layers();
             app.ui.dock_tabs.color = tab;
-            let mut h = harness(app, vec2(1200.0, 900.0), ThemeKind::Pro);
+            let mut h = harness(app, vec2(1200.0, 900.0), AppTheme::pro());
             let ctx = h.ctx.clone();
             h.state_mut().set_theme(&ctx, theme);
             h.run_steps(4);
@@ -476,7 +477,7 @@ fn theme_switch_keeps_the_selected_color_group_panel() {
                 assert!(h.query_by_label("#").is_some(), "{theme:?}: Color field missing");
                 assert!(h.query_all_by_label("Hue").next().is_none(), "{theme:?}: no HSB sliders");
             }
-            h.state_mut().set_theme(&ctx, ThemeKind::Pro);
+            h.state_mut().set_theme(&ctx, AppTheme::pro());
             h.run_steps(4);
             assert_eq!(h.state().ui.dock_tabs.color, tab, "{theme:?}: switching back changed the panel");
         }
@@ -484,7 +485,7 @@ fn theme_switch_keeps_the_selected_color_group_panel() {
 }
 
 /// Full app at `size` (1× scale) on a document with `n` layers named "Row 00", "Row 01", …
-fn app_harness_rows(size: egui::Vec2, theme: ThemeKind, n: usize) -> Harness<'static, PhotocraftApp> {
+fn app_harness_rows(size: egui::Vec2, theme: AppTheme, n: usize) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(size).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, theme);
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -518,7 +519,7 @@ fn rows_in_view(h: &Harness<'static, PhotocraftApp>, n: usize) -> usize {
 #[test]
 fn default_layout_shows_ten_layer_rows_at_900pt() {
     for (size, want) in [(vec2(1440.0, 900.0), 10), (vec2(1280.0, 720.0), 4)] {
-        let h = app_harness_rows(size, ThemeKind::ProMedium, 40);
+        let h = app_harness_rows(size, AppTheme::pro_medium(), 40);
         let rows = rows_in_view(&h, 40);
         let groups = crate::panel_docking::last_bodies(&h.ctx);
         assert!(rows >= want, "{size:?}: {rows} rows visible, want ≥ {want}: {groups:?}");
@@ -534,7 +535,7 @@ fn default_layout_shows_ten_layer_rows_at_900pt() {
 #[test]
 fn defaults_give_way_to_layers_but_user_sizes_stay() {
     let (app, _, _) = app_with_layers();
-    let h = harness(app, vec2(1440.0, 1400.0), ThemeKind::ProMedium);
+    let h = harness(app, vec2(1440.0, 1400.0), AppTheme::pro_medium());
     for g in [Group::Color, Group::Properties] {
         let height = rect_of(&h, g).height();
         assert!((height - g.default_height()).abs() < 2.0, "{g:?}: {height}");
@@ -542,7 +543,7 @@ fn defaults_give_way_to_layers_but_user_sizes_stay() {
     let (mut app, _, _) = app_with_layers();
     app.ui.dock.heights.insert(Group::Properties, 340.0);
     app.ui.dock.heights.insert(Group::Color, 200.0);
-    let h = harness(app, vec2(1440.0, 800.0), ThemeKind::ProMedium);
+    let h = harness(app, vec2(1440.0, 800.0), AppTheme::pro_medium());
     for (g, want) in [(Group::Color, 200.0), (Group::Properties, 340.0)] {
         let height = rect_of(&h, g).height();
         assert!((height - want).abs() < 2.0, "{g:?}: {height}");
@@ -553,7 +554,7 @@ fn defaults_give_way_to_layers_but_user_sizes_stay() {
 /// stays), and toggles closed again; old saved layouts place it above Layers.
 #[test]
 fn window_character_opens_its_own_group_and_keeps_properties() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, _, _) = app_with_layers();
         let mut h = harness(app, vec2(1440.0, 900.0), theme);
         let ctx = h.ctx.clone();
@@ -675,7 +676,7 @@ fn tab_in_full_screen_shows_and_hides_the_chrome_and_leaving_restores_the_panels
 fn navigator_preview_fills_its_group_and_keeps_aspect() {
     assert!(Group::Navigator.scrolls_itself(0), "the Navigator tab lays itself out");
     assert!(!Group::Navigator.scrolls_itself(1) && !Group::Navigator.scrolls_itself(2), "Histogram and Info still scroll");
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let mut sizes = Vec::new();
         for tall in [150.0, 260.0, 420.0] {
             let mut h = Harness::builder().with_size(vec2(1200.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
@@ -752,7 +753,7 @@ fn tab_order_is_by_name_and_bad_saved_orders_fall_back() {
 /// remembered layout and saved workspaces, and clicking still selects.
 #[test]
 fn dragging_a_tab_reorders_the_group_and_the_order_persists() {
-    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+    for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, _, _) = app_with_layers();
         let mut h = harness(app, vec2(1200.0, 800.0), theme);
         let tab = |h: &Harness<'static, PhotocraftApp>, panel: &str| probe::tab_rect(&h.ctx, panel).unwrap_or_else(|| panic!("{panel} tab drawn"));

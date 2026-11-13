@@ -103,10 +103,10 @@ fn appearance_defaults_and_legacy_theme_migrate() {
     let p = Preferences::default();
     // New users keep Photoshop's default; following the system is opt-in.
     assert_eq!(p.interface.appearance_mode, AppearanceMode::Dark);
-    assert_eq!(p.interface.dark_theme, DarkTheme::ProMedium);
-    assert_eq!(p.interface.light_theme, LightTheme::ProLight);
+    assert_eq!(p.interface.dark_theme, "craft.artcraft");
+    assert_eq!(p.interface.light_theme, "craft.pro");
     for (theme, mode, dark, light) in
-        [("pro", AppearanceMode::Dark, DarkTheme::Pro, LightTheme::ProLight), ("classic", AppearanceMode::Light, DarkTheme::ProMedium, LightTheme::Classic)]
+        [("pro", AppearanceMode::Dark, "craft.pro", "craft.pro"), ("classic", AppearanceMode::Light, "craft.artcraft", "craft.classic")]
     {
         let mut s = Session::new();
         s.load_prefs_json(&json!({"interface": {"theme": theme}}).to_string()).unwrap();
@@ -152,22 +152,22 @@ fn appearance_choices_validate_and_legacy_theme_still_selects() {
     s.execute("prefs.set", json!({"values": {"interface.appearanceMode": "auto", "interface.darkTheme": "studio", "interface.lightTheme": "classic"}}))
         .unwrap();
     assert_eq!(s.prefs().interface.appearance_mode, AppearanceMode::Auto);
-    assert_eq!(s.prefs().interface.dark_theme, DarkTheme::Studio);
-    assert_eq!(s.prefs().interface.light_theme, LightTheme::Classic);
+    assert_eq!(s.prefs().interface.dark_theme, "craft.studio");
+    assert_eq!(s.prefs().interface.light_theme, "craft.classic");
     let mut restarted = Session::new();
     restarted.load_prefs_json(&s.prefs_to_json()).unwrap();
     assert_eq!(restarted.prefs().interface, s.prefs().interface);
-    assert!(s.execute("prefs.set", json!({"path": "interface.darkTheme", "value": "classic"})).is_err());
+    assert!(s.execute("prefs.set", json!({"path": "interface.darkTheme", "value": ""})).is_err());
     s.execute("prefs.set", json!({"path": "interface.theme", "value": "pro"})).unwrap();
     assert_eq!(s.prefs().interface.appearance_mode, AppearanceMode::Dark);
-    assert_eq!(s.prefs().interface.dark_theme, DarkTheme::Pro);
-    assert_eq!(s.prefs().interface.light_theme, LightTheme::Classic);
+    assert_eq!(s.prefs().interface.dark_theme, "craft.pro");
+    assert_eq!(s.prefs().interface.light_theme, "craft.classic");
     s.execute("prefs.set", json!({"path": "interface", "value": {"theme": "studioLight"}})).unwrap();
     assert_eq!(s.prefs().interface.appearance_mode, AppearanceMode::Light);
-    assert_eq!(s.prefs().interface.light_theme, LightTheme::StudioLight);
-    assert_eq!(s.prefs().interface.dark_theme, DarkTheme::Pro);
+    assert_eq!(s.prefs().interface.light_theme, "craft.studio");
+    assert_eq!(s.prefs().interface.dark_theme, "craft.pro");
     // #2661: the light Pro brightness levels are light themes.
-    for (theme, light) in [("proLightGray", LightTheme::ProLightGray), ("proLight", LightTheme::ProLight)] {
+    for (theme, light) in [("proLightGray", "craft.pro-light-gray"), ("proLight", "craft.pro")] {
         s.execute("prefs.set", json!({"path": "interface.theme", "value": theme})).unwrap();
         assert_eq!(s.prefs().interface.appearance_mode, AppearanceMode::Light);
         assert_eq!(s.prefs().interface.light_theme, light);
@@ -184,14 +184,14 @@ fn favorite_themes_persist_and_reject_invalid_lists() {
     let mut s = Session::new();
     assert!(s.prefs().interface.favorite_themes.is_empty());
     s.execute("prefs.set", json!({"path": "interface.favoriteThemes", "value": ["classic", "studio"]})).unwrap();
-    assert_eq!(s.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
+    assert_eq!(s.prefs().interface.favorite_themes, vec!["craft.classic", "craft.studio"]);
     s.execute("prefs.set", json!({"path": "interface.theme", "value": "pro"})).unwrap();
     let mut restored = Session::new();
     restored.load_prefs_json(&s.prefs_to_json()).unwrap();
-    assert_eq!(restored.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
-    for invalid in [json!("classic"), json!(["unknown"]), json!(["classic", "classic"]), json!([23])] {
+    assert_eq!(restored.prefs().interface.favorite_themes, vec!["craft.classic", "craft.studio"]);
+    for invalid in [json!("classic"), json!(["bad id"]), json!(["classic", "classic"]), json!([23])] {
         assert!(s.execute("prefs.set", json!({"path": "interface.favoriteThemes", "value": invalid})).is_err());
-        assert_eq!(s.prefs().interface.favorite_themes, vec![Theme::Classic, Theme::Studio]);
+        assert_eq!(s.prefs().interface.favorite_themes, vec!["craft.classic", "craft.studio"]);
     }
 }
 
@@ -255,7 +255,7 @@ fn reset_one_keyed_override() {
     }
     assert_eq!(s.execute("prefs.get", json!({"path": "shortcuts"})).unwrap(), json!({"edit.redo": "Ctrl+Alt+Y"}));
     assert_eq!(s.execute("prefs.get", json!({"path": "menus.colors"})).unwrap(), json!({"edit.fill": "red"}));
-    assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("studioLight"));
+    assert_eq!(s.execute("prefs.get", json!({"path": "interface.lightTheme"})).unwrap(), json!("craft.studio"));
     assert_eq!(s.prefs().shortcut("edit.undo", undo), undo);
 }
 

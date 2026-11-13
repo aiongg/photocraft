@@ -125,7 +125,7 @@ mod tests {
 
     fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         let h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h
     }
 

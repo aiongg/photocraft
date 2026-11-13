@@ -864,25 +864,25 @@ fn closed_documents_release_navigator_but_keep_open_document_textures() {
 fn only_themes_with_a_dot_pattern_tile_the_canvas_surround() {
     // #4542: switching to Pro filled the empty workspace with red blocks on one GPU. Pro's
     // dots are its canvas colour, so the tiled texture had nothing to show in the first place.
-    use crate::theme::ThemeKind;
-    let tiles = |ctx: &egui::Context, kind: ThemeKind| {
-        crate::theme::apply(ctx, kind);
+    use crate::theme::AppTheme;
+    let tiles = |ctx: &egui::Context, kind: AppTheme| {
+        crate::theme::apply(ctx, &kind);
         let mut output = ctx.run_ui(Default::default(), |ui| paint_dots(ui, ui.max_rect(), true));
         output.textures_delta.clear();
         output.shapes.iter().any(|s| matches!(s.shape, egui::Shape::Mesh(_)))
     };
     let uploaded = |ctx: &egui::Context| ctx.tex_manager().read().allocated().filter(|(_, meta)| meta.name == "canvas-dots").count();
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         let ctx = egui::Context::default();
-        let dotted = matches!(kind, ThemeKind::Studio | ThemeKind::StudioLight | ThemeKind::SolarizedDark);
+        let dotted = matches!(kind.id().as_str(), "craft.studio" | "craft.solarized-dark");
         assert_eq!(tiles(&ctx, kind), dotted, "{kind:?}");
         assert_eq!(uploaded(&ctx), usize::from(dotted), "{kind:?}");
     }
     // The reported switch: a dotted theme, then Pro.
     let ctx = egui::Context::default();
-    assert!(tiles(&ctx, ThemeKind::Studio));
-    assert!(!tiles(&ctx, ThemeKind::Pro));
-    assert!(!tiles(&ctx, ThemeKind::ProMedium));
+    assert!(tiles(&ctx, AppTheme::studio()));
+    assert!(!tiles(&ctx, AppTheme::pro()));
+    assert!(!tiles(&ctx, AppTheme::pro_medium()));
     assert_eq!(uploaded(&ctx), 1, "only Studio's dots were uploaded");
 }
 
@@ -1234,7 +1234,7 @@ fn document_tab_close_button_sits_on_the_platform_side() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.ctx.set_os(os);
         h.state_mut().1 = true;
         h.run_steps(2);
@@ -1253,7 +1253,7 @@ fn document_tab_close_button_sits_on_the_platform_side() {
 #[test]
 fn middle_clicking_a_tab_closes_that_document() {
     use egui_kittest::kittest::Queryable;
-    for kind in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Pro] {
+    for kind in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::pro()] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         for name in ["keep", "doomed", "active"] {
             app.run("file.new", json!({"width": 8, "height": 8, "name": name})).unwrap();
@@ -1297,7 +1297,7 @@ fn middle_clicking_an_edited_tab_prompts_instead_of_discarding() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.state_mut().1 = true;
     h.run_steps(2);
     h.get_by_label_contains("edited").click_button(egui::PointerButton::Middle);
@@ -1308,7 +1308,7 @@ fn middle_clicking_an_edited_tab_prompts_instead_of_discarding() {
 
 #[test]
 fn spectrum_document_tabs_meet_canvas_without_a_gap() {
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::ProMedium] {
+    for kind in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::pro_medium()] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 80, "height": 60})).unwrap();
         app.sync_views();
@@ -1344,7 +1344,7 @@ fn large_tabs_preference_increases_tab_strip_height() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.state_mut().1 = true;
     h.run_steps(2);
     let normal_h = h.get_by_label_contains("Untitled @").rect().height();
@@ -1390,7 +1390,7 @@ fn tab_drop_index_and_move_target_cover_reorder_drops() {
 #[test]
 fn dragging_a_tab_reorders_the_documents() {
     use egui_kittest::kittest::Queryable;
-    for kind in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Pro] {
+    for kind in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::pro()] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         for name in ["a", "b", "c"] {
             app.run("file.new", json!({"width": 8, "height": 8, "name": name})).unwrap();
@@ -1431,7 +1431,7 @@ fn dragging_a_tab_off_the_strip_floats_it_in_a_window() {
     assert!(!torn_off(strip, egui::pos2(50.0, 26.0 + TEAR_OFF - 1.0)), "a wobble below the strip still reorders");
     assert!(torn_off(strip, egui::pos2(50.0, 26.0 + TEAR_OFF + 1.0)));
     assert!(torn_off(strip, egui::pos2(50.0, -TEAR_OFF - 1.0)), "dragged up, off the window's top");
-    for kind in [crate::theme::ThemeKind::Studio, crate::theme::ThemeKind::Pro] {
+    for kind in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::pro()] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         for name in ["a", "b", "c"] {
             app.run("file.new", json!({"width": 8, "height": 8, "name": name})).unwrap();
@@ -1677,7 +1677,7 @@ fn start_screen_buttons_stay_inside_a_narrow_canvas() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
         h.state_mut().1 = true;
         h.run_steps(3);
         for label in ["New file", "Open…"] {
@@ -1705,7 +1705,7 @@ fn home_recent_list_hides_when_the_preference_is_off() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.state_mut().1 = true;
     h.run_steps(3);
     assert!(h.query_by_label("hidden.psd").is_some(), "listed by default");
@@ -1729,7 +1729,7 @@ fn start_screen_narrow_window_renders_actions_row() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.state_mut().1 = true;
     h.run_steps(3);
     assert!(h.query_by_label("New file").is_some(), "New file button must be present in narrow mode");
@@ -1753,7 +1753,7 @@ fn home_recent_entries_can_be_removed() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
     h.state_mut().1 = true;
     h.run_steps(3);
     let listed = |h: &egui_kittest::Harness<'_, (PhotocraftApp, bool)>| {
@@ -3413,7 +3413,7 @@ fn arrange_layout_only_includes_docked_documents() {
 
 #[test]
 fn torn_off_document_is_not_drawn_again_in_the_main_window() {
-    for kind in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::Studio] {
+    for kind in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 80, "height": 60, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 80, "height": 60, "name": "docked"})).unwrap();
@@ -3541,7 +3541,7 @@ fn a_new_window_for_document_keeps_its_own_view() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.state_mut().1 = true;
     h.run_steps(4);
     assert!(h.state().0.ui.windows.iter().any(|w| w.open && !w.floating), "the extra window is open");
@@ -3577,7 +3577,7 @@ fn a_tiled_document_follows_navigator_and_status_bar_zoom() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().1 = true;
         h.run_steps(4);
         let active = h.state().0.session.active_index().unwrap();

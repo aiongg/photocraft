@@ -63,7 +63,7 @@ fn options_bar_swatch_opens_the_editor_and_reaches_the_gradients_panel() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     // The swatch opens the Gradient Editor window (Photoshop's behaviour), not a popup.
     h.get_by_label("Gradient picker").click();
@@ -263,7 +263,7 @@ fn the_options_bar_swatch_opens_the_gradient_editor_in_both_modes() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(4);
         assert!(!h.state().ui.panels.gradient_editor, "classic={classic}: starts closed");
         h.get_by_label("Gradient picker").click();
@@ -278,7 +278,7 @@ fn the_options_bar_swatch_opens_the_gradient_editor_in_both_modes() {
 #[test]
 fn the_editor_window_renders_with_and_without_a_gradient_layer() {
     let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
     // `run_ui` hands back a `FullOutput` whose texture deltas the caller has to consume.
     let run = |app: &mut PhotocraftApp| {
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| editor_window(app, ui.ctx()));
@@ -322,7 +322,7 @@ fn the_editor_edits_the_current_gradient_without_a_layer() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     // Open the window once the fonts are bound (the build's first frame runs without them).
     h.run_steps(2);
     h.state_mut().ui.panels.gradient_editor = true;
@@ -347,7 +347,7 @@ fn the_editor_saves_the_current_gradient_as_a_preset() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     h.state_mut().ui.panels.gradient_editor = true;
     h.run_steps(4);

@@ -69,7 +69,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 
 fn harness_with(builder: egui_kittest::HarnessBuilder<PhotocraftApp>) -> Harness<'static, PhotocraftApp> {
     let mut h = builder.with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::ThemeKind::ProMedium);
+        PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro_medium());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 64})).expect("new document");
         app

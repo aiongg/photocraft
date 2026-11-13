@@ -344,7 +344,7 @@ mod tests {
         let sm = recorded(&app);
         assert_eq!(sm.smart_filters[0].params.get("cyan").and_then(Value::as_f64), Some(30.0), "recorded in the old form");
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
         let dialog = h.state().ui.dialogs.last().unwrap().id;

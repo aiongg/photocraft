@@ -939,10 +939,10 @@ fn engine_execute_cannot_change_document_behind_adjustment_dialog() {
 
 #[test]
 fn ui_set_rejects_unknown_fields_before_changing_anything() {
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    app.set_theme(&ctx, ThemeKind::StudioLight);
+    app.set_theme(&ctx, AppTheme::studio_light());
     // Not the default tool, so a rejected `"tool": "move"` that still applied would show.
     app.ui.tool = Tool::Brush;
     // `dark` was advertised to MCP clients but never read; a typo looked like success too.
@@ -951,7 +951,7 @@ fn ui_set_rejects_unknown_fields_before_changing_anything() {
         assert_eq!(r["ok"], false, "{params}: {r}");
         assert!(r["error"].as_str().unwrap().contains("unknown field"), "{r}");
     }
-    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(app.ui.theme, AppTheme::studio_light());
     assert_eq!(app.ui.tool, Tool::Brush, "a rejected call applies none of its fields");
     // Every field the method reads gets past the check (a bad value is its own error).
     for field in UI_SET_FIELDS {
@@ -1361,17 +1361,17 @@ fn ui_set_color_panel_mode() {
 
 #[test]
 fn ui_set_unknown_theme_error_names_every_theme_and_each_name_works() {
-    use crate::theme::ThemeKind;
+    use crate::theme::AppTheme;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     let r = call(&mut app, &ctx, "ui.set", json!({"theme": "nope"}));
     assert_eq!(r["ok"], false);
     let error = r["error"].as_str().unwrap();
-    for kind in ThemeKind::ALL {
+    for kind in AppTheme::all() {
         assert!(error.contains(kind.id()), "{error} lacks {}", kind.id());
         assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": kind.id()}))["ok"], true);
         assert_eq!(app.ui.theme, kind);
-        assert_eq!(ThemeKind::from_name(kind.id()), Some(kind));
+        assert_eq!(AppTheme::from_name(kind.id()), Some(kind));
     }
 }
 

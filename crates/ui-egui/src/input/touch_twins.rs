@@ -64,7 +64,7 @@ mod tests {
             },
             app,
         );
-        crate::PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+        crate::PhotocraftApp::setup_context(&harness.ctx, crate::theme::AppTheme::pro());
         harness.run_steps(3);
         let file = harness.get_by_label("File").rect().center();
         let ctx = harness.ctx.clone();
