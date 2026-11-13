@@ -753,13 +753,17 @@ fn view_menu_zoom_keeps_its_centre_during_the_animation() {
     let ctx = h.ctx.clone();
     // Choose without the widget click helper, which runs repaint frames until settled.
     choose(h.state_mut(), &ctx, "view.zoomIn");
+    // The frame's clock, as the app's window gives one: with none, egui moves each pass of a frame on by the predicted
+    // frame time, and the zoom's relayout pass would start past the end of the ease.
+    let start = ctx.input(|i| i.time) + 0.25;
+    h.input_mut().time = Some(start);
     h.step();
-    h.input_mut().time = Some(ctx.input(|i| i.time) + 0.11);
+    h.input_mut().time = Some(start + 0.11);
     h.step();
     let displayed = crate::canvas::ViewXform::active(h.state()).unwrap();
     assert!(displayed.zoom > zoom && displayed.zoom < h.state().ui.views[0].zoom);
     assert!(displayed.to_screen(center[0], center[1]).distance(displayed.rect.center()) < 1.0);
-    h.input_mut().time = Some(ctx.input(|i| i.time) + 0.3);
+    h.input_mut().time = Some(start + 0.41);
     h.step();
     assert!(!h.state().ui.views[0].zoom_animating);
 }
