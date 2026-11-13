@@ -14,9 +14,13 @@
 //! - `ui.dialog.apply {dialog}`: commit Preferences changes without closing the dialog
 //! - `ui.window.open {document?}` / `ui.window.close {window}`: extra document windows
 //! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], tool?, modifiers?, button?}`: drive the active tool in document coordinates (`button: "secondary"` opens the tool's canvas context menu (the pasteboard colour menu outside the image) or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
-//! - `ui.click {x, y, button?, count?}` / `ui.move {x, y}`: synthetic pointer input in screen points
+//! - `ui.click {x, y, coordinates?, button?, count?, hold?, modifiers?}` / `ui.move {x, y, coordinates?, rest?, modifiers?}` /
+//!   `ui.wheel {x, y, coordinates?, dx?, dy?, modifiers?}` / `ui.release {button?, key?, x?, y?, coordinates?}`: synthetic
+//!   pointer input in screen points, or document points with `coordinates: "document"` (the main canvas maps them);
+//!   `hold` leaves the last press down until `ui.release`, `rest` waits for a hover to rest before the reply
 //!   (`count` at most [`MAX_CLICKS`], `x` and `y` within ±[`MAX_SCREEN_POINT`])
-//! - `ui.key {key, command?, shift?, alt?, ctrl?}` / `ui.type {text}`: synthetic keyboard input
+//! - `ui.key {key, hold?, command?, shift?, alt?, ctrl?}` / `ui.type {text}`: synthetic keyboard input
+//! - `ui.capsLock {on}`: hold Caps Lock on or off for the canvas (`null` returns to the keyboard's state)
 //! - The synthetic input methods reject unknown fields, wrong types, unknown enum values and
 //!   out-of-range numbers before acting, naming the parameter (#2449)
 //! - `ui.resize {width, height}`: resize the main window
@@ -47,6 +51,7 @@ mod dispatch;
 mod inspect;
 mod params;
 
+pub(crate) use dispatch::SyntheticHeld;
 use dispatch::dispatch;
 pub use inspect::{inspect, save_screenshot, save_screenshot_rgba};
 #[cfg(test)]
@@ -191,6 +196,7 @@ pub(super) const METHODS: &[&str] = &[
     "engine.execute",
     "jobs.cancel",
     "jobs.list",
+    "ui.capsLock",
     "ui.click",
     "ui.context.choose",
     "ui.dialog.apply",
@@ -206,10 +212,12 @@ pub(super) const METHODS: &[&str] = &[
     "ui.menu.list",
     "ui.move",
     "ui.pointer",
+    "ui.release",
     "ui.resize",
     "ui.screenshot",
     "ui.set",
     "ui.type",
+    "ui.wheel",
     "ui.window.close",
     "ui.window.open",
 ];

@@ -1171,69 +1171,238 @@ fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u6
 
 fn input_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
     let p = &req.params;
-    Some(match req.method.as_str() {
-        "ui.pointer" => pointer(app, ctx, p),
-        "ui.click" | "ui.move" => click(app, ctx, p, req.method == "ui.click"),
-        "ui.key" => key(app, ctx, p),
-        "ui.type" => {
-            let Some(text) = str_param(p, "text") else { return Some(err("missing `text`")) };
-            app.synthetic.push(egui::Event::Text(text.to_string()));
+    let queued = match req.method.as_str() {
+        "ui.pointer" => return Some(pointer(app, ctx, p)),
+        "ui.click" => click(app, p),
+        "ui.move" => pointer_move(app, p),
+        "ui.wheel" => wheel(app, p),
+        "ui.key" => key(app, p),
+        "ui.release" => release(app, p),
+        "ui.type" => match input_object(p, None, &["text"]).and_then(|p| input_choice(&p, "text", "text", &[]).map(|t| t.map(str::to_owned))) {
+            Ok(Some(text)) => {
+                push(app, egui::Event::Text(text));
+                Ok(())
+            }
+            Ok(None) => Err("missing `text`".into()),
+            Err(e) => Err(e),
+        },
+        "ui.capsLock" => caps_lock(app, p),
+        _ => return None,
+    };
+    Some(match queued {
+        Ok(()) => {
             ctx.request_repaint();
             Outcome::AfterInput
         }
-        _ => return None,
+        Err(e) => err(e),
     })
 }
 
-fn click(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value, click: bool) -> Outcome {
-    let fields: &[&str] = if click { &["x", "y", "button", "count"] } else { &["x", "y"] };
-    let parsed = (|| -> std::result::Result<_, String> {
-        let p = input_object(p, None, fields)?;
-        // Screen coordinates in points (as reported by ui.inspect window size).
-        let range = Some((-MAX_SCREEN_POINT, MAX_SCREEN_POINT));
-        let x = input_number(&p, "x", "x", range)?.unwrap_or(0.0) as f32;
-        let y = input_number(&p, "y", "y", range)?.unwrap_or(0.0) as f32;
-        let button = match input_choice(&p, "button", "button", &BUTTONS)?.unwrap_or("left") {
-            "right" | "secondary" => egui::PointerButton::Secondary,
-            "middle" => egui::PointerButton::Middle,
-            _ => egui::PointerButton::Primary,
-        };
-        let clicks = if click { uint_field(&p, "count")?.unwrap_or(1) } else { 0 };
-        if clicks > MAX_CLICKS {
-            return Err(format!("`count` must be at most {MAX_CLICKS} (got {clicks})"));
-        }
-        Ok((egui::pos2(x, y), button, clicks))
-    })();
-    let (pos, button, clicks) = match parsed {
-        Ok(parsed) => parsed,
-        Err(e) => return err(e),
-    };
-    app.synthetic.push(egui::Event::PointerMoved(pos));
-    for _ in 0..clicks {
-        app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: true, modifiers: Default::default() });
-        app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: false, modifiers: Default::default() });
-    }
-    ctx.request_repaint();
-    Outcome::AfterInput
+/// What the queued synthetic input holds down once it has run: the modifiers, buttons and keys, and
+/// where the pointer is. Each request names the modifiers held during it; a move or wheel leaves
+/// them held, a click or key that holds nothing lets them go.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SyntheticHeld {
+    mods: egui::Modifiers,
+    buttons: Vec<egui::PointerButton>,
+    keys: Vec<egui::Key>,
+    pos: Option<egui::Pos2>,
 }
 
-fn key(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
-    let parsed = (|| -> std::result::Result<_, String> {
-        let p = input_object(p, None, &["key", "modifiers", "shift", "alt", "command", "ctrl"])?;
-        let Some(name) = input_choice(&p, "key", "key", &[])? else { return Err("missing `key`".into()) };
-        let key = egui::Key::from_name(name).ok_or_else(|| format!("unknown key `{name}`"))?;
-        // Modifier flags may be top-level or grouped under "modifiers".
-        Ok((key, input_modifiers(&p, &KEY_MODIFIERS)?))
-    })();
-    let (key, m) = match parsed {
-        Ok(parsed) => parsed,
-        Err(e) => return err(e),
+impl SyntheticHeld {
+    fn apply(&mut self, event: &egui::Event) {
+        match event {
+            egui::Event::PointerMoved(pos) => self.pos = Some(*pos),
+            egui::Event::PointerButton { pos, button, pressed, .. } => {
+                self.pos = Some(*pos);
+                self.buttons.retain(|b| b != button);
+                if *pressed {
+                    self.buttons.push(*button);
+                }
+            }
+            egui::Event::Key { key, pressed, .. } => {
+                self.keys.retain(|k| k != key);
+                if *pressed {
+                    self.keys.push(*key);
+                }
+            }
+            egui::Event::ModifiersChanged(mods) => self.mods = *mods,
+            _ => {}
+        }
+    }
+
+    fn holds(&self) -> bool {
+        !self.buttons.is_empty() || !self.keys.is_empty()
+    }
+}
+
+fn push(app: &mut PhotocraftApp, event: egui::Event) {
+    app.synthetic_held.apply(&event);
+    app.synthetic.push(event);
+}
+
+/// Announces `mods` when they differ from the held ones.
+fn hold_mods(app: &mut PhotocraftApp, mods: egui::Modifiers) {
+    if app.synthetic_held.mods != mods {
+        push(app, egui::Event::ModifiersChanged(mods));
+    }
+}
+
+/// Lets the modifiers go when nothing stays held.
+fn release_mods_unless_holding(app: &mut PhotocraftApp) {
+    if !app.synthetic_held.holds() && app.synthetic_held.mods != egui::Modifiers::NONE {
+        push(app, egui::Event::ModifiersChanged(egui::Modifiers::NONE));
+    }
+}
+
+/// `x` and `y` of a pointer request in screen points, or document points with
+/// `coordinates: "document"` mapped through the main canvas.
+fn input_point(app: &PhotocraftApp, p: &Value) -> std::result::Result<egui::Pos2, String> {
+    let range = Some((-MAX_SCREEN_POINT, MAX_SCREEN_POINT));
+    let x = input_number(p, "x", "x", range)?.unwrap_or(0.0) as f32;
+    let y = input_number(p, "y", "y", range)?.unwrap_or(0.0) as f32;
+    match input_choice(p, "coordinates", "coordinates", &["screen", "document"])?.unwrap_or("screen") {
+        "document" => {
+            let at = crate::canvas::ViewXform::active(app).map(|xf| xf.to_screen(x, y)).ok_or("no document canvas to place document coordinates on")?;
+            let within = |v: f32| v.is_finite() && f64::from(v.abs()) <= MAX_SCREEN_POINT;
+            if within(at.x) && within(at.y) { Ok(at) } else { Err("the document point is too far off the screen".into()) }
+        }
+        _ => Ok(egui::pos2(x, y)),
+    }
+}
+
+const POINT_FIELDS: [&str; 8] = ["x", "y", "coordinates", "modifiers", "shift", "alt", "command", "ctrl"];
+
+fn fields(extra: &[&'static str]) -> Vec<&'static str> {
+    POINT_FIELDS.iter().chain(extra).copied().collect()
+}
+
+fn input_button(p: &Value) -> std::result::Result<Option<egui::PointerButton>, String> {
+    Ok(input_choice(p, "button", "button", &BUTTONS)?.map(|b| match b {
+        "right" | "secondary" => egui::PointerButton::Secondary,
+        "middle" => egui::PointerButton::Middle,
+        _ => egui::PointerButton::Primary,
+    }))
+}
+
+fn input_key(p: &Value) -> std::result::Result<Option<egui::Key>, String> {
+    input_choice(p, "key", "key", &[])?.map(|name| egui::Key::from_name(name).ok_or_else(|| format!("unknown key `{name}`"))).transpose()
+}
+
+/// `ui.click {x, y, coordinates?, button?, count?, hold?, modifiers?}`: with `hold` the last press
+/// stays down until `ui.release`.
+fn click(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    let p = input_object(p, None, &fields(&["button", "count", "hold"]))?;
+    let pos = input_point(app, &p)?;
+    let button = input_button(&p)?.unwrap_or(egui::PointerButton::Primary);
+    let clicks = uint_field(&p, "count")?.unwrap_or(1);
+    if clicks > MAX_CLICKS {
+        return Err(format!("`count` must be at most {MAX_CLICKS} (got {clicks})"));
+    }
+    let hold = bool_field(&p, "hold")?.unwrap_or(false);
+    let modifiers = modifiers_from(&input_modifiers(&p, &KEY_MODIFIERS)?);
+    hold_mods(app, modifiers);
+    push(app, egui::Event::PointerMoved(pos));
+    for nr in 1..=clicks {
+        push(app, egui::Event::PointerButton { pos, button, pressed: true, modifiers });
+        if !(hold && nr == clicks) {
+            push(app, egui::Event::PointerButton { pos, button, pressed: false, modifiers });
+        }
+    }
+    release_mods_unless_holding(app);
+    Ok(())
+}
+
+/// `ui.move {x, y, coordinates?, rest?, modifiers?}`: the modifiers stay held; a held button drags;
+/// `rest` seconds the reply waits for the hover to rest.
+fn pointer_move(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    let p = input_object(p, None, &fields(&["rest"]))?;
+    let pos = input_point(app, &p)?;
+    let rest = input_number(&p, "rest", "rest", Some((0.0, 10.0)))?.unwrap_or(0.0);
+    hold_mods(app, modifiers_from(&input_modifiers(&p, &KEY_MODIFIERS)?));
+    push(app, egui::Event::PointerMoved(pos));
+    if rest > 0.0 {
+        app.synthetic_rest = Some(crate::SyntheticRest::Pending(rest));
+    }
+    Ok(())
+}
+
+/// `ui.wheel {x, y, coordinates?, dx?, dy?, modifiers?}`: a wheel turn of `dx`, `dy` points.
+fn wheel(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    let p = input_object(p, None, &fields(&["dx", "dy"]))?;
+    let pos = input_point(app, &p)?;
+    let dx = input_number(&p, "dx", "dx", None)?.unwrap_or(0.0) as f32;
+    let dy = input_number(&p, "dy", "dy", None)?.unwrap_or(0.0) as f32;
+    let modifiers = modifiers_from(&input_modifiers(&p, &KEY_MODIFIERS)?);
+    hold_mods(app, modifiers);
+    push(app, egui::Event::PointerMoved(pos));
+    push(
+        app,
+        egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(dx, dy),
+            phase: egui::TouchPhase::Move,
+            modifiers,
+            source: egui::MouseWheelSource::Wheel,
+        },
+    );
+    Ok(())
+}
+
+/// `ui.key {key, hold?, modifiers?}`: with `hold` the key stays down until `ui.release`.
+fn key(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    let p = input_object(&p, None, &["key", "hold", "modifiers", "shift", "alt", "command", "ctrl"])?;
+    let Some(key) = input_key(&p)? else { return Err("missing `key`".into()) };
+    let hold = bool_field(&p, "hold")?.unwrap_or(false);
+    let modifiers = modifiers_from(&input_modifiers(&p, &KEY_MODIFIERS)?);
+    hold_mods(app, modifiers);
+    push(app, egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers });
+    if !hold {
+        push(app, egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers });
+        release_mods_unless_holding(app);
+    }
+    Ok(())
+}
+
+/// `ui.release {button?, key?, x?, y?, coordinates?}`: lets the named button or key go, or with
+/// neither everything held and the modifiers.
+fn release(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    let p = input_object(p, None, &["button", "key", "x", "y", "coordinates"])?;
+    let (button, key) = (input_button(&p)?, input_key(&p)?);
+    if button.is_some() && key.is_some() {
+        return Err("`button` and `key` exclude each other".into());
+    }
+    let all = button.is_none() && key.is_none();
+    let at = if p.get("x").is_some() || p.get("y").is_some() { Some(input_point(app, &p)?) } else { app.synthetic_held.pos };
+    let held = app.synthetic_held.clone();
+    let buttons: Vec<_> = held.buttons.iter().copied().filter(|b| all || button == Some(*b)).collect();
+    let keys: Vec<_> = held.keys.iter().copied().filter(|k| all || key == Some(*k)).collect();
+    let pos = at.unwrap_or_default();
+    if !buttons.is_empty() && held.pos != Some(pos) {
+        push(app, egui::Event::PointerMoved(pos));
+    }
+    for button in buttons {
+        push(app, egui::Event::PointerButton { pos, button, pressed: false, modifiers: held.mods });
+    }
+    for key in keys {
+        push(app, egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers: held.mods });
+    }
+    if all && held.mods != egui::Modifiers::NONE {
+        push(app, egui::Event::ModifiersChanged(egui::Modifiers::NONE));
+    }
+    Ok(())
+}
+
+/// `ui.capsLock {on}`: holds Caps Lock on or off for the canvas; `null` returns to the OS's state.
+fn caps_lock(app: &mut PhotocraftApp, p: &Value) -> std::result::Result<(), String> {
+    input_object(p, None, &["on"])?;
+    app.synthetic_caps_lock = match p.get("on") {
+        None => return Err("missing `on`".into()),
+        Some(Value::Null) => None,
+        Some(Value::Bool(on)) => Some(*on),
+        Some(_) => return Err("on must be a boolean or null".into()),
     };
-    let modifiers = modifiers_from(&m);
-    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers });
-    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers });
-    ctx.request_repaint();
-    Outcome::AfterInput
+    Ok(())
 }
 
 /// Simulated pen tilt/rotation of one `ui.pointer` event.

@@ -466,6 +466,12 @@ pub struct PhotocraftApp {
     pub(crate) type_ime: type_tool::ImeState,
     /// Control replies waiting for queued synthetic input to be processed.
     input_waiters: Vec<Sender<ControlResponse>>,
+    /// What the queued synthetic input holds down once it has run (`ui.click {hold}`, `ui.key {hold}`, modifiers).
+    pub(crate) synthetic_held: control::SyntheticHeld,
+    /// The hover rest a `ui.move {rest}` asked for before the replies waiting on input are answered.
+    pub(crate) synthetic_rest: Option<SyntheticRest>,
+    /// Caps Lock held on or off by `ui.capsLock`, in place of the OS's state.
+    pub(crate) synthetic_caps_lock: Option<bool>,
     /// Live (uncommitted) adjustment edit shown on canvas while a slider is dragged.
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).
@@ -774,6 +780,13 @@ pub struct PhotocraftApp {
     pub jobs: jobs_ui::JobsUi,
     #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
     live_tokens: theme::live::LiveTokens,
+}
+
+/// A hover rest of synthetic input: its seconds while the queue still runs, then the input time it ends at.
+#[derive(Clone, Copy, Debug)]
+enum SyntheticRest {
+    Pending(f64),
+    Until(f64),
 }
 
 /// The state a synthetic input batch was queued for.

@@ -106,6 +106,7 @@ impl PhotocraftApp {
     fn cancel_synthetic(&mut self, reason: &str) {
         let pending = self.synthetic_batch.take().is_some() || !self.synthetic.is_empty();
         self.synthetic.clear();
+        self.synthetic_rest = None;
         self.synthetic_snapshot = None;
         self.synthetic_reinject = false;
         self.automation_input = false;

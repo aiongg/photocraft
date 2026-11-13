@@ -7,6 +7,24 @@ use super::{
 };
 
 impl PhotocraftApp {
+    /// Whether the hover rest a `ui.move {rest}` asked for has passed once the queue has run; asks
+    /// for the pass that ends it.
+    fn synthetic_rest_passed(&mut self, ctx: &egui::Context) -> bool {
+        let now = ctx.input(|i| i.time);
+        let until = match self.synthetic_rest {
+            None => return true,
+            Some(crate::SyntheticRest::Pending(seconds)) => now + seconds,
+            Some(crate::SyntheticRest::Until(until)) => until,
+        };
+        if now >= until {
+            self.synthetic_rest = None;
+            return true;
+        }
+        self.synthetic_rest = Some(crate::SyntheticRest::Until(until));
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(until - now));
+        false
+    }
+
     /// Wait out the rest of [`Self::min_frame_ms`] since the last frame started.
     fn cap_frame_rate(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -37,7 +55,9 @@ impl PhotocraftApp {
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
         // Caps Lock state read from the OS once per frame (see `Services::caps_lock`): the canvas
         // cursor block needs it before the frame renders. `None` (Wayland/web) keeps `false`.
-        self.caps_lock = self.services.caps_lock.as_mut().is_some_and(|f| f());
+        // `ui.capsLock` holds it in place of the OS's state.
+        let services = &mut self.services;
+        self.caps_lock = self.synthetic_caps_lock.unwrap_or_else(|| services.caps_lock.as_mut().is_some_and(|f| f()));
         tool_cursor::set_wayland(ctx, self.services.is_wayland);
         if !self.styled {
             Self::setup_context(ctx, self.ui.theme);
@@ -224,7 +244,7 @@ impl PhotocraftApp {
         // settled input; an early-returning pass keeps the batch (and the waiting replies).
         if !self.synthetic.is_empty() || self.synthetic_batch.is_some() {
             ctx.request_repaint();
-        } else if !self.input_waiters.is_empty() {
+        } else if !self.input_waiters.is_empty() && self.synthetic_rest_passed(&ctx) {
             for w in self.input_waiters.drain(..) {
                 let _ = w.send(serde_json::json!({"ok": true, "result": null}));
             }
