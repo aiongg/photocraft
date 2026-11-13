@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
 use craft::host::target::{Backend, ShellInfo};
 use craft::host::{AppInfo, Host, SectionStore};
 use craft::i18n::Direction;
@@ -18,7 +19,7 @@ use craft::theme::{AppDefaults, AppSizes, ModeChoice, Size, SuiteChoice, ThemeId
 use craft::theme_store::{SelectionChange, SuiteClient};
 use craft::ui::dialog::{DialogHost, DialogId, dialog_id};
 use craft::ui::fonts::UiFonts;
-use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
+use craft::ui::runtime::commands::{CommandInput, CommandRef, CommandSet as _, CommandState, NavCommand};
 use craft::ui::runtime::env::{RootEnv, Scale};
 use craft::ui::runtime::frame::{ChromeToggle, FrameInput, FrameOutput};
 use craft::ui::runtime::{InstallError, InstallSpec};
@@ -204,7 +205,7 @@ fn build_host(sections: &Arc<PrefSections>, lang: &str) -> Host {
 
 impl Framework {
     /// The input for the coming frame, from PhotoCraft's preferences.
-    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: &AppTheme) -> FrameInput {
+    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: &AppTheme, states: Vec<(CommandRef, CommandState)>) -> FrameInput {
         self.sections.sync(session);
         let lang = i18n::current().code();
         if lang != self.lang {
@@ -220,7 +221,8 @@ impl Framework {
             .mode(if theme.is_dark() { ModeChoice::Dark } else { ModeChoice::Light })
             .scale(Scale::new(crate::prefs_ui::interface_zoom(session.prefs().interface.ui_scale, ctx)))
             .direction(if rtl { Direction::Rtl } else { Direction::Ltr });
-        FrameInput::new(root).host(Arc::clone(&self.host)).commands(CommandInput::new().overrides(Arc::clone(&self.overrides)))
+        let commands = states.into_iter().fold(CommandInput::new(), |input, (command, state)| input.state(command, state));
+        FrameInput::new(root).host(Arc::clone(&self.host)).commands(commands.overrides(Arc::clone(&self.overrides)))
     }
 
     /// Opens the suite folder this machine shares with the other Craft apps, in place of the
@@ -387,10 +389,20 @@ impl PhotocraftApp {
         if self.framework.sync_theme(&mut self.session) {
             crate::prefs_ui::show_selected_theme(self, ctx);
         }
+        // The Color panel menu's commands (its ramp's context menu fires them): the checks go in, the fired ones run
+        // after the frame.
+        let states = ColorPanelMenu::states(&self.ui.color_panel.panel).into_iter().map(|(command, state)| (CommandRef::from(command), state)).collect();
+        let mut color_commands = Vec::new();
         embed::before_input(ctx, |output: FrameOutput| {
             self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
-            self.framework.frame_input(&mut self.session, ctx, &self.ui.theme)
+            color_commands.extend(output.fired.iter().filter_map(|fired| ColorPanelCommand::from_ref(&fired.command)));
+            self.framework.frame_input(&mut self.session, ctx, &self.ui.theme, states)
         });
+        for command in color_commands {
+            if let Some(text) = crate::panels::color::run_menu_command(self, command) {
+                ctx.copy_text(text);
+            }
+        }
     }
 
     /// After PhotoCraft's own dialogs (`ui_body`): the framework dialogs it keeps open.

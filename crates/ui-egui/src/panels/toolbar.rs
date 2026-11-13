@@ -1,7 +1,7 @@
 use super::options_bar::reveal_focused_control;
-use super::{Align2, Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, c32, icons, json, pos2, vec2};
+use super::{Align2, Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, Tokens, Tool, icons, json, pos2, vec2};
 use craft::color::ui::{PairWell, SwatchPair, Well};
-use craft::ui::contract::Bind;
+use craft::ui::contract::{Bind, Show as _};
 
 use crate::state::ToolbarSide;
 
@@ -231,11 +231,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // doesn't hide them.)
         let tool_tips = ui.data(|d| d.get_temp::<(egui::Id, Rect)>(flyout_id)).is_none() && !ui.input(|i| i.pointer.primary_down());
         let ctx = ui.ctx().clone();
-        let footer = (if t.pro { 8.0 } else { 14.0 })
-            + chips_height(app, ui, full.width())
-            + 8.0
-            + if double { bx } else { bx * 2.0 + 3.0 }
-            + 6.0;
+        let footer = (if t.pro { 8.0 } else { 14.0 }) + chips_height(app, ui, full.width()) + 8.0 + if double { bx } else { bx * 2.0 + 3.0 } + 6.0;
         // As tall as the tools, so the colour chips sit right under them (Photoshop); a column
         // taller than the window scrolls and keeps the chips at the bottom.
         egui::ScrollArea::vertical()
