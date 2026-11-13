@@ -815,7 +815,7 @@ pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
         (d.doc.id.0, d.revision, d.active_layer.map(|l| l.0), d.selected_layers.len(), d.isolated_layers.len()).hash(&mut h);
     }
     let ui = &app.ui;
-    (&ui.recent_files, &ui.workspace, ui.palette_open, ui.transform.is_some(), ui.text_edit.is_some(), ui.dialogs.len()).hash(&mut h);
+    (&ui.recent_files, &ui.workspace, ui.palette_open, ui.transform.is_some(), ui.text_edit.is_some(), app.dialog_count()).hash(&mut h);
     (app.discard.is_some(), app.camera_raw.is_some(), crate::distort_ui::modal_workspace(app)).hash(&mut h);
     crate::prefs_ui::capturing_shortcut(app).hash(&mut h);
     // Edit / Clear Selected Guides are enabled only while a guide is selected.
