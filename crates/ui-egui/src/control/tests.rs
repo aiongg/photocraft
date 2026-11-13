@@ -464,21 +464,81 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     assert!(app.allow_close && app.session.documents().is_empty());
 }
 
-/// A dialog on the framework's `DialogHost` is listed by ui.inspect beside PhotoCraft's own and
-/// answered through ui.dialog.* by the id listed there; PhotoCraft's numeric ids stay its own.
+/// A dialog on the framework's `DialogHost` is set, confirmed and cancelled through ui.dialog.* by
+/// the id ui.inspect lists, whatever its type: a parameter dialog, then a prompt by each route.
 #[test]
-fn framework_dialogs_are_listed_and_answered_through_ui_dialog() {
-    use craft::ui::dialog::{DialogResult, PromptKind, StandardPrompt};
+fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
+    use craft::ui::contract::Bind;
+    use craft::ui::dialog::{DialogResult, PromptChoice, PromptKind, StandardPrompt};
+    use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
-    let listed = call(&mut app, &ctx, "ui.inspect", json!({}));
-    let prompt = listed["result"]["dialogs"].as_array().unwrap().last().cloned().expect("the framework prompt is listed");
-    assert_eq!(prompt["fields"]["choice"], "proceed", "{prompt}");
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": prompt["id"], "field": "choice", "value": "maybe"}))["ok"], false);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": prompt["id"]}))["ok"], true);
-    assert!(matches!(app.framework.dialogs.take::<StandardPrompt>(), Some(DialogResult::Cancel)));
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": prompt["id"]}))["ok"], false, "nothing left to cancel");
+    let top = |app: &mut PhotocraftApp| call(app, &ctx, "ui.inspect", json!({}))["result"]["dialogs"].as_array().and_then(|d| d.last().cloned());
+    let ok = |app: &mut PhotocraftApp, method: &str, params: Value| call(app, &ctx, method, params)["ok"].clone();
+
+    app.framework.dialogs.open(HostedParamDialog::new("gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
+        ParamDialog::new("gaussianBlur", "Gaussian Blur", Param::parse_list(r#"{"radius":0.1..1000=1}"#)).values(Bind::bound(fields))
+    }));
+    let blur = top(&mut app).expect("the blur dialog is listed")["id"].clone();
+    assert_eq!(ok(&mut app, "ui.dialog.set", json!({"dialog": blur, "field": "radius", "value": 4.5})), true);
+    assert_eq!(ok(&mut app, "ui.dialog.set", json!({"dialog": blur, "field": "angle", "value": 1})), false, "no such field");
+    assert_eq!(top(&mut app).expect("still open")["fields"]["radius"], 4.5);
+    assert_eq!(ok(&mut app, "ui.dialog.confirm", json!({"dialog": blur})), true);
+    let Some(DialogResult::Ok(result)) = app.framework.dialogs.take::<HostedParamDialog>() else { panic!("the blur dialog answers OK") };
+    assert_eq!(result.fields.number("radius"), Some(4.5));
+
+    // (method, extra params, accepted, the prompt's answer: Some(choice) for OK, None for Cancel or still open)
+    let routes: [(&str, Value, bool, Option<PromptChoice>); 3] = [
+        ("ui.dialog.confirm", json!({"choice": "alternate"}), true, Some(PromptChoice::Alternate)),
+        ("ui.dialog.confirm", json!({"choice": "maybe"}), false, None),
+        ("ui.dialog.cancel", json!({}), true, None),
+    ];
+    for (method, extra, accepted, answer) in routes {
+        app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+        let prompt = top(&mut app).expect("the prompt is listed")["id"].clone();
+        let mut params = extra.clone();
+        params["dialog"] = prompt.clone();
+        assert_eq!(ok(&mut app, method, params), accepted, "{method} {extra}");
+        match (app.framework.dialogs.take::<StandardPrompt>(), answer) {
+            (Some(DialogResult::Ok(got)), Some(want)) => assert_eq!(got.choice, want, "{method} {extra}"),
+            (Some(DialogResult::Cancel), None) => assert_eq!(method, "ui.dialog.cancel"),
+            (None, None) => {
+                assert!(!accepted, "{method} {extra}: a refused answer leaves the prompt open");
+                assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": prompt})), true);
+                app.framework.dialogs.take::<StandardPrompt>();
+            }
+            _ => panic!("{method} {extra}: the prompt answered otherwise"),
+        }
+        assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": prompt})), false, "nothing left to cancel");
+    }
+}
+
+/// ui.inspect lists PhotoCraft's own dialogs and the framework host's in their one stack order, top
+/// last, addressed by one `dialog` id; the top is the stack's, so a hosted prompt under a closed
+/// dialog of PhotoCraft's takes the input again.
+#[test]
+fn inspect_lists_own_and_hosted_dialogs_in_stack_order() {
+    use craft::ui::dialog::{PromptKind, StandardPrompt};
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    let about = app.ui.open_dialog(DialogKind::About, Default::default());
+    // A pass (here a request) puts the open dialog on the stack before the next one opens.
+    call(&mut app, &ctx, "ui.inspect", json!({}));
+    let prompt = app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+    let hosted = json!(prompt.value().to_string());
+    let document = app.ui.open_dialog(DialogKind::NewDocument, crate::state::UiState::new_document_fields());
+    let mine = [json!(about), hosted.clone(), json!(document)];
+    let listed = |app: &mut PhotocraftApp| -> Vec<Value> {
+        let dialogs = call(app, &ctx, "ui.inspect", json!({}))["result"]["dialogs"].clone();
+        dialogs.as_array().into_iter().flatten().map(|d| d["id"].clone()).filter(|id| mine.contains(id)).collect()
+    };
+    assert_eq!(listed(&mut app), mine);
+    assert!(app.framework.dialogs.stack().is_top(crate::app::framework::stack_id(document)));
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": document}))["ok"], true);
+    assert_eq!(listed(&mut app), [json!(about), hosted.clone()]);
+    assert!(app.framework.dialogs.stack().is_top(prompt), "the hosted prompt takes the input again");
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": hosted}))["ok"], true);
+    assert_eq!(listed(&mut app), [json!(about)]);
 }
 
 #[test]

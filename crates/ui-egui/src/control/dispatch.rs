@@ -12,6 +12,8 @@ type Handler = fn(&mut PhotocraftApp, &egui::Context, &ControlRequest) -> Option
 
 pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
     const HANDLERS: [Handler; 5] = [engine_methods, shell_methods, dialog_methods, input_methods, app_methods];
+    // A dialog opened or closed since the last pass changes the order `ui.inspect` and `ui.dialog.*` read.
+    app.sync_dialog_stack(ctx);
     HANDLERS.iter().find_map(|handler| handler(app, ctx, req)).unwrap_or_else(|| err(photocraft_engine::command_hints::unknown_method(&req.method, METHODS)))
 }
 

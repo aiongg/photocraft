@@ -604,8 +604,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     crate::layer_style::color_picker::prune(app);
     crate::type_panels_ui::color_picker::prune(app);
     crate::edit_history::track_dialogs(app, ctx);
+    // One stack for these dialogs and the framework host's: the top one takes the input.
+    app.sync_dialog_stack(ctx);
     let dialogs = app.ui.dialogs.clone();
-    let top = dialogs.last().map(|d| d.id);
+    let top = app.framework.dialogs.stack().top();
     let mut shown = Vec::new();
     for d in dialogs {
         let lang = if crate::prefs_ui::is_preferences(&d.fields) {
@@ -614,7 +616,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::i18n::current()
         };
         let _language = crate::i18n::language_scope(lang);
-        let interactive = top == Some(d.id);
+        let interactive = top == Some(crate::app::framework::stack_id(d.id));
         let mut fields = d.fields.clone();
         let mut outcome: Option<bool> = None; // Some(true)=OK, Some(false)=Cancel
         let mut apply_requested = false;
@@ -648,7 +650,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             modal = modal.frame(egui::Frame::popup(&ctx.global_style()).inner_margin(16));
         }
         // Tab / ⇧Tab walk the topmost dialog's text fields, not every widget (field_tab.rs).
-        let tab = if top == Some(d.id) && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
+        let tab = if interactive && !egui::Popup::is_any_open(ctx) { crate::field_tab::take_step(ctx) } else { 0 };
         // Photoshop doesn't dim the window behind dialogs: previews must be judged at true contrast.
         let web = fields.contains_key("__web");
         let web_popup_open = web && egui::Popup::is_any_open(ctx);
