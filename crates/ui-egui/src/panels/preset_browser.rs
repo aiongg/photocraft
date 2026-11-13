@@ -9,9 +9,9 @@ use craft::ui::patterns::presets::{
     DefaultOpen, PresetBrowser, PresetCommands, PresetEvent, PresetExport, PresetFileRequest, PresetFiles, PresetFooterEvent, PresetFooterOptions,
     PresetMenuAction, PresetPanelMenu, PresetPicker, PresetReorder, PresetRow, PresetState, PresetView,
 };
-use craft::ui::runtime::commands::CommandSet as _;
 use craft::ui::primitives::ContentPainterCx;
 use craft::ui::primitives::textures::TextureCache;
+use craft::ui::runtime::commands::CommandSet as _;
 use craft::ui::tile_grid::TileZoom;
 use egui::{Color32, ColorImage, Pos2, Rect, pos2};
 use serde::{Deserialize, Serialize};
@@ -220,7 +220,10 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// The Styles folders: each style group with its styles, keyed and named by the style's name.
 fn style_folders(app: &PhotocraftApp) -> Vec<Folder> {
     let groups = &app.session.presets.styles;
-    groups.iter().map(|group| Folder { name: group.name.clone(), items: group.items.iter().map(|style| (style.name.clone(), style.name.clone())).collect() }).collect()
+    groups
+        .iter()
+        .map(|group| Folder { name: group.name.clone(), items: group.items.iter().map(|style| (style.name.clone(), style.name.clone())).collect() })
+        .collect()
 }
 
 /// The pick purpose of the style library files, which keeps their last folder.
