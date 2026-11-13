@@ -171,7 +171,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview), nor while the Crop tool
     // hides everything outside its box (Show Cropped Area off).
     let edge = border == photocraft_engine::prefs::CanvasBorder::Line && beyond.is_none() && !crate::crop_shield::hides_outside(app);
-    let label = super::tabs::tab_title_at(app, idx, view.zoom);
+    let label = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
     let pasteboard = crate::prefs_ui::pasteboard_color(app);
     let dots = app.session.prefs().interface.show_canvas_dots;
     let theme = crate::theme::Tokens::get(ctx);
