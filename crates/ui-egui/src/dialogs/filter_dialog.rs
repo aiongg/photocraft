@@ -611,7 +611,7 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
         fields.insert(MATCH_COLOR_DESTINATION.into(), json!(destination));
         refresh_match_color_sources(&app.session, &mut fields);
     }
-    let id = app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+    let id = app.open_dialog(crate::state::DialogKind::Command, fields);
     Some(id)
 }
 
@@ -771,7 +771,7 @@ pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec:
             fields.insert("target".into(), colors.params());
         }
     }
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields)
+    app.open_dialog(crate::state::DialogKind::Command, fields)
 }
 
 pub(crate) fn label(key: &str) -> String {

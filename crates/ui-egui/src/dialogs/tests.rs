@@ -196,7 +196,7 @@ fn layer_style_title_gutters_can_start_drags() {
         let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
-        h.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
+        h.state_mut().open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
         h.run_steps(3);
         let before = h.get_by_label("Layer Style").rect();
         let from = match point {
@@ -247,7 +247,7 @@ fn dragging_the_title_bar_moves_the_dialog() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut harness = Harness::builder().with_size(egui::vec2(1400.0, 1100.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
     PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
-    harness.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
+    harness.state_mut().open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
     harness.run_steps(3);
     let before = harness.get_by_label("Layer Style").rect();
 
@@ -291,7 +291,7 @@ fn enter_closes_an_alert_but_not_the_enter_that_opened_it() {
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(2);
     let alert = |h: &mut egui_kittest::Harness<'static, PhotocraftApp>| {
-        h.state_mut().ui.open_dialog(DialogKind::Error, json!({"message": crate::move_lock::MESSAGE}).as_object().cloned().unwrap_or_default())
+        h.state_mut().open_dialog(DialogKind::Error, json!({"message": crate::move_lock::MESSAGE}).as_object().cloned().unwrap_or_default())
     };
     // Raised in the frame its own ↩ arrives: that ↩ leaves it open.
     alert(&mut h);

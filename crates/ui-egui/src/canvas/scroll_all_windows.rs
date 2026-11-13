@@ -314,7 +314,7 @@ mod tests {
         app.ui.tool_options.hand_scroll_all = option;
         app.ui.shell.sticky_shift = sticky_shift;
         if dialog {
-            app.ui.open_dialog(crate::state::DialogKind::About, Default::default());
+            app.open_dialog(crate::state::DialogKind::About, Default::default());
         }
         app.ui.views[0] = view(1.0, [1000.0, 750.0], 0.0);
         app.ui.windows.push(DocWindow {

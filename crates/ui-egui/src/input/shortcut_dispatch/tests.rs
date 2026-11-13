@@ -327,7 +327,7 @@ fn common_shortcuts_work_after_clicking_panels() {
         for (sc, what) in [("Cmd+Alt+I", "Image Size"), ("Cmd+Alt+C", "Canvas Size"), ("Cmd+L", "Levels"), ("Cmd+M", "Curves")] {
             press(&mut h, sc);
             assert_eq!(h.state().ui.dialogs.len(), 1, "{place:?}: {sc} opens {what}");
-            h.state_mut().ui.dialogs.clear();
+            h.state_mut().retain_dialogs(|_| false);
             h.run_steps(2);
         }
         if !text {

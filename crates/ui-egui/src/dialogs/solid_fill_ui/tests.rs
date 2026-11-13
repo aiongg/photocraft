@@ -120,7 +120,7 @@ fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
     let LayerContent::Fill(Fill::Solid(color)) = preview.layer(id).unwrap().content else { panic!() };
     assert_eq!(color.to_rgba8(), [255, 136, 0, 128]);
     assert_eq!(thumbnail_color(app, before.id, id, original), color);
-    app.ui.close_dialog(dialog);
+    app.close_dialog(dialog);
     assert!(display_doc(app, 0).is_none());
     assert!(app.solid_fill_preview.is_none());
     assert_eq!(thumbnail_color(app, before.id, id, original), original);
@@ -196,7 +196,7 @@ fn cmyk_lab_preview_thumbnail_cancel_and_ok_are_consistent() {
         assert_eq!(thumbnail_color(app, before.id, id, original), preview);
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);
-        app.ui.close_dialog(dialog);
+        app.close_dialog(dialog);
         assert!(display_doc(app, app.session.active_index().unwrap()).is_none());
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);
@@ -339,7 +339,7 @@ fn a_new_fills_picker_is_seeded_with_the_foregrounds_inks() {
     color_picker_ui::reset(&mut edited);
     assert_eq!(edited.get("color"), f.get("color"));
     assert_eq!(color_picker_ui::picked_cmyk(&edited), Some(rich), "Reset restores the seeded inks");
-    app.ui.dialogs.retain(|d| d.id != id);
+    app.retain_dialogs(|d| d.id != id);
     confirm_new(&mut app, &edited).unwrap();
     let st = app.session.active().unwrap();
     let LayerContent::Fill(Fill::Solid(original)) = st.doc.layer(st.active_layer.unwrap()).unwrap().content else { panic!("not a solid fill") };

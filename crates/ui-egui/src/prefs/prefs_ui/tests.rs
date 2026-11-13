@@ -1988,7 +1988,7 @@ fn preferences_apply_rejects_invalid_drafts_and_keeps_them_open() {
         assert!(apply(&mut app, id).is_err());
         assert_eq!(app.session.prefs().to_json(), before);
         assert_eq!(app.ui.dialog_mut(id).unwrap().fields, draft);
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     let id = open_preferences(&mut app, "interface");
     app.ui.dialog_mut(id).unwrap().fields.remove("values");
@@ -2006,7 +2006,7 @@ fn apply_rejects_missing_and_non_preferences_dialogs() {
     assert!(apply(&mut app, id).is_err());
     assert!(app.ui.dialog_mut(id).is_some());
     let fields = json!({"__prefsui": "prefs", "values": preference_values(app.session.prefs())}).as_object().unwrap().clone();
-    let id = app.ui.open_dialog(DialogKind::About, fields);
+    let id = app.open_dialog(DialogKind::About, fields);
     assert!(apply(&mut app, id).is_err());
     assert!(app.ui.dialog_mut(id).is_some());
     assert_eq!(app.session.prefs().to_json(), before);

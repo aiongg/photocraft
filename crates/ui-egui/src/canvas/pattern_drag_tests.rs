@@ -331,10 +331,10 @@ fn a_pattern_drag_ends_on_a_popup_nested_dialog_or_unlink_and_pan_wins() {
     drag.move_to(start);
     drag.press(start);
     drag.move_to(start + step(3.0));
-    let nested = drag.app.ui.open_dialog(crate::state::DialogKind::Command, serde_json::Map::new());
+    let nested = drag.app.open_dialog(crate::state::DialogKind::Command, serde_json::Map::new());
     drag.move_to(start + step(8.0));
     assert_phase(drag.phase(), [12.5, -3.25], "a nested dialog stops the drag");
-    let _ = drag.app.ui.close_dialog(nested);
+    let _ = drag.app.close_dialog(nested);
     drag.move_to(start + step(12.0));
     assert_phase(drag.phase(), [12.5, -3.25], "closing the nested dialog does not restart a held press");
     drag.release(start + step(12.0));

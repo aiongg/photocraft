@@ -665,7 +665,7 @@ fn new_guide_layout_remembers_successful_values_not_cancelled_edits() {
     assert_eq!(fields["clearExisting"], false);
     // A cancelled edit must not replace the last successfully used values.
     app.ui.dialog_mut(second).unwrap().fields.insert("columns".into(), json!(9));
-    app.ui.close_dialog(second);
+    app.close_dialog(second);
     let third = menu(&mut app, &ctx, "view.newGuideLayout", json!({})).unwrap()["dialog"].as_u64().unwrap();
     assert_eq!(app.ui.dialog_mut(third).unwrap().fields["columns"], 2);
 
@@ -696,13 +696,13 @@ fn lookup_export_dialog_uses_the_current_adjustment_selection() {
     assert_eq!(dialog["scope"], "selected");
     assert_eq!(dialog["size"], 33);
     assert_eq!(dialog["__choices"]["scope"], json!(["all", "selected"]));
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
 
     app.run("layer.new.layer", json!({"name": "Unrelated pixels"})).unwrap();
     let opened = front(&mut app, &ctx, "file.export.colorLookupTables", &json!({})).unwrap().unwrap();
     let id = opened["dialog"].as_u64().unwrap();
     assert_eq!(app.ui.dialogs.last().unwrap().fields["scope"], "all");
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
 
     app.run("layer.select", json!({"layer": current})).unwrap();
     let direct = app.run("file.export.colorLookupTables", json!({"size": 3, "scope": "selected"})).unwrap();
@@ -949,7 +949,7 @@ fn video_menu_commands_open_pickers_and_dialogs() {
     let fields = &app.ui.dialog_mut(interpret).unwrap().fields;
     assert_eq!(fields["__command"], "layer.videoLayers.interpretFootage");
     assert_eq!(fields["fps"], 30.0);
-    app.ui.close_dialog(interpret);
+    app.close_dialog(interpret);
 }
 
 /// One frame of the shortcut handler with a plain Esc press.
@@ -1028,7 +1028,7 @@ fn esc_leaves_full_screen_modes_unless_something_else_owns_it() {
     assert_eq!(app.ui.dialogs.len(), 1);
     press_esc(&mut app, &ctx);
     assert_eq!(app.ui.view.screen_mode, "fullScreen");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     // So does Free Transform: Esc cancels it and the mode stays.
     app.run("select.all", json!({})).unwrap();
     crate::transform_tool::begin(&mut app, &ctx).unwrap();

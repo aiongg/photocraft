@@ -668,7 +668,7 @@ fn a_save_asks_before_replacing_the_file_its_added_extension_names() {
 
     // A question closed without an answer counts as Cancel.
     save_as(&mut app, &open, "/pics/cat");
-    app.ui.close_dialog(replace_prompt(&app).expect("asked again"));
+    app.close_dialog(replace_prompt(&app).expect("asked again"));
     app.poll_file_dialog(&ctx, None);
     assert!(written.borrow().is_empty() && !app.file_dialog_open());
 
@@ -1467,7 +1467,7 @@ fn save_asks_before_replacing_a_file_another_app_changed() {
 
     // Cancel leaves the file and the unsaved document alone.
     let id = prompt.id;
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert_eq!(written.borrow().len(), 1);
     assert!(app.session.active().unwrap().is_dirty());
 

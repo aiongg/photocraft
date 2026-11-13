@@ -59,7 +59,7 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     if app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
         return Some(Ok(json!({"confirmationPending": true})));
     }
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
 }
 

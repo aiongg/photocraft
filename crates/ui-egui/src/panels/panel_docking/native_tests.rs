@@ -331,7 +331,7 @@ fn keys_held_in_a_panel_window_count_as_released_once_it_loses_the_keyboard() {
 
 #[test]
 fn a_dialog_blocks_the_panel_windows() {
-    let about = |app: &mut PhotocraftApp| _ = app.ui.open_dialog(crate::state::DialogKind::About, Default::default());
+    let about = |app: &mut PhotocraftApp| _ = app.open_dialog(crate::state::DialogKind::About, Default::default());
     let blur = |app: &mut PhotocraftApp| _ = crate::dialogs::open_command_dialog(app, "filter.blur.gaussianBlur", "Gaussian Blur");
     for (name, open) in [("About", &about as &dyn Fn(&mut PhotocraftApp)), ("Gaussian Blur", &blur)] {
         let mut desktop = Desktop::new(app_with_document());
@@ -353,7 +353,7 @@ fn a_dialog_blocks_the_panel_windows() {
         assert!(!desktop.host.borrow().windows[&viewport].hidden, "{name}: the panel window stays shown while the app is in the background");
         desktop.host.borrow_mut().focus = Some(viewport);
 
-        desktop.h.state_mut().ui.dialogs.clear();
+        desktop.h.state_mut().retain_dialogs(|_| false);
         desktop.steps(3);
         assert!(!modal_open(desktop.h.state(), &desktop.h.ctx), "{name}");
         desktop.click(viewport, close);

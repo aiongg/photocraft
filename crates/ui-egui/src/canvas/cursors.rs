@@ -266,7 +266,7 @@ pub(crate) fn paint_bucket_cursor(app: &mut PhotocraftApp, painter: &egui::Paint
                 }) {
                     let mut fields = serde_json::Map::new();
                     fields.insert("message".into(), json!(error));
-                    app.ui.open_dialog(crate::state::DialogKind::Error, fields);
+                    app.open_dialog(crate::state::DialogKind::Error, fields);
                 }
                 ctx.data_mut(|data| data.insert_temp(id, error.clone()));
             }

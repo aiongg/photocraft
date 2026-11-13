@@ -32,7 +32,7 @@ pub(crate) fn intercept(app: &mut PhotocraftApp, doc: DocId, path: &str, flat: b
     let mut fields = json!({MARK: true, "__label": "Save", "message": message, "document": doc.0, "path": path, "flat": flat});
     // A script's Targa, DDS or JPEG answer is kept for the save Replace writes.
     choices.record(&mut fields);
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
 }
 

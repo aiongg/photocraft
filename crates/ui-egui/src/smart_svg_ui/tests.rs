@@ -298,10 +298,10 @@ fn saved_changes_wait_on_document_switch_and_active_preview() {
     assert!(app.smart_svg.editing.first().unwrap().saved.is_some());
     let index = app.session.documents().iter().position(|st| st.doc.id == parent).unwrap();
     app.session.set_active(index);
-    app.ui.open_dialog(crate::state::DialogKind::Command, serde_json::Map::new());
+    app.open_dialog(crate::state::DialogKind::Command, serde_json::Map::new());
     poll(&mut app, &ctx);
     assert!(app.smart_svg.editing.first().unwrap().saved.is_some());
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     poll(&mut app, &ctx);
     assert!(app.smart_svg.editing.first().unwrap().saved.is_none());
 }

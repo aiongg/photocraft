@@ -27,7 +27,7 @@ pub fn alert(app: &mut PhotocraftApp, message: &str, pref: &str) {
     fields.insert("message".into(), json!(message));
     fields.insert(PREF.into(), json!(pref));
     fields.insert("skip".into(), json!(false));
-    app.ui.open_dialog(DialogKind::Error, fields);
+    app.open_dialog(DialogKind::Error, fields);
 }
 
 /// The box under an alert's text, on alerts opened by [`alert`].

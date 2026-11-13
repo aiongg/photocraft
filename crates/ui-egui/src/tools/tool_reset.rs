@@ -51,7 +51,7 @@ pub fn invoke(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Resul
                 return Some(Ok(json!({"dialog": d.id, "confirmationPending": true})));
             }
             let fields = json!({MARK: true, "__label": "Reset All Tools", "message": MESSAGE});
-            let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+            let id = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
             Some(Ok(json!({"dialog": id, "confirmationPending": true})))
         }
         _ => None,

@@ -388,7 +388,7 @@ pub fn open_options(app: &mut PhotocraftApp) -> Result<Value, String> {
         f.insert(k.into(), v[k].clone());
     }
     f.insert("background".into(), json!(v["background"].as_str().unwrap_or("none")));
-    Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)}))
+    Ok(json!({"dialog": app.open_dialog(DialogKind::Command, f)}))
 }
 
 /// Divide Slice dialog.
@@ -402,7 +402,7 @@ fn open_divide(app: &mut PhotocraftApp) -> Result<Value, String> {
     f.insert("number".into(), json!(n));
     f.insert("horizontal".into(), json!(2));
     f.insert("vertical".into(), json!(1));
-    Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)}))
+    Ok(json!({"dialog": app.open_dialog(DialogKind::Command, f)}))
 }
 
 /// Options bars of the Slice and Slice Select tools.

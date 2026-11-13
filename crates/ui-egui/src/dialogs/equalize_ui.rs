@@ -40,7 +40,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     f.insert("__layer".into(), st.and_then(|s| s.active_layer).map(|l| json!(l.0)).unwrap_or(Value::Null));
     f.insert("__selection".into(), st.and_then(selection_fingerprint).map(Value::String).unwrap_or(Value::Null));
     f.insert(KEY.into(), json!(true));
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// A hash of the selection's stored tiles and its default value, so OK can tell whether the

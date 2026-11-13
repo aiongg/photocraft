@@ -489,7 +489,7 @@ fn dialog_previews_through_the_layer() {
             assert!(st.doc.layer(PREVIEW_LAYER).is_none());
             assert!(max_diff(&st.doc, &want) <= 1e-6, "OK runs the real command");
         } else {
-            harness.state_mut().ui.close_dialog(id);
+            harness.state_mut().close_dialog(id);
             harness.run_steps(2);
             let st = harness.state().session.active().unwrap();
             assert!(Arc::ptr_eq(&st.doc, &committed), "Cancel leaves the document untouched");
@@ -524,7 +524,7 @@ fn a_clipped_target_dialog_previews_through_the_layer() {
     app.ui.dialog_mut(id).unwrap().fields.insert("__preview".into(), json!(false));
     assert!(display_doc(&mut app, 0).is_none());
     assert!(on_layer(&mut app, 0), "still the layer path, just hidden");
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert!(display_doc(&mut app, 0).is_none() && !on_layer(&mut app, 0));
 }
 
@@ -574,7 +574,7 @@ fn an_ineligible_adjustment_preview_records_why_it_uses_the_proxy() {
     assert_eq!(app.render_path.current(doc), Some(&crate::render_path::CpuReason::AdjustPreview("not a pixel layer")));
     assert_eq!(app.render_path.history().count(), 1);
     // Closing the dialog ends the reason, though the canvas is still current (no refresh).
-    app.ui.close_dialog(dialog);
+    app.close_dialog(dialog);
     assert!(!on_layer(&mut app, 0));
     assert_eq!(app.render_path.current(doc), None);
     assert_eq!(app.render_path.history().count(), 2);
@@ -600,7 +600,7 @@ fn an_adjustment_preview_keeps_the_canvas_reason() {
     let dialog = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").unwrap();
     assert!(!on_layer(&mut app, 0));
     assert_eq!(app.render_path.current(doc_id), Some(&canvas));
-    app.ui.close_dialog(dialog);
+    app.close_dialog(dialog);
     assert!(!on_layer(&mut app, 0));
     assert_eq!(app.render_path.current(doc_id), Some(&canvas));
     // The canvas entry, then the preview's start and end: never the canvas back on the GPU.
@@ -616,7 +616,7 @@ fn an_adjustment_preview_keeps_the_canvas_reason() {
     let dialog = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").unwrap();
     assert!(!on_layer(&mut app, 0));
     assert_eq!(app.render_path.current(doc_id), Some(&cpu));
-    app.ui.close_dialog(dialog);
+    app.close_dialog(dialog);
     assert!(!on_layer(&mut app, 0));
     assert_eq!(app.render_path.current(doc_id), Some(&cpu));
     assert_eq!(app.render_path.history().count(), 1, "the app-wide entry only");

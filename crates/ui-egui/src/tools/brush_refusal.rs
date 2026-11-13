@@ -95,7 +95,7 @@ fn locked(locks: photocraft_doc::Locks, tool: Tool) -> bool {
 
 /// Opens the alert: ordinary dialog state, listed by `ui.inspect` and closed by `ui.dialog.confirm`.
 pub fn prompt(app: &mut PhotocraftApp, message: &str) {
-    app.ui.open_dialog(DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+    app.open_dialog(DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
 }
 
 #[cfg(test)]

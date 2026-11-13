@@ -24,10 +24,10 @@ fn menu_and_canvas_invocations_open_options_but_explicit_params_run_directly() {
     assert_eq!(app.ui.dialogs.len(), 1);
     assert!(owns(&app.ui.dialogs[0].fields));
     assert_eq!(app.session.active().unwrap().history.past_len(), 0);
-    app.ui.close_dialog(opened["dialog"].as_u64().unwrap());
+    app.close_dialog(opened["dialog"].as_u64().unwrap());
     let id = crate::dialogs::open_command_dialog(&mut app, COMMAND, "Stroke…");
     assert!(owns(&app.ui.dialogs.last().unwrap().fields));
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
 
     app.run("select.rect", json!({"x": 10, "y": 10, "width": 10, "height": 10})).unwrap();
     crate::menus::invoke(&mut app, &ctx, COMMAND, json!({"width": 3, "location": "inside", "color": "#00ff00"})).unwrap();
@@ -171,7 +171,7 @@ fn stroke_choices_apply_on_confirm_and_cancel_does_not_modify_document() {
     let dialog = app.ui.dialog_mut(cancelled).unwrap();
     dialog.fields.insert("color".into(), json!("#00ff00"));
     dialog.fields.insert("width".into(), json!(4.0));
-    app.ui.close_dialog(cancelled);
+    app.close_dialog(cancelled);
     assert_eq!(app.session.active().unwrap().history.past_len(), initial);
     assert_eq!(pixel(&app, 10, 15)[3], 0.0);
 

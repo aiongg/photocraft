@@ -770,7 +770,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
 
     // Close that dialog and open another one for the same layer and the same command. Only the
     // dialog id differs, which is exactly what `same_target` has to notice.
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
     let second_dialog = app.ui.dialogs.first().expect("a dialog is open").id;
     assert_ne!(second_dialog, first_dialog, "a reopened dialog gets a new id");
@@ -1918,7 +1918,7 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
     };
     app.ui.tool_options.gradient_classic = true;
     for tool in [Tool::Brush, Tool::Pencil, Tool::Eraser, Tool::CloneStamp, Tool::PaintBucket, Tool::MagicEraser, Tool::RedEye, Tool::Gradient] {
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
         app.ui.tool = tool;
         tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, egui::Modifiers::NONE);
         // Brush and Classic gradient use the measured alerts (#11898, #12017).
@@ -1934,7 +1934,7 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
         assert!(app.trail.is_none(), "{tool:?} draws no trail");
     }
     // Tools that don't paint the group's pixels are unaffected.
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.ui.tool = Tool::RectMarquee;
     tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, egui::Modifiers::NONE);
     assert!(errors(&app).is_empty());
@@ -3229,7 +3229,7 @@ fn layer_style_dialog_previews_live_and_cancel_restores() {
     let (shown, key2) = display_doc(&mut app, 0);
     assert_eq!(fx(&shown), 2);
     assert_ne!(key, key2, "an edit re-renders the canvas");
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     let (shown, key) = display_doc(&mut app, 0);
     assert_eq!((fx(&shown), key), (0, 0));
     assert!(app.style_preview.is_none());
@@ -3471,7 +3471,7 @@ fn fade_dialog_previews_the_faded_layer_and_cancel_keeps_the_document() {
         assert!((shown[0] - 0.75).abs() < 0.01, "background jobs {background}: {shown:?}");
 
         // Cancel: nothing changed, nothing previewed, and Fade is still there to use.
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
         assert!(ensure_filter_preview(&mut app, 0, &ctx).is_none(), "background jobs {background}: no preview after Cancel");
         let st = app.session.active().unwrap();
         assert_eq!(st.doc.layer(layer).unwrap().surface().unwrap().pixel(3, 3)[0], 0.0, "background jobs {background}: the layer is untouched");

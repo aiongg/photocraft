@@ -538,7 +538,7 @@ fn keys_wait_while_the_overlay_colour_picker_is_open() {
     assert_eq!(ws(&app).brush_size, size, "[ went to the picker");
     press(&mut app, &ctx, Key::Z, Modifiers::COMMAND);
     assert_eq!(ws(&app).describe()["sampledProxyPixels"].as_u64(), Some(less), "Ctrl+Z went to the picker");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     press(&mut app, &ctx, Key::OpenBracket, Modifiers::NONE);
     assert!(ws(&app).brush_size < size);
     press(&mut app, &ctx, Key::Z, Modifiers::COMMAND);

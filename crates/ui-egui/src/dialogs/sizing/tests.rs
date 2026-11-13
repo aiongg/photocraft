@@ -106,7 +106,7 @@ fn columns_unit_is_width_only_and_follows_the_preference() {
         // A stray shared `col` (automation) shows Height in pixels rather than as columns.
         f.insert("__unit".into(), json!("col"));
         assert_eq!(field_unit(f, "height"), "px", "{command}");
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
 }
 
@@ -255,7 +255,7 @@ fn indexed_color_resamples_with_nearest_neighbor_only() {
         let f = &app.ui.dialog_mut(id).unwrap().fields;
         assert_eq!(f.get("resample"), Some(&json!(method)), "{pref}");
         assert_eq!(f.get("__indexed"), Some(&json!(true)));
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     // The open list offers only Automatic and Nearest Neighbor.
     use egui_kittest::{Harness, kittest::Queryable};
@@ -285,7 +285,7 @@ fn resample_follows_the_interpolation_preference() {
         let id = open(&mut app, "image.imageSize").unwrap();
         let f = &app.ui.dialog_mut(id).unwrap().fields;
         assert_eq!((f.get("resample"), f.get("__resample")), (Some(&json!(method)), Some(&json!(method))), "{pref}");
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     let id = open(&mut app, "image.imageSize").unwrap();
     let d = app.ui.dialog_mut(id).unwrap();
@@ -344,7 +344,7 @@ fn traditional_point_size_drives_points_and_picas() {
     for command in ["image.imageSize", "image.canvasSize"] {
         let id = open(&mut app, command).unwrap();
         assert_eq!(app.ui.dialog_mut(id).unwrap().fields.get("__ptPerIn"), Some(&json!(72.27)), "{command}");
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     let mut h = egui_kittest::Harness::builder()
         .with_size(egui::vec2(1400.0, 900.0))

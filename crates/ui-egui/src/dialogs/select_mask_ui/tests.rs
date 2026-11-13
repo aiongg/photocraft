@@ -451,7 +451,7 @@ fn keys_wait_while_the_overlay_colour_picker_is_open() {
     assert!(crate::color_picker_ui::any_open(&app));
     press(&mut app, &ctx, Key::B, Modifiers::NONE);
     assert_eq!(ws(&app).tool, SmTool::RefineEdge, "B went to the picker");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     press(&mut app, &ctx, Key::B, Modifiers::NONE);
     assert_eq!(ws(&app).tool, SmTool::Brush);
 }

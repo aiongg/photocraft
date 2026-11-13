@@ -321,7 +321,7 @@ fn clicking_around_the_ui_keeps_the_panels_put() {
         if app.ui.dialogs.is_empty() && app.ui.shell.dialog.is_none() {
             assert_eq!(drawn(&h), rects, "click at {p:?} moved the dock groups");
         }
-        h.state_mut().ui.dialogs.clear();
+        h.state_mut().retain_dialogs(|_| false);
     }
 }
 

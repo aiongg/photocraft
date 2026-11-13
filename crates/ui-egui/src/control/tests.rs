@@ -237,9 +237,9 @@ fn camera_raw_control_continuation_does_not_bypass_other_modal_or_command_gates(
         let blocked = call(&mut app, &ctx, "ui.menu.invoke", request);
         assert_eq!(blocked["ok"], false, "{blocked}");
     }
-    app.ui.open_dialog(DialogKind::About, Default::default());
+    app.open_dialog(DialogKind::About, Default::default());
     assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     assert!(crate::discard_ui::intercept(&mut app, "file.close", &json!({})));
     assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
     app.discard = None;
@@ -293,10 +293,10 @@ fn full_window_workspaces_are_modal_for_menu_invocations() {
         assert_eq!(crate::distort_ui::modal_workspace(&app), Some(workspace), "{workspace} stays open with its work");
         assert_eq!(app.session.active().unwrap().doc.id, doc);
         // An open dialog still takes precedence over the workspace's own requests.
-        app.ui.open_dialog(DialogKind::About, Default::default());
+        app.open_dialog(DialogKind::About, Default::default());
         let cancel = json!({"id":workspace,"params":{"ui":{"cancel":true}}});
         assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
         let cancelled = call(&mut app, &ctx, "ui.menu.invoke", cancel);
         assert_eq!(cancelled["ok"], true, "{workspace}: {cancelled}");
         assert_eq!(crate::distort_ui::modal_workspace(&app), None);
@@ -515,18 +515,17 @@ fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
 
 /// ui.inspect lists PhotoCraft's own dialogs and the framework host's in their one stack order, top
 /// last, addressed by one `dialog` id; the top is the stack's, so a hosted prompt under a closed
-/// dialog of PhotoCraft's takes the input again.
+/// dialog of PhotoCraft's takes the input again, and either kind counts as an open dialog.
 #[test]
 fn inspect_lists_own_and_hosted_dialogs_in_stack_order() {
     use craft::ui::dialog::{PromptKind, StandardPrompt};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    let about = app.ui.open_dialog(DialogKind::About, Default::default());
-    // A pass (here a request) puts the open dialog on the stack before the next one opens.
-    call(&mut app, &ctx, "ui.inspect", json!({}));
+    // Each dialog takes its place when it opens, with no pass between the opens.
+    let about = app.open_dialog(DialogKind::About, Default::default());
     let prompt = app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
     let hosted = json!(prompt.value().to_string());
-    let document = app.ui.open_dialog(DialogKind::NewDocument, crate::state::UiState::new_document_fields());
+    let document = app.open_dialog(DialogKind::NewDocument, crate::state::UiState::new_document_fields());
     let mine = [json!(about), hosted.clone(), json!(document)];
     let listed = |app: &mut PhotocraftApp| -> Vec<Value> {
         let dialogs = call(app, &ctx, "ui.inspect", json!({}))["result"]["dialogs"].clone();
@@ -539,6 +538,10 @@ fn inspect_lists_own_and_hosted_dialogs_in_stack_order() {
     assert!(app.framework.dialogs.stack().is_top(prompt), "the hosted prompt takes the input again");
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": hosted}))["ok"], true);
     assert_eq!(listed(&mut app), [json!(about)]);
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": about}))["ok"], true);
+    assert!(!app.dialog_open());
+    app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+    assert!(app.dialog_open(), "a hosted dialog counts as an open dialog");
 }
 
 #[test]
@@ -1833,14 +1836,14 @@ fn automation_confirming_a_file_writing_dialog_is_judged_as_its_file_command() {
     let target = outside_target();
     // A real disk-change prompt keeps its own fields settable, but its save is a file command.
     let fields = json!({"__diskChanged": true, "__label": "Save", "message": "", "document": doc, "path": target, "flat": false});
-    let prompt = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap());
+    let prompt = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap());
     let r = call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": prompt, "field": "__diskChanged", "value": true}));
     assert!(r.get("error").is_none(), "{r}");
     let r = call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": prompt}));
     assert!(written.borrow().is_empty(), "nothing is written: {:?}", written.borrow());
     assert!(r["error"].as_str().is_some_and(|e| e.contains("file.save")), "{r}");
     // Synthetic input (Enter or OK) reaches the same handler without the control pre-check.
-    let synthetic = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap());
+    let synthetic = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap());
     app.automation_input = true;
     let r = crate::dialogs::confirm(&mut app, synthetic);
     app.automation_input = false;

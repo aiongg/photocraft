@@ -138,7 +138,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     f.insert("position".into(), json!(position));
     f.insert("color".into(), json!(color));
     f.insert("customColor".into(), json!(custom));
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// The list entry (and Custom… colour) showing `rgb`: a named colour when it is one, else Custom….
@@ -176,9 +176,9 @@ pub fn open_edit(app: &mut PhotocraftApp) -> Result<u64, String> {
     f.insert(INITIAL_COLOR.into(), json!(if color == CUSTOM { custom.clone() } else { color.clone() }));
     f.insert("color".into(), json!(color));
     f.insert("customColor".into(), json!(custom));
-    let id = app.ui.open_dialog(DialogKind::Command, f.clone());
+    let id = app.open_dialog(DialogKind::Command, f.clone());
     if let Err(error) = crate::guide_edit::begin(app, id, &f) {
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
         return Err(error);
     }
     Ok(id)
@@ -288,7 +288,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
             // `dialogs::confirm` has already closed it: open it again with the typed values.
             let mut again = f.clone();
             again.insert("__error".into(), json!(e));
-            app.ui.open_dialog(DialogKind::Command, again);
+            app.open_dialog(DialogKind::Command, again);
             Err(e)
         }
     }
@@ -304,7 +304,7 @@ fn confirm_edit(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value
             if crate::guide_edit::retryable(app) {
                 let mut again = f.clone();
                 again.insert("__error".into(), json!(error));
-                let id = app.ui.open_dialog(DialogKind::Command, again);
+                let id = app.open_dialog(DialogKind::Command, again);
                 if let Some(draft) = app.guide_edit.as_mut() {
                     draft.dialog = id;
                 }

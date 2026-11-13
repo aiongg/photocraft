@@ -872,7 +872,7 @@ pub(super) fn document_window_canvas(
     view: crate::state::View,
     focused: bool,
 ) -> (crate::state::View, Rect) {
-    if !app.ui.dialogs.is_empty() {
+    if app.dialog_open() {
         egui::Modal::new(egui::Id::unique(("docwin-dialog-block", w.id))).backdrop_color(Color32::TRANSPARENT).frame(egui::Frame::NONE).show(ui.ctx(), |_| {});
     }
     let mut out = (view.clone(), Rect::NOTHING);

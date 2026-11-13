@@ -32,7 +32,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<Value, String> {
         fields.insert("__label".into(), json!("Duplicate Layer…"));
         fields.insert("name".into(), json!(st.doc.copy_name(&layer.name)));
     }
-    let id = app.ui.open_dialog(DialogKind::Command, fields);
+    let id = app.open_dialog(DialogKind::Command, fields);
     Ok(json!({"dialog": id}))
 }
 

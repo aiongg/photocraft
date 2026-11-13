@@ -378,7 +378,7 @@ fn paint_shows_the_target_clipping_for_the_view() {
         assert_eq!(meshes_with(&shapes, tex), 0, "{mode:?} {depth:?}: off, it draws nothing");
         assert!(app.levels_clipping.is_some(), "{mode:?} {depth:?}: the cache stays while the dialog is open");
         // Closed: the cache goes.
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
         paint_view(&mut app, &ctx, &view(10.0));
         assert!(app.levels_clipping.is_none(), "{mode:?} {depth:?}");
     }

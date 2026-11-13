@@ -796,7 +796,7 @@ fn channels_panel_menu_opens_new_spot_and_adds_a_channel() {
     menu.run_steps(2);
     let dialogs = &menu.state().ui.dialogs;
     assert!(dialogs.iter().any(|d| crate::channel_options_ui::owns_new_spot(&d.fields)), "New Spot Channel… opens its dialog");
-    menu.state_mut().ui.dialogs.clear();
+    menu.state_mut().retain_dialogs(|_| false);
     menu.get_by_label("New Channel…").click();
     menu.run_steps(2);
     assert!(menu.state().session.active().unwrap().doc.channels.is_empty(), "New Channel… asks first");

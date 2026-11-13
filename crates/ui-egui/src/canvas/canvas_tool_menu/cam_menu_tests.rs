@@ -101,7 +101,7 @@ fn content_aware_move_inside_selection_opens_color_range_and_load_selection_only
     // Choosing Color Range… opens the Color Range dialog.
     choose(h.state_mut(), &ctx, "select.colorRange");
     assert!(!h.state().ui.dialogs.is_empty());
-    h.state_mut().ui.dialogs.clear();
+    h.state_mut().retain_dialogs(|_| false);
 
     // Choosing Load Selection… opens the Load Selection dialog.
     assert!(open_at(h.state_mut(), &ctx, Tool::ContentAwareMove, [10.0, 10.0], Some([16.0, 16.0])));

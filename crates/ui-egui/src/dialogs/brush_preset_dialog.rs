@@ -42,7 +42,7 @@ pub fn open(app: &mut PhotocraftApp, brush: Option<&BrushSettings>) -> u64 {
     if let Some(b) = brush.and_then(|b| serde_json::to_value(b).ok()) {
         fields.insert("brush".into(), b);
     }
-    app.ui.open_dialog(DialogKind::Command, fields)
+    app.open_dialog(DialogKind::Command, fields)
 }
 
 fn on(f: &Map<String, Value>, key: &str) -> bool {

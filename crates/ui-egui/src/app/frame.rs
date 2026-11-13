@@ -173,7 +173,7 @@ impl PhotocraftApp {
         let ctx = ui.ctx().clone();
         // One control owner even when this callback cannot draw the custom editor.
         if !self.fonts_ready
-            || !self.ui.dialogs.is_empty()
+            || self.dialog_open()
             || screen_picker::busy(&ctx)
             || self.ui.text_edit.is_none()
             || ctx.text_edit_focused()

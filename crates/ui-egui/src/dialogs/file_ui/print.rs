@@ -61,7 +61,7 @@ pub fn open_print(app: &mut PhotocraftApp) -> u64 {
         f.entry(k.to_string()).or_insert(v);
     }
     refresh_printers(app, &mut f);
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 fn refresh_printers(app: &mut PhotocraftApp, f: &mut Map<String, Value>) {

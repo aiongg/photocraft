@@ -13,7 +13,7 @@ fn app() -> PhotocraftApp {
 /// Open New Document, set `fields`, press Create.
 fn create(app: &mut PhotocraftApp, fields: Value) {
     let f = app.new_document_fields();
-    let id = app.ui.open_dialog(DialogKind::NewDocument, f);
+    let id = app.open_dialog(DialogKind::NewDocument, f);
     let d = app.ui.dialog_mut(id).unwrap();
     for (k, v) in fields.as_object().unwrap() {
         d.fields.insert(k.clone(), v.clone());
@@ -71,7 +71,7 @@ fn a_corrupt_remembered_value_is_ignored() {
     }
     assert!(f.get("resolution").is_none());
     // A failed Create remembers nothing.
-    let id = app.ui.open_dialog(DialogKind::NewDocument, f);
+    let id = app.open_dialog(DialogKind::NewDocument, f);
     app.ui.dialog_mut(id).unwrap().fields.insert("width".into(), json!(0));
     let _ = crate::dialogs::confirm(&mut app, id);
     assert_eq!(app.session.prefs().dialogs["file.new"]["height"], json!(600), "unchanged");

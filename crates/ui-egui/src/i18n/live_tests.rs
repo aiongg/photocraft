@@ -480,7 +480,7 @@ fn preferences_preview_does_not_commit_until_applied_and_survives_reload() {
         assert!(text.iter().any(|text| text == "File"), "the main window keeps its committed language");
         assert_eq!(h.state().session.prefs().interface.language, "auto");
         assert_eq!(current(), Lang::EN, "preview must not leak to the main window");
-        h.state_mut().ui.close_dialog(id);
+        h.state_mut().close_dialog(id);
         h.step();
         assert_eq!(current(), Lang::EN);
         let id = crate::prefs_ui::open_preferences(h.state_mut(), "interface");

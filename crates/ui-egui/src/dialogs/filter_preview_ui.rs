@@ -534,12 +534,12 @@ mod tests {
         assert!(!center_at(&mut app, 10.0, 10.0));
         crate::dialogs::open_command_dialog(&mut app, "image.adjustments.brightnessContrast", "Brightness/Contrast…");
         assert_eq!(locator(&app), None, "an adjustment dialog has no preview window");
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
         // Every filter dialog with the window shares the locator, Unsharp Mask and Reduce Noise too.
         for command in ["filter.sharpen.unsharpMask", "filter.noise.reduceNoise"] {
             let id = crate::filter_dialog::open(&mut app, command).expect("the filter opens a dialog");
             assert_eq!(locator(&app), Some(id), "{command}");
-            app.ui.dialogs.clear();
+            app.retain_dialogs(|_| false);
         }
         let id = crate::filter_dialog::open(&mut app, "filter.sharpen.smartSharpen").expect("Smart Sharpen opens a dialog");
         assert_eq!(locator(&app), Some(id), "Smart Sharpen has the preview window");

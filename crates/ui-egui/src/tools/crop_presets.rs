@@ -249,7 +249,7 @@ pub fn open_new(app: &mut PhotocraftApp) -> Option<u64> {
         return Some(d.id);
     }
     let f = json!({NEW_MARK: true, "__label": "New Crop Preset", "name": name, "options": fields});
-    Some(app.ui.open_dialog(DialogKind::Command, f.as_object().cloned().unwrap_or_default()))
+    Some(app.open_dialog(DialogKind::Command, f.as_object().cloned().unwrap_or_default()))
 }
 
 /// Open Delete Crop Preset. `None` when no crop preset is saved; an open one is reused.
@@ -261,7 +261,7 @@ pub fn open_delete(app: &mut PhotocraftApp) -> Option<u64> {
         return Some(d.id);
     }
     let f = json!({DELETE_MARK: true, "__label": "Delete Crop Preset", "selected": []});
-    Some(app.ui.open_dialog(DialogKind::Command, f.as_object().cloned().unwrap_or_default()))
+    Some(app.open_dialog(DialogKind::Command, f.as_object().cloned().unwrap_or_default()))
 }
 
 pub fn owns(fields: &Map<String, Value>) -> bool {

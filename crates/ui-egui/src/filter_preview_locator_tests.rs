@@ -197,7 +197,7 @@ fn agents_centre_the_preview_with_ui_pointer_without_painting() {
     assert!(near(centre(&h), [400.0, 0.0]), "{:?}", centre(&h));
 
     // With the dialog cancelled the same gesture paints with the Brush again.
-    h.state_mut().ui.dialogs.clear();
+    h.state_mut().retain_dialogs(|_| false);
     let events = json!([{"kind": "down", "x": 40, "y": 30}, {"kind": "move", "x": 60, "y": 30}, {"kind": "up", "x": 60, "y": 30}]);
     let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"events": events}));
     let _ = crate::control::handle(h.state_mut(), &ctx, &req);

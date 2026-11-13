@@ -89,7 +89,7 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> Option<u64> {
             }
         }
     }
-    Some(app.ui.open_dialog(DialogKind::Command, f))
+    Some(app.open_dialog(DialogKind::Command, f))
 }
 
 fn num(f: &Map<String, Value>, key: &str) -> Option<f64> {

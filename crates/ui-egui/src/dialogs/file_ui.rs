@@ -67,7 +67,7 @@ fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: Value, choi
     if let Value::Object(m) = fields {
         f.extend(m);
     }
-    json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)})
+    json!({"dialog": app.open_dialog(DialogKind::Command, f)})
 }
 
 /// File › Scripts › Browse… lists Photoshop's script types (matching its filter, #2452) plus the

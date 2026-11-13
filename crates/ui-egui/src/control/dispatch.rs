@@ -12,8 +12,6 @@ type Handler = fn(&mut PhotocraftApp, &egui::Context, &ControlRequest) -> Option
 
 pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
     const HANDLERS: [Handler; 5] = [engine_methods, shell_methods, dialog_methods, input_methods, app_methods];
-    // A dialog opened or closed since the last pass changes the order `ui.inspect` and `ui.dialog.*` read.
-    app.sync_dialog_stack(ctx);
     HANDLERS.iter().find_map(|handler| handler(app, ctx, req)).unwrap_or_else(|| err(photocraft_engine::command_hints::unknown_method(&req.method, METHODS)))
 }
 
@@ -104,7 +102,7 @@ fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRe
     let open_modal = if app.camera_raw.is_some() { Some("filter.cameraRaw") } else { crate::distort_ui::modal_workspace(app) };
     let continuation = open_modal == Some(id)
         && params.as_object().is_some_and(|fields| fields.len() == 1 && fields.get("ui").is_some_and(Value::is_object))
-        && app.ui.dialogs.is_empty()
+        && !app.dialog_open()
         && app.discard.is_none()
         && !crate::crop_ui::blocks(app, id);
     if !continuation && !crate::menus::modal_allows(app, id) {
@@ -1016,7 +1014,7 @@ fn dialog_open(app: &mut PhotocraftApp, p: &Value) -> Reply {
         }
         fields.extend(f.clone());
     }
-    ok(json!({"dialog": app.ui.open_dialog(kind, fields)}))
+    ok(json!({"dialog": app.open_dialog(kind, fields)}))
 }
 
 /// The dialog kinds that open through their own module rather than `open_dialog`.
@@ -1316,7 +1314,7 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
 /// The Move tool is the one the event acts as: ⌘ makes most other tools the Move tool.
 fn modal_blocks_move_pointer(app: &PhotocraftApp, event: ToolEvent, mods: egui::Modifiers) -> bool {
     crate::canvas::event_tool(app, mods) == Tool::Move
-        && (!app.ui.dialogs.is_empty()
+        && (app.dialog_open()
             || app.ui.layers_panel_dialog.is_some()
             || app.discard.is_some()
             || app.camera_raw.is_some()
@@ -1431,7 +1429,7 @@ fn pointer_eyedropper_took(app: &mut PhotocraftApp, ctx: &egui::Context, g: &Poi
         return true;
     }
     // A Properties Levels/Curves eyedropper owns the primary button the same way.
-    if app.ui.dialogs.is_empty() && !g.secondary && crate::layer_picker::armed(app).is_some() {
+    if !app.dialog_open() && !g.secondary && crate::layer_picker::armed(app).is_some() {
         if down {
             crate::layer_picker::sample_at(app, x, y);
         }

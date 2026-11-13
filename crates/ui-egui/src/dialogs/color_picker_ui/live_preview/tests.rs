@@ -85,7 +85,7 @@ fn the_opening_colour_shows_the_original_value() {
     let mut f = Map::new();
     f.insert("background".into(), json!("white"));
     f.insert("other".into(), json!(3));
-    let parent = app.ui.open_dialog(DialogKind::Command, f);
+    let parent = app.open_dialog(DialogKind::Command, f);
     let before = fields(&app, parent).clone();
     let picker = open_for_field(&mut app, "Color Picker (Background Contents)", [1.0; 3], parent, "background");
     assert!(!sync(&mut app), "nothing to show yet");
@@ -108,7 +108,7 @@ fn derived_settings_are_rebuilt_from_the_opening_ones() {
     let mut f = Map::new();
     f.insert("picked".into(), json!("#000000"));
     f.insert("hue".into(), json!(0));
-    let parent = app.ui.open_dialog(DialogKind::Command, f);
+    let parent = app.open_dialog(DialogKind::Command, f);
     let before = fields(&app, parent).clone();
     let picker = open_for_field(&mut app, "Color Picker (Result)", [0.0; 3], parent, "picked");
     // The dialog's body consumes the colour each frame, as Replace Color's does.
@@ -136,7 +136,7 @@ fn a_picker_or_parent_closed_any_other_way_ends_the_preview() {
     let (fill, picker) = fill_with_picker(&mut app);
     let before = fields(&app, fill).clone();
     pick(&mut app, picker, "#336699");
-    app.ui.close_dialog(picker);
+    app.close_dialog(picker);
     assert!(sync(&mut app));
     assert_eq!(fields(&app, fill), &before);
     assert!(app.color_picker_live.is_empty());
@@ -307,7 +307,7 @@ fn a_pickers_target_stays_the_dialog_it_opened_on() {
     let ctx = egui::Context::default();
     let mut app = app();
     let (fill, picker) = fill_with_picker(&mut app);
-    let other = app.ui.open_dialog(DialogKind::Command, Map::new());
+    let other = app.open_dialog(DialogKind::Command, Map::new());
     let set = |app: &mut PhotocraftApp, field: &str, value: Value| {
         let (req, _rx) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": picker, "field": field, "value": value}));
         let crate::control::Reply::Done(r) = crate::control::handle(app, &ctx, &req) else { panic!("an immediate reply") };

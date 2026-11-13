@@ -65,7 +65,7 @@ pub(crate) fn begin(app: &mut PhotocraftApp, dialog: u64, fields: &Map<String, V
     let value = guide(&st.doc.guides, vertical, index).ok_or("no such guide")?;
     let context = context(app).ok_or("no document")?;
     if let Some(previous) = app.guide_edit.take() {
-        app.ui.close_dialog(previous.dialog);
+        app.close_dialog(previous.dialog);
         previous.edit.cancel();
     }
     app.guide_edit = Some(Draft {

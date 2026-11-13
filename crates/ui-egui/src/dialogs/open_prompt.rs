@@ -209,7 +209,7 @@ pub fn answer(app: &mut PhotocraftApp, action: Option<&str>) -> Result<Value, St
         }
         app.jobs.opens.clear();
         app.jobs.batches.clear();
-        app.ui.dialogs.retain(|d| !owns(&d.fields) && !owns_damage(&d.fields) && !owns_memory(&d.fields));
+        app.retain_dialogs(|d| !owns(&d.fields) && !owns_damage(&d.fields) && !owns_memory(&d.fields));
         app.ui.status = crate::i18n::fmt(tl!("Canceled opening {name}"), &[("name", &name)]);
         app.ui.status_error = false;
         return Ok(json!({"cancelled": dropped}));
@@ -283,7 +283,7 @@ fn show_damage(app: &mut PhotocraftApp) {
     ]
     .into_iter()
     .collect();
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+    app.open_dialog(crate::state::DialogKind::Command, fields);
 }
 
 /// Body of the standard modal; the same fields are visible to automation.
@@ -441,7 +441,7 @@ fn show_memory(app: &mut PhotocraftApp, prompt: &MemoryPrompt) {
     .into_iter()
     .collect();
 
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+    app.open_dialog(crate::state::DialogKind::Command, fields);
 }
 
 /// Answers the front high-memory prompt: accepts and starts the approved open, or declines and

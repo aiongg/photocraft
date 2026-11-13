@@ -488,7 +488,7 @@ fn double_clicking_a_chip_opens_its_color_picker() {
     let min = h.ctx.input(|i| i.viewport_rect()).min;
     // The foreground point is where the chips overlap: the foreground is on top there.
     for (p, target) in [(vec2(40.0, 40.0), "background"), (vec2(30.0, 30.0), "foreground")] {
-        h.state_mut().ui.dialogs.clear();
+        h.state_mut().retain_dialogs(|_| false);
         // Past the last double-click, so this one isn't counted as a triple-click.
         h.run_steps(40);
         click(&mut h, min + p);

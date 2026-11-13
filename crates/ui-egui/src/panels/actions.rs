@@ -341,7 +341,7 @@ fn stop_step(app: &mut PhotocraftApp, action: &Action, i: usize, p: &Value) -> C
     }
     let message = p.get("message").and_then(Value::as_str).unwrap_or_default();
     let fields = json!({STOP_DIALOG: true, "__label": "Message", "message": message, "allowContinue": allow, RESUME: token});
-    let dialog = app.ui.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let dialog = app.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Called::Paused(json!({"step": i, "id": id, "dialog": dialog}))
 }
 
@@ -1007,7 +1007,7 @@ fn new_set_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
     let names = photocraft_engine::actions_edit_cmds::set_names(&app.session);
     let name = (1u32..).map(|n| format!("Set {n}")).find(|n| !names.contains(n)).unwrap_or_default();
     let fields = json!({NEW_SET: true, "__command": "actions.newSet", "__label": "New Set", "name": name});
-    let id = app.ui.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Ok(json!({"dialog": id}))
 }
 
@@ -1040,7 +1040,7 @@ fn insert_stop_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
     let at = app.ui.actions.selected_step.map_or(len, |s| (s + 1).min(len));
     let fields =
         json!({INSERT_STOP: true, "__command": "actions.insert", "__label": "Insert Stop", "action": action, "at": at, "message": "", "allowContinue": false});
-    let id = app.ui.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Ok(json!({"dialog": id}))
 }
 

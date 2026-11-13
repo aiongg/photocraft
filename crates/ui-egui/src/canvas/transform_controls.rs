@@ -150,7 +150,7 @@ pub(super) fn begin_transform_controls_at(app: &mut PhotocraftApp, ctx: &egui::C
     let background = app.session.active().is_some_and(|st| photocraft_engine::transform_cmds::background_among(&st.doc, &st.selected_layers()).is_some());
     if background {
         let message = serde_json::json!({ "message": tl!(CONTROLS_LOCKED) });
-        app.ui.open_dialog(crate::state::DialogKind::Error, message.as_object().cloned().unwrap_or_default());
+        app.open_dialog(crate::state::DialogKind::Error, message.as_object().cloned().unwrap_or_default());
         return ControlsPress::Refused;
     }
     match crate::transform_tool::begin(app, ctx) {

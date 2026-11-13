@@ -99,7 +99,7 @@ fn cancel_does_nothing() {
     // A second press while it is up doesn't stack another prompt.
     click(&mut app, 40.0, 20.0);
     assert_eq!(app.ui.dialogs.len(), 1);
-    app.ui.close_dialog(id).unwrap();
+    app.close_dialog(id).unwrap();
     assert_eq!(past(&app), before.0);
     assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &before.1) || *app.session.active().unwrap().doc == *before.1);
     assert_eq!(active_content(&app), "Type");
@@ -118,7 +118,7 @@ fn only_pixel_painting_asks() {
         app.ui.tool = tool;
         click(&mut app, 30.0, 20.0);
         let id = prompt(&app).unwrap_or_else(|| panic!("{tool:?} asks")).id;
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     // ⌥-click with the Clone Stamp sets the source.
     app.ui.tool = Tool::CloneStamp;
@@ -146,7 +146,7 @@ fn a_stale_or_bad_prompt_fails_gracefully() {
     assert!(crate::dialogs::confirm(&mut app, id).is_err());
     // Garbage fields.
     for f in [json!({"__rasterize": "plaid", "layer": 1}), json!({"__rasterize": "type"}), json!({"__rasterize": "type", "layer": u64::MAX})] {
-        let id = app.ui.open_dialog(crate::state::DialogKind::Command, f.as_object().unwrap().clone());
+        let id = app.open_dialog(crate::state::DialogKind::Command, f.as_object().unwrap().clone());
         assert!(crate::dialogs::confirm(&mut app, id).is_err(), "{f}");
     }
     // A bad tool or point still just rasterizes.

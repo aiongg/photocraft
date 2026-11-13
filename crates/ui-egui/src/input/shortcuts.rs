@@ -511,7 +511,7 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // off the bar first and runs, as with a native menu bar (#6573), and closes an open menu or
     // list (or a panel's options menu, any popup) and runs, as Photoshop's menus do (#9065).
     crate::menu_keys::leave_for_shortcut(ctx);
-    if app.ui.dialogs.is_empty() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
+    if !app.dialog_open() && app.discard.is_none() && crate::type_tool::commit_shortcut(app, ctx) {
         return false;
     }
     crate::menu_keys::close_for_shortcut(ctx);
@@ -582,7 +582,7 @@ fn preflight_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 pub(crate) fn canvas_has_keys(app: &PhotocraftApp, focus: crate::shortcut_dispatch::Focus) -> bool {
     let liquify_focus =
         (app.distort.liquify.is_some() || app.distort.caf.is_some() || app.distort.select_mask.is_some()) && focus != crate::shortcut_dispatch::Focus::None;
-    !(liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() || app.smart_svg.modal_open() || app.save_options_open())
+    !(liquify_focus || app.dialog_open() || app.discard.is_some() || app.smart_svg.modal_open() || app.save_options_open())
 }
 
 fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {

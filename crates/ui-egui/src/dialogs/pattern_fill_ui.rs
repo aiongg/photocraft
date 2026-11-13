@@ -62,7 +62,7 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<u64> {
     let LayerContent::Fill(Fill::Pattern { scale, id, angle, link, phase, .. }) = &st.doc.layer(layer)?.content else { return None };
     let values = json!({"pattern": id, "scale": scale * 100.0, "angle": angle, "link": link, "phase": [phase.0, phase.1]});
     let f = fields(cmds::SET, json!({"layer": layer.0, "document": st.doc.id.0}), values);
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// Layer › New Fill Layer › Pattern…: the dialog in front of creating the layer, starting from
@@ -78,7 +78,7 @@ pub(crate) fn open_new(app: &mut PhotocraftApp) -> Result<u64, String> {
     // The command inserts above the active layer. Its id is frozen here (null with none, which
     // the command allows) so a later layer change cannot silently move the insertion point.
     f.insert(INSERT_KEY.into(), json!(st.active_layer.map(|id| id.0)));
-    Ok(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Ok(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// The command and its params: the target plus the dialog's values.

@@ -425,7 +425,7 @@ fn mixer_press_failed(app: &mut PhotocraftApp, message: String) {
             app.ui.dialogs.iter().any(|d| d.kind == crate::state::DialogKind::Error && d.fields.get("message").and_then(|m| m.as_str()) == Some(&message));
         if !shown {
             let params = json!({ "message": message }).as_object().cloned().unwrap_or_default();
-            app.ui.open_dialog(crate::state::DialogKind::Error, params);
+            app.open_dialog(crate::state::DialogKind::Error, params);
         }
     } else {
         app.ui.status = message;
@@ -454,7 +454,7 @@ fn red_eye_click(app: &mut PhotocraftApp, x: f64, y: f64) {
         let message = tl!(MODE_REFUSAL);
         let kind = crate::state::DialogKind::Error;
         if !app.ui.dialogs.iter().any(|d| d.kind == kind && d.fields.get("message").and_then(|m| m.as_str()) == Some(message)) {
-            app.ui.open_dialog(kind, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+            app.open_dialog(kind, json!({ "message": message }).as_object().cloned().unwrap_or_default());
         }
     }
 }
@@ -473,7 +473,7 @@ fn bucket_click(app: &mut PhotocraftApp, x: f64, y: f64) {
         let message = tl!(BITMAP_REFUSAL);
         let kind = crate::state::DialogKind::Error;
         if !app.ui.dialogs.iter().any(|d| d.kind == kind && d.fields.get("message").and_then(|m| m.as_str()) == Some(message)) {
-            app.ui.open_dialog(kind, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+            app.open_dialog(kind, json!({ "message": message }).as_object().cloned().unwrap_or_default());
         }
     }
 }
@@ -849,7 +849,7 @@ fn refuse_group(app: &mut PhotocraftApp, tool: Tool) -> bool {
         && app.session.active().and_then(|st| st.doc.layer(st.active_layer?)).is_some_and(photocraft_doc::Layer::is_group);
     if group {
         let message = crate::i18n::fmt(tl!("Could not use the {tool} because the target layer is a group."), &[("tool", tl!(tool.label()))]);
-        app.ui.open_dialog(crate::state::DialogKind::Error, json!({"message": message}).as_object().cloned().unwrap_or_default());
+        app.open_dialog(crate::state::DialogKind::Error, json!({"message": message}).as_object().cloned().unwrap_or_default());
     }
     group
 }

@@ -230,7 +230,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
                 if brush {
                     tip(whole_percent_field(ui, tl!("Opacity"), &mut b.opacity, 1.0..=100.0, 62.0), tl!("Set opacity for stroke"));
                 } else if eraser_percent(ui, tl!("Opacity"), &mut b.opacity) {
-                    range_alert(&mut app.ui, ONE_TO_100);
+                    range_alert(&mut app.ui, &mut app.framework.dialogs, ONE_TO_100);
                 }
                 let pressure = pressure_button(ui, b.pressure_opacity, tl!("Always use pressure for opacity"), brush);
                 if tip(pressure, tl!("Always use Pressure for Opacity. When off, Brush Preset controls pressure")).clicked() {
@@ -242,7 +242,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
                 if brush {
                     tip(percent_field(ui, tl!("Flow"), &mut b.flow, 1.0..=100.0, 62.0), tl!("Set flow rate for stroke"));
                 } else if eraser_percent(ui, tl!("Flow"), &mut b.flow) {
-                    range_alert(&mut app.ui, ONE_TO_100);
+                    range_alert(&mut app.ui, &mut app.framework.dialogs, ONE_TO_100);
                 }
                 let airbrush = icons::button(ui, "sparkles", 24.0, b.build_up, tl!("Enable airbrush-style build-up effects"));
                 if crate::brush_picker::named(airbrush, "Enable airbrush-style build-up effects").clicked() {
@@ -253,7 +253,7 @@ fn brush_specific_options(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: Tokens,
             if brush {
                 tip(smoothing_field(ui, b, 58.0), tl!("Set smoothing for stroke\nUse higher values to reduce the shakiness of brush strokes"));
             } else if super::brush_controls::smoothing_field_alerting(ui, b, 58.0).1 {
-                range_alert(&mut app.ui, ZERO_TO_100);
+                range_alert(&mut app.ui, &mut app.framework.dialogs, ZERO_TO_100);
             }
             smoothing_options(ui, b, brush);
             if app.ui.tool == Tool::Eraser {
@@ -975,12 +975,17 @@ fn eraser_percent(ui: &mut egui::Ui, label: &str, value: &mut f32) -> bool {
 }
 
 /// Shows one of the range alerts as a modal with OK, once even if more than one pass asks.
-fn range_alert(ui_state: &mut crate::state::UiState, text: &str) {
+fn range_alert(ui_state: &mut crate::state::UiState, host: &mut craft::ui::dialog::DialogHost, text: &str) {
     let message = tl!(text).to_owned();
     let shown =
         ui_state.dialogs.iter().any(|d| d.kind == crate::state::DialogKind::Error && d.fields.get("message").and_then(|m| m.as_str()) == Some(&message));
     if !shown {
-        ui_state.open_dialog(crate::state::DialogKind::Error, serde_json::json!({ "message": message }).as_object().cloned().unwrap_or_default());
+        crate::app::framework::open_dialog(
+            ui_state,
+            host,
+            crate::state::DialogKind::Error,
+            serde_json::json!({ "message": message }).as_object().cloned().unwrap_or_default(),
+        );
     }
 }
 

@@ -99,7 +99,7 @@ pub fn open(app: &mut PhotocraftApp, layer: LayerId, index: usize) -> Result<u64
     fields.insert("__zoom".into(), json!(fit));
     fields.insert("__imageSize".into(), json!([st.doc.size.width, st.doc.size.height]));
     app.filter_preview = None;
-    Ok(app.ui.open_dialog(DialogKind::Command, fields))
+    Ok(app.open_dialog(DialogKind::Command, fields))
 }
 
 /// Whether `fields` belong to this Blending Options dialog rather than another Smart Filter editor.

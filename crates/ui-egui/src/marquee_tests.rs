@@ -1032,12 +1032,12 @@ fn move_on_the_background_without_a_selection_shows_photoshops_lock_message() {
     assert_eq!(error_dialogs(&app), [crate::move_lock::MESSAGE]);
     assert!(app.drag.is_none(), "no drag started");
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     // ⌘-drag with a marquee (the Move tool for the drag, #896): the same.
     app.ui.tool = Tool::RectMarquee;
     drag(&mut app, [20.0, 20.0], [40.0, 20.0], Modifiers::COMMAND);
     assert_eq!(error_dialogs(&app), [crate::move_lock::MESSAGE]);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     // A position-locked layer: the same; unlocked, it moves.
     app.run("layer.new.layer", json!({})).unwrap();
     app.session
@@ -1048,7 +1048,7 @@ fn move_on_the_background_without_a_selection_shows_photoshops_lock_message() {
         .unwrap();
     drag(&mut app, [20.0, 20.0], [40.0, 20.0], Modifiers::COMMAND);
     assert_eq!(error_dialogs(&app).len(), 1);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.session
         .edit("unlock", |doc, a| {
             doc.layer_mut(a.unwrap()).unwrap().locks.position = false;
@@ -1087,7 +1087,7 @@ fn selected_pixels_move_off_the_background_but_not_off_a_fully_locked_layer() {
         drag(&mut app, [20.0, 20.0], [40.0, 20.0], m);
         assert_eq!(error_dialogs(&app), [crate::move_lock::MESSAGE], "{tool:?}");
         assert!(photocraft_engine::float_cmds::floating(app.session.active().unwrap()).is_none(), "{tool:?}");
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
     }
 }
 

@@ -377,13 +377,13 @@ pub(crate) fn open_smart_filter(app: &mut PhotocraftApp, command: &str, params: 
     let mut fields = seeded_fields(app, command, fields)?;
     let mode = app.session.active()?.doc.mode;
     seed_from_recorded(&mut fields, params, mode);
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, fields))
+    Some(app.open_dialog(crate::state::DialogKind::Command, fields))
 }
 
 /// Merge target-aware defaults with supplied parameters while preserving trusted modal metadata.
 fn open_fields(app: &mut PhotocraftApp, command: &str, fields: Map<String, Value>) -> Option<u64> {
     let fields = seeded_fields(app, command, fields)?;
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, fields))
+    Some(app.open_dialog(crate::state::DialogKind::Command, fields))
 }
 
 /// Normalize recorded settings once their target resolves, retaining modal addressing/chrome.

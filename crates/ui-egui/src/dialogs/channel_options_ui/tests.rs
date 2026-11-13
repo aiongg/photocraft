@@ -53,7 +53,7 @@ fn cancel_leaves_the_channel_alone() {
     let before = app.session.active().unwrap().history.past_len();
     let id = open(&mut app, &json!(0)).unwrap();
     app.ui.dialog_mut(id).unwrap().fields.insert("indicates".into(), json!("spot"));
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert!(channel(&app).spot.is_none());
     assert_eq!(app.session.active().unwrap().history.past_len(), before);
 }
@@ -85,7 +85,7 @@ fn menu_opens_the_dialog_on_the_targeted_channel_and_refuses_otherwise() {
     assert!(r["dialog"].is_u64());
     assert_eq!(app.ui.dialogs.last().unwrap().fields["channel"], json!(0));
     // Explicit params run the engine directly, no dialog.
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     crate::menus::invoke(&mut app, &ctx, COMMAND, json!({"channel": 0, "indicates": "spot"})).unwrap();
     assert!(app.ui.dialogs.is_empty());
     assert!(channel(&app).spot.is_some());
@@ -125,7 +125,7 @@ fn layer_mask_display_options_set_the_rubylith() {
     assert_eq!(app.ui.dialogs.last().unwrap().fields["channel"], json!("mask"));
     // Or with it targeted by `\` (the rubylith), which leaves the Channels target alone.
     app.run("channel.target", json!({"channel": "composite"})).unwrap();
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.run(photocraft_engine::mask_view_cmds::OVERLAY_ID, json!({})).unwrap();
     app.sync_mask_targets();
     crate::menus::invoke(&mut app, &ctx, COMMAND, json!({})).unwrap();
@@ -209,7 +209,7 @@ fn new_spot_channel_cancel_menu_routing_and_no_document() {
     let r = crate::menus::invoke(&mut app, &ctx, NEW_SPOT, json!({})).unwrap();
     let id = r["dialog"].as_u64().unwrap();
     assert!(owns_new_spot(&app.ui.dialog_mut(id).unwrap().fields));
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert_eq!(app.session.active().unwrap().doc.channels.len(), n, "Cancel adds nothing");
     // Explicit params run the engine directly, no dialog.
     crate::menus::invoke(&mut app, &ctx, NEW_SPOT, json!({"name": "Direct"})).unwrap();

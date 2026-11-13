@@ -130,9 +130,9 @@ fn another_dialog_cannot_consume_the_selected_step() {
     let mut h = sizing();
     let real = open(&mut h);
     let fields = h.state().ui.dialogs.last().unwrap().fields.clone();
-    let fake = h.state_mut().ui.open_dialog(DialogKind::Command, fields.clone());
+    let fake = h.state_mut().open_dialog(DialogKind::Command, fields.clone());
     assert!(dialogs::confirm(h.state_mut(), fake).is_err());
-    let fake = h.state_mut().ui.open_dialog(DialogKind::Command, fields);
+    let fake = h.state_mut().open_dialog(DialogKind::Command, fields);
     dialogs::cancel(h.state_mut(), fake).unwrap();
     dialogs::confirm(h.state_mut(), real).unwrap();
     assert_eq!(h.state().session.active().unwrap().doc.size, photocraft_engine::doc::Size::new(4, 3));

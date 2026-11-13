@@ -51,7 +51,7 @@ pub fn ask(app: &mut PhotocraftApp, r: PathRef, params: &Value) -> bool {
     f.insert("params".into(), params.clone());
     f.insert("__dontShowAgain".into(), json!(PREF));
     f.insert("skip".into(), json!(false));
-    app.ui.open_dialog(DialogKind::Command, f);
+    app.open_dialog(DialogKind::Command, f);
     true
 }
 

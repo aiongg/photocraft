@@ -610,7 +610,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                     // A hidden target layer keeps the button on and answers the click with the
                     // reference's alert (its message and an OK button), changing nothing (#12033).
                     if why == hidden {
-                        app.ui.open_dialog(DialogKind::Error, json!({"message": tl!(hidden)}).as_object().cloned().unwrap_or_default());
+                        app.open_dialog(DialogKind::Error, json!({"message": tl!(hidden)}).as_object().cloned().unwrap_or_default());
                     }
                     // Every other refusal goes to the status line, as the eraser tools do. What the
                     // command itself answered is reported there by `PhotocraftApp::run`, but a
@@ -1152,7 +1152,7 @@ pub fn ask_clear_notes(app: &mut PhotocraftApp) {
     f.insert("__command".into(), json!("notes.delete"));
     f.insert("__label".into(), json!(tl!("Clear All")));
     f.insert("document".into(), json!(doc));
-    app.ui.open_dialog(crate::state::DialogKind::Command, f);
+    app.open_dialog(crate::state::DialogKind::Command, f);
 }
 
 pub fn owns_clear_notes(fields: &Map<String, Value>) -> bool {
@@ -1198,7 +1198,7 @@ pub fn ask_delete_note(app: &mut PhotocraftApp, index: usize) {
     f.insert("document".into(), json!(doc));
     f.insert("index".into(), json!(index));
     f.insert("skip".into(), json!(false));
-    app.ui.open_dialog(crate::state::DialogKind::Command, f);
+    app.open_dialog(crate::state::DialogKind::Command, f);
 }
 
 fn delete_note(app: &mut PhotocraftApp, index: usize) {

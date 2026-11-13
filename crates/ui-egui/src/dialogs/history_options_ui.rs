@@ -43,7 +43,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     for key in photocraft_engine::history_options_cmds::OPTIONS {
         f.insert(key.into(), current.get(key).cloned().unwrap_or(Value::Bool(false)));
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 #[cfg(test)]

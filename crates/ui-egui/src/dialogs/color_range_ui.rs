@@ -109,7 +109,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     f.insert("__view".into(), json!("selection"));
     f.insert("__selectionPreview".into(), json!("none"));
     app.color_range = None;
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 pub fn owns(f: &Map<String, Value>) -> bool {
