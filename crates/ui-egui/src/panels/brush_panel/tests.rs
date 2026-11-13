@@ -792,22 +792,17 @@ fn brushes_panel_groups_collapse_and_filter() {
     let mut h = harness(1, 0);
     let groups = grouped_presets(&h.state().session.tools.presets);
     assert!(groups.len() >= 2, "{groups:?}");
-    let ctx = h.ctx.clone();
-    let shown = |h: &mut Harness<'static, PhotocraftApp>| {
-        h.run_steps(2);
-        brush_preview::with_cache(&ctx, |c| c.len())
-    };
-    let all = shown(&mut h);
-    // Collapse every group: no more previews are needed, and the old ones are kept (cached).
-    h.state_mut().ui.brushes_panel.collapsed = groups.iter().map(|(g, _)| g.clone()).collect();
-    let n = brush_preview::render_count(&ctx);
-    assert_eq!(shown(&mut h), all);
-    assert_eq!(brush_preview::render_count(&ctx), n);
-    // A filter shows matching presets even in collapsed top-level groups.
     let first = h.state().session.tools.presets[0].name.clone();
+    h.run_steps(2);
+    assert!(h.query_by_label(&first).is_some());
+    // Collapsing every group hides its presets.
+    h.state_mut().ui.brushes_panel.collapsed = groups.iter().map(|(g, _)| g.clone()).collect();
+    h.run_steps(2);
+    assert!(h.query_by_label(&first).is_none());
+    // A filter shows matching presets even in collapsed top-level groups.
     h.state_mut().ui.brushes_panel.filter = first.to_uppercase();
     h.run_steps(2);
-    assert!(brush_preview::render_count(&ctx) >= n);
+    assert!(h.query_by_label(&first).is_some());
 }
 
 /// #7257: with a search filter active, nested folders that contain matches can still be closed.
@@ -1476,7 +1471,7 @@ fn checkboxes_show_a_pressed_state_from_their_label() {
             .shapes
             .iter()
             .filter_map(|c| match &c.shape {
-                egui::Shape::Rect(r) if (r.rect.center() - boxr.center()).length() < 1.5 && r.rect.width() < 15.0 && r.fill != Color32::TRANSPARENT => {
+                egui::Shape::Rect(r) if (r.rect.center() - boxr.center()).length() < 1.5 && r.rect.width() < 15.0 && r.fill != egui::Color32::TRANSPARENT => {
                     Some(r.fill)
                 }
                 _ => None,
