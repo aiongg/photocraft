@@ -423,6 +423,13 @@ pub(crate) fn status(app: &PhotocraftApp, ui: &mut egui::Ui) {
     ui.label(egui::RichText::new(tl!("Redrawing")).color(t.text_dim).size(12.0));
 }
 
+/// The active document's redraw as a framework status bar shows it: "Redrawing" and how much is done.
+#[allow(dead_code, reason = "the framework status bar shows it")]
+pub(crate) fn progress(app: &PhotocraftApp) -> Option<craft::ui::bars::StatusProgress> {
+    let r = app.session.active().and_then(|st| app.redraws.get(&st.doc.id))?;
+    Some(craft::ui::bars::StatusProgress::new(tl!("Redrawing"), Some(r.fraction())))
+}
+
 /// Stop document `doc`'s redraw (its canvas was redrawn some other way, or is gone).
 pub(crate) fn cancel(app: &mut PhotocraftApp, doc: DocId) {
     app.redraws.remove(&doc);

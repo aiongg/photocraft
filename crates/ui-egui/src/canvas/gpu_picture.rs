@@ -160,6 +160,7 @@ impl GpuPicture {
     }
 
     /// The picture as the app's paint of a framework `RasterDisplay`.
+    #[allow(dead_code, reason = "the document display of the framework Canvas body paints it")]
     pub(crate) fn into_paint<'a>(self) -> AppPaint<'a, CanvasView> {
         AppPaint::new(move |cx, view| self.paint(&cx.painter, &view))
     }
