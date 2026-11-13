@@ -65,10 +65,10 @@ pub(crate) fn srgba(c: [f32; 4]) -> Srgba {
 }
 
 /// The Color panel's panel menu (the dock's menus are still drawn by PhotoCraft): the rows,
-/// checks and commands of `ColorPanelMenu`.
+/// checks and commands of `ColorPanelMenu`. The ramp's context menu fires the same commands
+/// through the framework (`framework_before_input`).
 pub(crate) fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let defs = ColorPanelCommand::defs().unwrap_or_default();
-    let states = ColorPanelMenu::states(&app.ui.color_panel.panel);
     for row in ColorPanelMenu::rows() {
         let PanelRow::Command(command) = row else {
             ui.separator();
@@ -76,7 +76,7 @@ pub(crate) fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         };
         let Some(id) = ColorPanelCommand::from_ref(&command) else { continue };
         let label = defs.iter().find(|d| d.command == command).map_or("", |d| d.label.as_str());
-        let checked = states.iter().find(|(c, _)| *c == id).and_then(|(_, s)| s.checked);
+        let checked = ColorPanelMenu::checked(&app.ui.color_panel.panel, id);
         let text = match checked {
             Some(on) => format!("{}{}", if on { "✔ " } else { "   " }, tl!(label)),
             None => tl!(label).to_string(),

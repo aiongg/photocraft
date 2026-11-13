@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
 use craft::host::target::{Backend, ShellInfo};
 use craft::host::{AppInfo, Host, SectionStore};
 use craft::i18n::Direction;
@@ -17,7 +18,7 @@ use craft::keymap::Overrides;
 use craft::theme::{ModeChoice, ThemeId};
 use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
-use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
+use craft::ui::runtime::commands::{CommandInput, CommandRef, CommandSet as _, CommandState, NavCommand};
 use craft::ui::runtime::env::{RootEnv, Scale};
 use craft::ui::runtime::frame::{ChromeToggle, FrameInput, FrameOutput};
 use craft::ui::runtime::{InstallError, InstallSpec};
@@ -87,7 +88,7 @@ fn build_host(sections: &Arc<PrefSections>, lang: &str) -> Host {
 
 impl Framework {
     /// The input for the coming frame, from PhotoCraft's preferences.
-    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: ThemeKind) -> FrameInput {
+    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: ThemeKind, states: Vec<(CommandRef, CommandState)>) -> FrameInput {
         self.sections.sync(session);
         let lang = i18n::current().code();
         if lang != self.lang {
@@ -103,7 +104,8 @@ impl Framework {
             .direction(if rtl { Direction::Rtl } else { Direction::Ltr });
         // Photoshop's Tab hides the panels, Shift+Tab all but the tools, over the canvas.
         root.tab_toggles_chrome = true;
-        FrameInput::new(root).host(Arc::clone(&self.host)).commands(CommandInput::new().overrides(Arc::clone(&self.overrides)))
+        let commands = states.into_iter().fold(CommandInput::new(), |input, (command, state)| input.state(command, state));
+        FrameInput::new(root).host(Arc::clone(&self.host)).commands(commands.overrides(Arc::clone(&self.overrides)))
     }
 
     /// The runtime's keymap overrides from PhotoCraft's own bindings: the chrome commands it
@@ -153,10 +155,20 @@ impl PhotocraftApp {
             let chrome = crate::shortcut_dispatch::framework_owned_texts(self);
             self.framework.set_overrides(rev, chrome);
         }
+        // The Color panel menu's commands (its ramp's context menu fires them): the checks go in, the fired ones run
+        // after the frame.
+        let states = ColorPanelMenu::states(&self.ui.color_panel.panel).into_iter().map(|(command, state)| (CommandRef::from(command), state)).collect();
+        let mut color_commands = Vec::new();
         embed::before_input(ctx, |output: FrameOutput| {
             self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
-            self.framework.frame_input(&mut self.session, ctx, self.ui.theme)
+            color_commands.extend(output.fired.iter().filter_map(|fired| ColorPanelCommand::from_ref(&fired.command)));
+            self.framework.frame_input(&mut self.session, ctx, self.ui.theme, states)
         });
+        for command in color_commands {
+            if let Some(text) = crate::panels::color::run_menu_command(self, command) {
+                ctx.copy_text(text);
+            }
+        }
     }
 
     /// After PhotoCraft's own dialogs (`ui_body`): the framework dialogs it keeps open.
