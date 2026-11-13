@@ -303,7 +303,7 @@ fn assert_bottom_sample_visible(h: &Harness<'_, State>) {
 #[test]
 fn adding_dash_controls_grows_the_popup_and_solid_shrinks_it_again() {
     for theme in crate::theme::AppTheme::all() {
-        let mut h = sized_harness(vec2(720.0, 1000.0), 2.0, theme);
+        let mut h = sized_harness(vec2(720.0, 1000.0), 2.0, theme.clone());
         open(&mut h);
         let solid_height = h.state().popup.unwrap().height();
         assert_bottom_sample_visible(&h);

@@ -158,7 +158,7 @@ fn studio_color_chips_keep_default_and_swap_buttons_below() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.run_steps(2);
         h.get_by_label("Switch Foreground and Background Colors (X)").click();
         h.run_steps(2);

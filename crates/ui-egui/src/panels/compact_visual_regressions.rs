@@ -92,7 +92,7 @@ fn compact_toolbar_tab_reveals_and_activates_the_last_tool() {
 #[test]
 fn tall_toolbar_keeps_the_colour_chips_under_the_tools() {
     for kind in theme::AppTheme::all() {
-        let harness = toolbar_harness_sized(kind, 1.0, 1600.0);
+        let harness = toolbar_harness_sized(kind.clone(), 1.0, 1600.0);
         let last = harness.get_by_label("Edit Toolbar…").rect();
         let swap = harness.get_by_label("Switch Foreground and Background Colors (X)").rect();
         assert!(swap.top() - last.bottom() < 80.0, "{kind:?}: the chips {swap:?} sit far below the last tool {last:?}");
@@ -196,7 +196,7 @@ fn color_chips_stay_centred_when_the_tools_scroll() {
     for kind in crate::theme::AppTheme::all() {
         for double in [false, true] {
             for scale in [1.0, 2.0] {
-                let (short, tall) = (chips(kind, double, 420.0, scale), chips(kind, double, 1400.0, scale));
+                let (short, tall) = (chips(kind.clone(), double, 420.0, scale), chips(kind.clone(), double, 1400.0, scale));
                 assert_eq!(short, tall, "{kind:?}, two columns {double}, scale {scale}: the chips don't move when the tools scroll");
             }
         }
@@ -444,7 +444,7 @@ fn the_narrow_options_bar_preference_shortens_the_bar() {
     assert_eq!(options_bar_height(false, true), 34.0);
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    crate::theme::apply(&ctx, crate::theme::AppTheme::pro());
+    crate::theme::apply(&ctx, &crate::theme::AppTheme::pro());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 900.0));
     let run = |app: &mut PhotocraftApp| {

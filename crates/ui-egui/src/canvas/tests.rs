@@ -875,7 +875,7 @@ fn only_themes_with_a_dot_pattern_tile_the_canvas_surround() {
     for kind in AppTheme::all() {
         let ctx = egui::Context::default();
         let dotted = matches!(kind.id().as_str(), "craft.studio" | "craft.solarized-dark");
-        assert_eq!(tiles(&ctx, kind), dotted, "{kind:?}");
+        assert_eq!(tiles(&ctx, kind.clone()), dotted, "{kind:?}");
         assert_eq!(uploaded(&ctx), usize::from(dotted), "{kind:?}");
     }
     // The reported switch: a dotted theme, then Pro.
@@ -1268,7 +1268,7 @@ fn middle_clicking_a_tab_closes_that_document() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.state_mut().1 = true;
         h.run_steps(2);
         h.get_by_label_contains("doomed").click_button(egui::PointerButton::Middle);
@@ -1320,7 +1320,7 @@ fn spectrum_document_tabs_meet_canvas_without_a_gap() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.state_mut().1 = true;
         h.run_steps(3);
         let app = &h.state().0;
@@ -1404,7 +1404,7 @@ fn dragging_a_tab_reorders_the_documents() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.state_mut().1 = true;
         h.run_steps(2);
         let b = h.get_by_label_contains("b").rect();
@@ -1445,7 +1445,7 @@ fn dragging_a_tab_off_the_strip_floats_it_in_a_window() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.state_mut().1 = true;
         h.run_steps(2);
         let b = h.get_by_label_contains("b").rect();
@@ -3431,7 +3431,7 @@ fn torn_off_document_is_not_drawn_again_in_the_main_window() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.state_mut().1 = true;
         h.run_steps(3);
         let tabs = h.state().0.tab_strip.as_ref().map(|s| s.tabs.iter().map(|(doc, _)| *doc).collect::<Vec<_>>());

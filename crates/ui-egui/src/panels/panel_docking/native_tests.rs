@@ -91,7 +91,7 @@ impl Desktop {
         let h = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(
             move |ui, app: &mut PhotocraftApp| {
                 if !ready {
-                    PhotocraftApp::setup_context(ui.ctx(), app.ui.theme);
+                    PhotocraftApp::setup_context(ui.ctx(), app.ui.theme.clone());
                     ui.ctx().set_embed_viewports(false);
                     ready = true;
                     return;

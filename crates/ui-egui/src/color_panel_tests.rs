@@ -523,7 +523,7 @@ fn color_wheel_fits_the_default_color_group() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.run_steps(4);
         let group = crate::panel_docking::probe::native_group_rect(h.state(), &h.ctx, Group::Color).unwrap();
         assert!((group.height() - Group::Color.default_height()).abs() < 0.5, "{kind:?}: Color group {group:?}");

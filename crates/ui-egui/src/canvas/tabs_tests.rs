@@ -91,7 +91,7 @@ fn studio_tabs_overflow_into_the_same_menu() {
 #[test]
 fn saved_document_tabs_track_file_identity() {
     for theme in AppTheme::all() {
-        let mut h = harness(2, theme);
+        let mut h = harness(2, theme.clone());
         h.state_mut().services.export = Some(Box::new(|_, _, _| Ok((vec![1], Vec::new()))));
         h.state_mut().services.write = Some(Box::new(|_, _| Ok(())));
         h.state_mut().save_as(Some("folder/My saved image.psd".into())).unwrap();
@@ -209,7 +209,7 @@ fn elided_on_strip(h: &Harness<'_, PhotocraftApp>) -> bool {
 #[test]
 fn crowded_tabs_keep_their_whole_names_and_the_menu_lists_every_document() {
     for theme in [AppTheme::pro(), AppTheme::studio()] {
-        let mut h = harness(14, theme);
+        let mut h = harness(14, theme.clone());
         let s = strip(&h);
         assert!(s.tabs.len() > 1 && s.tabs.len() < 14, "{theme:?}: {} shown", s.tabs.len());
         assert!(!elided_on_strip(&h), "{theme:?}: no tab title is cut");
@@ -243,7 +243,7 @@ fn crowded_tabs_keep_their_whole_names_and_the_menu_lists_every_document() {
 fn the_overflow_button_is_pinned_to_the_right_end() {
     for theme in [AppTheme::pro(), AppTheme::studio()] {
         let at = |docs: usize| {
-            let h = harness(docs, theme);
+            let h = harness(docs, theme.clone());
             let s = strip(&h);
             let button = h.get_by_label("More documents").rect();
             let last = s.tabs.iter().map(|(_, r)| r.right()).fold(f32::MIN, f32::max);

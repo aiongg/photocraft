@@ -75,7 +75,7 @@ fn expanded(app: &PhotocraftApp, group: LayerId) -> bool {
 fn a_new_active_layer_opens_its_groups_and_scrolls_into_view() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, inner, group, top, below_top) = tall_doc();
-        let mut h = harness(app, theme);
+        let mut h = harness(app, theme.clone());
         assert!(shown(&h, "Stack 29"), "{theme:?}: the panel starts at the top");
         assert!(row(&h, "Deep inside").is_none(), "{theme:?}: hidden in its closed group");
 
@@ -144,7 +144,7 @@ fn reveal_survives_odd_documents() {
 fn layers_scroll_position_survives_document_switches() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, inner, _, _, _) = tall_doc();
-        let mut h = harness(app, theme);
+        let mut h = harness(app, theme.clone());
         h.state_mut().run("layer.select", json!({"layer": inner.0})).unwrap();
         h.run_steps(4);
         let before = row(&h, "Deep inside").unwrap();

@@ -779,7 +779,7 @@ mod tests {
                 let (mut app, _) = app();
                 app.run("file.new", json!({"width": 20, "height": 20, "depth": 32})).unwrap();
                 let mut h = Harness::builder().with_size(size).with_pixels_per_point(scale).build_ui_state(|ui, app| windows(app, ui.ctx()), app);
-                PhotocraftApp::setup_context(&h.ctx, theme);
+                PhotocraftApp::setup_context(&h.ctx, theme.clone());
                 let ctx = h.ctx.clone();
                 crate::menus::invoke(h.state_mut(), &ctx, "view.thirtyTwoBitPreviewOptions", json!({})).unwrap();
                 h.run_steps(4);
