@@ -524,8 +524,8 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     assert_eq!(h.state().session.prefs().interface.favorite_themes, vec!["craft.classic"]);
     assert!(h.query_by_label("Remove from favorites: Classic").is_some());
     let (light, dark) = favorite_theme_groups(&["craft.studio".to_string(), "craft.classic".to_string(), "craft.adwaita".to_string()]);
-    assert_eq!(light, ["craft.classic", "craft.adwaita"].map(|id| ThemeId::parse(id).unwrap()));
-    assert_eq!(dark, vec![ThemeId::parse("craft.studio").unwrap()]);
+    assert_eq!(light, ["craft.studio", "craft.classic", "craft.adwaita"].map(|id| ThemeId::parse(id).unwrap()));
+    assert_eq!(dark, ["craft.studio", "craft.adwaita"].map(|id| ThemeId::parse(id).unwrap()));
 }
 
 /// The favourite star badge overhangs its swatch; showing it on hover must not move the swatches
@@ -1754,7 +1754,7 @@ fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_value
     let saved: Value = serde_json::from_str(store.lock().unwrap().as_ref().unwrap()).unwrap();
     assert_eq!(saved["performance"]["historyStates"], 12);
     assert_eq!(saved["interface"]["appearanceMode"], "light");
-    assert_eq!(saved["interface"]["lightTheme"], "studioLight");
+    assert_eq!(saved["interface"]["lightTheme"], "craft.studio");
     assert_eq!(saved["interface"]["uiFontSize"], "large");
 
     // Repeated Apply starts from the validated values, not the dialog's original snapshot.
