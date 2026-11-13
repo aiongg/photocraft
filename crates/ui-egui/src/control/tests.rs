@@ -464,6 +464,23 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     assert!(app.allow_close && app.session.documents().is_empty());
 }
 
+/// A dialog on the framework's `DialogHost` is listed by ui.inspect beside PhotoCraft's own and
+/// answered through ui.dialog.* by the id listed there; PhotoCraft's numeric ids stay its own.
+#[test]
+fn framework_dialogs_are_listed_and_answered_through_ui_dialog() {
+    use craft::ui::dialog::{DialogResult, PromptKind, StandardPrompt};
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+    let listed = call(&mut app, &ctx, "ui.inspect", json!({}));
+    let prompt = listed["result"]["dialogs"].as_array().unwrap().last().cloned().expect("the framework prompt is listed");
+    assert_eq!(prompt["fields"]["choice"], "proceed", "{prompt}");
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": prompt["id"], "field": "choice", "value": "maybe"}))["ok"], false);
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": prompt["id"]}))["ok"], true);
+    assert!(matches!(app.framework.dialogs.take::<StandardPrompt>(), Some(DialogResult::Cancel)));
+    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": prompt["id"]}))["ok"], false, "nothing left to cancel");
+}
+
 #[test]
 fn shell_dialogs_are_listed_and_driven_through_ui_dialog() {
     // #1004: Window › Workspace and View dialogs live in `ui.shell.dialog`, and ui.inspect and
@@ -545,7 +562,7 @@ fn expired_queued_edit_does_not_run_and_a_live_retry_runs_once() {
     // transport's, sent while the command may still apply.
     assert!(expired_error.starts_with("timeout"), "machines match on the prefix: {expired_error}");
     assert!(expired_error.contains("not run"), "the expired request says it never ran: {expired_error}");
-    let transport_error = super::timeout_error();
+    let transport_error = craft::automation::control::timeout_error();
     assert!(!transport_error.contains("not run"), "the transport can't know it didn't run: {transport_error}");
     assert!(transport_error.contains("may still apply"), "the transport warns against a blind re-send: {transport_error}");
 }
@@ -569,28 +586,28 @@ fn a_transport_that_gives_up_learns_whether_the_command_can_still_run() {
 
     let (dispatch, queued, _) = request(Instant::now() + Duration::from_secs(60));
     tx.send(queued).unwrap();
-    assert_eq!(dispatch.give_up(), super::expired_error(), "still queued: it will not run");
+    assert_eq!(dispatch.give_up(), craft::automation::control::expired_error(), "still queued: it will not run");
     app.drain_control(&ctx);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers, "a request given up on never runs");
 
     let (dispatch, expired, _) = request(Instant::now() - Duration::from_secs(1));
     tx.send(expired).unwrap();
     app.drain_control(&ctx);
-    assert_eq!(dispatch.give_up(), super::expired_error(), "rejected by the UI thread: it did not run");
+    assert_eq!(dispatch.give_up(), craft::automation::control::expired_error(), "rejected by the UI thread: it did not run");
 
     let (dispatch, live, reply) = request(Instant::now() + Duration::from_secs(60));
     tx.send(live).unwrap();
     app.drain_control(&ctx);
     assert_eq!(reply.try_recv().unwrap()["ok"], true);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1);
-    assert_eq!(dispatch.give_up(), super::timeout_error(), "dispatched: it may still apply");
+    assert_eq!(dispatch.give_up(), craft::automation::control::timeout_error(), "dispatched: it may still apply");
 }
 
 #[test]
 fn timeout_errors_name_the_likely_causes() {
     // #2489: the reply must tell "wait" from "check the machine", and its number
     // must come from the deadline it reports.
-    let error = super::timeout_error();
+    let error = craft::automation::control::timeout_error();
     assert!(error.starts_with("timeout"), "machines match on the prefix");
     assert!(error.contains(&format!("{}s", super::REPLY_DEADLINE.as_secs())), "the text matches the deadline: {error}");
     assert!(error.contains("may still be running"), "the wait-it-out cause");

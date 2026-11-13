@@ -238,10 +238,12 @@ impl PhotocraftApp {
         // the queue is empty, then release control replies waiting on it.
         // Only a pass that reached the end of the UI and delivered the in-flight batch counts as
         // settled input; an early-returning pass keeps the batch (and the waiting replies).
-        if !self.synthetic.is_empty() || self.synthetic_batch.is_some() {
+        let input_queued = !self.synthetic.is_empty() || self.synthetic_batch.is_some();
+        if input_queued {
             ctx.request_repaint();
-        } else {
-            #[cfg(not(target_arch = "wasm32"))]
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if !input_queued {
             self.reply_input_processed();
         }
         // A menu or dialog can start a filter after `jobs_ui::tick` ran in this frame. Keep

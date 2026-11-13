@@ -229,10 +229,11 @@ fn accepted_control_job_applies_after_its_dispatch_deadline() {
     let (mut req, reply) = crate::ControlRequest::new("engine.execute", json!({"command": "filter.blur.gaussianBlur", "params": {"radius": 2}}));
     req.deadline = Some(deadline);
     let (tx, rx) = std::sync::mpsc::channel();
-    h.state_mut().control_rx = Some(rx);
+    h.state_mut().control = Some(craft::automation::ControlChannel::new(rx));
     tx.send(req).unwrap();
     h.state_mut().drain_control(&ctx);
-    let job = h.state().jobs.waiters.first().expect("the accepted request waits for its job").0;
+    assert_eq!(h.state().control.as_ref().map(craft::automation::ControlChannel::waiting), Some(1), "the accepted request waits for its job");
+    let job = h.state().session.jobs().first().expect("the filter runs as a job").id;
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "the job has not been applied yet");
     assert!(reply.try_recv().is_err());
     // No frames poll the worker until the transport's deadline has elapsed.
@@ -245,10 +246,17 @@ fn accepted_control_job_applies_after_its_dispatch_deadline() {
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps + 1);
 }
 
+/// A control request waiting for `job` to end, as a waiting `engine.execute` leaves one.
+fn wait_for_job(app: &mut PhotocraftApp, job: JobId) -> std::sync::mpsc::Receiver<Value> {
+    let (req, reply) = crate::ControlRequest::new("engine.execute", json!({}));
+    let channel = app.control.get_or_insert_with(|| craft::automation::ControlChannel::new(std::sync::mpsc::channel().1));
+    channel.settle(req, crate::control::Reply::AfterJob(job.0), None, 0.0);
+    reply
+}
+
 /// The control reply for `job`, once the app's frame loop has applied it.
 fn job_reply(h: &mut Harness<'static, PhotocraftApp>, job: JobId) -> Value {
-    let (tx, rx) = std::sync::mpsc::channel();
-    h.state_mut().jobs.waiters.push((job, tx));
+    let rx = wait_for_job(h.state_mut(), job);
     let t = Instant::now();
     loop {
         h.step();
@@ -876,8 +884,7 @@ fn cancelled_batch_with_partial_results_reports_cancellation_without_beeping() {
         std::thread::sleep(Duration::from_millis(1));
     };
     let ctx = h.ctx.clone();
-    let (reply_tx, reply_rx) = std::sync::mpsc::channel();
-    h.state_mut().jobs.waiters.push((id, reply_tx));
+    let reply_rx = wait_for_job(h.state_mut(), id);
     crate::jobs_ui::on_event(h.state_mut(), &ctx, event);
     assert!(h.state().ui.status.contains("Canceled"), "{}", h.state().ui.status);
     assert_eq!(BEEPS.load(Ordering::Relaxed), 0);

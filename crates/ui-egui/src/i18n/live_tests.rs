@@ -446,7 +446,7 @@ fn a_control_request_changes_the_drawing_language_in_the_same_frame() {
         let document = h.state().session.active().expect("document").doc.clone();
         for code in ["zh-hans", "ja", "ko", "ru", "uk", "fr", "id", "en"] {
             let (tx, rx) = std::sync::mpsc::channel();
-            h.state_mut().control_rx = Some(rx);
+            h.state_mut().control = Some(craft::automation::ControlChannel::new(rx));
             let (request, reply) =
                 crate::control::ControlRequest::new("engine.execute", json!({"command": "prefs.set", "params": {"path": "interface.language", "value": code}}));
             tx.send(request).expect("request");
