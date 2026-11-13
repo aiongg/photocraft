@@ -42,7 +42,7 @@ fn mask(h: &Harness<'_, PhotocraftApp>) -> photocraft_doc::LayerMask {
 fn pixel_mask_properties_follow_target_for_raster_and_adjustment_in_both_themes() {
     for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         for adjustment in [false, true] {
-            let mut h = harness(adjustment, theme);
+            let mut h = harness(adjustment, theme.clone());
             assert!(h.query_all_by_label("Density").next().is_some(), "{theme:?}, adjustment={adjustment}");
             assert!(h.query_all_by_label("Feather").next().is_some());
             h.state_mut().ui.mask_target = false;
@@ -201,7 +201,7 @@ fn shape_properties_edit_density_and_feather() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.run_steps(4);
         let shape = |h: &Harness<'_, PhotocraftApp>| match &h.state().session.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content {
             photocraft_doc::LayerContent::Shape(sh) => sh.clone(),
@@ -258,7 +258,7 @@ fn row(h: &Harness<'_, PhotocraftApp>, of_mask: bool) -> Vec<f32> {
 fn refine_row_offers_select_and_mask_color_range_and_invert() {
     for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
         for adjustment in [false, true] {
-            let mut h = harness(adjustment, theme);
+            let mut h = harness(adjustment, theme.clone());
             for label in ["Refine", "Select and Mask…", "Color Range…", "Invert"] {
                 assert!(h.query_all_by_label(label).next().is_some(), "{theme:?}, adjustment={adjustment}: no {label}");
             }
@@ -337,7 +337,7 @@ fn card_harness(new_layer: bool, theme: crate::theme::AppTheme) -> Harness<'stat
 #[test]
 fn floating_properties_card_shows_document_properties_for_the_background() {
     for theme in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::breeze_dark()] {
-        let h = card_harness(false, theme);
+        let h = card_harness(false, theme.clone());
         assert!(h.query_all_by_label("Document").next().is_some(), "{theme:?}: Document properties in the card");
     }
 }
@@ -345,7 +345,7 @@ fn floating_properties_card_shows_document_properties_for_the_background() {
 #[test]
 fn floating_properties_card_shows_pixel_layer_properties() {
     for theme in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::breeze_dark()] {
-        let h = card_harness(true, theme);
+        let h = card_harness(true, theme.clone());
         assert!(h.query_all_by_label("Opacity").next().is_some(), "{theme:?}: layer controls in the card");
         assert!(h.query_all_by_label("Document").next().is_none());
     }

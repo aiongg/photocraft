@@ -301,7 +301,7 @@ fn section_lock_buttons_report_their_section_and_state_in_every_theme() {
 
     for theme in crate::theme::AppTheme::all() {
         let mut h = harness(0, 3);
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         let mut brush = h.state().session.tools.brush.clone();
         for i in 1..SECTIONS.len() {
             *section_lock(&mut brush, i).unwrap() = i % 2 == 0;
@@ -377,7 +377,7 @@ fn section_lock_buttons_show_focus_and_track_keyboard_navigation() {
     }
     for (index, theme) in crate::theme::AppTheme::all().into_iter().enumerate() {
         let mut h = harness(0, 0);
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.state_mut().session.tools.brush.locks.scattering = index % 2 == 0;
         h.state_mut().session.tools.brush.locks.texture = index % 2 != 0;
         h.run_steps(2);

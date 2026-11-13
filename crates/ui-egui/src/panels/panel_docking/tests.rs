@@ -1929,7 +1929,7 @@ fn release_only_position_updates_model_and_actual_geometry_on_that_frame() {
                 app.ui.panels.rail = rail;
                 app.ui.theme = theme.clone();
                 let rw = if rail { if theme.is_pro() { 36.0 } else { 44.0 } } else { 0.0 };
-                let mut h = dock_panel_harness(app, vec2(1280.0, 800.0), theme);
+                let mut h = dock_panel_harness(app, vec2(1280.0, 800.0), theme.clone());
                 let start = begin_outer_resize(&mut h);
                 let sign = if crate::direction::is_rtl() { 1.0 } else { -1.0 };
                 h.event(Event::PointerMoved(start + vec2(sign * 30.0, 0.0)));
@@ -2161,10 +2161,11 @@ fn constrained_composed_layout_reserves_the_canvas_with_or_without_a_rail() {
                 app.ui.theme = theme.clone();
                 app.ui.panels.toolbar_side = if crate::direction::is_rtl() { crate::state::ToolbarSide::Left } else { crate::state::ToolbarSide::Right };
                 let mut ready = false;
+                let ctx_theme = theme.clone();
                 let mut h = Harness::builder().with_size(vec2(400.0, 600.0)).with_step_dt(1.0 / 60.0).build_ui_state(
                     move |ui, app: &mut PhotocraftApp| {
                         if !ready {
-                            PhotocraftApp::setup_context(ui.ctx(), theme.clone());
+                            PhotocraftApp::setup_context(ui.ctx(), ctx_theme.clone());
                             ready = true;
                             return;
                         }

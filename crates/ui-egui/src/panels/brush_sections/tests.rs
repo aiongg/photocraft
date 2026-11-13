@@ -86,7 +86,7 @@ fn hue_jitter_paints_an_amount_track_in_every_theme() {
         let mut b = BrushSettings::default();
         b.color_dynamics.hue_jitter = 0.37;
         let mut h = section_harness(5, b.clone());
-        crate::PhotocraftApp::setup_context(&h.ctx, kind);
+        crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.run_steps(3);
         let label = caption_rect(&h, "Hue Jitter");
         let t = Tokens::get(&h.ctx);
@@ -142,7 +142,7 @@ fn transfer_mixer_harness(kind: theme::AppTheme, tool: Tool) -> Harness<'static,
 #[test]
 fn transfer_mixer_controls_follow_the_tool_and_section_in_every_theme() {
     for kind in theme::AppTheme::all() {
-        let mut h = transfer_mixer_harness(kind, Tool::Brush);
+        let mut h = transfer_mixer_harness(kind.clone(), Tool::Brush);
         let before = h.state().brush.clone();
         for tool in Tool::ALL {
             h.state_mut().tool = tool;
@@ -346,7 +346,7 @@ fn spacing_row_has_one_label_and_a_shared_header_in_every_theme() {
         for enabled in [false, true] {
             let b = BrushSettings { spacing: 0.427, spacing_enabled: enabled, ..Default::default() };
             let mut h = section_harness(0, b.clone());
-            crate::PhotocraftApp::setup_context(&h.ctx, kind);
+            crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(3);
             assert_eq!(h.query_all_by_role_and_label(Role::Label, "Spacing").count(), 0, "{kind:?}: the checkbox is the single label");
             assert_eq!(h.query_all_by_role_and_label(Role::CheckBox, "Spacing").count(), 1);
@@ -371,7 +371,7 @@ fn check_scatter_header(section: usize) {
             b.dual_brush.scatter = 2.137;
             b.dual_brush.both_axes = both_axes;
             let mut h = section_harness(section, b.clone());
-            crate::PhotocraftApp::setup_context(&h.ctx, kind);
+            crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(3);
             let label = caption_rect(&h, "Scatter");
             let axes = h.get_by_label("Both Axes").rect();
@@ -521,7 +521,7 @@ fn tip_geometry_fields_precede_the_widget_and_labels_align_in_all_themes() {
         for width in [280.0, 340.0] {
             let b = BrushSettings { angle: -23.0, roundness: 0.473, ..Default::default() };
             let mut h = section_harness_width(0, width, b.clone());
-            crate::PhotocraftApp::setup_context(&h.ctx, kind);
+            crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(3);
             let centre = tip_geometry_center(&h);
             let angle = h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(-23.0)).unwrap().rect();

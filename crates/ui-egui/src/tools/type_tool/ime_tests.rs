@@ -1270,7 +1270,7 @@ fn a_recreated_context_installed_before_run_ui_rejects_the_old_completion_and_re
     // The host replaces its Context and must run the same supported setup before `run_ui`;
     // a begin-pass hook registered later could not mark the first pass.
     let next = egui::Context::default();
-    PhotocraftApp::setup_context(&next, app.ui.theme);
+    PhotocraftApp::setup_context(&next, app.ui.theme.clone());
     let mut frame = eframe::Frame::_new_kittest();
     let mut saw_ui_pass = false;
     let mut output = next.run_ui(

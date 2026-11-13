@@ -59,7 +59,7 @@ fn translated_labels_stay_inside_the_dialog() {
     let cases = cases(&mut app);
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    crate::theme::apply(&ctx, crate::theme::AppTheme::pro());
+    crate::theme::apply(&ctx, &crate::theme::AppTheme::pro());
     let mut failures = Vec::new();
     for ppp in [1.0, 2.0] {
         ctx.set_pixels_per_point(ppp);

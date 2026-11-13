@@ -380,7 +380,7 @@ mod tests {
         assert!(icons::exists("trash"), "the stop deletion button has an embedded icon");
         for theme in theme::AppTheme::all() {
             let mut h = Harness::builder().with_size(vec2(260.0, 820.0)).build_ui_state(panel, app());
-            PhotocraftApp::setup_context(&h.ctx, theme);
+            PhotocraftApp::setup_context(&h.ctx, theme.clone());
             h.run_steps(3);
             for (_, name) in STYLES {
                 let rect = h.get_by_label(name).rect();

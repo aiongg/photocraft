@@ -59,7 +59,7 @@ fn no_documents_with_auto_show_draws_only_the_home_content() {
 #[test]
 fn toggling_home_swaps_the_chrome_and_keeps_the_panel_prefs() {
     for theme in AppTheme::all() {
-        let mut h = app(theme, true, true);
+        let mut h = app(theme.clone(), true, true);
         let panels = h.state().ui.panels.clone();
         assert!(chrome_shown(&h, &format!("{theme:?}, document open, before Home")), "{theme:?}: chrome with a document");
         assert_eq!(bars_shown(&h), (true, true), "{theme:?}: options bar and status bar with a document");

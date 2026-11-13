@@ -53,7 +53,7 @@ fn pick_at(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, y: f32) -> [f3
 #[test]
 fn every_theme_shows_the_same_spectrum_field() {
     for kind in AppTheme::all() {
-        let mut h = color_tab(kind, None);
+        let mut h = color_tab(kind.clone(), None);
         // Halfway down its 120 pt: no saturation, half brightness.
         let [r, g, b, _] = pick_at(&mut h, 60.0);
         assert!((r - g).abs() < 0.02 && (g - b).abs() < 0.02 && (0.3..0.7).contains(&r), "{kind:?}: the field picks a mid grey, got {r} {g} {b}");
@@ -68,7 +68,7 @@ fn every_theme_shows_the_same_spectrum_field() {
 #[test]
 fn every_theme_stretches_the_field_over_the_group() {
     for kind in AppTheme::all() {
-        let mut h = color_tab(kind, Some(380.0));
+        let mut h = color_tab(kind.clone(), Some(380.0));
         // Far below a 120 pt field: only a stretched one picks here, and a dark grey.
         let [r, g, b, _] = pick_at(&mut h, 300.0);
         assert!((r - g).abs() < 0.02 && (g - b).abs() < 0.02 && r < 0.25, "{kind:?}: the stretched field picks a dark grey, got {r} {g} {b}");

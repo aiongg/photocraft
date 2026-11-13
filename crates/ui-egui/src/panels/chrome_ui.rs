@@ -350,10 +350,11 @@ mod tests {
     fn status_bar_says_when_layers_dont_fit_gpu_memory() {
         use egui_kittest::{Harness, kittest::Queryable};
         for theme in [crate::theme::AppTheme::pro(), crate::theme::AppTheme::studio()] {
+            let ctx_theme = theme.clone();
             let mut h = Harness::builder().with_size(vec2(1200.0, 700.0)).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
+                PhotocraftApp::setup_context(&cc.egui_ctx, ctx_theme.clone());
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-                app.ui.theme = theme;
+                app.ui.theme = ctx_theme;
                 app
             });
             h.state_mut().run("file.new", json!({"width": 800, "height": 600})).unwrap();

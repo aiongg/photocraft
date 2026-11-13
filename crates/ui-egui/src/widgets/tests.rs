@@ -230,7 +230,7 @@ fn section_labels_keep_glyph_bearings_inside_the_panel() {
 fn column_label_stays_inside_its_column() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
-    crate::theme::apply(&ctx, crate::theme::AppTheme::pro());
+    crate::theme::apply(&ctx, &crate::theme::AppTheme::pro());
     // German "Canvas extension color": far wider than any column here.
     let long = "Farbe der Zeichenflächenerweiterung:";
     let mut col = egui::Rect::NOTHING;
@@ -754,7 +754,7 @@ fn value_field_digits_ink_is_centred_and_level_with_the_unit() {
             },
             (100.0, egui::Rect::NOTHING),
         );
-        crate::PhotocraftApp::setup_context(&h.ctx, kind);
+        crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.run_steps(3);
         let image = h.render().expect("render value field");
         let (field, suffix_left) = (h.state().1, h.state().1.right() - 14.0);
@@ -1721,7 +1721,7 @@ fn dropdown_list_keeps_its_width_while_scrolling() {
         BlendMode::Normal,
     );
     // The app's theme strokes plain rows, which is what made hovered rows wider.
-    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
+    crate::theme::apply(&h.ctx, &crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run();
@@ -1753,7 +1753,7 @@ fn open_blend_modes(height: f32, down: f32) -> Harness<'static, photocraft_color
         },
         BlendMode::Normal,
     );
-    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
+    crate::theme::apply(&h.ctx, &crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run_steps(4);
@@ -2131,7 +2131,7 @@ fn open_grouped_modes(starts_group: fn(&usize) -> bool) -> (egui::Rect, Vec<egui
         },
         0,
     );
-    crate::theme::apply(&h.ctx, crate::theme::AppTheme::pro_medium());
+    crate::theme::apply(&h.ctx, &crate::theme::AppTheme::pro_medium());
     h.run();
     h.get_by_role(egui::accesskit::Role::ComboBox).click();
     h.run_steps(4);

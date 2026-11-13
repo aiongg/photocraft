@@ -1421,7 +1421,7 @@ mod toolbar_tests {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&h.ctx, theme);
+            PhotocraftApp::setup_context(&h.ctx, theme.clone());
             h.run_steps(2);
             let left = |h: &egui_kittest::Harness<'_, PhotocraftApp>| h.ctx.data(|d| d.get_temp::<f32>(egui::Id::unique("toolbar-test-left"))).unwrap_or(0.0);
             let single = left(&h);
@@ -1452,7 +1452,7 @@ mod toolbar_tests {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&h.ctx, kind);
+            PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(2);
             for label in ["Edit Toolbar…", "Edit in Quick Mask Mode  (Q)", "Change Screen Mode  (F)"] {
                 assert!(h.query_by_label(label).is_some(), "{kind:?}: no {label:?} button");
@@ -1474,7 +1474,7 @@ mod toolbar_tests {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&h.ctx, theme);
+            PhotocraftApp::setup_context(&h.ctx, theme.clone());
             h.run_steps(2);
             let modes = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
                 (h.get_by_label("Edit in Quick Mask Mode  (Q)").rect(), h.get_by_label("Change Screen Mode  (F)").rect())

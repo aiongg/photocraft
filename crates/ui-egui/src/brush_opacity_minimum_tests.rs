@@ -64,7 +64,7 @@ fn the_brush_opacity_field_takes_whole_numbers_from_1_to_100() {
     use crate::theme::AppTheme;
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         for tool in [Tool::Brush, Tool::Pencil, Tool::Eraser] {
-            let mut h = options_bar(tool, theme);
+            let mut h = options_bar(tool, theme.clone());
             for (typed, want) in [("0", 0.01), ("-10", 0.01), ("150", 1.0), ("45", 0.45), ("33.7", 0.34)] {
                 let got = type_opacity(&mut h, typed);
                 assert!((got - want).abs() < 1e-6, "{theme:?} {tool:?} typed {typed}: {got}, want {want}");

@@ -25,7 +25,7 @@ fn bar(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
 #[test]
 fn auto_erase_has_the_reference_tooltip() {
     for theme in [AppTheme::pro_medium(), AppTheme::classic()] {
-        let mut h = bar(theme);
+        let mut h = bar(theme.clone());
         // Hovering the checkbox's label shows it.
         h.get_by_label("Auto Erase").hover();
         h.run_steps(60);

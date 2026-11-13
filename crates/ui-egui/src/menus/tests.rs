@@ -437,7 +437,7 @@ fn dropdown_items_have_room() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&harness.ctx, theme);
+        PhotocraftApp::setup_context(&harness.ctx, theme.clone());
         harness.run_steps(3);
         harness.get_by_label("File").click();
         harness.run_steps(3);

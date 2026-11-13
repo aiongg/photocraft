@@ -143,7 +143,7 @@ fn every_theme_shows_the_auto_select_toggle() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.run_steps(4);
         assert!(h.state().ui.tool_options.move_auto_select);
         h.get_by_role_and_label(egui::accesskit::Role::CheckBox, "Auto-Select:").click();
@@ -169,7 +169,7 @@ fn every_theme_shows_the_transform_controls_toggle() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.run_steps(4);
         let before = h.state().ui.tool_options.move_show_transform;
         h.get_by_label("Show Transform Controls").click();
@@ -198,7 +198,7 @@ fn every_theme_shows_the_type_options() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.run_steps(4);
         let fields: Vec<String> = h
             .query_all_by_role(egui::accesskit::Role::TextInput)
@@ -229,7 +229,7 @@ fn every_theme_shows_the_gradient_options() {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, theme);
+        PhotocraftApp::setup_context(&h.ctx, theme.clone());
         h.run_steps(4);
         let combos: Vec<String> = h
             .query_all_by_role(egui::accesskit::Role::ComboBox)

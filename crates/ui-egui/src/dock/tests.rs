@@ -90,7 +90,7 @@ fn drag(h: &mut Harness<'static, PhotocraftApp>, from: Pos2, to: Pos2) {
 fn switching_layer_kinds_keeps_the_layers_panel_still() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, pixel, adj) = app_with_layers();
-        let mut h = harness(app, vec2(1200.0, 800.0), theme);
+        let mut h = harness(app, vec2(1200.0, 800.0), theme.clone());
         assert!(probe::panel_rect(&h.ctx, "layers").is_some(), "{theme:?}: Layers drawn");
         let with_adj = drawn(&h);
         h.state_mut().run("layer.select", json!({"layer": pixel.0})).unwrap();
@@ -367,7 +367,7 @@ fn panel_tab_context_menu_closes_one_tab_or_its_group() {
         let names = g.tabs(pro);
         let ids: Vec<&str> = (0..names.len()).map(|i| panel_id(g, i, pro)).collect();
         let (app, _, _) = app_with_layers();
-        let mut h = harness(app, vec2(1300.0, 850.0), theme);
+        let mut h = harness(app, vec2(1300.0, 850.0), theme.clone());
         // Close the first tab: the group stays, showing (and selecting) the next one.
         right_click_tab(&mut h, ids[0]);
         h.get_by_label("Close Panel").click();
@@ -752,7 +752,7 @@ fn tab_order_is_by_name_and_bad_saved_orders_fall_back() {
 fn dragging_a_tab_reorders_the_group_and_the_order_persists() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, _, _) = app_with_layers();
-        let mut h = harness(app, vec2(1200.0, 800.0), theme);
+        let mut h = harness(app, vec2(1200.0, 800.0), theme.clone());
         let tab = |h: &Harness<'static, PhotocraftApp>, panel: &str| probe::tab_rect(&h.ctx, panel).unwrap_or_else(|| panic!("{panel} tab drawn"));
         let others = |h: &Harness<'static, PhotocraftApp>| probe::group_of(h.state(), "color");
         let color = others(&h);

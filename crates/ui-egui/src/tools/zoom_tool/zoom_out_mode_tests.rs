@@ -236,7 +236,7 @@ fn options_bar() -> Harness<'static, PhotocraftApp> {
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 crate::theme::install_fonts(ui.ctx());
-                crate::theme::apply(ui.ctx(), crate::theme::AppTheme::pro());
+                crate::theme::apply(ui.ctx(), &crate::theme::AppTheme::pro());
                 ready = true;
                 return;
             }

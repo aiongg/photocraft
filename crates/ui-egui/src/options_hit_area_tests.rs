@@ -219,7 +219,7 @@ fn options_tab_moves_from_opacity_to_flow_without_a_caption_stop() {
 fn options_bar_has_a_single_full_width_border() {
     for kind in [crate::theme::AppTheme::studio(), crate::theme::AppTheme::pro(), crate::theme::AppTheme::classic()] {
         let mut h = harness();
-        PhotocraftApp::setup_context(&h.ctx, kind);
+        PhotocraftApp::setup_context(&h.ctx, kind.clone());
         h.run_steps(4);
         let separator = crate::theme::Tokens::get(&h.ctx).separator;
         let borders: Vec<_> = h
