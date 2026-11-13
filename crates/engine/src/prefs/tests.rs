@@ -137,12 +137,12 @@ fn a_saved_serbian_language_migrates_to_sr_latn() {
 
 #[test]
 fn legacy_theme_migration_preserves_saved_theme_slots() {
-    for (legacy, slot, saved) in [("proMedium", "darkTheme", "solarizedDark"), ("studioLight", "lightTheme", "adwaita")] {
+    for (legacy, slot, saved, id) in [("proMedium", "darkTheme", "solarizedDark", "craft.solarized-dark"), ("studioLight", "lightTheme", "adwaita", "craft.adwaita")] {
         let mut interface = json!({"theme": legacy});
         interface[slot] = json!(saved);
         let mut session = Session::new();
         session.load_prefs_json(&json!({"interface": interface}).to_string()).unwrap();
-        assert_eq!(session.prefs_value()["interface"][slot], saved, "explicit {slot} survives migration");
+        assert_eq!(session.prefs_value()["interface"][slot], id, "explicit {slot} survives migration");
     }
 }
 

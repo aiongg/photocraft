@@ -398,16 +398,21 @@ impl Interface {
         }
     }
 
-    /// The pre-id single-theme preference (`interface.theme`): a theme name puts its theme in the
-    /// slot of its mode, which becomes the appearance mode.
+    /// The single-theme preference (`interface.theme`): a theme name or id puts its theme in the
+    /// slot of its mode. A name that says a mode also becomes the appearance mode; an id (what
+    /// `prefs.get` returns) goes in the slot the appearance mode shows and leaves the mode alone.
     fn set_legacy_theme(&mut self, value: &Value) -> std::result::Result<(), String> {
-        let (id, dark) = value.as_str().and_then(theme_ids::alias).ok_or_else(|| format!("unknown theme `{value}`"))?;
+        let (id, dark) = value.as_str().and_then(theme_ids::parse).ok_or_else(|| format!("unknown theme `{value}`"))?;
+        let id = id.to_string();
+        let dark = dark.unwrap_or(self.appearance_mode != AppearanceMode::Light);
         if dark {
-            self.dark_theme = id.into();
+            self.dark_theme = id;
         } else {
-            self.light_theme = id.into();
+            self.light_theme = id;
         }
-        self.appearance_mode = if dark { AppearanceMode::Dark } else { AppearanceMode::Light };
+        if value.as_str().is_some_and(|name| theme_ids::alias(name).is_some()) {
+            self.appearance_mode = if dark { AppearanceMode::Dark } else { AppearanceMode::Light };
+        }
         Ok(())
     }
 }
