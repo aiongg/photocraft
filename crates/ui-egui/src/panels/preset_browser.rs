@@ -4,9 +4,12 @@
 
 use craft::ui::contract::{Bind, DropZone, Show as _};
 use craft::ui::list::ThumbAspect;
+use craft::ui::menu::PanelRow;
 use craft::ui::patterns::presets::{
-    DefaultOpen, PresetBrowser, PresetEvent, PresetFooterEvent, PresetFooterOptions, PresetPicker, PresetReorder, PresetRow, PresetState,
+    DefaultOpen, PresetBrowser, PresetCommands, PresetEvent, PresetExport, PresetFileRequest, PresetFiles, PresetFooterEvent, PresetFooterOptions,
+    PresetMenuAction, PresetPanelMenu, PresetPicker, PresetReorder, PresetRow, PresetState, PresetView,
 };
+use craft::ui::runtime::commands::CommandSet as _;
 use craft::ui::primitives::ContentPainterCx;
 use craft::ui::primitives::textures::TextureCache;
 use craft::ui::tile_grid::TileZoom;
@@ -197,10 +200,7 @@ const STYLES_HEIGHT: f32 = 300.0;
 /// applies it to the active layer.
 pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let groups = app.session.presets.styles.clone();
-    let folders: Vec<Folder> = groups
-        .iter()
-        .map(|group| Folder { name: group.name.clone(), items: group.items.iter().map(|style| (style.name.clone(), style.name.clone())).collect() })
-        .collect();
+    let folders = style_folders(app);
     let zone = canvas_zone(app);
     let session = &app.session;
     let thumb = |cx: &ContentPainterCx, rect: Rect, name: &str| {
@@ -215,6 +215,114 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The floating window sizes to its content.
     let (events, rows) = show(&mut app.ui.presets_ui, zone, ui, STYLES, &folders, &thumb, Some(STYLES_HEIGHT));
     apply(app, ui.ctx(), STYLES, &names_of(&folders), &rows, events);
+}
+
+/// The Styles folders: each style group with its styles, keyed and named by the style's name.
+fn style_folders(app: &PhotocraftApp) -> Vec<Folder> {
+    let groups = &app.session.presets.styles;
+    groups.iter().map(|group| Folder { name: group.name.clone(), items: group.items.iter().map(|style| (style.name.clone(), style.name.clone())).collect() }).collect()
+}
+
+/// The pick purpose of the style library files, which keeps their last folder.
+const STYLE_FILES: &str = "styles";
+
+/// The Styles files: Load… reads a style library (`.asl`); Save… writes `export`, offered while there are styles.
+fn style_files(any: bool, export: Option<PresetExport>) -> PresetFiles<'static, PresetKey> {
+    PresetFiles::new(STYLE_FILES, tl!("Style Library"), &["asl"]).export(move |_| export.clone()).can_export(move |_| any)
+}
+
+/// The Styles panel menu ("…"), drawn by PhotoCraft as the dock's menus still are: the rows, checks and actions of
+/// `PresetPanelMenu`. Save… writes the selected style, else every style.
+pub(crate) fn styles_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    let any = app.session.presets.styles.iter().any(|group| !group.items.is_empty());
+    let selected = app.ui.presets_ui.selected.get(STYLES.id).cloned().map(PresetKey::Item);
+    let view = app.ui.presets_ui.browsers.get(STYLES.id).map_or(PresetView::Grid, |state| state.view);
+    let files = style_files(any, None);
+    let menu = PresetPanelMenu::new(view).new_group(true).files(&files).selected(selected.as_ref());
+    let defs = PresetCommands::defs().unwrap_or_default();
+    let mut picked = None;
+    for row in menu.rows() {
+        let PanelRow::Command(command) = row else {
+            ui.separator();
+            continue;
+        };
+        let Some(id) = PresetCommands::from_ref(&command) else { continue };
+        let label = defs.iter().find(|def| def.command == command).map_or("", |def| def.label.as_str());
+        let text = match menu.checked(id) {
+            Some(on) => format!("{}{}", if on { "✔ " } else { "   " }, tl!(label)),
+            None => tl!(label).to_string(),
+        };
+        if ui.add_enabled(menu.enabled(id), egui::Button::new(text)).clicked() {
+            picked = Some(id);
+            ui.close();
+        }
+    }
+    let Some(command) = picked else { return };
+    let action = match command {
+        PresetCommands::Save => export_styles(app, selected.as_ref()).and_then(|(export, count)| {
+            style_files(any, Some(export)).request(PresetCommands::Save, selected.as_ref()).map(|request| (PresetMenuAction::File(request), count))
+        }),
+        command => menu.run_command(command).map(|action| (action, 0)),
+    };
+    let Some((action, count)) = action else { return };
+    let result = match action {
+        PresetMenuAction::View(view) => {
+            app.ui.presets_ui.browsers.entry(STYLES.id.to_string()).or_insert_with(PresetState::new).view = view;
+            Ok(Value::Null)
+        }
+        PresetMenuAction::NewGroup => {
+            let names = names_of(&style_folders(app));
+            apply(app, ui.ctx(), STYLES, &names, &[], vec![PresetEvent::Footer(PresetFooterEvent::NewGroup)]);
+            Ok(Value::Null)
+        }
+        PresetMenuAction::File(request) => style_file(app, request, count),
+        _ => Ok(Value::Null),
+    };
+    if let Err(error) = result
+        && error != "cancelled"
+    {
+        app.ui.status = error;
+        app.ui.status_error = true;
+    }
+}
+
+/// The `.asl` of the `selected` style, else of every style, through `style.presets.exportAsl`, suggested as the
+/// style's name (or "Styles") without path-illegal characters; with the number of styles it holds.
+fn export_styles(app: &mut PhotocraftApp, selected: Option<&PresetKey>) -> Option<(PresetExport, u64)> {
+    let name = match selected {
+        Some(PresetKey::Item(name)) => Some(name.as_str()),
+        _ => None,
+    };
+    let reply = run(app, "style.presets.exportAsl", name.map_or_else(|| json!({}), |name| json!({"styles": [name]})))?;
+    let bytes = reply["data"].as_str().and_then(photocraft_engine::paint::tile::b64_decode)?;
+    let stem: String = name.unwrap_or("Styles").chars().filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')).collect();
+    let stem = if stem.trim().is_empty() { "Styles" } else { stem.trim() };
+    Some((PresetExport::new(format!("{stem}.asl"), bytes), reply["count"].as_u64().unwrap_or(0)))
+}
+
+/// Runs a Styles file request: Load… imports the picked style library, Save… writes the export (`count` styles) where
+/// the user picks.
+fn style_file(app: &mut PhotocraftApp, request: PresetFileRequest, count: u64) -> Result<Value, String> {
+    match request {
+        PresetFileRequest::Open { extensions, .. } => {
+            let extensions: Vec<&str> = extensions.iter().map(String::as_str).collect();
+            app.pick_file_bytes_filtered(&extensions, |app, name, bytes| match crate::preset_files_ui::open(app, &name, &bytes) {
+                Some(result) => result.map(|()| Value::Null),
+                None => Err(crate::i18n::fmt(tl!("{file} is not a style library (.asl)"), &[("file", &crate::file_open::display_name(&name))])),
+            })
+        }
+        PresetFileRequest::Save { file_name, bytes, .. } => app.pick_save(&file_name, move |app, path| {
+            let write = app.services.write.as_mut().ok_or("no writer configured")?;
+            write(&path, &bytes)?;
+            app.ui.status_error = false;
+            app.ui.status = crate::i18n::fmt(
+                &crate::i18n::trn(crate::i18n::current(), count, "Exported {n} style to {file}", "Exported {n} styles to {file}"),
+                &[("file", &crate::file_open::display_name(&path))],
+            );
+            Ok(json!({"path": path, "count": count}))
+        }),
+        _ => Ok(Value::Null),
+    }
 }
 
 fn names_of(folders: &[Folder]) -> Vec<String> {
