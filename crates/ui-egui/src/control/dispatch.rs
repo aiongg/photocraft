@@ -304,8 +304,8 @@ impl UiSet {
 /// ids (`proMedium`, `Pro (Medium Gray)`, `gnome`, ...), shown in its own mode.
 fn theme_param(app: &PhotocraftApp, p: &Value) -> std::result::Result<Option<(craft::theme::ThemeId, bool)>, String> {
     let Some(name) = str_param(p, "theme") else { return Ok(None) };
-    let (id, dark) =
-        photocraft_engine::prefs::theme_ids::parse(name).filter(|(id, _)| app.framework.has_theme(id)).ok_or_else(|| format!("unknown theme `{name}`"))?;
+    let (id, dark) = photocraft_engine::prefs::theme_ids::parse(name).ok_or_else(|| format!("unknown theme `{name}`"))?;
+    app.framework.check_theme(&id)?;
     Ok(Some((id, dark.unwrap_or(app.ui.theme.is_dark()))))
 }
 

@@ -137,7 +137,9 @@ fn a_saved_serbian_language_migrates_to_sr_latn() {
 
 #[test]
 fn legacy_theme_migration_preserves_saved_theme_slots() {
-    for (legacy, slot, saved, id) in [("proMedium", "darkTheme", "solarizedDark", "craft.solarized-dark"), ("studioLight", "lightTheme", "adwaita", "craft.adwaita")] {
+    for (legacy, slot, saved, id) in
+        [("proMedium", "darkTheme", "solarizedDark", "craft.solarized-dark"), ("studioLight", "lightTheme", "adwaita", "craft.adwaita")]
+    {
         let mut interface = json!({"theme": legacy});
         interface[slot] = json!(saved);
         let mut session = Session::new();
@@ -202,6 +204,18 @@ fn pre_id_theme_names_read_as_ids_where_they_were_saved() {
     assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.artcraft"));
     s.execute("prefs.set", json!({"path": "interface.appearanceMode", "value": "light"})).unwrap();
     assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.adwaita"));
+}
+
+#[test]
+fn writing_back_the_got_interface_keeps_a_slot_edit() {
+    for root in [false, true] {
+        let mut s = Session::new();
+        let mut interface = s.execute("prefs.get", json!({"path": "interface"})).unwrap();
+        interface["darkTheme"] = json!("craft.breeze");
+        let set = if root { json!({"path": "", "value": {"interface": interface}}) } else { json!({"path": "interface", "value": interface}) };
+        s.execute("prefs.set", set).unwrap();
+        assert_eq!(s.prefs().interface.dark_theme, "craft.breeze", "root object: {root}");
+    }
 }
 
 #[test]

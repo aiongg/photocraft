@@ -415,6 +415,13 @@ impl Interface {
         }
         Ok(())
     }
+
+    /// Whether `interface.theme` inside a section or root object asks for a change. Clients write
+    /// back the section `prefs.get` returned, theme included; applying that unchanged theme after
+    /// the slots would undo a slot edit made in the same object.
+    fn section_theme_changes(&self, value: &Value) -> bool {
+        value.as_str() != Some(self.shown_theme())
+    }
 }
 
 impl Default for Interface {
@@ -1503,7 +1510,8 @@ impl Preferences {
         }
         // The pre-id single-theme preference inside the section object, applied after the rest of it.
         let mut value = value;
-        let legacy_theme = if path == "interface" { value.as_object_mut().and_then(|interface| interface.remove("theme")) } else { None };
+        let legacy_theme = if path == "interface" { value.as_object_mut().and_then(|interface| interface.remove("theme")) } else { None }
+            .filter(|theme| self.interface.section_theme_changes(theme));
         check_value(path, &value)?;
         let mut root = self.to_json();
         set_path(&mut root, path, value)?;
@@ -1763,6 +1771,8 @@ impl Session {
         if path.is_empty() || SECTIONS.iter().any(|(id, _)| *id == path) || matches!(path, "shortcuts" | "alternateShortcuts" | "menus" | "toolbar") {
             // Whole section (or everything): merge the object key by key so each value is checked.
             let obj = value.as_object().ok_or_else(|| format!("`{path}` needs an object"))?;
+            let current = self.prefs().interface.clone();
+            let applies = |p: &str, v: &Value| p != "interface.theme" || current.section_theme_changes(v);
             for (k, v) in obj {
                 let p = if path.is_empty() { k.clone() } else { format!("{path}.{k}") };
                 if path.is_empty() && k == "colorSettings" {
@@ -1776,9 +1786,12 @@ impl Session {
                     && next.get(&p).is_some_and(|c| c.is_object())
                 {
                     for (k2, v2) in v.as_object().into_iter().flatten() {
-                        next.set(&format!("{p}.{k2}"), v2.clone())?;
+                        let p2 = format!("{p}.{k2}");
+                        if applies(&p2, v2) {
+                            next.set(&p2, v2.clone())?;
+                        }
                     }
-                } else {
+                } else if applies(&p, v) {
                     next.set(&p, v.clone())?;
                 }
             }

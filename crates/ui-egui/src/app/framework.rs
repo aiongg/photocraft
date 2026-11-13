@@ -14,7 +14,7 @@ use craft::host::target::{Backend, ShellInfo};
 use craft::host::{AppInfo, Host, SectionStore};
 use craft::i18n::Direction;
 use craft::keymap::Overrides;
-use craft::theme::{AppDefaults, AppSizes, ModeChoice, Size, SuiteChoice, ThemeDef, ThemeId, ThemePair, resolve_sized};
+use craft::theme::{AppDefaults, AppSizes, ModeChoice, Size, SuiteChoice, ThemeId, ThemePair, resolve_sized};
 use craft::theme_store::{SelectionChange, SuiteClient};
 use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
@@ -64,9 +64,6 @@ pub struct Framework {
     /// Whether the start's agreement ran: the suite's chosen fields over the preferences, once the
     /// suite's selection is read.
     started: bool,
-    /// The definition of the library theme on screen, which the runtime resolves its tokens from;
-    /// `None` while a theme PhotoCraft has a palette for shows.
-    library: Option<Arc<ThemeDef>>,
 }
 
 /// The preferences that choose the theme: the appearance mode and the theme id of each slot.
@@ -154,7 +151,6 @@ impl Default for Framework {
             suite: SuiteClient::memory(),
             synced: None,
             started: false,
-            library: None,
         }
     }
 }
@@ -181,7 +177,7 @@ impl Framework {
             self.host = Arc::new(build_host(&self.sections, lang));
         }
         let rtl = i18n::framework_i18n().from_code(lang).is_some_and(|l| i18n::framework_i18n().rtl(l));
-        let root = match &self.library {
+        let root = match theme.library() {
             Some(def) => base_root().library_theme(Arc::clone(def)),
             None => base_root().theme(theme.id().clone()),
         };
@@ -263,22 +259,24 @@ impl Framework {
     /// The theme `id` to show in the dark or light mode: PhotoCraft's palette for it, else its
     /// tokens resolved from the suite's definition under the root's contrast, size and sizes, as
     /// the runtime resolves its own. A theme the suite doesn't know shows as the default theme.
-    /// The definition becomes the runtime's library theme.
-    pub(crate) fn theme_for(&mut self, id: &ThemeId, dark: bool, ctx: &egui::Context) -> AppTheme {
-        self.library = None;
+    pub(crate) fn theme_for(&self, id: &ThemeId, dark: bool, ctx: &egui::Context) -> AppTheme {
         if let Some(theme) = AppTheme::palette(id, dark) {
             return theme;
         }
         let Some(def) = self.suite.theme(id) else { return AppTheme::default() };
         let root = base_root().mode(if dark { ModeChoice::Dark } else { ModeChoice::Light });
-        let theme = AppTheme::resolved(id, dark, &resolve_sized(&def, root.appearance(ctx), None, &root.sizes));
-        self.library = Some(Arc::new(def));
-        theme
+        let resolved = resolve_sized(&def, root.appearance(ctx), None, &root.sizes);
+        AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
-    /// Whether the suite has theme `id`: a built-in or a library theme it has loaded.
-    pub(crate) fn has_theme(&self, id: &ThemeId) -> bool {
-        self.suite.theme(id).is_some()
+    /// Whether theme `id` can show: the suite has it as a built-in or a loaded library theme.
+    /// A library theme picked for the suite and not loaded yet is refused as still loading.
+    pub(crate) fn check_theme(&self, id: &ThemeId) -> Result<(), String> {
+        match self.suite.theme(id) {
+            Some(_) => Ok(()),
+            None if self.suite.is_loading(id) => Err(format!("theme `{id}` is still loading")),
+            None => Err(format!("unknown theme `{id}`")),
+        }
     }
 
     /// The name of theme `id` for a menu: PhotoCraft's own name for its palettes, else the suite's.
