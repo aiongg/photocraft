@@ -168,7 +168,7 @@ impl RasterSource for PhotoComposite<'_> {
         let f = i32::try_from(factor).unwrap_or(i32::MAX);
         let b = self.doc.bounds();
         // Whole texels of `region`'s grid that lie past the document's start are left as they are.
-        let skip = |start: i32, lo: i32| if start >= lo { 0 } else { (lo - start).div_ceil(f) };
+        let skip = |start: i32, lo: i32| if start >= lo { 0 } else { (lo - start + f - 1) / f };
         let (tx, ty) = (skip(region.x0, b.x0), skip(region.y0, b.y0));
         let area = DRect::new(region.x0 + tx * f, region.y0 + ty * f, region.x1.min(b.x1), region.y1.min(b.y1));
         if area.is_empty() {

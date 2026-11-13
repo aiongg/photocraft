@@ -9,8 +9,8 @@ fn app_with(width: u32, height: u32, background: &str) -> PhotocraftApp {
 }
 
 fn read(source: &PhotoComposite<'_>, region: PixelRect, factor: u32) -> ColorImage {
-    let f = factor as i32;
-    let size = [region.width().div_ceil(f) as usize, region.height().div_ceil(f) as usize];
+    let texels = |n: i32| (n as u32).div_ceil(factor) as usize;
+    let size = [texels(region.width()), texels(region.height())];
     let mut out = ColorImage::filled(size, Color32::TRANSPARENT);
     source.read(region, factor, &mut out);
     out
