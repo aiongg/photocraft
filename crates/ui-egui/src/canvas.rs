@@ -95,7 +95,9 @@ pub(crate) use drag::{marquee_drag_ants, marquee_preview_px};
 pub(crate) use filter_preview::committed_filter_preview;
 #[cfg(test)]
 use filter_preview::filter_preview_display_doc;
-pub(crate) use filter_preview::{ensure_filter_preview, filter_channel_preview, filter_preview_factor};
+#[cfg(test)]
+pub(crate) use filter_preview::ensure_filter_preview;
+pub(crate) use filter_preview::{filter_channel_preview, filter_preview_factor};
 #[cfg(test)]
 pub(crate) use gesture::constrained_polygon_point;
 pub use gesture::{commit_crop, commit_polygon, polygon_cancel_stale, polygon_replaces_selection, polygon_retract};
