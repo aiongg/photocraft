@@ -1395,6 +1395,35 @@ fn ui_set_theme_picks_a_library_theme_the_suite_has_not_loaded() {
     assert!(app.ui.theme.is_dark());
 }
 
+/// A slot naming a theme the suite doesn't know (a deleted library theme) shows the mode's
+/// default, and once settled a frame resolves nothing.
+#[test]
+fn an_unknown_slot_theme_shows_the_mode_default_without_resolving_each_frame() {
+    use std::sync::atomic::Ordering;
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    let frame = |app: &mut PhotocraftApp| {
+        let changed = app.framework.sync_theme(&mut app.session);
+        if changed {
+            crate::prefs_ui::show_selected_theme(app, &ctx);
+        }
+        crate::prefs_ui::sync_appearance(app, &ctx);
+        changed
+    };
+    assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": "craft.pro"}))["ok"], true);
+    assert_eq!(app.ui.theme, crate::theme::AppTheme::pro());
+    app.run("prefs.set", json!({"values": {"interface.darkTheme": "user.deleted"}})).unwrap();
+    for _ in 0..10 {
+        if !frame(&mut app) {
+            break;
+        }
+    }
+    assert_eq!(app.ui.theme, crate::theme::AppTheme::pro_medium(), "the dark mode's default");
+    let resolves = app.framework.theme_resolves.load(Ordering::Relaxed);
+    assert!(!frame(&mut app));
+    assert_eq!(app.framework.theme_resolves.load(Ordering::Relaxed), resolves, "a settled frame resolves nothing");
+}
+
 #[test]
 fn ui_window_open_rejects_an_unknown_document_index() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

@@ -159,13 +159,16 @@ pub(super) fn sync_tooltips(app: &PhotocraftApp, ctx: &egui::Context) {
 }
 
 /// Shows the theme the saved appearance mode and slots select, without changing them, when it
-/// isn't the one on screen. Runs every frame, so it only compares the slot's id and the mode.
+/// isn't the one on screen. Runs every frame, so it only compares the slot's id and the mode; a
+/// slot the suite can't resolve, shown as the mode's default, resolves again only when
+/// `Framework::sync_theme` reports a change.
 pub(crate) fn sync_appearance(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A restored or embedding-supplied pin must not suppress native appearance events.
     ctx.set_theme(egui::ThemePreference::System);
     // The native service also covers Wayland sessions where winit has no system theme.
     let (slot, dark) = selected_slot(&app.session.prefs().interface, system_theme(app, ctx));
-    if slot == app.ui.theme.id().as_str() && dark == app.ui.theme.is_dark() {
+    let shown = &app.ui.theme;
+    if dark == shown.is_dark() && (slot == shown.id().as_str() || app.framework.shows_fallback_for(slot, shown)) {
         return;
     }
     show_selected_theme(app, ctx);
