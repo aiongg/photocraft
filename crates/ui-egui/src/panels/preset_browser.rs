@@ -250,10 +250,20 @@ pub(crate) fn styles_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             continue;
         };
         let Some(id) = PresetCommands::from_ref(&command) else { continue };
-        let label = defs.iter().find(|def| def.command == command).map_or("", |def| def.label.as_str());
+        // Literal at the call, so the catalog extraction (`tl!("…")`) finds them; a command added later shows the
+        // framework's English label until it is listed here.
+        let label = match id {
+            PresetCommands::GridView => tl!("Grid View"),
+            PresetCommands::ListView => tl!("List View"),
+            PresetCommands::NewGroup => tl!("New Group…"),
+            PresetCommands::Load => tl!("Load…"),
+            PresetCommands::Replace => tl!("Replace…"),
+            PresetCommands::Save => tl!("Save…"),
+            _ => defs.iter().find(|def| def.command == command).map_or("", |def| def.label.as_str()),
+        };
         let text = match menu.checked(id) {
-            Some(on) => format!("{}{}", if on { "✔ " } else { "   " }, tl!(label)),
-            None => tl!(label).to_string(),
+            Some(on) => format!("{}{label}", if on { "✔ " } else { "   " }),
+            None => label.to_string(),
         };
         if ui.add_enabled(menu.enabled(id), egui::Button::new(text)).clicked() {
             picked = Some(id);

@@ -1585,7 +1585,15 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
         if !self.collapsed.contains(id) && ui.available_width() >= PANEL_BODY_MIN_WIDTH {
             let pro = crate::theme::Tokens::get(ui.ctx()).pro;
             ui.spacing_mut().item_spacing.y = if pro { 0.0 } else { 6.0 };
-            egui::Frame::NONE.inner_margin(crate::widgets::body_margin(pro)).show(ui, |ui| body(self.app, ui, id));
+            let mut margin = crate::widgets::body_margin(pro);
+            if PANELS
+                .iter()
+                .find(|p| p.0 == id)
+                .is_some_and(|(_, label, group)| group.tabs(pro).iter().position(|name| name == label).is_some_and(|tab| group.footer_to_edge(tab)))
+            {
+                margin.bottom = 0;
+            }
+            egui::Frame::NONE.inner_margin(margin).show(ui, |ui| body(self.app, ui, id));
         }
     }
     fn dock_heights(&self, id: &String) -> Option<DockHeights> {

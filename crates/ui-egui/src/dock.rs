@@ -125,6 +125,12 @@ impl Group {
         matches!((self, tab), (Group::Layers, 0..=2) | (Group::History, 0) | (Group::History, 1) | (Group::Navigator, 0) | (Group::Color, 3))
     }
 
+    /// Tabs whose body is a framework panel with a footer bar (Layers, Patterns). The footer ends at the body's
+    /// bottom edge, as `panel_footer` runs on over the body margin, so the host gives these bodies no bottom margin.
+    pub fn footer_to_edge(self, tab: usize) -> bool {
+        matches!((self, tab), (Group::Layers, 0) | (Group::Color, 3))
+    }
+
     pub(crate) fn tab_mut(self, tabs: &mut DockTabs) -> &mut usize {
         match self {
             Group::Color => &mut tabs.color,

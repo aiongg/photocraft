@@ -52,8 +52,9 @@ pub struct PresetUi {
     /// a list follow it in library order. Saved with the UI state.
     #[serde(rename = "groupOrder", alias = "group_order", deserialize_with = "lenient_group_order", skip_serializing_if = "BTreeMap::is_empty")]
     pub group_order: BTreeMap<String, Vec<String>>,
-    /// The view state of the panels on the framework's preset browser (Patterns, Styles), by panel.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    /// The view state of the panels on the framework's preset browser (Patterns, Styles), by panel. Read leniently
+    /// like `groupOrder`: a panel's entry that no longer parses is dropped, not the whole saved UI state.
+    #[serde(deserialize_with = "lenient_browsers", skip_serializing_if = "BTreeMap::is_empty")]
     pub browsers: BTreeMap<String, craft::ui::patterns::presets::PresetState<super::preset_browser::PresetKey>>,
     /// In-place rename: (panel, preset or "group:<name>", text).
     #[serde(skip)]
@@ -71,6 +72,13 @@ fn lenient_group_order<'de, D: serde::Deserializer<'de>>(d: D) -> Result<BTreeMa
         out.insert(panel.clone(), names.iter().filter_map(Value::as_str).take(MAX_GROUP_ORDER).map(str::to_owned).collect());
     }
     Ok(out)
+}
+
+fn lenient_browsers<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<BTreeMap<String, craft::ui::patterns::presets::PresetState<super::preset_browser::PresetKey>>, D::Error> {
+    let v = Value::deserialize(d)?;
+    Ok(v.as_object().into_iter().flatten().filter_map(|(panel, state)| Some((panel.clone(), serde_json::from_value(state.clone()).ok()?))).collect())
 }
 
 impl PresetUi {
@@ -791,6 +799,15 @@ mod tests {
             let back: PresetUi = serde_json::from_value(json!({"groupOrder": bad})).unwrap();
             assert!(back.group_order.get("swatches").is_none_or(Vec::is_empty), "{bad}");
         }
+        let mut st = PresetUi::default();
+        st.browsers.insert("patterns".into(), Default::default());
+        st.group_order.insert("patterns".into(), vec!["Rocks".into()]);
+        st.selected.insert("patterns".into(), "p1".into());
+        let mut saved = serde_json::to_value(&st).unwrap();
+        saved["browsers"]["styles"] = json!("a state of an older format");
+        let back: PresetUi = serde_json::from_value(saved).unwrap();
+        assert!(back.browsers.contains_key("patterns") && !back.browsers.contains_key("styles"), "only the entry that fails is dropped");
+        assert_eq!((back.group_order, back.selected), (st.group_order, st.selected), "the rest of the state loads");
     }
 
     /// Regression: preset drops mapped the pointer through the raw widget rect, ignoring the
