@@ -16,7 +16,7 @@ use craft::i18n::Direction;
 use craft::keymap::Overrides;
 use craft::theme::{AppDefaults, AppSizes, ModeChoice, Size, SuiteChoice, ThemeId, ThemePair, resolve_sized};
 use craft::theme_store::{SelectionChange, SuiteClient};
-use craft::ui::dialog::DialogHost;
+use craft::ui::dialog::{DialogHost, DialogId, dialog_id};
 use craft::ui::fonts::UiFonts;
 use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
 use craft::ui::runtime::env::{RootEnv, Scale};
@@ -396,6 +396,20 @@ impl PhotocraftApp {
     pub(crate) fn framework_dialogs(&mut self, ui: &mut egui::Ui) {
         self.framework.dialogs.run(ui);
     }
+
+    /// Puts PhotoCraft's own dialogs (`ui.dialogs`) on the framework host's stack, in their
+    /// opening order, so both kinds have one top dialog and one order for automation. Called
+    /// before anything reads the order: the dialogs' pass and every control request.
+    pub(crate) fn sync_dialog_stack(&mut self, ctx: &egui::Context) {
+        let own = self.ui.dialogs.iter().map(|dialog| (stack_id(dialog.id), None));
+        self.framework.dialogs.sync_beside(ctx, own);
+    }
+}
+
+/// The framework stack's id of PhotoCraft's own dialog `id`: control requests address both kinds
+/// by one `dialog` id, PhotoCraft's `u64` for its own dialogs and the stack id for hosted ones.
+pub(crate) fn stack_id(id: u64) -> DialogId {
+    dialog_id(("photocraft.dialog", id))
 }
 
 /// The framework's settings sections, kept in PhotoCraft's preferences (`Preferences::sections`).
