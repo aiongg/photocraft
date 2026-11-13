@@ -37,6 +37,12 @@ fn transform_and_move(h: &mut Harness<'static, PhotocraftApp>) {
     h.run_steps(2);
 }
 
+/// Clicks the toolbar's Eyedropper Tool: a tool that stays in view at 900 pt, where the tool
+/// column scrolls and its last tools (Hand, Zoom) lie past its end.
+fn pick_another_tool(h: &Harness<'static, PhotocraftApp>) {
+    h.query_by_label_contains("Eyedropper Tool").expect("the toolbar's Eyedropper Tool").click();
+}
+
 fn red_bounds(h: &Harness<'static, PhotocraftApp>) -> photocraft_geom::Rect {
     let st = h.state().session.active().unwrap();
     let top = st.doc.layers.last().unwrap();
@@ -47,8 +53,7 @@ fn red_bounds(h: &Harness<'static, PhotocraftApp>) -> photocraft_geom::Rect {
 fn picking_another_tool_in_the_toolbar_applies_the_transform() {
     let mut h = app();
     transform_and_move(&mut h);
-    let hand = h.query_by_label_contains("Hand Tool").expect("the toolbar's Hand Tool");
-    hand.click();
+    pick_another_tool(&h);
     h.run_steps(4);
     assert!(h.state().ui.transform.is_none(), "the box closed");
     assert_eq!(red_bounds(&h), photocraft_geom::Rect::new(150, 140, 250, 200), "the move was applied, not cancelled");
@@ -93,7 +98,7 @@ fn placed_and_moved(h: &mut Harness<'static, PhotocraftApp>) {
 fn a_placed_image_is_applied_when_another_tool_is_picked() {
     let mut h = placed_app();
     placed_and_moved(&mut h);
-    h.query_by_label_contains("Hand Tool").expect("the toolbar's Hand Tool").click();
+    pick_another_tool(&h);
     h.run_steps(4);
     assert!(h.state().ui.transform.is_none());
     assert_eq!(h.state().session.active().unwrap().doc.layers.len(), 2, "the placed layer stays");
@@ -155,7 +160,7 @@ fn an_untouched_placed_image_stays_when_another_tool_or_layer_is_picked() {
             let bg = h.state().session.active().unwrap().doc.layers[0].id;
             h.state_mut().run("layer.select", json!({"layer": bg.0})).unwrap();
         } else {
-            h.query_by_label_contains("Hand Tool").expect("Hand Tool").click();
+            pick_another_tool(&h);
         }
         h.run_steps(4);
         let st = h.state().session.active().unwrap();
