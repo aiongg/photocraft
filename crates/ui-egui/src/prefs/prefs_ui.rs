@@ -70,7 +70,7 @@ mod save;
 mod shortcuts;
 mod startup;
 
-pub(crate) use appearance::{appearance_context_menu, cycle_appearance, interface_zoom, step_brightness, sync_appearance};
+pub(crate) use appearance::{appearance_context_menu, cycle_appearance, interface_zoom, show_selected_theme, step_brightness, sync_appearance};
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
 use appearance::{display_scale, favorite_theme_groups, selected_theme};

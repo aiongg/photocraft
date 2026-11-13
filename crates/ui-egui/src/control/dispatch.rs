@@ -246,8 +246,8 @@ fn ui_set(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     // rejected call applies none of its fields (#412's guarantee, down to the values
     // and nested keys).
     Reply::from_result(UiSet::parse(app, p).and_then(|set| {
-        if let Some((id, dark)) = &set.theme {
-            app.ready_theme(id, *dark)?;
+        if let Some((id, _)) = &set.theme {
+            app.check_theme(id)?;
         }
         set.apply(app, ctx, p)
     }))
@@ -290,10 +290,7 @@ impl UiSet {
         self.tools.apply(app);
         self.crop.apply(app);
         self.panels.apply_options(app);
-        if let Some((id, dark)) = self.theme {
-            let theme = app.framework.theme_for(&id, dark, ctx);
-            app.set_theme(ctx, theme);
-        }
+        let note = self.theme.and_then(|(id, dark)| app.pick_theme(ctx, &id, dark));
         self.panels.apply_dock(app);
         if let Some(update) = self.legacy_update {
             crate::panel_docking::commit_legacy_update(app, update, p);
@@ -301,7 +298,7 @@ impl UiSet {
         self.panels.apply_color_and_width(app, ctx);
         self.view.apply(app);
         self.brush.apply(app)?;
-        Ok(Value::Null)
+        Ok(note.map_or(Value::Null, |note| json!({"note": note})))
     }
 }
 
