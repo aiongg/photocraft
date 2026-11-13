@@ -66,11 +66,11 @@ pub const MAX_CLICKS: u64 = 256;
 pub const MAX_SCREEN_POINT: f64 = 1e6;
 
 pub(super) fn ok(v: Value) -> Reply {
-    Reply::Done(json!({"ok": true, "result": v}))
+    Reply::from_result(Ok(v))
 }
 
 pub(super) fn err(e: impl std::fmt::Display) -> Reply {
-    Reply::Done(json!({"ok": false, "error": e.to_string()}))
+    Reply::from_result(Err(e.to_string()))
 }
 
 /// A `ui.set` boolean field: `Ok(None)` when absent, an error when present with another type.
