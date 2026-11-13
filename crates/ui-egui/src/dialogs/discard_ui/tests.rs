@@ -777,16 +777,12 @@ fn a_synthetic_save_press_on_the_drawn_prompt_is_refused_and_reported() {
     app.services.automation_command =
         Some(Box::new(|id: &str, _: &Value| if id == "file.save" { Err(format!("automation command `{id}` is disabled")) } else { Ok(()) }));
     let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
-    // Queue Y as synthetic input and feed its step to the harness, as an offscreen host does.
-    let key = |pressed: bool| egui::Event::Key { key: Key::Y, physical_key: None, pressed, repeat: false, modifiers: egui::Modifiers::NONE };
-    h.state_mut().synthetic.extend([key(true), key(false)]);
-    let step = h.state_mut().take_synthetic_step();
-    assert_eq!(step.len(), 2, "press and release in one step");
-    assert!(h.state().automation_input, "the step is marked as automation input");
-    for event in step {
-        h.event(event);
-    }
-    h.run_steps(3);
+    // Y as synthetic input: the window host injects it, and the passes carrying it act for the
+    // automation client.
+    let ctx = h.ctx.clone();
+    let (req, _rx) = crate::control::ControlRequest::new("ui.key", serde_json::json!({"key": "Y"}));
+    assert!(matches!(crate::control::handle(h.state_mut(), &ctx, &req), crate::control::Reply::AfterInput));
+    h.run_steps(4);
     assert!(written.borrow().is_empty(), "nothing is written: {:?}", written.borrow());
     assert_eq!(docs_left(&h), Some(1), "the prompt stays up");
     assert_eq!(h.state().session.documents().len(), 1, "the document stays open");

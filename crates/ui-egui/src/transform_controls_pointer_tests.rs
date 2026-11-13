@@ -49,10 +49,8 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, kind: &str, at: [f64; 2
 }
 
 fn enter(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let (request, _receiver) = ControlRequest::new("ui.key", json!({"key": "Enter"}));
-    assert!(matches!(crate::control::handle(app, ctx, &request), Reply::AfterInput));
-    let events = app.take_synthetic_step();
-    assert!(!events.is_empty());
+    let key = |pressed| egui::Event::Key { key: egui::Key::Enter, physical_key: None, pressed, repeat: false, modifiers: egui::Modifiers::NONE };
+    let events = vec![key(true), key(false)];
     let mut output = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| crate::shortcuts::handle(app, ui.ctx()));
     output.textures_delta.clear(); // This CPU-only helper deliberately has no texture uploader.
 }

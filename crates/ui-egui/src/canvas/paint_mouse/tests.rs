@@ -143,12 +143,8 @@ fn mode_control_can_pick_a_row_with_ui_click() {
     let at = h.get_by_label("Darken").rect().center();
     let (req, _) = ControlRequest::new("ui.click", json!({"x": at.x, "y": at.y}));
     assert!(matches!(handle(h.state_mut(), &ctx, &req), Reply::AfterInput));
-    // The app injects these queued control events into its next frame's input.
-    let events = std::mem::take(&mut h.state_mut().synthetic);
-    for event in events {
-        h.event(event);
-    }
-    h.run_steps(2);
+    // The window host injects the move, the press and the release one pass each.
+    h.run_steps(5);
     assert!(h.state().ui.brush_mode_menu.is_none());
     assert_eq!(h.state().session.tools.brush.mode, photocraft_doc::BlendMode::Darken);
     assert_eq!(h.state().session.journal.last().unwrap(), &("tools.setBrush".into(), json!({"brush": {"mode": "Darken", "behind": false}})));
