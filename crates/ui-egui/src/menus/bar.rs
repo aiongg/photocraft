@@ -143,6 +143,14 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> f32 {
                 crate::palette::note_recent(&ctx, &id);
             }
             opened
+        } else if let Some(fired) = crate::shortcut_dispatch::fire_view_owned(&ctx, &id) {
+            // Zoom In, Zoom Out, Fit on Screen and 100%: the canvas's own commands, as their chords.
+            if fired {
+                crate::palette::note_recent(&ctx, &id);
+                Ok(Value::Null)
+            } else {
+                Err("no document view".to_string())
+            }
         } else {
             invoke(app, &ctx, &alt_click(id, alt), json!({}))
         };

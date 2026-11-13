@@ -8,7 +8,7 @@
 //! silently, as the greyed menu item shows.
 
 use craft::ui::canvas::ViewCommands;
-use craft::ui::runtime::commands::ChromeCommand;
+use craft::ui::runtime::commands::{ChromeCommand, CommandRef, FireSource};
 use craft::ui::runtime::frame::ChromeToggle;
 use craft::ui::runtime::overlay;
 use egui::{Key, KeyboardShortcut};
@@ -63,8 +63,9 @@ pub(crate) const FRAMEWORK_OWNED: [(&str, ChromeCommand); 2] =
 
 /// PhotoCraft's view commands the document canvas runs itself, with the canvas's command each one is: ⌘+, ⌘-, ⌘0
 /// and ⌘1. Their keys reach the runtime as keymap overrides (`app::framework`), the canvas that holds the key focus
-/// (else the one that held it last) applies them to its view, and [`dispatch_pressed`] leaves them alone. The menu
-/// items still run PhotoCraft's own commands.
+/// (else the one that held it last) applies them to its view, and [`dispatch_pressed`] leaves them alone. Their View
+/// menu rows fire the same commands ([`fire_view_owned`]), and the action recorder records what the canvas ran,
+/// whichever fired it ([`record_view_commands`]). Actions and automation run PhotoCraft's own (`run_view`).
 pub(crate) const VIEW_OWNED: [(&str, ViewCommands); 4] = [
     ("view.zoomIn", ViewCommands::ZoomIn),
     ("view.zoomOut", ViewCommands::ZoomOut),
@@ -404,6 +405,23 @@ fn label(id: &str) -> String {
         .unwrap_or(id)
         .trim_end_matches('…')
         .to_string()
+}
+
+/// The canvas's own command for the View menu row `id` of [`VIEW_OWNED`], fired as its chord fires it: `None` for
+/// any other row, else whether a canvas will run it.
+pub(crate) fn fire_view_owned(ctx: &egui::Context, id: &str) -> Option<bool> {
+    let (_, command) = VIEW_OWNED.iter().find(|(owned, _)| *owned == id)?;
+    Some(craft::ui::runtime::commands::fire(ctx, *command, FireSource::Menu))
+}
+
+/// Records each [`VIEW_OWNED`] command a canvas ran since the last frame, by its chord or its menu row, as
+/// PhotoCraft's view command: an action being recorded gets `view.fitOnScreen` for ⌘0 and for the menu item alike.
+pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
+    for fired in std::mem::take(&mut app.framework.delivered) {
+        if let Some((id, _)) = VIEW_OWNED.iter().find(|(_, command)| CommandRef::from(*command) == fired.command) {
+            crate::panels::actions::journal_view(app, id, json!({}));
+        }
+    }
 }
 
 /// Runs the commands of the chrome toggles the craft runtime took from the keys since the last

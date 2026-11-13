@@ -672,9 +672,14 @@ pub(crate) fn run_view(app: &mut PhotocraftApp, id: &str, params: Value) -> Resu
         _ => return Err(format!("unsupported view command: {id}")),
     }
     v.zoom_anchor = None;
+    journal_view(app, id, params);
+    Ok(Value::Null)
+}
+
+/// Journals the view command `id` that ran, which records it into the action being recorded.
+pub(crate) fn journal_view(app: &mut PhotocraftApp, id: &str, params: Value) {
     actions_cmds::note_automation_step(&mut app.session, id, &params);
     app.session.journal.push((id.into(), params));
-    Ok(Value::Null)
 }
 
 /// The set New Action records into: the selected action's, else the selected set folder's.

@@ -17,7 +17,7 @@ use craft::keymap::Overrides;
 use craft::theme::{ModeChoice, ThemeId};
 use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
-use craft::ui::runtime::commands::{CommandInput, CommandRef, NavCommand};
+use craft::ui::runtime::commands::{CommandInput, CommandRef, Fired, NavCommand};
 use craft::ui::runtime::env::{RootEnv, Scale};
 use craft::ui::runtime::frame::{ChromeToggle, FrameInput, FrameOutput};
 use craft::ui::runtime::{InstallError, InstallSpec};
@@ -55,6 +55,8 @@ pub struct Framework {
     overrides_rev: Option<u64>,
     /// The chrome toggles the runtime took from the keys since the last frame, for `logic`.
     pub(crate) chrome_toggles: Vec<ChromeToggle>,
+    /// The commands the runtime's components ran since the last frame, for the action recorder in `logic`.
+    pub(crate) delivered: Vec<Fired>,
 }
 
 impl Default for Framework {
@@ -69,6 +71,7 @@ impl Default for Framework {
             overrides: Arc::new(Overrides::new()),
             overrides_rev: None,
             chrome_toggles: Vec::new(),
+            delivered: Vec::new(),
         }
     }
 }
@@ -148,7 +151,8 @@ pub(crate) fn theme_of(kind: ThemeKind) -> (ThemeId, ModeChoice) {
 
 impl PhotocraftApp {
     /// Before each frame (`raw_input_hook`): the runtime's output of the last frame, and its
-    /// input for this one. Of the output, PhotoCraft runs the chrome toggles (in `logic`).
+    /// input for this one. Of the output, PhotoCraft runs the chrome toggles and records the view
+    /// commands the canvas ran (in `logic`).
     pub(crate) fn framework_before_input(&mut self, ctx: &egui::Context) {
         // The bindings come from walking the whole command table: only after a preferences change.
         let rev = self.session.prefs.rev();
@@ -159,6 +163,7 @@ impl PhotocraftApp {
         }
         embed::before_input(ctx, |output: FrameOutput| {
             self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
+            self.framework.delivered.extend(output.delivered);
             self.framework.frame_input(&mut self.session, ctx, self.ui.theme)
         });
     }
