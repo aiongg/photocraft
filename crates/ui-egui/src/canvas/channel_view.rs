@@ -566,6 +566,40 @@ fn view_key(v: &ChannelView, look: Look) -> u64 {
     s.bytes().fold(seed, |h, b| h.wrapping_mul(1_099_511_628_211).wrapping_add(b as u64))
 }
 
+/// A channel or mask view as the canvas's raster source draws it over the composite: what [`ensure`] renders into its
+/// texture, for any region at any factor.
+pub(crate) struct Overlay {
+    view: ChannelView,
+    look: Look,
+    active: Option<photocraft_doc::LayerId>,
+    screen: Screen,
+    /// Changes with the view, its look and, for printed spot inks, the display transform.
+    pub(crate) key: u64,
+}
+
+impl Overlay {
+    /// The view document `idx` shows of `doc` (its committed or previewed composite) on `display` (`None`: the main
+    /// window's); `None` while the plain composite shows.
+    pub(crate) fn of(app: &PhotocraftApp, idx: usize, doc: &Document, display: Option<u32>) -> Option<Overlay> {
+        let st = app.session.documents().get(idx)?;
+        let view = st.channel_view.clone();
+        if view.is_plain(&st.doc) {
+            return None;
+        }
+        let look = Look::of(&app.session);
+        let inks = prints_inks(doc, &view);
+        let (screen, screen_key) = if inks { (Screen::of(app, doc, display), Screen::key(app, doc, display)) } else { (Screen::default(), 0) };
+        let key = view_key(&view, look) ^ screen_key.rotate_left(17);
+        Some(Overlay { view, look, active: st.active_layer, screen, key })
+    }
+
+    /// The view's pixels over `r` of `doc`, one sample every `factor` pixels from `r`'s origin, row by row
+    /// (`r`'s size divided by `factor`, rounded up); `None` where it draws nothing.
+    pub(crate) fn render(&self, doc: &Document, r: Rect, factor: u32) -> Option<Vec<Color32>> {
+        render_with_source(doc, &self.view, r, factor, self.look, self.active, CompositeSource { cached: None, fresh: &mut None, screen: &self.screen })
+    }
+}
+
 /// Make the channel-view texture of document `idx`, shown on `display` (`None`: the main
 /// window's), current; `None` = nothing to draw.
 pub fn ensure(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, display: Option<u32>) -> Option<egui::TextureId> {

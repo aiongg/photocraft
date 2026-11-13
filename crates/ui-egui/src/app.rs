@@ -45,6 +45,7 @@ impl PhotocraftApp {
             ui: UiState::default(),
             services,
             canvases: HashMap::new(),
+            raster_logs: HashMap::new(),
             navigator_textures: HashMap::new(),
             display_memo: HashMap::new(),
             navigator_gpu: HashMap::new(),

@@ -39,6 +39,8 @@ pub mod outline;
 mod paint;
 pub mod paint_mouse;
 mod paint_thread;
+#[allow(dead_code, reason = "the document display of the framework Canvas body reads it")]
+mod raster_source;
 #[cfg(test)]
 mod paint_thread_tests;
 pub mod patch_preview;
@@ -103,6 +105,7 @@ use paint::{
     draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_gpu_view, paint_mapped_image_at,
     pattern_xf,
 };
+pub(crate) use raster_source::SourceLog;
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};
