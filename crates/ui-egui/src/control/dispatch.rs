@@ -245,7 +245,12 @@ fn ui_set(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     // Everything is validated and materialized before the first field is applied, so a
     // rejected call applies none of its fields (#412's guarantee, down to the values
     // and nested keys).
-    Reply::from_result(UiSet::parse(app, p).and_then(|set| set.apply(app, ctx, p)))
+    Reply::from_result(UiSet::parse(app, p).and_then(|set| {
+        if let Some((id, dark)) = &set.theme {
+            app.ready_theme(id, *dark)?;
+        }
+        set.apply(app, ctx, p)
+    }))
 }
 
 struct UiSet {
@@ -305,7 +310,6 @@ impl UiSet {
 fn theme_param(app: &PhotocraftApp, p: &Value) -> std::result::Result<Option<(craft::theme::ThemeId, bool)>, String> {
     let Some(name) = str_param(p, "theme") else { return Ok(None) };
     let (id, dark) = photocraft_engine::prefs::theme_ids::parse(name).ok_or_else(|| format!("unknown theme `{name}`"))?;
-    app.framework.check_theme(&id)?;
     Ok(Some((id, dark.unwrap_or(app.ui.theme.is_dark()))))
 }
 

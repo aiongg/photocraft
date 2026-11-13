@@ -66,6 +66,27 @@ pub struct Framework {
     started: bool,
 }
 
+/// Why a theme can't show now.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum ThemeUnavailable {
+    /// A library theme picked for the suite that the suite hasn't loaded yet.
+    Loading,
+    /// A library theme in the suite's library that nothing picked, so the suite doesn't load it.
+    NotPicked,
+    /// No theme the suite knows.
+    Unknown,
+}
+
+impl ThemeUnavailable {
+    /// The refusal for theme `id`.
+    pub(crate) fn message(self, id: &ThemeId) -> String {
+        match self {
+            ThemeUnavailable::Loading | ThemeUnavailable::NotPicked => format!("theme `{id}` is still loading"),
+            ThemeUnavailable::Unknown => format!("unknown theme `{id}`"),
+        }
+    }
+}
+
 /// The preferences that choose the theme: the appearance mode and the theme id of each slot.
 #[derive(Clone, Debug, PartialEq)]
 struct ThemePrefs {
@@ -269,13 +290,16 @@ impl Framework {
         AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
-    /// Whether theme `id` can show: the suite has it as a built-in or a loaded library theme.
-    /// A library theme picked for the suite and not loaded yet is refused as still loading.
-    pub(crate) fn check_theme(&self, id: &ThemeId) -> Result<(), String> {
-        match self.suite.theme(id) {
-            Some(_) => Ok(()),
-            None if self.suite.is_loading(id) => Err(format!("theme `{id}` is still loading")),
-            None => Err(format!("unknown theme `{id}`")),
+    /// Whether theme `id` can show now: the suite has it as a built-in or a loaded library theme.
+    pub(crate) fn theme_availability(&self, id: &ThemeId) -> Result<(), ThemeUnavailable> {
+        if self.suite.theme(id).is_some() {
+            Ok(())
+        } else if self.suite.is_loading(id) {
+            Err(ThemeUnavailable::Loading)
+        } else if self.suite.preview(id).is_some() {
+            Err(ThemeUnavailable::NotPicked)
+        } else {
+            Err(ThemeUnavailable::Unknown)
         }
     }
 
