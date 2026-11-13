@@ -591,15 +591,16 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
     }
     // Control requests waiting on this job; a cancelled batch reports the files it finished.
     #[cfg(not(target_arch = "wasm32"))]
-    app.reply_job(
-        e.id,
-        &match &e.outcome {
+    {
+        use craft::automation::control::result_reply;
+        let reply = match &e.outcome {
             JobOutcome::Done(v) if cancelled_batch => json!({"ok": false, "error": "cancelled", "result": v}),
-            JobOutcome::Done(v) => json!({"ok": true, "result": v}),
-            JobOutcome::Failed(err) => json!({"ok": false, "error": err}),
-            JobOutcome::Cancelled => json!({"ok": false, "error": "cancelled"}),
-        },
-    );
+            JobOutcome::Done(v) => result_reply(Ok(v.clone())),
+            JobOutcome::Failed(err) => result_reply(Err(err.clone())),
+            JobOutcome::Cancelled => result_reply(Err("cancelled".into())),
+        };
+        app.reply_job(e.id, &reply);
+    }
     // A Free Transform commit's session ends with its job (then reported like any job).
     crate::transform_tool::on_job_event(app, &e);
     if crate::prefs_ui::on_recovery_event(app, &e) {

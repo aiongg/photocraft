@@ -1,11 +1,15 @@
 //! `ui.screenshot` through the app: craft-automation's capture queue driven by PhotoCraft's logic
-//! and UI phases, the geometry the runtime reports, and the automation write authority. The
-//! queue's own rules (budgets, settling, deadlines) are craft-automation's and tested there.
+//! and UI phases, its document identity, the geometry the runtime reports, and the automation
+//! write authority. The queue's own rules (budgets, settling, deadlines, image checks) are
+//! craft-automation's and tested there.
 
-use craft::automation::screenshot::{CaptureGeometry, Captures, DocumentId};
+use craft::automation::screenshot::{CaptureGeometry, Captures, DocumentId, SETTLE_PASSES};
 use craft::ui::runtime::motion;
+use craft::ui::runtime::windows::WindowHost;
 use egui::{Color32, ColorImage, Context, ViewportId, vec2};
+use serde_json::{Value, json};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 fn captures(app: &crate::PhotocraftApp) -> &Captures {
     &app.control.as_ref().expect("a control channel").captures
@@ -179,4 +183,77 @@ fn assert_successful_capture(fixture: &mut ActualCallbackFixture, size: egui::Ve
     actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, minimized);
     assert_eq!(fixture.writes.borrow().len(), 1, "no duplicate output");
     assert!(fixture.reply.try_recv().is_err());
+}
+
+/// A `ui.screenshot` that arrives before the first frame (a launch with a capture request) is
+/// answered with an image once the UI has drawn and settled, not rejected.
+#[test]
+fn a_launch_and_capture_request_waits_for_the_first_ui_pass() {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()).with_control(rx);
+    let (request, reply) = crate::control::ControlRequest::new("ui.screenshot", json!({"focus": false}));
+    tx.send(request).unwrap();
+    let ctx = Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
+    // The settle delay runs on the wall clock.
+    let give_up = Instant::now() + Duration::from_secs(5);
+    let callback = loop {
+        let output = actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
+        assert!(reply.try_recv().is_err(), "no answer before the image");
+        if let Some(found) = actual_callback(&output) {
+            break found;
+        }
+        assert!(Instant::now() < give_up, "the request was never issued");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let geometry = captures(&app).last_geometry().expect("the first pass recorded the geometry");
+    callback.complete(Arc::new(ColorImage::filled(geometry.expected_pixels().unwrap(), Color32::RED)));
+    actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
+    let reply = reply.try_recv().expect("one answer after the image");
+    assert_eq!(reply["ok"], true, "{reply}");
+}
+
+/// PhotoCraft's document identity against a capture in flight: switching to another document, or
+/// away and back, fails it; an edit in the same document does not.
+#[test]
+fn a_capture_in_flight_follows_the_app_document_identity() {
+    let activate = |index: u64| ("document.activate", json!({"document": index}));
+    let cases: [(&str, Vec<(&str, Value)>, bool); 3] = [
+        ("switch to another document", vec![activate(0)], false),
+        ("switch away and back", vec![activate(0), activate(1)], false),
+        ("edit in the same document", vec![("layer.new.layer", json!({}))], true),
+    ];
+    for (name, between, captured) in cases {
+        let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
+        app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
+        let ctx = Context::default();
+        let now = motion::now();
+        let geometry = |document: Option<DocumentId>| {
+            let mut g = CaptureGeometry::new([600.0, 400.0], 8192);
+            g.document = document;
+            g
+        };
+        let admitted = app.document_identity();
+        let mut queue = Captures::default();
+        queue.note_geometry(geometry(admitted));
+        let (tx, _reply) = std::sync::mpsc::channel();
+        queue.admit(1, None, tx, admitted, 0.0, now).unwrap();
+        for _ in 0..SETTLE_PASSES {
+            queue.note_pass();
+        }
+        assert!(queue.issue(&WindowHost::of(&ctx), now, admitted).is_empty());
+        let callback = actual_callback(&ctx.run_ui(Default::default(), |_| {})).expect("issued");
+        callback.complete(Arc::new(ColorImage::filled([600, 400], Color32::RED)));
+
+        for (command, params) in between {
+            app.run(command, params).unwrap();
+        }
+        let current = app.document_identity();
+        assert_ne!(current, admitted, "{name}: the identity moved");
+        queue.note_geometry(geometry(current));
+        let finished = queue.drain(now, Some(geometry(current)), current);
+        assert_eq!(finished.len(), 1, "{name}");
+        assert_eq!(finished[0].result.is_ok(), captured, "{name}: {:?}", finished[0].result.as_ref().err());
+    }
 }
