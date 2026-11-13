@@ -2248,27 +2248,59 @@ fn actions_play_checks_each_step_for_synthetic_input() {
     assert_eq!(r["ran"], 1, "{r}");
 }
 
+/// Frames with the framework runtime, whose window host injects queued input one step per pass.
+fn input_frames() -> (craft::ui::testing::Frames, egui::Context) {
+    let frames = craft::ui::testing::Frames::new();
+    let ctx = frames.ctx.clone();
+    (frames, ctx)
+}
+
+/// Runs passes until the window host has injected everything queued; each pass's events.
+fn delivered(frames: &mut craft::ui::testing::Frames) -> Vec<Vec<egui::Event>> {
+    let host = craft::ui::runtime::windows::WindowHost::of(&frames.ctx.clone());
+    let mut passes = Vec::new();
+    for _ in 0..4 * MAX_CLICKS {
+        if host.injected_idle() {
+            break;
+        }
+        let mut events = Vec::new();
+        frames.frame(Vec::new(), |ui| events = ui.input(|i| i.events.clone()));
+        passes.push(events);
+    }
+    assert!(host.injected_idle(), "the queued input ran");
+    passes.retain(|events| !events.is_empty());
+    passes
+}
+
+/// `method` accepted as synthetic input; the steps it delivered, one pass each.
+fn queued(app: &mut PhotocraftApp, frames: &mut craft::ui::testing::Frames, method: &str, params: Value) -> Vec<Vec<egui::Event>> {
+    let (req, _rx) = ControlRequest::new(method, params.clone());
+    assert!(matches!(handle(app, &frames.ctx.clone(), &req), Reply::AfterInput), "{method} {params}");
+    delivered(frames)
+}
+
+fn nothing_queued(ctx: &egui::Context) -> bool {
+    craft::ui::runtime::windows::WindowHost::of(ctx).injected_idle()
+}
+
 #[test]
 fn huge_click_count_is_rejected() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = egui::Context::default();
+    let (mut frames, ctx) = input_frames();
     // #982: a huge count used to queue a press and a release per click before replying.
     for count in [json!(MAX_CLICKS + 1), json!(1_000_000_000u64), json!(u64::MAX)] {
         let r = call(&mut app, &ctx, "ui.click", json!({"x": 10, "y": 10, "count": count}));
         assert_eq!(r["ok"], false, "{r}");
         assert!(r["error"].as_str().unwrap().contains("`count` must be at most 256"), "{r}");
-        assert!(app.synthetic.is_empty(), "a rejected click queues nothing");
+        assert!(nothing_queued(&ctx), "a rejected click queues nothing");
     }
-    // Single, double and the largest allowed clicks still queue a move plus a press and a release each.
-    for (count, events) in [(None, 3), (Some(2), 5), (Some(MAX_CLICKS), 2 * MAX_CLICKS as usize + 1)] {
+    // Single, double and the largest allowed clicks still deliver a move plus a press and a release each.
+    for (count, steps) in [(None, 3), (Some(2), 5), (Some(MAX_CLICKS), 2 * MAX_CLICKS as usize + 1)] {
         let params = match count {
-            Some(n) => json!({"x": 10, "y": 10, "count": n}),
+            Some(n) => json!({"x": 10 + n, "y": 10, "count": n}),
             None => json!({"x": 10, "y": 10}),
         };
-        let (req, _rx) = ControlRequest::new("ui.click", params);
-        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput));
-        assert_eq!(app.synthetic.len(), events);
-        app.synthetic.clear();
+        assert_eq!(queued(&mut app, &mut frames, "ui.click", params).len(), steps);
     }
 }
 
@@ -2277,27 +2309,77 @@ fn huge_click_count_is_rejected() {
 #[test]
 fn huge_click_coordinate_is_rejected() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = egui::Context::default();
-    for method in ["ui.click", "ui.move"] {
+    let (mut frames, ctx) = input_frames();
+    for method in ["ui.click", "ui.move", "ui.wheel"] {
         for (field, v) in [("x", 1e308), ("y", -1e308), ("x", 3.5e38), ("y", 1e7), ("x", -1.5e6)] {
             let (req, _rx) = ControlRequest::new(method, json!({ field: v }));
             let Reply::Done(r) = handle(&mut app, &ctx, &req) else { panic!("{method} {field}={v}: accepted") };
             assert_eq!(r["ok"], false, "{method} {field}={v}: {r}");
             assert!(r["error"].as_str().unwrap().starts_with(&format!("{field} must be between")), "{r}");
-            assert!(app.synthetic.is_empty(), "a rejected {method} queues nothing");
+            assert!(nothing_queued(&ctx), "a rejected {method} queues nothing");
         }
     }
-    // Points at the edges of the range, off-window included, reach egui and run a frame each.
+    // Points at the edges of the range, off-window included, reach egui and run a pass each.
     let edge = MAX_SCREEN_POINT;
     for (method, x, y) in [("ui.move", edge, -edge), ("ui.click", -edge, edge), ("ui.click", -5.0, 20.0)] {
-        let (req, _rx) = ControlRequest::new(method, json!({"x": x, "y": y}));
-        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput));
-        while !app.synthetic.is_empty() {
-            let events = app.take_synthetic_step();
-            ctx.run_ui(egui::RawInput { events, ..Default::default() }, |_| {}).textures_delta.clear();
-        }
+        queued(&mut app, &mut frames, method, json!({"x": x, "y": y}));
         let pos = ctx.input(|i| i.pointer.latest_pos());
         assert_eq!(pos, Some(egui::pos2(x as f32, y as f32)), "{method} {x},{y}");
+    }
+}
+
+/// What the window holds after each family of synthetic input, as the next pass sees it: held
+/// presses and keys until `ui.release`, a move's and a wheel turn's modifiers, a click's let go,
+/// Caps Lock held for the canvas, and document points mapped through the main canvas.
+#[test]
+fn synthetic_input_families_hold_what_they_name() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let (mut frames, ctx) = input_frames();
+    let held = |frames: &mut craft::ui::testing::Frames| {
+        let mut seen = (false, false, egui::Modifiers::NONE);
+        frames.frame(Vec::new(), |ui| seen = ui.input(|i| (i.pointer.primary_down(), i.keys_down.contains(&egui::Key::Space), i.modifiers)));
+        seen
+    };
+    // (method, params, primary down, Space down, alt held) after the call.
+    let cases = [
+        ("ui.click", json!({"x": 40, "y": 40, "hold": true}), true, false, false),
+        ("ui.move", json!({"x": 60, "y": 40}), true, false, false),
+        ("ui.release", json!({}), false, false, false),
+        ("ui.move", json!({"x": 60, "y": 40, "alt": true}), false, false, true),
+        ("ui.wheel", json!({"x": 60, "y": 40, "dy": -40, "alt": true}), false, false, true),
+        ("ui.click", json!({"x": 60, "y": 40}), false, false, false),
+        ("ui.key", json!({"key": "Space", "hold": true}), false, true, false),
+        ("ui.click", json!({"x": 60, "y": 40, "hold": true}), true, true, false),
+        ("ui.release", json!({"key": "Space"}), true, false, false),
+        ("ui.release", json!({"button": "left"}), false, false, false),
+        ("ui.key", json!({"key": "Space"}), false, false, false),
+    ];
+    for (method, params, primary, space, alt) in cases {
+        queued(&mut app, &mut frames, method, params.clone());
+        let (down, key, mods) = held(&mut frames);
+        assert_eq!((down, key, mods.alt), (primary, space, alt), "after {method} {params}");
+    }
+    let host = craft::ui::runtime::windows::WindowHost::of(&ctx);
+    for (on, held) in [(json!(true), Some(true)), (json!(false), Some(false)), (Value::Null, None)] {
+        assert_eq!(call_after_input(&mut app, &ctx, "ui.capsLock", json!({ "on": on })), Value::Null);
+        assert_eq!(host.injected_caps_lock(), held, "ui.capsLock {on}");
+    }
+    // Document points need a canvas; with one they land where the main canvas shows them.
+    let r = call(&mut app, &ctx, "ui.move", json!({"x": 4, "y": 4, "coordinates": "document"}));
+    assert!(r["error"].as_str().is_some_and(|e| e.contains("no document canvas")), "{r}");
+    app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+    let Some(xf) = crate::canvas::ViewXform::active(&app) else { panic!("the new document has a view") };
+    queued(&mut app, &mut frames, "ui.move", json!({"x": 16, "y": 8, "coordinates": "document"}));
+    assert_eq!(ctx.input(|i| i.pointer.latest_pos()), Some(xf.to_screen(16.0, 8.0)));
+}
+
+/// The reply of an accepted request that waits for input, once the host has run it.
+fn call_after_input(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
+    let (req, _rx) = ControlRequest::new(method, params.clone());
+    match handle(app, ctx, &req) {
+        Reply::AfterInput => Value::Null,
+        Reply::Done(v) => panic!("{method} {params}: {v}"),
+        _ => panic!("{method} {params}: expected to wait for input"),
     }
 }
 
@@ -2308,7 +2390,7 @@ fn rejected(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: 
     assert_eq!(r["ok"], false, "{method} {params}: {r}");
     let error = r["error"].as_str().unwrap().to_string();
     assert!(error.contains(names), "{method} {params}: `{error}` should name `{names}`");
-    assert!(app.synthetic.is_empty(), "{method} {params}: a rejected call queues nothing");
+    assert!(nothing_queued(ctx), "{method} {params}: a rejected call queues nothing");
     assert_eq!(app.ui.tool, tool, "{method} {params}: a rejected call keeps the tool");
     assert_eq!(app.session.active().map(|d| d.revision), revision, "{method} {params}: a rejected call edits nothing");
     error
@@ -2410,21 +2492,20 @@ fn ui_click_and_move_reject_bad_params_before_queueing_input() {
     }
     let error = rejected(&mut app, &ctx, "ui.click", json!({"x": 10, "y": 10, "button": "ritgh"}), "button");
     assert!(error.contains("left") && error.contains("right") && error.contains("middle"), "the error lists the buttons: {error}");
-    // Valid calls queue what they did before; an omitted button is a left click.
-    for (method, params, button, events) in [
+    // Valid calls deliver what they did before; an omitted button is a left click.
+    let (mut frames, _) = input_frames();
+    for (method, params, button, steps) in [
         ("ui.click", json!({"x": 10, "y": 10}), egui::PointerButton::Primary, 3),
-        ("ui.click", json!({"x": 10, "y": 10, "button": "right", "count": 2}), egui::PointerButton::Secondary, 5),
-        ("ui.click", json!({"x": 10, "y": 10, "button": "secondary"}), egui::PointerButton::Secondary, 3),
+        ("ui.click", json!({"x": 11, "y": 10, "button": "right", "count": 2}), egui::PointerButton::Secondary, 5),
+        ("ui.click", json!({"x": 12, "y": 10, "button": "secondary"}), egui::PointerButton::Secondary, 3),
         ("ui.click", json!({"x": 10.5, "y": 10, "button": "middle", "count": null}), egui::PointerButton::Middle, 3),
-        ("ui.move", json!({"x": 10, "y": 10}), egui::PointerButton::Primary, 1),
+        ("ui.move", json!({"x": 13, "y": 10}), egui::PointerButton::Primary, 1),
     ] {
-        let (req, _rx) = ControlRequest::new(method, params.clone());
-        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput), "{method} {params}");
-        assert_eq!(app.synthetic.len(), events, "{method} {params}");
-        if let Some(egui::Event::PointerButton { button: queued, .. }) = app.synthetic.get(1) {
-            assert_eq!(*queued, button, "{method} {params}");
+        let passes = queued(&mut app, &mut frames, method, params.clone());
+        assert_eq!(passes.len(), steps, "{method} {params}");
+        if let Some(egui::Event::PointerButton { button: pressed, .. }) = passes.get(1).and_then(|step| step.first()) {
+            assert_eq!(*pressed, button, "{method} {params}");
         }
-        app.synthetic.clear();
     }
 }
 
@@ -2445,11 +2526,11 @@ fn ui_key_rejects_bad_params_before_queueing_input() {
     for (params, names) in cases {
         rejected(&mut app, &ctx, "ui.key", params, names);
     }
+    let (mut frames, _) = input_frames();
     for params in [json!({"key": "N", "ctrl": true}), json!({"key": "N", "shift": false, "modifiers": {"ctrl": true}})] {
-        let (req, _rx) = ControlRequest::new("ui.key", params.clone());
-        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput), "{params}");
-        assert!(matches!(app.synthetic.first(), Some(egui::Event::Key { key: egui::Key::N, modifiers, .. }) if modifiers.ctrl), "{params}");
-        app.synthetic.clear();
+        let passes = queued(&mut app, &mut frames, "ui.key", params.clone());
+        let press = passes.iter().flatten().find(|e| matches!(e, egui::Event::Key { pressed: true, .. }));
+        assert!(matches!(press, Some(egui::Event::Key { key: egui::Key::N, modifiers, .. }) if modifiers.ctrl), "{params}");
     }
 }
 
@@ -2467,12 +2548,10 @@ fn ui_screenshot_rejects_bad_params_before_capturing() {
     }
 }
 
-/// A key event's modifiers, as `ui.key` queued them.
-fn key_modifiers(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> egui::Modifiers {
-    app.synthetic.clear();
-    let (req, _rx) = ControlRequest::new("ui.key", params.clone());
-    assert!(matches!(handle(app, ctx, &req), Reply::AfterInput), "{params}");
-    match app.synthetic.first() {
+/// A key press's modifiers, as `ui.key` delivered them.
+fn key_modifiers(app: &mut PhotocraftApp, frames: &mut craft::ui::testing::Frames, params: Value) -> egui::Modifiers {
+    let passes = queued(app, frames, "ui.key", params.clone());
+    match passes.iter().flatten().find(|e| matches!(e, egui::Event::Key { pressed: true, .. })) {
         Some(egui::Event::Key { modifiers, .. }) => *modifiers,
         other => panic!("{params}: expected a key event, got {other:?}"),
     }
@@ -2481,10 +2560,10 @@ fn key_modifiers(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) ->
 #[test]
 fn ui_key_ctrl_reaches_shortcuts_like_a_real_ctrl_press() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = egui::Context::default();
-    let ctrl = key_modifiers(&mut app, &ctx, json!({"key":"N","ctrl":true}));
-    let command = key_modifiers(&mut app, &ctx, json!({"key":"N","command":true}));
-    let grouped = key_modifiers(&mut app, &ctx, json!({"key":"N","modifiers":{"ctrl":true}}));
+    let (mut frames, _) = input_frames();
+    let ctrl = key_modifiers(&mut app, &mut frames, json!({"key":"N","ctrl":true}));
+    let command = key_modifiers(&mut app, &mut frames, json!({"key":"N","command":true}));
+    let grouped = key_modifiers(&mut app, &mut frames, json!({"key":"N","modifiers":{"ctrl":true}}));
     assert_eq!(ctrl, grouped, "a grouped flag must match the top-level one");
     if cfg!(target_os = "macos") {
         // Two different keys: Control is not ⌘, and only ⌘ matches a shortcut.
@@ -2496,9 +2575,9 @@ fn ui_key_ctrl_reaches_shortcuts_like_a_real_ctrl_press() {
         assert_eq!(ctrl, command, "ctrl and command are the same key off the Mac");
         assert!(ctrl.command && ctrl.ctrl && !ctrl.mac_cmd, "{ctrl:?}");
     }
-    let plain = key_modifiers(&mut app, &ctx, json!({"key":"N"}));
+    let plain = key_modifiers(&mut app, &mut frames, json!({"key":"N"}));
     assert_eq!(plain, egui::Modifiers::default(), "{plain:?}");
-    let shift_alt = key_modifiers(&mut app, &ctx, json!({"key":"N","shift":true,"alt":true}));
+    let shift_alt = key_modifiers(&mut app, &mut frames, json!({"key":"N","shift":true,"alt":true}));
     assert!(shift_alt.shift && shift_alt.alt && !shift_alt.command && !shift_alt.ctrl, "{shift_alt:?}");
 }
 

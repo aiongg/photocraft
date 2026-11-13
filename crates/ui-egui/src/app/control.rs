@@ -86,7 +86,7 @@ impl PhotocraftApp {
 
     /// Answers the replies waiting on injected input once the window host has run it, or fails
     /// them when it withdrew the input.
-    pub(super) fn poll_input(&mut self, ctx: &egui::Context) {
+    pub(crate) fn poll_input(&mut self, ctx: &egui::Context) {
         if let Some(channel) = self.control.as_mut() {
             channel.poll_input(&WindowHost::of(ctx));
         }
@@ -100,7 +100,7 @@ impl PhotocraftApp {
     /// Before the frame's input: injected input queued for another active document (a switch away
     /// and back included) is withdrawn, so it cannot land in the wrong document; the window host
     /// withdraws it itself when the focus changed.
-    pub(super) fn withdraw_stale_input(&mut self, ctx: &egui::Context) {
+    pub(crate) fn withdraw_stale_input(&mut self, ctx: &egui::Context) {
         let Some(queued) = self.input_queued_for else { return };
         let host = WindowHost::of(ctx);
         if host.injected_idle() {
