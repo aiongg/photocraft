@@ -51,7 +51,7 @@ fn harness(app: PhotocraftApp, size: egui::Vec2, theme: AppTheme) -> Harness<'st
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, theme);
+    PhotocraftApp::setup_context(&h.ctx, theme.clone());
     h.state_mut().ui.theme = theme;
     h.run_steps(4);
     h
@@ -181,9 +181,9 @@ fn a_single_tab_click_expands_a_collapsed_panel() {
             app.ui.dock.set_collapsed(Group::Color, true);
             // Locking prevents rearrangement, not opening an existing panel.
             app.session.prefs.edit(|p| p.workspace_locked = true);
-            let mut h = harness(app, vec2(1200.0, 800.0), theme);
+            let mut h = harness(app, vec2(1200.0, 800.0), theme.clone());
             let collapsed_height = rect_of(&h, Group::Color).height();
-            let tab = probe::tab_rect(&h.ctx, panel_id(Group::Color, tab_index, is_pro(theme))).unwrap().center();
+            let tab = probe::tab_rect(&h.ctx, panel_id(Group::Color, tab_index, theme.is_pro())).unwrap().center();
             click(&mut h, tab);
             assert!(!h.state().ui.dock.is_collapsed(Group::Color), "{theme:?}: tab {tab_index}");
             assert_eq!(h.state().ui.dock_tabs.color, tab_index);
@@ -221,7 +221,7 @@ fn tiny_windows_do_not_panic() {
             let (mut app, _, _) = app_with_layers();
             app.ui.panels.history = true;
             app.ui.panels.navigator = true;
-            let mut h = harness(app, vec2(w, ht), theme);
+            let mut h = harness(app, vec2(w, ht), theme.clone());
             let (bodies, hits) = drawn(&h);
             for (_, r) in bodies {
                 assert!(r.height() >= 0.0 && r.is_finite());
@@ -363,7 +363,7 @@ fn panel_tab_context_menu_closes_one_tab_or_its_group() {
     for (theme, g, window) in
         [(AppTheme::pro_medium(), Group::Properties, "window.panel.properties"), (AppTheme::studio(), Group::Layers, "window.panel.layers")]
     {
-        let pro = is_pro(theme);
+        let pro = theme.is_pro();
         let names = g.tabs(pro);
         let ids: Vec<&str> = (0..names.len()).map(|i| panel_id(g, i, pro)).collect();
         let (app, _, _) = app_with_layers();
@@ -455,10 +455,6 @@ fn studio_properties_card_shows_the_adjustments_tab() {
     assert!(h.query_by_label("Adjustments").is_none() && h.query_by_label("Reset to defaults").is_some());
 }
 
-fn is_pro(theme: AppTheme) -> bool {
-    theme.is_pro()
-}
-
 #[test]
 fn theme_switch_keeps_the_selected_color_group_panel() {
     use egui_kittest::kittest::Queryable;
@@ -469,9 +465,9 @@ fn theme_switch_keeps_the_selected_color_group_panel() {
             app.ui.dock_tabs.color = tab;
             let mut h = harness(app, vec2(1200.0, 900.0), AppTheme::pro());
             let ctx = h.ctx.clone();
-            h.state_mut().set_theme(&ctx, theme);
+            h.state_mut().set_theme(&ctx, theme.clone());
             h.run_steps(4);
-            assert_eq!(Group::Color.tabs(is_pro(theme)).get(h.state().ui.dock_tabs.color), Some(name), "{theme:?}");
+            assert_eq!(Group::Color.tabs(theme.is_pro()).get(h.state().ui.dock_tabs.color), Some(name), "{theme:?}");
             if *name == "Color" {
                 // The spectrum field's hex readout, the same in every theme (#6000).
                 assert!(h.query_by_label("#").is_some(), "{theme:?}: Color field missing");
@@ -487,7 +483,7 @@ fn theme_switch_keeps_the_selected_color_group_panel() {
 /// Full app at `size` (1× scale) on a document with `n` layers named "Row 00", "Row 01", …
 fn app_harness_rows(size: egui::Vec2, theme: AppTheme, n: usize) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(size).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+        PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.ui.theme = theme;
         app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
@@ -556,7 +552,7 @@ fn defaults_give_way_to_layers_but_user_sizes_stay() {
 fn window_character_opens_its_own_group_and_keeps_properties() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let (app, _, _) = app_with_layers();
-        let mut h = harness(app, vec2(1440.0, 900.0), theme);
+        let mut h = harness(app, vec2(1440.0, 900.0), theme.clone());
         let ctx = h.ctx.clone();
         crate::menus::invoke(h.state_mut(), &ctx, "window.panel.character", json!({})).unwrap();
         h.run_steps(3);
@@ -564,7 +560,7 @@ fn window_character_opens_its_own_group_and_keeps_properties() {
         assert!(app.ui.panels.character && app.ui.panels.properties && app.ui.dock_tabs.character == 0, "{theme:?}");
         let ch = rect_of(&h, Group::Character);
         assert!(ch.height() > 60.0, "{theme:?}: Character expanded: {ch:?}");
-        if is_pro(theme) {
+        if theme.is_pro() {
             let props = rect_of(&h, Group::Properties);
             assert!(props.height() > 60.0 && props.bottom() <= ch.top(), "{theme:?}: Properties visible above Character");
         }
@@ -679,10 +675,11 @@ fn navigator_preview_fills_its_group_and_keeps_aspect() {
     for theme in [AppTheme::pro_medium(), AppTheme::studio()] {
         let mut sizes = Vec::new();
         for tall in [150.0, 260.0, 420.0] {
+            let shown = theme.clone();
             let mut h = Harness::builder().with_size(vec2(1200.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
                 let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-                app.ui.theme = theme;
+                app.ui.theme = shown;
                 app.ui.panels.navigator = true;
                 app.ui.dock.heights.insert(Group::Navigator, tall);
                 app.run("file.new", json!({"width": 200, "height": 300})).unwrap();

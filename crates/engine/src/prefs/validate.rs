@@ -215,7 +215,7 @@ pub(super) fn set_path(root: &mut Value, path: &str, value: Value) -> std::resul
 
 /// Validate one value for `path` before it is stored (choices, ranges, colours).
 pub(super) fn check_value(path: &str, v: &Value) -> std::result::Result<(), String> {
-    if matches!(path, "interface.darkTheme" | "interface.lightTheme") && !v.as_str().is_some_and(super::theme_ids::is_id) {
+    if matches!(path, "interface.darkTheme" | "interface.lightTheme") && v.as_str().and_then(super::theme_ids::parse).is_none() {
         return Err(format!("`{path}` must be a theme id"));
     }
     if path == "interface.favoriteThemes" {
@@ -223,12 +223,11 @@ pub(super) fn check_value(path: &str, v: &Value) -> std::result::Result<(), Stri
         if items.len() > super::theme_ids::MAX_FAVORITES {
             return Err("`interface.favoriteThemes` contains too many themes".into());
         }
-        let mut seen: Vec<String> = Vec::with_capacity(items.len());
+        let mut seen = Vec::with_capacity(items.len());
         for item in items {
-            let id = item.as_str().filter(|s| super::theme_ids::is_id(s)).ok_or_else(|| format!("unknown favorite theme `{item}`"))?;
-            let id = super::theme_ids::id_of(id);
+            let (id, _) = item.as_str().and_then(super::theme_ids::parse).ok_or_else(|| format!("unknown favorite theme `{item}`"))?;
             if seen.contains(&id) {
-                return Err(format!("duplicate favorite theme `{id}`"));
+                return Err(format!("duplicate favorite theme `{}`", id.as_str()));
             }
             seen.push(id);
         }

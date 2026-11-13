@@ -15,10 +15,10 @@ use super::{TabStrip, pro_tab_title};
 /// A real app window with `docs` documents named "ch1-pNN.png".
 fn harness(docs: usize, theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+        PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         // The theme is an interface preference, applied on the first frame: set the preference.
-        app.run("prefs.set", json!({"values": {"interface.theme": theme.id()}})).unwrap();
+        app.save_theme(&theme).unwrap();
         for n in 1..=docs {
             app.run("file.new", json!({"width": 400, "height": 300, "name": format!("ch1-p{n:02}.png")})).unwrap();
         }

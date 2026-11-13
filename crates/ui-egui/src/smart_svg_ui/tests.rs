@@ -571,11 +571,12 @@ fn capture_smart_svg_visual_fixtures() {
         open(&mut app);
         let mut ready = false;
         let lang = crate::i18n::lang_from_tag("en").unwrap();
+        let shown = theme.clone();
         let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 620.0)).wgpu().build_ui_state(
             move |ui, app: &mut PhotocraftApp| {
                 let _language = crate::i18n::language_scope(lang);
                 if !ready {
-                    PhotocraftApp::setup_context(ui.ctx(), theme);
+                    PhotocraftApp::setup_context(ui.ctx(), shown.clone());
                     ready = true;
                     return;
                 }

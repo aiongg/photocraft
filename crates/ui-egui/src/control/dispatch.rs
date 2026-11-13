@@ -267,9 +267,10 @@ impl UiSet {
         let view = ViewSet::parse(app, p)?;
         let theme = theme_param(app, p)?;
         let brush = BrushSet::parse(app, p)?;
+        // The dark Pro layouts: Pro and Pro (Medium Gray).
         let bridge_pro = match &theme {
-            Some((id, dark)) => *dark && matches!(id.as_str(), "craft.pro" | "craft.artcraft"),
-            None => app.ui.theme.is_dark() && matches!(app.ui.theme.id().as_str(), "craft.pro" | "craft.artcraft"),
+            Some((id, dark)) => crate::theme::AppTheme::palette(id, *dark).is_some_and(|theme| theme.is_pro() && theme.is_dark()),
+            None => app.ui.theme.is_pro() && app.ui.theme.is_dark(),
         };
         let legacy_update =
             crate::panel_docking::prepare_legacy_update(app, p, panels.panels.as_ref(), panels.dock_tabs.as_ref(), panels.dock.as_ref(), bridge_pro)?;
@@ -285,7 +286,7 @@ impl UiSet {
         self.crop.apply(app);
         self.panels.apply_options(app);
         if let Some((id, dark)) = self.theme {
-            let theme = app.framework.theme_for(&id, dark);
+            let theme = app.framework.theme_for(&id, dark, ctx);
             app.set_theme(ctx, theme);
         }
         self.panels.apply_dock(app);
@@ -299,14 +300,13 @@ impl UiSet {
     }
 }
 
-/// `theme`: a suite theme id (shown in the mode on screen), or a name PhotoCraft used before theme ids.
+/// `theme`: a suite theme id, shown in the mode on screen, or a name PhotoCraft took before theme
+/// ids (`proMedium`, `Pro (Medium Gray)`, `gnome`, ...), shown in its own mode.
 fn theme_param(app: &PhotocraftApp, p: &Value) -> std::result::Result<Option<(craft::theme::ThemeId, bool)>, String> {
     let Some(name) = str_param(p, "theme") else { return Ok(None) };
-    let (id, dark) = match photocraft_engine::prefs::theme_ids::legacy(name) {
-        Some((id, dark)) => (id, dark),
-        None => (name, app.ui.theme.is_dark()),
-    };
-    craft::theme::ThemeId::parse(id).map(|id| Some((id, dark))).map_err(|_| format!("unknown theme `{name}`"))
+    let (id, dark) =
+        photocraft_engine::prefs::theme_ids::parse(name).filter(|(id, _)| app.framework.has_theme(id)).ok_or_else(|| format!("unknown theme `{name}`"))?;
+    Ok(Some((id, dark.unwrap_or(app.ui.theme.is_dark()))))
 }
 
 // -- tools: stroke, tool, gradient, eyedropper, Content-Aware Move, tile grid, layer filter --

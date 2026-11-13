@@ -40,7 +40,7 @@ impl PhotocraftApp {
         self.caps_lock = self.services.caps_lock.as_mut().is_some_and(|f| f());
         tool_cursor::set_wayland(ctx, self.services.is_wayland);
         if !self.styled {
-            Self::setup_context(ctx, self.ui.theme);
+            Self::setup_context(ctx, self.ui.theme.clone());
             self.styled = true;
         } else {
             self.fonts_ready = true;

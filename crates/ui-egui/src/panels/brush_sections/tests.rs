@@ -126,7 +126,7 @@ fn transfer_mixer_harness(kind: theme::AppTheme, tool: Tool) -> Harness<'static,
     let mut h = Harness::builder().with_size(vec2(340.0, 1400.0)).build_ui_state(
         move |ui, state: &mut TransferState| {
             if !ready {
-                crate::PhotocraftApp::setup_context(ui.ctx(), kind);
+                crate::PhotocraftApp::setup_context(ui.ctx(), kind.clone());
                 ready = true;
                 return;
             }

@@ -699,7 +699,7 @@ fn jobs_cancel_during_the_write_reports_the_save_as_not_cancelled_and_it_finishe
 fn a_running_save_shows_its_percentage_in_the_status_bar_and_tab_title() {
     for theme in crate::theme::AppTheme::all() {
         let mut h = app_harness();
-        h.state_mut().run("prefs.set", json!({"values": {"interface.theme": theme.id()}})).unwrap();
+        h.state_mut().save_theme(&theme).unwrap();
         h.run_steps(2);
         let gate = Arc::new(AtomicBool::new(false));
         let g = gate.clone();

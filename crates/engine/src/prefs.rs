@@ -388,6 +388,30 @@ pub struct Interface {
     pub notification_duration_seconds: u32,
 }
 
+impl Interface {
+    /// The theme id of the slot the appearance mode shows; `Auto` answers the dark slot, since the
+    /// system's mode is the shell's to read.
+    pub fn shown_theme(&self) -> &str {
+        match self.appearance_mode {
+            AppearanceMode::Light => &self.light_theme,
+            AppearanceMode::Dark | AppearanceMode::Auto => &self.dark_theme,
+        }
+    }
+
+    /// The pre-id single-theme preference (`interface.theme`): a theme name puts its theme in the
+    /// slot of its mode, which becomes the appearance mode.
+    fn set_legacy_theme(&mut self, value: &Value) -> std::result::Result<(), String> {
+        let (id, dark) = value.as_str().and_then(theme_ids::alias).ok_or_else(|| format!("unknown theme `{value}`"))?;
+        if dark {
+            self.dark_theme = id.into();
+        } else {
+            self.light_theme = id.into();
+        }
+        self.appearance_mode = if dark { AppearanceMode::Dark } else { AppearanceMode::Light };
+        Ok(())
+    }
+}
+
 impl Default for Interface {
     fn default() -> Self {
         Self {
@@ -1256,8 +1280,10 @@ impl Default for HistoryOptions {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MenuCustomization {
+    #[serde(deserialize_with = "theme_ids::commands")]
     pub hidden: Vec<String>,
     /// Command id → colour name (red, orange, yellow, green, blue, violet, gray).
+    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub colors: BTreeMap<String, String>,
 }
 
@@ -1342,11 +1368,13 @@ pub struct Preferences {
     pub history_options: HistoryOptions,
     /// Edit › Keyboard Shortcuts: command id → shortcut (`Cmd+Shift+N` notation); an empty
     /// string removes the default shortcut.
+    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub shortcuts: BTreeMap<String, String>,
     /// Edit › Keyboard Shortcuts: a command's further keys besides its main one (#3665),
     /// command id → keys. A list replaces the command's default alternates
     /// ([`ALTERNATE_SHORTCUTS`]); an empty list removes them. Settings files from before this
     /// map load with nothing stored, so every command keeps its defaults.
+    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub alternate_shortcuts: BTreeMap<String, Vec<String>>,
     /// Edit › Keyboard Shortcuts › Set: saved shortcut sets by name (`crate::shortcut_sets`).
     pub shortcut_sets: BTreeMap<String, crate::shortcut_sets::ShortcutSet>,
@@ -1436,12 +1464,13 @@ impl Preferences {
             let obj = value.as_object().ok_or("`alternateShortcuts` maps command ids to lists of shortcuts")?;
             let mut map = BTreeMap::new();
             for (id, v) in obj {
-                map.insert(id.clone(), alternate_keys(v).map_err(|e| format!("`alternateShortcuts.{id}`: {e}"))?);
+                map.insert(theme_ids::command_id(id), alternate_keys(v).map_err(|e| format!("`alternateShortcuts.{id}`: {e}"))?);
             }
             self.alternate_shortcuts = map;
             return Ok(());
         }
         if let Some(id) = path.strip_prefix("alternateShortcuts.") {
+            let id = &theme_ids::command_id(id);
             // null = back to the command's default alternates.
             match value {
                 Value::Null => {
@@ -1459,27 +1488,25 @@ impl Preferences {
             (Some(_), Value::String(s)) if !s.is_empty() => Value::String(normalize_shortcut(s).ok_or_else(|| format!("`{s}` is not a valid shortcut"))?),
             (Some(_), Value::Null) => {
                 // null = back to the default.
-                let id = &path["shortcuts.".len()..];
-                self.shortcuts.remove(id);
+                self.shortcuts.remove(&theme_ids::command_id(&path["shortcuts.".len()..]));
                 return Ok(());
             }
             _ => value,
         };
         if path == "interface.theme" {
-            // The pre-id single-theme preference: a legacy name picks the slot of its mode.
-            let (id, dark) = value.as_str().and_then(theme_ids::legacy).ok_or_else(|| format!("unknown theme `{value}`"))?;
-            if dark {
-                self.interface.dark_theme = id.into();
-            } else {
-                self.interface.light_theme = id.into();
-            }
-            self.interface.appearance_mode = if dark { AppearanceMode::Dark } else { AppearanceMode::Light };
-            return Ok(());
+            return self.interface.set_legacy_theme(&value);
         }
+        // The pre-id single-theme preference inside the section object, applied after the rest of it.
+        let mut value = value;
+        let legacy_theme = if path == "interface" { value.as_object_mut().and_then(|interface| interface.remove("theme")) } else { None };
         check_value(path, &value)?;
         let mut root = self.to_json();
         set_path(&mut root, path, value)?;
-        *self = serde_json::from_value(root).map_err(|e| format!("invalid value for `{path}`: {e}"))?;
+        let mut next: Preferences = serde_json::from_value(root).map_err(|e| format!("invalid value for `{path}`: {e}"))?;
+        if let Some(theme) = legacy_theme {
+            next.interface.set_legacy_theme(&theme)?;
+        }
+        *self = next;
         Ok(())
     }
 
@@ -1647,7 +1674,7 @@ impl Session {
         // appearance instead of silently switching established users to Auto.
         if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
             && !interface.contains_key("appearanceMode")
-            && let Some((id, dark)) = interface.get("theme").and_then(Value::as_str).and_then(theme_ids::legacy)
+            && let Some((id, dark)) = interface.get("theme").and_then(Value::as_str).and_then(theme_ids::alias)
         {
             let (mode, slot) = if dark { ("dark", "darkTheme") } else { ("light", "lightTheme") };
             interface.insert("appearanceMode".into(), json!(mode));
@@ -1694,6 +1721,10 @@ impl Session {
         let mut v = self.prefs().to_json();
         if let Value::Object(m) = &mut v {
             m.insert("colorSettings".into(), serde_json::to_value(&self.color.settings).unwrap_or(Value::Null));
+        }
+        // Old clients read the single-theme preference: the theme the appearance mode shows.
+        if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut) {
+            interface.insert("theme".into(), json!(self.prefs().interface.shown_theme()));
         }
         v
     }

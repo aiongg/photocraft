@@ -1,45 +1,61 @@
 //! Theme ids in the preferences: the dark and light slots and the favorites hold the ids of the
-//! Craft suite's themes. The theme names PhotoCraft saved before ids (`proMedium`, `studioLight`,
-//! ...) read as their ids.
+//! Craft suite's themes. The theme names PhotoCraft took before ids (`proMedium`, `studioLight`,
+//! `Pro (Medium Gray)`, `gnome`, ...) read as their ids, in the slots, the favorites, `ui.set
+//! {theme}` and the command ids saved with shortcuts and menu colours.
 
+use std::collections::BTreeMap;
+
+use craft::theme::ThemeId;
 use serde::{Deserialize, Deserializer};
 
 /// How many favorite themes the appearance menu keeps.
 pub const MAX_FAVORITES: usize = 64;
 
-/// The theme ids are at most this long (craft-theme's limit).
-const MAX_ID_LEN: usize = 64;
-
-/// The theme ids and mode a pre-id theme name stands for: the theme id, and whether it is the dark
-/// variant.
-pub fn legacy(name: &str) -> Option<(&'static str, bool)> {
-    Some(match name {
-        "pro" => ("craft.pro", true),
-        "proMedium" => ("craft.artcraft", true),
-        "proLightGray" => ("craft.pro-light-gray", false),
-        "proLight" => ("craft.pro", false),
-        "studio" => ("craft.studio", true),
-        "studioLight" => ("craft.studio", false),
-        "classic" => ("craft.classic", false),
-        "solarizedDark" => ("craft.solarized-dark", true),
-        "adwaita" => ("craft.adwaita", false),
-        "adwaitaDark" => ("craft.adwaita", true),
-        "breezeLight" => ("craft.breeze", false),
-        "breezeDark" => ("craft.breeze", true),
-        "softDark" => ("craft.soft", true),
-        "softLight" => ("craft.soft", false),
+/// The suite theme a name PhotoCraft took before theme ids stands for, and whether it is the dark
+/// variant. Case, spaces, `_`, `-` and parentheses don't matter: `proMedium`, `Pro (Medium Gray)`
+/// and `pro_medium_gray` are one name.
+pub fn alias(name: &str) -> Option<(&'static str, bool)> {
+    Some(match name.to_ascii_lowercase().replace([' ', '_', '-', '(', ')'], "").as_str() {
+        "pro" | "prodark" | "photoshop" | "dark" => ("craft.pro", true),
+        "promedium" | "promediumgray" | "medium" | "mediumgray" => ("craft.artcraft", true),
+        "prolightgray" | "lightgray" | "mediumlight" => ("craft.pro-light-gray", false),
+        "prolight" | "prolightest" | "lightest" | "light" => ("craft.pro", false),
+        "studio" | "studiodark" => ("craft.studio", true),
+        "studiolight" => ("craft.studio", false),
+        "classic" | "win2000" | "retro" => ("craft.classic", false),
+        "adwaita" | "adwaitalight" | "gnome" | "gnomelight" => ("craft.adwaita", false),
+        "adwaitadark" | "gnomedark" => ("craft.adwaita", true),
+        "solarizeddark" | "solarized" => ("craft.solarized-dark", true),
+        "breezelight" | "breeze" | "kde" | "kdelight" | "plasma" | "plasmalight" => ("craft.breeze", false),
+        "breezedark" | "kdedark" | "plasmadark" => ("craft.breeze", true),
+        "softdark" => ("craft.soft", true),
+        "softlight" => ("craft.soft", false),
         _ => return None,
     })
 }
 
-/// The id a saved value names: a pre-id theme name's id, else the value itself.
+/// The id a saved value names: an [`alias`]'s id, else the value itself.
 pub fn id_of(value: &str) -> String {
-    legacy(value).map_or_else(|| value.to_owned(), |(id, _)| id.to_owned())
+    alias(value).map_or_else(|| value.to_owned(), |(id, _)| id.to_owned())
 }
 
-/// Whether `value` is a theme id or a pre-id theme name.
-pub fn is_id(value: &str) -> bool {
-    !value.is_empty() && value.len() <= MAX_ID_LEN && !value.chars().any(|c| c.is_whitespace() || c.is_control())
+/// The theme `value` names, and its mode when an alias gave one: an [`alias`], else a theme id.
+pub fn parse(value: &str) -> Option<(ThemeId, Option<bool>)> {
+    match alias(value) {
+        Some((id, dark)) => ThemeId::parse(id).ok().map(|id| (id, Some(dark))),
+        None => ThemeId::parse(value).ok().map(|id| (id, None)),
+    }
+}
+
+/// The command id a saved one names: the pre-id theme commands (`window.theme.proMedium`) read as
+/// `window.theme.dark.<id>` or `window.theme.light.<id>`; every other id reads as saved.
+pub fn command_id(id: &str) -> String {
+    let theme = id.strip_prefix("window.theme.").filter(|name| !name.contains('.')).and_then(alias);
+    match theme {
+        Some((theme, true)) => format!("window.theme.dark.{theme}"),
+        Some((theme, false)) => format!("window.theme.light.{theme}"),
+        None => id.to_owned(),
+    }
 }
 
 pub(super) fn theme<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -48,4 +64,14 @@ pub(super) fn theme<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error>
 
 pub(super) fn themes<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
     Vec::<String>::deserialize(d).map(|v| v.iter().map(|s| id_of(s)).collect())
+}
+
+/// A map keyed by command id, with [`command_id`] applied to each key.
+pub(crate) fn command_keys<'de, D: Deserializer<'de>, V: Deserialize<'de>>(d: D) -> Result<BTreeMap<String, V>, D::Error> {
+    BTreeMap::<String, V>::deserialize(d).map(|map| map.into_iter().map(|(id, v)| (command_id(&id), v)).collect())
+}
+
+/// A list of command ids, with [`command_id`] applied to each.
+pub(crate) fn commands<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    Vec::<String>::deserialize(d).map(|v| v.iter().map(|id| command_id(id)).collect())
 }

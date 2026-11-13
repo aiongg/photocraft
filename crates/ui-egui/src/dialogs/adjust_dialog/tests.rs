@@ -236,7 +236,7 @@ fn curves_dialog_fits_its_graph_and_controls() {
         for theme in crate::theme::AppTheme::all() {
             for size in [egui::vec2(1280.0, 900.0), egui::vec2(900.0, 720.0)] {
                 let mut h = Harness::builder().with_size(size).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app_with_image());
-                PhotocraftApp::setup_context(&h.ctx, theme);
+                PhotocraftApp::setup_context(&h.ctx, theme.clone());
                 let id = open(h.state_mut(), "image.adjustments.curves").unwrap();
                 h.run_steps(4);
                 let window = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", id)))).unwrap();

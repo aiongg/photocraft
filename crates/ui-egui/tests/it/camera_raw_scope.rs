@@ -23,10 +23,11 @@ fn fixture(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
 fn fixture_render(theme: AppTheme, gpu: bool) -> Harness<'static, PhotocraftApp> {
     let builder = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 800.0));
     let builder = if gpu { builder.wgpu() } else { builder };
+    let shown = theme.clone();
     let mut h = builder.build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+        PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.set_theme(&cc.egui_ctx, theme);
+        app.set_theme(&cc.egui_ctx, shown);
         app.run("file.new", json!({"width":64,"height":48})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("edit.fill", json!({"color":"#80ff00"})).unwrap();
@@ -36,7 +37,7 @@ fn fixture_render(theme: AppTheme, gpu: bool) -> Harness<'static, PhotocraftApp>
     h.run_steps(3);
     // Startup preferences can replace the initial theme; apply the requested test theme after it.
     let ctx = h.ctx.clone();
-    h.state_mut().set_theme(&ctx, theme);
+    h.state_mut().set_theme(&ctx, theme.clone());
     h.run_steps(3);
     assert_eq!(h.state().ui.theme, theme);
     settle(&mut h);
@@ -688,7 +689,7 @@ fn pixel_hover_gpu_badge_single_band_and_crosshair_appear_and_clear_in_all_theme
     let mut h = fixture_render(AppTheme::pro(), true);
     for theme in AppTheme::all().into_iter().skip(part).step_by(4) {
         let ctx = h.ctx.clone();
-        h.state_mut().set_theme(&ctx, theme);
+        h.state_mut().set_theme(&ctx, theme.clone());
         h.run_steps(3);
         settle(&mut h);
         assert_eq!(h.state().ui.theme, theme);

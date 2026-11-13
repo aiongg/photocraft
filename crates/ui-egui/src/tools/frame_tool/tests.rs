@@ -204,8 +204,8 @@ fn frame_creation_handles_render_at_native_scales() {
         for (width, height) in [(1280.0, 720.0), (800.0, 480.0)] {
             for scale in [1.0, 2.0] {
                 let mut app = app();
-                app.ui.theme = theme;
-                app.run("prefs.set", json!({"path":"interface.theme","value":theme.id()})).unwrap();
+                app.ui.theme = theme.clone();
+                app.save_theme(&theme).unwrap();
                 app.custom_titlebar = true;
                 app.session.prefs.edit(|p| p.general.animated_zoom = false);
                 drag(&mut app, [20.0, 30.0], [180.0, 130.0]);
@@ -227,8 +227,9 @@ fn frame_creation_handles_render_at_native_scales() {
                     .unwrap();
                 app.run("layer.new.frame",json!({"x":210,"y":70,"width":120,"height":160,"shape":"ellipse","layer":source.0,"stroke":{"color":"#50a0ef","width":4,"align":"outside"}})).unwrap();
                 select(&mut app, empty, Target::Frame);
+                let shown = theme.clone();
                 let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(width, height)).with_pixels_per_point(scale).wgpu().build_eframe(move |cc| {
-                    PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                    PhotocraftApp::setup_context(&cc.egui_ctx, shown);
                     if let Some(rs) = cc.wgpu_render_state.as_ref() {
                         app.set_wgpu(rs.clone());
                     }

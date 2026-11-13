@@ -154,7 +154,7 @@ fn copy_color_formats() {
 fn every_mode_works_in_every_theme() {
     for kind in AppTheme::all() {
         for mode in ColorPanelMode::ALL {
-            let mut h = color_tab(kind, mode, [1.0, 0.0, 0.0, 1.0]);
+            let mut h = color_tab(kind.clone(), mode, [1.0, 0.0, 0.0, 1.0]);
             match mode {
                 ColorPanelMode::HueCube | ColorPanelMode::BrightnessCube => {
                     assert!(h.query_by_label("#").is_some(), "{kind:?} {mode:?}: the readout");
@@ -512,7 +512,7 @@ fn color_wheel_fits_the_default_color_group() {
     for kind in AppTheme::all() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.ui.color_panel.mode = ColorPanelMode::ColorWheel;
-        app.ui.theme = kind;
+        app.ui.theme = kind.clone();
         app.ui.dock_tabs.color = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
         let mut h = Harness::builder().with_size(vec2(1440.0, 1200.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {

@@ -112,6 +112,17 @@ impl Palette {
         }
     }
 
+    /// The Light Theme row of the Appearance settings, in PhotoCraft's order.
+    const LIGHT_ROW: [Palette; 7] =
+        [Palette::ProLight, Palette::ProLightGray, Palette::StudioLight, Palette::Classic, Palette::Adwaita, Palette::BreezeLight, Palette::SoftLight];
+
+    /// The Dark Theme row, in PhotoCraft's order.
+    const DARK_ROW: [Palette; 7] =
+        [Palette::ProMedium, Palette::Pro, Palette::Studio, Palette::SolarizedDark, Palette::AdwaitaDark, Palette::BreezeDark, Palette::SoftDark];
+
+    /// Photoshop's four interface brightnesses, darkest first.
+    const BRIGHTNESSES: [Palette; 4] = [Palette::Pro, Palette::ProMedium, Palette::ProLightGray, Palette::ProLight];
+
     /// The palette that draws suite theme `id` in the dark or light mode, if PhotoCraft has one.
     fn of(id: &ThemeId, dark: bool) -> Option<Palette> {
         Palette::ALL.into_iter().find(|p| p.theme() == (id.as_str(), dark))
@@ -130,23 +141,10 @@ impl Palette {
 /// The theme on screen: a suite theme in the mode shown, with the tokens PhotoCraft draws it with.
 /// The themes PhotoCraft has palettes for (see [`AppTheme::all`]) keep them; any other suite theme
 /// (a library theme, `craft.graphite`) takes its tokens from craft-theme's resolved tokens.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AppTheme {
-    id: &'static ThemeId,
+    id: ThemeId,
     tokens: Tokens,
-}
-
-/// The one shared copy of `id`, so that a theme is `Copy`. A process meets few distinct ids (the
-/// built-ins and the library themes the user picks), each kept once.
-fn interned(id: &ThemeId) -> &'static ThemeId {
-    static IDS: std::sync::Mutex<Vec<&'static ThemeId>> = std::sync::Mutex::new(Vec::new());
-    let mut ids = IDS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if let Some(known) = ids.iter().find(|known| ***known == *id) {
-        return known;
-    }
-    let id: &'static ThemeId = Box::leak(Box::new(id.clone()));
-    ids.push(id);
-    id
 }
 
 impl Default for AppTheme {
@@ -159,7 +157,7 @@ impl Default for AppTheme {
 impl From<Palette> for AppTheme {
     fn from(palette: Palette) -> Self {
         let (id, _) = palette.theme();
-        AppTheme { id: interned(&ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default())), tokens: Tokens::for_palette(palette) }
+        AppTheme { id: ThemeId::parse(id).unwrap_or_else(|_| ThemeId::suite_default()), tokens: Tokens::for_palette(palette) }
     }
 }
 
@@ -184,6 +182,21 @@ impl AppTheme {
         Palette::ALL.map(AppTheme::from)
     }
 
+    /// The themes the Light Theme row of the Appearance settings offers, in its order.
+    pub fn light_row() -> [AppTheme; 7] {
+        Palette::LIGHT_ROW.map(AppTheme::from)
+    }
+
+    /// The themes the Dark Theme row offers, in its order.
+    pub fn dark_row() -> [AppTheme; 7] {
+        Palette::DARK_ROW.map(AppTheme::from)
+    }
+
+    /// Photoshop's four interface brightnesses, darkest first.
+    pub fn brightnesses() -> [AppTheme; 4] {
+        Palette::BRIGHTNESSES.map(AppTheme::from)
+    }
+
     /// PhotoCraft's palette for suite theme `id` in the dark or light mode, if it has one.
     pub fn palette(id: &ThemeId, dark: bool) -> Option<Self> {
         Palette::of(id, dark).map(Self::from)
@@ -191,7 +204,7 @@ impl AppTheme {
 
     /// Suite theme `id` shown in the dark or light mode with the tokens craft-theme resolved for it.
     pub fn resolved(id: &ThemeId, dark: bool, resolved: &craft::theme::Resolved) -> Self {
-        AppTheme { id: interned(id), tokens: Tokens::from_resolved(&resolved.tokens, dark) }
+        AppTheme { id: id.clone(), tokens: Tokens::from_resolved(&resolved.tokens, dark) }
     }
 
     /// The name PhotoCraft's Appearance settings give a theme it has a palette for.
@@ -200,7 +213,7 @@ impl AppTheme {
     }
 
     pub fn id(&self) -> &ThemeId {
-        self.id
+        &self.id
     }
 
     pub fn tokens(&self) -> Tokens {
@@ -214,6 +227,12 @@ impl AppTheme {
     /// Photoshop-grammar layout (tab strips, flat panels).
     pub fn is_pro(&self) -> bool {
         self.tokens.pro
+    }
+
+    /// The Window › Theme command that shows this theme: `window.theme.dark.<id>` or `window.theme.light.<id>`.
+    #[cfg(test)]
+    pub(crate) fn command(&self) -> String {
+        format!("window.theme.{}.{}", if self.is_dark() { "dark" } else { "light" }, self.id.as_str())
     }
 }
 

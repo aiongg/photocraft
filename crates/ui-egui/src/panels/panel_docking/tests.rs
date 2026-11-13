@@ -309,11 +309,12 @@ fn capture_custom_panel_docking_visual_fixtures() {
                 app.run("window.panel.move", json!({"panel":"swatches", "anchor":"layers", "zone":"top"})).unwrap();
                 app.run("window.panel.float", json!({"panel":"properties","x":30,"y":90,"width":300,"height":440})).unwrap();
                 let mut ready = false;
+                let shown = theme.clone();
                 let mut harness = Harness::builder().with_size(vec2(width, 800.0)).with_pixels_per_point(scale).wgpu().build_ui_state(
                     move |ui, app: &mut PhotocraftApp| {
                         if !ready {
-                            PhotocraftApp::setup_context(ui.ctx(), theme);
-                            app.ui.theme = theme;
+                            PhotocraftApp::setup_context(ui.ctx(), shown.clone());
+                            app.ui.theme = shown.clone();
                             ready = true;
                             return;
                         }
@@ -562,8 +563,8 @@ fn control_set(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> V
 fn current_main_hidden_tabs_migrate_by_name_and_selected_identity() {
     for theme in [crate::theme::AppTheme::pro_medium(), crate::theme::AppTheme::studio()] {
         let mut app = app();
-        app.ui.theme = theme;
-        let pro = matches!(theme.id().as_str(), "craft.pro" | "craft.artcraft") && theme.is_dark();
+        app.ui.theme = theme.clone();
+        let pro = theme.is_pro() && theme.is_dark();
         let color = Group::Color.tabs(pro).iter().position(|name| *name == "Color").unwrap();
         let swatches = Group::Color.tabs(pro).iter().position(|name| *name == "Swatches").unwrap();
         app.ui.dock.hide_tab(Group::Color, swatches, pro);
@@ -1134,7 +1135,7 @@ fn dock_panel_harness(app: PhotocraftApp, size: egui::Vec2, theme: crate::theme:
     let mut harness = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
-                PhotocraftApp::setup_context(ui.ctx(), theme);
+                PhotocraftApp::setup_context(ui.ctx(), theme.clone());
                 ready = true;
                 return;
             }
@@ -1926,7 +1927,7 @@ fn release_only_position_updates_model_and_actual_geometry_on_that_frame() {
             for rail in [false, true] {
                 let mut app = app_with_columns(&[400.0], false);
                 app.ui.panels.rail = rail;
-                app.ui.theme = theme;
+                app.ui.theme = theme.clone();
                 let rw = if rail { if theme.is_pro() { 36.0 } else { 44.0 } } else { 0.0 };
                 let mut h = dock_panel_harness(app, vec2(1280.0, 800.0), theme);
                 let start = begin_outer_resize(&mut h);
@@ -2157,13 +2158,13 @@ fn constrained_composed_layout_reserves_the_canvas_with_or_without_a_rail() {
             for rail in [false, true] {
                 let mut app = app_with_columns(&[290.0, 220.0], false);
                 app.ui.panels.rail = rail;
-                app.ui.theme = theme;
+                app.ui.theme = theme.clone();
                 app.ui.panels.toolbar_side = if crate::direction::is_rtl() { crate::state::ToolbarSide::Left } else { crate::state::ToolbarSide::Right };
                 let mut ready = false;
                 let mut h = Harness::builder().with_size(vec2(400.0, 600.0)).with_step_dt(1.0 / 60.0).build_ui_state(
                     move |ui, app: &mut PhotocraftApp| {
                         if !ready {
-                            PhotocraftApp::setup_context(ui.ctx(), theme);
+                            PhotocraftApp::setup_context(ui.ctx(), theme.clone());
                             ready = true;
                             return;
                         }

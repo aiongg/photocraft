@@ -29,8 +29,10 @@ pub const MAX_NAME: usize = 64;
 #[serde(default, rename_all = "camelCase")]
 pub struct ShortcutSet {
     /// Command id → main key; "" removes the default key.
+    #[serde(deserialize_with = "crate::prefs::theme_ids::command_keys")]
     pub shortcuts: BTreeMap<String, String>,
     /// Command id → further keys, replacing the defaults.
+    #[serde(deserialize_with = "crate::prefs::theme_ids::command_keys")]
     pub alternate_shortcuts: BTreeMap<String, Vec<String>>,
 }
 

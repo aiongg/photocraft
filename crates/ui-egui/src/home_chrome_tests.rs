@@ -17,7 +17,7 @@ fn app(theme: AppTheme, document: bool, auto_show: bool) -> Harness<'static, Pho
     }
     s.edit_prefs(|p| p.general.auto_show_home_screen = auto_show);
     let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+        PhotocraftApp::setup_context(&cc.egui_ctx, theme.clone());
         let mut app = PhotocraftApp::new(s, crate::Services::default());
         app.ui.theme = theme;
         app

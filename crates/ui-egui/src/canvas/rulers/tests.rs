@@ -18,7 +18,7 @@ fn ruler_ticks_labels_and_pointer_stay_out_of_the_origin_corner() {
                 },
                 app,
             );
-            PhotocraftApp::setup_context(&h.ctx, theme);
+            PhotocraftApp::setup_context(&h.ctx, theme.clone());
             h.event(egui::Event::PointerMoved(corner.center()));
             h.run_steps(4);
             let mut ticks = 0;

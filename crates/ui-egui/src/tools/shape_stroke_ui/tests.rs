@@ -256,7 +256,7 @@ fn tab_and_space_operate_the_opener_and_the_complete_style_target() {
 fn popup_is_content_sized_and_keeps_presets_inside_small_windows_in_all_themes() {
     for theme in crate::theme::AppTheme::all() {
         for scale in [1.0, 2.0] {
-            let mut h = sized_harness(vec2(720.0, 900.0), scale, theme);
+            let mut h = sized_harness(vec2(720.0, 900.0), scale, theme.clone());
             open(&mut h);
             let large = h.state().popup.expect("the parent popup response");
             assert!(large.height() < 500.0, "{theme:?} {scale}x: empty space must not fill the 900pt window: {large:?}");

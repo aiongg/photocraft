@@ -270,7 +270,7 @@ fn spectrum_popup_style_matches_main_menu_and_preserves_studio() {
     {
         let ctx = egui::Context::default();
         crate::theme::apply(&ctx, &kind);
-        let tokens = crate::theme::kind.tokens();
+        let tokens = kind.tokens();
         let mut out = ctx.run_ui(Default::default(), |ui| {
             let original_padding = ui.spacing().button_padding;
             let original_hover = ui.visuals().widgets.hovered.fg_stroke;
@@ -433,7 +433,7 @@ fn text_field_text_ink_is_centred_in_its_box() {
                 },
                 (text.to_owned(), egui::Rect::NOTHING),
             );
-            crate::PhotocraftApp::setup_context(&h.ctx, kind);
+            crate::PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(3);
             let image = h.render().expect("render text field");
             let field = h.state().1;
@@ -791,7 +791,7 @@ fn themed_value_field_number_sits_inside_its_box_in_every_size() {
                 },
                 (v, egui::Rect::NOTHING),
             );
-            crate::PhotocraftApp::setup_context(&harness.ctx, kind);
+            crate::PhotocraftApp::setup_context(&harness.ctx, kind.clone());
             harness.run();
             let number = harness.get_by_role(egui::accesskit::Role::SpinButton).rect();
             let field = harness.state().1;

@@ -757,7 +757,7 @@ fn gradient_map_stop_controls_fit_a_narrow_properties_panel_in_every_theme() {
                 },
                 json!({"stops": [[0, "#000000"], [1, "#ffffff"]]}),
             );
-            PhotocraftApp::setup_context(&h.ctx, kind);
+            PhotocraftApp::setup_context(&h.ctx, kind.clone());
             h.run_steps(4);
             for role in [egui::accesskit::Role::Button, egui::accesskit::Role::ComboBox, egui::accesskit::Role::SpinButton] {
                 for control in h.query_all_by_role(role) {

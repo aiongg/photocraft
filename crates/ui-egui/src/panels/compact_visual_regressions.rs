@@ -36,7 +36,7 @@ fn toolbar_harness_sized(kind: theme::AppTheme, scale: f32, height: f32) -> egui
 fn compact_toolbar_scrolls_to_and_activates_the_last_tool() {
     for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
-            let mut harness = toolbar_harness(kind, scale);
+            let mut harness = toolbar_harness(kind.clone(), scale);
             harness.event(egui::Event::PointerMoved(pos2(25.0, 100.0)));
             harness.event(egui::Event::MouseWheel {
                 source: egui::MouseWheelSource::Unknown,
@@ -64,7 +64,7 @@ fn compact_toolbar_scrolls_to_and_activates_the_last_tool() {
 fn compact_toolbar_tab_reveals_and_activates_the_last_tool() {
     for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
-            let mut harness = toolbar_harness(kind, scale);
+            let mut harness = toolbar_harness(kind.clone(), scale);
             // The supported shortcut preference clears the canvas Tab binding. From no
             // focus, every step below is a real Tab processed by the app's dispatcher.
             let mut reached = false;
@@ -111,12 +111,13 @@ fn capture_compact_visual_fixtures() {
                 app.session.tools.foreground = [1.0, 0.0, 1.0, 1.0];
                 app.session.tools.background = [0.0, 1.0, 0.0, 1.0];
                 let mut ready = false;
+                let shown = kind.clone();
                 let mut harness = egui_kittest::Harness::builder().with_size(vec2(width, height)).with_pixels_per_point(scale).wgpu().build_ui_state(
                     move |ui, app: &mut PhotocraftApp| {
                         if !ready {
                             egui_extras::install_image_loaders(ui.ctx());
                             crate::theme::install_fonts(ui.ctx());
-                            crate::theme::apply(ui.ctx(), &kind);
+                            crate::theme::apply(ui.ctx(), &shown);
                             ready = true;
                             return;
                         }
@@ -240,12 +241,13 @@ fn tab_focus_reveals_the_final_narrow_tool_option() {
     for kind in theme::AppTheme::all() {
         for scale in [1.0, 1.5, 2.0] {
             let mut ready = false;
+            let shown = kind.clone();
             let mut harness = egui_kittest::Harness::builder().with_size(vec2(360.0, 120.0)).with_pixels_per_point(scale).build_ui_state(
                 move |ui, app: &mut PhotocraftApp| {
                     if !ready {
                         egui_extras::install_image_loaders(ui.ctx());
                         theme::install_fonts(ui.ctx());
-                        theme::apply(ui.ctx(), &kind);
+                        theme::apply(ui.ctx(), &shown);
                         app.ui.tool = if Tokens::get(ui.ctx()).pro { Tool::Pencil } else { Tool::Brush };
                         app.session.prefs.edit(|prefs| prefs.shortcuts.insert("window.togglePanels".into(), String::new()));
                         ready = true;
@@ -366,7 +368,7 @@ fn the_crop_ratio_fields_show_three_decimals() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
     let Some(kind) = crate::theme::AppTheme::all().into_iter().find(|k| {
-        crate::theme::apply(&ctx, *k);
+        crate::theme::apply(&ctx, k);
         Tokens::get(&ctx).pro
     }) else {
         return;
@@ -400,7 +402,7 @@ fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
     let Some(kind) = crate::theme::AppTheme::all().into_iter().find(|k| {
-        crate::theme::apply(&ctx, *k);
+        crate::theme::apply(&ctx, k);
         Tokens::get(&ctx).pro
     }) else {
         return;

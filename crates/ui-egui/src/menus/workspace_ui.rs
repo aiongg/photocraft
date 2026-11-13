@@ -583,11 +583,12 @@ mod tests {
         for theme in crate::theme::AppTheme::all() {
             for width in [800.0, 1200.0] {
                 let builder = egui_kittest::Harness::builder().with_size(egui::vec2(width, 800.0)).with_max_steps(64);
+                let shown = theme.clone();
                 let mut h = builder.build_eframe(move |cc| {
-                    PhotocraftApp::setup_context(&cc.egui_ctx, theme);
+                    PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
                     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-                    app.run("prefs.set", json!({"path": "interface.theme", "value": theme.id()})).unwrap();
-                    app.ui.theme = theme;
+                    app.save_theme(&shown).unwrap();
+                    app.ui.theme = shown;
                     // The workspace's docks, not the Home screen (which draws none).
                     app.session.edit_prefs(|p| p.general.auto_show_home_screen = false);
                     app.ui.panels.menu_bar = false;

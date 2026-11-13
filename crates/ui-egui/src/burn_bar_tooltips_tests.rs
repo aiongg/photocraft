@@ -187,7 +187,7 @@ fn render_tooltips_for_visual_inspection() {
         for tool in [Tool::Burn, Tool::Dodge] {
             for (i, (role, label, tip)) in CONTROLS.into_iter().enumerate() {
                 let mut h = bar(tool, lang, 1000.0, 1.0, false);
-                PhotocraftApp::setup_context(&h.ctx, theme);
+                PhotocraftApp::setup_context(&h.ctx, theme.clone());
                 h.run_steps(4);
                 h.render().unwrap().save(out.join(format!("{theme:?}-{tool:?}-{i}-before.png"))).unwrap();
                 let name = control_name(&h, lang, role, label);

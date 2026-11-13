@@ -1342,19 +1342,26 @@ fn ui_set_color_panel_mode() {
     assert_eq!(app.ui.color_panel.mode, ColorPanelMode::HsbSliders);
 }
 
+/// `ui.set {theme}` takes a suite theme id, shown in the mode on screen, or a name PhotoCraft took
+/// before theme ids, shown in its own mode; a theme the suite doesn't have is refused.
 #[test]
-fn ui_set_unknown_theme_error_names_every_theme_and_each_name_works() {
+fn ui_set_theme_takes_ids_and_pre_id_names_and_refuses_unknown_themes() {
     use crate::theme::AppTheme;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    let r = call(&mut app, &ctx, "ui.set", json!({"theme": "nope"}));
-    assert_eq!(r["ok"], false);
-    let error = r["error"].as_str().unwrap();
-    for kind in AppTheme::all() {
-        assert!(error.contains(kind.id()), "{error} lacks {}", kind.id());
-        assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": kind.id()}))["ok"], true);
-        assert_eq!(app.ui.theme, kind);
-        assert_eq!(AppTheme::from_name(kind.id()), Some(kind));
+    for unknown in ["nope", "Not an id!"] {
+        assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": unknown}))["ok"], false, "{unknown}");
+        assert_eq!(app.ui.theme, AppTheme::pro_medium(), "{unknown}");
+    }
+    for (name, shown) in [
+        ("craft.studio", AppTheme::studio()),
+        ("studioLight", AppTheme::studio_light()),
+        ("Pro (Medium Gray)", AppTheme::pro_medium()),
+        ("gnome", AppTheme::adwaita()),
+        ("craft.pro", AppTheme::pro_light()),
+    ] {
+        assert_eq!(call(&mut app, &ctx, "ui.set", json!({"theme": name}))["ok"], true, "{name}");
+        assert_eq!(app.ui.theme, shown, "{name}");
     }
 }
 
