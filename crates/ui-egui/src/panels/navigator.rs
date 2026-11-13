@@ -94,8 +94,11 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Visible-area rectangle.
     let v = app.ui.views[idx].clone();
     let canvas = app.last_canvas_rect;
-    let (zoom, center) =
-        if v.zoom_animating && app.session.prefs().general.animated_zoom { v.display_camera.unwrap_or((v.zoom, v.center)) } else { (v.zoom, v.center) };
+    let (zoom, center) = if v.zoom_easing || (v.zoom_animating && app.session.prefs().general.animated_zoom) {
+        v.display_camera.unwrap_or((v.zoom, v.center))
+    } else {
+        (v.zoom, v.center)
+    };
     let point_zoom = (zoom / app.canvas_ppp()).max(1e-6);
     // Pixel aspect correction shows fewer document columns across the same canvas width.
     let vw = canvas.width() / point_zoom / app.ui.view.display_aspect() * s;

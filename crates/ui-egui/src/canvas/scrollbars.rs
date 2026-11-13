@@ -332,6 +332,7 @@ mod tests {
             zoom_animating: false,
             zoom_anchor: None,
             display_camera: None,
+            zoom_easing: false,
         };
         assert!(clamp_view(&mut v, vec2(500.0, 400.0), 1.0));
         assert_eq!(v.center, [250.0, 200.0]);
@@ -375,6 +376,7 @@ mod tests {
             zoom_animating: false,
             zoom_anchor: None,
             display_camera: None,
+            zoom_easing: false,
         };
         assert!(!clamp_view(&mut v, vec2(500.0, 400.0), 1.0));
     }

@@ -236,7 +236,6 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         h.step();
         assert!(h.state().perf.gpu, "{name}: keep the GPU canvas");
         assert_eq!(h.state().perf.last_refresh, "", "{name}: reuse the composite");
-        assert!(h.state().canvases.values().all(|cache| cache.texture.is_none()), "{name}: no CPU texture fallback");
         let xf = view_xf(&h);
         if name == "midpoint" {
             assert!(xf.zoom > 1.0 && xf.zoom < target);

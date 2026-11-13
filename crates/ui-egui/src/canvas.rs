@@ -1936,6 +1936,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let shown = document_display::show(app, ui, &mut view, &pass);
     if primary && let Some(stored) = app.ui.views.get_mut(idx) {
         stored.display_camera = view.display_camera;
+        stored.zoom_easing = view.zoom_easing;
     }
     let display_view =
         View { zoom: (shown.view.zoom * f64::from(ppp)) as f32, center: [shown.view.center.x as f32, shown.view.center.y as f32], ..view.clone() };
