@@ -243,7 +243,9 @@ fn a_capture_in_flight_follows_the_app_document_identity() {
             queue.note_pass();
         }
         assert!(queue.issue(&WindowHost::of(&ctx), now, admitted).is_empty());
-        let callback = actual_callback(&ctx.run_ui(Default::default(), |_| {})).expect("issued");
+        let mut output = ctx.run_ui(Default::default(), |_| {});
+        output.textures_delta.clear();
+        let callback = actual_callback(&output).expect("issued");
         callback.complete(Arc::new(ColorImage::filled([600, 400], Color32::RED)));
 
         for (command, params) in between {
