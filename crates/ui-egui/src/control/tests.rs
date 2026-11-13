@@ -1403,23 +1403,23 @@ fn ui_set_color_panel_picks_the_edited_chip() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"background": true}}))["ok"], true);
-    assert!(app.ui.color_panel.background);
+    assert!(app.ui.color_panel.panel.background);
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"background": "yes"}}))["ok"], false);
-    assert!(app.ui.color_panel.background, "a bad value changes nothing");
+    assert!(app.ui.color_panel.panel.background, "a bad value changes nothing");
 }
 
 #[test]
 fn ui_set_color_panel_mode() {
-    use crate::state::ColorPanelMode;
+    use craft::color::ui::ColorPanelMode;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
-    assert_eq!(app.ui.color_panel.mode, ColorPanelMode::HueCube);
+    assert_eq!(app.ui.color_panel.panel.mode, ColorPanelMode::HueCube);
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"mode": "rgbSliders"}}))["ok"], true);
-    assert_eq!(app.ui.color_panel.mode, ColorPanelMode::RgbSliders);
+    assert_eq!(app.ui.color_panel.panel.mode, ColorPanelMode::RgbSliders);
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"mode": "hsbSliders"}}))["ok"], true);
-    assert_eq!(app.ui.color_panel.mode, ColorPanelMode::HsbSliders);
+    assert_eq!(app.ui.color_panel.panel.mode, ColorPanelMode::HsbSliders);
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"mode": "nope"}}))["ok"], false);
-    assert_eq!(app.ui.color_panel.mode, ColorPanelMode::HsbSliders);
+    assert_eq!(app.ui.color_panel.panel.mode, ColorPanelMode::HsbSliders);
 }
 
 /// `ui.set {theme}` takes a suite theme id, shown in the mode on screen, or a name PhotoCraft took

@@ -747,7 +747,7 @@ fn floated_color_panel_menu_picks_the_mode() {
     h.run_steps(2);
     h.get_by_label("   RGB Sliders").click();
     h.run_steps(2);
-    assert_eq!(h.state().ui.color_panel.mode, crate::state::ColorPanelMode::RgbSliders);
+    assert_eq!(h.state().ui.color_panel.panel.mode, craft::color::ui::ColorPanelMode::RgbSliders);
 }
 
 #[test]
