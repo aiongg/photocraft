@@ -21,12 +21,12 @@ fn color_tab(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp
     h
 }
 
-/// The Hue Cube's field.
 /// The foreground (0) or background (1) well: the pair's wells are radio buttons.
 fn well<'a>(h: &'a egui_kittest::Harness<'_, PhotocraftApp>, i: usize) -> egui_kittest::Node<'a> {
     h.query_all_by_role(egui::accesskit::Role::RadioButton).nth(i).expect("a well")
 }
 
+/// The Hue Cube's field.
 fn field(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> Rect {
     h.get_by_label("Saturation and brightness").rect()
 }
