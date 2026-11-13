@@ -42,14 +42,14 @@ pub mod outline;
 mod paint;
 pub mod paint_mouse;
 mod paint_thread;
-#[allow(dead_code, reason = "the document display of the framework Canvas body reads it")]
-mod raster_source;
 #[cfg(test)]
 mod paint_thread_tests;
 pub mod patch_preview;
 pub mod pattern_preview;
 pub mod pixel_grid;
 pub mod quick_pick;
+#[allow(dead_code, reason = "the document display of the framework Canvas body reads it")]
+mod raster_source;
 pub mod rotate_view;
 pub mod rulers;
 pub mod scroll_all_windows;
@@ -82,11 +82,11 @@ pub(crate) use cursors::{
 };
 use cursors::{brush_tip_centre, eyedropper_ring, preview_locator_cursor, visible_crosshair};
 pub(crate) use display::GPU_OUTPUT;
-use display::texture_key;
-pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
 use display::checker;
 #[cfg(test)]
 use display::sync_display_lut;
+use display::texture_key;
+pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
 pub use drag::{Drag, DragDocument, fixed_size_px, marquee_corners, marquee_px, marquee_readout, readout_in, size_readout, square_px};
 pub(crate) use drag::{angle_readout, doc_box_corners, draw_readout, draw_value_readout};
 #[cfg(test)]
@@ -94,14 +94,15 @@ pub(crate) use drag::{marquee_drag_ants, marquee_preview_px};
 #[cfg(test)]
 pub(crate) use filter_preview::committed_filter_preview;
 #[cfg(test)]
-use filter_preview::filter_preview_display_doc;
-#[cfg(test)]
 pub(crate) use filter_preview::ensure_filter_preview;
+#[cfg(test)]
+use filter_preview::filter_preview_display_doc;
 pub(crate) use filter_preview::{filter_channel_preview, filter_preview_factor};
 #[cfg(test)]
 pub(crate) use gesture::constrained_polygon_point;
 pub use gesture::{commit_crop, commit_polygon, polygon_cancel_stale, polygon_replaces_selection, polygon_retract};
 pub(crate) use gesture::{finish_gesture, polygon_close_reach, selection_mode};
+use gpu_picture::{GpuRequest, gpu_picture};
 pub(crate) use navigator::NavigatorCache;
 #[cfg(test)]
 use navigator::navigator_waits_for_drag;
@@ -109,12 +110,8 @@ pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navig
 #[cfg(test)]
 use paint::draw_tool_state;
 pub(crate) use paint::{clip_line, marching_ants_line_shapes, marching_ants_mapped};
-use paint::{
-    draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_mapped_image_at,
-    pattern_xf,
-};
+use paint::{draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_mapped_image_at, pattern_xf};
 pub(crate) use raster_source::SourceLog;
-use gpu_picture::{GpuRequest, gpu_picture};
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};
@@ -426,18 +423,15 @@ fn paint_canvas(
             crate::render_path::view_cpu(app, doc.id.0);
         }
     }
-    let picture = if gpu_ok {
-        gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target_xf, zoom: view.zoom, render_zoom })
-    } else {
-        None
-    };
+    let picture =
+        if gpu_ok { gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target_xf, zoom: view.zoom, render_zoom }) } else { None };
     if let Some(picture) = picture {
         on_gpu = true;
         // Shadow, checkerboard, document and pixel grid in one custom shader (gpu_canvas.rs).
         let t = crate::theme::Tokens::get(ctx);
         let picture = picture.framed(!t.bevel && !t.pro && drop_shadow, pixel_grid);
-        let canvas_view = CanvasView::new(rect, Point::new(f64::from(xf.center[0]), f64::from(xf.center[1])), f64::from(point_zoom))
-            .rotation(f64::from(view.rotation));
+        let canvas_view =
+            CanvasView::new(rect, Point::new(f64::from(xf.center[0]), f64::from(xf.center[1])), f64::from(point_zoom)).rotation(f64::from(view.rotation));
         if picture.shows_document() {
             if app.navigator_plain.contains(&doc.id) {
                 app.navigator_gpu.insert(doc.id, picture.params(&canvas_view));
