@@ -181,7 +181,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         }
         if let Some(space) = craft::ui::canvas::canvas_space(&body.env) {
             let painter = ui.painter_at(body.rect);
-            if shadow {
+            // egui's shadow is an upright rect: a turned page gets none rather than a dark box around it.
+            if shadow && space.view.rotation == 0.0 {
                 let area = Rect::from_points(&space.view.quad(rect64(bounds)));
                 painter.add(egui::Shadow { offset: [0, 8], blur: 28, spread: 0, color: Color32::from_black_alpha(150) }.as_shape(area, 0));
             }

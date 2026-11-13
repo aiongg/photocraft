@@ -439,7 +439,6 @@ mod navigator_wheel_tests {
         v.zoom = 2.0;
         v.request_zoom_animation(true);
         v.display_camera = Some((1.5, c));
-        v.zoom_transition = Some(crate::state::ZoomTransition { from: (1.0, c), target: (v.zoom, c), started: 0.0 });
         v.zoom_anchor = Some(([50.0, 25.0], [200.0, 150.0]));
         // ⌘/Ctrl-drag: the rectangle fills the canvas (`last_canvas_rect`, 800 × 600 pt).
         drag(&mut app, &ctx, Modifiers::COMMAND, [50.0, 25.0], [100.0, 50.0]);
@@ -462,7 +461,7 @@ mod navigator_wheel_tests {
             (expected.zoom, expected.center)
         );
         assert!(v.zoom > 1.0 && !v.fit_pending);
-        assert!(!v.zoom_animating && v.zoom_transition.is_none() && v.zoom_anchor.is_none(), "direct navigation cancels the old transition");
+        assert!(!v.zoom_animating && v.zoom_anchor.is_none(), "direct navigation cancels the old transition");
         assert_eq!(v.display_camera, Some((v.zoom, v.center)), "the selected rectangle is displayed immediately");
         assert!(ctx.data(|d| d.get_temp::<Pos2>(navigator_zoom_drag_id())).is_none(), "the drag is over");
     }
@@ -1827,7 +1826,7 @@ mod navigator_animated_zoom_tests {
             let view = &h.state().ui.views[0];
             assert_eq!(view.zoom, zoom, "{label}");
             assert_eq!(view.display_camera, Some((view.zoom, view.center)), "{label}");
-            assert!(!view.zoom_animating && view.zoom_anchor.is_none() && view.zoom_transition.is_none(), "{label}");
+            assert!(!view.zoom_animating && view.zoom_anchor.is_none(), "{label}");
             assert!(!view.fit_pending, "{label}");
         }
     }

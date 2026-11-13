@@ -108,6 +108,8 @@ use paint::draw_tool_state;
 pub(crate) use paint::{clip_line, marching_ants_line_shapes, marching_ants_mapped};
 use paint::{draw_drag_preview, marching_ants_segment_shapes};
 pub(crate) use raster_source::SourceLogs;
+#[cfg(test)]
+pub(crate) use raster_source::CompositePrep;
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};

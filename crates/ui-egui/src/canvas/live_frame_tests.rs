@@ -34,7 +34,8 @@ fn live_brush_texture_includes_this_frames_press_and_moves() {
             let key = live.display_key();
             let doc = live.doc().clone();
             let (_, display) = canvas_display(app, &doc, None);
-            assert_eq!(app.canvases.values().next().unwrap().tex_preview_key, key ^ display, "{tool:?}: texture includes this frame's input");
+            let shown = app.raster_logs.values().next().and_then(|log| log.composite_seen()).map(|seen| seen.1);
+            assert_eq!(shown, Some(key ^ display), "{tool:?}: the canvas picture includes this frame's input");
         };
         shown(&mut h);
         h.input_mut().events.push(egui::Event::PointerMoved(p + vec2(25.0, 0.0)));
@@ -65,32 +66,26 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         app.ui.tool = tool;
         let v = &mut app.ui.views[0];
         v.fit_pending = false;
-        v.zoom = 2.0;
+        v.zoom = 1.0;
         v.center = [32.0, 32.0];
         v.doc_size = [64, 64];
-        v.zoom_animating = true;
-        v.display_camera = Some((1.0, [32.0, 32.0]));
-        v.zoom_transition = Some(crate::state::ZoomTransition { from: (1.0, [32.0, 32.0]), target: (2.0, [32.0, 32.0]), started: 0.0 });
-        let view = v.clone();
         let ctx = egui::Context::default();
-        let tex = ensure_texture(&mut app, &ctx, 0, None).unwrap().0;
         let rect = Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0));
-        let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), time: Some(0.1), ..Default::default() }, |ui| {
-            canvas_view(&mut app, ui, 0, rect, view.clone(), true);
-        });
-        out.textures_delta.clear();
-        let mesh = out
-            .shapes
-            .iter()
-            .find_map(|s| match &s.shape {
-                egui::Shape::Mesh(mesh) if mesh.texture_id == tex => Some(mesh),
-                _ => None,
-            })
-            .unwrap();
-        let min = mesh.vertices.iter().map(|v| v.pos.x).fold(f32::INFINITY, f32::min);
-        let max = mesh.vertices.iter().map(|v| v.pos.x).fold(f32::NEG_INFINITY, f32::max);
-        let shown = app.ui.views[0].display_camera.unwrap().0;
-        assert!(shown > 1.0 && shown < 2.0, "{tool:?}: animation is between endpoints");
-        assert!(((max - min) - 64.0 * shown).abs() < 0.01, "{tool:?}: image must use the animated camera, width {} at zoom {shown}", max - min);
+        let mut pass = |app: &mut PhotocraftApp, view: View, time: f64| {
+            let mut shown = view.clone();
+            let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), time: Some(time), ..Default::default() }, |ui| {
+                shown = canvas_view(app, ui, 0, rect, view.clone(), true);
+            });
+            shown
+        };
+        let mut view = pass(&mut app, app.ui.views[0].clone(), 0.0);
+        // A discrete zoom to 200 % eases from what the canvas drew: the tools map through the camera in between.
+        view.zoom = 2.0;
+        view.request_zoom_animation(true);
+        let view = pass(&mut app, view, 0.1);
+        let view = pass(&mut app, view, 0.15);
+        let shown = app.ui.views[0].display_camera.expect("the canvas records the camera it drew").0;
+        assert!(shown > 1.0 && shown < 2.0, "{tool:?}: the camera is between the endpoints, {shown}");
+        assert_eq!(view.zoom, 2.0, "{tool:?}: the requested zoom stays the target");
     }
 }

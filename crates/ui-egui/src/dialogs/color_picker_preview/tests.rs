@@ -244,12 +244,9 @@ fn ok_counts_the_previewed_canvas_as_the_document_so_only_the_layer_is_redrawn()
             pick(&mut app, "#ff0000")
         };
         // The canvas draws the preview, then OK commits it.
-        crate::canvas::ensure_texture(&mut app, &ctx, 0, None).unwrap();
+        drop(crate::canvas::CompositePrep::new(&mut app, &ctx, 0, None).unwrap());
         let doc_id = app.session.active().unwrap().doc.id;
-        let cached = |app: &PhotocraftApp| {
-            let c = &app.canvases[&crate::canvas::cache_key(doc_id, None)];
-            (c.tex_revision, c.tex_preview_key)
-        };
+        let cached = |app: &PhotocraftApp| app.raster_logs[&crate::canvas::cache_key(doc_id, None)].composite_seen().unwrap();
         let doc = app.session.active().unwrap().doc.clone();
         let dk = crate::canvas::canvas_display(&app, &doc, None).1;
         assert_ne!(cached(&app).1, dk, "gradient={gradient}: the canvas holds the preview");
@@ -271,14 +268,14 @@ fn ok_after_a_colour_the_canvas_never_drew_redraws_as_before() {
     let ctx = egui::Context::default();
     new_type_layer(&mut app, "Hello");
     let dialog = pick(&mut app, "#ff0000");
-    crate::canvas::ensure_texture(&mut app, &ctx, 0, None).unwrap();
+    drop(crate::canvas::CompositePrep::new(&mut app, &ctx, 0, None).unwrap());
     let doc = app.session.active().unwrap().doc.clone();
     let dk = crate::canvas::canvas_display(&app, &doc, None).1;
     // The colour changes and OK lands before the canvas drew it: the shown copy is not the edit.
     set_color(&mut app, "#0000ff");
     crate::dialogs::confirm(&mut app, dialog).unwrap();
-    let c = &app.canvases[&crate::canvas::cache_key(doc.id, None)];
-    assert_ne!(c.tex_preview_key, dk, "a stale red preview is never counted as the blue document");
+    let seen = app.raster_logs[&crate::canvas::cache_key(doc.id, None)].composite_seen().unwrap();
+    assert_ne!(seen.1, dk, "a stale red preview is never counted as the blue document");
 }
 
 #[test]
