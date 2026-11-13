@@ -4,6 +4,7 @@
 
 use craft::ui::contract::{Bind, DropZone, Show as _};
 use craft::ui::list::ThumbAspect;
+use craft::ui::tile_grid::TileZoom;
 use craft::ui::patterns::presets::{
     DefaultOpen, PresetBrowser, PresetEvent, PresetFooterEvent, PresetFooterOptions, PresetPicker, PresetReorder, PresetRow, PresetState,
 };
@@ -57,13 +58,18 @@ fn rows(folders: &[Folder], order: &[usize]) -> Vec<PresetRow<PresetKey>> {
     rows
 }
 
+/// The thumbnail sizes of every preset panel, as factors of the grid's large thumbnail (48 pt): 20 to 96 pt in 6 pt
+/// steps, 40 pt by default.
+const THUMB_RANGE: TileZoom = TileZoom::bounded(20.0 / 48.0, 2.0, 6.0 / 48.0, 40.0 / 48.0);
+
 /// Where preset drops land: the canvas proper, rulers excluded, on the canvas's layer.
 fn canvas_zone(app: &PhotocraftApp) -> DropZone {
     DropZone::new(app.last_canvas_layer, canvas_drop_rect(app))
 }
 
 /// Shows `panel`'s browser over `folders` with `thumb` painting a preset's thumbnail, and returns its events with the
-/// keys of the rows it showed, in order. `presets` is the panel state, `zone` the canvas.
+/// keys of the rows it showed, in order. `presets` is the panel state, `zone` the canvas; `room_height` sizes the
+/// browser to its presets up to that height, else it takes the available height.
 fn show(
     presets: &mut PresetUi,
     zone: DropZone,
@@ -71,18 +77,27 @@ fn show(
     panel: PresetPanel,
     folders: &[Folder],
     thumb: &dyn Fn(&ContentPainterCx, Rect, &str),
+    room_height: Option<f32>,
 ) -> (Vec<PresetEvent<PresetKey>>, Vec<PresetKey>) {
     let order = presets.display_order(panel.id, &names_of(folders));
     let rows = rows(folders, &order);
     let selected = presets.selected.get(panel.id).cloned().map(PresetKey::Item);
-    let mut state = presets.browsers.get(panel.id).cloned().unwrap_or_default();
+    let mut state = presets.browsers.get(panel.id).cloned().unwrap_or_else(|| {
+        let mut state = PresetState::new();
+        state.zoom = THUMB_RANGE.default_value();
+        state
+    });
     let mut browser = PresetBrowser::new(tl!(panel.label), Bind::bound(&mut state), &rows);
     if let Some(key) = selected.clone() {
         browser = browser.selected(key);
     }
+    if let Some(height) = room_height {
+        browser = browser.room_height(height);
+    }
     let out = browser
         .browser_id(browser_id(panel))
         .default_open(DefaultOpen::First)
+        .thumb_range(THUMB_RANGE)
         .reorder(PresetReorder::items_and_groups())
         .drop_zone(zone)
         .footer(PresetFooterOptions::new().new_group(true).can_delete(selected.is_some()))
@@ -167,13 +182,13 @@ pub fn patterns_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     };
     let zone = canvas_zone(app);
-    let (events, rows) = show(&mut app.ui.presets_ui, zone, ui, PATTERNS, &folders, &thumb);
+    let (events, rows) = show(&mut app.ui.presets_ui, zone, ui, PATTERNS, &folders, &thumb, None);
     apply(app, ui.ctx(), PATTERNS, &names_of(&folders), &rows, events);
 }
 
 // ------------------------------------------------------------------ Styles
 
-/// The height of the Styles browser, footer included.
+/// The most height the Styles presets take before they scroll.
 const STYLES_HEIGHT: f32 = 300.0;
 
 /// Window › Styles: a click applies the style to the selected layers (Shift adds its effects), a drop on the canvas
@@ -195,12 +210,8 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ColorImage::from_rgba_unmultiplied([S as usize, S as usize], &px)
         });
     };
-    // The floating window sizes to its content: the browser fills a room of the height Styles' list had.
-    let room = egui::vec2(ui.available_width(), STYLES_HEIGHT);
-    let (events, rows) = ui.allocate_ui(room, |ui| {
-        ui.set_min_height(STYLES_HEIGHT);
-        show(&mut app.ui.presets_ui, zone, ui, STYLES, &folders, &thumb)
-    }).inner;
+    // The floating window sizes to its content.
+    let (events, rows) = show(&mut app.ui.presets_ui, zone, ui, STYLES, &folders, &thumb, Some(STYLES_HEIGHT));
     apply(app, ui.ctx(), STYLES, &names_of(&folders), &rows, events);
 }
 
