@@ -2377,6 +2377,28 @@ fn actions_play_checks_each_step_for_synthetic_input() {
     assert_eq!(r["ran"], 1, "{r}");
 }
 
+/// An injected shortcut acts for the automation client: Cmd+J asks `automation_authorize` before it
+/// runs, and a refusal leaves the document as it was.
+#[test]
+fn an_injected_shortcut_asks_the_automation_policy() {
+    thread_local!(static ASKED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+    fn deny_via_copy(id: &str, _: &serde_json::Value) -> photocraft_engine::Result<()> {
+        if id == "layer.new.layerViaCopy" {
+            ASKED.set(true);
+            Err(photocraft_engine::EngineError::Other(format!("automation command `{id}` is disabled")))
+        } else {
+            Ok(())
+        }
+    }
+    let services = crate::Services { automation_authorize: Some(deny_via_copy), ..Default::default() };
+    let (mut h, transport) = crate::lifecycle_tests::app_harness(services, 1);
+    let layers = h.state().session.active().unwrap().doc.layers.len();
+    let reply = crate::lifecycle_tests::answered(&mut h, &transport, "ui.key", json!({"key": "J", "command": true}));
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert!(ASKED.get(), "the shortcut's command asked the policy");
+    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers, "the refused command added no layer");
+}
+
 /// Frames with the framework runtime, whose window host injects queued input one step per pass.
 fn input_frames() -> (craft::ui::testing::Frames, egui::Context) {
     let frames = craft::ui::testing::Frames::new();

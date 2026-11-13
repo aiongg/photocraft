@@ -1,7 +1,7 @@
 //! Synthetic input around the app's passes: input queued for one active document is withdrawn
-//! when another document becomes active, not on an edit, and a hidden window keeps painting while
-//! input or a capture waits. The queue itself is the window host's (craft-automation's
-//! `synthetic` trials).
+//! when another document becomes active between passes, not on an edit nor on a switch the
+//! injected step makes itself, and a hidden window keeps painting while input or a capture waits.
+//! The queue itself is the window host's (craft-automation's `synthetic` trials).
 
 use crate::{PhotocraftApp, Services};
 use craft::ui::runtime::windows::WindowHost;
@@ -87,4 +87,57 @@ fn a_logic_tick_requests_a_hidden_paint_for_waiting_captures_and_queued_input() 
     let _reply = queue_key(&mut app, &ctx);
     let out = ctx.run_logic(&host_input(egui::ViewportId::ROOT), |ctx| app.logic(ctx, &mut frame));
     assert!(paints(&out), "queued synthetic input keeps the hidden window painting");
+}
+
+/// The whole app in an eframe harness with `documents` open and a control channel; the channel's
+/// sending end.
+pub(crate) fn app_harness(
+    services: Services,
+    documents: usize,
+) -> (egui_kittest::Harness<'static, PhotocraftApp>, std::sync::mpsc::Sender<crate::ControlRequest>) {
+    let (transport, requests) = std::sync::mpsc::channel();
+    let requests = std::cell::Cell::new(Some(requests));
+    let services = std::cell::Cell::new(Some(services));
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let mut app = PhotocraftApp::new(Session::new(), services.take().expect("one app"));
+        for _ in 0..documents {
+            app.run("file.new", json!({"width": 32, "height": 32})).expect("a document");
+        }
+        app.control = Some(craft::automation::ControlChannel::new(requests.take().expect("one channel")));
+        app
+    });
+    h.run_steps(8);
+    (h, transport)
+}
+
+/// Sends `method` over the harness's control channel and runs passes until it is answered.
+pub(crate) fn answered(
+    h: &mut egui_kittest::Harness<'static, PhotocraftApp>,
+    transport: &std::sync::mpsc::Sender<crate::ControlRequest>,
+    method: &str,
+    params: serde_json::Value,
+) -> serde_json::Value {
+    let (req, reply) = crate::ControlRequest::new(method, params);
+    transport.send(req).expect("the channel is open");
+    for _ in 0..64 {
+        h.run_steps(1);
+        if let Ok(answer) = reply.try_recv() {
+            return answer;
+        }
+    }
+    panic!("{method} was not answered");
+}
+
+/// A step that switches the active document itself (Ctrl+Tab on its press pass) delivers the rest
+/// of its request: the reply is ok, and the key and the modifier are released.
+#[test]
+fn a_step_that_switches_the_document_delivers_the_rest_of_its_request() {
+    let (mut h, transport) = app_harness(Services::default(), 2);
+    let before = h.state().session.active_generation();
+    let reply = answered(&mut h, &transport, "ui.key", json!({"key": "Tab", "ctrl": true}));
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_ne!(h.state().session.active_generation(), before, "Ctrl+Tab switched the document");
+    h.run_steps(1);
+    assert!(h.ctx.input(|i| i.keys_down.is_empty() && i.modifiers.is_none()), "nothing stays down");
 }
