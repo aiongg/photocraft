@@ -74,14 +74,16 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         let ctx = egui::Context::default();
         PhotocraftApp::setup_context(&ctx, Default::default());
         let rect = Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0));
-        let mut pass = |app: &mut PhotocraftApp, view: View, time: f64| {
+        let pass = |app: &mut PhotocraftApp, view: View, time: f64| {
             let mut shown = view.clone();
-            let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), time: Some(time), ..Default::default() }, |ui| {
+            let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), time: Some(time), ..Default::default() }, |ui| {
                 shown = canvas_view(app, ui, 0, rect, view.clone(), true);
             });
+            out.textures_delta.clear();
             shown
         };
-        let mut view = pass(&mut app, app.ui.views[0].clone(), 0.0);
+        let first = app.ui.views[0].clone();
+        let mut view = pass(&mut app, first, 0.0);
         // A discrete zoom to 200 % eases from the zoom it was asked from: the tools map through the camera in between.
         view.request_zoom_animation(true);
         view.zoom = 2.0;

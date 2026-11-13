@@ -93,6 +93,8 @@ pub(crate) use filter_preview::committed_filter_preview;
 #[cfg(test)]
 pub(crate) use filter_preview::ensure_filter_preview;
 #[cfg(test)]
+use filter_preview::filter_channel_preview;
+#[cfg(test)]
 use filter_preview::filter_preview_display_doc;
 pub(crate) use filter_preview::filter_preview_factor;
 #[cfg(test)]
@@ -128,7 +130,7 @@ pub(crate) use tabs::arranged_cells;
 use tabs::dots;
 pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
-use tabs::{TEAR_OFF, pro_tab_title, tab_context_items, tab_drop_index, tab_move_target, tabs, torn_off};
+use tabs::{TEAR_OFF, paint_dots, pro_tab_title, tab_context_items, tab_drop_index, tab_move_target, tabs, torn_off};
 pub use tabs::{TabStrip, document_area, extra_windows};
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter};

@@ -320,6 +320,7 @@ fn meshes_with(shapes: &[egui::epaint::ClippedShape], tex: egui::TextureId) -> u
 #[test]
 fn only_the_main_canvas_draws_the_display() {
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
     open_levels(&mut app, json!({"inBlack": 100}), Some("shadows"));
     let main = main_view(&mut app);

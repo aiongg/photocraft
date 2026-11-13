@@ -2144,6 +2144,7 @@ fn a_huge_view_centre_draws_the_selection_outline_without_overflow() {
     // with unchecked i32 arithmetic: the frame panicked ("attempt to multiply/subtract with
     // overflow") and release builds wrapped to an inverted region.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     // Zoomed far out the quantisation step, and so the padding, is largest (64 · 256 px).
     let cases = [([1e30, 1e30], false), ([-1e30, -1e30], false), ([3e9, -3e9], false), ([512.0, 512.0], true)];
     for ((centre, traced), zoom) in cases.into_iter().flat_map(|c| [(c, 1.0), (c, 1.0 / 64.0)]) {
@@ -2172,6 +2173,7 @@ fn a_one_pixel_selection_traces_at_hundred_percent_on_a_scaled_display() {
     // 1 px selection still traces at 100 % on a 2x display (a points-based step sampled every
     // second pixel and lost it: zero segments).
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
     app.run("select.rect", json!({"x": 50, "y": 50, "width": 1, "height": 100})).unwrap();
@@ -2194,6 +2196,7 @@ fn a_secondary_canvas_does_not_overwrite_the_main_canvas_scale() {
     // #1943 review: a document window can sit on a display with another scale; only the
     // primary canvas records `app.ppp`, so the main mapping doesn't change under it.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("view.actualPixels", json!({})).unwrap();
@@ -2223,6 +2226,7 @@ fn a_flicked_hand_drag_glides_on_only_with_flick_panning() {
     // keeps the view gliding for a while; off, the view stops where the drag ended.
     for flick in [true, false] {
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 2000, "height": 1500})).unwrap();
         app.run("prefs.set", json!({"path": "tools.enableFlickPanning", "value": flick})).unwrap();
@@ -2279,6 +2283,7 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     // #2302 review: `app.ui.transform` is global, but only the primary canvas draws and drives
     // the box. A secondary window's Hand must still pan while the main window transforms.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -2322,6 +2327,7 @@ fn letting_go_of_alt_during_an_alt_sample_press_does_not_paint() {
     // #7802: Alt-pressing with the Brush samples a colour on the press. If Alt was let go
     // before egui recognised the drag, that drag started a stroke from the sampled point.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300, "background": "white"})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -2375,6 +2381,7 @@ fn letting_go_of_alt_during_a_mixer_brush_sample_press_does_not_paint() {
     // As #7802 for the Brush: an Alt-press with the Mixer Brush loads paint from the canvas.
     // If Alt was let go before egui recognised the drag, that drag started a Mixer stroke.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300, "background": "white"})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -2426,6 +2433,7 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // the moving pixels. The preview is image content, drawn before the grid and guides like
     // the document is; the box and handles still go over them, as in Photoshop.
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -2473,6 +2481,7 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
     // the mesh lines, pins and planes over the guides, as in Photoshop.
     for command in ["edit.puppetWarp", "edit.perspectiveWarp", photocraft_engine::vp_cmds::VP] {
         let ctx = egui::Context::default();
+        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
@@ -3046,6 +3055,7 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
 #[test]
 fn an_armed_eyedropper_hides_no_cursor_on_a_secondary_canvas() {
     let ctx = egui::Context::default();
+    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();

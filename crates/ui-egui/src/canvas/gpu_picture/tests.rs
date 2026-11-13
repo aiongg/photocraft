@@ -4,7 +4,7 @@ use egui::{Rect, pos2};
 
 fn picture(shows: Shows, k: u32, growth: [f32; 2]) -> GpuPicture {
     let params = ViewParams { doc: 1, doc_size: [400, 300], zoom: 1.0, center: [0.0, 0.0], rotation: 0.0, view_key: 9, display: 0, output: 0, hdr: None };
-    GpuPicture { params, shows, k, growth, bounds: DRect::new(0, 0, 400, 300), doc_size: [400, 300], pattern: false }
+    GpuPicture { params, shows, k, growth, bounds: DRect::new(0, 0, 400, 300) }
 }
 
 #[test]
@@ -23,9 +23,4 @@ fn a_canvas_view_maps_to_the_shader_view() {
         assert_eq!((p.zoom, p.center, p.doc, p.view_key), (zoom, center, 1, 9), "{view:?}");
         assert!((p.rotation - rotation).abs() < 1e-6, "{view:?}: {}", p.rotation);
     }
-    // The shader's own shadow and grid only where today's canvas asks, and never a grid over a preview's texels.
-    let framed = |shows| picture(shows, 1, [0.0, 0.0]).framed(true, true).params;
-    assert_eq!((framed(Shows::Document).shadow, framed(Shows::Document).pixel_grid), (true, true));
-    assert_eq!((framed(Shows::Preview).shadow, framed(Shows::Preview).pixel_grid), (true, false));
-    assert_eq!((picture(Shows::Document, 1, [0.0, 0.0]).params.shadow, picture(Shows::Document, 1, [0.0, 0.0]).params.pixel_grid), (false, false));
 }

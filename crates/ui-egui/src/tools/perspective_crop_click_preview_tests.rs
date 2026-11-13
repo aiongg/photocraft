@@ -161,11 +161,16 @@ fn hover_over_the_canvas_moves_the_preview() {
     }];
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
+            // The harness runs its first frame before `setup_context` installs the runtime.
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
             let v = app.ui.views[0].clone();
             crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
         },
         a,
     );
+    crate::PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(2);
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 400.0));
     let xf = ViewXform { rect, zoom: 2.0, center: [100.0, 75.0], flip: false, rotation: 0.0, aspect: 1.0 };
