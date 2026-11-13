@@ -18,6 +18,16 @@ fn app_with_doc() -> PhotocraftApp {
     app
 }
 
+/// A control request waiting on the queued input, as a `ui.key` leaves one.
+fn wait_for_input(app: &mut PhotocraftApp) -> std::sync::mpsc::Receiver<serde_json::Value> {
+    let (_transport, rx) = std::sync::mpsc::channel();
+    let mut channel = craft::automation::ControlChannel::new(rx);
+    let (req, reply) = crate::ControlRequest::new("ui.key", json!({"key": "V"}));
+    channel.settle(req, crate::control::Reply::AfterInput, None, 0.0);
+    app.control = Some(channel);
+    reply
+}
+
 fn press(key: Key) -> Event {
     Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }
 }
@@ -86,8 +96,7 @@ fn a_document_change_before_injection_drops_the_batch_and_replies() {
     let mut app = app_with_doc();
     app.synthetic.extend([press(Key::V), release(Key::V)]);
     assert!(!hook(&mut app, &ctx).is_empty());
-    let (tx, rx) = std::sync::mpsc::channel();
-    app.input_waiters.push(tx);
+    let rx = wait_for_input(&mut app);
     // The document changed while the events were still in flight: the next hook sees it before
     // the host consumes them, so it withdraws the batch and fails the waiting reply.
     app.run("file.new", json!({"width": 16, "height": 16})).expect("a second document");
@@ -104,8 +113,7 @@ fn a_document_change_inside_the_pass_is_delivered_and_not_reported_as_cancelled(
     let mut app = app_with_doc();
     app.synthetic.extend([press(Key::V), release(Key::V)]);
     assert!(!hook(&mut app, &ctx).is_empty());
-    let (tx, rx) = std::sync::mpsc::channel();
-    app.input_waiters.push(tx);
+    let rx = wait_for_input(&mut app);
     // `logic` opens another document after the hook consumed the events into this pass. They
     // cannot be withdrawn now. Treat the batch as delivered (automation-gated) rather than
     // failing the reply while the input still lands.
@@ -139,8 +147,7 @@ fn an_edit_in_the_same_document_does_not_cancel_the_queued_batch() {
     let mut app = app_with_doc();
     app.synthetic.extend([press(Key::L), release(Key::L)]);
     assert!(!hook(&mut app, &ctx).is_empty());
-    let (tx, rx) = std::sync::mpsc::channel();
-    app.input_waiters.push(tx);
+    let rx = wait_for_input(&mut app);
     // A command edits the same document while the step is in flight: the revision changes, the
     // document activation does not, so the step is not cancelled.
     app.run("layer.new.layer", json!({"name": "queued"})).expect("an edit");
@@ -162,7 +169,10 @@ fn a_logic_tick_requests_a_hidden_paint_for_waiting_captures_and_queued_input() 
     let mut frame = eframe::Frame::_new_kittest();
     let (tx, _rx) = std::sync::mpsc::channel();
     let document = app.document_identity();
-    app.captures.admit(90, None, tx, document, 0.0, crate::screenshot::now()).expect("parked before the first pass");
+    let (_transport, requests) = std::sync::mpsc::channel();
+    let mut channel = craft::automation::ControlChannel::new(requests);
+    channel.captures.admit(90, None, tx, document, 0.0, craft::ui::runtime::motion::now()).expect("parked before the first pass");
+    app.control = Some(channel);
     let out = ctx.run_logic(&host_input(egui::ViewportId::ROOT), |ctx| app.logic(ctx, &mut frame));
     let paints = |out: &egui::LogicOutput| {
         out.viewport_commands.get(&egui::ViewportId::ROOT).is_some_and(|commands| commands.contains(&egui::ViewportCommand::RequestPaintWhileHidden))
