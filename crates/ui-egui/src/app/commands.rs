@@ -416,11 +416,6 @@ impl PhotocraftApp {
         self.view_docs = ids;
         self.prune_thumbs();
         self.sync_mask_targets();
-        // Channel-view textures outlive a hidden view (cheap re-show), not their document.
-        if !self.channel_views.is_empty() {
-            let docs = self.session.documents();
-            self.channel_views.retain(|id, _| docs.iter().any(|d| d.doc.id.0 == *id));
-        }
         // With no document left, no canvas paints the Levels clipping display to drop its cache.
         if self.session.documents().is_empty() {
             self.levels_clipping = None;

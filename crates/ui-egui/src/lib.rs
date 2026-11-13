@@ -683,8 +683,6 @@ pub struct PhotocraftApp {
     pub(crate) color_picker_preview: Option<color_picker_preview::Preview>,
     /// Channel thumbnails for one document snapshot; view-only revisions reuse their pixels.
     channel_thumbs: Option<(DocId, std::sync::Weak<Document>, bool, Vec<egui::TextureHandle>)>,
-    /// Channels panel overlays / channel views drawn over the canvas, per document id.
-    pub(crate) channel_views: HashMap<u64, channel_view::Cache>,
     /// Selection outline keyed by (document, mask identity × step × visible region).
     pub(crate) outline_cache: Option<(DocId, u64, std::sync::Arc<Vec<outline::Segment>>)>,
     /// GPU canvas renderer, when running on the wgpu backend (see [`Self::set_wgpu`]). Dropped

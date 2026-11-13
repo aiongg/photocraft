@@ -171,7 +171,7 @@ pub fn paint(app: &mut PhotocraftApp, painter: &Painter, xf: &ViewXform, idx: us
     if need.is_empty() {
         return;
     }
-    let Some(cache) = app.canvases.get_mut(&crate::canvas::cache_key(id, output)) else { return };
+    let cache = app.canvases.entry(crate::canvas::cache_key(id, output)).or_default();
     if !cache.grid.as_ref().is_some_and(|g| g.covers(revision, preview_key, &need)) {
         cache.grid = Some(GridLines::build(&doc, revision, preview_key, cache_region(visible, doc.bounds())));
     }

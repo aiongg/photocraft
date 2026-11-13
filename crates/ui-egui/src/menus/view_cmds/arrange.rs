@@ -41,7 +41,6 @@ pub(crate) fn float_window(app: &mut PhotocraftApp, doc: usize, offset: usize, f
     let mut view = app.ui.views.get(doc).cloned().unwrap_or_default();
     view.zoom_animating = false;
     view.zoom_anchor = None;
-    view.zoom_transition = None;
     view.display_camera = None;
     view.fit_pending = offset > 0 || view.fit_pending;
     // A floating window draws the document's own view from now on (`tabs::extra_windows`).

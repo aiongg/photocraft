@@ -93,7 +93,7 @@ pub(crate) struct SourceLogs {
 impl SourceLogs {
     /// The pictures that showed a preview `was_preview` tells count as the committed document from now on, so the
     /// commit's damage refreshes only what it changed ([`super::textures::shown_as_document`]). The composite's keys
-    /// carry the display's key `display_key`; the channel view's are raw, as `channel_view::ensure` keeps them.
+    /// carry the display's key `display_key`; the channel view's are raw.
     pub(crate) fn shown_as_document(&mut self, display_key: u64, was_preview: impl Fn(u64) -> bool) {
         for (_, shown) in &mut self.composite.entries {
             if was_preview(shown.key ^ display_key) {
@@ -185,7 +185,7 @@ pub(crate) struct CompositePrep {
     picture: CanvasPicture,
     display: Option<Arc<CanvasDisplay>>,
     revision: Revision,
-    log_key: u64,
+    log_key: (photocraft_doc::DocId, u32),
 }
 
 impl CompositePrep {
@@ -259,7 +259,7 @@ pub(crate) struct OverlayPrep {
     picture: CanvasPicture,
     overlay: Overlay,
     revision: Revision,
-    log_key: u64,
+    log_key: (photocraft_doc::DocId, u32),
 }
 
 impl OverlayPrep {

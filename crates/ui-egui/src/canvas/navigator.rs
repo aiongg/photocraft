@@ -1,6 +1,6 @@
 use super::display::{canvas_display, display_doc, display_image};
 use super::strokes::live_stroke;
-use super::textures::{effect_reach, ensure_texture};
+use super::textures::effect_reach;
 use super::{Document, PhotocraftApp, Rect, TextureOptions};
 
 /// Longest side of the Navigator panel's image (about twice the panel's width, for HiDPI).
@@ -68,9 +68,6 @@ pub fn navigator_waits_for_gpu(app: &PhotocraftApp, idx: usize, ctx: &egui::Cont
 }
 
 pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize) -> Option<egui::TextureId> {
-    if app.gpu.is_none() {
-        return ensure_texture(app, ctx, idx, app.session.color.main_display).map(|(t, _)| t);
-    }
     // Keyed by the document snapshot, not its revision: selecting a layer changes no pixels.
     let (snapshot, id, revision, damage_from, last_damage) =
         app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id, st.revision, st.damage_from(), st.last_damage))?;

@@ -171,54 +171,6 @@ pub fn fit_view(view: &mut View, doc: &Document, area: Vec2, ppp: f32, aspect: f
     view.fill_pending = false;
 }
 
-/// Ease a transient presentation camera over 220 ms without changing the requested camera.
-pub(super) fn animated_view(view: &mut View, xf: ViewXform, ppp: f32, animated_zoom: bool, time: f64) -> View {
-    if !animated_zoom {
-        view.request_zoom_animation(false);
-    }
-    let target = (view.zoom, view.center);
-    // Clamping, a canvas resize, or another camera command can make the original anchor
-    // incompatible with the requested camera. The target must always win.
-    if let Some((doc, screen)) = view.zoom_anchor {
-        let offset = xf.unmap_vec((pos2(screen[0], screen[1]) - xf.rect.center()) / (view.zoom / ppp));
-        if (doc[0] as f32 - offset.x - view.center[0]).abs() > 0.01 || (doc[1] as f32 - offset.y - view.center[1]).abs() > 0.01 {
-            view.zoom_anchor = None;
-        }
-    }
-    let mut shown = view.clone();
-    if view.zoom_animating {
-        if view.zoom_transition.is_none_or(|a| a.target != target) {
-            view.zoom_transition = Some(crate::state::ZoomTransition { from: view.display_camera.unwrap_or(target), target, started: time });
-        }
-        if let Some(a) = view.zoom_transition {
-            let elapsed = (time - a.started) / 0.22;
-            let t = if elapsed.is_finite() { elapsed.clamp(0.0, 1.0) as f32 } else { 1.0 };
-            let ease = t * t * (3.0 - 2.0 * t);
-            let lerp = |from: f32, to: f32| from + (to - from) * ease;
-            shown.zoom = lerp(a.from.0, target.0);
-            shown.center = [lerp(a.from.1[0], target.1[0]), lerp(a.from.1[1], target.1[1])];
-            if let Some((doc, screen)) = view.zoom_anchor {
-                let zoom = shown.zoom / ppp;
-                if zoom.is_finite() && zoom > 0.0 {
-                    let offset = xf.unmap_vec((pos2(screen[0], screen[1]) - xf.rect.center()) / zoom);
-                    shown.center = [doc[0] as f32 - offset.x, doc[1] as f32 - offset.y];
-                }
-            }
-            if t >= 1.0 {
-                view.zoom_animating = false;
-            }
-        }
-    }
-    if !view.zoom_animating {
-        shown.zoom = target.0;
-        shown.center = target.1;
-        view.zoom_anchor = None;
-        view.zoom_transition = None;
-    }
-    view.display_camera = Some((shown.zoom, shown.center));
-    shown
-}
-
 /// Centre the document and zoom until it fills the canvas. One axis can extend beyond the
 /// viewport, matching the Hand tool's Fill Screen action.
 pub fn fill_view(view: &mut View, doc: &Document, area: Vec2, ppp: f32, aspect: f32) {
@@ -230,20 +182,6 @@ pub fn fill_view(view: &mut View, doc: &Document, area: Vec2, ppp: f32, aspect: 
     view.center = [w / 2.0, h / 2.0];
     view.fit_pending = false;
     view.fill_pending = false;
-}
-
-/// Where a wheel or pinch zoom anchors for a pointer at `p`: the pointer itself over the image,
-/// otherwise the nearest point of the image (#3720). Anchoring on a pointer out on the gray
-/// pasteboard slid the image away from it, out of the window after a few notches; Photoshop keeps
-/// the image in view. Clamped in document space, so a rotated or flipped view behaves the same.
-pub(super) fn wheel_anchor(xf: &ViewXform, p: Pos2, doc_size: [u32; 2]) -> Pos2 {
-    let [w, h] = doc_size;
-    let d = xf.to_doc(p);
-    if w == 0 || h == 0 || !(d[0].is_finite() && d[1].is_finite()) {
-        return p;
-    }
-    let c = [d[0].clamp(0.0, f64::from(w)), d[1].clamp(0.0, f64::from(h))];
-    if c == d { p } else { xf.to_screen(c[0] as f32, c[1] as f32) }
 }
 
 /// Zoom to `new_zoom` about `p`: keep its document point under the pointer, or move it to the

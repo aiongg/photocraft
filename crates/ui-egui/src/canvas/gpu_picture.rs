@@ -140,7 +140,7 @@ impl GpuPicture {
     /// its place in the pass, so the copies reuse the same few uniform buffers as the view pans.
     pub(crate) fn into_paint<'a>(self) -> AppPaint<'a, CanvasView> {
         let mut n = 0u64;
-        AppPaint::new(move |cx, view| {
+        AppPaint::new(move |cx, view: CanvasView| {
             let key = if n == 0 { self.params.view_key } else { egui::Id::unique((self.params.view_key, "copy", n)).value() };
             n += 1;
             crate::gpu_canvas::GpuCanvas::paint(&cx.painter, view.rect, ViewParams { view_key: key, ..self.params(&view) });

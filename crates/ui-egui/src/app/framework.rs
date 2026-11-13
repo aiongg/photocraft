@@ -358,16 +358,19 @@ impl Framework {
     }
 
     /// The runtime's keymap overrides from PhotoCraft's own bindings: the chrome commands it
-    /// dispatches for PhotoCraft (`shortcut_dispatch::FRAMEWORK_OWNED`) get PhotoCraft's keys for
-    /// them, and the pane moves are unbound, because PhotoCraft's own table binds F6 and Shift+F6
+    /// dispatches for PhotoCraft (`shortcut_dispatch::FRAMEWORK_OWNED`) and the document canvas's
+    /// view commands (`shortcut_dispatch::VIEW_OWNED`) get PhotoCraft's keys for them, and the pane moves are unbound, because PhotoCraft's own table binds F6 and Shift+F6
     /// (Window › Color, Select › Modify › Feather) until those are a framework `CommandSet`.
-    fn set_overrides(&mut self, rev: u64, chrome: [Vec<String>; 2]) {
+    fn set_overrides(&mut self, rev: u64, chrome: [Vec<String>; 2], view: [Vec<String>; 4]) {
         self.overrides_rev = Some(rev);
         let mut overrides = Overrides::new();
         for command in [NavCommand::NextPane, NavCommand::PreviousPane] {
             overrides.insert(CommandRef::from(command).key(), Vec::new());
         }
         for ((_, command), texts) in crate::shortcut_dispatch::FRAMEWORK_OWNED.iter().zip(chrome) {
+            overrides.insert(CommandRef::from(*command).key(), texts);
+        }
+        for ((_, command), texts) in crate::shortcut_dispatch::VIEW_OWNED.iter().zip(view) {
             overrides.insert(CommandRef::from(*command).key(), texts);
         }
         if *self.overrides != overrides {
@@ -383,8 +386,9 @@ impl PhotocraftApp {
         // The bindings come from walking the whole command table: only after a preferences change.
         let rev = self.session.prefs.rev();
         if self.framework.overrides_rev != Some(rev) {
-            let chrome = crate::shortcut_dispatch::framework_owned_texts(self);
-            self.framework.set_overrides(rev, chrome);
+            let chrome = crate::shortcut_dispatch::owned_texts(self, &crate::shortcut_dispatch::FRAMEWORK_OWNED);
+            let view = crate::shortcut_dispatch::owned_texts(self, &crate::shortcut_dispatch::VIEW_OWNED);
+            self.framework.set_overrides(rev, chrome, view);
         }
         if self.framework.sync_theme(&mut self.session) {
             crate::prefs_ui::show_selected_theme(self, ctx);

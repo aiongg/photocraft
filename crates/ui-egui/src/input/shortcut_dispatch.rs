@@ -7,6 +7,7 @@
 //! is disabled in the current state reports why on the status bar instead of doing nothing
 //! silently, as the greyed menu item shows.
 
+use craft::ui::canvas::ViewCommands;
 use craft::ui::runtime::commands::ChromeCommand;
 use craft::ui::runtime::frame::ChromeToggle;
 use craft::ui::runtime::overlay;
@@ -60,10 +61,26 @@ pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
 pub(crate) const FRAMEWORK_OWNED: [(&str, ChromeCommand); 2] =
     [("window.togglePanels", ChromeCommand::TogglePanels), ("window.toggle.dock", ChromeCommand::TogglePanelsKeepTools)];
 
-/// The binding texts [`bindings`] gives each command of [`FRAMEWORK_OWNED`], in its order.
-pub(crate) fn framework_owned_texts(app: &PhotocraftApp) -> [Vec<String>; 2] {
+/// PhotoCraft's view commands the document canvas runs itself, with the canvas's command each one is: ⌘+, ⌘-, ⌘0
+/// and ⌘1. Their keys reach the runtime as keymap overrides (`app::framework`), the canvas that holds the key focus
+/// (else the one that held it last) applies them to its view, and [`dispatch_pressed`] leaves them alone. The menu
+/// items still run PhotoCraft's own commands.
+pub(crate) const VIEW_OWNED: [(&str, ViewCommands); 4] = [
+    ("view.zoomIn", ViewCommands::ZoomIn),
+    ("view.zoomOut", ViewCommands::ZoomOut),
+    ("view.fitOnScreen", ViewCommands::FitOnScreen),
+    ("view.actualPixels", ViewCommands::ActualPixels),
+];
+
+/// The binding texts [`bindings`] gives each of `owned`, in its order.
+pub(crate) fn owned_texts<C, const N: usize>(app: &PhotocraftApp, owned: &[(&str, C); N]) -> [Vec<String>; N] {
     let table = resolved(app);
-    FRAMEWORK_OWNED.map(|(owned, _)| table.iter().filter(|(id, _, _)| id == owned).map(|(_, text, _)| text.clone()).collect())
+    std::array::from_fn(|i| table.iter().filter(|(id, _, _)| id == owned[i].0).map(|(_, text, _)| text.clone()).collect())
+}
+
+/// Whether the craft runtime dispatches command `id` ([`FRAMEWORK_OWNED`], [`VIEW_OWNED`]).
+fn runtime_owned(id: &str) -> bool {
+    FRAMEWORK_OWNED.iter().any(|(owned, _)| *owned == id) || VIEW_OWNED.iter().any(|(owned, _)| *owned == id)
 }
 
 /// [`bindings`] with each binding's text as the preferences and defaults write it.
@@ -264,7 +281,7 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
     const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
     let table: Vec<(String, KeyboardShortcut)> = bindings(app)
         .into_iter()
-        .filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str())) && !FRAMEWORK_OWNED.iter().any(|(owned, _)| owned == id))
+        .filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str())) && !runtime_owned(id))
         .collect();
     let command = |e: &egui::Event| match e {
         egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
