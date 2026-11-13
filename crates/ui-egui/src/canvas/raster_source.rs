@@ -13,7 +13,7 @@ use photocraft_engine::display_color::CanvasDisplay;
 
 use super::channel_view::Overlay;
 use super::display::{cache_key, display_image};
-use super::textures::{CanvasPicture, canvas_picture, damage_since};
+use super::textures::{CanvasPicture, ProxyPreview, canvas_picture, damage_since};
 use super::{DRect, Document, PhotocraftApp};
 
 /// How many of the revisions a source handed out it can still tell damage since: a display's whole-document and
@@ -181,7 +181,7 @@ pub(crate) struct PhotoComposite<'a> {
 impl<'a> PhotoComposite<'a> {
     /// Document `idx`'s picture on `output` (`None`: the main window's display); `None` when no such document is open.
     pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
-        let mut p = canvas_picture(app, ctx, idx, output)?;
+        let mut p = canvas_picture(app, ctx, idx, output, ProxyPreview::Document)?;
         let display = p.display.take();
         let shown = Shown::of(&p, p.display_key);
         let revision = shown.revision(p.id, 0);
@@ -227,7 +227,8 @@ impl RasterSource for PhotoComposite<'_> {
 }
 
 /// Document `idx`'s channel or mask view on one display (Quick Mask, a layer mask, alpha or single colour
-/// channels), drawn by a second `RasterDisplay` over the canvas picture, which shows the same document or preview.
+/// channels), drawn by a second `RasterDisplay` over the canvas picture. It shows the live preview the canvas picture
+/// shows, and also an adjustment's proxy preview, which the GPU picture draws and [`PhotoComposite`] does not.
 /// Built once per pass, only while the view is not the plain composite.
 pub(crate) struct ChannelOverlay<'a> {
     picture: Picture<'a>,
@@ -240,7 +241,7 @@ impl<'a> ChannelOverlay<'a> {
     /// Document `idx`'s view on `output` (`None`: the main window's display); `None` when no such document is open or
     /// it shows the plain composite.
     pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
-        let p = canvas_picture(app, ctx, idx, output)?;
+        let p = canvas_picture(app, ctx, idx, output, ProxyPreview::Preview)?;
         let overlay = Overlay::of(app, idx, &p.doc, output)?;
         let shown = OverlayShown { picture: Shown::of(&p, 0), view: overlay.key };
         let revision = shown.picture.revision(p.id, overlay.key);
@@ -251,7 +252,8 @@ impl<'a> ChannelOverlay<'a> {
         Some(ChannelOverlay { picture: Picture::new(app, idx, p, 0), overlay, revision, log })
     }
 
-    /// Where the view lies in the document: where the canvas picture under it lies ([`PhotoComposite::bounds`]).
+    /// Where the view lies in the document: where the canvas picture under it lies ([`PhotoComposite::bounds`]; an
+    /// adjustment preview keeps the document's size).
     pub(crate) fn bounds(&self) -> DRect {
         self.picture.shown.bounds
     }

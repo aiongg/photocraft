@@ -143,3 +143,25 @@ fn a_channel_view_draws_its_own_picture() {
     let composite = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), PixelRect::new(0, 0, 8, 1), 1).pixels;
     assert_eq!(composite[6], Color32::WHITE, "the composite stays the document's");
 }
+
+#[test]
+fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the_document() {
+    let mut app = app_with(2400, 2200, "#808080");
+    let st = app.session.active().unwrap();
+    assert!(crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(&app)) > 1, "large enough for a proxy preview");
+    // Only the red channel shows: an opaque view over the composite.
+    let view = &mut app.session.active_mut().unwrap().channel_view;
+    view.set_color_visible(1, false);
+    view.set_color_visible(2, false);
+    let ctx = egui::Context::default();
+    let at = PixelRect::new(0, 0, 1, 1);
+    let overlay_before = read(&ChannelOverlay::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    let composite_before = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    let id = crate::adjust_dialog::open(&mut app, "image.adjustments.levels").unwrap();
+    app.ui.dialog_mut(id).unwrap().fields.insert("inBlack".into(), json!(100));
+    assert!(crate::adjust_preview::display_doc(&mut app, 0).is_some(), "the adjustment previews");
+    let overlay = read(&ChannelOverlay::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    let composite = read(&PhotoComposite::new(&mut app, &ctx, 0, None).unwrap(), at, 1).pixels;
+    assert_ne!(overlay, overlay_before, "the overlay shows the live preview");
+    assert_eq!(composite, composite_before, "the composite shows the document");
+}

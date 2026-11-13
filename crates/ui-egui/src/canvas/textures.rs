@@ -130,8 +130,19 @@ pub(crate) struct CanvasPicture {
     pub display_key: u64,
 }
 
-/// [`CanvasPicture`] of document `idx` on `output`; `None` when no such document is open.
-pub(crate) fn canvas_picture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<CanvasPicture> {
+/// What a [`CanvasPicture`] shows while an adjustment dialog previews a large document as a GPU proxy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProxyPreview {
+    /// The committed document: drawn here, the preview would cost a full-size composite per change.
+    Document,
+    /// The live preview, as the channel views draw it: an opaque view over the document would hide the live change
+    /// (#2078).
+    Preview,
+}
+
+/// [`CanvasPicture`] of document `idx` on `output`, showing `proxy` during a proxy adjustment preview; `None` when
+/// no such document is open.
+pub(crate) fn canvas_picture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>, proxy: ProxyPreview) -> Option<CanvasPicture> {
     let (revision, last_damage, id, committed) = {
         let st = app.session.documents().get(idx)?;
         let reach = |r: DRect| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) };
@@ -151,9 +162,10 @@ pub(crate) fn canvas_picture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: 
         (doc, preview_key, reduced) = (preview, key, k > 1);
     }
     let reduced = reduced || bounds != committed;
-    // An adjustment dialog's preview of a large document is taken by the GPU path as a proxy: drawn here it would
-    // cost a full-size composite per change, so the document shows instead.
-    if crate::adjust_preview::shown_key(app) == Some(preview_key)
+    // An adjustment dialog's preview of a large document is taken by the GPU path as a proxy (`ProxyPreview`). The
+    // display key depends on the document, so this comes before it.
+    if proxy == ProxyPreview::Document
+        && crate::adjust_preview::shown_key(app) == Some(preview_key)
         && let Some(st) = app.session.documents().get(idx)
         && crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(app)) > 1
     {
@@ -173,7 +185,8 @@ pub(crate) fn ensure_texture_in_view(
     view: Option<InView>,
 ) -> Option<CpuTextures> {
     let output = display;
-    let CanvasPicture { revision, last_damage, id, doc, preview_key, bounds, reduced, display, display_key } = canvas_picture(app, ctx, idx, output)?;
+    let CanvasPicture { revision, last_damage, id, doc, preview_key, bounds, reduced, display, display_key } =
+        canvas_picture(app, ctx, idx, output, ProxyPreview::Document)?;
     // Detail textures and partial redraws work in the document's own pixels.
     let view = view.filter(|_| !reduced);
     let seen = app.canvases.get(&cache_key(id, output)).map(|c| (c.tex_revision, c.tex_preview_key));
