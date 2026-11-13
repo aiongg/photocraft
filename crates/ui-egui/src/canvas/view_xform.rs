@@ -38,13 +38,16 @@ impl ViewXform {
                 rotation: v.rotation,
                 aspect: app.ui.view.display_aspect(),
             }
-            .shown(app.canvas_ppp()),
+            .shown(app, app.canvas_ppp()),
         )
     }
 
     /// This mapping as the canvas draws it at `ppp` device pixels per point: pixel-aligned by the canvas's own rule
-    /// ([`pixel_aligned`]), so tools and overlays land where the picture is.
-    pub(crate) fn shown(self, ppp: f32) -> Self {
+    /// ([`pixel_aligned`]) unless the view follows the pointer, so tools and overlays land where the picture is.
+    pub(crate) fn shown(self, app: &PhotocraftApp, ppp: f32) -> Self {
+        if super::document_display::view_follows_pointer(app) {
+            return self;
+        }
         let view = CanvasView::new(self.rect, Point::new(f64::from(self.center[0]), f64::from(self.center[1])), f64::from(self.zoom))
             .rotation(f64::from(self.rotation))
             .flip_x(self.flip)
