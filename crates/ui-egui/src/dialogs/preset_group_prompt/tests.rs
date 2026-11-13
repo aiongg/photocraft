@@ -1,6 +1,6 @@
 //! The documented dialog API must reject malformed answers without losing the pending import.
 use super::*;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 
 #[derive(Clone, Copy, Debug)]
 enum Kind {
@@ -23,7 +23,7 @@ struct Fixture {
 fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (request, _reply) = ControlRequest::new(method, params);
     match handle(app, ctx, &request) {
-        Outcome::Done(value) => value,
+        Reply::Done(value) => value,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

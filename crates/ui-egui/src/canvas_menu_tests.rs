@@ -223,7 +223,7 @@ fn secondary_taps_keep_other_canvas_tool_menus_open() {
 }
 
 fn control_tap(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, popup: Popup) {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
 
     let [x, y] = crate::canvas::ViewXform::active(h.state()).unwrap().to_doc(at);
     let (req, _) = ControlRequest::new("ui.pointer", json!({"button":"secondary", "events":[{"kind":"down", "x":x, "y":y}, {"kind":"up", "x":x, "y":y}]}));
@@ -238,7 +238,7 @@ fn control_tap(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, popup: Popup) {
     let mut stayed_open = true;
     ctx.run_ui(input, |ui| {
         if reply.is_none()
-            && let Outcome::Done(result) = handle(h.state_mut(), ui.ctx(), &req)
+            && let Reply::Done(result) = handle(h.state_mut(), ui.ctx(), &req)
         {
             reply = Some(result);
         }

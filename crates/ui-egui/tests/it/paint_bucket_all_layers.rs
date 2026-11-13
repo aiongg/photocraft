@@ -7,7 +7,7 @@ use photocraft_doc::LayerId;
 use photocraft_geom::Rect;
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::canvas::ViewXform;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
@@ -59,7 +59,7 @@ fn setup(h: &mut Harness) -> LayerId {
     };
     let ctx = h.ctx.clone();
     let (req, _rx) = ControlRequest::new("ui.set", json!({"tool": "paintBucket", "zoom": 1.0, "center": [200, 150]}));
-    assert!(matches!(handle(h.state_mut(), &ctx, &req), Outcome::Done(_)));
+    assert!(matches!(handle(h.state_mut(), &ctx, &req), Reply::Done(_)));
     h.run_steps(6);
     background
 }

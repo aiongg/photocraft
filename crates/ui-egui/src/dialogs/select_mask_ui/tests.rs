@@ -681,7 +681,7 @@ fn greyed_controls_explain_themselves() {
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let (req, _rx) = crate::control::ControlRequest::new(method, params);
     match crate::control::handle(app, &egui::Context::default(), &req) {
-        crate::control::Outcome::Done(v) => v,
+        crate::control::Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

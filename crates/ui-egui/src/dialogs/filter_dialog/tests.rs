@@ -936,7 +936,7 @@ fn match_color_source_layer_preview_and_ok_edit_only_the_target() {
 /// Send an actual control-protocol request and require its synchronous reply.
 fn match_color_control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (request, _) = crate::control::ControlRequest::new(method, params);
-    let crate::control::Outcome::Done(reply) = crate::control::handle(app, ctx, &request) else { panic!("{method} should finish immediately") };
+    let crate::control::Reply::Done(reply) = crate::control::handle(app, ctx, &request) else { panic!("{method} should finish immediately") };
     reply
 }
 

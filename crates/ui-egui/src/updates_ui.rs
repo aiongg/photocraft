@@ -421,7 +421,7 @@ mod tests {
         let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
             let (req, _) = crate::control::ControlRequest::new(method, params);
             match crate::control::handle(app, &ctx, &req) {
-                crate::control::Outcome::Done(value) => value,
+                crate::control::Reply::Done(value) => value,
                 _ => panic!("expected an immediate reply"),
             }
         };

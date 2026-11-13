@@ -5,12 +5,12 @@ use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::control::{ControlRequest, Outcome};
+use crate::control::{ControlRequest, Reply};
 use crate::state::Tool;
 
 fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (request, _receiver) = ControlRequest::new(method, params);
-    let Outcome::Done(reply) = crate::control::handle(app, ctx, &request) else { panic!("expected an immediate {method} reply") };
+    let Reply::Done(reply) = crate::control::handle(app, ctx, &request) else { panic!("expected an immediate {method} reply") };
     reply
 }
 
@@ -50,7 +50,7 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, kind: &str, at: [f64; 2
 
 fn enter(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let (request, _receiver) = ControlRequest::new("ui.key", json!({"key": "Enter"}));
-    assert!(matches!(crate::control::handle(app, ctx, &request), Outcome::AfterInput));
+    assert!(matches!(crate::control::handle(app, ctx, &request), Reply::AfterInput));
     let events = app.take_synthetic_step();
     assert!(!events.is_empty());
     let mut output = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| crate::shortcuts::handle(app, ui.ctx()));

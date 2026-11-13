@@ -273,7 +273,7 @@ fn a_refused_handle_press_on_the_canvas_reaches_no_move_tool() {
 #[test]
 fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
     // `ui.pointer` takes the same path: the alert, and the press is not forwarded to the Move tool.
-    use crate::control::{ControlRequest, Outcome};
+    use crate::control::{ControlRequest, Reply};
     let (mut app, bg, a, _) = app();
     corner_layer(&mut app);
     select(&mut app, a, "replace");
@@ -284,7 +284,7 @@ fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
     let ctx = egui::Context::default();
     let call = |app: &mut PhotocraftApp, method: &str, params: serde_json::Value| {
         let (request, _receiver) = ControlRequest::new(method, params);
-        let Outcome::Done(reply) = crate::control::handle(app, &ctx, &request) else { panic!("expected an immediate {method} reply") };
+        let Reply::Done(reply) = crate::control::handle(app, &ctx, &request) else { panic!("expected an immediate {method} reply") };
         assert_eq!(reply["ok"], true, "{method}: {reply}");
     };
     call(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [100, 100]}));

@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas_tool_menu::{CanvasToolMenu, EYEDROPPER_COPY_HEX, EYEDROPPER_COPY_HTML, available, choose, mode_checked, open_at, rows};
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::state::Tool;
 
 /// 400 × 300 white with three layers: a red (220,30,30) block at 100,100–300,250 ("Red", active),
@@ -36,7 +36,7 @@ fn app() -> PhotocraftApp {
 fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (req, _rx) = ControlRequest::new(method, params);
     match handle(app, ctx, &req) {
-        Outcome::Done(v) => v,
+        Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }

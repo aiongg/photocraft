@@ -4,13 +4,13 @@ use super::params::{
     BUTTONS, KEY_MODIFIERS, MAX_CLICKS, MAX_SCREEN_POINT, POINTER_MODIFIERS, UI_SET_FIELDS, bool_field, err, f32_field, f32_range, input_choice,
     input_modifiers, input_number, input_object, merged_object, modifiers_from, num_field, ok, screen_point, uint_field, whole_object,
 };
-use super::{ControlRequest, DialogKind, Outcome, PhotocraftApp, SHELL_DIALOG, Tool, ToolEvent, Value, json, run_waiting, tool_event, wrap};
+use super::{ControlRequest, DialogKind, PhotocraftApp, Reply, SHELL_DIALOG, Tool, ToolEvent, Value, json, run_waiting, tool_event};
 use photocraft_engine::jobs::{CancelReport, JobId};
 
 /// A domain handler: `Some` when it owns the request's method, `None` to let the next one try.
-type Handler = fn(&mut PhotocraftApp, &egui::Context, &ControlRequest) -> Option<Outcome>;
+type Handler = fn(&mut PhotocraftApp, &egui::Context, &ControlRequest) -> Option<Reply>;
 
-pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
+pub(super) fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
     const HANDLERS: [Handler; 5] = [engine_methods, shell_methods, dialog_methods, input_methods, app_methods];
     HANDLERS.iter().find_map(|handler| handler(app, ctx, req)).unwrap_or_else(|| err(photocraft_engine::command_hints::unknown_method(&req.method, METHODS)))
 }
@@ -29,13 +29,13 @@ fn wait_param(p: &Value) -> bool {
 
 // ---- engine commands, menus and jobs ----
 
-fn engine_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
+fn engine_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
     Some(match req.method.as_str() {
         "ui.context.choose" => context_choose(app, ctx, &req.params),
         "engine.execute" | "ui.menu.invoke" => execute_command(app, ctx, req),
-        "engine.commands" => wrap(app.run("command.list", json!({}))),
+        "engine.commands" => Reply::from_result(app.run("command.list", json!({}))),
         // Background jobs (#210): running ones with progress, then the last few that ended.
-        "jobs.list" => wrap(app.session.execute("jobs.list", json!({})).map_err(|e| e.to_string())),
+        "jobs.list" => Reply::from_result(app.session.execute("jobs.list", json!({})).map_err(|e| e.to_string())),
         "jobs.cancel" => jobs_cancel(app, &req.params),
         "ui.menu.list" => {
             // Report the same enablement the native menu shows, so a listed item is invokable.
@@ -50,7 +50,7 @@ fn engine_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
     })
 }
 
-fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     let Some(id) = str_param(p, "id") else { return err("missing `id`") };
     if app.ui.canvas_tool_menu.is_none() && app.ui.brush_mode_menu.is_some() {
         return mode_menu_choose(app, ctx, id);
@@ -71,7 +71,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Ou
 }
 
 /// A row of the painting tools' Shift+right-click menu, by its English label (`brushModeMenu.choices`).
-fn mode_menu_choose(app: &mut PhotocraftApp, ctx: &egui::Context, label: &str) -> Outcome {
+fn mode_menu_choose(app: &mut PhotocraftApp, ctx: &egui::Context, label: &str) -> Reply {
     let item = match crate::brush_mode_menu::find(app, label) {
         Ok(item) => item,
         Err(e) => return err(e),
@@ -87,7 +87,7 @@ fn mode_menu_choose(app: &mut PhotocraftApp, ctx: &egui::Context, label: &str) -
 }
 
 /// `engine.execute` and `ui.menu.invoke`: run command `command` (or `id`) with `params`, as the menu would or, for `engine.execute`, directly.
-fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
+fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
     let p = &req.params;
     let Some(id) = str_param(p, "command").or(str_param(p, "id")) else { return err("missing `command`") };
     if req.method == "engine.execute" && METHODS.contains(&id) && photocraft_engine::commands::find(id).is_none() {
@@ -129,7 +129,7 @@ fn execute_command(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRe
     run_waiting(app, wait, |app| crate::menus::invoke(app, ctx, id, params))
 }
 
-fn jobs_cancel(app: &mut PhotocraftApp, p: &Value) -> Outcome {
+fn jobs_cancel(app: &mut PhotocraftApp, p: &Value) -> Reply {
     let all = p.get("job").is_none_or(Value::is_null);
     match p.get("job").and_then(Value::as_u64) {
         // Same reply as the engine's `jobs.cancel`: `{cancelled: n}`, plus `notCancelled:
@@ -157,7 +157,7 @@ fn cancel_each(app: &mut PhotocraftApp, ids: Vec<JobId>) -> CancelReport {
 
 // ---- the shell: view state, windows, GPU, focus, screenshots ----
 
-fn shell_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
+fn shell_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
     let p = &req.params;
     Some(match req.method.as_str() {
         "ui.set" => ui_set(app, ctx, p),
@@ -167,7 +167,7 @@ fn shell_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequ
             {
                 return Some(err(format!("no document {d}")));
             }
-            wrap(crate::menus::invoke(app, ctx, "window.newWindowForDocument", json!({})))
+            Reply::from_result(crate::menus::invoke(app, ctx, "window.newWindowForDocument", json!({})))
         }
         "ui.window.close" => {
             let Some(id) = u64_param(p, "window") else { return Some(err("missing `window`")) };
@@ -193,7 +193,7 @@ fn shell_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequ
     })
 }
 
-fn simulate_gpu_loss(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn simulate_gpu_loss(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     if p.get("destroy").and_then(Value::as_bool).unwrap_or(false) {
         let destroyed = app.destroy_window_device();
         ctx.request_repaint();
@@ -217,7 +217,7 @@ fn simulate_gpu_loss(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) ->
     ok(json!({"wasActive": active, "gpuInfo": app.perf.gpu_info}))
 }
 
-fn screenshot(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn screenshot(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     let parsed =
         input_object(p, None, &["path", "focus"]).and_then(|p| Ok((input_choice(&p, "path", "path", &[])?.map(str::to_string), bool_field(&p, "focus")?)));
     let (path, focus) = match parsed {
@@ -230,22 +230,22 @@ fn screenshot(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcom
     }
     // The capture itself is admitted by `PhotocraftApp::drain_control` (budget and
     // geometry) and issued from a later `App::ui` pass once open/close animations
-    // (modals, popups) have settled (see `screenshot.rs`).
+    // (modals, popups) have settled (craft-automation's screenshot queue).
     let token = app.ui.alloc_id();
     ctx.request_repaint();
-    Outcome::Screenshot { token, path }
+    Reply::screenshot(token, path)
 }
 
 // ---- ui.set: every field is validated and materialized into a `UiSet` before the first one is applied ----
 
-fn ui_set(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn ui_set(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     if let Some(field) = p.as_object().and_then(|o| o.keys().find(|k| !UI_SET_FIELDS.contains(&k.as_str()))) {
         return err(format!("unknown field `{field}` (fields: {})", UI_SET_FIELDS.join(", ")));
     }
     // Everything is validated and materialized before the first field is applied, so a
     // rejected call applies none of its fields (#412's guarantee, down to the values
     // and nested keys).
-    wrap(UiSet::parse(app, p).and_then(|set| set.apply(app, ctx, p)))
+    Reply::from_result(UiSet::parse(app, p).and_then(|set| set.apply(app, ctx, p)))
 }
 
 struct UiSet {
@@ -958,10 +958,14 @@ fn brush_size_param(p: &Value) -> std::result::Result<Option<f64>, String> {
 
 // ---- dialogs ----
 
-fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
+fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
     let p = &req.params;
     let s = |k: &str| str_param(p, k);
     let u = |k: &str| u64_param(p, k);
+    // A dialog on the framework's `DialogHost`, listed by ui.inspect with its decimal id.
+    if req.method != "ui.dialog.open" && craft::automation::dialogs::names_open_dialog(&app.framework.dialogs, p) {
+        return craft::automation::dialogs::dialog_method(&mut app.framework.dialogs, ctx, &req.method, p).map(Reply::from_result);
+    }
     Some(match req.method.as_str() {
         "ui.dialog.open" => dialog_open(app, p),
         // The shell's own dialog (Window › Workspace, View › Pixel Aspect Ratio › Custom, Show
@@ -972,7 +976,7 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
         // The unsaved-changes prompt (closing, Revert, quitting), listed by ui.inspect with the
         // id "discard" (#4920): confirm takes a `choice` (save, dontSave, cancel; default save).
         "ui.dialog.confirm" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => discard_dialog_confirm(app, ctx, s("choice").unwrap_or("save")),
-        "ui.dialog.cancel" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => wrap(crate::discard_ui::answer_control(app, ctx, "cancel")),
+        "ui.dialog.cancel" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => Reply::from_result(crate::discard_ui::answer_control(app, ctx, "cancel")),
         "ui.dialog.set" | "ui.dialog.apply" if s("dialog") == Some(crate::discard_ui::CONTROL_ID) => {
             err("the unsaved-changes prompt has no fields; use `ui.dialog.confirm` with a `choice`")
         }
@@ -996,7 +1000,7 @@ fn dialog_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReq
     })
 }
 
-fn dialog_open(app: &mut PhotocraftApp, p: &Value) -> Outcome {
+fn dialog_open(app: &mut PhotocraftApp, p: &Value) -> Reply {
     let kind = match str_param(p, "kind").unwrap_or("") {
         "newDocument" | "NewDocument" => DialogKind::NewDocument,
         "about" | "About" => DialogKind::About,
@@ -1014,7 +1018,7 @@ fn dialog_open(app: &mut PhotocraftApp, p: &Value) -> Outcome {
 }
 
 /// The dialog kinds that open through their own module rather than `open_dialog`.
-fn open_named_dialog(app: &mut PhotocraftApp, p: &Value, kind: &str) -> Outcome {
+fn open_named_dialog(app: &mut PhotocraftApp, p: &Value, kind: &str) -> Reply {
     let opened = |id: Option<u64>, missing: &str| match id {
         Some(id) => ok(json!({"dialog": id})),
         None => err(missing),
@@ -1033,7 +1037,7 @@ fn open_named_dialog(app: &mut PhotocraftApp, p: &Value, kind: &str) -> Outcome 
     }
 }
 
-fn color_picker_dialog(app: &mut PhotocraftApp, p: &Value) -> Outcome {
+fn color_picker_dialog(app: &mut PhotocraftApp, p: &Value) -> Reply {
     if let Some(style) = p.get("textStyle") {
         return text_style_color_picker(app, p, style);
     }
@@ -1060,7 +1064,7 @@ fn color_picker_dialog(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     ok(json!({"dialog": crate::color_picker_ui::open(app, target)}))
 }
 
-fn text_style_color_picker(app: &mut PhotocraftApp, p: &Value, style: &Value) -> Outcome {
+fn text_style_color_picker(app: &mut PhotocraftApp, p: &Value, style: &Value) -> Reply {
     if ["parent", "effect", "field", "target"].iter().any(|key| p.get(*key).is_some()) {
         return err("textStyle cannot be combined with another picker target");
     }
@@ -1079,7 +1083,7 @@ fn text_style_color_picker(app: &mut PhotocraftApp, p: &Value, style: &Value) ->
     }
 }
 
-fn shell_dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
+fn shell_dialog_set(app: &mut PhotocraftApp, p: &Value) -> Reply {
     let Some(field) = str_param(p, "field") else { return err("need `dialog` and `field`") };
     let value = p.get("value").cloned().unwrap_or(Value::Null);
     match app.ui.shell.dialog.as_mut() {
@@ -1091,7 +1095,7 @@ fn shell_dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     }
 }
 
-fn shell_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context) -> Outcome {
+fn shell_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context) -> Reply {
     let Some((kind, fields)) = app.ui.shell.dialog.clone() else { return err("no shell dialog is open") };
     if let Some((command, params)) = crate::workspace_ui::dialog_command(&kind, &fields)
         && let Some(authorize) = app.services.automation_command.as_ref()
@@ -1099,10 +1103,10 @@ fn shell_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context) -> Outcome
     {
         return err(error);
     }
-    wrap(crate::workspace_ui::confirm(app, ctx))
+    Reply::from_result(crate::workspace_ui::confirm(app, ctx))
 }
 
-fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Outcome {
+fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: &str) -> Reply {
     if choice != "cancel"
         && let Some((command, params)) = crate::discard_ui::pending_command(app)
         && let Some(authorize) = app.services.automation_command.as_ref()
@@ -1110,10 +1114,10 @@ fn discard_dialog_confirm(app: &mut PhotocraftApp, ctx: &egui::Context, choice: 
     {
         return err(error);
     }
-    wrap(crate::discard_ui::answer_control(app, ctx, choice))
+    Reply::from_result(crate::discard_ui::answer_control(app, ctx, choice))
 }
 
-fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
+fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Reply {
     let (Some(id), Some(field)) = (u64_param(p, "dialog"), str_param(p, "field")) else { return err("need `dialog` and `field`") };
     let value = p.get("value").cloned().unwrap_or(Value::Null);
     // A Color Picker previewing in this dialog owns its fields until its OK or Cancel: an edit now
@@ -1149,7 +1153,7 @@ fn dialog_set(app: &mut PhotocraftApp, p: &Value) -> Outcome {
     }
 }
 
-fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u64) -> Outcome {
+fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u64) -> Reply {
     let apply = req.method == "ui.dialog.apply";
     let command = app.ui.dialogs.iter().find(|dialog| dialog.id == id).and_then(|dialog| {
         if apply {
@@ -1169,7 +1173,7 @@ fn dialog_confirm_or_apply(app: &mut PhotocraftApp, req: &ControlRequest, id: u6
 
 // ---- synthetic input: pointer events, clicks, keys, text ----
 
-fn input_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
+fn input_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
     let p = &req.params;
     Some(match req.method.as_str() {
         "ui.pointer" => pointer(app, ctx, p),
@@ -1179,13 +1183,13 @@ fn input_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequ
             let Some(text) = str_param(p, "text") else { return Some(err("missing `text`")) };
             app.synthetic.push(egui::Event::Text(text.to_string()));
             ctx.request_repaint();
-            Outcome::AfterInput
+            Reply::AfterInput
         }
         _ => return None,
     })
 }
 
-fn click(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value, click: bool) -> Outcome {
+fn click(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value, click: bool) -> Reply {
     let fields: &[&str] = if click { &["x", "y", "button", "count"] } else { &["x", "y"] };
     let parsed = (|| -> std::result::Result<_, String> {
         let p = input_object(p, None, fields)?;
@@ -1214,10 +1218,10 @@ fn click(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value, click: bool) -
         app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: false, modifiers: Default::default() });
     }
     ctx.request_repaint();
-    Outcome::AfterInput
+    Reply::AfterInput
 }
 
-fn key(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn key(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     let parsed = (|| -> std::result::Result<_, String> {
         let p = input_object(p, None, &["key", "modifiers", "shift", "alt", "command", "ctrl"])?;
         let Some(name) = input_choice(&p, "key", "key", &[])? else { return Err("missing `key`".into()) };
@@ -1233,7 +1237,7 @@ fn key(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
     app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers });
     app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers });
     ctx.request_repaint();
-    Outcome::AfterInput
+    Reply::AfterInput
 }
 
 /// Simulated pen tilt/rotation of one `ui.pointer` event.
@@ -1264,7 +1268,7 @@ struct PointerGesture {
 }
 
 /// Validate every sample before starting a gesture, then respect modal, button and temporary-tool ownership.
-fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Outcome {
+fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     // Every field and event is validated before the first event runs, so a rejected call
     // changes nothing (#2449).
     let parsed = match parse_pointer(p) {
@@ -1575,7 +1579,7 @@ fn forward_pointer_event(app: &mut PhotocraftApp, g: &PointerGesture, s: Pointer
 // ---- the application: open, save, quit ----
 
 /// The application-level control methods: open, save and quit.
-fn app_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Outcome> {
+fn app_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Option<Reply> {
     let p = &req.params;
     Some(match req.method.as_str() {
         "app.open" => match str_param(p, "path") {
@@ -1608,7 +1612,7 @@ fn app_methods(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlReques
 
 /// The `app.open` control method: opens a path through the configured automation read
 /// capability, with optional high-memory approval.
-fn app_open(app: &mut PhotocraftApp, path: &str, approved: bool) -> Outcome {
+fn app_open(app: &mut PhotocraftApp, path: &str, approved: bool) -> Reply {
     if let Some(outcome) = open_pcraft_directory(app, path) {
         return outcome;
     }
@@ -1616,7 +1620,7 @@ fn app_open(app: &mut PhotocraftApp, path: &str, approved: bool) -> Outcome {
         Some(read) => read(path),
         None => Err("automation read authority is not configured".into()),
     };
-    wrap(opened.and_then(|crate::AutomationReadResult { name, bytes, save_path }| {
+    Reply::from_result(opened.and_then(|crate::AutomationReadResult { name, bytes, save_path }| {
         let name = app.open_name(&name);
         let warnings = app.open_automation_bytes_with_approval(&name, &bytes, approved)?;
         // Brushes/gradients go to the preset libraries: no document, no Open Recent entry.
@@ -1635,7 +1639,7 @@ fn app_open(app: &mut PhotocraftApp, path: &str, approved: bool) -> Outcome {
 /// Directory .pcraft (the native on-disk form) loads through a capability-scoped
 /// source; the single-file (zip) form falls back to the bytes path, as do all
 /// other formats. `None` means "not a directory .pcraft".
-fn open_pcraft_directory(app: &mut PhotocraftApp, path: &str) -> Option<Outcome> {
+fn open_pcraft_directory(app: &mut PhotocraftApp, path: &str) -> Option<Reply> {
     if !path.rsplit_once('.').is_some_and(|(_, ext)| ext.eq_ignore_ascii_case(photocraft_format::EXTENSION)) {
         return None;
     }

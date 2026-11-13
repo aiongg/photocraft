@@ -1,6 +1,6 @@
 use super::services::{ExportSettings, FormatChoices, SAVE_OPTIONS_OPEN, SaveKind, Services, plain_raster, saved_revision_after_write};
 use super::{
-    ControlRequest, DocId, Document, HashMap, PhotocraftApp, Receiver, Session, SyntheticTarget, Tool, UiState, Value, actions, analysis_ui, brush_panel,
+    DocId, Document, HashMap, PhotocraftApp, Session, SyntheticTarget, Tool, UiState, Value, actions, analysis_ui, brush_panel,
     brush_picker, camera_raw_ui, canvas, dds_options_ui, delete_layer_prompt, dialogs, discard_ui, distort_ui, dock, field_wheel, file_open, gpu_canvas,
     gpu_status, gradient_ui, histogram_panel, i18n, jobs_ui, jpeg_options_ui, json, kys_import, last_brush, layers_panel_ui, mask_thumbs_ui, mask_trash_prompt,
     monitor_status, native_menu, notices, open_prompt, paint_mouse, palette, panel_docking, panels, prefs_ui, preset_files_ui, preset_panels, rasterize_prompt,
@@ -11,6 +11,7 @@ use super::{
 
 mod clipboard;
 mod commands;
+#[cfg(not(target_arch = "wasm32"))]
 mod control;
 mod files;
 pub(crate) use files::ensure_memory_to_save;
@@ -20,7 +21,6 @@ mod gpu;
 mod ime;
 mod input;
 mod prefs;
-mod screenshot;
 mod targets;
 mod thumbs;
 mod view;
@@ -90,10 +90,9 @@ impl PhotocraftApp {
             mixer_sampling: false,
             caps_lock: false,
             opacity_keys: None,
-            control_rx: None,
-            captures: crate::screenshot::Captures::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            control: None,
             type_ime: type_tool::ImeState::default(),
-            input_waiters: Vec::new(),
             live_adjust: None,
             frame: 0,
             notices_hovered: false,
@@ -254,10 +253,8 @@ impl eframe::App for PhotocraftApp {
         if let Err(err) = tool_memory::save_on_exit(self) {
             log::warn!("Preferences: could not save the final tool state: {err}");
         }
-        // Release a pending screenshot's image budget and answer its control request; the
-        // callback is inert afterwards (it holds only a weak slot).
-        let finished = self.captures.cancel_all("the application is closing");
-        self.finish_captures(finished);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.close_control();
     }
 
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {

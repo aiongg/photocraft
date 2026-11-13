@@ -13,7 +13,7 @@ use egui::{Modifiers, PointerButton, Pos2, Rect, Vec2, pos2, vec2};
 use egui_kittest::kittest::Queryable;
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::canvas::ViewXform;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_ui::{corners, pending};
 use serde_json::{Value, json};
 
@@ -47,7 +47,7 @@ fn harness() -> Harness {
 fn control(h: &mut Harness, method: &str, params: Value) -> Value {
     let ctx = h.ctx.clone();
     let (req, _rx) = ControlRequest::new(method, params.clone());
-    let Outcome::Done(v) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} {params}: not done") };
+    let Reply::Done(v) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} {params}: not done") };
     assert_eq!(v["ok"], true, "{method} {params}: {v}");
     h.run_steps(6);
     v
@@ -210,7 +210,7 @@ fn pin_keeps_the_bar_where_it_is() {
 fn request(h: &mut Harness, method: &str, params: Value) -> Value {
     let ctx = h.ctx.clone();
     let (req, _rx) = ControlRequest::new(method, params.clone());
-    let Outcome::Done(v) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} {params}: not done") };
+    let Reply::Done(v) = handle(h.state_mut(), &ctx, &req) else { panic!("{method} {params}: not done") };
     v
 }
 

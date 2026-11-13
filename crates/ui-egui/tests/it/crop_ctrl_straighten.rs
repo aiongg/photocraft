@@ -10,7 +10,7 @@
 //! Driven as an agent does, through `ui.pointer` (document px), in both crop modes.
 
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_ui::{angle, corners as turned_corners, pending};
 use serde_json::{Value, json};
 
@@ -41,7 +41,7 @@ fn app(classic: bool, ratio: &str) -> (PhotocraftApp, egui::Context) {
 /// Runs one control-channel request, which must succeed.
 fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) {
     let (req, _rx) = ControlRequest::new(method, params.clone());
-    assert!(matches!(handle(app, ctx, &req), Outcome::Done(_)), "{method} {params}");
+    assert!(matches!(handle(app, ctx, &req), Reply::Done(_)), "{method} {params}");
 }
 
 /// One `ui.pointer` call: `events` with ⌘ held or not.

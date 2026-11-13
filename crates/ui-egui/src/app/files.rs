@@ -839,15 +839,6 @@ impl PhotocraftApp {
         Ok(reply(&target, &warnings))
     }
 
-    /// The active document's identity at admission: a queued capture never applies to another
-    /// document. Includes the revision so a saved image is attributable to a known state.
-    pub(crate) fn document_identity(&self) -> Option<crate::screenshot::DocumentId> {
-        self.session.active().map(|st| crate::screenshot::DocumentId {
-            document: st.doc.id.0,
-            revision: st.revision,
-            generation: self.session.active_generation(),
-        })
-    }
 }
 
 /// The New Document dialog's key in the preferences' `dialogs` map.

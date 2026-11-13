@@ -5,7 +5,7 @@ use egui_kittest::{Harness, kittest::Queryable};
 use photocraft_engine::{EngineError, Session, actions_cmds::Action, actions_edit_cmds, atn_cmds, prefs::PlaybackPerformance};
 use photocraft_ui_egui::{
     PhotocraftApp, actions, canvas,
-    control::{ControlRequest, Outcome, handle},
+    control::{ControlRequest, Reply, handle},
     dialogs,
 };
 use serde_json::{Value, json};
@@ -128,7 +128,7 @@ fn control_playback_opens_menu_settings_only_for_menu_invocation() {
     // also verifies Step by Step cannot defer the menu step past the control request.
     for (from, ran) in [(1, 0), (0, 1)] {
         let (req, _reply) = ControlRequest::new("engine.execute", json!({"command":"actions.play","params":{"action":"A","from":from}}));
-        let Outcome::Done(reply) = handle(app, &ctx, &req) else { panic!("direct playback must return immediately") };
+        let Reply::Done(reply) = handle(app, &ctx, &req) else { panic!("direct playback must return immediately") };
         assert_eq!(reply["ok"], true, "{reply}");
         let played = &reply["result"];
         assert_eq!(played["ran"], ran, "{reply}");
@@ -141,7 +141,7 @@ fn control_playback_opens_menu_settings_only_for_menu_invocation() {
 
     app.services.automation_authorize = Some(|_, _| Ok(()));
     let (req, _reply) = ControlRequest::new("ui.menu.invoke", json!({"id":"actions.play","params":{"action":"A","from":1}}));
-    let Outcome::Done(reply) = handle(app, &ctx, &req) else { panic!("menu invocation must return its paused dialog") };
+    let Reply::Done(reply) = handle(app, &ctx, &req) else { panic!("menu invocation must return its paused dialog") };
     assert_eq!(reply["ok"], true, "{reply}");
     let dialog = reply["result"]["paused"]["dialog"].as_u64().expect("menu playback opens Gaussian Blur settings");
     assert_eq!(app.ui.dialog_mut(dialog).unwrap().fields["__command"], "filter.blur.gaussianBlur");

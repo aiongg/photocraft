@@ -26,6 +26,7 @@ macro_rules! tl {
 }
 mod brush_mode_menu;
 pub mod canvas;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod control;
 pub mod dialogs;
 pub mod dock;
@@ -53,7 +54,6 @@ pub mod panels;
 pub mod preset_files_ui;
 pub mod proxy;
 pub mod render_path;
-pub mod screenshot;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
@@ -64,12 +64,12 @@ pub mod widgets;
 pub mod work_area;
 
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender};
 
 use photocraft_doc::{DocId, Document};
 use photocraft_engine::Session;
 use serde_json::{Value, json};
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use control::{ControlRequest, ControlResponse};
 pub use file_dialog::{FileDialogAnswer, FileDialogFn, FileDialogReply, FileDialogRequest};
 pub use file_open::OsEvent;
@@ -262,7 +262,7 @@ pub(crate) use services::SAVE_OPTIONS_OPEN;
 pub(crate) use services::saved_revision_after_write;
 pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
-    CaptionStyleFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, EncodePngFn, ExportFn,
+    CaptionStyleFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn,
     ExportSettings, ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox,
     LastUpdateFn, LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PenScreenFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable,
     RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
@@ -460,14 +460,12 @@ pub struct PhotocraftApp {
     pub caps_lock: bool,
     /// The first digit of a two-digit opacity typed on the number keys (`opacity_keys`, #352).
     pub(crate) opacity_keys: opacity_keys::Pending,
-    control_rx: Option<Receiver<ControlRequest>>,
-    /// `ui.screenshot` requests: bounded admission, a weak-slot callback per issuance, monotonic
-    /// deadlines and a capture-time geometry epoch (see `screenshot.rs`).
-    captures: screenshot::Captures,
+    /// The control channel: requests from a transport, the replies waiting on input, jobs and
+    /// screenshots, and the screenshot queue (`app/control.rs`).
+    #[cfg(not(target_arch = "wasm32"))]
+    control: Option<craft::automation::ControlChannel>,
     /// The custom Type tool's IME owner/generation/receipt tracker (`type_tool::sync_ime`).
     pub(crate) type_ime: type_tool::ImeState,
-    /// Control replies waiting for queued synthetic input to be processed.
-    input_waiters: Vec<Sender<ControlResponse>>,
     /// Live (uncommitted) adjustment edit shown on canvas while a slider is dragged.
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).
@@ -787,21 +785,10 @@ pub struct PhotocraftApp {
 /// The state a synthetic input batch was queued for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SyntheticTarget {
-    document: Option<screenshot::DocumentId>,
+    /// The active document's generation: it changes on every switch of the active document, a
+    /// switch away and back included, and not on an edit, so an edit does not cancel a queued step.
+    document: Option<u64>,
     focus: Option<egui::Id>,
-}
-
-impl SyntheticTarget {
-    /// The document must be the same one in the same activation (a switch away and back is a
-    /// change); its revision is attribution only, so an edit does not cancel a queued step.
-    fn matches(self, other: Self) -> bool {
-        self.focus == other.focus
-            && match (self.document, other.document) {
-                (Some(a), Some(b)) => a.same_activation(b),
-                (None, None) => true,
-                _ => false,
-            }
-    }
 }
 
 #[cfg(test)]

@@ -483,13 +483,13 @@ fn keyboard_shortcuts_dialog_lists_the_keys_under_tools() {
 
 #[test]
 fn agents_reposition_a_marquee_with_space() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = egui::Context::default();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     let mut call = |p: serde_json::Value| {
         let (req, _rx) = ControlRequest::new("ui.pointer", p);
-        assert!(matches!(handle(&mut app, &ctx, &req), Outcome::Done(_)));
+        assert!(matches!(handle(&mut app, &ctx, &req), Reply::Done(_)));
     };
     call(json!({"tool": "rectMarquee", "events": [{"kind": "down", "x": 20, "y": 20}, {"kind": "move", "x": 120, "y": 80}]}));
     call(json!({"space": true, "events": [{"kind": "move", "x": 170, "y": 110}]}));

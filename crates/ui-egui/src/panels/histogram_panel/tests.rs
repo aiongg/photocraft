@@ -40,7 +40,7 @@ fn settle(app: &mut PhotocraftApp) {
 fn ui_set(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Value {
     let (req, _rx) = crate::control::ControlRequest::new("ui.set", params);
     match crate::control::handle(app, ctx, &req) {
-        crate::control::Outcome::Done(v) => v,
+        crate::control::Reply::Done(v) => v,
         _ => panic!("ui.set: expected an immediate reply"),
     }
 }

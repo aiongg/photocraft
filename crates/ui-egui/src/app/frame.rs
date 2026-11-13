@@ -7,6 +7,25 @@ use super::{
 };
 
 impl PhotocraftApp {
+    /// Close this frame's stage record (`frame_stages`): keep it if it was slow, and hand it to
+    /// the stroke trace. `ui_ms` is this pass's UI build. A pass egui will run again
+    /// (`request_discard`, such as a sizing pass) leaves the record open, so a frame is one
+    /// record across all its passes.
+    pub(crate) fn finish_frame(&mut self, ctx: &egui::Context, ui_ms: f64) {
+        self.perf.stage.ui_ms += ui_ms;
+        self.perf.stage.stroking |= self.live_stroke.is_some();
+        if ctx.will_discard() {
+            return;
+        }
+        let stages = std::mem::take(&mut self.perf.stage);
+        let stages = self.slow_frames.finish(stages, gpu_canvas::now_ms(), self.perf.gpu, self.perf.gpu_ms);
+        let info = &self.perf.gpu_info;
+        self.stroke_trace.frame(&stages, stages.stroking, || {
+            let gpu = format!("{} {}", info.backend, info.adapter).trim().to_string();
+            if info.present.is_empty() { gpu } else { format!("{gpu}, {}", info.present) }
+        });
+    }
+
     /// Wait out the rest of [`Self::min_frame_ms`] since the last frame started.
     fn cap_frame_rate(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -60,9 +79,7 @@ impl PhotocraftApp {
         if self.live_tokens.poll(ctx, self.ui.theme) {
             self.checker = None;
         }
-        // Finish or expire outstanding captures first, so a new request admitted in this pass
-        // sees their released budget.
-        self.drain_captures(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.drain_control(ctx);
         native_menu::run(self, ctx);
         view_cmds::leave_full_screen_without_document(self, ctx);
@@ -136,16 +153,15 @@ impl PhotocraftApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
         }
         self.place_next_dropped(ctx);
-        // The control transport wakes the UI on arrival (ctx.request_repaint); only poll while a
-        // screenshot is pending. (Polling every 50 ms here made idle apps render at 20 fps.)
-        if self.captures.any_pending() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(16));
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let capture_unissued = self.poll_captures(ctx);
+        #[cfg(target_arch = "wasm32")]
+        let capture_unissued = false;
         // A hidden host runs no UI pass: a queued (or re-queued) capture asks for one. An issued
         // capture's own `Screenshot` command forces its paint; asking again would spin a hidden
         // window while a slow readback is in flight. Synthetic input queued during hidden ticks
         // needs the same wake: its events sit in eframe's preserved input until a UI pass.
-        if self.captures.any_unissued() || self.synthetic_batch.is_some() || !self.synthetic.is_empty() {
+        if capture_unissued || self.synthetic_batch.is_some() || !self.synthetic.is_empty() {
             ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaintWhileHidden);
         }
         self.poll_file_dialog(ctx, Some(frame));
@@ -168,12 +184,10 @@ impl PhotocraftApp {
         // 0.36 saved panel sizes under `Id::unique(name)`; 0.37 reads parent-scoped keys. Data-only,
         // so it runs even before fonts are ready; the old keys stay for a 0.36 rollback.
         panels::migrate_panel_state(&ctx);
-        // A real UI pass, not a hidden `run_logic` tick: record the capture geometry (the
-        // document identity included) and count one settling pass. `run_logic` leaves these
-        // input values stale; only this real UI phase counts toward settling.
-        let geometry = crate::screenshot::CaptureGeometry::current(&ctx, self.document_identity());
-        self.captures.note_geometry(geometry);
-        self.captures.note_pass();
+        // A real UI pass, not a hidden `run_logic` tick, which leaves these input values stale:
+        // only this phase counts toward settling.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.note_capture_pass(&ctx);
         // A real UI pass consumes the one in-flight synthetic batch (see `inject_synthetic`).
         self.begin_synthetic_pass(&ctx);
         self.hover_layer = None;
@@ -226,10 +240,9 @@ impl PhotocraftApp {
         // settled input; an early-returning pass keeps the batch (and the waiting replies).
         if !self.synthetic.is_empty() || self.synthetic_batch.is_some() {
             ctx.request_repaint();
-        } else if !self.input_waiters.is_empty() {
-            for w in self.input_waiters.drain(..) {
-                let _ = w.send(serde_json::json!({"ok": true, "result": null}));
-            }
+        } else {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.reply_input_processed();
         }
         // A menu or dialog can start a filter after `jobs_ui::tick` ran in this frame. Keep
         // polling it even when the platform would otherwise put the event loop to sleep.
@@ -241,6 +254,7 @@ impl PhotocraftApp {
         type_tool::sync_ime(self, &ctx);
         // Issue any due `ui.screenshot` now that this pass's state is settled: a queued request
         // that has waited its passes and animation delay captures exactly this frame.
+        #[cfg(not(target_arch = "wasm32"))]
         self.issue_captures(&ctx);
         // Last, after everything drawn this frame: a lost window device can't draw it (#3438).
         gpu_status::check_window(self, &ctx);

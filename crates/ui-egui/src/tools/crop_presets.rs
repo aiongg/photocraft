@@ -543,13 +543,13 @@ mod tests {
 
     #[test]
     fn control_channel_opens_the_dialogs() {
-        use crate::control::{ControlRequest, Outcome, handle};
+        use crate::control::{ControlRequest, Reply, handle};
         let mut app = app();
         let ctx = egui::Context::default();
         let call = |app: &mut PhotocraftApp, m: &str, p: Value| {
             let (r, _rx) = ControlRequest::new(m, p);
             match handle(app, &ctx, &r) {
-                Outcome::Done(v) => v,
+                Reply::Done(v) => v,
                 _ => Value::Null,
             }
         };

@@ -126,7 +126,7 @@ fn mode_picker_outside_dismissal_does_not_paint_or_erase() {
 
 #[test]
 fn mode_control_can_pick_a_row_with_ui_click() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     use egui_kittest::kittest::Queryable;
     let mut h = harness(Some("erase"));
     let ctx = h.ctx.clone();
@@ -136,13 +136,13 @@ fn mode_control_can_pick_a_row_with_ui_click() {
         json!({"button": "right", "shift": true,
         "events": [{"kind": "down", "x": 200, "y": 150}, {"kind": "up", "x": 200, "y": 150}]}),
     );
-    assert!(matches!(handle(h.state_mut(), &ctx, &req), Outcome::Done(_)));
+    assert!(matches!(handle(h.state_mut(), &ctx, &req), Reply::Done(_)));
     h.run_steps(2);
     assert!(h.state().ui.brush_mode_menu.is_some());
     assert_eq!(h.state().session.journal.len(), before);
     let at = h.get_by_label("Darken").rect().center();
     let (req, _) = ControlRequest::new("ui.click", json!({"x": at.x, "y": at.y}));
-    assert!(matches!(handle(h.state_mut(), &ctx, &req), Outcome::AfterInput));
+    assert!(matches!(handle(h.state_mut(), &ctx, &req), Reply::AfterInput));
     // The app injects these queued control events into its next frame's input.
     let events = std::mem::take(&mut h.state_mut().synthetic);
     for event in events {

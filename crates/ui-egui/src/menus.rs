@@ -319,7 +319,7 @@ mod window_documents_tests {
         let mut app = app(2);
         let ctx = egui::Context::default();
         let (req, _rx) = crate::control::ControlRequest::new("ui.menu.invoke", json!({"id": "window.document.0"}));
-        let crate::control::Outcome::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("expected an immediate reply") };
+        let crate::control::Reply::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("expected an immediate reply") };
         assert_eq!(r["ok"], true, "{r}");
         assert_eq!(app.session.active_index(), Some(0));
     }

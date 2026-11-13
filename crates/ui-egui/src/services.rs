@@ -344,8 +344,6 @@ pub type AutomationCommandFn = Box<dyn Fn(&str, &Value) -> Result<(), String>>;
 /// Open a URL in the system browser (native) — reliable cross-platform, unlike `ctx.open_url`.
 pub type OpenUrlFn = Box<dyn Fn(&str) -> Result<(), String>>;
 
-pub type EncodePngFn = Box<dyn Fn(u32, u32, &[u8]) -> Result<Vec<u8>, String>>;
-
 /// Put an RGBA8 image (width, height, pixels) on the OS clipboard.
 pub type ClipboardSetFn = Box<dyn FnMut(u32, u32, &[u8]) -> Result<(), String>>;
 
@@ -532,8 +530,6 @@ pub struct Services {
     /// each step of `actions.play`. Installed on the session only while a control request or
     /// an automation-driven [`PhotocraftApp::run`] runs, so a local play of a recorded `file.*` step still works.
     pub automation_authorize: Option<fn(&str, &serde_json::Value) -> photocraft_engine::Result<()>>,
-    /// Encode an RGBA8 image as PNG (used for screenshots and `ui.render`).
-    pub encode_png: Option<EncodePngFn>,
     /// Open a URL in the system browser (native). Falls back to `ctx.open_url` (web) when unset.
     pub open_url: Option<OpenUrlFn>,
     /// Preferences ▸ General ▸ Beep When Done: the platform's default beep, played when a

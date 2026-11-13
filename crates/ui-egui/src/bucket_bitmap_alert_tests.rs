@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::brush_refusal_alert_tests::{alerts, app, refused, steps, stroke};
 use super::*;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 
 fn bitmap() -> PhotocraftApp {
     let mut app = app(Tool::PaintBucket);
@@ -36,7 +36,7 @@ fn the_alert_is_listed_in_ui_inspect() {
     let mut app = bitmap();
     stroke(&mut app);
     let (req, _rx) = ControlRequest::new("ui.inspect", json!({}));
-    let Outcome::Done(inspect) = handle(&mut app, &egui::Context::default(), &req) else { panic!("ui.inspect: expected an immediate reply") };
+    let Reply::Done(inspect) = handle(&mut app, &egui::Context::default(), &req) else { panic!("ui.inspect: expected an immediate reply") };
     assert_eq!(inspect["result"]["dialogs"][0]["fields"]["message"], TEXT, "{inspect}");
 }
 

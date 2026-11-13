@@ -3,7 +3,7 @@ use super::*;
 fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
     let (req, _rx) = ControlRequest::new(method, params);
     match handle(app, ctx, &req) {
-        Outcome::Done(v) => v,
+        Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
 }
@@ -31,7 +31,7 @@ fn unknown_names_suggest_the_right_method_or_command() {
     assert!(e.contains("engine.execute {\"command\": \"edit.undo\"}"), "{e}");
     for m in METHODS {
         let (req, _rx) = ControlRequest::new(*m, json!({}));
-        if let Outcome::Done(v) = handle(&mut app, &ctx, &req) {
+        if let Reply::Done(v) = handle(&mut app, &ctx, &req) {
             assert!(!v.to_string().contains("unknown method"), "{m} is listed but not served: {v}");
         }
     }
@@ -2249,7 +2249,7 @@ fn huge_click_count_is_rejected() {
             None => json!({"x": 10, "y": 10}),
         };
         let (req, _rx) = ControlRequest::new("ui.click", params);
-        assert!(matches!(handle(&mut app, &ctx, &req), Outcome::AfterInput));
+        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput));
         assert_eq!(app.synthetic.len(), events);
         app.synthetic.clear();
     }
@@ -2264,7 +2264,7 @@ fn huge_click_coordinate_is_rejected() {
     for method in ["ui.click", "ui.move"] {
         for (field, v) in [("x", 1e308), ("y", -1e308), ("x", 3.5e38), ("y", 1e7), ("x", -1.5e6)] {
             let (req, _rx) = ControlRequest::new(method, json!({ field: v }));
-            let Outcome::Done(r) = handle(&mut app, &ctx, &req) else { panic!("{method} {field}={v}: accepted") };
+            let Reply::Done(r) = handle(&mut app, &ctx, &req) else { panic!("{method} {field}={v}: accepted") };
             assert_eq!(r["ok"], false, "{method} {field}={v}: {r}");
             assert!(r["error"].as_str().unwrap().starts_with(&format!("{field} must be between")), "{r}");
             assert!(app.synthetic.is_empty(), "a rejected {method} queues nothing");
@@ -2274,7 +2274,7 @@ fn huge_click_coordinate_is_rejected() {
     let edge = MAX_SCREEN_POINT;
     for (method, x, y) in [("ui.move", edge, -edge), ("ui.click", -edge, edge), ("ui.click", -5.0, 20.0)] {
         let (req, _rx) = ControlRequest::new(method, json!({"x": x, "y": y}));
-        assert!(matches!(handle(&mut app, &ctx, &req), Outcome::AfterInput));
+        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput));
         while !app.synthetic.is_empty() {
             let events = app.take_synthetic_step();
             ctx.run_ui(egui::RawInput { events, ..Default::default() }, |_| {}).textures_delta.clear();
@@ -2402,7 +2402,7 @@ fn ui_click_and_move_reject_bad_params_before_queueing_input() {
         ("ui.move", json!({"x": 10, "y": 10}), egui::PointerButton::Primary, 1),
     ] {
         let (req, _rx) = ControlRequest::new(method, params.clone());
-        assert!(matches!(handle(&mut app, &ctx, &req), Outcome::AfterInput), "{method} {params}");
+        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput), "{method} {params}");
         assert_eq!(app.synthetic.len(), events, "{method} {params}");
         if let Some(egui::Event::PointerButton { button: queued, .. }) = app.synthetic.get(1) {
             assert_eq!(*queued, button, "{method} {params}");
@@ -2430,7 +2430,7 @@ fn ui_key_rejects_bad_params_before_queueing_input() {
     }
     for params in [json!({"key": "N", "ctrl": true}), json!({"key": "N", "shift": false, "modifiers": {"ctrl": true}})] {
         let (req, _rx) = ControlRequest::new("ui.key", params.clone());
-        assert!(matches!(handle(&mut app, &ctx, &req), Outcome::AfterInput), "{params}");
+        assert!(matches!(handle(&mut app, &ctx, &req), Reply::AfterInput), "{params}");
         assert!(matches!(app.synthetic.first(), Some(egui::Event::Key { key: egui::Key::N, modifiers, .. }) if modifiers.ctrl), "{params}");
         app.synthetic.clear();
     }
@@ -2445,7 +2445,7 @@ fn ui_screenshot_rejects_bad_params_before_capturing() {
     }
     for (params, path) in [(json!({}), None), (Value::Null, None), (json!({"path": "shot.png", "focus": false}), Some("shot.png"))] {
         let (req, _rx) = ControlRequest::new("ui.screenshot", params.clone());
-        let Outcome::Screenshot { path: queued, .. } = handle(&mut app, &ctx, &req) else { panic!("{params}: expected a capture") };
+        let Reply::Screenshot { path: queued, .. } = handle(&mut app, &ctx, &req) else { panic!("{params}: expected a capture") };
         assert_eq!(queued.as_deref(), path, "{params}");
     }
 }
@@ -2454,7 +2454,7 @@ fn ui_screenshot_rejects_bad_params_before_capturing() {
 fn key_modifiers(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> egui::Modifiers {
     app.synthetic.clear();
     let (req, _rx) = ControlRequest::new("ui.key", params.clone());
-    assert!(matches!(handle(app, ctx, &req), Outcome::AfterInput), "{params}");
+    assert!(matches!(handle(app, ctx, &req), Reply::AfterInput), "{params}");
     match app.synthetic.first() {
         Some(egui::Event::Key { modifiers, .. }) => *modifiers,
         other => panic!("{params}: expected a key event, got {other:?}"),

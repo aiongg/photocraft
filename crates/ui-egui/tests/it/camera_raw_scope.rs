@@ -492,7 +492,7 @@ fn controller_click_delivered_in_one_raw_frame_selects_an_existing_curve_point()
     let at = curve_at(graph, [128.0, 128.0]);
     let ctx = h.ctx.clone();
     let (request, _) = control::ControlRequest::new("ui.click", json!({"x":at.x,"y":at.y}));
-    assert!(matches!(control::handle(h.state_mut(), &ctx, &request), control::Outcome::AfterInput));
+    assert!(matches!(control::handle(h.state_mut(), &ctx, &request), control::Reply::AfterInput));
     // Harness::event splits a press/release pair across frames. Feed the controller's actual
     // raw-input batch to egui to cover the native rapid-click boundary instead.
     let input = egui::RawInput { screen_rect: Some(ctx.content_rect()), events: h.state_mut().take_synthetic_step(), ..Default::default() };

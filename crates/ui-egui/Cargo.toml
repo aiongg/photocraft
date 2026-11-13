@@ -11,7 +11,7 @@ workspace = true
 chrono = { workspace = true }
 craft-print = { workspace = true }
 craft-ui = { workspace = true }
-craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap"] }
+craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap", "automation"] }
 # Interface translations over the embedded craft-i18n catalogs (`build.rs`, `src/i18n.rs`).
 craft-i18n = { workspace = true }
 photocraft-geom = { workspace = true }

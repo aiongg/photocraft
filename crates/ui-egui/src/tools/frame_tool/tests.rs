@@ -163,7 +163,7 @@ fn modifiers_shape_selection_and_invalid_control_params_are_consistent() {
     let ctx = egui::Context::default();
     let call = |app: &mut PhotocraftApp, p: Value| {
         let (req, _) = crate::control::ControlRequest::new("ui.set", p);
-        let crate::control::Outcome::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("immediate state update") };
+        let crate::control::Reply::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("immediate state update") };
         v
     };
     assert_eq!(call(&mut app, json!({"frameShape":"triangle","frameSides":6}))["ok"], true);

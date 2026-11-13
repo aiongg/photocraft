@@ -139,7 +139,7 @@ fn ui_inspect_reports_the_mode_on_and_off() {
     let mut app = app_with_selected_board();
     let adding = |app: &mut PhotocraftApp| {
         let (req, _) = crate::control::ControlRequest::new("ui.inspect", json!({}));
-        let crate::control::Outcome::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("inspect") };
+        let crate::control::Reply::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("inspect") };
         v["result"]["artboardTool"]["adding"].clone()
     };
     assert_eq!(adding(&mut app), json!(false));

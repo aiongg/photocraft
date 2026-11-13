@@ -11,7 +11,7 @@
 use egui::{Event, Modifiers, PointerButton};
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::canvas::ViewXform;
-use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use serde_json::{Value, json};
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
@@ -32,7 +32,7 @@ fn app() -> PhotocraftApp {
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let ctx = egui::Context::default();
     let (req, _rx) = ControlRequest::new(method, params);
-    let Outcome::Done(v) = handle(app, &ctx, &req) else { panic!("{method} didn't finish") };
+    let Reply::Done(v) = handle(app, &ctx, &req) else { panic!("{method} didn't finish") };
     v
 }
 

@@ -272,7 +272,7 @@ fn playback_options_ok_refuses_values_automation_set_that_the_dialog_cannot_show
     let control = |app: &mut PhotocraftApp, method: &str, params: Value| {
         let (request, _) = crate::control::ControlRequest::new(method, params);
         match crate::control::handle(app, &egui::Context::default(), &request) {
-            crate::control::Outcome::Done(v) => v,
+            crate::control::Reply::Done(v) => v,
             _ => panic!("{method} answers at once"),
         }
     };

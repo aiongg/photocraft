@@ -72,7 +72,7 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id":"filter.blur.gaussianBlur"}));
         let ctx = harness.ctx.clone();
         let response = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request);
-        assert!(matches!(response, photocraft_ui_egui::control::Outcome::Done(_)));
+        assert!(matches!(response, photocraft_ui_egui::control::Reply::Done(_)));
         harness.run_steps(6);
         let preview = id.0 ^ (1u64 << 61);
         assert!(observer.has(preview, [512, 512]), "filter preview uploaded");

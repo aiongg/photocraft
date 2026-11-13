@@ -94,7 +94,7 @@ fn menu_stroke_edits_the_targeted_filter_mask_and_undoes() {
 /// An implicit white smart-filter mask is a dialog target, and ui.set cannot redirect its Stroke.
 #[test]
 fn implicit_filter_mask_dialog_retains_its_target_when_ui_set_changes_it() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
     use photocraft_doc::LayerContent;
     let mut app = app();
     app.run("edit.fill", json!({"contents": "white"})).unwrap();
@@ -106,7 +106,7 @@ fn implicit_filter_mask_dialog_retains_its_target_when_ui_set_changes_it() {
     let ctx = egui::Context::default();
     let id = crate::menus::invoke(&mut app, &ctx, COMMAND, json!({})).unwrap()["dialog"].as_u64().unwrap();
     let (request, _) = ControlRequest::new("ui.set", json!({"filterMaskTarget": false}));
-    let Outcome::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.set should finish immediately") };
+    let Reply::Done(reply) = handle(&mut app, &ctx, &request) else { panic!("ui.set should finish immediately") };
     assert_eq!(reply["ok"], true, "{reply}");
     assert!(!app.filter_mask_targeted());
     let fields = &mut app.ui.dialog_mut(id).unwrap().fields;

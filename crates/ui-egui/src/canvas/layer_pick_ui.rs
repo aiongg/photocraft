@@ -256,7 +256,7 @@ mod tests {
         let _ = crate::control::handle(&mut a, &ctx, &req);
         assert_eq!(a.ui.layer_menu.as_ref().map(|m| m.layers[0].0), Some(red));
         let (req, _rx) = crate::control::ControlRequest::new("ui.inspect", Value::Null);
-        let crate::control::Outcome::Done(v) = crate::control::handle(&mut a, &ctx, &req) else { panic!("inspect") };
+        let crate::control::Reply::Done(v) = crate::control::handle(&mut a, &ctx, &req) else { panic!("inspect") };
         assert_eq!(v["result"]["layerMenu"]["layers"][0][1], "Red");
     }
 

@@ -71,7 +71,7 @@ fn layer_rasterize_type_keeps_its_step_name() {
     for (method, params) in [("ui.menu.invoke", json!({"id": "layer.rasterize.type"})), ("engine.execute", json!({"command": "layer.rasterize.type"}))] {
         let mut app = app_with(Kind::Type);
         let (req, _rx) = crate::control::ControlRequest::new(method, params);
-        let crate::control::Outcome::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("{method}: deferred") };
+        let crate::control::Reply::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("{method}: deferred") };
         assert_ne!(r.get("ok"), Some(&Value::Bool(false)), "{method}: {r}");
         assert_eq!(active_content(&app), "Pixel", "{method}");
         assert_eq!(step_name(&app).as_deref(), Some("Rasterize Type"), "{method}");

@@ -173,12 +173,12 @@ fn the_dialog_under_a_picker_refuses_control_edits() {
     let mut app = app();
     let (fill, picker) = fill_with_picker(&mut app);
     let (req, _rx) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": fill, "field": "opacity", "value": 50}));
-    let crate::control::Outcome::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("an immediate reply") };
+    let crate::control::Reply::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("an immediate reply") };
     assert_eq!(r["ok"], false, "{r}");
     assert_eq!(fields(&app, fill)["opacity"], json!(100.0));
     crate::dialogs::cancel(&mut app, picker).unwrap();
     let (req, _rx) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": fill, "field": "opacity", "value": 50}));
-    let crate::control::Outcome::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("an immediate reply") };
+    let crate::control::Reply::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("an immediate reply") };
     assert_eq!(r["ok"], true, "{r}");
 }
 
@@ -270,7 +270,7 @@ fn control_edits_preview_at_once() {
     let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
         let (req, _rx) = crate::control::ControlRequest::new(method, params);
         match crate::control::handle(app, &ctx, &req) {
-            crate::control::Outcome::Done(v) => v,
+            crate::control::Reply::Done(v) => v,
             _ => panic!("{method}: expected an immediate reply"),
         }
     };
@@ -310,7 +310,7 @@ fn a_pickers_target_stays_the_dialog_it_opened_on() {
     let other = app.ui.open_dialog(DialogKind::Command, Map::new());
     let set = |app: &mut PhotocraftApp, field: &str, value: Value| {
         let (req, _rx) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": picker, "field": field, "value": value}));
-        let crate::control::Outcome::Done(r) = crate::control::handle(app, &ctx, &req) else { panic!("an immediate reply") };
+        let crate::control::Reply::Done(r) = crate::control::handle(app, &ctx, &req) else { panic!("an immediate reply") };
         r["ok"].as_bool()
     };
     assert_eq!(set(&mut app, "__dialog", json!(other)), Some(false));

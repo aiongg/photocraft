@@ -167,7 +167,7 @@ fn the_control_channel_sees_and_confirms_the_prompt() {
     let call = |app: &mut PhotocraftApp, method: &str, params: serde_json::Value| {
         let (req, _rx) = crate::control::ControlRequest::new(method, params);
         match crate::control::handle(app, &ctx, &req) {
-            crate::control::Outcome::Done(v) => v,
+            crate::control::Reply::Done(v) => v,
             _ => panic!("deferred"),
         }
     };

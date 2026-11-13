@@ -349,7 +349,7 @@ fn empty_smart_result_is_reported_without_error() {
 
 #[test]
 fn mixer_brush_is_selectable_and_paints_only_inside_the_selection_via_control() {
-    use crate::control::{ControlRequest, Outcome, handle};
+    use crate::control::{ControlRequest, Reply, handle};
 
     let mut app = app();
     app.run("paint.pencil", json!({"points": [[50, 30]], "size": 200, "color": "#204080"})).unwrap();
@@ -381,7 +381,7 @@ fn mixer_brush_is_selectable_and_paints_only_inside_the_selection_via_control() 
             ]
         }),
     );
-    assert!(matches!(handle(&mut app, &ctx, &req), Outcome::Done(_)));
+    assert!(matches!(handle(&mut app, &ctx, &req), Reply::Done(_)));
     assert_eq!(app.ui.tool, Tool::MixerBrush);
     assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("paint.mixerBrush"));
 
