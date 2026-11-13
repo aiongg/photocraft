@@ -5,7 +5,7 @@
 use craft::keymap::Chord;
 use craft::ui::runtime::keys::focus_holds;
 use egui::accesskit::Role;
-use egui::{Modifiers, PointerButton, Pos2, vec2};
+use egui::{Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::LayerContent;
@@ -1058,4 +1058,54 @@ fn alt_choosing_an_adjustment_from_the_menu_reopens_the_last_settings() {
     crate::palette::note_recent(&h.ctx, "file.new");
     choose(&mut h, Modifiers::ALT);
     assert_eq!(crate::palette::recent_ids(&h.ctx).first().map(String::as_str), Some("image.adjustments.levels"), "Edit › Search's most recent");
+}
+
+fn zoom(h: &Harness<'static, PhotocraftApp>) -> f32 {
+    h.state().current_zoom()
+}
+
+#[test]
+fn ctrl_plus_zooms_the_canvas_not_the_interface() {
+    let mut h = harness();
+    let z0 = zoom(&h);
+    // ⌘+ / Ctrl+'+' as typed with ⇧ on a US layout, and as the numpad / Nordic `+`.
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT, Key::Plus);
+    h.run_steps(2);
+    let z1 = zoom(&h);
+    assert!(z1 > z0, "⌘+ should zoom the canvas in ({z0} -> {z1})");
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Plus);
+    h.run_steps(2);
+    assert!(zoom(&h) > z1);
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Minus);
+    h.run_steps(2);
+    assert!((zoom(&h) - z1).abs() < 1e-4);
+    // ⌘1 is 100%, ⌘0 fits on screen again.
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Num1);
+    h.run_steps(2);
+    assert_eq!(zoom(&h), 1.0);
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Num0);
+    h.run_steps(3);
+    assert!((zoom(&h) - z0).abs() < 1e-3, "⌘0 fits on screen: {} vs {z0}", zoom(&h));
+    assert_eq!(h.ctx.zoom_factor(), 1.0, "the interface must never scale");
+}
+
+#[test]
+fn keyboard_zoom_works_with_a_dialog_open() {
+    let mut h = harness();
+    crate::dialogs::open_command_dialog(h.state_mut(), "image.adjustments.brightnessContrast", "Brightness/Contrast…");
+    h.run_steps(3);
+    assert_eq!(h.state().ui.dialogs.len(), 1);
+    let z0 = zoom(&h);
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Equals);
+    h.run_steps(2);
+    assert!(zoom(&h) > z0);
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT, Key::Plus);
+    h.run_steps(2);
+    assert_eq!(h.ctx.zoom_factor(), 1.0);
+    assert_eq!(h.state().ui.dialogs.len(), 1);
+    // Other commands stay blocked while the dialog is open (⌘J would duplicate the layer).
+    let layers = h.state().session.active().unwrap().doc.layers.len();
+    h.key_press_modifiers(Modifiers::COMMAND, Key::J);
+    h.run_steps(2);
+    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers);
 }
