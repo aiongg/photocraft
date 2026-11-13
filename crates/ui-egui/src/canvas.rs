@@ -111,7 +111,7 @@ pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navig
 use paint::draw_tool_state;
 pub(crate) use paint::{clip_line, marching_ants_line_shapes, marching_ants_mapped};
 use paint::{draw_beyond_canvas, draw_drag_preview, marching_ants_segment_shapes, paint_cpu_detail, paint_cpu_document, paint_mapped_image_at, pattern_xf};
-pub(crate) use raster_source::SourceLog;
+pub(crate) use raster_source::SourceLogs;
 use selection::selection_shown_offset;
 pub use selection::{SelCursor, selection_cursor};
 pub(crate) use selection::{floating_outline, selection_drag_delta};
@@ -404,13 +404,6 @@ fn paint_canvas(
     // Crop tool: the layers' pixels past the canvas while a frame is edited, under the canvas
     // (whose edge blends into them) and without its shadow.
     let beyond = draw_beyond_canvas(app, painter, &xf, idx, output);
-    // View › Pattern Preview (#1067): copies of the document around it, from the same texture.
-    let pattern = if app.ui.view.pattern_preview {
-        let v = visible_doc_rect(&xf);
-        crate::pattern_preview::copies([v.x0, v.y0, v.x1, v.y1].map(f64::from), size)
-    } else {
-        Vec::new()
-    };
     let drop_shadow = drop_shadow && !beyond && !app.ui.view.pattern_preview;
     let mut on_gpu = false;
     // A flipped or pixel-aspect-corrected view draws through the CPU path (the GPU canvas shader
@@ -467,12 +460,16 @@ fn paint_canvas(
         if let Some((detail, area)) = textures.and_then(|t| t.detail) {
             paint_cpu_detail(painter, &xf, doc.bounds(), rotated, checkerboard, detail, area);
         }
-        // Pattern Preview tiles what is shown: a size-changing preview's area, from its origin.
-        let (tile, copies) = if area == doc.bounds() || !app.ui.view.pattern_preview {
-            (size, pattern.clone())
+        // View › Pattern Preview (#1067): copies of what is shown around it, from the same texture: a size-changing
+        // preview's area, from its origin.
+        let (tile, copies) = if !app.ui.view.pattern_preview {
+            (size, Vec::new())
         } else {
-            let tile = [area.width(), area.height()];
-            let v = visible_doc_rect(&xf).translate(-area.x0, -area.y0);
+            let (tile, v) = if area == doc.bounds() {
+                (size, visible_doc_rect(&xf))
+            } else {
+                ([area.width(), area.height()], visible_doc_rect(&xf).translate(-area.x0, -area.y0))
+            };
             (tile, crate::pattern_preview::copies([v.x0, v.y0, v.x1, v.y1].map(f64::from), tile))
         };
         for &c in &copies {

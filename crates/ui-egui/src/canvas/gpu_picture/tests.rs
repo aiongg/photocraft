@@ -17,7 +17,7 @@ fn picture(shows: Shows, k: u32, growth: [f32; 2]) -> GpuPicture {
         hdr: None,
         offset: [0.0, 0.0],
     };
-    GpuPicture { params, shows, k, growth, doc_size: [400, 300], pattern: false }
+    GpuPicture { params, shows, k, growth, bounds: DRect::new(0, 0, 400, 300), doc_size: [400, 300], pattern: false }
 }
 
 #[test]

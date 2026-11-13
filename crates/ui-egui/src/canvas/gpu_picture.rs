@@ -9,9 +9,9 @@ use craft::ui::canvas::AppPaint;
 use super::display::{hdr_preview, sync_display_lut};
 use super::filter_preview::{ensure_adjust_proxy, ensure_filter_preview, ensure_proxy_preview, filter_preview_display_doc};
 use super::paint::paint_gpu_view;
-use super::textures::{ensure_gpu, redraw_focus, visible_doc_rect};
+use super::textures::{ensure_gpu, preview_bounds, redraw_focus, visible_doc_rect};
 use super::view_xform::ViewXform;
-use super::{Document, PhotocraftApp, viewport_pages};
+use super::{DRect, Document, PhotocraftApp, viewport_pages};
 use crate::gpu_canvas::ViewParams;
 
 #[cfg(test)]
@@ -54,6 +54,9 @@ pub(crate) struct GpuPicture {
     /// How far a size-changing preview grows past the reduced document on each side, in its texels: it grows around
     /// the old image centre, so the view keeps its pan.
     growth: [f32; 2],
+    /// Where the picture lies in the document, in document pixels: a preview's own area (`preview_bounds`), else the
+    /// document's bounds.
+    bounds: DRect,
     /// The document's own size, which View › Pattern Preview tiles.
     doc_size: [u32; 2],
     /// View › Pattern Preview is on: copies of the picture around it, from the same texture.
@@ -96,9 +99,10 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
         let view_key = egui::Id::unique(("pc-canvas-proxy", ctx.viewport_id(), idx)).value();
         let params = base(key, preview_size, view_key, display, hdr_preview(app, doc));
         let growth = [(preview_size[0] as f32 - reduced[0] as f32) / 2.0, (preview_size[1] as f32 - reduced[1] as f32) / 2.0];
-        return Some(GpuPicture { params, shows: Shows::Preview, k, growth, doc_size, pattern });
+        let bounds = preview_bounds(doc.size, photocraft_geom::Size::new(preview_size[0], preview_size[1]), k);
+        return Some(GpuPicture { params, shows: Shows::Preview, k, growth, bounds, doc_size, pattern });
     }
-    let plain = |params: ViewParams, shows: Shows| GpuPicture { params, shows, k: 1, growth: [0.0, 0.0], doc_size, pattern };
+    let plain = |params: ViewParams, shows: Shows| GpuPicture { params, shows, k: 1, growth: [0.0, 0.0], bounds: doc.bounds(), doc_size, pattern };
     if viewport_pages::show(app, ctx, idx, req.xf, req.zoom) {
         app.perf.gpu = true;
         let key = viewport_pages::stream_key(doc.id.0);
@@ -123,6 +127,13 @@ impl GpuPicture {
         self.params.shadow = shadow;
         self.params.pixel_grid = pixel_grid && self.shows != Shows::Preview;
         self
+    }
+
+    /// Where the picture lies in the document, in document pixels: a reduced or size-changing preview's own area, else
+    /// the document's bounds.
+    #[allow(dead_code, reason = "the document display of the framework Canvas body places it")]
+    pub(crate) fn bounds(&self) -> DRect {
+        self.bounds
     }
 
     /// Whether it draws the document's own texture set, which the Navigator can draw again at its size.

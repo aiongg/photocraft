@@ -1,5 +1,6 @@
-//! [`PhotoComposite`]: a document's canvas picture as the framework's raster display reads it, the composite with the
-//! live preview, the colour management and the channel view folded in.
+//! A document's canvas pictures as the framework's raster displays read them: [`PhotoComposite`], the composite with
+//! the live preview and the colour management folded in, and [`ChannelOverlay`], the Channels panel's view, which a
+//! second display draws over the composite or the GPU picture.
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -7,13 +8,12 @@ use std::sync::Arc;
 use craft::behavior::PixelSize;
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::primitives::Revision;
-use egui::ColorImage;
+use egui::{Color32, ColorImage};
 use photocraft_engine::display_color::CanvasDisplay;
 
 use super::channel_view::Overlay;
-use super::display::{cache_key, canvas_display, display_doc, display_image};
-use super::filter_preview::filter_channel_preview;
-use super::textures::{damage_since, effect_reach, preview_bounds};
+use super::display::{cache_key, display_image};
+use super::textures::{CanvasPicture, canvas_picture, damage_since};
 use super::{DRect, Document, PhotocraftApp};
 
 /// How many of the revisions a source handed out it can still tell damage since: a display's whole-document and
@@ -28,25 +28,46 @@ mod tests;
 pub(crate) struct Shown {
     /// The document's revision.
     revision: u64,
-    /// The preview key with the display key folded in, as the CPU canvas caches keep it.
+    /// The preview key with the source's display key folded in, as the CPU canvas caches keep it.
     key: u64,
-    /// The channel view's key; 0 for the plain composite.
-    overlay: u64,
     /// Where the picture lies in the document: the document's bounds, or a size-changing preview's own.
     bounds: DRect,
     /// The picture is a preview reduced for a zoomed-out view, in its own pixels.
     reduced: bool,
 }
 
-/// The revisions one document's source handed out on one display, newest last, so a display asking for the damage
-/// since the revision its texture shows gets an answer. Kept per `(document, display)` in the app.
-#[derive(Default)]
-pub(crate) struct SourceLog {
-    entries: VecDeque<(Revision, Shown)>,
+impl Shown {
+    fn of(p: &CanvasPicture, display_key: u64) -> Self {
+        Shown { revision: p.revision, key: p.preview_key ^ display_key, bounds: p.bounds, reduced: p.reduced }
+    }
+
+    fn revision(&self, id: photocraft_doc::DocId, view: u64) -> Revision {
+        let b = self.bounds;
+        Revision::of(&(id.0, self.revision, self.key, view, (b.x0, b.y0, b.x1, b.y1), self.reduced))
+    }
 }
 
-impl SourceLog {
-    fn record(&mut self, revision: Revision, shown: Shown) {
+/// What a [`ChannelOverlay`] showed: the picture it was drawn from and the channel view's key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct OverlayShown {
+    picture: Shown,
+    view: u64,
+}
+
+/// The revisions one source handed out on one display, newest last, so a display asking for the damage since the
+/// revision its texture shows gets an answer.
+pub(crate) struct SourceLog<S> {
+    entries: VecDeque<(Revision, S)>,
+}
+
+impl<S> Default for SourceLog<S> {
+    fn default() -> Self {
+        SourceLog { entries: VecDeque::new() }
+    }
+}
+
+impl<S: Copy> SourceLog<S> {
+    fn record(&mut self, revision: Revision, shown: S) {
         if self.entries.back().is_some_and(|(r, _)| *r == revision) {
             return;
         }
@@ -57,91 +78,188 @@ impl SourceLog {
         self.entries.push_back((revision, shown));
     }
 
-    fn find(&self, revision: Revision) -> Option<Shown> {
+    fn find(&self, revision: Revision) -> Option<S> {
         self.entries.iter().rev().find(|(r, _)| *r == revision).map(|(_, s)| *s)
     }
+}
 
-    /// The pictures that showed a preview `was_preview` tells (by its key with display key `display_key` folded in)
-    /// count as the committed document from now on, so the commit's damage refreshes only what it changed
-    /// ([`super::textures::shown_as_document`]).
+/// One document's source logs on one display, kept per `(document, display)` in the app.
+#[derive(Default)]
+pub(crate) struct SourceLogs {
+    composite: SourceLog<Shown>,
+    overlay: SourceLog<OverlayShown>,
+}
+
+impl SourceLogs {
+    /// The pictures that showed a preview `was_preview` tells count as the committed document from now on, so the
+    /// commit's damage refreshes only what it changed ([`super::textures::shown_as_document`]). The composite's keys
+    /// carry the display's key `display_key`; the channel view's are raw, as `channel_view::ensure` keeps them.
     pub(crate) fn shown_as_document(&mut self, display_key: u64, was_preview: impl Fn(u64) -> bool) {
-        for (_, shown) in &mut self.entries {
+        for (_, shown) in &mut self.composite.entries {
             if was_preview(shown.key ^ display_key) {
                 shown.key = display_key;
+            }
+        }
+        for (_, shown) in &mut self.overlay.entries {
+            if was_preview(shown.picture.key) {
+                shown.picture.key = 0;
             }
         }
     }
 }
 
-/// Document `idx`'s canvas picture on one display, for a `RasterDisplay`: the composite the CPU canvas shows (the
-/// committed document, or the live adjustment, filter or tool preview), through the display's colour management, with
-/// the Channels panel's view over it. Built once per pass; damage comes from the same records the CPU canvas cache
-/// reads ([`damage_since`]).
-pub(crate) struct PhotoComposite<'a> {
+/// The picture a source draws from this pass ([`canvas_picture`]) and what its damage reads.
+struct Picture<'a> {
     app: &'a PhotocraftApp,
     idx: usize,
     doc: Arc<Document>,
-    display: Option<Arc<CanvasDisplay>>,
-    overlay: Option<Overlay>,
     /// The document's revision and the raw preview key.
     now: (u64, u64),
+    /// The key folded into `shown.key`: the display's for the composite, 0 for the channel view.
     display_key: u64,
     /// The document's damage span start and its last damage, grown by its layer effects' reach.
     last_damage: (u64, Option<DRect>),
     shown: Shown,
+}
+
+impl<'a> Picture<'a> {
+    fn new(app: &'a PhotocraftApp, idx: usize, p: CanvasPicture, display_key: u64) -> Self {
+        let shown = Shown::of(&p, display_key);
+        Picture { app, idx, doc: p.doc, now: (p.revision, p.preview_key), display_key, last_damage: p.last_damage, shown }
+    }
+
+    fn size(&self) -> PixelSize {
+        PixelSize::new(self.doc.size.width, self.doc.size.height)
+    }
+
+    /// What changed since a picture of this source showed `seen`.
+    fn damage(&self, seen: Shown) -> Option<PixelRect> {
+        // A reduced or moved picture is in other pixels than the document's damage.
+        if seen.reduced || self.shown.reduced || seen.bounds != self.shown.bounds {
+            return None;
+        }
+        let r = damage_since(self.app, self.idx, (seen.revision, seen.key), self.now, self.display_key, self.last_damage)?;
+        let r = r.intersect(&self.doc.bounds());
+        Some(if r.is_empty() { PixelRect::default() } else { PixelRect::new(r.x0, r.y0, r.x1, r.y1) })
+    }
+
+    /// Writes what `render` draws of `region` at `factor` into `out`. `render` gets the part of `region` inside the
+    /// document, starting on a whole texel of `region`'s grid, and returns its row width in texels and its texels;
+    /// texels before the document's start and past its end are left as they are.
+    fn read(&self, region: PixelRect, factor: u32, out: &mut ColorImage, render: impl FnOnce(DRect, u32) -> Option<(usize, Vec<Color32>)>) {
+        let factor = factor.max(1);
+        let f = i32::try_from(factor).unwrap_or(i32::MAX);
+        let b = self.doc.bounds();
+        let skip = |start: i32, lo: i32| if start >= lo { 0 } else { (lo - start + f - 1) / f };
+        let (tx, ty) = (skip(region.x0, b.x0), skip(region.y0, b.y0));
+        let area = DRect::new(region.x0 + tx * f, region.y0 + ty * f, region.x1.min(b.x1), region.y1.min(b.y1));
+        if area.is_empty() {
+            return;
+        }
+        let Some((w, px)) = render(area, factor) else { return };
+        let h = px.len() / w.max(1);
+        let (tx, ty) = (tx as usize, ty as usize);
+        let [out_w, out_h] = out.size;
+        for row in 0..h.min(out_h.saturating_sub(ty)) {
+            let n = w.min(out_w.saturating_sub(tx));
+            let at = (ty + row) * out_w + tx;
+            out.pixels[at..at + n].copy_from_slice(&px[row * w..row * w + n]);
+        }
+    }
+}
+
+/// Document `idx`'s canvas picture on one display, for a `RasterDisplay`: the composite the CPU canvas shows (the
+/// committed document, or the live adjustment, filter or tool preview), through the display's colour management.
+/// Built once per pass; damage comes from the same records the CPU canvas cache reads ([`damage_since`]).
+pub(crate) struct PhotoComposite<'a> {
+    picture: Picture<'a>,
+    display: Option<Arc<CanvasDisplay>>,
     revision: Revision,
-    log: Option<&'a SourceLog>,
+    log: Option<&'a SourceLog<Shown>>,
 }
 
 impl<'a> PhotoComposite<'a> {
     /// Document `idx`'s picture on `output` (`None`: the main window's display); `None` when no such document is open.
     pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
-        let (revision, last_damage, id, committed) = {
-            let st = app.session.documents().get(idx)?;
-            let reach = |r: DRect| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) };
-            (st.revision, (st.damage_from(), st.last_damage.map(reach)), st.doc.id, st.doc.bounds())
-        };
-        let (mut doc, mut preview_key) = display_doc(app, idx);
-        // A filter dialog's preview: reduced for a zoomed-out view (a proxy, factor `k`) it covers the whole document
-        // at its own size; one whose dimensions change otherwise (Image › Rotation) covers its own area, centred on
-        // the document's, as the GPU canvas draws it.
-        let mut bounds = committed;
-        let mut reduced = false;
-        if let Some((preview, key)) = filter_channel_preview(app, idx, ctx) {
-            let k = app.filter_preview.as_ref().map_or(1, |p| p.key.k.max(1));
-            bounds = preview_bounds(committed.size(), preview.size, k);
-            (doc, preview_key, reduced) = (preview, key, k > 1);
-        }
-        let reduced = reduced || bounds != committed;
-        // An adjustment dialog's preview of a large document is taken by the GPU path as a proxy; read here it would
-        // cost a full-size composite per change, so the document shows instead.
-        if crate::adjust_preview::shown_key(app) == Some(preview_key)
-            && let Some(st) = app.session.documents().get(idx)
-            && crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(app)) > 1
-        {
-            (doc, preview_key) = (st.doc.clone(), 0);
-        }
-        let (display, display_key) = canvas_display(app, &doc, output);
-        let overlay = Overlay::of(app, idx, &doc, output);
-        let shown = Shown { revision, key: preview_key ^ display_key, overlay: overlay.as_ref().map_or(0, |o| o.key), bounds, reduced };
-        let picture = Revision::of(&(id.0, shown.revision, shown.key, shown.overlay, (bounds.x0, bounds.y0, bounds.x1, bounds.y1), reduced));
-        let log_key = cache_key(id, output);
-        app.raster_logs.entry(log_key).or_default().record(picture, shown);
+        let mut p = canvas_picture(app, ctx, idx, output)?;
+        let display = p.display.take();
+        let shown = Shown::of(&p, p.display_key);
+        let revision = shown.revision(p.id, 0);
+        let log_key = cache_key(p.id, output);
+        app.raster_logs.entry(log_key).or_default().composite.record(revision, shown);
         let app: &'a PhotocraftApp = app;
-        let log = app.raster_logs.get(&log_key);
-        Some(PhotoComposite { app, idx, doc, display, overlay, now: (revision, preview_key), display_key, last_damage, shown, revision: picture, log })
+        let log = app.raster_logs.get(&log_key).map(|l| &l.composite);
+        let display_key = p.display_key;
+        Some(PhotoComposite { picture: Picture::new(app, idx, p, display_key), display, revision, log })
     }
 
     /// Where the picture lies in the document, in document pixels: the document's bounds, or a filter preview's own
     /// area when it is reduced or changes the canvas size (its pixels are then its own, `size` of them over this).
     pub(crate) fn bounds(&self) -> DRect {
-        self.shown.bounds
+        self.picture.shown.bounds
     }
 }
 
 impl RasterSource for PhotoComposite<'_> {
     fn size(&self) -> PixelSize {
-        PixelSize::new(self.doc.size.width, self.doc.size.height)
+        self.picture.size()
+    }
+
+    fn revision(&self) -> Revision {
+        self.revision
+    }
+
+    fn damage(&self, since: Revision) -> Option<PixelRect> {
+        if since == self.revision {
+            return Some(PixelRect::default());
+        }
+        self.picture.damage(self.log?.find(since)?)
+    }
+
+    fn read(&self, region: PixelRect, factor: u32, out: &mut ColorImage) {
+        let doc = &self.picture.doc;
+        self.picture.read(region, factor, out, |area, factor| {
+            let buf = photocraft_compose::render_reduced_by(doc, area, factor);
+            let img = display_image(self.display.as_deref(), &buf);
+            Some((img.size[0], img.pixels))
+        });
+    }
+}
+
+/// Document `idx`'s channel or mask view on one display (Quick Mask, a layer mask, alpha or single colour
+/// channels), drawn by a second `RasterDisplay` over the canvas picture, which shows the same document or preview.
+/// Built once per pass, only while the view is not the plain composite.
+pub(crate) struct ChannelOverlay<'a> {
+    picture: Picture<'a>,
+    overlay: Overlay,
+    revision: Revision,
+    log: Option<&'a SourceLog<OverlayShown>>,
+}
+
+impl<'a> ChannelOverlay<'a> {
+    /// Document `idx`'s view on `output` (`None`: the main window's display); `None` when no such document is open or
+    /// it shows the plain composite.
+    pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
+        let p = canvas_picture(app, ctx, idx, output)?;
+        let overlay = Overlay::of(app, idx, &p.doc, output)?;
+        let shown = OverlayShown { picture: Shown::of(&p, 0), view: overlay.key };
+        let revision = shown.picture.revision(p.id, overlay.key);
+        let log_key = cache_key(p.id, output);
+        app.raster_logs.entry(log_key).or_default().overlay.record(revision, shown);
+        let app: &'a PhotocraftApp = app;
+        let log = app.raster_logs.get(&log_key).map(|l| &l.overlay);
+        Some(ChannelOverlay { picture: Picture::new(app, idx, p, 0), overlay, revision, log })
+    }
+
+    /// Where the view lies in the document: where the canvas picture under it lies ([`PhotoComposite::bounds`]).
+    pub(crate) fn bounds(&self) -> DRect {
+        self.picture.shown.bounds
+    }
+}
+
+impl RasterSource for ChannelOverlay<'_> {
+    fn size(&self) -> PixelSize {
+        self.picture.size()
     }
 
     fn revision(&self) -> Revision {
@@ -153,43 +271,18 @@ impl RasterSource for PhotoComposite<'_> {
             return Some(PixelRect::default());
         }
         let seen = self.log?.find(since)?;
-        // A reduced or moved picture is in other pixels than the document's damage, and a new channel view draws
-        // everything differently.
-        if seen.reduced || self.shown.reduced || seen.overlay != self.shown.overlay || seen.bounds != self.shown.bounds {
+        // Another view, look or display transform draws everything differently.
+        if seen.view != self.overlay.key {
             return None;
         }
-        let r = damage_since(self.app, self.idx, (seen.revision, seen.key), self.now, self.display_key, self.last_damage)?;
-        let r = r.intersect(&self.doc.bounds());
-        Some(if r.is_empty() { PixelRect::default() } else { PixelRect::new(r.x0, r.y0, r.x1, r.y1) })
+        self.picture.damage(seen.picture)
     }
 
     fn read(&self, region: PixelRect, factor: u32, out: &mut ColorImage) {
-        let factor = factor.max(1);
-        let f = i32::try_from(factor).unwrap_or(i32::MAX);
-        let b = self.doc.bounds();
-        // Whole texels of `region`'s grid that lie past the document's start are left as they are.
-        let skip = |start: i32, lo: i32| if start >= lo { 0 } else { (lo - start + f - 1) / f };
-        let (tx, ty) = (skip(region.x0, b.x0), skip(region.y0, b.y0));
-        let area = DRect::new(region.x0 + tx * f, region.y0 + ty * f, region.x1.min(b.x1), region.y1.min(b.y1));
-        if area.is_empty() {
-            return;
-        }
-        let buf = photocraft_compose::render_reduced_by(&self.doc, area, factor);
-        let mut img = display_image(self.display.as_deref(), &buf);
-        if let Some(px) = self.overlay.as_ref().and_then(|o| o.render(&self.doc, area, factor))
-            && px.len() == img.pixels.len()
-        {
-            for (under, over) in img.pixels.iter_mut().zip(px) {
-                *under = under.blend(over);
-            }
-        }
-        let (w, h) = (img.size[0], img.size[1]);
-        let (tx, ty) = (tx as usize, ty as usize);
-        let [out_w, out_h] = out.size;
-        for row in 0..h.min(out_h.saturating_sub(ty)) {
-            let n = w.min(out_w.saturating_sub(tx));
-            let at = (ty + row) * out_w + tx;
-            out.pixels[at..at + n].copy_from_slice(&img.pixels[row * w..row * w + n]);
-        }
+        let doc = &self.picture.doc;
+        self.picture.read(region, factor, out, |area, factor| {
+            let w = area.width().div_ceil(factor) as usize;
+            self.overlay.render(doc, area, factor).map(|px| (w, px))
+        });
     }
 }

@@ -110,6 +110,59 @@ pub(super) fn preview_bounds(doc: photocraft_geom::Size, preview: photocraft_geo
     DRect::new(x0, y0, x1, y1)
 }
 
+/// What a canvas shows of document `idx` on `output` (`None`: the main window's display) this pass, before any
+/// texture: the committed document or its live preview, and the display's colour management. The CPU canvas cache and
+/// the raster sources start from it.
+pub(crate) struct CanvasPicture {
+    /// The document's revision.
+    pub revision: u64,
+    /// The document's damage span start and its last damage, grown by its layer effects' reach.
+    pub last_damage: (u64, Option<DRect>),
+    pub id: photocraft_doc::DocId,
+    /// The document or the preview shown, and its preview key (raw: the display key is not folded in).
+    pub doc: std::sync::Arc<Document>,
+    pub preview_key: u64,
+    /// Where it lies in the document: the document's bounds, or a filter preview's own area.
+    pub bounds: DRect,
+    /// Its pixels are not the document's: a preview reduced for a zoomed-out view, or one that changes the canvas size.
+    pub reduced: bool,
+    pub display: Option<std::sync::Arc<photocraft_engine::display_color::CanvasDisplay>>,
+    pub display_key: u64,
+}
+
+/// [`CanvasPicture`] of document `idx` on `output`; `None` when no such document is open.
+pub(crate) fn canvas_picture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<CanvasPicture> {
+    let (revision, last_damage, id, committed) = {
+        let st = app.session.documents().get(idx)?;
+        let reach = |r: DRect| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) };
+        (st.revision, (st.damage_from(), st.last_damage.map(reach)), st.doc.id, st.doc.bounds())
+    };
+    let (mut doc, mut preview_key) = display_doc(app, idx);
+    // A filter dialog's live preview: the GPU canvas draws it from its own texture, but the CPU canvas (no usable
+    // GPU, a flipped or pixel-aspect-corrected view, a GPU fallback) and the raster sources draw its result, as the
+    // channel views draw it. A preview reduced for a zoomed-out view (a proxy, factor `k`) covers the whole document
+    // at its own size. One whose dimensions change otherwise (Image › Rotation) covers its own area, centred on the
+    // document's, as the GPU canvas draws it (`preview_bounds`).
+    let mut bounds = committed;
+    let mut reduced = false;
+    if let Some((preview, key)) = filter_channel_preview(app, idx, ctx) {
+        let k = app.filter_preview.as_ref().map_or(1, |p| p.key.k.max(1));
+        bounds = preview_bounds(committed.size(), preview.size, k);
+        (doc, preview_key, reduced) = (preview, key, k > 1);
+    }
+    let reduced = reduced || bounds != committed;
+    // An adjustment dialog's preview of a large document is taken by the GPU path as a proxy: drawn here it would
+    // cost a full-size composite per change, so the document shows instead.
+    if crate::adjust_preview::shown_key(app) == Some(preview_key)
+        && let Some(st) = app.session.documents().get(idx)
+        && crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(app)) > 1
+    {
+        (doc, preview_key) = (st.doc.clone(), 0);
+    }
+    let (display, display_key) = canvas_display(app, &doc, output);
+    Some(CanvasPicture { revision, last_damage, id, doc, preview_key, bounds, reduced, display, display_key })
+}
+
 /// [`ensure_texture`], and for a canvas showing `view` of a document too large for one
 /// full-resolution texture, the detail texture of the part in view ([`detail_plan`], #7568).
 pub(crate) fn ensure_texture_in_view(
@@ -120,37 +173,9 @@ pub(crate) fn ensure_texture_in_view(
     view: Option<InView>,
 ) -> Option<CpuTextures> {
     let output = display;
-    let (revision, last_damage, id) = {
-        let st = app.session.documents().get(idx)?;
-        (st.revision, (st.damage_from(), st.last_damage.map(|r| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) })), st.doc.id)
-    };
-    let (mut doc, mut preview_key) = display_doc(app, idx);
-    // A filter dialog's live preview: the GPU canvas draws it from its own texture, but this CPU
-    // canvas (no usable GPU, a flipped or pixel-aspect-corrected view, a GPU fallback) showed the
-    // document unfiltered. Its result is drawn here instead, as the channel views draw it.
-    // A preview reduced for a zoomed-out view (a proxy, factor `k`) covers the whole document at
-    // its own size. One whose dimensions change otherwise (Image › Rotation) covers its own area,
-    // centred on the document's, as the GPU canvas draws it (`preview_bounds`).
-    let committed = app.session.documents().get(idx).map(|st| st.doc.bounds()).unwrap_or(doc.bounds());
-    let mut bounds = committed;
-    let mut reduced = false;
-    if let Some((preview, key)) = filter_channel_preview(app, idx, ctx) {
-        let k = app.filter_preview.as_ref().map_or(1, |p| p.key.k.max(1));
-        bounds = preview_bounds(committed.size(), preview.size, k);
-        (doc, preview_key, reduced) = (preview, key, k > 1);
-    }
+    let CanvasPicture { revision, last_damage, id, doc, preview_key, bounds, reduced, display, display_key } = canvas_picture(app, ctx, idx, output)?;
     // Detail textures and partial redraws work in the document's own pixels.
-    let reduced = reduced || bounds != committed;
     let view = view.filter(|_| !reduced);
-    // A flipped view draws a GPU machine's canvas through here: an adjustment dialog's preview of
-    // a large document (taken by the GPU path) would cost a full-size CPU composite per change.
-    if crate::adjust_preview::shown_key(app) == Some(preview_key)
-        && let Some(st) = app.session.documents().get(idx)
-        && crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(app)) > 1
-    {
-        (doc, preview_key) = (st.doc.clone(), 0);
-    }
-    let (display, display_key) = canvas_display(app, &doc, output);
     let seen = app.canvases.get(&cache_key(id, output)).map(|c| (c.tex_revision, c.tex_preview_key));
     let damage = seen.and_then(|seen| damage_since(app, idx, seen, (revision, preview_key), display_key, last_damage)).filter(|_| !reduced);
     // The detail texture can lag the whole-document one (made or moved later): its own damage.

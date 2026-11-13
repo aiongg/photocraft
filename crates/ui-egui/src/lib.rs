@@ -356,8 +356,8 @@ pub struct PhotocraftApp {
     /// Canvas caches per (document, display): CPU textures hold monitor values; the GPU
     /// canvas state is shared (`canvas::GPU_OUTPUT`).
     canvases: HashMap<(DocId, u32), canvas::CanvasCache>,
-    /// The revisions each document's canvas raster source handed out per display (`canvas::PhotoComposite`).
-    raster_logs: HashMap<(DocId, u32), canvas::SourceLog>,
+    /// The revisions each document's canvas raster sources handed out per display (`canvas::PhotoComposite`, `canvas::ChannelOverlay`).
+    raster_logs: HashMap<(DocId, u32), canvas::SourceLogs>,
     /// Navigator textures belong to open documents, not the lifetime of the egui context.
     navigator_textures: HashMap<DocId, canvas::NavigatorCache>,
     /// `canvas::display_doc`'s live-adjust and Duotone documents per document: (snapshot,
