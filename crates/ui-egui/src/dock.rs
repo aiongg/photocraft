@@ -121,8 +121,10 @@ impl Group {
     /// Layers' siblings and do the same: wrapped in the dock's scroll area as well, the two nested
     /// areas shared the wheel, and where the outer content overflowed by one physical pixel (at
     /// 125 % scaling for some window heights) the footer and list moved a pixel as you scrolled (#6238).
-    pub fn scrolls_itself(self, tab: usize) -> bool {
+    /// The Color tab sizes its field to the group and scrolls its slider modes itself (#6000).
+    pub fn scrolls_itself(self, pro: bool, tab: usize) -> bool {
         matches!((self, tab), (Group::Layers, 0..=2) | (Group::History, 0) | (Group::History, 1) | (Group::Navigator, 0) | (Group::Color, 3))
+            || (self == Group::Color && self.tabs(pro).get(tab) == Some(&"Color"))
     }
 
     /// Tabs whose body is a framework panel with a footer bar (Layers, Patterns). The footer ends at the body's

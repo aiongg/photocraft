@@ -64,7 +64,7 @@ fn scrolling_the_paths_list_does_not_move_the_footer() {
 fn the_layers_group_tabs_all_scroll_themselves() {
     use crate::dock::Group;
     for tab in 0..=2 {
-        assert!(Group::Layers.scrolls_itself(tab), "Layers group tab {tab}");
+        assert!(Group::Layers.scrolls_itself(false, tab), "Layers group tab {tab}");
     }
-    assert!(!Group::Layers.scrolls_itself(3), "a tab that does not exist is not special");
+    assert!(!Group::Layers.scrolls_itself(false, 3), "a tab that does not exist is not special");
 }

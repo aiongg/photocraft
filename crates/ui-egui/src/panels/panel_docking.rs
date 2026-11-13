@@ -1134,7 +1134,7 @@ fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     // The native group's selected tab is this panel while its body draws, so a custom group
     // holding several of the group's panels keeps the selection `sync_visibility` chose.
     let shown = std::mem::replace(group.tab_mut(&mut app.ui.dock_tabs), tab);
-    if group.scrolls_itself(tab) {
+    if group.scrolls_itself(pro, tab) {
         ui.set_min_height(ui.available_height().max(0.0));
         crate::panels::dock_body(app, ui, *group, tab);
     } else {
