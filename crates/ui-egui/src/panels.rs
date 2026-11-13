@@ -21,6 +21,8 @@ mod brush_controls;
 pub mod brush_panel;
 pub mod brush_preview;
 pub mod brush_sections;
+mod brush_settings;
+mod brush_settings_events;
 pub mod brushes_tab;
 pub mod channels_panel;
 pub mod chrome_ui;

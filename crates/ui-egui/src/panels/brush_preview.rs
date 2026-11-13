@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use craft::draw::ui::brush_settings::PreviewStroke;
 use egui::Color32;
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint::{self, Pattern, StrokePoint, TipShape};
@@ -103,12 +104,13 @@ pub fn tip_sig(tip: &TipShape, hardness: f32, angle: f32, roundness: f32, flip: 
     h.finish()
 }
 
-/// A stroke rendered with the brush (scaled down to fit), as straight RGBA8: Photoshop's preview
-/// S-curve with pressure tapering in and out.
+/// A stroke rendered with the brush (scaled down to fit), as straight RGBA8: the framework's
+/// [`PreviewStroke`] (Photoshop's S-curve with the pressure tapering in and out).
 pub fn preview_pixels(b: &BrushSettings, w: u32, h: u32, color: [f32; 4]) -> Vec<u8> {
     use photocraft_color::{ColorMode, PixelFormat, SampleType};
+    let shape = PreviewStroke::new(w, h);
     let mut brush = b.clone();
-    let k = ((h as f32 * 0.55) / brush.size.max(1.0)).min(1.0);
+    let k = shape.fit(f64::from(brush.size)) as f32;
     brush.size = (brush.size * k).max(1.0);
     brush.dual_brush.size = (brush.dual_brush.size * k).max(1.0);
     brush.color = color;
@@ -116,15 +118,7 @@ pub fn preview_pixels(b: &BrushSettings, w: u32, h: u32, color: [f32; 4]) -> Vec
     brush.seed = 7;
     // Build-up adds dabs over (simulated) time: the preview has none.
     brush.build_up = false;
-    let n = 64;
-    let points: Vec<StrokePoint> = (0..=n)
-        .map(|i| {
-            let s = i as f64 / n as f64;
-            let x = 10.0 + s * (w as f64 - 20.0);
-            let y = h as f64 / 2.0 - (s * std::f64::consts::TAU).sin() * h as f64 * 0.22;
-            StrokePoint::new(x, y, (s * std::f64::consts::PI).sin().max(0.05) as f32)
-        })
-        .collect();
+    let points: Vec<StrokePoint> = shape.samples().into_iter().map(|s| StrokePoint::new(s.x, s.y, s.pressure)).collect();
     let fmt = PixelFormat::new(ColorMode::Rgb, SampleType::U8, true);
     let mut s = photocraft_raster::Surface::new(fmt);
     paint::apply_stroke(&mut s, &paint::Stroke { brush, points }, None, false);
@@ -132,6 +126,12 @@ pub fn preview_pixels(b: &BrushSettings, w: u32, h: u32, color: [f32; 4]) -> Vec
     let mut px = vec![[0.0f32; 4]; (w * h) as usize];
     s.read_rgba_into(r, &mut px);
     px.iter().flat_map(|p| p.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8)).collect()
+}
+
+/// The stroke preview of `b` in `color` as the picture the framework's `StripImage` takes.
+pub fn stroke_image(b: &BrushSettings, [w, h]: [usize; 2], color: Color32) -> egui::ColorImage {
+    let c = color.to_normalized_gamma_f32();
+    egui::ColorImage::from_rgba_unmultiplied([w, h], &preview_pixels(b, w as u32, h as u32, [c[0], c[1], c[2], 1.0]))
 }
 
 /// Box-downsample a tip bitmap so its larger side is at most `max` (cheap bilinear lookups after).

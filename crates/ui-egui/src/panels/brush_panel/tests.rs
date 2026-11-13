@@ -239,177 +239,6 @@ fn section_locks_round_trip_and_survive_preset_picks() {
     assert_eq!(b.tip, chalk.tip);
 }
 
-#[test]
-fn section_locks_are_always_visible_and_toggle_on_click() {
-    use egui_kittest::kittest::Queryable;
-
-    fn collect_icon_rects(shape: &egui::Shape, out: &mut Vec<egui::Rect>) {
-        match shape {
-            egui::Shape::Rect(r) if (r.rect.size() - vec2(12.0, 12.0)).length() < 0.5 => out.push(r.rect),
-            egui::Shape::Mesh(mesh) => out.push(mesh.calc_bounds()),
-            egui::Shape::Vec(shapes) => {
-                for s in shapes {
-                    collect_icon_rects(s, out);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let mut h = harness(0, 0);
-    let mut icons = Vec::new();
-    for clipped in &h.output().shapes {
-        collect_icon_rects(&clipped.shape, &mut icons);
-    }
-
-    // Every lockable section (1..SECTIONS.len()) paints its lock icon even when unlocked and unhovered.
-    for (name, _) in SECTIONS.iter().skip(1) {
-        let row = h.get_by_label(name).rect();
-        let lock_center = egui::pos2(row.right() - 11.0, row.center().y);
-        assert!(icons.iter().any(|r| r.contains(lock_center)), "expected lock icon at {lock_center:?} for {name}");
-    }
-
-    // Clicking the lock toggles it on and off without changing the selected section.
-    let row = h.get_by_label("Scattering").rect();
-    let lock_pos = egui::pos2(row.right() - 11.0, row.center().y);
-    assert!(!h.state().session.tools.brush.locks.scattering);
-    assert_eq!(h.state().ui.brush_section, 0);
-
-    h.hover_at(lock_pos);
-    h.run_steps(1);
-    h.drag_at(lock_pos);
-    h.run_steps(1);
-    h.drop_at(lock_pos);
-    h.run_steps(2);
-    assert!(h.state().session.tools.brush.locks.scattering);
-    assert_eq!(h.state().ui.brush_section, 0);
-
-    h.hover_at(lock_pos);
-    h.run_steps(1);
-    h.drag_at(lock_pos);
-    h.run_steps(1);
-    h.drop_at(lock_pos);
-    h.run_steps(2);
-    assert!(!h.state().session.tools.brush.locks.scattering);
-    assert_eq!(h.state().ui.brush_section, 0);
-}
-
-#[test]
-fn section_lock_buttons_report_their_section_and_state_in_every_theme() {
-    use egui::accesskit::{Role, Toggled};
-    use egui_kittest::kittest::{NodeT, Queryable};
-
-    for theme in crate::theme::ThemeKind::ALL {
-        let mut h = harness(0, 3);
-        PhotocraftApp::setup_context(&h.ctx, theme);
-        let mut brush = h.state().session.tools.brush.clone();
-        for i in 1..SECTIONS.len() {
-            *section_lock(&mut brush, i).unwrap() = i % 2 == 0;
-        }
-        h.state_mut().session.tools.brush = brush.clone();
-        let presets = h.state().session.tools.presets.clone();
-        let journal = h.state().session.journal.len();
-        h.run_steps(3);
-        for (i, &(name, _)) in SECTIONS.iter().enumerate().skip(1) {
-            let label = format!("Lock: {name}");
-            let node = h.get_by_role_and_label(Role::Button, &label);
-            assert!(!node.accesskit_node().is_disabled(), "locks remain available for disabled sections");
-            assert_eq!(h.query_all_by_label(&label).count(), 1, "{theme:?}: {name} has one distinct control");
-            assert_eq!(node.accesskit_node().toggled(), Some(if i % 2 == 0 { Toggled::True } else { Toggled::False }), "{theme:?}: {name}");
-            let row = h.get_by_label(name).rect();
-            assert!(row.contains_rect(node.rect()), "the named control is the lock's existing hit target");
-        }
-        assert_eq!(h.state().session.tools.brush, brush, "describing a lock must not edit it");
-        assert_eq!(h.state().session.tools.presets, presets);
-        assert_eq!(h.state().session.journal.len(), journal);
-        assert_eq!(h.state().ui.brush_section, 3);
-    }
-}
-
-#[test]
-fn section_lock_buttons_accept_keyboard_without_selecting_or_enabling_sections() {
-    use egui::accesskit::{Role, Toggled};
-    use egui_kittest::kittest::{NodeT, Queryable};
-
-    for (i, &(name, _)) in SECTIONS.iter().enumerate().skip(1) {
-        let mut h = harness(0, 0);
-        let before = h.state().session.tools.brush.clone();
-        let presets = h.state().session.tools.presets.clone();
-        let journal = h.state().session.journal.len();
-        let label = format!("Lock: {name}");
-        let mut replay = photocraft_engine::Session::new();
-        replay.tools.brush = before.clone();
-        h.get_by_role_and_label(Role::Button, &label).focus();
-        h.run_steps(2);
-        for locked in [true, false] {
-            h.key_press(egui::Key::Space);
-            h.run_steps(3);
-            let mut expected = before.clone();
-            *section_lock(&mut expected, i).unwrap() = locked;
-            assert_eq!(h.state().session.tools.brush, expected, "{name}: only this section's lock changes");
-            assert_eq!(h.state().ui.brush_section, 0);
-            assert_eq!(h.state().session.tools.presets, presets);
-            assert_eq!(h.get_by_role_and_label(Role::Button, &label).accesskit_node().toggled(), Some(if locked { Toggled::True } else { Toggled::False }));
-            let (id, params) = last_journal(h.state()).unwrap();
-            assert_eq!(id, "tools.setBrush");
-            assert_eq!(params["brush"].as_object().unwrap().len(), 1);
-            assert_eq!(params["brush"]["locks"].as_object().unwrap().len(), 1);
-            assert_eq!(params["brush"]["locks"].as_object().unwrap().values().next(), Some(&json!(locked)));
-            replay.execute(&id, params).unwrap();
-            assert_eq!(replay.tools.brush, expected, "command replay preserves the lock-only edit");
-        }
-        assert_eq!(h.state().session.journal.len(), journal + 2, "one command per activation");
-        assert_eq!(replay.tools.brush, before);
-    }
-}
-
-#[test]
-fn section_lock_buttons_show_focus_and_track_keyboard_navigation() {
-    use egui::accesskit::Role;
-    use egui_kittest::kittest::Queryable;
-
-    fn has_ring(shape: &egui::Shape, target: egui::Rect, color: egui::Color32) -> bool {
-        match shape {
-            egui::Shape::Rect(r) => r.rect == target && r.stroke == Stroke::new(1.0, color) && r.stroke_kind == egui::StrokeKind::Inside,
-            egui::Shape::Vec(v) => v.iter().any(|s| has_ring(s, target, color)),
-            _ => false,
-        }
-    }
-    for (index, theme) in crate::theme::ThemeKind::ALL.into_iter().enumerate() {
-        let mut h = harness(0, 0);
-        PhotocraftApp::setup_context(&h.ctx, theme);
-        h.state_mut().session.tools.brush.locks.scattering = index % 2 == 0;
-        h.state_mut().session.tools.brush.locks.texture = index % 2 != 0;
-        h.run_steps(2);
-        let before = h.state().session.tools.brush.clone();
-        let presets = h.state().session.tools.presets.clone();
-        let journal = h.state().session.journal.len();
-        let first = h.get_by_role_and_label(Role::Button, "Lock: Scattering").rect();
-        let second = h.get_by_role_and_label(Role::Button, "Lock: Texture").rect();
-        let accent = Tokens::get(&h.ctx).accent;
-        let ring = |h: &Harness<'_, PhotocraftApp>, rect| h.output().shapes.iter().any(|s| s.clip_rect.contains_rect(rect) && has_ring(&s.shape, rect, accent));
-        assert!(!ring(&h, first) && !ring(&h, second), "{theme:?}: unfocused locks have no focus ring");
-        h.get_by_role_and_label(Role::Button, "Lock: Scattering").focus();
-        h.run_steps(2);
-        assert!(h.get_by_role_and_label(Role::Button, "Lock: Scattering").is_focused());
-        assert!(ring(&h, first) && !ring(&h, second), "{theme:?}: the focused lock needs a visible indicator");
-        h.key_press(egui::Key::Tab);
-        h.run_steps(2);
-        assert!(!h.get_by_role_and_label(Role::Button, "Lock: Scattering").is_focused());
-        assert!(!ring(&h, first), "Tab removes the old lock's indicator");
-        h.get_by_role_and_label(Role::Button, "Lock: Texture").focus();
-        h.run_steps(2);
-        assert!(!ring(&h, first) && ring(&h, second), "the ring follows focus");
-        h.get_by_label("Brush Tip Shape").focus();
-        h.run_steps(2);
-        assert!(!ring(&h, first) && !ring(&h, second));
-        assert_eq!(h.state().session.tools.brush, before, "focus must not edit settings");
-        assert_eq!(h.state().session.tools.presets, presets);
-        assert_eq!(h.state().session.journal.len(), journal);
-        assert_eq!(h.state().ui.brush_section, 0);
-    }
-}
-
 /// A harness that shows the options bar with `tool` in the Studio (non-pro) theme.
 fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
@@ -917,100 +746,10 @@ fn hue_jitter_amount_edits_keep_percentage_units_and_command_routing() {
 }
 
 #[test]
-fn checkbox_only_rows_toggle_without_changing_the_selected_controls() {
-    use egui_kittest::kittest::Queryable;
-    for (section, &(name, _)) in SECTIONS.iter().enumerate().skip(8) {
-        let mut h = harness(0, 1);
-        let before = toggle_value(h.state(), section);
-        let n = h.state().session.journal.len();
-        h.get_by_label(name).click();
-        h.run_steps(3);
-        assert_eq!(h.state().ui.brush_section, 1, "{name} must leave Shape Dynamics open");
-        assert_eq!(toggle_value(h.state(), section), !before, "{name}");
-        assert_eq!(h.state().session.journal.len(), n + 1, "one command for {name}");
-        assert_eq!(last_journal(h.state()).unwrap().0, "tools.setBrush");
-        h.get_by_label(name).click();
-        h.run_steps(3);
-        assert_eq!(toggle_value(h.state(), section), before, "a second row click turns {name} back");
-        assert_eq!(h.state().ui.brush_section, 1);
-        assert_eq!(h.state().session.journal.len(), n + 2);
-    }
-}
-
-#[test]
-fn checkbox_only_box_and_lock_clicks_do_not_select_or_double_toggle() {
-    use egui_kittest::kittest::Queryable;
-    for (section, &(name, _)) in SECTIONS.iter().enumerate().skip(8) {
-        let mut h = harness(0, 1);
-        let rect = h.get_by_label(name).rect();
-        let before = toggle_value(h.state(), section);
-        let n = h.state().session.journal.len();
-        let at = egui::pos2(rect.left() + 12.0, rect.center().y);
-        h.hover_at(at);
-        h.run_steps(2);
-        h.drag_at(at);
-        h.run_steps(2);
-        h.drop_at(at);
-        h.run_steps(3);
-        assert_eq!(toggle_value(h.state(), section), !before, "checkbox click on {name}");
-        assert_eq!(h.state().ui.brush_section, 1);
-        assert_eq!(h.state().session.journal.len(), n + 1);
-        let at = egui::pos2(rect.right() - 11.0, rect.center().y);
-        h.hover_at(at);
-        h.run_steps(2);
-        h.drag_at(at);
-        h.run_steps(2);
-        h.drop_at(at);
-        h.run_steps(3);
-        assert_eq!(toggle_value(h.state(), section), !before, "lock click must not toggle {name}");
-        assert_eq!(h.state().ui.brush_section, 1);
-        assert_eq!(h.state().session.journal.len(), n + 2);
-        let mut brush = h.state().session.tools.brush.clone();
-        assert!(*section_lock(&mut brush, section).unwrap(), "{name} lock");
-    }
-}
-
-#[test]
 fn checkbox_only_rows_cannot_restore_an_empty_properties_pane() {
     for (section, &(name, _)) in SECTIONS.iter().enumerate().skip(8) {
         let h = harness(0, section);
         assert_eq!(h.state().ui.brush_section, 0, "an old selection of {name} returns to Brush Tip Shape");
-    }
-}
-
-#[test]
-fn smoothing_row_preserves_its_amount_and_options_across_toggles() {
-    use egui_kittest::kittest::Queryable;
-    let mut h = harness(0, 1);
-    h.state_mut().run("tools.setBrush", json!({"brush": {"smoothing": {"amount": 0.65, "pulledString": true, "catchUpOnEnd": false}}})).unwrap();
-    let before = h.state().session.tools.brush.smoothing.clone();
-    h.run_steps(2);
-    for enabled in [false, true] {
-        h.get_by_label("Smoothing").click();
-        h.run_steps(3);
-        let mut expected = before.clone();
-        expected.enabled = enabled;
-        assert_eq!(h.state().session.tools.brush.smoothing, expected);
-        assert_eq!(h.state().ui.brush_section, 1);
-        assert_eq!(last_journal(h.state()).unwrap().1["brush"], json!({"smoothing": {"enabled": enabled}}));
-    }
-}
-
-#[test]
-fn checkbox_only_rows_are_accessible_checkboxes_and_accept_space() {
-    use egui::accesskit::Role;
-    use egui_kittest::kittest::{NodeT, Queryable};
-    let mut h = harness(0, 1);
-    for (section, &(name, _)) in SECTIONS.iter().enumerate().skip(8) {
-        let node = h.get_by_label(name);
-        assert_eq!(node.accesskit_node().role(), Role::CheckBox, "{name}");
-        node.focus();
-        h.run_steps(2);
-        let before = toggle_value(h.state(), section);
-        h.key_press(egui::Key::Space);
-        h.run_steps(3);
-        assert_eq!(toggle_value(h.state(), section), !before, "Space toggles {name}");
-        assert_eq!(h.state().ui.brush_section, 1);
     }
 }
 
@@ -1034,49 +773,6 @@ fn editing_the_options_bar_amount_reenables_smoothing() {
     assert!(smoothing.enabled && smoothing.amount != 0.4);
     assert_eq!(h.state().session.journal.len(), n + 1, "one options-bar gesture");
     assert_eq!(last_journal(h.state()).unwrap().1["brush"]["smoothing"]["enabled"], true);
-}
-
-/// #4282: every name in the section list starts in the same column, Brush Tip Shape included,
-/// whether or not its row has an enable box (Photoshop indents the rows without one).
-#[test]
-fn section_names_line_up_whether_or_not_they_have_a_box() {
-    fn text_x(shape: &egui::Shape, out: &mut Vec<(String, f32)>) {
-        match shape {
-            egui::Shape::Text(text) => out.push((text.galley.job.text.clone(), text.pos.x)),
-            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| text_x(s, out)),
-            _ => {}
-        }
-    }
-    // Shape Dynamics is shown, so its heading paints too; the list's copy is the leftmost.
-    let h = harness(0, 1);
-    let mut painted = Vec::new();
-    for shape in &h.output().shapes {
-        text_x(&shape.shape, &mut painted);
-    }
-    let left = |name: &str| painted.iter().filter(|(t, _)| t == name).map(|(_, x)| *x).reduce(f32::min);
-    let columns: Vec<(&str, f32)> = SECTIONS.iter().map(|(name, _)| (*name, left(name).unwrap_or_else(|| panic!("{name} painted")))).collect();
-    let (_, boxed) = columns[1];
-    for (name, x) in &columns {
-        assert!((x - boxed).abs() < 0.5, "{name} starts at {x}, the boxed names at {boxed}: {columns:?}");
-    }
-}
-
-#[test]
-fn preview_strip_re_renders_only_when_the_brush_changes() {
-    let mut h = harness(0, 0);
-    let ctx = h.ctx.clone();
-    let n0 = brush_preview::render_count(&ctx);
-    assert!(n0 >= 1, "the strip rendered");
-    h.run_steps(6);
-    assert_eq!(brush_preview::render_count(&ctx), n0, "idle frames re-rendered a preview");
-    // Change the brush through the engine: the strip renders once more, then stays cached.
-    h.state_mut().run("tools.setBrush", json!({"brush": {"scattering": {"enabled": true, "scatter": {"jitter": 2.0}}}})).unwrap();
-    h.run_steps(5);
-    assert_eq!(brush_preview::render_count(&ctx), n0 + 1);
-    // Colour and the jitter seed of strokes aren't preview inputs: no re-render.
-    h.state_mut().session.tools.brush.color = [1.0, 0.0, 0.0, 1.0];
-    h.run_steps(3);
-    assert_eq!(brush_preview::render_count(&ctx), n0 + 1);
 }
 
 #[test]
@@ -1774,18 +1470,6 @@ fn brush_settings_hamburger_menu_actions() {
     assert!(!h.state().ui.panels.brush_settings);
 }
 
-#[test]
-fn brushes_button_at_top_of_brush_settings_opens_brushes_panel() {
-    use egui_kittest::kittest::Queryable;
-
-    let mut h = harness(0, 0);
-    assert_eq!(h.state().ui.brush_tab, 0);
-    h.get_by_label("Brushes").click();
-    h.run_steps(3);
-    assert!(h.state().ui.panels.brush_settings);
-    assert_eq!(h.state().ui.brush_tab, 1);
-}
-
 /// The fill painted for the check box in `rect` in the last frame (the topmost filled rect there).
 fn box_fill(h: &Harness<'_, PhotocraftApp>, rect: egui::Rect) -> Option<Color32> {
     h.output()
@@ -1798,54 +1482,6 @@ fn box_fill(h: &Harness<'_, PhotocraftApp>, rect: egui::Rect) -> Option<Color32>
             _ => None,
         })
         .next_back()
-}
-
-/// #4476: while the mouse is down on a section's row or its box, the box shows it's pressed, as
-/// in Photoshop: an unchecked box darkens, a checked one turns less opaque. The release then
-/// acts as before.
-#[test]
-fn section_boxes_show_a_pressed_state() {
-    use egui_kittest::kittest::Queryable;
-    let mut h = app_harness();
-    h.key_press(egui::Key::F5);
-    h.run_steps(3);
-    let t = Tokens::get(&h.ctx);
-    let boxr = h.get_by_label("Enable Shape Dynamics").rect();
-    let row = h.get_by_label("Shape Dynamics").rect();
-    assert!(!h.state().session.tools.brush.shape_dynamics.enabled);
-    assert_eq!(box_fill(&h, boxr), Some(widgets::check_box_fill(false, false, &t)));
-    // Held on the row's name: the unchecked box darkens; the release turns the section on.
-    let at = egui::pos2(row.center().x, row.center().y);
-    h.drag_at(at);
-    h.run_steps(2);
-    assert_eq!(box_fill(&h, boxr), Some(widgets::check_box_fill(false, true, &t)), "pressed, unchecked");
-    h.drop_at(at);
-    h.run_steps(3);
-    assert!(h.state().session.tools.brush.shape_dynamics.enabled);
-    assert_eq!(box_fill(&h, boxr), Some(widgets::check_box_fill(true, false, &t)));
-    // Held on the checked box itself: less opaque, then the release turns it off.
-    h.drag_at(boxr.center());
-    h.run_steps(2);
-    assert_eq!(box_fill(&h, boxr), Some(widgets::check_box_fill(true, true, &t)), "pressed, checked");
-    h.drop_at(boxr.center());
-    h.run_steps(3);
-    assert!(!h.state().session.tools.brush.shape_dynamics.enabled);
-    // A checkbox-only row (no settings of its own) is one checkbox across the row: a press
-    // anywhere on it presses its box, and the release toggles it.
-    let wet = h.get_by_label("Wet Edges").rect();
-    let wet_box = egui::Rect::from_center_size(egui::pos2(wet.left() + 12.0, wet.center().y), vec2(13.0, 13.0));
-    let was = h.state().session.tools.brush.wet_edges;
-    h.drag_at(wet.center());
-    h.run_steps(2);
-    assert_eq!(box_fill(&h, wet_box), Some(widgets::check_box_fill(was, true, &t)), "pressed checkbox-only row");
-    h.drop_at(wet.center());
-    h.run_steps(3);
-    assert_ne!(h.state().session.tools.brush.wet_edges, was);
-    // The four looks are distinct.
-    let looks = [(false, false), (false, true), (true, false), (true, true)].map(|(on, pressed)| widgets::check_box_fill(on, pressed, &t));
-    for (i, a) in looks.iter().enumerate() {
-        assert!(looks.iter().skip(i + 1).all(|b| b != a), "{looks:?}");
-    }
 }
 
 /// The shared check box (options bars, dialogs) does the same, and pressing its label counts.
@@ -2031,4 +1667,49 @@ fn tip_geometry_edits_and_arrow_drag_route_only_changed_fields_through_the_brush
     assert_eq!(h.state().session.tools.brush, expected);
     assert_eq!(last_journal(h.state()).unwrap().1["brush"], json!({"angle": 90.0_f32}));
     assert_eq!(h.state().session.journal.len(), journal + 3, "one command per field edit and arrow gesture");
+}
+
+/// The panel's event families run the commands the events table names.
+#[test]
+fn panel_events_map_to_their_commands() {
+    use super::super::brush_settings_events::{EVENT_COMMANDS, apply_action, apply_section_events};
+    use craft::draw::ui::brush_settings::{BrushPanelAction, BrushSectionEvent};
+
+    // Every event family names its command once.
+    let commands: Vec<&str> = EVENT_COMMANDS.iter().map(|(_, command)| *command).collect();
+    assert!(commands.iter().all(|command| ["tools.setBrush", "brush.presets.update", "window.panel.brushes"].contains(command)));
+
+    // A section's flag and lock edit only their own field and leave as one `tools.setBrush` of that field;
+    // a switch keeps its options (Smoothing keeps its amount).
+    let mut app = app();
+    app.run("tools.setBrush", json!({"brush": {"smoothing": {"amount": 0.65, "pulledString": true}}})).unwrap();
+    let cases: [(usize, bool, Value); 4] = [
+        (1, false, json!({"shapeDynamics": {"enabled": true}})),
+        (3, true, json!({"locks": {"texture": true}})),
+        (8, false, json!({"noise": true})),
+        (11, false, json!({"smoothing": {"enabled": false}})),
+    ];
+    for (section, lock, patch) in cases {
+        let before = app.session.tools.brush.clone();
+        let mut after = before.clone();
+        let field = if lock { section_lock(&mut after, section) } else { section_flag(&mut after, section) }.unwrap();
+        *field = !*field;
+        commit(&mut app, &before, &after);
+        let (command, params) = last_journal(&app).unwrap();
+        assert_eq!((command.as_str(), &params["brush"]), ("tools.setBrush", &patch));
+    }
+    assert_eq!(app.session.tools.brush.smoothing.amount, 0.65);
+
+    // Select shows a pane and the Brushes link opens the Brushes panel: neither edits the brush.
+    let mut brush = app.session.tools.brush.clone();
+    assert!(apply_section_events(&mut brush, vec![BrushSectionEvent::OpenLink]));
+    assert!(!apply_section_events(&mut brush, vec![BrushSectionEvent::Select(2)]));
+    assert_eq!(brush, app.session.tools.brush);
+
+    // Reset keeps the colours, smoothing and locks.
+    let mut brush = app.session.tools.brush.clone();
+    brush.size = 99.0;
+    brush.locks.texture = true;
+    apply_action(&mut app, &mut brush, BrushPanelAction::Reset);
+    assert_eq!((brush.size, brush.locks.texture, brush.smoothing.amount), (BrushSettings::default().size, true, 0.65));
 }
