@@ -70,7 +70,10 @@ fn structure_and_color_default_to_whole_numbers_and_open_a_slider() {
     assert_eq!(h.state().ui.tool_options.cam_color, 0.0);
     assert_eq!(spin(&h, "Structure:").accesskit_node().numeric_value(), Some(4.0));
     assert_eq!(spin(&h, "Color:").accesskit_node().numeric_value(), Some(0.0));
-    assert!(h.query_all_by_role(Role::Slider).next().is_none(), "the slider stays closed");
+    assert!(
+        h.query_all_by_role(Role::Slider).all(|n| !matches!(n.accesskit_node().label().as_deref(), Some("Structure" | "Color"))),
+        "the slider stays closed"
+    );
     let before = steps(&h);
     h.get_by_role_and_label(Role::Button, "Structure").click();
     h.run_steps(4);

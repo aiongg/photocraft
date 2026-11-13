@@ -472,9 +472,9 @@ fn theme_switch_keeps_the_selected_color_group_panel() {
             h.run_steps(4);
             assert_eq!(Group::Color.tabs(is_pro(theme)).get(h.state().ui.dock_tabs.color), Some(name), "{theme:?}");
             if *name == "Color" {
-                // The spectrum field's hex readout, the same in every theme (#6000).
-                assert!(h.query_by_label("#").is_some(), "{theme:?}: Color field missing");
-                assert!(h.query_all_by_label("Hue").next().is_none(), "{theme:?}: no HSB sliders");
+                // The Hue Cube's field, the same in every theme (#6000).
+                assert!(h.query_by_label("Saturation and brightness").is_some(), "{theme:?}: Color field missing");
+                assert!(h.query_all_by_label("Saturation").next().is_none(), "{theme:?}: no HSB sliders");
             }
             h.state_mut().set_theme(&ctx, ThemeKind::Pro);
             h.run_steps(4);
