@@ -54,6 +54,7 @@ mod navigator;
 pub(crate) mod options_bar;
 pub(super) mod panel_docking;
 mod panel_state;
+pub(crate) mod preset_browser;
 pub mod preset_panels;
 mod properties;
 pub mod props_layout;

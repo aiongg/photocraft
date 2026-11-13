@@ -108,6 +108,7 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let main_focused = ui.ctx().input(|i| i.viewport().focused.unwrap_or(true));
     let rect = ui.available_rect_before_wrap();
     app.last_canvas_rect = rect;
+    app.last_canvas_layer = ui.layer_id();
     app.drop_canvas_rect = Some(rect);
     // Window › Arrange: tiled / n-up layouts show several documents side by side; the active one
     // takes input, a click elsewhere activates that document.

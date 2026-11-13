@@ -1,6 +1,6 @@
 use super::{
     Align2, Color32, CornerRadius, Ev, FontId, GroupView, ItemView, PhotocraftApp, Place, Pos2, Rect, Sense, Stroke, TextureHandle, Tokens, Tool, Value,
-    browser, canvas_drop_rect, empty, generic, json, paint_gradient, pattern_texture, pos2, run, shape_texture, style_texture, vec2,
+    browser, canvas_drop_rect, empty, generic, json, paint_gradient, pos2, run, shape_texture, vec2,
 };
 
 // ------------------------------------------------------------------ Gradients
@@ -39,65 +39,6 @@ pub fn gradients_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
             _ => {
                 generic(app, "gradients", "gradient.presets", &e, json!({"name": "Custom"}));
-            }
-        }
-    }
-}
-
-// ------------------------------------------------------------------ Patterns
-
-pub fn patterns_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    // Until the preset store has loaded the saved patterns, their folder entries would look
-    // deleted: don't prune them yet.
-    if app.services.preset_store.is_none() {
-        photocraft_engine::presets::patterns::sync(&mut app.session);
-    }
-    let lib = app.session.patterns.items.clone();
-    let groups: Vec<GroupView> = app
-        .session
-        .presets
-        .pattern_groups
-        .iter()
-        .map(|g| GroupView {
-            name: g.name.clone(),
-            items: g
-                .items
-                .iter()
-                .filter_map(|id| lib.iter().find(|p| &p.id == id))
-                .map(|p| ItemView { key: p.id.clone(), name: p.display_name().to_string() })
-                .collect(),
-        })
-        .collect();
-    let pats: Vec<Vec<photocraft_doc::Pattern>> =
-        app.session.presets.pattern_groups.iter().map(|g| g.items.iter().filter_map(|id| lib.iter().find(|p| &p.id == id).cloned()).collect()).collect();
-    let canvas = canvas_drop_rect(app);
-    let mut st = std::mem::take(&mut app.ui.presets_ui);
-    let max_h = (ui.available_height() - 40.0).clamp(90.0, 280.0);
-    let ctx = ui.ctx().clone();
-    let events = browser(
-        ui,
-        &mut st,
-        "patterns",
-        &groups,
-        Place { canvas, max_h, new_tip: tl!("Create new pattern from the selection"), flush: false },
-        &mut |ui, r, gi, ii| {
-            let tex = pattern_texture(&ctx, &pats[gi][ii]);
-            ui.painter().image(tex.id(), r, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-        },
-    );
-    app.ui.presets_ui = st;
-    for e in events {
-        match &e {
-            Ev::Select(k) => {
-                app.ui.presets_ui.selected.insert("patterns".into(), k.clone());
-                run(app, "pattern.presets.select", json!({"pattern": k}));
-            }
-            Ev::Activate(k) | Ev::Drop(k, _) => {
-                app.ui.presets_ui.selected.insert("patterns".into(), k.clone());
-                run(app, "pattern.presets.apply", json!({"pattern": k}));
-            }
-            _ => {
-                generic(app, "patterns", "pattern.presets", &e, json!({}));
             }
         }
     }
@@ -158,7 +99,7 @@ fn float_window(
 /// Draws the open floating panels (Styles, Shapes, Tool Presets, Clone Source).
 pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let p = app.ui.presets_ui.clone();
-    if p.styles && float_window(app, ctx, "styles", tl!("Styles"), 250.0, 0.0, styles_panel) {
+    if p.styles && float_window(app, ctx, "styles", tl!("Styles"), 250.0, 0.0, super::styles_panel) {
         app.ui.presets_ui.styles = false;
     }
     if p.shapes && float_window(app, ctx, "shapes", tl!("Shapes"), 250.0, 280.0, shapes_panel) {
@@ -173,52 +114,6 @@ pub fn windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
 }
 
 // ------------------------------------------------------------------ Styles
-
-pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let src = app.session.presets.styles.clone();
-    let groups: Vec<GroupView> = src
-        .iter()
-        .map(|g| GroupView { name: g.name.clone(), items: g.items.iter().map(|i| ItemView { key: i.name.clone(), name: i.name.clone() }).collect() })
-        .collect();
-    let canvas = canvas_drop_rect(app);
-    let mut st = std::mem::take(&mut app.ui.presets_ui);
-    let ctx = ui.ctx().clone();
-    let t = Tokens::get(&ctx);
-    let mut texes: Vec<Vec<TextureHandle>> = Vec::new();
-    for g in &src {
-        texes.push(g.items.iter().map(|s| style_texture(app, &ctx, s)).collect());
-    }
-    let events = browser(
-        ui,
-        &mut st,
-        "styles",
-        &groups,
-        Place { canvas, max_h: 300.0, new_tip: tl!("Create new style from the selected layer"), flush: false },
-        &mut |ui, r, gi, ii| {
-            ui.painter().rect_filled(r, 2.0, t.field);
-            ui.painter().image(texes[gi][ii].id(), r, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-        },
-    );
-    app.ui.presets_ui = st;
-    let shift = ui.input(|i| i.modifiers.shift);
-    for e in events {
-        match &e {
-            Ev::Select(k) | Ev::Activate(k) => {
-                app.ui.presets_ui.selected.insert("styles".into(), k.clone());
-                // Clicking applies to the selected layers (⇧ adds to their effects).
-                run(app, "style.presets.apply", json!({"preset": k, "add": shift}));
-            }
-            Ev::Drop(k, pos) => {
-                // Dropping on the canvas styles the layer under the pointer's selection: the active layer.
-                let _ = pos;
-                run(app, "style.presets.apply", json!({"preset": k}));
-            }
-            _ => {
-                generic(app, "styles", "style.presets", &e, json!({"name": "Style"}));
-            }
-        }
-    }
-}
 
 /// The Styles panel menu ("…"): Import Styles… / Export Selected Styles… / Export Styles…
 /// (Photoshop layer style libraries, `.asl`).

@@ -20,10 +20,9 @@ use crate::theme::Tokens;
 
 mod panels;
 
-pub use panels::{
-    clone_sample_point, clone_source_panel, finish_custom_shape, gradients_panel, patterns_panel, select_tool_preset, shape_picker, shapes_panel, styles_panel,
-    tool_presets_panel, windows,
-};
+pub use super::preset_browser::{patterns_panel, styles_panel};
+pub(crate) use super::preset_browser::pattern_picker;
+pub use panels::{clone_sample_point, clone_source_panel, finish_custom_shape, gradients_panel, select_tool_preset, shape_picker, shapes_panel, tool_presets_panel, windows};
 #[cfg(test)]
 use panels::{new_tool_preset_params, tool_id};
 
@@ -36,7 +35,7 @@ pub struct PresetUi {
     pub shapes: bool,
     pub tool_presets: bool,
     pub clone_source: bool,
-    /// Thumbnail size per panel (px; the minimum shows a list).
+    /// Thumbnail size per panel on the app's own browser (px; the minimum shows a list).
     pub sizes: BTreeMap<String, f32>,
     /// Folders whose open state differs from the default (only the first folder starts open).
     pub toggled: BTreeSet<String>,
@@ -51,6 +50,9 @@ pub struct PresetUi {
     /// a list follow it in library order. Saved with the UI state.
     #[serde(rename = "groupOrder", alias = "group_order", deserialize_with = "lenient_group_order", skip_serializing_if = "BTreeMap::is_empty")]
     pub group_order: BTreeMap<String, Vec<String>>,
+    /// The view state of the panels on the framework's preset browser (Patterns, Styles), by panel.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub browsers: BTreeMap<String, craft::ui::patterns::presets::PresetState<super::preset_browser::PresetKey>>,
     /// In-place rename: (panel, preset or "group:<name>", text).
     #[serde(skip)]
     pub renaming: Option<(String, String, String)>,
@@ -226,80 +228,6 @@ pub fn paint_gradient(ui: &egui::Ui, rect: Rect, stops: &[(f32, [f32; 4])]) {
         mesh.add_triangle(i, i + 2, i + 3);
     }
     p.add(mesh);
-}
-
-fn pattern_texture(ctx: &egui::Context, pat: &photocraft_doc::Pattern) -> TextureHandle {
-    cached_texture(ctx, ("pattern", pat.id.clone()), || {
-        let (w, h) = (pat.width.max(1), pat.height.max(1));
-        let fmt = pat.surface.format();
-        // Only the pixels the swatch shows are read: a pattern file can declare a padded source
-        // of any size, and reading it whole to pick 4096 of its pixels is gigabytes of floats.
-        // Tiles smaller than the swatch repeat; larger ones are shown shrunk.
-        const S: u32 = 64;
-        let step = (w.max(h) as f32 / S as f32).max(1.0);
-        let mut img = ColorImage::new([S as usize, S as usize], vec![Color32::TRANSPARENT; (S * S) as usize]);
-        for y in 0..S {
-            for x in 0..S {
-                let sx = ((x as f32 * step) as u32) % w;
-                let sy = ((y as f32 * step) as u32) % h;
-                let px = pat.surface.read_region(photocraft_geom::Rect::from_xywh(sx as i32, sy as i32, 1, 1));
-                img.pixels[(y * S + x) as usize] = c32(photocraft_raster::to_rgba(&fmt, &px));
-            }
-        }
-        img
-    })
-}
-
-/// Photoshop's pattern picker: a swatch of the library pattern `selected` (an id) that opens a grid
-/// of every library pattern's swatch, each named in its tooltip. Returns the id of a newly picked
-/// pattern.
-pub(crate) fn pattern_picker(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &str) -> Option<String> {
-    const SWATCH: f32 = 40.0;
-    let t = Tokens::get(ui.ctx());
-    let ctx = ui.ctx().clone();
-    let pats = &app.session.patterns.items;
-    let current = pats.iter().find(|p| p.id == selected);
-    let uv = Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0));
-    let (r, resp) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
-    if let Some(p) = current {
-        ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
-    }
-    ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
-    let name = current.map_or(String::new(), |p| p.display_name().to_string());
-    let resp = resp.on_hover_text(&name);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Patterns")));
-    let mut picked = None;
-    egui::Popup::menu(&resp).show(|ui| {
-        picked = pattern_grid(app, ui, selected);
-    });
-    picked
-}
-
-/// Library grid shared by the standalone picker and paint popups. Drawing it inline avoids
-/// replacing an already-open paint popup with a second memory-backed popup.
-pub(crate) fn pattern_grid(app: &PhotocraftApp, ui: &mut egui::Ui, selected: &str) -> Option<String> {
-    const SWATCH: f32 = 40.0;
-    let t = Tokens::get(ui.ctx());
-    let ctx = ui.ctx().clone();
-    let uv = Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0));
-    let mut picked = None;
-    ui.set_max_width(6.0 * (SWATCH + 4.0));
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
-        for p in &app.session.patterns.items {
-            let (r, cell) = ui.allocate_exact_size(vec2(SWATCH, SWATCH), Sense::click());
-            ui.painter().image(pattern_texture(&ctx, p).id(), r, uv, Color32::WHITE);
-            let (w, c) = if p.id == selected { (2.0, t.accent) } else { (1.0, t.field_border) };
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(w, c), egui::StrokeKind::Outside);
-            let cell = cell.on_hover_text(p.display_name());
-            cell.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), p.display_name()));
-            if cell.clicked() {
-                picked = Some(p.id.clone());
-                ui.close();
-            }
-        }
-    });
-    picked.filter(|id| id != selected)
 }
 
 pub(crate) fn style_texture(app: &PhotocraftApp, ctx: &egui::Context, st: &photocraft_engine::presets::styles::StylePreset) -> TextureHandle {
@@ -697,7 +625,7 @@ fn empty(ui: &mut egui::Ui, s: &str) {
 
 /// Where drops onto the canvas are accepted: the canvas proper, rulers excluded (a drop on the
 /// ruler strip is not a canvas drop).
-fn canvas_drop_rect(app: &PhotocraftApp) -> egui::Rect {
+pub(crate) fn canvas_drop_rect(app: &PhotocraftApp) -> egui::Rect {
     crate::rulers::content_rect(app, app.last_canvas_rect)
 }
 

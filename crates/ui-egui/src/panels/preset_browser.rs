@@ -2,7 +2,7 @@
 //! come from a panel's groups in the panel's folder order; the browser's events run as the panel's engine commands,
 //! through one mapping for every preset panel (`events`).
 
-use craft::ui::contract::{Bind, DropZone};
+use craft::ui::contract::{Bind, DropZone, Show as _};
 use craft::ui::list::ThumbAspect;
 use craft::ui::patterns::presets::{
     DefaultOpen, PresetBrowser, PresetEvent, PresetFooterEvent, PresetFooterOptions, PresetPicker, PresetReorder, PresetRow, PresetState,
@@ -28,6 +28,8 @@ pub enum PresetKey {
 pub(crate) struct PresetPanel {
     /// The panel's key in `PresetUi` (`selected`, `group_order`, `browsers`).
     pub(crate) id: &'static str,
+    /// The panel's name, in English.
+    label: &'static str,
     /// The engine prefix of `{prefix}.edit` and `{prefix}.new`.
     pub(crate) prefix: &'static str,
     /// The params of `{prefix}.new`.
@@ -36,8 +38,8 @@ pub(crate) struct PresetPanel {
     rename_new: bool,
 }
 
-pub(crate) const PATTERNS: PresetPanel = PresetPanel { id: "patterns", prefix: "pattern.presets", new_params: || json!({}), rename_new: false };
-pub(crate) const STYLES: PresetPanel = PresetPanel { id: "styles", prefix: "style.presets", new_params: || json!({"name": "Style"}), rename_new: true };
+pub(crate) const PATTERNS: PresetPanel = PresetPanel { id: "patterns", label: "Patterns", prefix: "pattern.presets", new_params: || json!({}), rename_new: false };
+pub(crate) const STYLES: PresetPanel = PresetPanel { id: "styles", label: "Styles", prefix: "style.presets", new_params: || json!({"name": "Style"}), rename_new: true };
 
 /// A folder of a panel: its name and its presets as (key, name).
 pub(crate) struct Folder {
@@ -49,7 +51,7 @@ pub(crate) struct Folder {
 fn rows(folders: &[Folder], order: &[usize]) -> Vec<PresetRow<PresetKey>> {
     let mut rows = Vec::new();
     for folder in order.iter().filter_map(|&at| folders.get(at)) {
-        rows.push(PresetRow::group(PresetKey::Group(folder.name.clone()), folder.name.clone(), 0).count(folder.items.len()));
+        rows.push(PresetRow::group(PresetKey::Group(folder.name.clone()), folder.name.clone(), 0));
         rows.extend(folder.items.iter().map(|(key, name)| PresetRow::item(PresetKey::Item(key.clone()), name.clone(), 1)));
     }
     rows
@@ -60,8 +62,8 @@ fn canvas_zone(app: &PhotocraftApp) -> DropZone {
     DropZone::new(app.last_canvas_layer, canvas_drop_rect(app))
 }
 
-/// Shows `panel`'s browser over `folders` with `thumb` painting a preset's thumbnail, and returns its events.
-/// `presets` is the panel state, `zone` the canvas.
+/// Shows `panel`'s browser over `folders` with `thumb` painting a preset's thumbnail, and returns its events with the
+/// keys of the rows it showed, in order. `presets` is the panel state, `zone` the canvas.
 fn show(
     presets: &mut PresetUi,
     zone: DropZone,
@@ -69,14 +71,17 @@ fn show(
     panel: PresetPanel,
     folders: &[Folder],
     thumb: &dyn Fn(&ContentPainterCx, Rect, &str),
-) -> Vec<PresetEvent<PresetKey>> {
+) -> (Vec<PresetEvent<PresetKey>>, Vec<PresetKey>) {
     let order = presets.display_order(panel.id, &names_of(folders));
     let rows = rows(folders, &order);
     let selected = presets.selected.get(panel.id).cloned().map(PresetKey::Item);
     let mut state = presets.browsers.get(panel.id).cloned().unwrap_or_default();
-    let out = PresetBrowser::new(panel.id, Bind::bound(&mut state), &rows)
+    let mut browser = PresetBrowser::new(tl!(panel.label), Bind::bound(&mut state), &rows);
+    if let Some(key) = selected.clone() {
+        browser = browser.selected(key);
+    }
+    let out = browser
         .browser_id(browser_id(panel))
-        .selected(selected.clone())
         .default_open(DefaultOpen::First)
         .reorder(PresetReorder::items_and_groups())
         .drop_zone(zone)
@@ -88,7 +93,7 @@ fn show(
         })
         .show(ui);
     presets.browsers.insert(panel.id.to_string(), state);
-    out.events
+    (out.events, rows.into_iter().map(|row| row.key).collect())
 }
 
 fn browser_id(panel: PresetPanel) -> egui::Id {
@@ -162,11 +167,14 @@ pub fn patterns_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
     };
     let zone = canvas_zone(app);
-    let events = show(&mut app.ui.presets_ui, zone, ui, PATTERNS, &folders, &thumb);
-    apply(app, ui.ctx(), PATTERNS, &names_of(&folders), events);
+    let (events, rows) = show(&mut app.ui.presets_ui, zone, ui, PATTERNS, &folders, &thumb);
+    apply(app, ui.ctx(), PATTERNS, &names_of(&folders), &rows, events);
 }
 
 // ------------------------------------------------------------------ Styles
+
+/// The height of the Styles browser, footer included.
+const STYLES_HEIGHT: f32 = 300.0;
 
 /// Window › Styles: a click applies the style to the selected layers (Shift adds its effects), a drop on the canvas
 /// applies it to the active layer.
@@ -187,8 +195,13 @@ pub fn styles_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ColorImage::from_rgba_unmultiplied([S as usize, S as usize], &px)
         });
     };
-    let events = show(&mut app.ui.presets_ui, zone, ui, STYLES, &folders, &thumb);
-    apply(app, ui.ctx(), STYLES, &names_of(&folders), events);
+    // The floating window sizes to its content: the browser fills a room of the height Styles' list had.
+    let room = egui::vec2(ui.available_width(), STYLES_HEIGHT);
+    let (events, rows) = ui.allocate_ui(room, |ui| {
+        ui.set_min_height(STYLES_HEIGHT);
+        show(&mut app.ui.presets_ui, zone, ui, STYLES, &folders, &thumb)
+    }).inner;
+    apply(app, ui.ctx(), STYLES, &names_of(&folders), &rows, events);
 }
 
 fn names_of(folders: &[Folder]) -> Vec<String> {
@@ -211,17 +224,28 @@ pub(crate) fn act(panel: PresetPanel, event: &PresetEvent<PresetKey>, rows: &[Pr
     let edit = format!("{}.edit", panel.prefix);
     let run = |params: Value| Some(Act::Run(edit.clone(), params));
     match event {
-        PresetEvent::Rename { key: PresetKey::Item(key), text } => run(json!({"action": "rename", "preset": key, "name": text})),
-        PresetEvent::Rename { key: PresetKey::Group(group), text } => run(json!({"action": "renameGroup", "group": group, "name": text})),
+        PresetEvent::Rename { key: PresetKey::Item(key), text, .. } => run(json!({"action": "rename", "preset": key, "name": text})),
+        PresetEvent::Rename { key: PresetKey::Group(group), text, .. } => run(json!({"action": "renameGroup", "group": group, "name": text})),
         PresetEvent::Delete(PresetKey::Item(key)) => run(json!({"action": "delete", "preset": key})),
         PresetEvent::Delete(PresetKey::Group(group)) => run(json!({"action": "deleteGroup", "group": group})),
-        PresetEvent::MoveTo { key: PresetKey::Item(key), group: PresetKey::Group(group) } => run(json!({"action": "move", "preset": key, "to": group})),
+        PresetEvent::MoveTo { key: PresetKey::Item(key), group: PresetKey::Group(group), .. } => run(json!({"action": "move", "preset": key, "to": group})),
         PresetEvent::Footer(PresetFooterEvent::NewGroup) => run(json!({"action": "newGroup", "name": "Group"})),
         PresetEvent::Footer(PresetFooterEvent::New) => Some(Act::Run(format!("{}.new", panel.prefix), (panel.new_params)())),
         PresetEvent::Footer(PresetFooterEvent::Delete) => selected.and_then(|key| run(json!({"action": "delete", "preset": key}))),
         PresetEvent::Reorder(edit) if matches!(edit.phase(), Some(craft::behavior::GesturePhase::Commit) | None) => {
             let mv = edit.value()?;
-            let remaining: Vec<&PresetKey> = rows.iter().filter(|key| !mv.keys.contains(key)).collect();
+            // `to` counts the rows left once the moved ones, with a moved folder's presets, are taken out.
+            let mut moving_folder = false;
+            let remaining: Vec<&PresetKey> = rows
+                .iter()
+                .filter(|key| {
+                    let moved = mv.keys.contains(key);
+                    if matches!(key, PresetKey::Group(_)) {
+                        moving_folder = moved;
+                    }
+                    !moved && !(moving_folder && matches!(key, PresetKey::Item(_)))
+                })
+                .collect();
             match &mv.key {
                 PresetKey::Group(from) => {
                     // The next folder after the landing place, in the order without the moved one.
@@ -246,7 +270,7 @@ pub(crate) fn act(panel: PresetPanel, event: &PresetEvent<PresetKey>, rows: &[Pr
 /// `panel`'s own handling of the events that use a preset: Patterns select and fill, Styles apply.
 fn panel_act(panel: PresetPanel, event: &PresetEvent<PresetKey>) -> Option<Act> {
     let (key, add) = match event {
-        PresetEvent::Select { key: PresetKey::Item(key), mods } | PresetEvent::Activate { key: PresetKey::Item(key), mods } => (key, mods.shift),
+        PresetEvent::Select { key: PresetKey::Item(key), mods, .. } | PresetEvent::Activate { key: PresetKey::Item(key), mods, .. } => (key, mods.shift),
         PresetEvent::DropAt { key: PresetKey::Item(key), .. } => (key, false),
         _ => return None,
     };
@@ -260,13 +284,12 @@ fn panel_act(panel: PresetPanel, event: &PresetEvent<PresetKey>) -> Option<Act> 
     })
 }
 
-/// Runs `events` for `panel`, in order, and keeps the panel's selection and folder order.
-fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, names: &[String], events: Vec<PresetEvent<PresetKey>>) {
+/// Runs `events` for `panel`, in order, and keeps the panel's selection and folder order. `rows` are the keys of the
+/// rows the browser showed, which the events' positions count in.
+fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, names: &[String], rows: &[PresetKey], events: Vec<PresetEvent<PresetKey>>) {
     for event in events {
-        let order = app.ui.presets_ui.display_order(panel.id, names);
-        let rows: Vec<PresetKey> = rows_keys(app, panel, names, &order);
         let selected = app.ui.presets_ui.selected.get(panel.id).cloned();
-        let Some(act) = panel_act(panel, &event).or_else(|| act(panel, &event, &rows, selected.as_deref())) else { continue };
+        let Some(act) = panel_act(panel, &event).or_else(|| act(panel, &event, rows, selected.as_deref())) else { continue };
         if let PresetEvent::Select { key: PresetKey::Item(key), .. } | PresetEvent::Activate { key: PresetKey::Item(key), .. } | PresetEvent::DropAt { key: PresetKey::Item(key), .. } =
             &event
         {
@@ -287,7 +310,7 @@ fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, names
 fn after(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, event: &PresetEvent<PresetKey>, reply: &Value) {
     let ui = &mut app.ui.presets_ui;
     match event {
-        PresetEvent::Rename { key: PresetKey::Item(key), text } if ui.selected.get(panel.id) == Some(key) => {
+        PresetEvent::Rename { key: PresetKey::Item(key), text, .. } if ui.selected.get(panel.id) == Some(key) => {
             ui.selected.insert(panel.id.into(), text.clone());
         }
         PresetEvent::Delete(PresetKey::Item(_)) | PresetEvent::Footer(PresetFooterEvent::Delete) => {
@@ -306,22 +329,6 @@ fn after(app: &mut PhotocraftApp, ctx: &egui::Context, panel: PresetPanel, event
         }
         _ => {}
     }
-}
-
-/// The keys of `panel`'s rows in display order, as the browser showed them.
-fn rows_keys(app: &PhotocraftApp, panel: PresetPanel, names: &[String], order: &[usize]) -> Vec<PresetKey> {
-    let items = |at: usize| -> Vec<String> {
-        match panel.id {
-            "patterns" => app.session.presets.pattern_groups.get(at).map(|group| group.items.clone()).unwrap_or_default(),
-            _ => app.session.presets.styles.get(at).map(|group| group.items.iter().map(|style| style.name.clone()).collect()).unwrap_or_default(),
-        }
-    };
-    let mut keys = Vec::new();
-    for &at in order {
-        keys.push(PresetKey::Group(names[at].clone()));
-        keys.extend(items(at).into_iter().map(PresetKey::Item));
-    }
-    keys
 }
 
 // ------------------------------------------------------------------ pattern picker
