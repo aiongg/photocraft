@@ -351,7 +351,7 @@ mod tests {
     // clipboard keys in its input hook (registered before this menu's), and the menu's Cut reaches
     // egui's input after that hook, where the craft field no longer reads it.
     #[test]
-    #[ignore = "craft: mig/text-context-menu"]
+    #[ignore = "craft: the rename field's runtime takes Escape and the clipboard keys before this menu's; PhotoCraft still opens its own menu on craft fields instead of the framework edit menu"]
     fn right_click_in_a_text_field_opens_its_edit_menu_not_the_canvas_menu() {
         let (mut h, field) = renaming();
         right_click(&mut h, field);
@@ -369,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "craft: mig/text-context-menu"]
+    #[ignore = "craft: the rename field's runtime takes Escape and the clipboard keys before this menu's; PhotoCraft still opens its own menu on craft fields instead of the framework edit menu"]
     fn text_field_menu_select_all_then_cut_moves_the_text_to_the_clipboard() {
         let (mut h, field) = renaming();
         // A click in the field drops the selection the rename started with.

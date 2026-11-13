@@ -9,6 +9,7 @@
 
 use craft::ui::runtime::commands::ChromeCommand;
 use craft::ui::runtime::frame::ChromeToggle;
+use craft::ui::runtime::overlay;
 use egui::{Key, KeyboardShortcut};
 use serde_json::json;
 
@@ -297,6 +298,8 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
         }
         let id = clip_key_command(app, delete_key_command(app, id));
         let owner = key_owner(app, ctx);
+        // The shortcut closes the open craft popups (menus, lists) as a menu pick does.
+        overlay::close_popups(ctx);
         dispatch_as(app, ctx, &id, last);
         ran = true;
         if key_owner(app, ctx) != owner {

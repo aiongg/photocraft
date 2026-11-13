@@ -1909,7 +1909,6 @@ mod layer_click_type_commit_tests {
     }
 
     #[test]
-    #[ignore = "craft-layers: a double-click on a thumbnail reports no Activate (map_events drops ThumbClicked.clicks)"]
     fn layer_click_commits_without_breaking_modifier_selection_or_double_click_editing() {
         let kind = theme::ThemeKind::default();
         let (mut h, text, other) = harness(kind);

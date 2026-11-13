@@ -176,7 +176,7 @@ enum At {
 /// shape layer's thumbnail its fill picker, an adjustment or gradient its Properties, a frame's
 /// content a Smart Object's contents; elsewhere on the row, Layer Style.
 #[test]
-#[ignore = "craft-layers: a double-click on a thumbnail reports no Activate (map_events drops ThumbClicked.clicks)"]
+#[ignore = "craft-layers: the double-click's second press reselects the row with no part (map_events gives a Selection the part of single clicks only), so a fill row with a mask targets its mask"]
 fn double_clicks_open_what_the_part_shows() {
     type Case = (&'static str, fn() -> Session, At, fn(&mut H));
     let cases: [Case; 14] = [

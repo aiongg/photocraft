@@ -308,6 +308,7 @@ mod panel_menus {
     //! #12324), or on the whole selection when the clicked row is one of several selected rows.
 
     use craft::layers::ui::tree::LayerPart;
+    use egui::accesskit::Role;
     use egui::{Event, Modifiers, PointerButton, Pos2};
     use egui_kittest::Harness;
     use egui_kittest::kittest::{NodeT, Queryable};
@@ -343,8 +344,38 @@ mod panel_menus {
     }
 
     fn pick(h: &mut H, item: &str) {
-        let at = h.get_by_label(item).rect().center();
+        let at = scroll_to(h, item);
         press(h, at, PointerButton::Primary);
+    }
+
+    /// Wheels the open menu that holds `item` until the item sits in the menu's upper half or the
+    /// menu stops scrolling (a menu taller than its room scrolls), clear of its scroll strips, and
+    /// returns the item's centre.
+    fn scroll_to(h: &mut H, item: &str) -> Pos2 {
+        let mut last = None;
+        loop {
+            let rect = h.get_by_label(item).rect();
+            let menu = h
+                .query_all_by_role(Role::Menu)
+                .filter(|m| m.accesskit_node().bounding_box().is_some())
+                .map(|m| m.rect())
+                .find(|m| m.x_range().contains(rect.center().x))
+                .expect("a menu holds the item");
+            if rect.center().y <= menu.center().y || last == Some(rect) {
+                return rect.center();
+            }
+            last = Some(rect);
+            h.hover_at(Pos2::new(rect.center().x, menu.center().y));
+            h.run_steps(1);
+            h.event(Event::MouseWheel {
+                source: egui::MouseWheelSource::Unknown,
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, -3.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: Modifiers::NONE,
+            });
+            h.run_steps(4);
+        }
     }
 
     fn layer(h: &H, name: &str) -> Layer {
@@ -401,7 +432,6 @@ mod panel_menus {
     }
 
     #[test]
-    #[ignore = "craft: the row menu runs past the window's bottom edge (Label Color at y 965 in a 900-pt window)"]
     fn context_menu_picks_act_on_the_clicked_row() {
         type Case = (&'static str, fn() -> Session, On, &'static [&'static str], fn(&mut H));
         let cases: [Case; 9] = [
@@ -466,7 +496,7 @@ mod panel_menus {
             // A submenu opens under the pointer; the last item is the pick.
             for (i, item) in items.iter().enumerate() {
                 if i + 1 < items.len() {
-                    let at = h.get_by_label(item).rect().center();
+                    let at = scroll_to(&mut h, item);
                     assert!(h.ctx.content_rect().contains(at), "{case}: {item} at {at:?} is in the window");
                     h.hover_at(at);
                     h.run_steps(4);

@@ -155,7 +155,6 @@ fn letters_in_the_open_blend_list_do_not_switch_tools() {
 /// With the Blend Mode list open, a command shortcut closes the list and runs (#9065: ⌘1, 100%, as
 /// Photoshop's menus do).
 #[test]
-#[ignore = "craft: an app shortcut that runs has no way to close an open craft overlay (the Select list stays open)"]
 fn a_command_shortcut_closes_the_open_blend_list_and_runs() {
     let mut h = harness(3000, 2000);
     assert_ne!(h.state().ui.views[0].zoom, 1.0, "the document starts fitted, not at 100%");

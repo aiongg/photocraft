@@ -216,7 +216,7 @@ fn double_click_in_one_frame(h: &mut egui_kittest::Harness<'static, PhotocraftAp
 /// it. That selection must not land after the editor captured its target, or OK refuses the edit
 /// ("The document or Smart Filter changed").
 #[test]
-#[ignore = "craft: a double-click whose clicks share a frame loses the second press (deferred Down, release in the next pass)"]
+#[ignore = "craft: a double-click's second click reports its Selection a pass after its Activate (Activate on the press, select on the release), so the reselect lands after the editor captured its target"]
 fn double_clicking_a_filter_of_an_inactive_smart_object_edits_it() {
     let (mut h, a, _, c) = panel();
     assert_eq!(h.state().session.active().unwrap().active_layer, Some(LayerId(c)));
@@ -235,7 +235,6 @@ fn double_clicking_a_filter_of_an_inactive_smart_object_edits_it() {
 
 /// The same for Liquify, whose workspace takes the strokes with it: a refused OK lost them.
 #[test]
-#[ignore = "craft: a double-click whose clicks share a frame loses the second press (deferred Down, release in the next pass)"]
 fn double_clicking_the_liquify_filter_of_an_inactive_smart_object_edits_it() {
     let (mut h, a, _, c) = panel();
     let stroke = json!({"tool": "forwardWarp", "size": 8, "points": [[4.0, 8.0, 1.0], [8.0, 8.0, 1.0]]});

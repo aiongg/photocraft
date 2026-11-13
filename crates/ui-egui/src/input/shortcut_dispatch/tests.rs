@@ -2,6 +2,8 @@
 //! command, or the item is visibly disabled with a reason — through the whole app, with a
 //! realistic layered document, from the places focus usually is.
 
+use craft::keymap::Chord;
+use craft::ui::runtime::keys::focus_holds;
 use egui::accesskit::Role;
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
@@ -236,12 +238,6 @@ fn every_displayed_shortcut_is_bound_to_its_item() {
     assert!(broken.is_empty(), "{} displayed shortcuts don't reach their item:\n{}", broken.len(), broken.join("\n"));
 }
 
-/// The commands whose chords the focused Layers rows run themselves (craft-layers' stacking and
-/// visibility keys): with the rows focused the press is the list's and reaches no app command,
-/// so it runs once (`layers_rows_tests::command_bracket_moves_the_layer_once`).
-const ROWS_KEYS: [&str; 5] =
-    ["layer.hideLayers", "layer.arrange.bringToFront", "layer.arrange.bringForward", "layer.arrange.sendBackward", "layer.arrange.sendToBack"];
-
 /// Press every displayed shortcut from each place focus usually is: each dispatches its command,
 /// or the menu shows it disabled and the press reports why. (Dry run: File › Exit, Open, Help
 /// links… resolve and check enablement without running.)
@@ -259,6 +255,9 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
                 continue;
             }
             let parsed = parse(&sc).unwrap();
+            // A press the focused component holds (the Layers rows' stacking and visibility keys)
+            // is the component's and reaches no app command.
+            let held = Chord::parse(&sc).is_ok_and(|chord| focus_holds(&h.ctx, chord));
             press(&mut h, &sc);
             let log = take_log(&h.ctx);
             if !focus.allows(&parsed) {
@@ -269,9 +268,8 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
                 continue;
             }
             let enabled = items.iter().find(|i| i.id == id).map_or_else(|| crate::menus::is_enabled(h.state(), &id), |i| i.enabled);
-            let held_by_rows = matches!(place, Place::LayersRow | Place::FocusedWidget) && ROWS_KEYS.contains(&id.as_str());
             match log.as_slice() {
-                [] if held_by_rows => {}
+                [] if held => {}
                 [(bound, Outcome::Ran)] if same(&id, bound) && enabled => {}
                 [(bound, Outcome::Disabled(why))] if same(&id, bound) && !enabled && !why.is_empty() => {}
                 other => failures.push(format!("{place:?}: {sc} ({id}, menu enabled: {enabled}) -> {other:?}")),
