@@ -457,6 +457,14 @@ pub(crate) fn shown_as_document(app: &mut PhotocraftApp, doc: photocraft_doc::Do
             c.tex_preview_key = key;
         }
     }
+    // The raster sources' pictures of the document, keyed like the CPU textures.
+    let outputs: Vec<u32> = app.raster_logs.keys().filter(|k| k.0 == doc).map(|k| k.1).collect();
+    for out in outputs {
+        let (_, key) = canvas_display(app, &d, (out != 0).then_some(out));
+        if let Some(log) = app.raster_logs.get_mut(&(doc, out)) {
+            log.shown_as_document(key, &was_preview);
+        }
+    }
 }
 
 /// How far beyond an edit's damage rect the composite can change: layer effects (shadows, glows,
