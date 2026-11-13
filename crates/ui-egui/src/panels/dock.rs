@@ -313,7 +313,7 @@ pub(crate) fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, group: crate
         (Group::Color, 3) => crate::preset_panels::patterns_panel(app, ui),
         // The Color tab is the same in every theme, in the mode picked from its panel menu
         // (#6000); only the tab order differs between themes.
-        (Group::Color, tab) if group.tabs(pro).get(tab) == Some(&"Color") => crate::color_panel_ui::panel(app, ui),
+        (Group::Color, tab) if group.tabs(pro).get(tab) == Some(&"Color") => super::color::panel(app, ui),
         (Group::Color, _) => crate::swatches_ui::panel(app, ui),
         (Group::Properties, 0) => properties_body(app, ui),
         (Group::Properties, _) => adjustments_grid(app, ui),

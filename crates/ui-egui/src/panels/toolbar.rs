@@ -1,5 +1,8 @@
 use super::options_bar::reveal_focused_control;
 use super::{Align2, Color32, PhotocraftApp, Pos2, Rect, Sense, Stroke, StrokeKind, Tokens, Tool, c32, icons, json, pos2, vec2};
+use craft::color::ui::{PairWell, SwatchPair, Well};
+use craft::ui::contract::Bind;
+
 use crate::state::ToolbarSide;
 
 // ----------------------------------------------------------------------------- toolbar
@@ -229,7 +232,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let tool_tips = ui.data(|d| d.get_temp::<(egui::Id, Rect)>(flyout_id)).is_none() && !ui.input(|i| i.pointer.primary_down());
         let ctx = ui.ctx().clone();
         let footer = (if t.pro { 8.0 } else { 14.0 })
-            + chips_height(t.pro, t.round_chips, t.round_chips && double)
+            + chips_height(app, ui, full.width())
             + 8.0
             + if double { bx } else { bx * 2.0 + 3.0 }
             + 6.0;
@@ -449,7 +452,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.add_space(if t.pro { 8.0 } else { 14.0 });
         // Centred in the tool column as it is before the tools scroll: a scroll bar widens the
         // UI it is in, and the chips moved over by its width (#7316).
-        color_chips(app, ui, double, full.width());
+        color_chips(app, ui, full.width());
         ui.add_space(8.0);
 
         let layout = if double { egui::Layout::left_to_right(egui::Align::Min) } else { egui::Layout::top_down(egui::Align::Min) };
@@ -546,170 +549,49 @@ pub fn paint_toolbar_flyout_indicator(ui: &mut egui::Ui, tokens: &Tokens, resp: 
     ui.painter().add(egui::Shape::convex_polygon(tri, tokens.text_faint, Stroke::NONE));
 }
 
-/// Colour chips: chip size and the background chip's offset (points).
-fn chip_metrics(pro: bool) -> (f32, f32) {
-    if pro { (18.0, 10.0) } else { (21.0, 12.0) }
+/// Photoshop's foreground / background colour chips: `SwatchPair` in host-picker mode, the
+/// foreground in front, Default Colors (D) and Switch Colors (X) over them, centred in the tool
+/// column.
+fn chip_pair<'a>(app: &PhotocraftApp, active: &'a mut Well) -> SwatchPair<'a> {
+    let tools = &app.session.tools;
+    let wells = [
+        PairWell::new(tl!("Set foreground color"), crate::panels::color::srgba(tools.foreground)),
+        PairWell::new(tl!("Set background color"), crate::panels::color::srgba(tools.background)),
+    ];
+    SwatchPair::new(tl!("Colors"), wells, Bind::bound(active))
+        .popover(false)
+        .click_activates(false)
+        .default_button(tl!("Default Foreground and Background Colors (D)"))
+        .swap_button(tl!("Switch Foreground and Background Colors (X)"))
 }
 
-/// Height of the default-colours and swap icons over the chips.
-const CHIP_ICON: f32 = 13.0;
-
-/// Studio themes: round chip diameter and the background chip's vertical offset (points).
-pub(super) const STUDIO_CHIP: (f32, f32) = (30.0, 19.0);
-
-/// Room under the round chips for the Default Colors and Switch Colors buttons.
-const STUDIO_ROW: f32 = 15.0;
-
-/// Room above the stacked round chips so Default Colors, at their top-right, clears them.
-const STUDIO_TOP: f32 = 6.0;
-
-/// Height of the colour chips block.
-pub(super) fn chips_height(pro: bool, studio: bool, wide: bool) -> f32 {
-    if studio && wide {
-        return STUDIO_CHIP.0 + STUDIO_ROW;
-    }
-    if studio {
-        return STUDIO_TOP + STUDIO_CHIP.0 + STUDIO_CHIP.1 + STUDIO_ROW;
-    }
-    let (chip, step) = chip_metrics(pro);
-    CHIP_ICON + 3.0 + chip + step
+/// The height of the colour chips block, from a sizing pass of the pair.
+fn chips_height(app: &PhotocraftApp, ui: &mut egui::Ui, column: f32) -> f32 {
+    let mut active = Well::Primary;
+    craft::ui::layout::measure_slot(ui, column, |ui| {
+        let _ = chip_pair(app, &mut active).show(ui);
+    })
+    .y
 }
 
-/// Photoshop's foreground / background colour chips: the Default Colors (D) and Switch Colors (X)
-/// icons above them, the foreground chip over the background one, all centred in the toolbar
-/// column and kept inside it.
-pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, two_columns: bool, column: f32) {
-    let t = Tokens::get(ui.ctx());
-    // Studio themes: round chips stacked vertically, the controls below them.
-    let studio = t.round_chips;
-    let (chip, step) = if studio { STUDIO_CHIP } else { chip_metrics(t.pro) };
-    // With two tool columns (a short window) the round chips lie side by side, which saves height.
-    let wide = studio && two_columns;
-    let group = if studio && !wide { chip } else { chip + step };
-    let w = column.max(group);
-    let (rect, _) = ui.allocate_exact_size(vec2(w, chips_height(t.pro, studio, wide)), Sense::hover());
-    let left = (rect.left() + (w - group) / 2.0).round();
-    let (fg, bg) = if wide {
-        let fg = Rect::from_min_size(pos2(left, rect.top()), vec2(chip, chip));
-        (fg, fg.translate(vec2(step, 0.0)))
-    } else if studio {
-        let fg = Rect::from_min_size(pos2(left, rect.top() + STUDIO_TOP), vec2(chip, chip));
-        (fg, fg.translate(vec2(0.0, step)))
-    } else {
-        let fg = Rect::from_min_size(pos2(left, rect.top() + CHIP_ICON + 3.0), vec2(chip, chip));
-        (fg, fg.translate(vec2(step, step)))
-    };
-    let radius = t.radius_sm.min(3.0);
-    let p = ui.painter();
-    if studio {
-        let dot = |r: Rect, color: Color32| {
-            p.circle_filled(r.center(), r.width() / 2.0, color);
-            // A light line inside a dark one, so any colour reads against the toolbar.
-            p.circle_stroke(r.center(), r.width() / 2.0 - 0.5, Stroke::new(1.0, t.text.gamma_multiply(0.9)));
-            p.circle_stroke(r.center(), r.width() / 2.0 + 0.5, Stroke::new(1.0, t.field_border));
-        };
-        dot(bg, c32(app.session.tools.background));
-        // The foreground chip sits on the background one, a toolbar-coloured gap between them.
-        p.circle_filled(fg.center(), fg.width() / 2.0 + 2.0, t.chrome);
-        dot(fg, c32(app.session.tools.foreground));
-    } else {
-        let frame = |r: Rect| {
-            // A light line inside a dark one, so any colour reads against the toolbar.
-            p.rect_stroke(r, radius, Stroke::new(1.0, t.text.gamma_multiply(0.9)), StrokeKind::Inside);
-            p.rect_stroke(r, radius, Stroke::new(1.0, t.field_border), StrokeKind::Outside);
-        };
-        p.rect_filled(bg, radius, c32(app.session.tools.background));
-        frame(bg);
-        p.rect_filled(fg.expand(2.0), radius + 2.0, t.chrome);
-        p.rect_filled(fg, radius, c32(app.session.tools.foreground));
-        frame(fg);
-    }
-    // Photoshop: clicking a chip opens the Color Picker for that colour.
-    let bg_resp = ui.interact(bg, ui.scope_id().with("bgchip"), Sense::click());
-    let fg_resp = ui.interact(fg, ui.scope_id().with("fgchip"), Sense::click());
-    if fg_resp.on_hover_text(tl!("Set foreground color")).clicked() {
-        crate::color_picker_ui::open(app, "foreground");
-    } else if bg_resp.on_hover_text(tl!("Set background color")).clicked() {
-        crate::color_picker_ui::open(app, "background");
-    }
-    // Default Colors at the left, Switch Colors at the right, over the chips.
-    let (dr, sr) = if studio {
-        // Switch Colors is a curve right under the chips, centred on them so its heads touch
-        // them. Default Colors never moves it: at the left edge beside it when the chips lie side
-        // by side, at the block's top-right corner when they are stacked.
-        let (cx, row) = ((fg.center().x + bg.center().x) / 2.0, fg.bottom().max(bg.bottom()) + 3.5);
-        let default = if wide {
-            Rect::from_center_size(pos2(rect.left() + CHIP_ICON / 2.0, row), vec2(CHIP_ICON, CHIP_ICON))
-        } else {
-            // Just high enough that its bottom-left corner clears the foreground chip's outline.
-            let x = rect.right() - CHIP_ICON;
-            let (dx, r) = ((x - fg.center().x).max(0.0), fg.width() / 2.0 + 1.0);
-            let clear = if dx < r { (r * r - dx * dx).sqrt() } else { 0.0 };
-            Rect::from_min_size(pos2(x, fg.center().y - clear - CHIP_ICON), vec2(CHIP_ICON, CHIP_ICON))
-        };
-        (Some(default), Rect::from_center_size(pos2(cx, row), vec2(20.0, 14.0)))
-    } else {
-        let icon = |x: f32| Rect::from_min_size(pos2(x, rect.top()), vec2(CHIP_ICON, CHIP_ICON));
-        (Some(icon(left)), icon(left + group - CHIP_ICON))
-    };
-    let d = dr.map(|dr| ui.interact(dr, ui.scope_id().with("default-colors"), Sense::click()));
-    let s = ui.interact(sr, ui.scope_id().with("swap-colors"), Sense::click());
-    let p = ui.painter();
-    for (r, resp) in dr.into_iter().zip(d.iter()).chain([(sr, &s)]) {
-        if resp.hovered() && !studio {
-            p.rect_filled(r.expand(2.0), radius, t.hover);
+/// The colour chips: a click on a chip opens the Color Picker for that colour (Photoshop).
+pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, column: f32) {
+    let mut active = Well::Primary;
+    let layout = egui::Layout::top_down(egui::Align::Center);
+    let out = ui.allocate_ui_with_layout(vec2(column, 0.0), layout, |ui| chip_pair(app, &mut active).show(ui)).inner;
+    match out.clicked {
+        Some(Well::Secondary) => {
+            crate::color_picker_ui::open(app, "background");
         }
-    }
-    let ink = |resp: &egui::Response| if resp.hovered() { t.text } else { t.icon };
-    if studio {
-        // Switch Colors: a shallow curve hugging the bottom chip, with a filled head at each end.
-        // It glows on hover instead of getting a button box.
-        let hot = s.hovered();
-        let stroke = Stroke::new(1.5, ink(&s));
-        let (c, rad) = (pos2(sr.center().x, sr.center().y - 5.0), 9.0);
-        let (from, to) = (0.45, std::f32::consts::PI - 0.45);
-        let arc: Vec<_> = (0..=12)
-            .map(|i| {
-                let a = from + (to - from) * i as f32 / 12.0;
-                c + vec2(rad * a.cos(), rad * a.sin())
-            })
-            .collect();
-        if hot {
-            p.add(egui::Shape::line(arc.clone(), Stroke::new(5.0, t.text.gamma_multiply(0.18))));
+        Some(_) => {
+            crate::color_picker_ui::open(app, "foreground");
         }
-        let ends = [(arc[0], from, -1.0_f32), (arc[arc.len() - 1], to, 1.0)];
-        p.add(egui::Shape::line(arc, stroke));
-        // Each head points along the curve, away from its middle.
-        for (end, a, sign) in ends {
-            let dir = vec2(-a.sin(), a.cos()) * sign;
-            let side = vec2(-dir.y, dir.x);
-            let tip = end + dir * 2.5;
-            let base = tip - dir * 5.0;
-            p.add(egui::Shape::convex_polygon(vec![tip, base + side * 3.0, base - side * 3.0], ink(&s), Stroke::NONE));
-        }
-    } else {
-        // Switch Colors: the compact clockwise bend has left- and down-pointing heads.
-        // swap_arrow.rs owns its geometry and the pixel-level render regression test.
-        crate::swap_arrow::paint(p, sr.min, ink(&s));
+        None => {}
     }
-    // Default Colors: a small black chip over a small white one.
-    if let (Some(dr), Some(d)) = (dr, d.as_ref()) {
-        let small = 7.0;
-        let (b, w) = (Rect::from_min_size(dr.min + vec2(1.0, 1.0), vec2(small, small)), Rect::from_min_size(dr.min + vec2(5.0, 5.0), vec2(small, small)));
-        p.rect_filled(w, 1.0, Color32::WHITE);
-        p.rect_stroke(w, 1.0, Stroke::new(1.0, ink(d)), StrokeKind::Inside);
-        p.rect_filled(b.expand(1.0), 1.5, t.chrome);
-        p.rect_filled(b, 1.0, Color32::BLACK);
-        p.rect_stroke(b, 1.0, Stroke::new(1.0, ink(d)), StrokeKind::Inside);
-    }
-    if let Some(d) = &d {
-        d.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Default Foreground and Background Colors (D)")));
-    }
-    s.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Switch Foreground and Background Colors (X)")));
-    if s.on_hover_text(tl!("Switch Foreground and Background Colors (X)")).clicked() {
+    if out.swap {
         chip_command(app, "tools.swapColors");
     }
-    if d.is_some_and(|d| d.on_hover_text(tl!("Default Foreground and Background Colors (D)")).clicked()) {
+    if out.defaults {
         chip_command(app, "tools.defaultColors");
     }
 }

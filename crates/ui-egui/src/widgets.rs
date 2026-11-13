@@ -26,7 +26,6 @@ pub mod point_curve;
 pub mod press_menu;
 mod scrub;
 mod slider;
-pub mod swap_arrow;
 pub(super) mod tab_strip;
 pub mod task_bar;
 mod text_field;
