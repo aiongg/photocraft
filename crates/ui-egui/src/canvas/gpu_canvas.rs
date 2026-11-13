@@ -11,13 +11,10 @@
 //! render-pass blit chain. Documents larger than the device's maximum texture size are split
 //! into tiles.
 //!
-//! Per frame the shader draws, in *device pixels*:
-//! - a soft analytic drop shadow around the document on the pasteboard (erf-blurred box),
-//! - a transparency checkerboard (8 pt squares, grays 255/204, the same size at every zoom)
-//!   under the document, anchored to the document's top-left corner so it moves with the image,
-//! - the document itself, sampled trilinearly when zoomed out, bilinearly between 1× and 2×, and
-//!   with an anti-aliased "sharp nearest" filter at integer scales and ≥ 2×,
-//! - a one-device-pixel pixel grid above 500% zoom, over pixels with content only.
+//! Per frame the shader draws, in *device pixels*, the document's pixels alone, premultiplied: sampled trilinearly
+//! when zoomed out, bilinearly between 1× and 2×, and with an anti-aliased "sharp nearest" filter at integer scales
+//! and ≥ 2×. The framework canvas's `RasterDisplay` draws the checkerboard under them and the edge around them, and
+//! its pixel grid draws over them.
 //!
 //! GPU resources live in the renderer's `callback_resources` type map; the per-frame callback only
 //! carries plain view parameters, so it is `Send + Sync` on every target (including wasm).
@@ -121,10 +118,6 @@ pub struct ViewParams {
     /// Camera rotation in radians, clockwise in Y-down screen space. Rotate around [`Self::center`]
     /// before sampling. Flip stays on the CPU path.
     pub rotation: f32,
-    /// Draw the drop shadow on the pasteboard.
-    pub shadow: bool,
-    /// Draw the pixel grid at high zoom.
-    pub pixel_grid: bool,
     /// Distinguishes views painted in the same frame (main canvas, extra windows).
     pub view_key: u64,
     /// Display transform: 0 none, 1 the document's display LUT (document → monitor profile,
@@ -136,10 +129,6 @@ pub struct ViewParams {
     /// before the display LUT; `None` when off. The display LUT must then leave it out
     /// (`ColorState::gpu_canvas_lut`).
     pub hdr: Option<[f32; 2]>,
-    /// Where this draw puts the document, in document pixels from its own place: `[0, 0]` for the
-    /// document, a whole number of widths and heights for a View › Pattern Preview copy (#1067).
-    /// A copy samples the same texture, so nothing is composited again.
-    pub offset: [f32; 2],
 }
 
 /// When high-bit documents get an `Rgba16Float` canvas texture.
@@ -570,7 +559,7 @@ impl GpuCanvas {
         r.callback_resources.get::<Resources>()?.layer_fit
     }
 
-    /// Set the checkerboard and gamut warning colours.
+    /// Set the gamut warning colours.
     pub fn set_style(&self, style: CanvasStyle) {
         let mut r = self.rs.renderer.write();
         if let Some(res) = r.callback_resources.get_mut::<Resources>() {

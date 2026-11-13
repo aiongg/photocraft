@@ -23,116 +23,6 @@ pub(super) fn paint_mapped_image_at(painter: &egui::Painter, xf: &ViewXform, tex
     painter.add(egui::Shape::mesh(mesh));
 }
 
-/// The GPU canvas view, then its View › Pattern Preview copies (#1067): the same texture drawn
-/// again whole document sizes away, each with its own view uniform and no shadow.
-pub(super) fn paint_gpu_view(painter: &egui::Painter, rect: Rect, params: crate::gpu_canvas::ViewParams, copies: &[[i32; 2]]) {
-    crate::gpu_canvas::GpuCanvas::paint(painter, rect, params);
-    for (k, &c) in copies.iter().enumerate() {
-        let copy = crate::gpu_canvas::ViewParams {
-            offset: crate::pattern_preview::offset(c, params.doc_size),
-            shadow: false,
-            // Keyed by slot, not by tile index, so panning reuses the same few uniform buffers.
-            view_key: egui::Id::unique((params.view_key, "pattern", k)).value(),
-            ..params
-        };
-        crate::gpu_canvas::GpuCanvas::paint(painter, rect, copy);
-    }
-}
-
-/// The mapping that draws Pattern Preview copy `c` of a `size` document where it sits next to
-/// the document: the same view, looking the matching number of document sizes back.
-pub(super) fn pattern_xf(xf: &ViewXform, c: [i32; 2], size: [u32; 2]) -> ViewXform {
-    let [ox, oy] = crate::pattern_preview::offset(c, size);
-    ViewXform { center: [xf.center[0] - ox, xf.center[1] - oy], ..*xf }
-}
-
-/// CPU canvas: the transparency checkerboard (or white) and the display texture, for the
-/// document or one of its Pattern Preview copies (`xf` from [`pattern_xf`]).
-pub(super) fn paint_cpu_document(
-    painter: &egui::Painter,
-    xf: &ViewXform,
-    bounds: DRect,
-    rotated: bool,
-    checker: Option<(egui::TextureId, f32)>,
-    tex: Option<egui::TextureId>,
-    opaque: bool,
-) {
-    let size = [bounds.width() as f32, bounds.height() as f32];
-    let origin = [bounds.x0 as f32, bounds.y0 as f32];
-    let img_rect = xf.doc_rect(bounds);
-    match checker {
-        Some((checker_id, square)) if !opaque || tex.is_none() => {
-            if rotated {
-                let tiles = vec2(size[0], size[1]) / (2.0 * square);
-                paint_mapped_image_at(painter, xf, checker_id, Rect::from_min_max(Pos2::ZERO, pos2(tiles.x, tiles.y)), origin, size, Color32::WHITE);
-            } else {
-                let tiles = img_rect.size() / (2.0 * square);
-                painter.image(checker_id, img_rect, Rect::from_min_max(Pos2::ZERO, pos2(tiles.x, tiles.y)), Color32::WHITE);
-            }
-        }
-        // On software window adapters this hidden full-canvas pass is CPU rasterization too.
-        // Keep the white-background branch unchanged (its antialiased outer edge is visible).
-        Some(_) => {}
-        None => {
-            if rotated {
-                paint_mapped_quad(painter, xf, origin, size, Color32::WHITE);
-            } else {
-                painter.rect_filled(img_rect, 0.0, Color32::WHITE);
-            }
-        }
-    }
-    if let Some(tex) = tex {
-        if rotated {
-            paint_mapped_image_at(painter, xf, tex, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), origin, size, Color32::WHITE);
-        } else {
-            let uv = if xf.flip { Rect::from_min_max(pos2(1.0, 0.0), pos2(0.0, 1.0)) } else { Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)) };
-            painter.image(tex, img_rect, uv, Color32::WHITE);
-        }
-    }
-}
-
-/// [`ensure_texture_in_view`]'s detail texture over document area `area` (x0, y0, x1, y1), on its
-/// own checkerboard (or white), so the reduced texture under it doesn't show through where the
-/// image is transparent. The checkerboard keeps [`paint_cpu_document`]'s phase.
-pub(super) fn paint_cpu_detail(
-    painter: &egui::Painter,
-    xf: &ViewXform,
-    bounds: DRect,
-    rotated: bool,
-    checker: Option<(egui::TextureId, f32)>,
-    tex: egui::TextureId,
-    area: [f32; 4],
-) {
-    let [x0, y0, x1, y1] = area;
-    let corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-    let pts = corners.map(|[x, y]| xf.to_screen(x, y));
-    let quad = |tex: egui::TextureId, uvs: [Pos2; 4]| {
-        let mut mesh = Mesh::with_texture(tex);
-        for (pos, uv) in pts.into_iter().zip(uvs) {
-            mesh.vertices.push(egui::epaint::Vertex { pos, uv, color: Color32::WHITE });
-        }
-        mesh.add_triangle(0, 1, 2);
-        mesh.add_triangle(0, 2, 3);
-        painter.add(egui::Shape::mesh(mesh));
-    };
-    match checker {
-        Some((checker_id, square)) => {
-            let tile = 2.0 * square;
-            let uvs = if rotated {
-                corners.map(|[x, y]| pos2(x / tile, y / tile))
-            } else {
-                let min = xf.doc_rect(bounds).min;
-                pts.map(|p| ((p - min) / tile).to_pos2())
-            };
-            quad(checker_id, uvs);
-        }
-        None => {
-            painter.add(egui::Shape::convex_polygon(pts.to_vec(), Color32::WHITE, Stroke::NONE));
-        }
-    }
-    quad(tex, [pos2(0.0, 0.0), pos2(1.0, 0.0), pos2(1.0, 1.0), pos2(0.0, 1.0)]);
-}
-
 fn paint_mapped_quad(painter: &egui::Painter, xf: &ViewXform, origin: [f32; 2], size: [f32; 2], color: Color32) {
     let ([x, y], [w, h]) = (origin, size);
     let pts = vec![xf.to_screen(x, y), xf.to_screen(x + w, y), xf.to_screen(x + w, y + h), xf.to_screen(x, y + h)];
@@ -401,19 +291,21 @@ fn ring(outer: DRect, inner: DRect) -> Vec<DRect> {
 /// downsampled proxy past that (so a far-off layer costs no more than a 16 MP composite).
 /// Drawn before the canvas, each band reaching a point under its edge. Returns whether anything
 /// past the canvas was drawn.
-pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, idx: usize, output: Option<u32>) -> bool {
-    let ctx = painter.ctx().clone();
-    let Some((snapshot, id)) = app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id)) else { return false };
+/// Crop tool: the layers' pixels past the canvas while a frame is edited, as prepared for this pass with the app
+/// borrowed mutably; painted under the canvas ([`Beyond::paint`]). `None` while they do not show.
+pub(super) fn beyond_canvas(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Beyond> {
+    let ctx = ctx.clone();
+    let (snapshot, id) = app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id))?;
     let key = egui::Id::unique(("crop-beyond-canvas", id.0, output));
     let frame =
         app.ui.crop_rect.filter(|f| f.iter().all(|v| v.is_finite()) && app.session.active_index() == Some(idx) && crate::crop_ui::shows_beyond_canvas(app));
     let Some(f) = frame else {
         ctx.data_mut(|d| d.remove::<BeyondCanvas>(key));
-        return false;
+        return None;
     };
     let (doc, preview_key) = display_doc(app, idx);
     if doc.has_artboards() {
-        return false;
+        return None;
     }
     let (display, display_key) = canvas_display(app, &doc, output);
     let doc_key = preview_key ^ display_key;
@@ -446,20 +338,38 @@ pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painte
             c
         }
     };
-    // Transparency out to the frame, in phase with the canvas's own checkerboard.
-    let canvas = xf.doc_rect(doc.bounds());
     // A turned frame reaches as far as its corners.
     let f = crate::crop_ui::turned_bounds(f, crate::crop_ui::angle(app));
     let fr = DRect::new(f[0].floor() as i32, f[1].floor() as i32, f[2].ceil() as i32, f[3].ceil() as i32);
     let square = app.session.prefs().transparency_and_gamut.square();
-    let checker_id = square.map(|_| checker(app, &ctx));
+    let checker = square.map(|sq| (sq, checker(app, &ctx)));
     let around = ring(c.extent.union(&fr), doc.bounds());
+    (!around.is_empty()).then_some(Beyond { bounds: doc.bounds(), around, bands: c.bands, checker })
+}
+
+/// The pixels past the canvas that show this pass ([`beyond_canvas`]).
+pub(super) struct Beyond {
+    /// The canvas's own bounds.
+    bounds: DRect,
+    /// The bands around the canvas out to the frame and every layer's pixels.
+    around: Vec<DRect>,
+    bands: Vec<(DRect, DRect, egui::TextureHandle)>,
+    /// The transparency grid's square and texture; none draws transparency white.
+    checker: Option<(f32, egui::TextureId)>,
+}
+
+impl Beyond {
+    /// Paints them through `xf`, under the canvas: transparency out to the frame, in phase with the canvas's own
+    /// checkerboard, then the composite's bands.
+    pub(super) fn paint(&self, painter: &egui::Painter, xf: &ViewXform) {
+        let canvas = xf.doc_rect(self.bounds);
+        let (around, square, checker_id) = (&self.around, self.checker.map(|c| c.0), self.checker.map(|c| c.1));
     // A turned view (Rotate View, or the Crop tool's default mode turning the image behind its
     // box) draws each band as its turned quad: its screen bounding box would stretch the band's
     // texture and spread the checkerboard past the band.
     let turned = xf.rotation != 0.0;
     let checker_uv = |p: Pos2, sq: f32| ((p - canvas.min) / (2.0 * sq)).to_pos2();
-    for &b in &around {
+    for &b in around {
         if turned {
             let q = doc_quad(xf, b);
             match square.zip(checker_id) {
@@ -481,7 +391,7 @@ pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painte
             }
         }
     }
-    for (b, t, tex) in &c.bands {
+    for (b, t, tex) in &self.bands {
         let part = |a: i32, o: i32, len: u32| (i64::from(a) - i64::from(o)) as f32 / len.max(1) as f32;
         let (mut u0, mut u1) = (part(b.x0, t.x0, t.width()), part(b.x1, t.x0, t.width()));
         if turned {
@@ -499,7 +409,7 @@ pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painte
         let at = |p: Pos2| uv.min + (p - r.min) / r.size() * uv.size();
         painter.image(tex.id(), e, Rect::from_min_max(at(e.min), at(e.max)), Color32::WHITE);
     }
-    !around.is_empty()
+    }
 }
 
 /// Document rect `b`'s corners on screen, clockwise from its top-left (a parallelogram in a turned

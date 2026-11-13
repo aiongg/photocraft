@@ -178,21 +178,37 @@ pub(crate) struct PhotoComposite<'a> {
     log: Option<&'a SourceLog<Shown>>,
 }
 
-impl<'a> PhotoComposite<'a> {
+/// A [`PhotoComposite`] prepared for this pass with the app borrowed mutably (the picture brought up to date, the
+/// revision logged), to be read from once the app is borrowed shared.
+pub(crate) struct CompositePrep {
+    idx: usize,
+    picture: CanvasPicture,
+    display: Option<Arc<CanvasDisplay>>,
+    revision: Revision,
+    log_key: u64,
+}
+
+impl CompositePrep {
     /// Document `idx`'s picture on `output` (`None`: the main window's display); `None` when no such document is open.
-    pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
+    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
         let mut p = canvas_picture(app, ctx, idx, output, ProxyPreview::Document)?;
         let display = p.display.take();
         let shown = Shown::of(&p, p.display_key);
         let revision = shown.revision(p.id, 0);
         let log_key = cache_key(p.id, output);
         app.raster_logs.entry(log_key).or_default().composite.record(revision, shown);
-        let app: &'a PhotocraftApp = app;
-        let log = app.raster_logs.get(&log_key).map(|l| &l.composite);
-        let display_key = p.display_key;
-        Some(PhotoComposite { picture: Picture::new(app, idx, p, display_key), display, revision, log })
+        Some(CompositePrep { idx, picture: p, display, revision, log_key })
     }
 
+    /// The source over `app`, the app this was prepared with.
+    pub(crate) fn source(self, app: &PhotocraftApp) -> PhotoComposite<'_> {
+        let log = app.raster_logs.get(&self.log_key).map(|l| &l.composite);
+        let display_key = self.picture.display_key;
+        PhotoComposite { picture: Picture::new(app, self.idx, self.picture, display_key), display: self.display, revision: self.revision, log }
+    }
+}
+
+impl<'a> PhotoComposite<'a> {
     /// Where the picture lies in the document, in document pixels: the document's bounds, or a filter preview's own
     /// area when it is reduced or changes the canvas size (its pixels are then its own, `size` of them over this).
     pub(crate) fn bounds(&self) -> DRect {
@@ -237,21 +253,36 @@ pub(crate) struct ChannelOverlay<'a> {
     log: Option<&'a SourceLog<OverlayShown>>,
 }
 
-impl<'a> ChannelOverlay<'a> {
+/// A [`ChannelOverlay`] prepared for this pass with the app borrowed mutably, as [`CompositePrep`].
+pub(crate) struct OverlayPrep {
+    idx: usize,
+    picture: CanvasPicture,
+    overlay: Overlay,
+    revision: Revision,
+    log_key: u64,
+}
+
+impl OverlayPrep {
     /// Document `idx`'s view on `output` (`None`: the main window's display); `None` when no such document is open or
     /// it shows the plain composite.
-    pub(crate) fn new(app: &'a mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
+    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
         let p = canvas_picture(app, ctx, idx, output, ProxyPreview::Preview)?;
         let overlay = Overlay::of(app, idx, &p.doc, output)?;
         let shown = OverlayShown { picture: Shown::of(&p, 0), view: overlay.key };
         let revision = shown.picture.revision(p.id, overlay.key);
         let log_key = cache_key(p.id, output);
         app.raster_logs.entry(log_key).or_default().overlay.record(revision, shown);
-        let app: &'a PhotocraftApp = app;
-        let log = app.raster_logs.get(&log_key).map(|l| &l.overlay);
-        Some(ChannelOverlay { picture: Picture::new(app, idx, p, 0), overlay, revision, log })
+        Some(OverlayPrep { idx, picture: p, overlay, revision, log_key })
     }
 
+    /// The source over `app`, the app this was prepared with.
+    pub(crate) fn source(self, app: &PhotocraftApp) -> ChannelOverlay<'_> {
+        let log = app.raster_logs.get(&self.log_key).map(|l| &l.overlay);
+        ChannelOverlay { picture: Picture::new(app, self.idx, self.picture, 0), overlay: self.overlay, revision: self.revision, log }
+    }
+}
+
+impl<'a> ChannelOverlay<'a> {
     /// Where the view lies in the document: where the canvas picture under it lies ([`PhotoComposite::bounds`]; an
     /// adjustment preview keeps the document's size).
     pub(crate) fn bounds(&self) -> DRect {
