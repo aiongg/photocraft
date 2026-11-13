@@ -71,7 +71,7 @@ pub(super) fn form(app: &mut PhotocraftApp, command: &str, label: &str, fields: 
     let orig: Map<String, Value> =
         f.iter().filter(|(k, _)| !k.starts_with("__") || RESET_SHELL_KEYS.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
     f.insert("__formOrig".into(), Value::Object(orig));
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// The Batch and Image Processor dialogs' "Include All Subfolders" checkbox reads as Photoshop's.

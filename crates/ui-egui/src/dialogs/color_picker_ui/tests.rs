@@ -401,7 +401,7 @@ fn web_only_survives_reopen_and_other_picker_targets() {
     assert_eq!(f["__webOnly"], json!(true));
     assert_eq!(f["color"], json!(hex(web_safe([app.session.tools.foreground[0], app.session.tools.foreground[1], app.session.tools.foreground[2]]))));
     assert_eq!(f["__orig"], f["color"], "the opening snap moves __orig too, so OK with no edit is unchanged");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let id = open_for_target(&mut app, "noteColor", "Color Picker", [1.0, 0.53, 0.0]);
     let f = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
     assert_eq!(f["__webOnly"], json!(true));
@@ -652,11 +652,11 @@ fn the_top_picker_samples_the_image() {
     assert_eq!(app.session.tools.foreground, [0.0, 0.0, 0.0, 1.0], "only OK sets the foreground");
 
     // A dialog opened over the picker takes the input.
-    let about = app.ui.open_dialog(DialogKind::About, Map::new());
+    let about = app.open_dialog(DialogKind::About, Map::new());
     assert_eq!(top(&app), None);
     sample_at(&mut app, 25.0, 5.0);
     assert_eq!(dialog_color(&app, id), "#ff0000");
-    app.ui.close_dialog(about);
+    app.close_dialog(about);
     sample_at(&mut app, 25.0, 5.0);
     assert_eq!(dialog_color(&app, id), "#00ff00");
 }

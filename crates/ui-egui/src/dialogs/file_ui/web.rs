@@ -54,7 +54,7 @@ pub fn open_web(app: &mut PhotocraftApp) -> u64 {
     ] {
         f.entry(k.to_string()).or_insert(v);
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// Settings variants shown in 4-Up (current, then two smaller alternatives).

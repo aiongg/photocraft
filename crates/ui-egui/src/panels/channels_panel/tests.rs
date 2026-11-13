@@ -568,11 +568,11 @@ fn channel_options_in_quick_mask_take_the_targeted_alpha() {
     let ctx = egui::Context::default();
     crate::menus::invoke(&mut app, &ctx, "channel.options", json!({})).unwrap();
     assert_eq!(app.ui.dialogs.last().unwrap().fields["channel"], json!("quickMask"), "the composite targeted: Quick Mask Options");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.run("channel.target", json!({"channel": 0})).unwrap();
     crate::menus::invoke(&mut app, &ctx, "channel.options", json!({})).unwrap();
     assert_eq!(app.ui.dialogs.last().unwrap().fields["channel"], json!(0), "the dispatcher opens the alpha's options");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let mut h = menu_harness(app);
     menu_click(&mut h, "Channel Options…");
     assert_eq!(h.state().ui.dialogs.last().unwrap().fields["channel"], json!(0), "so does the panel menu");
@@ -653,7 +653,7 @@ fn panel_menu_merge_channels_opens_its_dialog() {
     }
     let r = crate::menus::invoke(&mut app, &ctx, "channel.merge", json!({})).unwrap();
     assert!(r["dialog"].is_u64() && app.session.documents().len() == 3, "the dispatcher asks too");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     crate::menus::invoke(&mut app, &ctx, "channel.merge", json!({"mode": "rgb"})).unwrap();
     assert!(app.ui.dialogs.is_empty() && app.session.documents().len() == 1, "explicit params merge directly");
 }

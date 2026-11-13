@@ -129,7 +129,7 @@ pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId,
     f.insert("layer".into(), json!(layer.0));
     f.insert("tool".into(), json!(format!("{tool:?}")));
     f.insert("at".into(), json!(at));
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// The active type layer when `id` is a filter that only needs it rasterized: the engine greys it
@@ -175,7 +175,7 @@ pub fn intercept_filter(app: &mut PhotocraftApp, id: &str, params: &Value) -> Op
     f.insert("params".into(), params.clone());
     f.insert("choice".into(), json!("rasterize"));
     f.insert("smartObject".into(), json!(smart));
-    Some(Ok(json!({"dialog": app.ui.open_dialog(DialogKind::Command, f)})))
+    Some(Ok(json!({"dialog": app.open_dialog(DialogKind::Command, f)})))
 }
 
 /// Is this the filter prompt (Convert to Smart Object / Rasterize / Cancel)?

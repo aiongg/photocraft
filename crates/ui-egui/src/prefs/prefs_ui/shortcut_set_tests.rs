@@ -78,7 +78,7 @@ fn a_new_set_saves_the_dialogs_bindings_and_ok_keeps_it() {
 #[test]
 fn choosing_a_set_loads_it_and_save_and_delete_wait_for_ok() {
     let (mut h, first, _) = dialog(vec![]);
-    h.state_mut().ui.dialogs.retain(|d| d.id != first);
+    h.state_mut().retain_dialogs(|d| d.id != first);
     h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"edit.copy": "F9"}, "saveSet": "A"})).unwrap();
     h.state_mut().run("edit.keyboardShortcuts", json!({"useSet": ""})).unwrap();
     let ctx = h.ctx.clone();
@@ -171,7 +171,7 @@ fn pick_set(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
 #[test]
 fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
     let (mut h, first, _) = dialog(vec![]);
-    h.state_mut().ui.dialogs.retain(|d| d.id != first);
+    h.state_mut().retain_dialogs(|d| d.id != first);
     h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"edit.copy": "F9"}, "saveSet": "A"})).unwrap();
     // B, from a settings file written before sets left action keys out: it holds an old key for
     // the action, and gives F2 to a command.
@@ -213,7 +213,7 @@ fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
 #[test]
 fn an_edit_still_marks_the_set_modified_and_sets_save_no_action_keys() {
     let (mut h, first, _) = dialog(vec![]);
-    h.state_mut().ui.dialogs.retain(|d| d.id != first);
+    h.state_mut().retain_dialogs(|d| d.id != first);
     h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"edit.copy": "F9"}, "saveSet": "A"})).unwrap();
     crate::actions::assign_shortcut(h.state_mut(), "Sepia", "F2").unwrap();
     let ctx = h.ctx.clone();

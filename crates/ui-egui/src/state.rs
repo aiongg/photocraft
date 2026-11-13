@@ -759,19 +759,8 @@ impl UiState {
         id
     }
 
-    pub fn open_dialog(&mut self, kind: DialogKind, fields: serde_json::Map<String, serde_json::Value>) -> u64 {
-        let id = self.alloc_id();
-        self.dialogs.push(Dialog { id, kind, fields });
-        id
-    }
-
     pub fn dialog_mut(&mut self, id: u64) -> Option<&mut Dialog> {
         self.dialogs.iter_mut().find(|d| d.id == id)
-    }
-
-    pub fn close_dialog(&mut self, id: u64) -> Option<Dialog> {
-        let i = self.dialogs.iter().position(|d| d.id == id)?;
-        Some(self.dialogs.remove(i))
     }
 
     pub fn new_document_fields() -> serde_json::Map<String, serde_json::Value> {

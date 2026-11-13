@@ -43,7 +43,7 @@ pub fn fields(app: &PhotocraftApp, command: &str) -> Map<String, Value> {
 
 pub fn open(app: &mut PhotocraftApp, command: &str) -> u64 {
     let f = fields(app, command);
-    app.ui.open_dialog(crate::state::DialogKind::Command, f)
+    app.open_dialog(crate::state::DialogKind::Command, f)
 }
 
 /// Only the New Group params are passed to the engine; private UI markers are ignored.

@@ -141,7 +141,7 @@ fn stale_targets_and_invalid_colors_never_apply_or_leave_preview() {
                 app.run("file.new", json!({"width":3,"height":3})).unwrap();
             }
             "parent" => {
-                app.ui.close_dialog(parent);
+                app.close_dialog(parent);
             }
             "effect" => {
                 app.ui.dialog_mut(parent).unwrap().fields.insert("effects".into(), json!([]));

@@ -71,7 +71,7 @@ fn open_kind(app: &mut PhotocraftApp, kind: &str, label: &str, fields: Value) ->
     if let Value::Object(m) = fields {
         f.extend(m);
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// Is this a dialog rendered by this module?

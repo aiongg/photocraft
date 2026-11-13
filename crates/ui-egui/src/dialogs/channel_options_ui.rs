@@ -75,7 +75,7 @@ pub fn fields(app: &PhotocraftApp, channel: &Value) -> Option<Map<String, Value>
 /// Opens Channel Options on `channel`, or `None` if it doesn't exist.
 pub fn open(app: &mut PhotocraftApp, channel: &Value) -> Option<u64> {
     let f = fields(app, channel)?;
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// The New Channel fields: Channel Options' for a channel still to be made (the next "Alpha N"
@@ -97,7 +97,7 @@ pub fn new_channel_fields(app: &PhotocraftApp) -> Option<Map<String, Value>> {
 /// Opens New Channel, or `None` without a document.
 pub fn open_new_channel(app: &mut PhotocraftApp) -> Option<u64> {
     let f = new_channel_fields(app)?;
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// The `channel.options` params for the dialog's fields: spot channels take `solidity`, the
@@ -234,7 +234,7 @@ pub fn new_spot_fields(app: &PhotocraftApp) -> Option<Map<String, Value>> {
 /// Opens New Spot Channel, or `None` without a document.
 pub fn open_new_spot(app: &mut PhotocraftApp) -> Option<u64> {
     let f = new_spot_fields(app)?;
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 pub fn new_spot_params(f: &Map<String, Value>) -> Value {

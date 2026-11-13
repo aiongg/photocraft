@@ -475,7 +475,7 @@ fn an_open_dialog_blocks_menu_clicks_except_view_navigation() {
     assert!(!bar.find("image.imageRotation.90cw").unwrap().enabled);
     assert!(bar.find("view.zoomIn").unwrap().enabled);
     // With the dialog closed the rows come back and a click runs.
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     frame(&ctx, egui::RawInput::default(), |ui| sync(&mut app, ui.ctx()));
     assert!(synced.borrow().last().unwrap().find("image.imageRotation.90cw").unwrap().enabled);
 }

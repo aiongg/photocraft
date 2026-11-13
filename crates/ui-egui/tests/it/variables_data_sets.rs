@@ -23,7 +23,7 @@ fn app_with_variables_dialog(cur: u64) -> PhotocraftApp {
     fields.insert("__variables".into(), state);
     fields.insert("__page".into(), json!("dataSets"));
     fields.insert("__cur".into(), json!(cur));
-    app.ui.open_dialog(DialogKind::Command, fields);
+    app.open_dialog(DialogKind::Command, fields);
     app
 }
 
@@ -357,7 +357,7 @@ fn app_with_malformed_variables(page: &str) -> PhotocraftApp {
         json!({"defs": [42, {"name": "v1", "layer": 0, "type": "textReplacement"}], "dataSets": ["bad", {"name": "A", "values": [7, "x"]}, {"name": "B", "values": "nope"}]}),
     );
     fields.insert("__page".into(), json!(page));
-    app.ui.open_dialog(DialogKind::Command, fields);
+    app.open_dialog(DialogKind::Command, fields);
     app
 }
 

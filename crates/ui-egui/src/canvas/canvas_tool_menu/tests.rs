@@ -154,7 +154,7 @@ fn type_edit_menu_rows_act_on_the_text_and_the_layer() {
     reopen(&mut app);
     choose(&mut app, &ctx, "type.warpText");
     assert!(!app.ui.dialogs.is_empty(), "Warp Text… asks for its settings");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     reopen(&mut app);
     choose(&mut app, &ctx, "type.rasterizeTypeLayer");
     assert!(app.ui.text_edit.is_none() && text_of(&app, id).is_none(), "the type layer is pixels now");
@@ -1080,7 +1080,7 @@ fn open_stroke(app: &mut PhotocraftApp) -> u64 {
 fn pressure_on_open(app: &mut PhotocraftApp) -> Option<bool> {
     let id = open_stroke(app);
     let on = app.ui.dialog_mut(id).unwrap().fields.get("simulatePressure").and_then(Value::as_bool);
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     on
 }
 
@@ -1166,7 +1166,7 @@ fn stroke_path_failed_confirmation_does_not_remember_simulate_pressure() {
     assert!(crate::dialogs::confirm(&mut app, id).is_err(), "stroking a missing path fails");
     assert_eq!(app.session.journal.iter().filter(|(id, _)| id == "path.stroke").count(), 1, "the failed OK ran no stroke");
     while let Some(d) = app.ui.dialogs.last().map(|d| d.id) {
-        app.ui.close_dialog(d);
+        app.close_dialog(d);
     }
     assert_eq!(app.session.prefs().dialogs.get("path.stroke"), Some(&json!({"simulatePressure": true})), "a failed OK leaves the memory alone");
     assert_eq!(pressure_on_open(&mut app), Some(true), "the next opening still shows the last applied choice");
@@ -1187,7 +1187,7 @@ fn stroke_path_does_not_remember_its_tool_choice() {
         let f = &app.ui.dialog_mut(id).unwrap().fields;
         (f.get("simulatePressure").cloned(), f.get("tool").cloned())
     };
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert_eq!(pressure, Some(json!(true)), "the checkbox is remembered");
     assert_eq!(tool, None, "the tool is not: the dialog opens on the spec default");
     // The Paths panel's plain Stroke button strokes without a dialog, so it writes nothing: the

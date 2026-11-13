@@ -69,7 +69,7 @@ pub(crate) fn intercept(app: &mut PhotocraftApp, held: Held) -> Result<Option<He
     let message = crate::i18n::fmt(&message, &[("group", &held.stem)]);
     let fields = json!({MARK: true, "__label": label, "message": message, "group": held.stem, "kind": held.what, "choice": "new"});
     app.held_preset_import = Some(held);
-    app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Ok(None)
 }
 

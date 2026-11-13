@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn new_document_opens_on_the_name_and_tabs_to_width_then_height() {
         let mut h = harness(PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()));
-        h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+        h.state_mut().open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         assert!(h.get_by_role(Role::TextInput).is_focused(), "the name field has focus");
         type_text(&mut h, "Poster");
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn tab_in_a_dialog_without_fields_does_nothing() {
         let mut h = harness(PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()));
-        h.state_mut().ui.open_dialog(DialogKind::About, Default::default());
+        h.state_mut().open_dialog(DialogKind::About, Default::default());
         h.run_steps(3);
         tab(&mut h);
         assert_eq!(h.ctx.memory(|m| m.focused()), None);

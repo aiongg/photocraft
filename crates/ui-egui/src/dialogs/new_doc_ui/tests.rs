@@ -336,7 +336,7 @@ mod dialog {
             app,
         );
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-        h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+        h.state_mut().open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         h
     }
@@ -424,7 +424,7 @@ mod dialog {
         let pixel = h.state_mut().session.execute("document.pixel", serde_json::json!({"x":0,"y":0})).unwrap();
         assert_eq!(pixel[3], 0.0);
 
-        h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+        h.state_mut().open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(2);
         h.get_by_label("Saved").click();
         h.run_steps(2);
@@ -469,7 +469,7 @@ mod dialog {
         let mut h =
             Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-        h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+        h.state_mut().open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(3);
         h
     }
@@ -708,7 +708,7 @@ mod dialog {
         second_click_creates_once(&mut h, at);
         assert_eq!(created(&h), (900, 600, 150.0), "6 x 4 in at 150 ppi");
 
-        h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+        h.state_mut().open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
         h.run_steps(2);
         h.get_by_label("Web").click();
         h.run_steps(2);

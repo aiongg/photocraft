@@ -60,7 +60,7 @@ fn render_start_actions_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, avail_w:
         ui.painter().text(new_rect.center(), egui::Align2::CENTER_CENTER, new_label, crate::theme::semibold(13.0), egui::Color32::WHITE);
         if new_resp.clicked() {
             let fields = app.new_document_fields();
-            app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
+            app.open_dialog(crate::state::DialogKind::NewDocument, fields);
         }
 
         ui.add_space(8.0);
@@ -96,7 +96,7 @@ fn render_start_rail(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_w: f32) {
     ui.painter().text(new_rect.center(), egui::Align2::CENTER_CENTER, new_label, crate::theme::semibold(13.0), egui::Color32::WHITE);
     if new_resp.clicked() {
         let fields = app.new_document_fields();
-        app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
+        app.open_dialog(crate::state::DialogKind::NewDocument, fields);
     }
 
     ui.add_space(8.0);

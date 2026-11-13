@@ -88,7 +88,7 @@ pub fn fields(app: &PhotocraftApp) -> Option<Map<String, Value>> {
 /// Opens Merge Channels, or `None` without a document.
 pub fn open(app: &mut PhotocraftApp) -> Option<u64> {
     let f = fields(app)?;
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// Why OK is greyed (English, for `tl!`): the mode needs more documents than are offered, or the
@@ -156,7 +156,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     if let Err(e) = &result {
         let mut again = f.clone();
         again.insert("__error".into(), json!(e));
-        app.ui.open_dialog(crate::state::DialogKind::Command, again);
+        app.open_dialog(crate::state::DialogKind::Command, again);
     }
     result
 }
@@ -336,7 +336,7 @@ mod tests {
         app.run("image.mode.rgb", json!({})).unwrap();
         assert_eq!(crate::dialogs::confirm(&mut app, dialog).unwrap_err(), CHANGED);
         assert!(app.ui.dialogs.iter().any(|d| d.id == dialog));
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
         assert!(confirm(&mut app, &f).is_err());
         let again = &app.ui.dialogs.last().expect("the dialog again").fields;
         assert!(owns(again) && again["__error"].is_string());

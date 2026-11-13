@@ -185,7 +185,7 @@ fn cancel_draws_nothing_and_ok_remembers_the_size() {
     let before = layers(&app);
     press(&mut app, Tool::Rectangle, [10.0, 10.0], [10.0, 10.0]);
     let id = only_dialog(&app);
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     assert_eq!(layers(&app), before);
 
     press(&mut app, Tool::Rectangle, [10.0, 10.0], [10.0, 10.0]);
@@ -197,7 +197,7 @@ fn cancel_draws_nothing_and_ok_remembers_the_size() {
     assert_eq!((f["width"].as_f64(), f["height"].as_f64(), f["fromCenter"].as_bool()), (Some(33.0), Some(44.0), Some(true)));
     // Each tool remembers its own values.
     let id = only_dialog(&app);
-    app.ui.close_dialog(id);
+    app.close_dialog(id);
     press(&mut app, Tool::EllipseShape, [50.0, 50.0], [50.0, 50.0]);
     assert_eq!(app.ui.dialogs[0].fields["width"].as_f64(), Some(100.0));
 }
@@ -269,7 +269,7 @@ fn the_dialog_body_renders_for_every_tool_and_unit() {
         let mut fields = app.ui.dialog_mut(id).unwrap().fields.clone();
         let ctx = egui::Context::default();
         ctx.run_ui(egui::RawInput::default(), |ui| body(&app, ui, &mut fields)).textures_delta.clear();
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
 }
 

@@ -2269,7 +2269,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // current pointer samples before preparing the image, or every dab appears a frame late.
     // Under a dialog the image keeps its place below the dialog's own overlays (Refine Edge).
     let crop_camera = primary && crate::crop_mode::moves_image(app);
-    let paint_after_input = crop_camera || (primary && app.ui.dialogs.is_empty() && strokes_live(app.ui.tool));
+    let paint_after_input = crop_camera || (primary && !app.dialog_open() && strokes_live(app.ui.tool));
     let paint_input = CanvasPaintInput {
         ctx: &ctx,
         rect,
@@ -2291,7 +2291,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let img_rect = xf.doc_rect(doc.bounds());
 
     // Under an open dialog the canvas widget is inert, but the image still pans and zooms.
-    let under_dialog = !app.ui.dialogs.is_empty();
+    let under_dialog = app.dialog_open();
     let free_hover = under_dialog && crate::dialogs::free_pointer_over(&ctx, rect).is_some();
     // A press on the canvas while a tool letter is held makes that tool temporary (#2672).
     if !under_dialog && ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| rect.contains(p))) {
@@ -2853,7 +2853,7 @@ mod rotation_preview_isolation_tests {
             let key = original.id.0 ^ (1u64 << 61);
             assert_eq!(filter_preview_display_doc(app, &original, key).icc_profile, result.icc_profile, "the canvas shows it through its own profile");
             assert_eq!(app.session.active().unwrap().doc.icc_profile, original.icc_profile, "previewing changes nothing");
-            app.ui.dialogs.clear();
+            app.retain_dialogs(|_| false);
             app.filter_preview = None;
             result
         };
@@ -3325,7 +3325,7 @@ fn polygon_edge_scroll(app: &PhotocraftApp, ctx: &egui::Context, idx: usize, rec
     if app.ui.polygon.is_empty()
         || app.ui.tool != Tool::PolygonLasso
         || app.session.active_index() != Some(idx)
-        || !app.ui.dialogs.is_empty()
+        || app.dialog_open()
         || app.camera_raw.is_some()
         || app.discard.is_some()
         || app.drag.is_some()

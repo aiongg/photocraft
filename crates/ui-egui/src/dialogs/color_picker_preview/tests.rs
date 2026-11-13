@@ -84,7 +84,7 @@ fn cancel_leaves_the_text_and_history_as_they_were_and_stops_the_preview() {
     let dialog = pick(&mut app, "#00ff00");
     assert!(display_doc(&mut app, 0).is_some());
 
-    app.ui.close_dialog(dialog).unwrap();
+    app.close_dialog(dialog).unwrap();
     assert!(display_doc(&mut app, 0).is_none(), "Cancel: the canvas draws the document again");
     let after = committed(&app);
     assert!(Arc::ptr_eq(&after.0, &doc));
@@ -161,7 +161,7 @@ fn no_preview_for_other_pickers_other_tabs_or_bad_fields() {
     let fg = crate::color_picker_ui::open(&mut app, "foreground");
     set_color(&mut app, "#ff0000");
     assert!(display_doc(&mut app, 0).is_none());
-    app.ui.close_dialog(fg).unwrap();
+    app.close_dialog(fg).unwrap();
 
     // Another document's tab never shows this picker's colour.
     pick(&mut app, "#ff0000");
@@ -370,7 +370,7 @@ fn a_gradient_stop_colour_is_previewed_before_ok_and_cancel_changes_nothing() {
         assert!(Arc::ptr_eq(&after.0, &doc));
         assert_eq!((after.1, after.2, after.3), (revision, dirty, history), "{depth}-bit: the session is untouched");
 
-        app.ui.close_dialog(dialog).unwrap();
+        app.close_dialog(dialog).unwrap();
         assert!(display_doc(&mut app, 0).is_none(), "{depth}-bit: Cancel shows the document again");
         assert_eq!(crate::canvas::display_doc(&mut app, 0).1, 0, "{depth}-bit: the canvas draws the document");
         assert_eq!(stop_rgb(&app.session.active().unwrap().doc, id, 0), [0, 0, 0]);

@@ -72,7 +72,7 @@ fn validate(app: &PhotocraftApp, t: &Target) -> Result<(), String> {
 
 /// Validate before changing either the panel state or the dialog stack. Also used by automation.
 pub(crate) fn open(app: &mut PhotocraftApp, kind: Kind, id: u32) -> Result<u64, String> {
-    if !app.ui.dialogs.is_empty() {
+    if app.dialog_open() {
         return Err("close the current dialog before opening a text style color picker".into());
     }
     let st = app.session.active().ok_or("no active document")?;
@@ -88,7 +88,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, kind: Kind, id: u32) -> Result<u64, 
     panels.styles = true;
     panels.styles_tab = usize::from(kind.paragraph());
     panels.options = Some((kind.paragraph(), id));
-    Ok(app.ui.open_dialog(DialogKind::Command, fields))
+    Ok(app.open_dialog(DialogKind::Command, fields))
 }
 
 fn chosen(fields: &Map<String, Value>) -> Result<String, String> {
@@ -109,7 +109,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> R
 pub(crate) fn prune(app: &mut PhotocraftApp) {
     let invalid: Vec<_> =
         app.ui.dialogs.iter().filter(|d| owns(&d.fields) && target(&d.fields).and_then(|t| validate(app, &t)).is_err()).map(|d| d.id).collect();
-    app.ui.dialogs.retain(|d| !invalid.contains(&d.id));
+    app.retain_dialogs(|d| !invalid.contains(&d.id));
     if !app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
         app.text_style_preview = None;
     }

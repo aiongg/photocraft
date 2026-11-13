@@ -222,7 +222,7 @@ fn edit_selected_guides_opens_new_guide_on_the_guide_and_applies_the_edit() {
     let mut edited = f.clone();
     edited.insert("orientation".into(), json!("vertical"));
     edited.insert("position".into(), json!("30"));
-    app.ui.dialogs.retain(|d| d.id != id);
+    app.retain_dialogs(|d| d.id != id);
     crate::new_guide_ui::confirm(&mut app, &edited).unwrap();
     assert_eq!(guides(&app), (vec![50.0, 60.0], vec![]));
     let g = &app.session.active().unwrap().doc.guides;
@@ -242,7 +242,7 @@ fn edit_selected_guides_takes_arithmetic_in_the_position() {
     // "30 + 10" with percent rulers is 40 % of the 200 px width.
     edited.insert("position".into(), json!("30 + 10"));
     assert_eq!(crate::new_guide_ui::params(&app, &edited)["position"], "30 % + 10");
-    app.ui.dialogs.retain(|d| d.id != id);
+    app.retain_dialogs(|d| d.id != id);
     crate::new_guide_ui::confirm(&mut app, &edited).unwrap();
     assert_eq!(guides(&app), (vec![80.0], vec![30.0]));
     assert_eq!(selected(&app), Some((true, 0)), "the edited guide stays selected");
@@ -250,7 +250,7 @@ fn edit_selected_guides_takes_arithmetic_in_the_position() {
     let id = crate::new_guide_ui::open_edit(&mut app).unwrap();
     let mut edited = app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.clone();
     edited.insert("position".into(), json!("100% - 50px"));
-    app.ui.dialogs.retain(|d| d.id != id);
+    app.retain_dialogs(|d| d.id != id);
     crate::new_guide_ui::confirm(&mut app, &edited).unwrap();
     assert_eq!(guides(&app), (vec![150.0], vec![30.0]));
 }
@@ -271,12 +271,12 @@ fn editing_an_uncoloured_guide_keeps_the_preference_colour_unless_one_is_chosen(
     // A refused position keeps the dialog open with the message and the guide untouched.
     let mut bad = f.clone();
     bad.insert("position".into(), json!("far"));
-    app.ui.dialogs.retain(|d| d.id != id);
+    app.retain_dialogs(|d| d.id != id);
     assert!(crate::new_guide_ui::confirm(&mut app, &bad).is_err());
     assert_eq!(guides(&app).0, vec![50.0]);
     assert!(app.ui.dialogs.last().is_some_and(|d| d.fields.contains_key("__error")));
     // A preference colour that isn't a named one shows as Custom….
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.run("prefs.set", json!({"path": "guidesGridAndSlices.guideColor", "value": "#123456"})).unwrap();
     let id = crate::new_guide_ui::open_edit(&mut app).unwrap();
     let f = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;

@@ -26,7 +26,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, answered: &str, path: &str) {
     let message = crate::i18n::fmt(tl!("“{name}” already exists. Replace it?"), &[("name", display_name(path).as_str())]);
     let detail = crate::i18n::fmt(tl!("The name in the save dialog was “{name}”."), &[("name", display_name(answered).as_str())]);
     let fields = json!({MARK: true, "__label": "Save", "message": message, "detail": detail, "path": path});
-    app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
 }
 
 pub fn body(ui: &mut egui::Ui, fields: &Map<String, Value>) {

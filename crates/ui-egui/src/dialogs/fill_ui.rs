@@ -109,7 +109,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
         }
     }
     f.insert("__target".into(), target);
-    app.ui.open_dialog(crate::state::DialogKind::Command, f)
+    app.open_dialog(crate::state::DialogKind::Command, f)
 }
 
 /// The `edit.fill` params of the dialog's fields: only the options of the chosen contents.

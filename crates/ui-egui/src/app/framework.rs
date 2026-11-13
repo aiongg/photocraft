@@ -26,10 +26,11 @@ use craft::ui::shell::embed;
 use craft::window::system::SystemWindows;
 use photocraft_engine::Session;
 use photocraft_engine::prefs::{AppearanceMode, Preferences};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use super::PhotocraftApp;
 use crate::i18n;
+use crate::state::{Dialog, DialogKind, UiState};
 use crate::theme::AppTheme;
 
 /// Installs the runtime on `ctx` with `fonts`, unless it is there already (a language change, or
@@ -397,13 +398,41 @@ impl PhotocraftApp {
         self.framework.dialogs.run(ui);
     }
 
-    /// Puts PhotoCraft's own dialogs (`ui.dialogs`) on the framework host's stack, in their
-    /// opening order, so both kinds have one top dialog and one order for automation. Called
-    /// before anything reads the order: the dialogs' pass and every control request.
-    pub(crate) fn sync_dialog_stack(&mut self, ctx: &egui::Context) {
-        let own = self.ui.dialogs.iter().map(|dialog| (stack_id(dialog.id), None));
-        self.framework.dialogs.sync_beside(ctx, own);
+    /// Opens PhotoCraft's own dialog `kind` on top of the one dialog stack, over the dialog its fields name as its
+    /// parent. Returns its id.
+    pub fn open_dialog(&mut self, kind: DialogKind, fields: Map<String, Value>) -> u64 {
+        open_dialog(&mut self.ui, &mut self.framework.dialogs, kind, fields)
     }
+
+    /// Closes PhotoCraft's own dialog `id`: it leaves the stack with the framework dialogs opened over it.
+    pub fn close_dialog(&mut self, id: u64) -> Option<Dialog> {
+        let at = self.ui.dialogs.iter().position(|d| d.id == id)?;
+        self.framework.dialogs.close_beside(stack_id(id));
+        Some(self.ui.dialogs.remove(at))
+    }
+
+    /// Closes PhotoCraft's own dialogs for which `keep` is false, each as [`close_dialog`](Self::close_dialog) does.
+    pub fn retain_dialogs(&mut self, mut keep: impl FnMut(&Dialog) -> bool) {
+        let closed: Vec<u64> = self.ui.dialogs.iter().filter(|d| !keep(d)).map(|d| d.id).collect();
+        for id in closed {
+            self.close_dialog(id);
+        }
+    }
+
+    /// Whether a dialog is open, PhotoCraft's own or a framework one: the canvas, shortcuts, menus and tools under it
+    /// take no input.
+    pub fn dialog_open(&self) -> bool {
+        !self.framework.dialogs.stack().is_empty()
+    }
+}
+
+/// [`PhotocraftApp::open_dialog`] for code that holds other parts of the app at the same time.
+pub(crate) fn open_dialog(ui: &mut UiState, host: &mut DialogHost, kind: DialogKind, fields: Map<String, Value>) -> u64 {
+    let parent = crate::dialogs::parent_of(&fields).map(stack_id);
+    let id = ui.alloc_id();
+    ui.dialogs.push(Dialog { id, kind, fields });
+    host.open_beside(stack_id(id), parent);
+    id
 }
 
 /// The framework stack's id of PhotoCraft's own dialog `id`: control requests address both kinds

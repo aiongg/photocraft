@@ -23,19 +23,15 @@ fn context_entries(app: &PhotocraftApp, menu: &crate::canvas_tool_menu::CanvasTo
 /// Snapshot of everything on screen, addressable by id.
 pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let screen = ctx.content_rect();
-    // PhotoCraft's own dialogs and the framework host's, in their one stack order (top last). One
-    // opened since the last pass or control request isn't on the stack yet: it is the newest.
-    let own = |d: &crate::state::Dialog| json!({"id": d.id, "kind": d.kind, "title": crate::dialogs::title(d), "fields": d.fields});
-    let mut unstacked: Vec<&crate::state::Dialog> = app.ui.dialogs.iter().collect();
+    // PhotoCraft's own dialogs and the framework host's, in their one stack order (top last).
     let stacked = craft::automation::dialogs::inspect_stack(&app.framework.dialogs, |id| {
-        let at = unstacked.iter().position(|d| crate::app::framework::stack_id(d.id) == id)?;
-        Some(own(unstacked.remove(at)))
+        let d = app.ui.dialogs.iter().find(|d| crate::app::framework::stack_id(d.id) == id)?;
+        Some(json!({"id": d.id, "kind": d.kind, "title": crate::dialogs::title(d), "fields": d.fields}))
     });
     let mut dialogs = match stacked {
         Value::Array(stacked) => stacked,
         _ => Vec::new(),
     };
-    dialogs.extend(unstacked.into_iter().map(own));
     if let Some((kind, fields)) = &app.ui.shell.dialog {
         dialogs.push(json!({"id": SHELL_DIALOG, "kind": kind, "title": crate::workspace_ui::title(kind), "fields": fields}));
     }

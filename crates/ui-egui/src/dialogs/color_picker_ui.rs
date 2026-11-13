@@ -149,7 +149,7 @@ pub fn open(app: &mut PhotocraftApp, target: &str) -> u64 {
     if let Some(cmyk) = app.session.tools.picked_cmyk(rgb) {
         seed_cmyk(&mut fields, cmyk);
     }
-    app.ui.open_dialog(DialogKind::Command, fields)
+    app.open_dialog(DialogKind::Command, fields)
 }
 
 /// Open picker `f` showing the inks its opening colour was picked as (#4196, #8568). Current and
@@ -204,7 +204,7 @@ pub fn open_for_command(app: &mut PhotocraftApp, label: &str, rgb: [f32; 3], com
     if let Some(st) = app.session.active() {
         f.insert("__document".into(), json!(st.doc.id.0));
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 /// Open the picker on `rgb` for a colour field of another dialog (e.g. Edit › Fill's Color…): the
@@ -214,7 +214,7 @@ pub fn open_for_field(app: &mut PhotocraftApp, label: &str, rgb: [f32; 3], dialo
     let mut f = fields_with_web(app, "field", label, rgb);
     f.insert("__dialog".into(), json!(dialog));
     f.insert("__field".into(), json!(field));
-    let id = app.ui.open_dialog(DialogKind::Command, f);
+    let id = app.open_dialog(DialogKind::Command, f);
     live_preview::begin_field(app, id, dialog, field);
     id
 }
@@ -223,7 +223,7 @@ pub fn open_for_field(app: &mut PhotocraftApp, label: &str, rgb: [f32; 3], dialo
 /// colour): OK hands `"#rrggbb"` to `target`'s setter in [`confirm`]; Cancel leaves it alone. The
 /// Crop shield shows the picked colour while the picker is open ([`live_preview`]).
 pub fn open_for_target(app: &mut PhotocraftApp, target: &str, label: &str, rgb: [f32; 3]) -> u64 {
-    let id = app.ui.open_dialog(DialogKind::Command, fields_with_web(app, target, label, rgb));
+    let id = app.open_dialog(DialogKind::Command, fields_with_web(app, target, label, rgb));
     if target == "cropShield" {
         live_preview::begin_crop_shield(app, id);
     }
@@ -950,7 +950,7 @@ pub fn widget_tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if let Some(r) = requests.and_then(|r| r.into_iter().last()) {
         let mut f = fields_with_web(app, "widget", &r.title, r.rgb);
         f.insert("__widget".into(), json!(r.widget));
-        app.ui.open_dialog(DialogKind::Command, f);
+        app.open_dialog(DialogKind::Command, f);
     }
 }
 

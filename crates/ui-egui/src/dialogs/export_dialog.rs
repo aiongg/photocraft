@@ -120,7 +120,7 @@ fn open_sized(app: &mut PhotocraftApp, src_w: u32, src_h: u32) -> Result<u64, St
     f.insert("__h".into(), json!(src_h));
     seed_remembered(app, &mut f);
     fit_size(&mut f, f64::from(src_w), f64::from(src_h));
-    Ok(app.ui.open_dialog(DialogKind::Command, f))
+    Ok(app.open_dialog(DialogKind::Command, f))
 }
 
 /// The size fields for exporting a `src_w` × `src_h` source. A remembered percent scales it.

@@ -361,7 +361,7 @@ fn polygon_edge_scroll_pauses_for_dialogs_and_temporary_navigation() {
         h.run_steps(1);
         match pause {
             "dialog" => {
-                h.state_mut().ui.open_dialog(crate::state::DialogKind::Error, json!({"message":"Pause"}).as_object().unwrap().clone());
+                h.state_mut().open_dialog(crate::state::DialogKind::Error, json!({"message":"Pause"}).as_object().unwrap().clone());
             }
             "space" => h.event(egui::Event::Key { key: egui::Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }),
             _ => h.event(egui::Event::PointerButton { pos: edge, button: PointerButton::Middle, pressed: true, modifiers: Modifiers::NONE }),

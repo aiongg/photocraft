@@ -190,7 +190,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             let mut brush = before.clone();
             if angle_field(ui, &mut brush) {
                 let message = tl!(ANGLE_RANGE_MESSAGE).to_string();
-                app.ui.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+                app.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
             }
             widgets::checkbox(ui, &mut app.ui.tool_options.bg_protect_fg, tl!("Protect Foreground Color"))
                 .on_hover_text(tl!("Do not erase the foreground swatch color"));
@@ -324,6 +324,6 @@ pub(crate) fn open_range_alert(app: &mut PhotocraftApp) {
     let message = tl!(TOLERANCE_RANGE_ALERT).to_owned();
     let shown = app.ui.dialogs.iter().any(|d| d.kind == crate::state::DialogKind::Error && d.fields.get("message").and_then(|m| m.as_str()) == Some(&message));
     if !shown {
-        app.ui.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+        app.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
     }
 }

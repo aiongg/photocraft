@@ -891,7 +891,7 @@ fn show_layout(app: &mut PhotocraftApp, ui: &mut egui::Ui, dock_only: bool) {
 /// The app's dialogs count from the frame they open; any other egui modal (a format's options,
 /// a job's progress) from the frame after it first shows.
 pub(crate) fn modal_open(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
-    !app.ui.dialogs.is_empty()
+    app.dialog_open()
         || app.ui.layers_panel_dialog.is_some()
         || app.discard.is_some()
         || app.camera_raw.is_some()

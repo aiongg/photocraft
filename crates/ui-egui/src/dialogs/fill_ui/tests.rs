@@ -473,7 +473,7 @@ fn the_color_swatch_opens_the_color_picker() {
     assert!(!egui::Popup::is_any_open(&h.ctx), "no egui colour popup");
     // Cancel: the Fill dialog is unchanged.
     h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#000000"));
-    h.state_mut().ui.close_dialog(picker);
+    h.state_mut().close_dialog(picker);
     h.run_steps(3);
     assert_eq!(fill_and_picker(&h), (id, None));
     assert_eq!(field(&h, id, "contents"), json!("color"));

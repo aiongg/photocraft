@@ -371,7 +371,7 @@ fn global_light_dialog_reflects_active_document_light() {
     assert_eq!(fields["altitude"], json!(45.0));
 
     // 5. Cancel preserves the document's light.
-    app.ui.close_dialog(d_id);
+    app.close_dialog(d_id);
     let gl = app.session.active().unwrap().doc.global_light;
     assert_eq!(gl.angle, 30.0);
     assert_eq!(gl.altitude, 45.0);
@@ -388,7 +388,7 @@ fn global_light_dialog_reflects_active_document_light() {
     let fields2 = &app.ui.dialog_mut(d_id2).unwrap().fields;
     assert_eq!(fields2["angle"], json!(-45.0));
     assert_eq!(fields2["altitude"], json!(15.0));
-    app.ui.close_dialog(d_id2);
+    app.close_dialog(d_id2);
 
     // Switch back to doc1: dialog still reflects doc1's light (30 / 45).
     assert!(app.session.set_active(0));
@@ -464,7 +464,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
     assert_eq!(fields["simulatePaper"], json!(false));
 
     // 5. Cancel preserves the document.
-    app.ui.close_dialog(d_id);
+    app.close_dialog(d_id);
     assert_eq!(app.session.color.proof(doc1_id).setup.name, "srgb");
 
     // 6. Multiple documents: each document initializes the dialog to its own condition.
@@ -480,7 +480,7 @@ fn proof_setup_dialog_reflects_active_document_proof_condition() {
     assert_eq!(fields2["intent"], json!("perceptual"));
     assert_eq!(fields2["bpc"], json!(false));
     assert_eq!(fields2["simulatePaper"], json!(true));
-    app.ui.close_dialog(d_id2);
+    app.close_dialog(d_id2);
 
     // Switch back to doc1: dialog still reflects doc1's sRGB.
     assert!(app.session.set_active(0));
@@ -675,7 +675,7 @@ fn select_and_mask_remembers_settings_only_when_asked() {
     let opened = |app: &mut PhotocraftApp| {
         let id = open(app, cmd).unwrap();
         let f = fields(app, id);
-        app.ui.dialogs.retain(|d| d.id != id);
+        app.retain_dialogs(|d| d.id != id);
         f
     };
     let first = opened(&mut app);
@@ -2140,7 +2140,7 @@ fn replace_color_result_swatch_sets_the_sliders() {
     let picker = picker.id;
     h.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#3355cc"));
     crate::dialogs::confirm(h.state_mut(), picker).unwrap();
-    h.state_mut().ui.dialogs.retain(|d| d.id != picker);
+    h.state_mut().retain_dialogs(|d| d.id != picker);
     h.run_steps(3);
     let f = h.state_mut().ui.dialog_mut(id).unwrap().fields.clone();
     let n = |k: &str| f[k].as_f64().unwrap() as f32;
@@ -2400,7 +2400,7 @@ fn indexed_matte_dropdown_and_picker_change_the_applied_edge_color() {
             assert_ne!(picker, id);
             harness.state_mut().ui.dialog_mut(picker).unwrap().fields.insert("color".into(), json!("#0000ff"));
             crate::dialogs::confirm(harness.state_mut(), picker).unwrap();
-            harness.state_mut().ui.dialogs.retain(|dialog| dialog.id != picker);
+            harness.state_mut().retain_dialogs(|dialog| dialog.id != picker);
             harness.run_steps(3);
         }
         harness.get_by_label("OK").click();

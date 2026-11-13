@@ -195,7 +195,7 @@ fn other_alerts_have_no_dont_show_again() {
     let mut app = app();
     let mut fields = serde_json::Map::new();
     fields.insert("message".into(), json!("Something else."));
-    let id = app.ui.open_dialog(DialogKind::Error, fields);
+    let id = app.open_dialog(DialogKind::Error, fields);
     app.ui.dialog_mut(id).unwrap().fields.insert("skip".into(), json!(true));
     let before = app.session.prefs().dialogs.clone();
     crate::dialogs::confirm(&mut app, id).unwrap();

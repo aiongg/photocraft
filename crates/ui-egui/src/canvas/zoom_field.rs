@@ -520,7 +520,7 @@ pub fn tick(app: &mut crate::PhotocraftApp, ctx: &Context) {
         let open =
             app.ui.dialogs.iter().any(|d| d.kind == crate::state::DialogKind::Error && d.fields.get("message").and_then(|m| m.as_str()) == Some(&message));
         if !open {
-            app.ui.open_dialog(crate::state::DialogKind::Error, serde_json::json!({ "message": message }).as_object().cloned().unwrap_or_default());
+            app.open_dialog(crate::state::DialogKind::Error, serde_json::json!({ "message": message }).as_object().cloned().unwrap_or_default());
         }
     }
     if ctx.data_mut(|d| d.remove_temp::<bool>(alert_id())).unwrap_or(false)

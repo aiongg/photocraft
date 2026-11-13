@@ -220,7 +220,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
     for key in ["__previewGuides", "__previewParams", "__previewSource"] {
         f.remove(key);
     }
-    app.ui.open_dialog(crate::state::DialogKind::Command, f)
+    app.open_dialog(crate::state::DialogKind::Command, f)
 }
 
 fn parse_length_value(val: Option<&Value>, app: Option<&PhotocraftApp>, along_x: bool, optional: bool) -> Value {

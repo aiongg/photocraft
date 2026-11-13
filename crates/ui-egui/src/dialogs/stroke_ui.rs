@@ -59,7 +59,7 @@ pub fn open(app: &mut PhotocraftApp) -> u64 {
         f.insert("__document".into(), json!(st.doc.id.0));
         f.insert("__layer".into(), json!(st.active_layer));
     }
-    app.ui.open_dialog(crate::state::DialogKind::Command, f)
+    app.open_dialog(crate::state::DialogKind::Command, f)
 }
 
 /// Pass Stroke choices and the captured editing target, leaving other private markers out.

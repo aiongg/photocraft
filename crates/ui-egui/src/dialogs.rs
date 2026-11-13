@@ -597,6 +597,12 @@ fn default_max_width(d: &Dialog, compact: bool, curves: bool, about_tabs: bool, 
     }
 }
 
+/// The dialog a dialog with these fields was opened from: a field's Color Picker or a guide layout's child names it
+/// in `__dialog`, a Layer Style colour's picker in its target.
+pub(crate) fn parent_of(fields: &serde_json::Map<String, Value>) -> Option<u64> {
+    fields.get("__dialog").and_then(Value::as_u64).or_else(|| crate::layer_style::color_picker::parent_of(fields))
+}
+
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if crate::guide_edit::sync(app) {
         ctx.request_repaint();
@@ -605,7 +611,6 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     crate::type_panels_ui::color_picker::prune(app);
     crate::edit_history::track_dialogs(app, ctx);
     // One stack for these dialogs and the framework host's: the top one takes the input.
-    app.sync_dialog_stack(ctx);
     let dialogs = app.ui.dialogs.clone();
     let top = app.framework.dialogs.stack().top();
     let mut shown = Vec::new();
@@ -1169,7 +1174,7 @@ fn confirm_command_more(app: &mut PhotocraftApp, d: Dialog) -> Result<Value, Str
 
 pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
     confirm_preflight(app, id)?;
-    let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
+    let d = app.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
     match d.kind {
         DialogKind::NewDocument => {
             let r = app.run("file.new", crate::new_doc_ui::command_params(&d.fields));
@@ -1195,7 +1200,7 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 
 /// Cancel a dialog and its dependent Layer Style picker, without applying edits.
 pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
-    let closed = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
+    let closed = app.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
     dont_show_again::closed(app, &closed);
     crate::guide_edit::cancel(app, id);
     // A Color Picker puts back what its live preview showed in its target.
@@ -1215,12 +1220,12 @@ pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
     for picker in &pickers {
         crate::color_picker_ui::live_preview::end(app, *picker);
     }
-    app.ui.dialogs.retain(|d| !pickers.contains(&d.id));
+    app.retain_dialogs(|d| !pickers.contains(&d.id));
     crate::actions::record_again::cancel(app, id);
     crate::actions::menu_item::cancel(app, id);
     crate::actions::stopped(app, &closed.fields);
     if crate::guide_layout_ui::owns(&closed.fields) {
-        app.ui.dialogs.retain(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));
+        app.retain_dialogs(|child| child.fields.get("__dialog").and_then(Value::as_u64) != Some(id));
     }
     // Cancel on a profile prompt opens neither its file nor the ones still to come.
     if crate::open_prompt::owns_memory(&closed.fields) {
@@ -1238,7 +1243,7 @@ pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
     if crate::preset_group_prompt::owns(&closed.fields) {
         crate::preset_group_prompt::cancel(app);
     }
-    app.ui.dialogs.retain(|d| !crate::layer_style::color_picker::child_of(&d.fields, id));
+    app.retain_dialogs(|d| !crate::layer_style::color_picker::child_of(&d.fields, id));
     app.filter_preview = None;
     app.color_range = None;
     crate::type_panels_ui::color_picker::prune(app);
@@ -1275,7 +1280,7 @@ pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) 
     let mut fields = serde_json::Map::new();
     fields.insert("__command".into(), json!(command));
     fields.insert("__label".into(), json!(label));
-    app.ui.open_dialog(DialogKind::Command, fields)
+    app.open_dialog(DialogKind::Command, fields)
 }
 
 pub mod adjust_dialog;

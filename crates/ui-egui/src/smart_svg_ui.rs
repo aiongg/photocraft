@@ -363,7 +363,7 @@ fn safe_to_apply(app: &PhotocraftApp) -> bool {
                 && st.channel_view.target == photocraft_engine::channel_cmds::ChannelTarget::Composite
                 && app.session.job_on(st.doc.id).is_none()
         })
-        && app.ui.dialogs.is_empty()
+        && !app.dialog_open()
         && app.ui.layers_panel_dialog.is_none()
         && app.discard.is_none()
         && app.camera_raw.is_none()

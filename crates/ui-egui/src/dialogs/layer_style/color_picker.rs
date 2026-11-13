@@ -34,7 +34,12 @@ pub(crate) fn owns(fields: &Map<String, Value>) -> bool {
 }
 
 pub(crate) fn child_of(fields: &Map<String, Value>, parent: u64) -> bool {
-    fields.get(TARGET).and_then(|v| v.get("parent")).and_then(Value::as_u64) == Some(parent)
+    parent_of(fields) == Some(parent)
+}
+
+/// The Layer Style dialog a picker with these fields was opened from.
+pub(crate) fn parent_of(fields: &Map<String, Value>) -> Option<u64> {
+    fields.get(TARGET).and_then(|v| v.get("parent")).and_then(Value::as_u64)
 }
 
 pub(crate) fn has_child(app: &PhotocraftApp, parent: u64) -> bool {
@@ -123,7 +128,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, parent: u64, effect: &str, field: &s
     let rgb = color_picker_ui::parse_hex(&color).ok_or("invalid effect color")?;
     let mut fields = color_picker_ui::fields_with_web(app, "dialog", "Color Picker (Layer Style Color)", rgb);
     fields.insert(TARGET.into(), serde_json::to_value(t).map_err(|e| e.to_string())?);
-    Ok(app.ui.open_dialog(DialogKind::Command, fields))
+    Ok(app.open_dialog(DialogKind::Command, fields))
 }
 
 pub(crate) fn take_request(app: &mut PhotocraftApp, parent: u64) -> Result<(), String> {
@@ -175,7 +180,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> R
 pub(crate) fn prune(app: &mut PhotocraftApp) {
     let invalid: Vec<_> =
         app.ui.dialogs.iter().filter(|d| owns(&d.fields) && target(&d.fields).and_then(|t| validate(app, &t)).is_err()).map(|d| d.id).collect();
-    app.ui.dialogs.retain(|d| !invalid.contains(&d.id));
+    app.retain_dialogs(|d| !invalid.contains(&d.id));
 }
 
 #[cfg(test)]

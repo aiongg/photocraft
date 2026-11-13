@@ -71,7 +71,7 @@ fn typed_angles_are_whole_degrees_clamped_with_the_alert() {
     assert_eq!(type_angle(&mut h, "400"), 180.0);
     assert_eq!(alerts(&h), vec!["An integer between -180 ° and 180 ° is required. Closest value inserted.".to_string()]);
     assert!(shown(&h).starts_with("180"), "{}", shown(&h));
-    h.state_mut().ui.dialogs.clear();
+    h.state_mut().retain_dialogs(|_| false);
     assert_eq!(type_angle(&mut h, "-200"), -180.0);
     assert_eq!(alerts(&h).len(), 1, "one alert for -200");
 }

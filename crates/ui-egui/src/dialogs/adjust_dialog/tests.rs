@@ -343,7 +343,7 @@ fn cancel_leaves_the_document_untouched() {
     harness.state_mut().ui.dialog_mut(id).unwrap().fields.insert("points".into(), json!([[0, 255], [255, 0]]));
     harness.run_steps(2);
     let before = harness.state().session.active().unwrap().doc.clone();
-    harness.state_mut().ui.close_dialog(id);
+    harness.state_mut().close_dialog(id);
     harness.run_steps(2);
     let after = harness.state().session.active().unwrap().doc.clone();
     assert!(std::sync::Arc::ptr_eq(&before, &after));
@@ -441,7 +441,7 @@ fn curves_pointer_drag_previews_until_confirm_and_cancel_preserves_document() {
             h.state_mut().run("edit.undo", json!({})).unwrap();
             assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
         } else {
-            h.state_mut().ui.close_dialog(id);
+            h.state_mut().close_dialog(id);
             h.run_steps(2);
             assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
         }
@@ -554,7 +554,7 @@ fn curves_picker_cancel_and_confirm_keep_one_transaction() {
             app.run("edit.redo", json!({})).unwrap();
             assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &committed));
         } else {
-            app.ui.close_dialog(id);
+            app.close_dialog(id);
             assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &original));
             assert_eq!(app.session.active().unwrap().history.past_len(), steps);
         }
@@ -919,7 +919,7 @@ fn lab_subset_recall_preserves_combined_record_beside_native_lightness() {
         let fields = dialog.fields.clone();
         let lightness = fields["lightness"].clone();
         remember(&mut app, &fields);
-        app.ui.dialogs.clear();
+        app.retain_dialogs(|_| false);
         let id = open_last(&mut app, &command).unwrap();
         let fields = &app.ui.dialog_mut(id).unwrap().fields;
         assert_eq!(fields[key], combined);
@@ -946,7 +946,7 @@ fn levels_recall_on_a_viewed_mask_keeps_its_settings_beside_a_lab_colour_set() {
     dialog.fields.insert("inBlack".into(), json!(20.0));
     let fields = dialog.fields.clone();
     remember(&mut app, &fields);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let id = open_last(&mut app, command).unwrap();
     let fields = &app.ui.dialog_mut(id).unwrap().fields;
     assert_eq!(fields["target"], json!("mask"));
@@ -1025,7 +1025,7 @@ fn photo_filter_keeps_only_preserve_luminosity_from_its_last_ok() {
     let cmd = "image.adjustments.photoFilter";
     let first = open_neutral(&mut app, cmd).unwrap();
     let neutral = crate::filter_dialog::params_of(&app.ui.dialog_mut(first).unwrap().fields.clone());
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let id = open(&mut app, cmd).unwrap();
     let mut sample = photocraft_engine::adjust_params::to_params(
         &photocraft_engine::adjust_params::from_params("photoFilter", &sample_params("photoFilter"), None, photocraft_doc::ColorMode::Rgb).unwrap(),
@@ -1050,7 +1050,7 @@ fn photo_filter_keeps_only_preserve_luminosity_from_its_last_ok() {
     crate::dialogs::confirm(&mut app, again).unwrap();
     let again = open(&mut app, cmd).unwrap();
     assert_eq!(crate::filter_dialog::params_of(&app.ui.dialog_mut(again).unwrap().fields.clone()), neutral, "all neutral again");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     // ⌥ reopens at every last setting (#8900).
     let id = open(&mut app, cmd).unwrap();
     if let Value::Object(p) = sample.clone() {
@@ -1059,10 +1059,10 @@ fn photo_filter_keeps_only_preserve_luminosity_from_its_last_ok() {
     crate::dialogs::confirm(&mut app, id).unwrap();
     let alt = open_last(&mut app, cmd).unwrap();
     assert_eq!(crate::filter_dialog::params_of(&app.ui.dialog_mut(alt).unwrap().fields.clone()), sample, "⌥ reopens at the last settings");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let smart = open_neutral(&mut app, cmd).unwrap();
     assert_eq!(crate::filter_dialog::params_of(&app.ui.dialog_mut(smart).unwrap().fields.clone()), neutral, "open_neutral ignores them");
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
 
     let levels = "image.adjustments.levels";
     let id = open(&mut app, levels).unwrap();
@@ -1098,7 +1098,7 @@ fn photo_filter_reopens_with_the_choice_its_colour_implies() {
     assert_eq!(h.state_mut().ui.dialog_mut(id).unwrap().fields["color"], neutral, "the neutral colour again");
     assert_eq!(h.ctx.data(|d| d.get_temp::<bool>(mode)), Some(false), "Filter is chosen for the preset colour");
     // That opening is cancelled with Filter chosen; ⌥ brings the custom colour back with Color.
-    h.state_mut().ui.close_dialog(id);
+    h.state_mut().close_dialog(id);
     h.run_steps(1);
     let id = open_last(h.state_mut(), cmd).unwrap();
     h.run_steps(2);
@@ -1174,7 +1174,7 @@ fn tone_dialog_explicit_colour_sets_and_pixels_override_gray_panel_state() {
             assert_eq!(curve_mode(&app, kind, &fields), app.session.active().unwrap().doc.mode);
             reset(&app, &egui::Context::default(), &mut fields);
             assert_eq!(fields["target"], json!({"colors":[0,2]}));
-            app.ui.dialogs.clear();
+            app.retain_dialogs(|_| false);
             app.run("channel.target", json!({"colors":[0,2]})).unwrap();
             let id = open_with_params(&mut app, &command, &json!({"target":"pixels"})).unwrap();
             let fields = app.ui.dialog_mut(id).unwrap().fields.clone();
@@ -1452,7 +1452,7 @@ fn selective_color_dialog_cancel_leaves_the_document_untouched() {
     drag_slider(&mut h, 0, true);
     set_field(&mut h, id, "blues", json!([0.0, 0.0, 0.0, 60.0]));
     h.run_steps(2);
-    h.state_mut().ui.close_dialog(id);
+    h.state_mut().close_dialog(id);
     h.run_steps(2);
     assert!(std::sync::Arc::ptr_eq(&before, &h.state().session.active().unwrap().doc));
 }
@@ -1550,7 +1550,7 @@ fn selective_color_preview_shows_every_colour_until_cancel() {
     assert_eq!(pixel(app, 8, 8), before_red, "the committed document is unchanged");
     assert_eq!(pixel(app, 56, 8), before_blue);
     assert!(std::sync::Arc::ptr_eq(&doc, &app.session.active().unwrap().doc));
-    h.state_mut().ui.close_dialog(id);
+    h.state_mut().close_dialog(id);
     h.run_steps(2);
     let app = h.state_mut();
     assert!(crate::adjust_preview::display_doc(app, 0).is_none(), "closing the dialog drops the preview");
@@ -1609,7 +1609,7 @@ fn selective_color_open_last_restores_every_row_and_the_method() {
     dialog.fields.insert("colors".into(), json!("blues"));
     let fields = dialog.fields.clone();
     remember(&mut app, &fields);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     let id = open_last(&mut app, SELECTIVE).unwrap();
     let restored = &app.ui.dialog_mut(id).unwrap().fields;
     assert_eq!(restored["method"], json!("absolute"));

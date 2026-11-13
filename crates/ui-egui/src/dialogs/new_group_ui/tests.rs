@@ -32,11 +32,11 @@ fn menu_invocations_open_the_dialog_but_explicit_params_run_directly() {
         assert!(owns(fields));
         assert_eq!((fields["__command"].as_str(), fields["__label"].as_str()), (Some(command), Some(title)));
         assert!(groups(&app).is_empty(), "nothing happens until OK");
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
         // `ui.dialog.open {kind: "command"}` gets the same dialog.
         let id = crate::dialogs::open_command_dialog(&mut app, command, "Group…");
         assert!(owns(&app.ui.dialogs.last().unwrap().fields));
-        app.ui.close_dialog(id);
+        app.close_dialog(id);
     }
     // Explicit params (Actions, CLI, MCP) run the engine without asking.
     crate::menus::invoke(&mut app, &ctx, NEW_GROUP, json!({"name": "Direct"})).unwrap();
@@ -67,7 +67,7 @@ fn ok_creates_the_group_with_the_options_in_one_step_and_cancel_changes_nothing(
     let initial = steps(&app);
     let cancelled = open(&mut app, NEW_GROUP);
     app.ui.dialog_mut(cancelled).unwrap().fields.insert("name".into(), json!("Nope"));
-    app.ui.close_dialog(cancelled);
+    app.close_dialog(cancelled);
     assert_eq!(steps(&app), initial);
     assert!(groups(&app).is_empty());
 

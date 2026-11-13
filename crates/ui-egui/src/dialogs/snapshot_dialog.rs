@@ -28,7 +28,7 @@ pub fn open(app: &mut PhotocraftApp) -> Option<u64> {
     f.insert("__label".into(), json!("New Snapshot"));
     f.insert("name".into(), json!(name));
     f.insert("from".into(), json!("fullDocument"));
-    Some(app.ui.open_dialog(crate::state::DialogKind::Command, f))
+    Some(app.open_dialog(crate::state::DialogKind::Command, f))
 }
 
 /// Takes the snapshot. A cleared Name gets the next default name, as the camera button would give

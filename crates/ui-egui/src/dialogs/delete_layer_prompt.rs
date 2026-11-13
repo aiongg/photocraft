@@ -33,7 +33,7 @@ pub fn intercept(app: &mut PhotocraftApp, command: &str, params: &Value) -> Opti
     if app.ui.dialogs.iter().any(|d| owns(&d.fields)) {
         return Some(Ok(json!({"confirmationPending": true})));
     }
-    let id = app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Some(Ok(json!({"dialog": id, "confirmationPending": true})))
 }
 
@@ -88,7 +88,7 @@ mod tests {
         assert!(owns(&app.ui.dialogs[0].fields));
         assert!(app.ui.dialogs[0].fields["message"].as_str().unwrap().contains("Ink"));
         app.ui.dialog_mut(dialog).unwrap().fields.insert("skip".into(), json!(true));
-        app.ui.close_dialog(dialog);
+        app.close_dialog(dialog);
         assert!(app.session.active().unwrap().doc.layer(id).is_some());
         assert!(!app.session.prefs().dialogs.contains_key(PREF));
     }
@@ -145,7 +145,7 @@ mod tests {
         assert!(h.state().ui.dialogs.iter().any(|d| owns(&d.fields)));
         assert!(h.state().session.active().unwrap().doc.layer(id).is_some());
         let dialog = h.state().ui.dialogs[0].id;
-        h.state_mut().ui.close_dialog(dialog);
+        h.state_mut().close_dialog(dialog);
         h.state_mut().run("layer.delete", json!({})).unwrap();
         assert!(h.state().ui.dialogs.is_empty());
         assert!(h.state().session.active().unwrap().doc.layer(id).is_none());

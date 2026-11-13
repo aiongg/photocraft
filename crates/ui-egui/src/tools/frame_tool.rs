@@ -767,7 +767,7 @@ mod tests;
 
 /// A compact on-canvas import/replace bar, following the currently selected frame.
 pub fn task_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, xf: &ViewXform) {
-    if app.ui.tool != Tool::Frame || app.ui.frame_tool.drag.is_some() || app.ui.transform.is_some() || !app.ui.dialogs.is_empty() {
+    if app.ui.tool != Tool::Frame || app.ui.frame_tool.drag.is_some() || app.ui.transform.is_some() || app.dialog_open() {
         return;
     }
     let Some(l) = selected(app) else { return };

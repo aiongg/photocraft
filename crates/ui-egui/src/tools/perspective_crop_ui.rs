@@ -496,7 +496,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let pt_per_in = app.session.prefs().units_and_rulers.point_size.per_inch();
     // Out-of-range numbers and text get the reference application's alerts (#11977).
     if let Some(message) = crate::crop_size::perspective_fields(&mut app.ui.tool_options, ui, doc_dpi, pt_per_in) {
-        app.ui.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
+        app.open_dialog(crate::state::DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
     }
     if crate::widgets::secondary_button(ui, tl!("Front Image"), 0.0).clicked()
         && let Some((size, dpi)) = app.session.active().map(|st| (st.doc.size, f64::from(st.doc.resolution_dpi)))

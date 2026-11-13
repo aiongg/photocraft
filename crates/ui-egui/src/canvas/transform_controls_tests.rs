@@ -294,7 +294,7 @@ fn free_transform_on_a_locked_layer_is_refused_up_front() {
     assert_eq!(r, Err(crate::transform_tool::LOCKED.to_string()));
     assert!(app.ui.transform.is_none() && app.transform_preview.is_none(), "no box opened");
     assert_eq!(errors(&app), [crate::transform_tool::LOCKED]);
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     // The Move tool's transform controls.
     app.ui.tool = Tool::Move;
     app.ui.tool_options.move_show_transform = true;
@@ -393,7 +393,7 @@ fn the_background_among_several_joins_the_frame_and_its_handles_refuse() {
     app.session.execute("layer.select", json!({"layer": bg.0})).unwrap();
     assert_eq!(transform_controls_rect(&app, &xf), None);
     // Without the Background the handles start Free Transform, as before.
-    app.ui.dialogs.clear();
+    app.retain_dialogs(|_| false);
     app.session.execute("layer.select", json!({"layer": a.0})).unwrap();
     app.session.execute("layer.select", json!({"layer": b.0, "mode": "add"})).unwrap();
     let r = transform_controls_rect(&app, &xf).unwrap();

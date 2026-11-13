@@ -681,7 +681,7 @@ pub fn open(app: &mut PhotocraftApp, select: Option<&str>) -> Option<u64> {
     set_blending_fields(&mut f, &layer, mode);
     f.insert("__document".into(), json!(st.doc.id));
     f.insert("patternList".into(), pattern_list(app));
-    Some(app.ui.open_dialog(crate::state::DialogKind::LayerStyle, f))
+    Some(app.open_dialog(crate::state::DialogKind::LayerStyle, f))
 }
 
 /// Double-click on an effect row of the Layers panel: open Layer Style for that row's layer. A

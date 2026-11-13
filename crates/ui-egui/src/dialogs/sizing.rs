@@ -157,7 +157,7 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Option<u64> {
         f.insert("anchor".into(), json!("center"));
         f.insert("extensionColor".into(), json!("background"));
     }
-    Some(app.ui.open_dialog(DialogKind::Command, f))
+    Some(app.open_dialog(DialogKind::Command, f))
 }
 
 fn num(f: &Map<String, Value>, k: &str) -> f64 {

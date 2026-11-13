@@ -210,7 +210,7 @@ fn about_window(tab: &str, table: bool) -> (f32, f32, f32) {
     });
     let mut fields = serde_json::Map::new();
     fields.insert("tab".into(), serde_json::json!(tab));
-    h.state_mut().ui.open_dialog(crate::state::DialogKind::About, fields);
+    h.state_mut().open_dialog(crate::state::DialogKind::About, fields);
     h.ctx.data_mut(|d| d.insert_temp(egui::Id::unique("credits_view"), View { table, ..View::default() }));
     h.run_steps(6);
     let ok = h.query_all_by_role(Role::Button).find(|n| n.accesskit_node().label().as_deref() == Some("OK")).map(|n| n.rect()).expect("the OK button");

@@ -350,7 +350,7 @@ mod tests {
             .find(|d| d.fields.get("__prefsui").and_then(|v| v.as_str()) == Some("shortcuts"))
             .map(|d| d.id)
             .expect("the shortcuts dialog");
-        h.state_mut().ui.close_dialog(dialog);
+        h.state_mut().close_dialog(dialog);
         h.run_steps(2);
         crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
         h.run_steps(2);

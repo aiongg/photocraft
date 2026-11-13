@@ -106,7 +106,7 @@ pub(crate) fn stop(app: &mut PhotocraftApp) -> bool {
 /// the action list or a new recording.
 pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(timer) = app.paused_playbacks.timer else { return };
-    let esc = app.ui.dialogs.is_empty() && crate::window_keys::take_escape(ctx);
+    let esc = !app.dialog_open() && crate::window_keys::take_escape(ctx);
     let changed = timer.rev != app.session.actions.rev || app.session.actions.recording.is_some();
     if esc || changed || !app.paused_playbacks.paused.contains_key(&timer.token) {
         stop(app);
@@ -114,7 +114,7 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
     let now = Instant::now();
     // A dialog opened meanwhile (Playback Options itself, say) holds the next step until it closes.
-    if now < timer.due || !app.ui.dialogs.is_empty() {
+    if now < timer.due || app.dialog_open() {
         ctx.request_repaint_after(timer.due.saturating_duration_since(now).max(Duration::from_millis(100)));
         return;
     }
@@ -139,7 +139,7 @@ pub(super) fn open_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
         "seconds": a.pause_seconds(),
         "singleState": a.create_single_history_state,
     });
-    let id = app.ui.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
+    let id = app.open_dialog(crate::state::DialogKind::Command, fields.as_object().cloned().unwrap_or_default());
     Ok(json!({"dialog": id}))
 }
 

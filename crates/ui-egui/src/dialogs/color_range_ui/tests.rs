@@ -362,7 +362,7 @@ fn preview_mode_is_view_state_and_cancel_preserves_selection() {
         assert_eq!((st.revision, st.history.past_len()), (revision, past));
         assert_eq!(coverage(h.state(), 2, 22), 1.0);
     }
-    h.state_mut().ui.close_dialog(id);
+    h.state_mut().close_dialog(id);
     let painter = h.ctx.layer_painter(egui::LayerId::background());
     let ctx = h.ctx.clone();
     let doc = h.state().session.active().unwrap().doc.id;

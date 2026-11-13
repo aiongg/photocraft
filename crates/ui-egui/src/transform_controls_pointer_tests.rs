@@ -558,7 +558,7 @@ fn other_samplers_releases_end_an_existing_transform_handle_drag() {
         pointer(&mut app, &ctx, "down", [200.0, 150.0]);
         pointer(&mut app, &ctx, "up", [999.0, 690.0]);
         assert_eq!(app.ui.transform.as_ref().unwrap().quad, preview, "{sampler}: the sampler's coordinates do not move the box");
-        app.ui.dialogs.retain(|d| d.id != dialog);
+        app.retain_dialogs(|d| d.id != dialog);
         pointer(&mut app, &ctx, "move", [650.0, 410.0]);
         assert_eq!(app.ui.transform.as_ref().unwrap().quad, preview, "{sampler}: later moves need a new press");
     }

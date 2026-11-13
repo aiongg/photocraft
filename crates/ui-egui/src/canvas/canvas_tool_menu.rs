@@ -1506,7 +1506,7 @@ fn spec_dialog(app: &mut PhotocraftApp, command: &str, label: &str, spec: &str, 
     fields.insert("__label".into(), json!(label));
     fields.insert("__filter".into(), json!(true));
     fields.insert("__spec".into(), json!(spec));
-    app.ui.open_dialog(crate::state::DialogKind::Command, fields);
+    app.open_dialog(crate::state::DialogKind::Command, fields);
 }
 
 /// Photoshop's Stroke Path dialog: the brush-based tool to stroke with (painting with that tool's

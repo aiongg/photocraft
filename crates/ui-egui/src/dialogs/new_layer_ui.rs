@@ -24,7 +24,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<u64, String> {
         MARK: true, "__command": COMMAND, "__label": "New Layer",
         "name": name, "clipToPrevious": false, "color": "none", "mode": "Normal", "opacity": 100.0, "fillNeutral": false,
     });
-    Ok(app.ui.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default()))
+    Ok(app.open_dialog(DialogKind::Command, fields.as_object().cloned().unwrap_or_default()))
 }
 
 fn mode(f: &Map<String, Value>) -> BlendMode {

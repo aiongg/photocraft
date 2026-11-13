@@ -1046,7 +1046,7 @@ fn text_color_dialog_edits_only_the_selected_range_and_cancel_is_inert() {
     let selection = app.ui.text_edit.clone();
     let dialog = super::open_color_picker(&mut app, [0.0; 3]);
     app.ui.dialogs.last_mut().unwrap().fields.insert("color".into(), json!("#ff0000"));
-    app.ui.close_dialog(dialog).unwrap();
+    app.close_dialog(dialog).unwrap();
     assert_eq!(rgb_at(&app, id, 6), [0, 0, 0, 255]);
     assert_eq!(app.session.active().unwrap().history.entries().len(), before);
     assert_eq!(app.ui.text_edit, selection);
@@ -2619,7 +2619,7 @@ mod multi_layer_formatting {
             if confirm {
                 crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
             } else {
-                h.state_mut().ui.close_dialog(dialog).unwrap();
+                h.state_mut().close_dialog(dialog).unwrap();
             }
             for i in 0..3 {
                 let mut expected = originals[i].clone();

@@ -43,7 +43,7 @@ fn open_for(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
     if command == STATISTICS {
         f.insert("mode".into(), json!("median"));
     }
-    app.ui.open_dialog(DialogKind::Command, f)
+    app.open_dialog(DialogKind::Command, f)
 }
 
 fn folder_mode(f: &Map<String, Value>) -> bool {
