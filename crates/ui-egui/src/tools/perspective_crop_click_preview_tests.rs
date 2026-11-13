@@ -157,7 +157,7 @@ fn hover_over_the_canvas_moves_the_preview() {
         rotation: 0.0,
         zoom_animating: false,
         zoom_anchor: None,
-        display_camera: None,
+        zoom_from: None,
     }];
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {

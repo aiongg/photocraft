@@ -680,7 +680,7 @@ fn space_on_the_canvas_moves_the_frame_not_the_view() {
         rotation: 0.0,
         zoom_animating: false,
         zoom_anchor: None,
-        display_camera: None,
+        zoom_from: None,
     };
     a.ui.views = vec![view.clone()];
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
@@ -738,7 +738,7 @@ fn a_handle_held_past_the_canvas_edge_scrolls_the_view() {
         rotation: 0.0,
         zoom_animating: false,
         zoom_anchor: None,
-        display_camera: None,
+        zoom_from: None,
     }];
     a.ui.crop_rect = Some([40.0, 10.0, 100.0, 40.0]);
     a.crop.default_frame = false;
@@ -790,7 +790,7 @@ fn a_press_beside_the_canvas_does_not_scroll_it_for_a_crop_drag() {
         rotation: 0.0,
         zoom_animating: false,
         zoom_anchor: None,
-        display_camera: None,
+        zoom_from: None,
     }];
     a.ui.crop_rect = Some([40.0, 10.0, 100.0, 40.0]);
     a.crop.default_frame = false;
@@ -830,7 +830,7 @@ fn zoomed_view(height: u32) -> crate::state::View {
         rotation: 0.0,
         zoom_animating: false,
         zoom_anchor: None,
-        display_camera: None,
+        zoom_from: None,
     }
 }
 

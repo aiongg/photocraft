@@ -208,23 +208,18 @@ pub struct View {
     /// Optional document/screen anchor for a pointer-centred Zoom-tool transition.
     #[serde(skip)]
     pub(crate) zoom_anchor: Option<([f64; 2], [f32; 2])>,
-    /// The zoom and centre the canvas showed last pass: a discrete zoom eases from there.
+    /// The zoom and centre of the view when the discrete zoom above was asked for: the ease starts there.
     #[serde(skip)]
-    pub(crate) display_camera: Option<(f32, [f32; 2])>,
-    /// The canvas's zoom ease ran last pass: `display_camera` is part way to the camera above.
-    #[serde(skip)]
-    pub(crate) zoom_easing: bool,
+    pub(crate) zoom_from: Option<(f32, [f32; 2])>,
 }
 
 impl View {
-    /// Start a discrete zoom only when Animated Zoom is enabled; otherwise discard the
-    /// presentation camera so the requested camera takes effect immediately.
+    /// Asks the canvas to ease the discrete zoom about to be made, from the zoom and centre the view has now, when
+    /// Animated Zoom is enabled; otherwise the zoom jumps. Called before the zoom or centre changes.
     pub(crate) fn request_zoom_animation(&mut self, enabled: bool) {
         self.zoom_animating = enabled;
         self.zoom_anchor = None;
-        if !enabled {
-            self.display_camera = Some((self.zoom, self.center));
-        }
+        self.zoom_from = enabled.then_some((self.zoom, self.center));
     }
 }
 
@@ -239,8 +234,7 @@ impl Default for View {
             rotation: 0.0,
             zoom_animating: false,
             zoom_anchor: None,
-            display_camera: None,
-            zoom_easing: false,
+            zoom_from: None,
         }
     }
 }

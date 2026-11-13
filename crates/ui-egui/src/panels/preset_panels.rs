@@ -827,8 +827,7 @@ mod tests {
             rotation: 0.0,
             zoom_animating: false,
             zoom_anchor: None,
-            display_camera: None,
-            zoom_easing: false,
+            zoom_from: None,
         };
         let p = egui::pos2(400.0, 300.0);
         let off = crate::canvas::doc_point_at(&app, p).unwrap();

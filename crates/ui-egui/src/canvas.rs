@@ -27,7 +27,7 @@ pub mod canvas_tool_menu;
 pub mod channel_view;
 mod cursors;
 mod display;
-mod document_display;
+pub(crate) mod document_display;
 mod drag;
 mod filter_preview;
 mod gesture;
@@ -1190,8 +1190,8 @@ fn handle_canvas_tool_clicks(
                     let center = app.session.prefs().tools.zoom_clicked_point_to_center;
                     let doc_anchor = xf.to_doc(p);
                     let screen_anchor = p;
-                    zoom_about(view, xf, p, nz, center, ppp);
                     view.request_zoom_animation(app.session.prefs().general.animated_zoom && nz != display_zoom);
+                    zoom_about(view, xf, p, nz, center, ppp);
                     view.zoom_anchor = (view.zoom_animating && !center).then_some((doc_anchor, [screen_anchor.x, screen_anchor.y]));
                 }
                 // A click with the (temporary) Hand does nothing, never the tool underneath.
@@ -1889,10 +1889,10 @@ fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document, r
 
 pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect: Rect, mut view: View, primary: bool) -> View {
     let ctx = ui.ctx().clone();
-    // The Frame tool starts transforms from pointer events, which carry no context; the options
-    // bar that also records it can be hidden.
+    // The Frame tool starts transforms from pointer events, which carry no context (the options bar that also records
+    // it can be hidden), and the mapping outside the canvas reads the canvas's zoom ease through it.
     if primary {
-        app.frame_tool_ctx = Some(ctx.clone());
+        app.canvas_ctx = Some(ctx.clone());
     }
     // The camera as the app holds it before this frame's input. The canvas works on its own copy
     // (`view`) and writes it back at the end; a tool that moves the camera itself meanwhile (the
@@ -1932,17 +1932,15 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // Inline type keeps Tab (it types a tab character) and the clipboard and Select All keys.
     let keys = crate::shortcuts::canvas_has_keys(app, crate::shortcut_dispatch::Focus::of(&ctx))
         .then(|| if app.ui.text_edit.is_some() { KeyUse::CANVAS.with_keep(KeepKeys::Tab).with_edits(INLINE_TYPE_EDITS) } else { KeyUse::CANVAS });
-    let pass = document_display::CanvasPass { ctx: &ctx, idx, doc: &doc, output, rect, ppp, flip, aspect, keys, jumped: pointer_here };
-    let shown = document_display::show(app, ui, &mut view, &pass);
-    if primary && let Some(stored) = app.ui.views.get_mut(idx) {
-        stored.display_camera = view.display_camera;
-        stored.zoom_easing = view.zoom_easing;
-    }
-    let display_view =
-        View { zoom: (shown.view.zoom * f64::from(ppp)) as f32, center: [shown.view.center.x as f32, shown.view.center.y as f32], ..view.clone() };
-    let xf = document_display::view_xform(&shown.view);
+    // P-15 replaces this with the framework's ToolHost. PhotoCraft's tools run before the canvas shows, so this pass's
+    // input is in this pass's picture, on the response egui gives the tool widget from the last pass's layout; the
+    // canvas body places the widget (`document_display::show`).
+    let widget = document_display::tool_widget(idx, ctx.viewport_id());
+    let response = ctx.read_response(widget).unwrap_or_else(|| ui.interact(rect, widget.with("unplaced"), Sense::hover()));
+    // The tools map through the view on screen: the canvas's zoom ease, unless a press stops it this pass.
+    let (zoom, center) = if pointer_here { (view.zoom, view.center) } else { document_display::shown_camera(Some(&ctx), idx, ctx.viewport_id(), &view, ppp) };
+    let xf = ViewXform { rect, zoom: zoom / ppp, center, flip, rotation: view.rotation, aspect }.shown(app, ppp);
     let pixel_grid = app.ui.view.shows(app.ui.view.show.pixel_grid);
-    let response = shown.response;
     crate::paint_mouse::track_right_press(&response);
     let stroke_dismissal = primary && crate::shape_stroke_ui::dismiss_from_canvas(app, &response);
     let painter = ui.painter_at(rect);
@@ -2139,7 +2137,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             menu_dismiss_press,
             zoom_out: &zoom_out,
             hold_zoom_out: &hold_zoom_out,
-            display_zoom: display_view.zoom,
+            display_zoom: xf.zoom * ppp,
         };
         handle_primary_canvas_input(app, ui, &mut view, &input);
     }
@@ -2153,6 +2151,10 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             ctx.request_repaint();
         }
     }
+    let pass = document_display::CanvasPass { ctx: &ctx, idx, doc: &doc, output, rect, ppp, flip, aspect, keys, jumped: pointer_here };
+    let shown = document_display::show(app, ui, &mut view, &pass);
+    let display_view = View { zoom: (shown.zoom * f64::from(ppp)) as f32, center: [shown.center.x as f32, shown.center.y as f32], ..view.clone() };
+    let xf = document_display::view_xform(&shown);
     let (layer_edges, ants) = paint_canvas(app, ui, &display_view, xf, &paint_input);
     // A Hand drag (the tool, Space or the middle button) keeps every overlay on screen, as in
     // Photoshop: the Pen path being drawn, paths, guides, grid, transform box (#6592). Only the

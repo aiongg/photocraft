@@ -94,11 +94,7 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Visible-area rectangle.
     let v = app.ui.views[idx].clone();
     let canvas = app.last_canvas_rect;
-    let (zoom, center) = if v.zoom_easing || (v.zoom_animating && app.session.prefs().general.animated_zoom) {
-        v.display_camera.unwrap_or((v.zoom, v.center))
-    } else {
-        (v.zoom, v.center)
-    };
+    let (zoom, center) = crate::canvas::document_display::shown_camera(Some(ui.ctx()), idx, egui::ViewportId::ROOT, &v, app.canvas_ppp());
     let point_zoom = (zoom / app.canvas_ppp()).max(1e-6);
     // Pixel aspect correction shows fewer document columns across the same canvas width.
     let vw = canvas.width() / point_zoom / app.ui.view.display_aspect() * s;
@@ -115,8 +111,8 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let set = |app: &mut PhotocraftApp, zoom: f32, animate: bool| {
                 let target = crate::zoom_levels::clamp(zoom, v.doc_size);
                 if target != app.ui.views[idx].zoom {
-                    app.ui.views[idx].zoom = target;
                     app.ui.views[idx].request_zoom_animation(animate && app.session.prefs().general.animated_zoom);
+                    app.ui.views[idx].zoom = target;
                 }
                 app.ui.views[idx].fit_pending = false;
             };

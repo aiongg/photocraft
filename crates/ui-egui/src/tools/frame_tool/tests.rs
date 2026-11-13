@@ -148,7 +148,7 @@ fn frame_content_and_both_selection_follow_clicks_and_double_clicks() {
     let ctx = egui::Context::default();
     crate::PhotocraftApp::setup_context(&ctx, Default::default());
     ctx.begin_pass(Default::default());
-    app.frame_tool_ctx = Some(ctx.clone());
+    app.canvas_ctx = Some(ctx.clone());
     drag(&mut app, [70., 75.], [85., 85.]);
     ctx.end_pass().textures_delta.clear();
     assert!(!app.ui.frame_tool.auto_transform);
@@ -305,7 +305,7 @@ fn real_canvas_clicks_select_both_then_double_click_selects_the_image() {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
-            app.frame_tool_ctx = Some(ui.ctx().clone());
+            app.canvas_ctx = Some(ui.ctx().clone());
             crate::canvas::document_area(app, ui);
         },
         app,
@@ -459,7 +459,7 @@ fn cancelling_a_frame_content_drag_clears_its_auto_commit() {
     let ctx = egui::Context::default();
     crate::PhotocraftApp::setup_context(&ctx, Default::default());
     ctx.begin_pass(Default::default());
-    app.frame_tool_ctx = Some(ctx.clone());
+    app.canvas_ctx = Some(ctx.clone());
     tool_event(&mut app, ToolEvent::Down { x: 70., y: 75., pressure: 1.0 }, egui::Modifiers::NONE);
     assert!(app.ui.frame_tool.auto_transform, "a content drag transforms automatically");
     crate::transform_tool::cancel(&mut app);
@@ -506,7 +506,7 @@ fn overhanging_content_handles_start_transform_and_cancel() {
     let ctx = egui::Context::default();
     crate::PhotocraftApp::setup_context(&ctx, Default::default());
     ctx.begin_pass(Default::default());
-    app.frame_tool_ctx = Some(ctx.clone());
+    app.canvas_ctx = Some(ctx.clone());
     let st = app.session.active().unwrap();
     let frame = selected(&app).unwrap();
     let child = frame.children().unwrap().first().unwrap();

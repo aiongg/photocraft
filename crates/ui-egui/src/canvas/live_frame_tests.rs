@@ -1,5 +1,5 @@
-//! Live painting tools show this frame's pointer input in this frame (no extra frame of delay),
-//! and the deferred image follows the animated camera.
+//! Live painting tools show this frame's pointer input in this frame (no extra frame of delay): the tools run before
+//! the canvas shows. The tools map through the canvas's zoom ease.
 
 use super::*;
 use serde_json::json;
@@ -24,6 +24,8 @@ fn live_brush_texture_includes_this_frames_press_and_moves() {
         );
         PhotocraftApp::setup_context(&h.ctx, Default::default());
         h.run_steps(3);
+        // One pass a frame: a second pass would show the input whatever the order of tools and canvas.
+        h.ctx.options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
         let p = h.state().last_canvas_rect.center();
         h.input_mut().events.push(egui::Event::PointerMoved(p));
         h.input_mut().events.push(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
@@ -80,13 +82,14 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
             shown
         };
         let mut view = pass(&mut app, app.ui.views[0].clone(), 0.0);
-        // A discrete zoom to 200 % eases from what the canvas drew: the tools map through the camera in between.
-        view.zoom = 2.0;
+        // A discrete zoom to 200 % eases from the zoom it was asked from: the tools map through the camera in between.
         view.request_zoom_animation(true);
+        view.zoom = 2.0;
         let view = pass(&mut app, view, 0.1);
         let view = pass(&mut app, view, 0.15);
-        let shown = app.ui.views[0].display_camera.expect("the canvas records the camera it drew").0;
-        assert!(shown > 1.0 && shown < 2.0, "{tool:?}: the camera is between the endpoints, {shown}");
+        let ppp = ctx.pixels_per_point();
+        let shown = super::document_display::shown_camera(Some(&ctx), 0, egui::ViewportId::ROOT, &view, ppp).0;
+        assert!(shown > 1.0 && shown < 2.0, "{tool:?}: the canvas's ease is between the endpoints, {shown}");
         assert_eq!(view.zoom, 2.0, "{tool:?}: the requested zoom stays the target");
     }
 }

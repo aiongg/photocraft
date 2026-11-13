@@ -412,7 +412,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
                 select(app, id, t);
                 if t != Target::Frame {
                     // The canvas's own context: preview textures loaded into another never draw.
-                    let Some(ctx) = app.frame_tool_ctx.clone() else { return true };
+                    let Some(ctx) = app.canvas_ctx.clone() else { return true };
                     match crate::transform_tool::begin(app, &ctx) {
                         Ok(()) => {
                             app.ui.frame_tool.auto_transform = true;
@@ -643,7 +643,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     if tool != Tool::Frame {
         return false;
     }
-    app.frame_tool_ctx = Some(ui.ctx().clone());
+    app.canvas_ctx = Some(ui.ctx().clone());
     for (icon, shape, label) in [
         ("square", "rectangle", tl!("Create a new rectangular frame")),
         ("circle", "ellipse", tl!("Create a new elliptical frame")),

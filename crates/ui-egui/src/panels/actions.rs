@@ -656,18 +656,18 @@ pub(crate) fn run_view(app: &mut PhotocraftApp, id: &str, params: Value) -> Resu
         }
         "view.zoomIn" => {
             v.fit_pending = false;
-            v.zoom = crate::zoom_levels::step(v.zoom, 1, v.doc_size);
             v.request_zoom_animation(app.session.prefs().general.animated_zoom);
+            v.zoom = crate::zoom_levels::step(v.zoom, 1, v.doc_size);
         }
         "view.zoomOut" => {
             v.fit_pending = false;
-            v.zoom = crate::zoom_levels::step(v.zoom, -1, v.doc_size);
             v.request_zoom_animation(app.session.prefs().general.animated_zoom);
+            v.zoom = crate::zoom_levels::step(v.zoom, -1, v.doc_size);
         }
         "view.actualPixels" => {
             v.fit_pending = false;
-            v.zoom = 1.0;
             v.request_zoom_animation(app.session.prefs().general.animated_zoom);
+            v.zoom = 1.0;
         }
         _ => return Err(format!("unsupported view command: {id}")),
     }

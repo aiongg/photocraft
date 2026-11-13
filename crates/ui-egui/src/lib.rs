@@ -506,7 +506,9 @@ pub struct PhotocraftApp {
     pub(crate) drop_canvas_rect: Option<egui::Rect>,
     /// The document tab strip last frame: a drop there opens the file at the slot under it.
     pub(crate) tab_strip: Option<canvas::TabStrip>,
-    pub(crate) frame_tool_ctx: Option<egui::Context>,
+    /// The main canvas's context, for code without one that reads the canvas: the Frame tool's transforms from pointer
+    /// events, and the mapping and panels that read the canvas's zoom ease (`document_display::shown_camera`).
+    pub(crate) canvas_ctx: Option<egui::Context>,
     pub(crate) frame_preview: Option<frame_tool::Preview>,
     /// Files dropped on the canvas still to place, one Free Transform at a time, each with the
     /// document it was dropped on.
