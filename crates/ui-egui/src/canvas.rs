@@ -4,10 +4,8 @@
 //! update only their damage rectangle (`set_partial`). The wgpu compositor (M5) will replace this
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
-use craft::behavior::CanvasView;
-use craft::behavior::kurbo::Point;
 use craft::ui::runtime::commands::EditCommand;
-use craft::ui::runtime::focus::{EditSet, KeepKeys, KeyUse, host_canvas};
+use craft::ui::runtime::focus::{EditSet, KeepKeys, KeyUse};
 use egui::{Color32, Mesh, PointerButton, Pos2, Rect, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Rect as DRect;
@@ -82,7 +80,6 @@ pub(crate) use cursors::{
 };
 use cursors::{brush_tip_centre, eyedropper_ring, preview_locator_cursor, visible_crosshair};
 pub(crate) use display::GPU_OUTPUT;
-use display::checker;
 #[cfg(test)]
 use display::sync_display_lut;
 use display::texture_key;
@@ -97,12 +94,11 @@ pub(crate) use filter_preview::committed_filter_preview;
 pub(crate) use filter_preview::ensure_filter_preview;
 #[cfg(test)]
 use filter_preview::filter_preview_display_doc;
-pub(crate) use filter_preview::{filter_channel_preview, filter_preview_factor};
+pub(crate) use filter_preview::filter_preview_factor;
 #[cfg(test)]
 pub(crate) use gesture::constrained_polygon_point;
 pub use gesture::{commit_crop, commit_polygon, polygon_cancel_stale, polygon_replaces_selection, polygon_retract};
 pub(crate) use gesture::{finish_gesture, polygon_close_reach, selection_mode};
-use gpu_picture::{GpuRequest, gpu_picture};
 pub(crate) use navigator::NavigatorCache;
 #[cfg(test)]
 use navigator::navigator_waits_for_drag;
@@ -131,14 +127,12 @@ pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
 use tabs::{TEAR_OFF, pro_tab_title, tab_context_items, tab_drop_index, tab_move_target, tabs, torn_off};
 pub use tabs::{TabStrip, document_area, extra_windows};
-use tabs::{dots, paint_dots};
+use tabs::dots;
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter};
-#[cfg(test)]
-pub(crate) use textures::detail_plan;
 pub(crate) use textures::visible_doc_rect;
-pub(crate) use textures::{DetailPlan, damage_since, effect_reach, ensure_texture_in_view, retain_gpu_documents, shown_as_document};
-pub use textures::{MAX_TEXTURE, ensure_texture};
+pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};
+pub use textures::MAX_TEXTURE;
 #[cfg(test)]
 use textures::{clamp_texture_side, preview_bounds, texture_factor};
 #[cfg(test)]
@@ -151,64 +145,17 @@ use transform_controls::{begin_transform_controls_at, draw_transform_controls, t
 #[cfg(test)]
 use transform_controls::{transform_controls_hit, transform_controls_layers};
 pub use view_xform::{ViewXform, doc_point_at, fill_view, fit_view};
-use view_xform::{animated_view, wheel_anchor, zoom_about};
+use view_xform::zoom_about;
 
+#[derive(Default)]
 pub struct CanvasCache {
     pub revision: u64,
-    pub texture: Option<egui::TextureHandle>,
-    /// Display pixels per document pixel of the cached image (≤ 1).
-    pub scale: f32,
     /// Hash of the live-adjust preview used for this render (0 = none).
     pub preview_key: u64,
-    /// The current image lives in the GPU canvas (`gpu_canvas`) rather than `texture`.
+    /// The current image lives in the GPU canvas (`gpu_canvas`).
     pub on_gpu: bool,
-    /// Revision and preview key `texture` was rendered at. Tracked apart from the GPU canvas's
-    /// `revision`, so the Navigator never shows a stale CPU image after GPU-path edits.
-    pub tex_revision: u64,
-    pub tex_preview_key: u64,
-    /// All uploaded texels are opaque. Screen coverage is checked separately before omitting
-    /// the checker. Updated with uploads, never by scanning during an unchanged frame.
-    pub texture_opaque: bool,
-    /// The CPU path's pixel grid for the part of the document in view (pixel_grid.rs).
+    /// The pixel grid for the part of the document in view (pixel_grid.rs).
     pub grid: Option<crate::pixel_grid::GridLines>,
-    /// The CPU path's sharper textures of the part in view, over a reduced `texture` (#7568),
-    /// by `InView::key` (two windows of a document can show different parts).
-    pub detail: Vec<(u64, DetailTexture)>,
-}
-
-/// [`CanvasCache::detail`]: the part of the document `DetailPlan` chose, uploaded at its factor.
-pub struct DetailTexture {
-    texture: egui::TextureHandle,
-    plan: DetailPlan,
-    /// The texels it holds, in the plan's reduced pixels (`render_reduced_damage`'s output rect).
-    out: DRect,
-    /// Revision and preview key (display key folded in) it was rendered at.
-    revision: u64,
-    preview_key: u64,
-    /// Pixels were composited for it this call (for the perf span).
-    rendered: bool,
-}
-
-/// The CPU canvas textures to draw: the whole document, and over it the sharper part in view.
-pub(crate) struct CpuTextures {
-    pub texture: egui::TextureId,
-    pub scale: f32,
-    /// The document area the texture covers: the document's bounds, or for a filter preview that
-    /// changes the canvas's dimensions (Image › Rotation) its result centred on the document, as
-    /// the GPU canvas draws it.
-    pub bounds: DRect,
-    /// The detail texture and the document area it covers (x0, y0, x1, y1 in document pixels).
-    pub detail: Option<(egui::TextureId, [f32; 4])>,
-}
-
-/// The part of a CPU canvas view in sight: its document area and zoom (physical pixels per
-/// document pixel), for [`ensure_texture_in_view`]'s detail texture.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct InView {
-    pub visible: DRect,
-    pub zoom: f32,
-    /// Which view this is, so each keeps its own detail texture.
-    pub key: u64,
 }
 
 /// Photoshop-style zoom label: "33.3", "100", "12.5".
@@ -1351,7 +1298,6 @@ struct CanvasOverlayInput<'a> {
     lent: bool,
     idx: usize,
     output: Option<u32>,
-    beyond: bool,
     panning: bool,
     zoom_out: &'a dyn Fn(bool) -> bool,
 }
@@ -1364,7 +1310,6 @@ fn paint_primary_overlays(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut
     let response = input.response;
     let doc = input.doc;
     let idx = input.idx;
-    let beyond = input.beyond;
     // The transform preview is image content: it goes under the grid and guides, which
     // stay visible across a layer being transformed (#5086); the box is drawn later.
     crate::transform_tool::draw_content(app, painter, xf);
@@ -2202,7 +2147,6 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             ctx.request_repaint();
         }
     }
-    let beyond = shown.beyond;
     let (layer_edges, ants) = paint_canvas(app, ui, &display_view, xf, &paint_input);
     // A Hand drag (the tool, Space or the middle button) keeps every overlay on screen, as in
     // Photoshop: the Pen path being drawn, paths, guides, grid, transform box (#6592). Only the
@@ -2219,7 +2163,6 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             lent: temporary.is_some() || middle,
             idx,
             output,
-            beyond,
             panning,
             zoom_out: &zoom_out,
         };

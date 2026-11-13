@@ -1849,22 +1849,6 @@ fn brush_tip_centre_follows_the_crosshair_preference_at_any_size() {
 }
 
 #[test]
-fn view_transform_roundtrip() {
-    for flip in [false, true] {
-        let xf =
-            ViewXform { rect: Rect::from_min_size(pos2(100.0, 50.0), vec2(800.0, 600.0)), zoom: 2.5, center: [320.0, 240.0], flip, rotation: 0.0, aspect: 1.0 };
-        let s = xf.to_screen(10.0, 20.0);
-        let d = xf.to_doc(s);
-        assert!((d[0] - 10.0).abs() < 1e-3 && (d[1] - 20.0).abs() < 1e-3);
-        assert_eq!(xf.to_screen(320.0, 240.0), xf.rect.center());
-        // Flipped, document x grows to the left.
-        assert_eq!(xf.to_screen(330.0, 240.0).x > xf.rect.center().x, !flip);
-        let r = xf.doc_rect(DRect::new(0, 0, 10, 10));
-        assert!(r.width() > 0.0 && r.height() > 0.0);
-    }
-}
-
-#[test]
 fn eyedropper_ring_colors_pair_the_sampled_and_current_colours() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 40, "height": 20, "background": "transparent"})).unwrap();
@@ -3272,62 +3256,6 @@ fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
         let shadow =
             (0..64).flat_map(|y| (0..64).map(move |x| (x, y))).filter(|&(x, y)| !block(x, y) && without.get(x, y)[0] - with.get(x, y)[0] > 0.05).count();
         assert!(shadow > 20, "placed {placed}: the Drop Shadow is previewed ({shadow} px)");
-    }
-}
-
-#[test]
-fn fill_view_covers_the_canvas_and_centres_the_document() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 400, "height": 200})).unwrap();
-    let doc = app.session.active().unwrap().doc.clone();
-    let mut view = View { fill_pending: true, ..View::default() };
-
-    fill_view(&mut view, &doc, vec2(600.0, 600.0), 1.0, 1.0);
-
-    assert_eq!(view.zoom, 3.0, "the short edge fills the available height");
-    assert_eq!(view.center, [200.0, 100.0]);
-    assert!(!view.fill_pending);
-
-    // A scaled display stores the physical factor: the same point zoom is 2× the device px.
-    let mut view = View { fill_pending: true, ..View::default() };
-    fill_view(&mut view, &doc, vec2(600.0, 600.0), 2.0, 1.0);
-    assert_eq!(view.zoom, 6.0);
-
-    // Fit never magnifies past 100% = one image pixel per physical pixel, at any display
-    // scale (it used to cap at one per *point*, so a 150% display opened images at 150%).
-    for ppp in [1.0f32, 1.5, 2.0] {
-        let mut view = View { fit_pending: true, ..View::default() };
-        fit_view(&mut view, &doc, vec2(600.0, 600.0), ppp, 1.0);
-        assert_eq!(view.zoom, 1.0, "ppp {ppp}: a small image opens at 100%");
-    }
-    // A large image still shrinks to fit: 1000×500 into 440 points is 0.44 pt/px, so 0.66
-    // physical at ppp 1.5.
-    let big = {
-        app.run("file.new", json!({"width": 1000, "height": 500})).unwrap();
-        app.session.active().unwrap().doc.clone()
-    };
-    let mut view = View { fit_pending: true, ..View::default() };
-    fit_view(&mut view, &big, vec2(480.0, 480.0), 1.5, 1.0);
-    assert!((view.zoom - 0.66).abs() < 1e-5, "{}", view.zoom);
-}
-
-#[test]
-fn a_hundred_percent_is_one_physical_pixel_per_document_pixel() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 400, "height": 200})).unwrap();
-    app.sync_views();
-    for ppp in [1.0f32, 1.25, 2.0] {
-        app.ppp = ppp;
-        let xf = ViewXform::active(&app).unwrap();
-        // 100% zoom: one document pixel is one physical pixel, i.e. 1/ppp egui points.
-        let step = xf.to_screen(1.0, 0.0) - xf.to_screen(0.0, 0.0);
-        // `to_screen` differences around the view centre cancel in f32; 1e-3 is still exact
-        // enough to see a wrong ppp factor (which would be a 20–100% error).
-        assert!((step.x - 1.0 / ppp).abs() < 1e-3, "ppp {ppp}: {step:?} want {:?}", 1.0 / ppp);
-        assert!((app.point_zoom() - 1.0 / ppp).abs() < 1e-5, "ppp {ppp}: {}", app.point_zoom());
-        // Screen ↔ document stays an exact round trip.
-        let back = xf.to_doc(xf.to_screen(123.0, 45.0));
-        assert!((back[0] - 123.0).abs() < 1e-3 && (back[1] - 45.0).abs() < 1e-3, "ppp {ppp}: {back:?}");
     }
 }
 

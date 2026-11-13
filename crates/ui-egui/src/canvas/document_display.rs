@@ -5,7 +5,8 @@ use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::{Point, Rect as Rect64, Size};
 use craft::behavior::{CanvasView, PixelSize};
 use craft::ui::canvas::{Canvas, CanvasOutput, Extent, NavigationOptions, RasterDisplay, RasterSource};
-use craft::ui::contract::{Bind, Show, ShowContainer};
+use craft::ui::contract::{Bind, Props, Show, ShowContainer};
+use craft::ui::runtime::env::Label;
 use craft::ui::primitives::Checker;
 use craft::ui::runtime::focus::{KeyUse, host_canvas};
 use craft::ui::style::DataColor;
@@ -84,8 +85,6 @@ pub(crate) struct Shown {
     pub output: CanvasOutput,
     pub view: CanvasView,
     pub response: egui::Response,
-    /// The Crop tool shows the layers' pixels past the canvas.
-    pub beyond: bool,
 }
 
 /// The document's picture as prepared for this pass, before the app is borrowed shared.
@@ -163,7 +162,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let overlay = overlay.map(|prep| prep.source(app));
     let bounds = gpu.as_ref().map(GpuPicture::bounds).or_else(|| composite.as_ref().map(|c| c.bounds())).unwrap_or_else(|| doc.bounds());
     let mapping = (bounds != doc.bounds()).then(|| placement(bounds));
-    let widget = egui::Id::new(("pc-canvas-tools", idx, ctx.viewport_id()));
+    let widget = egui::Id::unique(("pc-canvas-tools", idx, ctx.viewport_id()));
 
     let mut bound = given;
     let mut canvas = Canvas::new(label.clone()).id_salt(("pc-canvas", idx)).view(Bind::bound(&mut bound)).document(Size::new(f64::from(size.width), f64::from(size.height))).navigation(navigation);
@@ -175,10 +174,12 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let shown = canvas.show_at(ui, rect, |ui, body| {
         // Pasteboard: the Interface colour or the theme's canvas with its dots, under the document's shadow.
         match pasteboard {
-            Some(color) => ui.painter_at(body.rect).rect_filled(body.rect, 0.0, color),
+            Some(color) => {
+                ui.painter_at(body.rect).rect_filled(body.rect, 0.0, color);
+            }
             None => super::tabs::paint_dots(ui, body.rect, dots),
         }
-        if let Some(space) = craft::ui::canvas::canvas_space(&craft::ui::runtime::env::Env::of(ui)) {
+        if let Some(space) = craft::ui::canvas::canvas_space(&body.env) {
             let painter = ui.painter_at(body.rect);
             if shadow {
                 let area = Rect::from_points(&space.view.quad(rect64(bounds)));
@@ -189,25 +190,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
                 beyond.paint(&painter, &view_xform(&space.view));
             }
         }
-        let framed = |display: RasterDisplay<'_>| {
-            let display = match &checker {
-                Some(checker) => display.checkerboard(checker.clone()),
-                None => display,
-            };
-            let display = if edge { display.outlined() } else { display };
-            match mapping {
-                Some(frame) => display.mapped(frame, 1),
-                None if pattern => display.extent(Extent::Tiled),
-                None => display,
-            }
-        };
+        let frame = Frame { checker: checker.as_ref(), edge, mapping, pattern };
         if let Some(picture) = &gpu {
-            framed(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).show_at(ui, body.rect);
+            frame.apply(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).show_at(ui, body.rect);
         } else if let Some(composite) = &composite {
-            framed(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).show_at(ui, body.rect);
+            frame.apply(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).show_at(ui, body.rect);
         }
         if let Some(overlay) = &overlay {
-            let display = RasterDisplay::new(craft::ui::words::Label::Empty, overlay as &dyn RasterSource).id_salt("pc-channel-view");
+            let display = RasterDisplay::new(Label::Empty, overlay as &dyn RasterSource).id_salt("pc-channel-view");
             let display = match mapping {
                 Some(frame) => display.mapped(frame, 1),
                 None => display,
@@ -229,7 +219,31 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let shown_view = output.space.map_or(given, |space| space.view);
     view.display_camera = Some(((shown_view.zoom * f64::from(ppp)) as f32, [shown_view.center.x as f32, shown_view.center.y as f32]));
     let response = shown.inner.unwrap_or_else(|| ui.interact(rect, widget, Sense::click_and_drag()));
-    Shown { output, view: shown_view, response, beyond: beyond.is_some() }
+    Shown { output, view: shown_view, response }
+}
+
+/// How the document's picture sits on the canvas: the transparency checkerboard under it, its edge, where a reduced or
+/// size-changing picture lies, and View › Pattern Preview's copies around it.
+struct Frame<'c> {
+    checker: Option<&'c Checker>,
+    edge: bool,
+    mapping: Option<Homography>,
+    pattern: bool,
+}
+
+impl Frame<'_> {
+    fn apply<'d>(&self, display: RasterDisplay<'d>) -> RasterDisplay<'d> {
+        let display = match self.checker {
+            Some(checker) => display.checkerboard(checker.clone()),
+            None => display,
+        };
+        let display = if self.edge { display.outlined() } else { display };
+        match self.mapping {
+            Some(frame) => display.mapped(frame, 1),
+            None if self.pattern => display.extent(Extent::Tiled),
+            None => display,
+        }
+    }
 }
 
 /// The unit square onto `bounds`, the document area a reduced or size-changing picture covers.

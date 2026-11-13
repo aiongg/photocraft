@@ -174,7 +174,6 @@ pub fn consume(ctx: &egui::Context, sc: &KeyboardShortcut) -> bool {
 /// at any zoom): Zoom In / Out, Fit on Screen, 100%.
 pub const NAV_COMMANDS: [&str; 4] = ["view.zoomIn", "view.zoomOut", "view.fitOnScreen", "view.actualPixels"];
 
-/// ⌘+ / ⌘- / ⌘0 / ⌘1 (or their Edit › Keyboard Shortcuts overrides). Returns true when one ran.
 /// Layer › New › Layer's shortcut with ⌥ added (⌥⇧⌘N by default) makes the layer at once, as in
 /// Photoshop: the plain shortcut asks with the New Layer dialog first, like the menu item, and
 /// the Layers panel button's click and ⌥-click are the same pair the other way round (#4794).
@@ -196,14 +195,6 @@ fn new_layer_without_dialog(app: &mut PhotocraftApp, ctx: &egui::Context) -> boo
     if let Err(e) = app.run(NEW_LAYER, json!({})) {
         app.ui.status = e;
         app.ui.status_error = true;
-    }
-    true
-}
-
-fn nav_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    let Some(id) = nav_shortcut(app, ctx) else { return false };
-    if crate::menus::is_enabled(app, id) {
-        let _ = crate::menus::invoke(app, ctx, id, json!({}));
     }
     true
 }
@@ -587,12 +578,9 @@ pub(crate) fn canvas_has_keys(app: &PhotocraftApp, focus: crate::shortcut_dispat
 
 fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus: crate::shortcut_dispatch::Focus) -> bool {
     use crate::shortcut_dispatch::{Focus, dispatch_pressed};
-    // Dialogs (and Liquify's panel while one of its controls has focus) keep canvas zoom; a
-    // focused text field keeps its keys.
+    // Dialogs (and Liquify's panel while one of its controls has focus) keep canvas zoom: the
+    // document canvas runs its view commands itself (`shortcut_dispatch::VIEW_OWNED`).
     if !canvas_has_keys(app, focus) {
-        if focus != Focus::Text {
-            nav_keys(app, ctx);
-        }
         return true;
     }
     if focus == Focus::Text {

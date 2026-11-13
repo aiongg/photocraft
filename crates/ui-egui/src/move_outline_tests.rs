@@ -48,7 +48,6 @@ fn app() -> (PhotocraftApp, LayerId, LayerId) {
         zoom_animating: false,
         zoom_anchor: None,
         display_camera: None,
-        zoom_transition: None,
     }];
     (app, ids[0], ids[1])
 }
