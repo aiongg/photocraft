@@ -259,10 +259,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             display.show_at(ui, body.rect);
         }
         // P-15 replaces this widget with the framework's ToolHost. PhotoCraft's tools read its response before the
-        // canvas shows (`canvas_view`); here it takes its place over the displays and the key focus in the canvas.
-        let response = ui.interact(body.rect, widget, Sense::click_and_drag());
-        if let Some(keys) = pass.keys {
-            host_canvas(ui.ctx(), response.id, keys);
+        // canvas shows (`canvas_view`); here it takes its place over the displays and the key focus in the canvas. Not
+        // in the canvas's measuring run: egui keeps a widget where it first registered in a pass, under the canvas's
+        // own widget, which would then take the first press after the canvas first shows.
+        if !craft::ui::runtime::measure::active(ui.ctx()) {
+            let response = ui.interact(body.rect, widget, Sense::click_and_drag());
+            if let Some(keys) = pass.keys {
+                host_canvas(ui.ctx(), response.id, keys);
+            }
         }
     });
     drop((composite, overlay));
