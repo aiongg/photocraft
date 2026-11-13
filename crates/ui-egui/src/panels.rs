@@ -27,7 +27,7 @@ pub mod brushes_tab;
 pub mod channels_panel;
 pub mod chrome_ui;
 pub mod clip_line_ui;
-mod color;
+pub(crate) mod color;
 pub mod color_hud;
 pub mod color_panel_ui;
 pub mod comps_ui;
@@ -67,11 +67,6 @@ pub(crate) mod toolbar;
 pub mod type_panels_ui;
 pub(super) mod variables_ui;
 
-#[cfg(test)]
-use color::color_field_height;
-pub(crate) use color::{color_field, color_field_fill_id, field_chips, field_hsva, offer_color_field_fill, srgb_hsva};
-#[cfg(test)]
-pub(crate) use color::{hsva_color32, hsva_srgb, srgb_bytes};
 #[cfg(test)]
 pub(crate) use dock::DOCK_MIN_WIDTH;
 #[cfg(test)]
@@ -113,7 +108,7 @@ use title_bar::title_x;
 pub use title_bar::{sync_window_title, system_title_bar, title_bar, window_title};
 #[cfg(test)]
 use toolbar::{
-    STUDIO_CHIP, TOOL_SECTIONS, chips_height, color_chips, next_slot_tool, slot_tool, tool_flyout_drag_open, tool_flyout_release, toolbar_icon_size,
+    TOOL_SECTIONS, color_chips, next_slot_tool, slot_tool, tool_flyout_drag_open, tool_flyout_release, toolbar_icon_size,
     visible_sections,
 };
 pub use toolbar::{paint_toolbar_flyout_indicator, toolbar};
