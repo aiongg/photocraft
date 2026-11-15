@@ -478,12 +478,27 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
             _ => {}
         }
     }
+    app.adjust_refusal = None;
     take_results(app, ctx);
-    Ok(())
+    match app.adjust_refusal.take() {
+        Some(refusal) => Err(refusal),
+        None => Ok(()),
+    }
 }
 
 /// Cancels dialog `id`, as Cancel or Escape would, and runs what a cancel leaves to do.
 pub(crate) fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+    // A prompt answers Escape with its escape button, as an answer its family takes; the host's own cancel is a result
+    // that reaches no family (it stands for a replaced prompt).
+    let escape = app.framework.dialogs.get_dyn_mut(id).and_then(|dialog| dialog.downcast_mut::<StandardPrompt>()).and_then(|prompt| {
+        let choice = prompt.escape_choice()?;
+        prompt.set_choice(choice);
+        Some(())
+    });
+    if escape.is_some() && app.framework.dialogs.confirm_by_id(ctx, id) {
+        take_results(app, ctx);
+        return Ok(());
+    }
     if !app.framework.dialogs.cancel_by_id(ctx, id) {
         return Err(format!("no dialog {}", id.value()));
     }

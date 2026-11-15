@@ -289,13 +289,11 @@ pub fn preview(app: &PhotocraftApp, doc: &Document) -> Option<(Guides, Color32)>
         return None;
     }
     let dialog = app.framework.dialogs.get_by_id::<HostedGuideLayoutDialog>(id)?;
+    // The colour is the dialog's own, drawn for the whole set; OK commits guides without colours of their own.
     let mut guides = Guides::default();
     for line in dialog.preview()? {
         let vertical = line.along == Axis::Y;
         if vertical { &mut guides.vertical } else { &mut guides.horizontal }.push(line.position);
-        if let Some(Rgba([r, g, b, _])) = line.color {
-            guides.set_color(vertical, line.position, Some([r, g, b]));
-        }
     }
     let [r, g, b, _] = dialog.values().color.rgba().0;
     Some((guides, Color32::from_rgb(r, g, b)))
