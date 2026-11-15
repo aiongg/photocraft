@@ -9,7 +9,7 @@ use egui_kittest::Harness;
 use photocraft_engine::prefs::{bindable_items, normalize_shortcut};
 use serde_json::json;
 
-use super::shortcuts::{assign, press_ok};
+use super::shortcuts::{press_ok, rebind};
 use crate::PhotocraftApp;
 
 pub(super) fn harness_with(session: photocraft_engine::Session) -> Harness<'static, PhotocraftApp> {
@@ -37,7 +37,7 @@ pub(super) fn tap(h: &mut Harness<'_, PhotocraftApp>, key: Key, modifiers: Modif
 fn edit_and_ok(h: &mut Harness<'_, PhotocraftApp>, command: &str, text: &str) {
     let ctx = h.ctx.clone();
     crate::prefs_ui::open_shortcuts(h.state_mut(), 0);
-    assign(h.state_mut(), &CommandRef::new(command), Binding::parse(text).unwrap(), Policy::Steal).unwrap();
+    rebind(h.state_mut(), &CommandRef::new(command), Binding::parse(text).unwrap(), Policy::Steal).unwrap();
     press_ok(h.state_mut(), &ctx);
     // The runtime's keymap follows the saved preferences on the next pass.
     h.run_steps(2);

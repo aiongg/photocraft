@@ -303,7 +303,7 @@ fn target(app: &mut PhotocraftApp, key: Row, extend: bool) {
 }
 
 fn open_options(app: &mut PhotocraftApp, key: Row) {
-    let _ = crate::channel_options_ui::open(app, &json!({ "channel": key.reference() }));
+    let _ = crate::channel_options_ui::open(app, &key.reference());
 }
 
 /// An alpha or spot row moved. `to` of the event counts the rows that remain once the moved row is out, over every
