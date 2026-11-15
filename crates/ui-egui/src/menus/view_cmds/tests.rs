@@ -1,4 +1,4 @@
-use super::dialogs::{front, params_for};
+use super::dialogs::params_for;
 use super::*;
 use crate::menus::{invoke as menu, is_live, menu_rows, row};
 use craft::automation::actions::{Action, ActionStep};
@@ -23,14 +23,16 @@ fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
 /// The dialog a command's reply names.
 fn opened(app: &PhotocraftApp, reply: &Value) -> DialogId {
     let want = reply["dialog"].as_str().expect("the reply names a dialog");
-    // PLAN: assumed `app.framework.dialogs: DialogHost` and `OpenDialog { id, .. }`
     app.framework.dialogs.open_dialogs().into_iter().map(|d| d.id).find(|id| id.value().to_string() == want).expect("the named dialog is open")
 }
 
-/// Runs a menu command that opens a form and returns the form's dialog.
+/// Runs a menu command that opens a form and returns the form's dialog, after the frame that shows it: a hosted
+/// form loads its remembered values and defaults when it first shows.
 fn open_form(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str) -> DialogId {
     let reply = menu(app, ctx, id, json!({})).unwrap();
-    opened(app, &reply)
+    let dialog = opened(app, &reply);
+    frame(app, ctx);
+    dialog
 }
 
 /// The most recently opened dialog.
@@ -38,9 +40,9 @@ fn last_dialog(app: &PhotocraftApp) -> DialogId {
     app.framework.dialogs.open_dialogs().last().expect("a dialog is open").id
 }
 
-/// The values of the hosted form.
+/// The values the open dialog `id` lists (a hosted form or the guide layout dialog).
 fn fields(app: &PhotocraftApp, id: DialogId) -> Value {
-    serde_json::to_value(app.framework.dialogs.get_by_id::<HostedParamDialog>(id).expect("a hosted form").fields()).unwrap()
+    app.framework.dialogs.open_dialogs().into_iter().find(|open| open.id == id).and_then(|open| open.fields).expect("an open dialog that lists its fields")
 }
 
 /// Sets a form value as the user editing that row would.
@@ -81,14 +83,21 @@ fn names_in(dir: &std::path::Path) -> Vec<String> {
     names
 }
 
-/// Fires a view command on the canvas and runs the frame that drains it.
-fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: craft::ui::canvas::ViewCommands) {
-    craft::ui::runtime::commands::fire(ctx, command, craft::ui::runtime::commands::FireSource::Menu);
-    ctx.run_ui(Default::default(), |ui| {
+/// One frame of the app on `ctx`.
+fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let mut output = ctx.run_ui(Default::default(), |ui| {
         let mut frame = eframe::Frame::_new_kittest();
         app.logic_frame(ui.ctx(), &mut frame);
         app.ui_frame(ui, &mut frame);
     });
+    // No renderer takes the frame's texture uploads.
+    output.textures_delta.clear();
+}
+
+/// Fires a view command on the canvas and runs the frame that drains it.
+fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: craft::ui::canvas::ViewCommands) {
+    craft::ui::runtime::commands::fire(ctx, command, craft::ui::runtime::commands::FireSource::Menu);
+    frame(app, ctx);
 }
 
 /// The form must list every source first and default to Current only when a document exists.
@@ -292,16 +301,20 @@ fn arrange_layouts_floating_windows_and_matching() {
     menu(&mut app, &ctx, "window.arrange.threeUpStacked", json!({})).unwrap();
     assert_eq!(checked(&app, "window.arrange.threeUpStacked"), Some(true));
     menu(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
-    assert_eq!(app.ui.windows.len(), 3);
+    assert_eq!(app.ui.document_windows.floating.len(), 3);
     app.ui.views[2].zoom = 3.0;
     app.ui.views[2].center = [1.0, 2.0];
     menu(&mut app, &ctx, "window.arrange.matchAll", json!({})).unwrap();
     assert!(app.ui.views.iter().all(|v| v.zoom == 3.0 && v.center == [1.0, 2.0]));
-    assert!(app.ui.windows.iter().all(|w| w.view.zoom == 3.0));
     menu(&mut app, &ctx, "window.arrange.consolidateAllToTabs", json!({})).unwrap();
-    assert!(app.ui.windows.is_empty());
+    assert!(app.ui.document_windows.floating.is_empty());
     menu(&mut app, &ctx, "window.arrange.newWindowForDocument", json!({})).unwrap();
-    assert_eq!(app.ui.windows.len(), 1);
+    assert_eq!(app.ui.document_windows.floating.len(), 1);
+    // The new window starts on its own copy of the document's view, which Match All then takes too.
+    app.ui.views[2].zoom = 5.0;
+    menu(&mut app, &ctx, "window.arrange.matchAll", json!({})).unwrap();
+    let window = app.ui.document_windows.floating[0].0.id;
+    assert_eq!(app.ui.window_views[&window].zoom, 5.0);
 }
 
 /// Match Zoom clamps the matched zoom to each document's own range: a 10 x 10 document can't go
@@ -319,12 +332,15 @@ fn match_zoom_clamps_to_each_documents_zoom_range() {
     menu(&mut app, &ctx, "window.arrange.matchZoom", json!({})).unwrap();
     assert_eq!(app.ui.views[1].zoom, 0.05);
     assert_eq!(app.ui.views[0].zoom, lowest);
-    // Floating windows too, before their first frame (no `doc_size` yet).
-    menu(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
+    // A window with its own view too, before its first frame (no `doc_size` yet).
+    app.session.set_active(0);
+    menu(&mut app, &ctx, "window.arrange.newWindowForDocument", json!({})).unwrap();
+    let window = app.ui.document_windows.floating[0].0.id;
+    app.session.set_active(1);
     app.ui.views[1].zoom = 0.05;
     menu(&mut app, &ctx, "window.arrange.matchZoom", json!({})).unwrap();
-    assert_eq!(app.ui.windows.len(), 2);
-    assert!(app.ui.windows.iter().all(|w| w.view.zoom == if w.document == 0 { lowest } else { 0.05 }));
+    assert_eq!(app.ui.window_views[&window].zoom, lowest);
+    assert_eq!(app.ui.views[1].zoom, 0.05);
 }
 
 #[test]
@@ -381,27 +397,27 @@ fn stylistic_set_checkmark_follows_the_toggle() {
     }
 }
 
-/// Two actions of one name in sets A and B (a loaded library): the Batch form lists the name once
-/// and both sets, starts on the selected action's set, and runs that set's action.
+/// Actions of two sets: the Batch form lists every action name and both sets, starts on the selected action's set,
+/// and runs that action.
 #[test]
-fn batch_menu_runs_the_selected_sets_action_among_same_named_ones() {
+fn batch_menu_starts_on_the_selected_actions_set_and_runs_its_action() {
     let (mut app, ctx) = app_with(0);
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("source.png").to_string_lossy().into_owned();
     let output = dir.path().join("out");
     app.run("file.new", json!({"width": 2, "height": 1})).unwrap();
     app.run("file.saveACopy", json!({"path": input})).unwrap();
-    for (set, step) in [("A", "image.adjustments.invert"), ("B", "image.imageRotation.90cw")] {
-        let mut action = Action::new("Retouch", vec![ActionStep::new(step, json!({}))]);
+    for (set, name, step) in [("A", "Retouch", "image.adjustments.invert"), ("B", "Turn", "image.imageRotation.90cw")] {
+        let mut action = Action::new(name, vec![ActionStep::new(step, json!({}))]);
         action.set = Some(set.into());
         app.session.actions.list.push(action).unwrap();
     }
     app.ui.actions.panel.selected = Some(ActionSelection::Action(1));
     let id = open_form(&mut app, &ctx, "file.automate.batch");
-    assert_eq!(choice_ids(&mut app, "file.automate.batch", "action"), ["Retouch"]);
+    assert_eq!(choice_ids(&mut app, "file.automate.batch", "action"), ["Retouch", "Turn"]);
     assert_eq!(choice_ids(&mut app, "file.automate.batch", "set"), ["A", "B"]);
     let shown = fields(&app, id);
-    assert_eq!((&shown["action"], &shown["set"]), (&json!("Retouch"), &json!("B")));
+    assert_eq!((&shown["action"], &shown["set"]), (&json!("Turn"), &json!("B")));
     set(&mut app, &ctx, id, "input", json!(dir.path().to_string_lossy()));
     set(&mut app, &ctx, id, "output", json!(output.to_string_lossy()));
     confirm(&mut app, &ctx, id).unwrap();
@@ -447,7 +463,9 @@ fn batch_menu_runs_the_action_chosen_in_the_form() {
     set(&mut app, &ctx, id, "output", json!(cancelled.to_string_lossy()));
     let rotate = app.session.actions.list.actions().iter().position(|action| action.name == "RotateRGB").unwrap();
     app.session.actions.list.delete_action(rotate).unwrap();
-    assert!(confirm(&mut app, &ctx, id).unwrap_err().contains("no action named"));
+    // The run's refusal reaches the user through the status bar and a notice, as a failed filter's does.
+    confirm(&mut app, &ctx, id).unwrap();
+    assert!(app.ui.status_error && app.ui.status.contains("no action named"), "{}", app.ui.status);
     assert!(!cancelled.exists());
 }
 
@@ -488,40 +506,52 @@ fn apply_image_dialog_offers_source_layer_scale_and_offset() {
     assert!((p[0] - want).abs() < 0.003, "{p:?} vs {want}");
 }
 
+/// The `columns` or `rows` value of the guide layout dialog with the count and gutter edited.
+fn guide_group(shown: &Value, key: &str, number: u64, gutter: f64) -> Value {
+    let mut group = shown[key].clone();
+    group["enabled"] = json!(true);
+    group["number"] = json!(number);
+    group["gutter"]["value"] = json!(gutter);
+    group
+}
+
 #[test]
 fn new_guide_layout_remembers_successful_values_not_cancelled_edits() {
     let (mut app, ctx) = app_with(1);
     let first = open_form(&mut app, &ctx, "view.newGuideLayout");
-    assert_eq!(fields(&app, first)["columns"], 8);
-    assert_eq!(fields(&app, first)["gutter"], "20 px");
-    for (key, value) in [("columns", json!(2)), ("gutter", json!("0 px")), ("rows", json!(2)), ("rowGutter", json!("0 px"))] {
-        set(&mut app, &ctx, first, key, value);
-    }
+    let shown = fields(&app, first);
+    assert_eq!(shown["columns"]["number"], 8);
+    assert_eq!(shown["columns"]["gutter"]["value"], 20.0);
+    set(&mut app, &ctx, first, "columns", guide_group(&shown, "columns", 2, 0.0));
+    set(&mut app, &ctx, first, "rows", guide_group(&shown, "rows", 2, 0.0));
     confirm(&mut app, &ctx, first).unwrap();
 
     let second = open_form(&mut app, &ctx, "view.newGuideLayout");
     let shown = fields(&app, second);
-    assert_eq!(shown["columns"], 2);
-    assert_eq!(shown["gutter"], "0 px");
-    assert_eq!(shown["rows"], 2);
-    assert_eq!(shown["rowGutter"], "0 px");
+    for key in ["columns", "rows"] {
+        assert_eq!(shown[key]["number"], 2, "{key}");
+        assert_eq!(shown[key]["gutter"]["value"], 0.0, "{key}");
+    }
     assert_eq!(shown["clearExisting"], false);
     // A cancelled edit must not replace the last successfully used values.
-    set(&mut app, &ctx, second, "columns", json!(9));
+    set(&mut app, &ctx, second, "columns", guide_group(&shown, "columns", 9, 0.0));
     cancel(&mut app, &ctx, second);
     let third = open_form(&mut app, &ctx, "view.newGuideLayout");
-    assert_eq!(fields(&app, third)["columns"], 2);
+    assert_eq!(fields(&app, third)["columns"]["number"], 2);
 }
 
+/// A layout that the command refuses (the dialog's document is no longer the active one) is not remembered.
 #[test]
 fn new_guide_layout_does_not_remember_a_failed_command() {
-    let (mut app, ctx) = app_with(0);
-    let reply = front(&mut app, &ctx, "view.newGuideLayout", &json!({})).unwrap().unwrap();
-    let id = opened(&app, &reply);
-    set(&mut app, &ctx, id, "columns", json!(3));
-    assert!(confirm(&mut app, &ctx, id).is_err());
+    let (mut app, ctx) = app_with(2);
+    let id = open_form(&mut app, &ctx, "view.newGuideLayout");
+    let shown = fields(&app, id);
+    set(&mut app, &ctx, id, "columns", guide_group(&shown, "columns", 3, 20.0));
+    app.session.set_active(0);
+    confirm(&mut app, &ctx, id).unwrap();
+    assert!(app.ui.status.contains("another document"), "{}", app.ui.status);
     let again = open_form(&mut app, &ctx, "view.newGuideLayout");
-    assert_eq!(fields(&app, again)["columns"], 8);
+    assert_eq!(fields(&app, again)["columns"]["number"], 8);
 }
 
 #[test]
@@ -529,8 +559,7 @@ fn lookup_export_dialog_uses_the_current_adjustment_selection() {
     let (mut app, ctx) = app_with(1);
     app.run("layer.newAdjustmentLayer.invert", json!({})).unwrap();
     let current = app.session.active().unwrap().active_layer.unwrap();
-    let opened_reply = front(&mut app, &ctx, "file.export.colorLookupTables", &json!({})).unwrap().unwrap();
-    let id = opened(&app, &opened_reply);
+    let id = open_form(&mut app, &ctx, "file.export.colorLookupTables");
     let shown = fields(&app, id);
     assert_eq!(shown["scope"], "selected");
     assert_eq!(shown["size"], 33);
@@ -538,8 +567,7 @@ fn lookup_export_dialog_uses_the_current_adjustment_selection() {
     cancel(&mut app, &ctx, id);
 
     app.run("layer.new.layer", json!({"name": "Unrelated pixels"})).unwrap();
-    let opened_reply = front(&mut app, &ctx, "file.export.colorLookupTables", &json!({})).unwrap().unwrap();
-    let id = opened(&app, &opened_reply);
+    let id = open_form(&mut app, &ctx, "file.export.colorLookupTables");
     assert_eq!(fields(&app, id)["scope"], "all");
     cancel(&mut app, &ctx, id);
 
@@ -667,18 +695,19 @@ fn a_batch_that_fails_on_its_files_says_which_and_why() {
 #[test]
 fn float_in_window_takes_a_document_and_position() {
     let (mut app, ctx) = app_with(3);
-    let r = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 1, "position": [1950.0, 40.5]})).unwrap();
-    let w = app.ui.windows.last().unwrap();
-    assert_eq!(r, json!({"window": w.id}));
-    assert_eq!((w.document, w.position), (1, Some([1950.0, 40.5])));
-    assert!(w.floating);
+    let doc = app.session.documents()[1].doc.id;
+    let r = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": doc.0, "position": [1950.0, 40.5]})).unwrap();
+    let (group, rect) = app.ui.document_windows.floating.last().unwrap();
+    assert_eq!(r, json!({"window": group.id}));
+    assert_eq!((group.documents.clone(), rect.min), (vec![doc], egui::pos2(1950.0, 40.5)));
     assert_eq!(app.session.active_index(), Some(1), "the floated document stays active");
-    let again = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
+    let again = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": doc.0})).unwrap();
     assert_eq!(again, r, "tearing off the same document reuses its window");
-    assert_eq!(app.ui.windows.len(), 1);
-    assert_eq!(app.ui.windows[0].position, Some([1950.0, 40.5]));
+    assert_eq!(app.ui.document_windows.floating.len(), 1);
+    assert_eq!(app.ui.document_windows.floating[0].1.min, egui::pos2(1950.0, 40.5));
+    let unknown = app.session.documents().iter().map(|st| st.doc.id.0).max().unwrap() + 1;
     for bad in [
-        json!({"document": 3}),
+        json!({"document": unknown}),
         json!({"document": -1}),
         json!({"document": "b"}),
         json!({"position": [1.0]}),
@@ -688,19 +717,22 @@ fn float_in_window_takes_a_document_and_position() {
     ] {
         assert!(menu(&mut app, &ctx, "window.arrange.floatInWindow", bad.clone()).is_err(), "{bad}");
     }
-    assert_eq!(app.ui.windows.len(), 1, "rejected params open no window");
-    app.ui.windows[0].open = false;
-    let reopened = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
+    assert_eq!(app.ui.document_windows.floating.len(), 1, "rejected params open no window");
+    let window = app.ui.document_windows.floating[0].0.id;
+    app.ui.document_windows.close_window(window);
+    let reopened = menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": doc.0})).unwrap();
     assert_ne!(reopened, r, "a closed window can be floated again");
-    assert_eq!(app.ui.windows.last().map(|w| (w.document, w.position)), Some((1, None)));
+    assert_eq!(app.ui.document_windows.floating.last().map(|(group, _)| group.documents.clone()), Some(vec![doc]));
 }
 
 #[test]
 fn float_all_in_windows_gives_each_document_its_own_view() {
     let (mut app, ctx) = app_with(3);
     menu(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
-    assert_eq!(app.ui.windows.iter().map(|w| w.document).collect::<Vec<_>>(), [0, 1, 2]);
-    assert!(app.ui.windows.iter().all(|w| w.floating));
+    let ids: Vec<_> = app.session.documents().iter().map(|st| st.doc.id).collect();
+    let floated: Vec<_> = app.ui.document_windows.floating.iter().map(|(group, _)| group.documents.clone()).collect();
+    assert_eq!(floated, ids.iter().map(|id| vec![*id]).collect::<Vec<_>>());
+    assert!(app.ui.document_windows.docked.is_empty());
 }
 
 #[test]
@@ -752,22 +784,17 @@ fn load_selection_without_alpha_channels_offers_the_composite() {
     confirm(&mut app, &ctx, dialog).unwrap();
 }
 
-/// One frame of the shortcut handler with a plain Esc press.
-fn press_esc(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let key = egui::Key::Escape;
-    let input = egui::RawInput {
-        focused: true,
-        events: vec![egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers: egui::Modifiers::NONE }],
-        ..Default::default()
-    };
-    ctx.run_ui(input, |ui| crate::shortcuts::handle(app, ui.ctx())).textures_delta.clear();
+/// A plain Esc press, through the canvas passes: the tool host claims it first where a gesture, a transform or a
+/// straighten line owns it, then the app's key route.
+fn press_esc(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    crate::canvas::testing::key(app, egui::Key::Escape, egui::Modifiers::NONE);
 }
 
 #[test]
 fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
     let (mut app, ctx) = app_with(1);
     app.ui.tool = crate::Tool::Crop;
-    crate::crop_ui::each_pass(&mut app);
+    crate::canvas::testing::frame(&mut app);
     let default_frame = |app: &PhotocraftApp| crate::crop_ui::frame(app).is_some() && crate::crop_ui::is_default_frame(app);
     assert!(default_frame(&app));
     for mode in ["fullScreen", "fullScreenWithMenuBar"] {
@@ -783,7 +810,7 @@ fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
     press_esc(&mut app, &ctx);
     assert!(!crate::crop_ui::straightening(&app));
     assert_mode(&app, "fullScreen");
-    crate::crop_ui::each_pass(&mut app);
+    crate::canvas::testing::frame(&mut app);
     press_esc(&mut app, &ctx);
     assert_mode(&app, "standard");
 }
@@ -798,11 +825,12 @@ fn esc_in_full_screen_cancels_a_crop_drag_on_the_default_frame() {
     for (what, from) in [("draw", [20.0, 20.0]), ("resize", [100.0, 80.0]), ("turn", [130.0, 110.0])] {
         let (mut app, ctx) = app_with(1);
         app.ui.tool = crate::Tool::Crop;
-        crate::crop_ui::each_pass(&mut app);
+        crate::canvas::testing::frame(&mut app);
+        assert!(crate::crop_ui::is_default_frame(&app), "{what}: the gesture starts on the default frame");
         menu(&mut app, &ctx, "view.screenMode.fullScreen", json!({})).unwrap();
         tool_event(&mut app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, none);
         tool_event(&mut app, ToolEvent::Move { x: 60.0, y: 50.0, pressure: 1.0 }, none);
-        assert!(crate::crop_ui::dragging(&app) && crate::crop_ui::is_default_frame(&app), "{what}: mid-gesture on the default frame");
+        assert!(crate::crop_ui::dragging(&app), "{what}: mid-gesture");
         press_esc(&mut app, &ctx);
         assert_mode(&app, "fullScreen");
         assert!(!crate::crop_ui::dragging(&app), "{what}: the gesture is cancelled");

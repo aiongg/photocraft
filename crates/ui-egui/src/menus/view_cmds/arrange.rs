@@ -69,10 +69,21 @@ pub(super) fn arrange(app: &mut PhotocraftApp, k: &str, p: &Value) -> Result<Val
     let space = space(app);
     let arranged = run_arrange(&mut app.ui.document_windows, command, &space);
     crate::canvas::document_area::apply_arranged(app, arranged);
+    if matches!(command, ArrangeCommands::NewWindowForDocument) {
+        keep_own_view(app);
+    }
     match arranged {
         Arranged::Views { zoom, location, rotation, .. } => match_views(app, zoom, location, rotation),
         _ => Ok(json!({"arrange": k})),
     }
+}
+
+/// Gives the window New Window for Document just opened its own copy of its document's view, so the two scroll and
+/// zoom apart.
+fn keep_own_view(app: &mut PhotocraftApp) {
+    let Some((group, _)) = app.ui.document_windows.floating.last() else { return };
+    let Some(view) = group.documents.first().and_then(|doc| crate::canvas::tabs::document_index(app, *doc)).and_then(|doc| app.ui.views.get(doc)).cloned() else { return };
+    app.ui.window_views.insert(group.id, view);
 }
 
 /// Float in Window for a given document (default the active one) and screen position (`[x, y]` in points, default the
@@ -91,9 +102,12 @@ fn float_in_window(app: &mut PhotocraftApp, p: &Value) -> Result<Value, String> 
         Some(v) => Some(screen_position(v).ok_or("position must be [x, y] in points")?),
     };
     let space = space(app);
-    let min = match position {
-        Some([x, y]) => egui::pos2(x, y),
-        None => craft::behavior::placement::cascade_rects(space.area, space.size, app.ui.document_windows.floating.len() + 1, space.step)
+    // A document alone in a floating window keeps the window where it is.
+    let kept = app.ui.document_windows.floating.iter().find(|(group, _)| group.documents == [doc]).map(|(_, rect)| rect.min);
+    let min = match (position, kept) {
+        (Some([x, y]), _) => egui::pos2(x, y),
+        (None, Some(min)) => min,
+        (None, None) => craft::behavior::placement::cascade_rects(space.area, space.size, app.ui.document_windows.floating.len() + 1, space.step)
             .pop()
             .map_or(space.area.min, |r| r.min),
     };
@@ -116,7 +130,7 @@ fn match_views(app: &mut PhotocraftApp, zoom: bool, loc: bool, rot: bool) -> Res
     // (which picking the Crop tool made 0), so it isn't copied (#9308).
     let crop = crate::crop_ui::turns_view(app);
     let rotation = if crop { 0.0 } else { src.rotation };
-    for (d, v) in app.ui.views.iter_mut().enumerate() {
+    let take = |d: usize, v: &mut crate::state::View| {
         if zoom {
             let [w, h] = sizes.get(d).copied().unwrap_or(v.doc_size);
             v.request_zoom_animation(animated_zoom);
@@ -129,6 +143,22 @@ fn match_views(app: &mut PhotocraftApp, zoom: bool, loc: bool, rot: bool) -> Res
             v.rotation = rotation;
         }
         v.fit_pending = false;
+    };
+    for (d, v) in app.ui.views.iter_mut().enumerate() {
+        take(d, v);
+    }
+    // The windows with a view of their own (New Window for Document) match too, each within its document's range.
+    let owners: Vec<(u64, usize)> = app
+        .ui
+        .document_windows
+        .floating
+        .iter()
+        .filter_map(|(group, _)| Some((group.id, crate::canvas::tabs::document_index(app, group.shown.or_else(|| group.documents.first().copied())?)?)))
+        .collect();
+    for (window, d) in owners {
+        if let Some(v) = app.ui.window_views.get_mut(&window) {
+            take(d, v);
+        }
     }
     // Match Zoom and Match Location copy no rotation: they report the camera's as it is.
     Ok(json!({"zoom": src.zoom, "center": src.center, "rotation": if rot { rotation } else { src.rotation }}))
