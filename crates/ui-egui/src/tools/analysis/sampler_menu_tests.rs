@@ -83,7 +83,7 @@ fn a_stale_sampler_or_odd_point_fails_gracefully() {
     let mut empty = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     empty.ui.tool = Tool::ColorSampler;
     assert_eq!(super::sampler_at(&empty, [1.0, 1.0]), None);
-    if crate::canvas_tool_menu::open_at(&mut empty, Tool::ColorSampler, Default::default(), egui::pos2(10.0, 10.0), [1.0, 1.0]) {
+    if crate::canvas_tool_menu::open_at(&mut empty, Tool::ColorSampler, Default::default(), egui::pos2(10.0, 10.0), [1.0, 1.0], None) {
         crate::canvas_tool_menu::choose(&mut empty, &ctx, SAMPLER_DELETE);
     }
     assert!(empty.session.active().is_none());

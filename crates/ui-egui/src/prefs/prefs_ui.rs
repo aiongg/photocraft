@@ -59,7 +59,7 @@ mod dialogs;
 mod fields;
 mod presets;
 mod save;
-mod shortcuts;
+pub(crate) mod shortcuts;
 mod startup;
 
 // PLAN: assumed top-w18's appearance file keeps `display_scale` and `selected_theme` and exports `appearance_button` and `theme_menu`.

@@ -14,7 +14,7 @@ use serde_json::{Map, Value, json};
 use crate::PhotocraftApp;
 
 mod arrange;
-mod dialogs;
+pub(crate) mod dialogs;
 mod dispatch;
 mod options;
 

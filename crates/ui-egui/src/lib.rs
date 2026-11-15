@@ -12,10 +12,10 @@
 /// PhotoCraft as craft-update knows it, with its 128 px icon and accent colour: the update
 /// prompt shows both, and an AppImage's menu entry gets the icon.
 #[cfg(not(target_arch = "wasm32"))]
-pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
+pub const UPDATE_APP: craft::update::app::App = craft::update::app::App {
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.photocraft.png")),
     accent: Some([0x2f, 0x7b, 0xf5]),
-    ..craft_update::suite::PHOTOCRAFT
+    ..craft::update::suite::PHOTOCRAFT
 };
 
 /// Translate a string literal into the current UI language: `tl!("Image Size…")`.
@@ -639,7 +639,6 @@ pub struct PhotocraftApp {
     pub slow_frames: frame_stages::SlowFrames,
     /// Preferences, autosave and snapping runtime state (see `prefs_ui`, `snap_ui`).
     pub(crate) prefs_rt: prefs_ui::Runtime,
-    // PLAN: top-w24 changes `updates_rt` to craft-update's `Updater` without naming the wrapper type; `updates_ui::Runtime` kept.
     pub(crate) updates_rt: updates_ui::Runtime,
     /// Close, Revert or Exit parked behind the unsaved-changes prompt (see `discard_ui`).
     pub(crate) discard: Option<discard_ui::Prompt>,
@@ -705,6 +704,8 @@ mod brush_picker_escape_tests;
 mod cam_no_pixels_alert_tests;
 #[cfg(test)]
 mod eyedropper_context_menu_tests;
+#[cfg(test)]
+mod paths_scroll_tests;
 #[cfg(test)]
 mod patch_shift_constrain_tests;
 #[cfg(test)]

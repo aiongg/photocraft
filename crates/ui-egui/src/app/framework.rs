@@ -70,6 +70,8 @@ pub struct Framework {
     /// The UI language `host` speaks.
     lang: &'static str,
     pub dialogs: DialogHost,
+    /// The per-open state each open parameter dialog's family needs when its answer comes back, by dialog key.
+    pub captured: std::collections::BTreeMap<String, serde_json::Value>,
     /// The runtime's keymap overrides. The runtime rebuilds its keymap when the `Arc` changes, so
     /// it is replaced only when the bindings it carries change.
     overrides: Arc<Overrides>,
@@ -236,6 +238,7 @@ impl Framework {
             sections,
             lang,
             dialogs: DialogHost::new(),
+            captured: Default::default(),
             overrides: Arc::new(Overrides::new()),
             overrides_rev: None,
             catalog: None,

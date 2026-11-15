@@ -229,7 +229,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, event: PathsEvent<PathRef>) {
             if command == PathsCommands::StrokePath {
                 // Stroke Path… asks for the tool first, as in Photoshop (#2978).
                 if let Some(name) = name_of(&doc, &target) {
-                    crate::canvas_tool_menu::pen_dialogs::open(app, "path.stroke", &name); // PLAN: assumed fn open(app: &mut PhotocraftApp, command: &str, name: &str)
+                    crate::canvas_tool_menu::pen_dialogs::open(app, "path.stroke", &name);
                 }
             } else if let Some((cmd, params)) = command_params(app, command, &target) {
                 run(app, cmd, params);

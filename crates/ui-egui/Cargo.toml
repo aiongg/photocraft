@@ -10,7 +10,7 @@ workspace = true
 [dependencies]
 chrono = { workspace = true }
 craft-print = { workspace = true }
-craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap", "automation", "theme-store", "print", "menu", "timeline", "text", "text-font-picker", "font-manager"] }
+craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap", "automation", "theme-store", "print", "menu", "timeline", "text", "text-font-picker", "font-manager", "quit", "cms"] }
 # Interface translations over the embedded craft-i18n catalogs (`build.rs`, `src/i18n.rs`).
 craft-i18n = { workspace = true }
 photocraft-geom = { workspace = true }
@@ -46,9 +46,8 @@ base64 = "0.23"
 web-time = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-craft-update = { workspace = true }
 # `FilePanels::pump_with`: rfd's folder picker and file paths exist on native only.
-craft = { workspace = true, features = ["dialogs"] }
+craft = { workspace = true, features = ["dialogs", "update"] }
 rayon = { workspace = true }
 # Safe native UI-language APIs (Windows/macOS); no subprocess or web dependency.
 sys-locale = "=0.3.2"

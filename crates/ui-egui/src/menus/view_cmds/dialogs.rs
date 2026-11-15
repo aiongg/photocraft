@@ -111,6 +111,26 @@ fn blend_modes() -> Vec<(String, Label)> {
     ])
 }
 
+/// A choice id read as words ("colorDodge" is "Color dodge"), translated when the catalog has the sentence.
+pub(crate) fn label_of(key: &str) -> String {
+    // A name that already reads as text ("iPhone 14 Pro Max", "Web 1920") is not camelCase.
+    if key.contains(' ') {
+        return tl!(key).to_owned();
+    }
+    let mut out = String::new();
+    for (i, c) in key.chars().enumerate() {
+        if i == 0 {
+            out.extend(c.to_uppercase());
+        } else if c.is_uppercase() {
+            out.push(' ');
+            out.extend(c.to_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    tl!(&out).to_owned()
+}
+
 /// A folder field with its Browse button.
 fn folder(key: &str, label: &'static str, default: impl Into<String>) -> Param {
     Param::new(key, label, ParamKind::text(default)).browse(PathKind::Folder)
