@@ -280,19 +280,17 @@ mod tests {
     #[test]
     fn the_control_channel_opens_and_closes_the_hud() {
         let mut h = harness();
-        let c = h.state().last_canvas_rect.center();
+        crate::canvas::testing::window(h.state_mut(), vec2(1200.0, 800.0));
+        // The document's centre, in document points as `ui.pointer` takes them.
+        let c = [200.0, 150.0];
         let pointer = |h: &mut Harness<'static, PhotocraftApp>, events: serde_json::Value| {
-            let ctx = h.ctx.clone();
-            let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"button": "right", "shift": true, "alt": true, "events": events}));
-            let _ = crate::control::handle(h.state_mut(), &ctx, &req);
-            // The canvas takes the queued input on its next pass.
-            h.run_steps(2);
+            crate::canvas::testing::control(h.state_mut(), "ui.pointer", json!({"button": "right", "shift": true, "alt": true, "events": events}));
         };
-        pointer(&mut h, json!([{"kind": "down", "x": c.x, "y": c.y}, {"kind": "up", "x": c.x, "y": c.y}]));
+        pointer(&mut h, json!([{"kind": "down", "x": c[0], "y": c[1]}, {"kind": "up", "x": c[0], "y": c[1]}]));
         assert!(h.state().ui.color_hud.is_none(), "the Up event closed it");
         assert!(h.state().ui.brush_picker.is_none(), "the picker stayed closed");
         // A down without its up leaves the HUD open for the next frame's edits.
-        pointer(&mut h, json!([{"kind": "down", "x": c.x, "y": c.y}]));
+        pointer(&mut h, json!([{"kind": "down", "x": c[0], "y": c[1]}]));
         assert!(h.state().ui.color_hud.is_some_and(|hud| !hud.hold));
         assert!(h.state().ui.brush_picker.is_none(), "the picker stayed closed");
     }

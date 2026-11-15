@@ -178,6 +178,7 @@ impl PhotocraftApp {
             gradient: Default::default(),
             raw: None,
             raw_reply: None,
+            adjust_refusal: None,
             raw_shelf: Vec::new(),
             raw_redevelop: Vec::new(),
             wide_angle: None,

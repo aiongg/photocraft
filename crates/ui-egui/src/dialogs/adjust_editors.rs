@@ -192,11 +192,14 @@ pub struct EditorSetup {
     pub tone: Option<ColorBalanceTone>,
     /// The Smart Filter the dialog edits is not reachable from the active document: the editor shows no controls.
     pub stale: bool,
+    /// The clipping display the Levels editor reported on the pass before: the dialog's display changes when the editor's
+    /// report does (an Alt-held thumb), so a display set from outside (automation) stays until the editor next reports.
+    pub reported_clipping: std::cell::Cell<Option<craft::imaging::ui::adjust::LevelsClip>>,
 }
 
 impl Default for EditorSetup {
     fn default() -> Self {
-        Self { channels: ToneChannels::of(ToneSpace::Rgb, false), histograms: Vec::new(), pickers_unavailable: false, gradients: Vec::new(), swatches: [[0.0; 3], [1.0; 3]], tone: None, stale: false }
+        Self { channels: ToneChannels::of(ToneSpace::Rgb, false), histograms: Vec::new(), pickers_unavailable: false, gradients: Vec::new(), swatches: [[0.0; 3], [1.0; 3]], tone: None, stale: false, reported_clipping: Default::default() }
     }
 }
 
@@ -226,7 +229,9 @@ fn show(kind: &str, setup: &EditorSetup, ui: &mut Ui, value: &mut AdjustValue, c
                 panel = panel.pickers_unavailable();
             }
             let out = panel.show(ui);
-            *cx.clipping = out.clipping;
+            if setup.reported_clipping.replace(out.clipping) != out.clipping {
+                *cx.clipping = out.clipping;
+            }
             lifted(out.edit, |levels| AdjustValue::Levels { levels })
         }
         ("curves", AdjustValue::Curves { curves }) => {

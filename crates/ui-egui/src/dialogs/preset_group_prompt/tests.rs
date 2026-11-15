@@ -101,7 +101,7 @@ impl Fixture {
         let id = alerts::prompt_tagged::<PresetClash>(&self.app).expect("the import question opens");
         let response = call(&mut self.app, &self.ctx, "ui.inspect", json!({}));
         assert_eq!(response["ok"], true);
-        assert!(response["result"]["dialogs"].as_array().unwrap().iter().any(|d| d["id"] == json!(id)));
+        assert!(response["result"]["dialogs"].as_array().unwrap().iter().any(|d| d["id"] == json!(id.value().to_string())));
         id
     }
 

@@ -311,6 +311,9 @@ struct Preflight<'a, 'x> {
     scope: &'a ToolScope<'a>,
     inner: DynTool<'x>,
     tool: Tool,
+    /// A hosted dialog's pick runs the pass: its presses are the dialog's own, so the painting refusals and the quick-pick
+    /// chord (which belong to the selected tool) do not apply.
+    dialog: bool,
     /// The selection tools' outline is open (a Polygonal or Magnetic Lasso being drawn): an arrow nudges it, not the
     /// layer. Read before the pass takes the families' state out of the app.
     outline_open: bool,
@@ -324,7 +327,7 @@ impl CanvasTool for Preflight<'_, '_> {
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let tool = self.tool;
         let doc = cx.space().map(|space| space.view.to_doc(pointer.pos));
-        if pointer.button == PointerButton::Primary {
+        if pointer.button == PointerButton::Primary && !self.dialog {
             if let Some(doc) = doc {
                 if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
                     return ToolAction::Done;
@@ -380,7 +383,7 @@ impl CanvasTool for Preflight<'_, '_> {
     }
 
     fn takes(&self, button: PointerButton, mods: Mods) -> bool {
-        self.scope.with_app(|app| super::quick_pick::takes(app, mods)) || self.inner.takes(button, mods)
+        (!self.dialog && self.scope.with_app(|app| super::quick_pick::takes(app, mods))) || self.inner.takes(button, mods)
     }
 
     fn autoscrolls(&self) -> bool {
@@ -414,8 +417,11 @@ impl Preflight<'_, '_> {
     fn refused(&self, pointer: &ToolPointer, at: [f64; 2]) -> bool {
         let tool = self.tool;
         let pressure = pointer.sample.pressure;
+        let mods = pointer.mods;
         self.scope.with_app(|app| {
-            press_refused(app, tool)
+            // Auto-Select's press picks the layer to move, so the hidden active layer is not its target.
+            let picks = tool == Tool::Move && !crate::move_ui::moves_selected_pixels_with(app, tool) && app.ui.tool_options.move_auto_select != mods.cmd;
+            (!picks && press_refused(app, tool))
                 || crate::rasterize_prompt::intercept(app, tool, at[0], at[1], pressure)
                 || refuse_group(app, tool)
                 || crate::retouch_ui::clone_stamp_without_source(app, tool)
@@ -534,7 +540,7 @@ fn with_rig<R>(
         } else if source_wanted && !dialog_picked && let Some(state) = retouch.take() {
             alt_t = Some(retouch::source_tool(&scope, state, host));
         }
-        let mut pre = Preflight { scope: &scope, inner: selected, tool, outline_open };
+        let mut pre = Preflight { scope: &scope, inner: selected, tool, dialog: dialog_picked, outline_open };
         let mut tool_host = ToolHost::new().momentary(momentary);
         if let Some(mover) = command_t.as_mut() {
             tool_host = tool_host.stand_in(StandInKey::Command, dynamic(mover));

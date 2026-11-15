@@ -471,7 +471,8 @@ fn action_dialog_uses_recorded_alpha_instead_of_current_red_channel() {
             assert_eq!(params(&h)["target"], json!({"channel": 0}));
             let neutral = photocraft_engine::adjust_params::to_params(&photocraft_engine::adjust_params::default_for(kind, ColorMode::Grayscale).unwrap());
             for key in ["red", "green", "blue"] {
-                assert_eq!(params(&h)[key], neutral[key], "hidden {key} starts neutral");
+                // A gray plane's command parameters carry no colour records (the engine drops them); one that is carried is neutral.
+                assert!(params(&h).get(key).is_none_or(|record| *record == neutral[key]), "hidden {key} starts neutral: {}", params(&h));
             }
             for key in ["cyan", "black", "lightness", "a", "b"] {
                 assert!(params(&h).get(key).is_none());
@@ -547,7 +548,7 @@ fn explicit_pixels_action_bypasses_current_alpha_target() {
     play(&mut h, "Pixel edit");
     assert_eq!(names(&h), ["RGB"]);
     for key in ["red", "green", "blue"] {
-        assert_eq!(params(&h)[key], json!([[0, 255], [255, 255]]), "pixel targets retain their recorded {key} curve");
+        assert_eq!(params(&h)[key], json!([[0.0, 255.0], [255.0, 255.0]]), "pixel targets retain their recorded {key} curve");
     }
     h.get_by_label("Set White Point").click();
     h.run_steps(2);
@@ -859,7 +860,8 @@ fn last_tone_settings_follow_the_current_scalar_target() {
                 h.run_steps(4);
                 let fields = params(&h);
                 for key in ["red", "green", "blue"] {
-                    let neutral = if kind == "levels" { fields[key]["gamma"] == 1.0 } else { fields[key] == json!([[0.0, 0.0], [255.0, 255.0]]) };
+                    // The gray plane's command parameters carry no colour records; one that is carried is neutral.
+                    let neutral = fields.get(key).is_none_or(|record| if kind == "levels" { record["gamma"] == 1.0 } else { *record == json!([[0.0, 0.0], [255.0, 255.0]]) });
                     assert!(neutral, "{mode:?} {target:?} {kind}: hidden {key} must stay neutral: {fields}");
                 }
                 assert!(fields.get("layer").is_none() && fields.get("document").is_none());
@@ -933,11 +935,12 @@ fn last_tone_settings_on_grayscale_pixels_drop_hidden_colour_records() {
         let id = adjust_dialog::open_last(h.state_mut(), &command).unwrap();
         h.run_steps(4);
         let fields = params(&h);
+        // The recalled colour record is dropped: absent, or neutral where the parameters carry one.
         if kind == "levels" {
-            assert_eq!(fields["red"]["gamma"], 1.0);
+            assert!(fields.get("red").is_none_or(|red| red["gamma"] == 1.0), "{fields}");
             assert_eq!(fields["gamma"], 2.0);
         } else {
-            assert_eq!(fields["red"], json!([[0.0, 0.0], [255.0, 255.0]]));
+            assert!(fields.get("red").is_none_or(|red| *red == json!([[0.0, 0.0], [255.0, 255.0]])), "{fields}");
             assert_eq!(fields["points"], json!([[0.0, 255.0], [255.0, 0.0]]));
         }
         cancel(&mut h, id);
@@ -1304,7 +1307,7 @@ fn record_again_uses_recorded_alpha_settings_and_matches_its_preview() {
             let original = app.session.active().unwrap().doc.clone();
             let mut h = harness(app);
             h.run_steps(3);
-            let reply = control(&mut h, "ui.menu.invoke", json!({"id": "actions.recordAgain"}));
+            let reply = control(&mut h, "ui.menu.invoke", json!({"id": "actionsPanel.recordAgain"}));
             assert_eq!(reply["ok"], true, "{reply}");
             assert_eq!(names(&h), ["Saved sky"], "{mode:?} {kind}");
             let values = params(&h);

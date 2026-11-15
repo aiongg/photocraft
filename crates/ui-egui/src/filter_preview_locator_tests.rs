@@ -47,9 +47,7 @@ fn harness(command: Option<&str>, rotation: f32) -> Harness<'static, PhotocraftA
 }
 
 fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value) {
-    let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new(method, params);
-    let _ = crate::control::handle(h.state_mut(), &ctx, &req);
+    crate::canvas::testing::control(h.state_mut(), method, params);
     h.run_steps(2);
 }
 
@@ -104,13 +102,11 @@ fn click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.run_steps(2);
 }
 
-/// Sends `events` as one `ui.pointer` request, then lets the frames run: the tool host takes
-/// the events on a later pass and the reply comes after.
+/// Sends `events` as one `ui.pointer` request, then runs frames until the window host has delivered them (one input per
+/// pass).
 fn pointer(h: &mut Harness<'static, PhotocraftApp>, events: Value) {
-    let ctx = h.ctx.clone();
-    let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"events": events}));
-    let _ = crate::control::handle(h.state_mut(), &ctx, &req);
-    h.run_steps(3);
+    crate::canvas::testing::control(h.state_mut(), "ui.pointer", json!({"events": events}));
+    h.run_steps(2);
 }
 
 #[test]

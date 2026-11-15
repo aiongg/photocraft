@@ -41,12 +41,18 @@ fn anchors(app: &mut PhotocraftApp) -> Vec<[f64; 2]> {
     knots(app).iter().map(anchor).collect()
 }
 
+/// Whether every coordinate of `got` is within a thousandth of `want`: the drag's points pass through the view's f32 screen space.
+fn same(got: &[[f64; 2]], want: &[[f64; 2]]) -> bool {
+    got.len() == want.len() && got.iter().zip(want).all(|(g, w)| (g[0] - w[0]).abs() < 1e-3 && (g[1] - w[1]).abs() < 1e-3)
+}
+
 #[test]
 fn dragging_the_bottom_edge_moves_both_its_anchors_in_one_drag_segment_step() {
     let mut app = document(Tool::DeleteAnchorPoint);
     let n = steps(&app);
     drag(&mut app, [200.0, 500.0], [200.0, 540.0]);
-    assert_eq!(anchors(&mut app), vec![[100.0, 300.0], [300.0, 300.0], [300.0, 540.0], [100.0, 540.0]]);
+    let moved = anchors(&mut app);
+    assert!(same(&moved, &[[100.0, 300.0], [300.0, 300.0], [300.0, 540.0], [100.0, 540.0]]), "{moved:?}");
     assert_eq!(steps(&app), n + 1);
     assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Drag Segment"));
 }
@@ -64,6 +70,6 @@ fn a_segment_with_handles_a_hair_off_its_anchors_still_drags() {
     app.run("path.set", json!({"name": "Path 1", "path": path})).unwrap();
     drag(&mut app, [200.0, 500.0], [200.0, 540.0]);
     let moved = anchors(&mut app);
-    assert_eq!((moved[2], moved[3]), ([300.0, 540.0], [100.0, 540.0]), "{moved:?}");
+    assert!(same(&moved[2..], &[[300.0, 540.0], [100.0, 540.0]]), "{moved:?}");
 }
 
