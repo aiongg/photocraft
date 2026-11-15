@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::shape_gradient_ui::{self as shape_gradient, ShapeGradients};
-use crate::shape_paint_ui::{PaintChange, gradient_preview, paint_of, paint_param, rgba, srgba};
+use crate::shape_paint_ui::{ChipLibrary, PaintChange, decorate_chip, gradient_fill, paint_of, paint_param, rgba, srgba};
 use crate::shape_stroke_ui::StrokeOptions;
 use crate::state::Tool;
 use crate::vector_ui::enabled_stroke_width;
@@ -99,12 +99,13 @@ fn already_shown(change: &ShapeChange, appearance: &ShapeAppearance, settings: &
     }
 }
 
-/// The paint change a chip's paint stands for; a gradient is `gradient`, which the chip only previews.
+/// The paint change a chip's paint stands for; a gradient is [`gradient_fill`] over `gradient`, the chip's
+/// [`ChipLibrary::gradient`].
 fn paint_change(paint: &craft::color::ui::Paint, gradient: &Fill) -> Option<PaintChange> {
     match paint {
         craft::color::ui::Paint::None => Some(PaintChange::None),
         craft::color::ui::Paint::Solid(c) => Some(PaintChange::Color(rgba(*c))),
-        craft::color::ui::Paint::Gradient(_) => Some(PaintChange::Gradient(gradient.clone())),
+        craft::color::ui::Paint::Gradient(preview) => Some(PaintChange::Gradient(gradient_fill(preview, gradient))),
         _ => None,
     }
 }
@@ -182,42 +183,18 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
         .find_map(|p| crate::screen_picker::take(app, ("shape-bar", p)).map(|c| (p, c)));
     let recent_colors: Vec<craft::theme::Srgba> = crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| srgba([c[0], c[1], c[2], 1.0])).collect();
     let groups = ShapeGradients::groups_of(&app.session.presets.gradients, fg, bg);
-    let mut gradients = ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
-    let default_gradient = gradients.default_fill();
-    // The gradients the chips' editors produced this pass, fill then stroke.
-    let mut edited: [Option<Fill>; 2] = [None, None];
-    let out = {
-        let bar = ShapeBar::new(kind, &settings, &appearance, ppi)
-            .paint(paint)
-            .fallbacks(srgba(fg), srgba(bg))
-            .sampled(sampled)
-            .stroke_open(Bind::bound(&mut app.ui.shape_stroke_open))
-            .chips(|which, chip, chip_ui| {
-                let (slot, current) = match which {
-                    ShapePaint::Fill => (0, fill.as_ref()),
-                    ShapePaint::Stroke => (1, stroke.as_ref().map(|s| &s.paint)),
-                    _ => (0, None),
-                };
-                let from = match current {
-                    Some(f @ Fill::Gradient { .. }) => f.clone(),
-                    _ => default_gradient.clone(),
-                };
-                chip.recent(&recent_colors)
-                    .swatches(&app.session.presets.swatches, Bind::bound(&mut app.ui.paint_folders))
-                    .full_picker(true)
-                    .gradient_editor(gradient_preview(&default_gradient), |ui: &mut egui::Ui| {
-                        let base = edited[slot].clone().unwrap_or_else(|| from.clone());
-                        let picked = shape_gradient::editor(ui, &base, &mut gradients, Bind::bound(&mut app.ui.shape_gradient_state))?;
-                        let preview = gradient_preview(&picked);
-                        edited[slot] = Some(picked);
-                        Some(preview)
-                    })
-                    .show(chip_ui)
-            });
-        bar.show(ui)
-    };
-    let gradient_of = |slot: usize| edited[slot].clone().unwrap_or_else(|| default_gradient.clone());
-    let (fill_gradient, stroke_gradient) = (gradient_of(0), gradient_of(1));
+    let gradients = ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
+    let current = [fill.clone(), stroke.as_ref().map(|s| s.paint.clone())];
+    let mut library =
+        ChipLibrary::new(&recent_colors, &app.session.presets.swatches, &mut app.ui.paint_folders, gradients, &mut app.ui.shape_gradient_state, current);
+    let out = ShapeBar::new(kind, &settings, &appearance, ppi)
+        .paint(paint)
+        .fallbacks(srgba(fg), srgba(bg))
+        .sampled(sampled)
+        .stroke_open(Bind::bound(&mut app.ui.shape_stroke_open))
+        .chips(|which, chip, chip_ui| decorate_chip(chip, which, &mut library, chip_ui))
+        .show(ui);
+    let (fill_gradient, stroke_gradient) = (library.gradient(ShapePaint::Fill), library.gradient(ShapePaint::Stroke));
 
     let mut recent: Option<[f32; 3]> = None;
     let mut remembered: Vec<Fill> = Vec::new();

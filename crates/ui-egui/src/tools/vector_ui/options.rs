@@ -301,29 +301,49 @@ fn live_of(live: &photocraft_doc::vector::LiveShape) -> fw::LiveShape {
     }
 }
 
-/// One field's edit as a `shape.edit` patch, with the colour a solid pick adds to the Recently Used Colors.
+/// One field's edit as a `shape.edit` patch, with the colour a solid pick adds to the Recently Used Colors and the
+/// gradient a gradient pick adds to the Gradient tab's Recent row.
 struct Edit {
     field: &'static str,
     patch: Value,
     recent: Option<[f32; 3]>,
+    gradient: Option<photocraft_doc::Fill>,
 }
 
-/// The `shape.edit` patch of `change` on the layer `sh`; `None` when the change is no edit.
-fn edit_of(change: &fw::ShapeChange, sh: &photocraft_doc::ShapeLayer) -> Option<Edit> {
-    let plain = |field, patch| Some(Edit { field, patch, recent: None });
+/// The gradient a chip's `paint` stands for over `base`; `None` for a paint that is no gradient.
+fn picked_gradient(paint: &Paint, base: &photocraft_doc::Fill) -> Option<photocraft_doc::Fill> {
+    match paint {
+        Paint::Gradient(preview) => Some(crate::shape_paint_ui::gradient_fill(preview, base)),
+        _ => None,
+    }
+}
+
+/// The `shape.edit` patch of `change` on the layer `sh`; `None` when the change is no edit. `gradients` are the fill's
+/// and the stroke's [`ChipLibrary::gradient`](crate::shape_paint_ui::ChipLibrary::gradient), which a gradient paint
+/// is laid over.
+fn edit_of(change: &fw::ShapeChange, sh: &photocraft_doc::ShapeLayer, gradients: &[photocraft_doc::Fill; 2]) -> Option<Edit> {
+    let plain = |field, patch| Some(Edit { field, patch, recent: None, gradient: None });
     let width_now = sh.stroke.as_ref().map_or(0.0, |s| s.width);
     match change {
-        fw::ShapeChange::Fill(paint) => {
-            Some(Edit { field: "fill", patch: json!({"fill": crate::shape_paint_ui::fill_param(paint)}), recent: crate::shape_paint_ui::solid_rgb(paint) })
-        }
+        fw::ShapeChange::Fill(paint) => Some(Edit {
+            field: "fill",
+            patch: json!({"fill": crate::shape_paint_ui::fill_param(paint, &gradients[0])}),
+            recent: crate::shape_paint_ui::solid_rgb(paint),
+            gradient: picked_gradient(paint, &gradients[0]),
+        }),
         fw::ShapeChange::Stroke { paint, width, .. } => {
-            let color = crate::shape_paint_ui::fill_param(paint);
+            let color = crate::shape_paint_ui::fill_param(paint, &gradients[1]);
             let stroke = if color.is_null() {
                 Value::Null
             } else {
                 json!({"color": color, "width": width.unwrap_or_else(|| f64::from(enabled_stroke_width(width_now)))})
             };
-            Some(Edit { field: "stroke", patch: json!({"stroke": stroke}), recent: crate::shape_paint_ui::solid_rgb(paint) })
+            Some(Edit {
+                field: "stroke",
+                patch: json!({"stroke": stroke}),
+                recent: crate::shape_paint_ui::solid_rgb(paint),
+                gradient: picked_gradient(paint, &gradients[1]),
+            })
         }
         fw::ShapeChange::StrokeWidth(w) => {
             // A step that clamps at 0 on a shape with no stroke is no change.
@@ -394,24 +414,36 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     let target = (doc.0, id.0);
     let was_linked = app.ui.arrow_default == Some(target);
     let mut linked = was_linked;
-    let swatches = &app.session.presets.swatches;
-    let folders = &mut app.ui.paint_folders;
     let recent_colors: Vec<Srgba> = crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| Srgba::new(c[0], c[1], c[2], 1.0)).collect();
+    let groups = crate::shape_gradient_ui::ShapeGradients::groups_of(&app.session.presets.gradients, fg, bg);
+    let gradients =
+        crate::shape_gradient_ui::ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
+    let current = [sh.fill.clone(), sh.stroke.as_ref().map(|s| s.paint.clone())];
+    let mut library = crate::shape_paint_ui::ChipLibrary::new(
+        &recent_colors,
+        &app.session.presets.swatches,
+        &mut app.ui.paint_folders,
+        gradients,
+        &mut app.ui.shape_gradient_state,
+        current,
+    );
     let output = ShapePanel::new(label(tl!("Shape properties")), &shown, &appearance, ppi)
         .sections(true, sh.live.is_some())
         .stroke_open(Bind::bound(&mut app.ui.shape_stroke_open))
-        .chips(|which, chip, chip_ui| crate::shape_paint_ui::decorate_chip(chip, which, &recent_colors, swatches, folders, chip_ui))
+        .chips(|which, chip, chip_ui| crate::shape_paint_ui::decorate_chip(chip, which, &mut library, chip_ui))
         .fallbacks(Srgba::new(fg[0], fg[1], fg[2], fg[3]), Srgba::new(bg[0], bg[1], bg[2], bg[3]))
         .arrow_default(Bind::bound(&mut linked))
         .show(ui);
     let fw::ShapePanelOutput { events, pick_color, .. } = output;
+    let paint_gradients = [library.gradient(fw::ShapePaint::Fill), library.gradient(fw::ShapePaint::Stroke)];
 
     let mut applied = false;
     let mut recent: Option<[f32; 3]> = None;
+    let mut remembered: Vec<photocraft_doc::Fill> = Vec::new();
     let prefix = |field: &str| format!("shape-{doc:?}-{}-{field}", id.0);
     for event in &events {
         let Some(change) = event.value() else { continue };
-        let Some(edit) = edit_of(change, &sh) else { continue };
+        let Some(edit) = edit_of(change, &sh, &paint_gradients) else { continue };
         let mut patch = edit.patch;
         patch["layer"] = json!(id.0);
         if let Some(key) = history_keys::coalesce(&prefix(edit.field), event) {
@@ -421,6 +453,9 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
             Ok(_) => {
                 applied = true;
                 recent = edit.recent.or(recent);
+                if !matches!(event, EditEvent::Update { .. } | EditEvent::Cancel { .. }) {
+                    remembered.extend(edit.gradient);
+                }
             }
             Err(e) => {
                 app.ui.status = e;
@@ -431,6 +466,9 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     if applied && let Some(rgb) = recent {
         // A colour picked in a Fill/Stroke popover joins the Recently Used Colors once the edit took it.
         crate::paint_picker::remember(app, rgb);
+    }
+    for g in &remembered {
+        crate::shape_gradient_ui::remember_recent(&mut app.ui.recent_gradients, g);
     }
     if linked != was_linked {
         app.ui.arrow_default = linked.then_some(target);

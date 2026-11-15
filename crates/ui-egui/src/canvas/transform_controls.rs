@@ -1,7 +1,11 @@
 use super::tools::selection::floating_outline;
 use super::PhotocraftApp;
 use crate::state::Tool;
+use craft::behavior::EditEvent;
+use craft::behavior::geometry::quad::{BoxRules, BoxState, TransformMode};
 use craft::behavior::kurbo::{self, BezPath};
+use craft::draw::ui::transform::{RotateZone, TransformBox, TransformEdit};
+use craft::ui::contract::{Bind, Props as _, Show as _};
 
 // The hit-zone tests (`transform_hit_zone_tests.rs`, tools-w31) read `super::*`.
 #[cfg(test)]
@@ -106,6 +110,40 @@ pub(crate) fn begin_controls(app: &mut PhotocraftApp, ctx: &egui::Context) -> Co
         Err(e) => {
             app.ui.status = e;
             ControlsPress::Missed
+        }
+    }
+}
+
+/// The Move tool's transform box in the accessibility tree.
+const CONTROLS_LABEL: &str = "Transform controls";
+
+/// Move › Show Transform Controls over the canvas body `rect`: a `TransformBox` on [`frame`] whose inside and outside
+/// (past the corner rotate bands) stay the Move tool's. Its first `Begin` runs [`begin_controls`]; once a session
+/// starts, this pass's box events go to the session, and from the next pass the session's `TransformOverlay` carries
+/// the drag on. The hand-off relies on both boxes having the same automatic id: the first `TransformBox` of the canvas
+/// body, since the overlay shows nothing before the session opens and this box shows nothing after.
+pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
+    let Some(start) = frame(app) else { return };
+    let settings = crate::transform_tool::settings(app);
+    // The rules a new session starts with (`TransformSession::box_rules` in Free mode), so the drag reads the same
+    // before and after the hand-off.
+    let rules = BoxRules::in_mode(TransformMode::Free).with_scale(settings.scale_rule()).with_aspect_linked(settings.aspect_linked);
+    let out = TransformBox::new(CONTROLS_LABEL, Bind::given(BoxState::from_rect(start)), start, 0.0)
+        .rules(rules)
+        .rotate_zone(RotateZone::Band)
+        .reference_point(false)
+        .inside_moves(false)
+        .show_at(ui, rect);
+    if !out.edit.events.iter().any(|event| matches!(event, EditEvent::Begin { .. })) {
+        return;
+    }
+    if begin_controls(app, ui.ctx()) != ControlsPress::Started {
+        return;
+    }
+    let now = ui.input(|i| i.time);
+    if let Some(t) = app.ui.transform.as_mut() {
+        for event in out.edit.events.iter().cloned() {
+            t.session.apply(TransformEdit::Box(event), now);
         }
     }
 }

@@ -270,7 +270,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
         guides = super::rulers::show(app, ui, host);
-        selection_controls(app, ui, body.rect, idx, &label);
+        selection_controls(app, ui, body.rect, idx, output, &label);
         // Under the controls, through the canvas's reserved paint slot.
         let mut under = Vec::new();
         if primary {
@@ -376,7 +376,7 @@ fn pasteboards(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usiz
 }
 
 /// The selection's marching ants, the Layer Edges outline and the pixel grid.
-fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, label: &str) {
+fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, output: Option<u32>, label: &str) {
     let ants = ants_shown(app, idx);
     if let Some(state) = app.session.documents().get(idx) {
         let doc = state.doc.clone();
@@ -394,8 +394,12 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
         SelectionOutline::solid(label.to_owned(), std::slice::from_ref(&edges)).show_at(ui, rect);
     }
     if app.ui.view.shows(app.ui.view.show.pixel_grid) {
-        let composite = super::display_doc(app, idx).0;
-        craft::ui::canvas_controls::PixelGrid::new(label.to_owned(), &composite).show_at(ui, rect);
+        let ctx = ui.ctx().clone();
+        // The grid reads the committed composite: a tool's live proposal comes from the controls shown after it.
+        if let Some(prep) = CompositePrep::new(app, &ctx, idx, output, None) {
+            let composite = prep.source(app);
+            craft::ui::canvas_controls::PixelGrid::new(label.to_owned(), &composite as &dyn RasterSource).show_at(ui, rect);
+        }
     }
 }
 
@@ -422,8 +426,6 @@ fn canvas_controls(
     crate::type_path_placement::show(app, ui, rect);
     crate::transform_tool::show_in_canvas(app, ui, rect, now);
     crate::cam_transform::show(app, ui, rect);
-    // PLAN: the TransformBox (RotateZone::Band over `transform_controls::frame`) and the TransformOverlay are
-    // canvas-widgets-w21's; the contract names no show function, so this is its assumed entry.
     super::transform_controls::show(app, ui, rect);
     crate::move_box::show(app, ui, rect);
     crate::move_hover::show(app, ui, rect, pointer);

@@ -812,7 +812,7 @@ impl PanelSet {
             writes.push(Box::new(move |app| app.ui.chrome.home_recent_view = view));
         }
         if let Some(v) = p.get("statusInfo") {
-            let key = v.as_str().filter(|key| is_status_key(key)).ok_or_else(|| "statusInfo is not a status bar item".to_string())?.to_string();
+            let key = v.as_str().filter(|key| crate::chrome_ui::status_item_of(key).is_some()).ok_or_else(|| "statusInfo is not a status bar item".to_string())?.to_string();
             writes.push(Box::new(move |app| app.ui.chrome.status_info = key));
         }
         let dock_tabs = if p.get("dockTabs").is_some() {
@@ -1363,13 +1363,4 @@ fn open_pcraft_directory(app: &mut PhotocraftApp, path: &str) -> Option<Reply> {
         Ok(None) => None, // a regular file: the bytes path reads the zip form
         Err(e) => Some(err(e)),
     }
-}
-
-/// Whether `key` names a status bar item: the chrome state keeps a key only when it maps to an item and back.
-fn is_status_key(key: &str) -> bool {
-    let mut chrome = crate::chrome_ui::ChromeState { status_info: key.to_owned(), ..Default::default() };
-    let item = crate::chrome_ui::status_item(&chrome);
-    chrome.status_info.clear();
-    crate::chrome_ui::set_status_item(&mut chrome, item);
-    chrome.status_info == key
 }

@@ -64,9 +64,14 @@ const STATUS_KEYS: [(&str, StatusItem); 9] = [
     ("layers", StatusItem::LayerCount),
 ];
 
+/// The status bar item saved as `key`; `None` for a key that names no item.
+pub(crate) fn status_item_of(key: &str) -> Option<StatusItem> {
+    STATUS_KEYS.iter().find(|(saved, _)| *saved == key).map(|(_, item)| *item)
+}
+
 /// The status bar item the chrome state remembers; an unknown key shows the dimensions.
 pub(crate) fn status_item(chrome: &ChromeState) -> StatusItem {
-    STATUS_KEYS.iter().find(|(key, _)| *key == chrome.status_info).map_or(StatusItem::DocumentDimensions, |(_, item)| *item)
+    status_item_of(&chrome.status_info).unwrap_or(StatusItem::DocumentDimensions)
 }
 
 /// Remembers the status bar item the user picked.

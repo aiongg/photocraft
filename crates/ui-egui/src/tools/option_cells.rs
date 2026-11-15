@@ -3,7 +3,7 @@
 
 use std::ops::RangeInclusive;
 
-use craft::behavior::NumberCodec;
+use craft::behavior::{EditEvents, NumberCodec};
 use craft::ui::contract::{Bind, FieldLayout, Props as _, Show as _, ShowContainer as _, SideLabel, Sizing};
 use craft::ui::primitives::IconSpec;
 use craft::ui::dialog::Alert;
@@ -76,15 +76,15 @@ impl<'a> NumberCell<'a> {
         self
     }
 
-    /// Shows the cell. Returns the alert of a typed value that was clamped to the range, in the pass
-    /// it committed.
-    pub(crate) fn show(self, ui: &mut egui::Ui) -> Option<RangeAlert> {
+    /// Shows the cell. Returns the pass's edit events, which a caller keys its history step by
+    /// (`history_keys::coalesce`), and the alert of a typed value that was clamped to the range.
+    pub(crate) fn show(self, ui: &mut egui::Ui) -> NumberCellOutput {
         let Self { caption, value, range, unit, whole, popup_slider, tooltip, enabled, icon } = self;
         let mut side = SideLabel::new().scrub(true);
         if let Some(icon) = icon {
             side = side.icon(icon).layout(FieldLayout::Inside);
         }
-        let mut alert = None;
+        let mut out = NumberCellOutput { events: EditEvents::default(), out_of_range: None };
         Field::new(caption.clone()).enabled(enabled).side(side).sizing(Sizing::Content).show(ui, |ui, _| {
             let mut field = NumberField::named(caption.clone(), Bind::bound(&mut *value)).range(range.clone()).scrub_by_label();
             if whole {
@@ -100,10 +100,19 @@ impl<'a> NumberCell<'a> {
             if let Some(tooltip) = tooltip.clone() {
                 field = field.tooltip(tooltip);
             }
-            alert = field.show(ui).out_of_range;
+            let shown = field.show(ui);
+            out = NumberCellOutput { events: shown.edit.events, out_of_range: shown.out_of_range };
         });
-        alert
+        out
     }
+}
+
+/// What a [`NumberCell`] reported this pass.
+pub(crate) struct NumberCellOutput {
+    /// The field's edit events: a scrub or arrow run is one gesture, a typed commit a `Set`.
+    pub events: EditEvents<f32>,
+    /// A typed value that was clamped to the range, in the pass it committed.
+    pub out_of_range: Option<RangeAlert>,
 }
 
 /// Opens the out-of-range alert for `alert`; `ui` supplies the env that words its range. One alert

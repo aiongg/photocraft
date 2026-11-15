@@ -3,12 +3,14 @@
 use craft::color::palette::SwatchGroup;
 use craft::color::ui::{GradientPreview, Paint, PaintChip, PaintChipOutput, SwatchKey};
 use craft::draw::stroke::StrokeStyle;
+use craft::draw::ui::GradientRef;
 use craft::draw::ui::shape::{ShapeAppearance, ShapePaint};
 use craft::theme::Srgba;
 use craft::ui::contract::{Bind, Show as _};
 use craft::ui::patterns::presets::PresetState;
 use serde_json::{Value, json};
 
+use crate::shape_gradient_ui::ShapeGradients;
 use crate::shape_stroke_ui::StrokeOptions;
 
 pub(crate) fn color_of(f: &photocraft_doc::Fill) -> Option<[f32; 4]> {
@@ -74,15 +76,32 @@ pub(crate) fn paint_of(fill: Option<&photocraft_doc::Fill>) -> Paint {
     }
 }
 
-/// The `shape.edit` parameter of a chip's `paint`: a colour as float RGBA, a gradient as its stops, `null` for No
-/// Color or a paint the shape tools do not offer (a pattern or picture).
-pub(crate) fn fill_param(paint: &Paint) -> Value {
+/// The gradient a chip's `preview` stands for over `base` (the chip's [`ChipLibrary::gradient`]): `base` itself when
+/// the preview shows its stops, so the stops keep their colour models; otherwise `base` with the preview's stops, its
+/// angle, style and the other fields kept.
+pub(crate) fn gradient_fill(preview: &GradientPreview, base: &photocraft_doc::Fill) -> photocraft_doc::Fill {
+    if gradient_preview(base) == *preview {
+        return base.clone();
+    }
+    let stops = preview.stops.iter().map(|(t, c)| (*t, photocraft_doc::Color::rgba(c.r, c.g, c.b, c.a))).collect();
+    match base {
+        photocraft_doc::Fill::Gradient { .. } => {
+            let mut merged = base.clone();
+            if let photocraft_doc::Fill::Gradient { stops: kept, .. } = &mut merged {
+                *kept = stops;
+            }
+            merged
+        }
+        _ => photocraft_doc::Fill::gradient(stops, 90.0, 1.0, photocraft_doc::GradientStyle::Linear, false),
+    }
+}
+
+/// The `shape.edit` parameter of a chip's `paint`: a colour as float RGBA, a gradient as [`gradient_fill`] over
+/// `base` gives it, `null` for No Color or a paint the shape tools do not offer (a pattern or picture).
+pub(crate) fn fill_param(paint: &Paint, base: &photocraft_doc::Fill) -> Value {
     match paint {
         Paint::Solid(c) => json!(rgba(*c)),
-        Paint::Gradient(preview) => {
-            let stops: Vec<Value> = preview.stops.iter().map(|(t, c)| json!([t, photocraft_doc::Color::rgba(c.r, c.g, c.b, c.a)])).collect();
-            json!({"gradient": {"stops": stops}})
-        }
+        Paint::Gradient(preview) => paint_param(&gradient_fill(preview, base)),
         _ => Value::Null,
     }
 }
@@ -102,15 +121,70 @@ pub(crate) fn appearance_of(sh: &photocraft_doc::ShapeLayer, locked: bool) -> Sh
     ShapeAppearance::new(paint_of(sh.fill.as_ref()), paint_of(sh.stroke.as_ref().map(|s| &s.paint)), f64::from(width)).stroke_style(style).locked(locked)
 }
 
-/// The Fill or Stroke chip of the Shape Properties panel: the Recently Used Colors, the swatch library and the full
-/// Color Picker. `which` is the chip's own paint; the chip has no Gradient tab here.
-pub(crate) fn decorate_chip<'a>(
-    chip: PaintChip<'a>,
-    _which: ShapePaint,
+/// What the Fill and Stroke chips offer beside the paint, for the shape options bar and the Shape Properties panel
+/// alike: the Recently Used Colors, the swatch library, the full Color Picker and the Gradient tab.
+pub(crate) struct ChipLibrary<'a> {
     recent: &'a [Srgba],
     swatches: &'a [SwatchGroup],
     folders: &'a mut PresetState<SwatchKey>,
-    ui: &mut egui::Ui,
-) -> PaintChipOutput {
-    chip.recent(recent).swatches(swatches, Bind::bound(folders)).full_picker(true).show(ui)
+    gradients: ShapeGradients<'a>,
+    gradient_state: &'a mut PresetState<GradientRef>,
+    /// The chips' paints as the bar or panel shows them, fill then stroke.
+    current: [Option<photocraft_doc::Fill>; 2],
+    /// What a switch to the Gradient tab sets.
+    default_gradient: photocraft_doc::Fill,
+    /// The gradients the chips' editors produced this pass, fill then stroke.
+    edited: [Option<photocraft_doc::Fill>; 2],
+}
+
+impl<'a> ChipLibrary<'a> {
+    /// The library over `recent` colours, the swatch `swatches` with their open `folders`, the `gradients` store and
+    /// its list state; `current` is the fill and the stroke paint shown.
+    pub(crate) fn new(
+        recent: &'a [Srgba],
+        swatches: &'a [SwatchGroup],
+        folders: &'a mut PresetState<SwatchKey>,
+        gradients: ShapeGradients<'a>,
+        gradient_state: &'a mut PresetState<GradientRef>,
+        current: [Option<photocraft_doc::Fill>; 2],
+    ) -> Self {
+        let default_gradient = gradients.default_fill();
+        ChipLibrary { recent, swatches, folders, gradients, gradient_state, current, default_gradient, edited: [None, None] }
+    }
+
+    /// The gradient chip `which` stands for: the one its editor produced this pass, else its own gradient, else the
+    /// default gradient.
+    pub(crate) fn gradient(&self, which: ShapePaint) -> photocraft_doc::Fill {
+        let slot = slot(which);
+        self.edited[slot].clone().or_else(|| self.current[slot].clone().filter(|f| matches!(f, photocraft_doc::Fill::Gradient { .. }))).unwrap_or_else(|| self.default_gradient.clone())
+    }
+}
+
+/// A chip's place in [`ChipLibrary`]'s pairs: 0 the fill, 1 the stroke.
+fn slot(which: ShapePaint) -> usize {
+    match which {
+        ShapePaint::Stroke => 1,
+        _ => 0,
+    }
+}
+
+/// The Fill or Stroke chip `which` with what `library` offers; a gradient edited in its Gradient tab is kept in the
+/// library for [`ChipLibrary::gradient`].
+pub(crate) fn decorate_chip<'c>(chip: PaintChip<'c>, which: ShapePaint, library: &'c mut ChipLibrary<'_>, ui: &mut egui::Ui) -> PaintChipOutput {
+    let from = library.gradient(which);
+    let default_preview = gradient_preview(&library.default_gradient);
+    let ChipLibrary { recent, swatches, folders, gradients, gradient_state, edited, .. } = library;
+    let edited = &mut edited[slot(which)];
+    chip.recent(*recent)
+        .swatches(*swatches, Bind::bound(&mut **folders))
+        .full_picker(true)
+        .gradient_editor(default_preview, move |ui: &mut egui::Ui| {
+            // A second run in the same pass starts from what the first produced.
+            let base = edited.clone().unwrap_or_else(|| from.clone());
+            let picked = crate::shape_gradient_ui::editor(ui, &base, gradients, Bind::bound(&mut **gradient_state))?;
+            let preview = gradient_preview(&picked);
+            *edited = Some(picked);
+            Some(preview)
+        })
+        .show(ui)
 }
