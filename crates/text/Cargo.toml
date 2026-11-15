@@ -15,7 +15,8 @@ photocraft-color = { workspace = true }
 photocraft-raster = { workspace = true }
 photocraft-doc = { workspace = true }
 craft-psd = { workspace = true }
-# The installed fonts come from the craft font catalog, which scans the font folders; parley's own system backend stays off.
+# No `system` feature: fontique's system backend links fontconfig on Linux. The installed fonts
+# come from the craft font Catalog; the bundled fonts are always registered (native + web).
 craft = { workspace = true, default-features = false, features = ["font-catalog"] }
 parley = { version = "0.11", default-features = false, features = ["std"] }
 skrifa = "0.47"
@@ -26,10 +27,12 @@ flate2 = { workspace = true }
 # stay under Cloudflare's 25 MiB per-file cap (packaging/web/package.sh). The web build falls back
 # to the generic Unicode rules for those scripts.
 # Native only: the glyph rasteriser composites and converts its pixel buffers on all cores.
+# The Catalog's system listing (CoreText, DirectWrite and fontconfig files) is native only too.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 parley = { version = "0.11", default-features = false, features = ["std", "complex-scripts"] }
 craft = { workspace = true, default-features = false, features = ["font-catalog-system"] }
 rayon = { workspace = true }
+craft = { workspace = true, default-features = false, features = ["font-catalog", "font-catalog-system"] }
 
 [build-dependencies]
 # Deflates the bundled fonts (build.rs); `flate2` above inflates them.
