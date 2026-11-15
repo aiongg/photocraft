@@ -190,7 +190,8 @@ pub fn camera_raw_surface(surf: &Surface, area: Rect, p: &CameraRaw) -> Surface 
     let fmt = surf.format();
     let (w, h) = (area.width() as usize, area.height() as usize);
     let mut px = rgba_region(surf, area, len);
-    camera_raw::develop(&mut px, w, h, p, fmt.sample == SampleType::F32);
+    // PLAN: assumed `DevelopInputs::default()` for `develop(.., &DevelopInputs)` (dialogs-w50)
+    camera_raw::develop(&mut px, w, h, p, fmt.sample == SampleType::F32, &camera_raw::DevelopInputs::default());
     let n = fmt.channels();
     let orig = surf.read_region(area);
     let mut data = vec![0.0f32; w * h * n];
@@ -361,7 +362,8 @@ fn adaptive_wide_angle(s: &mut Session, p: &Value) -> Result<Value> {
         wideangle::WideModel::Fisheye => "fisheye",
         wideangle::WideModel::Perspective => "perspective",
         wideangle::WideModel::FullSpherical => "fullSpherical",
-        wideangle::WideModel::Auto => "auto",
+        // The framework's lens model is `non_exhaustive`: a model it adds later reads as `auto`.
+        _ => "auto",
     };
     if let Some(m) = stored.as_object_mut() {
         m.remove("layer");

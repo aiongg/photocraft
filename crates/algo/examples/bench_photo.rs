@@ -4,7 +4,8 @@
 //! `cargo run --release -p photocraft-algo --example bench_photo [case-substring]`
 use std::time::Instant;
 
-use photocraft_algo::camera_raw::{CameraRaw, Wheel, develop};
+// PLAN: assumed `DevelopInputs::default()` for `develop(.., &DevelopInputs)` (dialogs-w50)
+use photocraft_algo::camera_raw::{CameraRaw, DevelopInputs, Wheel, develop};
 use photocraft_algo::hdr::{self, MergeOptions, ToneMethod};
 use photocraft_algo::lens::{self, LensCorrection};
 use photocraft_algo::panorama::{self, AlignOptions, Layout, RoiImage};
@@ -62,11 +63,12 @@ fn main() {
                 ..Default::default()
             },
             false,
+            &DevelopInputs::default(),
         );
     });
     time("camera raw: clarity + texture + dehaze", &only, || {
         let mut a = px.clone();
-        develop(&mut a, w, h, &CameraRaw { clarity: 30.0, texture: 20.0, dehaze: 25.0, ..Default::default() }, false);
+        develop(&mut a, w, h, &CameraRaw { clarity: 30.0, texture: 20.0, dehaze: 25.0, ..Default::default() }, false, &DevelopInputs::default());
     });
     time("camera raw: hsl + grading + curve", &only, || {
         let mut a = px.clone();
@@ -83,6 +85,7 @@ fn main() {
                 ..Default::default()
             },
             false,
+            &DevelopInputs::default(),
         );
     });
     time("camera raw: sharpen + NR + grain + vignette", &only, || {
@@ -93,6 +96,7 @@ fn main() {
             h,
             &CameraRaw { sharpen_amount: 40.0, noise_luminance: 30.0, noise_color: 25.0, grain_amount: 20.0, vignette_amount: -30.0, ..Default::default() },
             false,
+            &DevelopInputs::default(),
         );
     });
     time("lens correction (distortion, CA, vignette, persp)", &only, || {
@@ -111,33 +115,34 @@ fn main() {
         )
     });
     time("adaptive wide angle (fisheye, 2 constraints)", &only, || {
-        let p = WideAngle {
-            model: WideModel::Fisheye,
-            focal_length: 12.0,
-            constraints: vec![
-                Constraint { a: [500.0, 600.0], b: [5500.0, 600.0], orientation: Orientation::Horizontal },
-                Constraint { a: [700.0, 500.0], b: [700.0, 3500.0], orientation: Orientation::Vertical },
-            ],
-            ..Default::default()
-        };
+        let mut p = WideAngle::default();
+        p.model = WideModel::Fisheye;
+        p.focal_length = 12.0;
+        p.constraints = vec![
+            Constraint::new([500.0, 600.0], [5500.0, 600.0], Orientation::Horizontal),
+            Constraint::new([700.0, 500.0], [700.0, 3500.0], Orientation::Vertical),
+        ];
         wideangle::apply(&s, r, &p, Interp::Bicubic)
     });
     // The mesh solve alone, on the dialog's 800 x 533 proxy.
     let proxy = Rect::new(0, 0, 800, 533);
     let solve_case = |constraints: Vec<Constraint>| {
-        let p = WideAngle { model: WideModel::Fisheye, focal_length: 12.0, constraints, ..Default::default() };
+        let mut p = WideAngle::default();
+        p.model = WideModel::Fisheye;
+        p.focal_length = 12.0;
+        p.constraints = constraints;
         wideangle::solve(&p, proxy)
     };
     time("wide angle solve: 800x533 proxy, H + V", &only, || {
         solve_case(vec![
-            Constraint { a: [60.0, 80.0], b: [740.0, 80.0], orientation: Orientation::Horizontal },
-            Constraint { a: [100.0, 60.0], b: [100.0, 470.0], orientation: Orientation::Vertical },
+            Constraint::new([60.0, 80.0], [740.0, 80.0], Orientation::Horizontal),
+            Constraint::new([100.0, 60.0], [100.0, 470.0], Orientation::Vertical),
         ])
     });
     time("wide angle solve: 800x533 proxy, 2 free", &only, || {
         solve_case(vec![
-            Constraint { a: [60.0, 80.0], b: [740.0, 95.0], orientation: Orientation::Free },
-            Constraint { a: [100.0, 60.0], b: [110.0, 470.0], orientation: Orientation::Free },
+            Constraint::new([60.0, 80.0], [740.0, 95.0], Orientation::Free),
+            Constraint::new([100.0, 60.0], [110.0, 470.0], Orientation::Free),
         ])
     });
     time("hdr: merge 3 exposures + local adaptation", &only, || {
