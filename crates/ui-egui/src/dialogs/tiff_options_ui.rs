@@ -154,7 +154,7 @@ pub fn park_dialog(app: &mut PhotocraftApp, path: String, copy: bool, record: &'
     options.pyramid = pyramid;
     options.transparency = transparency;
     let dialog =
-        HostedFormatOptions::new(ExportOptionsKind::Tiff).initial(FormatOptions::Tiff(options)).tiff_document(layered, has_transparency, layer_note);
+        HostedFormatOptions::new(app.ctx(), ExportOptionsKind::Tiff).initial(FormatOptions::Tiff(options)).tiff_document(layered, has_transparency, layer_note);
     let parked = Parked { layered, has_transparency, layer_note };
     format_prompts::park(app, ParkedSave { doc, path, copy, record, format: ParkedFormat::Tiff(parked) }, dialog)
 }

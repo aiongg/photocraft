@@ -220,12 +220,12 @@ fn open_levels(app: &mut PhotocraftApp, params: Value, end: Option<LevelsClip>) 
     let id = crate::adjust_dialog::open(app, "image.adjustments.levels").unwrap();
     let mode = app.session.active().unwrap().doc.mode;
     let cx = ValueCx::new(mode, Value::Null);
-    let mut merged = values::to_params(hosted(app, id).value(), &cx);
+    let mut merged = values::to_params(&hosted(app, id).value().value, &cx, true);
     if let (Some(merged), Value::Object(extra)) = (merged.as_object_mut(), params) {
         merged.extend(extra);
     }
     let dialog = hosted(app, id);
-    *dialog.value_mut() = values::from_params("levels", &merged, &cx).unwrap();
+    dialog.value_mut().value = values::from_params("levels", &merged, &cx).unwrap();
     dialog.set_clipping(end);
     id
 }

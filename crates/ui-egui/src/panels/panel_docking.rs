@@ -823,6 +823,9 @@ fn legacy_on(layout: &Layout<String>, panels: Option<&Value>, dock_tabs: Option<
     }
     if let Some(collapsed) = dock.and_then(|dock| dock.get("collapsed")).and_then(Value::as_array) {
         let collapsed: Vec<&str> = collapsed.iter().filter_map(Value::as_str).collect();
+        if let Some(unknown) = collapsed.iter().find(|name| !LEGACY_GROUPS.iter().any(|(key, _)| key == *name)) {
+            return Err(format!("`dock.collapsed` names no panel group: `{unknown}`"));
+        }
         for (key, first) in &shown {
             let Some(first) = first else { continue };
             let minimize = collapsed.contains(key);

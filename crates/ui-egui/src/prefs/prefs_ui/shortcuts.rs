@@ -321,8 +321,7 @@ fn menus_body(ui: &mut egui::Ui, rows: &[Row], draft: &mut MenusDraft) -> bool {
     *draft != before
 }
 
-/// Test hook: assigns `binding` to `command` in the open dialog's draft keymap, as the dialog's
-/// own edit does.
+/// Test hook: adds `binding` to `command` in the open dialog's draft keymap, as the dialog's own edit does.
 #[cfg(test)]
 pub(crate) fn assign(
     app: &mut PhotocraftApp,
@@ -332,6 +331,19 @@ pub(crate) fn assign(
 ) -> Result<craft::keymap::Assigned, craft::keymap::AssignError> {
     let session = app.prefs_rt.shortcuts.as_mut().ok_or(craft::keymap::AssignError::UnknownCommand)?;
     session.keymap.assign(command, binding, policy)
+}
+
+/// Test hook: makes `binding` the only binding of `command` in the open dialog's draft keymap, as recording over its
+/// key in the dialog does.
+#[cfg(test)]
+pub(crate) fn rebind(
+    app: &mut PhotocraftApp,
+    command: &CommandRef,
+    binding: craft::keymap::Binding,
+    policy: craft::keymap::Policy,
+) -> Result<craft::keymap::Assigned, craft::keymap::AssignError> {
+    let session = app.prefs_rt.shortcuts.as_mut().ok_or(craft::keymap::AssignError::UnknownCommand)?;
+    session.keymap.set_bindings(command, vec![binding], policy)
 }
 
 /// Test hook: presses OK in the open dialog and handles the outcome, in one pass on `ctx`.

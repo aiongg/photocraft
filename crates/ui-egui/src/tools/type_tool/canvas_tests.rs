@@ -161,7 +161,12 @@ fn open_presets(h: &Harness<'static, PhotocraftApp>, menu: &str) {
 /// The accessible name of the field `label` of the Properties panel, or of the options bar's own name for it
 /// ("Font size" is "Set font size" there).
 fn field_name(h: &Harness<'static, PhotocraftApp>, role: egui::accesskit::Role, label: &str) -> String {
-    if h.query_by_role_and_label(role, label).is_some() { label.to_owned() } else { format!("Set {}", label.to_lowercase()) }
+    // The Character panel names its style field "Style"; the options bar names it "Set font style".
+    let lower = label.to_lowercase();
+    [label.to_owned(), format!("Set {lower}"), format!("Set font {lower}")]
+        .into_iter()
+        .find(|name| h.query_by_role_and_label(role, name).is_some())
+        .unwrap_or_else(|| format!("Set {lower}"))
 }
 
 /// Scrolls the open popup list until the row `label` is shown: lists draw only the rows in view, so a row near the end
@@ -1594,10 +1599,15 @@ mod multi_layer_formatting {
             assert_eq!(style(h.state(), ids[i], 0), expected, "family changes preserve each peer's face and metrics");
         }
         assert_eq!(style(h.state(), ids[2], 0), before[2]);
-        h.get_all_by_role(Role::ComboBox).find(|n| n.value().as_deref() == Some("Smooth")).unwrap().click();
-        h.run();
-        h.get_by_label("Sharp").click();
-        h.run();
+        h.get_all_by_role(Role::ComboBox).find(|n| n.value().as_deref() == Some("Smooth")).unwrap().focus();
+        h.run_steps(2);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        reveal(&mut h, "Sharp");
+        h.get_by_label("Sharp").focus();
+        h.run_steps(2);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(2);
         h.get_by_role_and_label(Role::Button, "Toggle text orientation").click();
         h.run();
         for id in &ids[..2] {

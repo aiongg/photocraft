@@ -9,7 +9,7 @@ use photocraft_engine::shortcut_sets::{DEFAULTS_NAME, ShortcutSet, modified};
 use serde_json::json;
 
 use super::shortcut_capture_tests::{harness, tap};
-use super::shortcuts::{assign, press_ok};
+use super::shortcuts::{press_ok, rebind};
 use crate::PhotocraftApp;
 
 /// Makes the dialog's draft use the set `name`, as choosing it in the Set row does.
@@ -38,7 +38,7 @@ fn sets_saved_in_the_dialog_persist_and_the_active_sets_keys_run() {
     let ctx = h.ctx.clone();
     open(&mut h);
     // An edit in the dialog, then New Set… with a name: the set holds the edited bindings.
-    assign(h.state_mut(), &CommandRef::new("edit.copy"), Binding::parse("F9").unwrap(), Policy::Steal).unwrap();
+    rebind(h.state_mut(), &CommandRef::new("edit.copy"), Binding::parse("F9").unwrap(), Policy::Steal).unwrap();
     {
         let session = h.state_mut().prefs_rt.shortcuts.as_mut().unwrap();
         let builtins = [(DEFAULTS_NAME, Overrides::new())];
@@ -136,7 +136,7 @@ fn an_edit_still_marks_the_set_modified_and_sets_save_no_action_keys() {
     crate::actions::assign_shortcut(h.state_mut(), "Sepia", "F2").unwrap();
     assert!(!modified(h.state().session.prefs()), "A's keys are the bindings");
     open(&mut h);
-    assign(h.state_mut(), &CommandRef::new("edit.copy"), Binding::parse("F8").unwrap(), Policy::Steal).unwrap();
+    rebind(h.state_mut(), &CommandRef::new("edit.copy"), Binding::parse("F8").unwrap(), Policy::Steal).unwrap();
     ok(&mut h);
     let p = h.state().session.prefs();
     assert_eq!(p.shortcut_sets["A"].shortcuts, [("edit.copy".to_string(), "F8".to_string())].into(), "the set holds the edit and no action key");

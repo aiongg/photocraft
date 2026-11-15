@@ -9,12 +9,12 @@
 
 use craft::behavior::geometry::quad::BoxState;
 use craft::behavior::kurbo::{self, BezPath};
-use craft::behavior::{CancelReason, DocKey, EditEvent, GesturePhase, PointerButton};
+use craft::behavior::{DocKey, GesturePhase, PointerButton};
 use craft::draw::ui::transform::TransformBox;
 use craft::imaging::selection::{ColorIndicates, PreviewMode, QuickMaskLook};
 use craft::imaging::trace::{MaskRect, MaskSource};
 use craft::text::quotes::QuoteStyle;
-use craft::text::ui::editor::{TextEditor, TextSelection};
+use craft::text::ui::editor::{EditorEnd, TextEditor, TextSelection};
 use craft::theme::Srgba;
 use craft::imaging::ui::selection::SelectionOverlay;
 use craft::ui::canvas::canvas_space;
@@ -226,23 +226,19 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
     let background_press = canvas_space(&Env::of(ui).view()).is_some_and(|space| space.background().pressed == Some(PointerButton::Primary));
     let held = craft::ui::runtime::pointer::frame(ui.ctx()).mods;
     let mods = egui::Modifiers { alt: held.alt, ctrl: held.ctrl, shift: held.shift, mac_cmd: false, command: held.cmd };
-    for event in out.edit.events.iter() {
-        match event {
-            // A Type Mask replaces the selection with ⇧ or ⌥ on the press that commits (#12073).
-            EditEvent::Commit { .. } => {
-                if background_press {
-                    app.canvas_tools.type_tool.began_with_session = true;
-                }
-                commit_with(app, mods);
+    // The editor's end is the session's, whether or not its text changed: an untouched placeholder or an empty mask
+    // ends on Escape too. Every other end of the gesture (the frame drag's `cancel_all`, an undo, a removed editor)
+    // leaves the text.
+    match out.ended {
+        // A Type Mask replaces the selection with ⇧ or ⌥ on the press that commits (#12073).
+        Some(EditorEnd::Commit) => {
+            if background_press {
+                app.canvas_tools.type_tool.began_with_session = true;
             }
-            // The editor's own cancel is ⌘. and Esc where Esc does not commit (`cx.cancel(CancelReason::Escape)`,
-            // editor.rs). Every other reason (the frame drag's `cancel_all`, an undo, a removed editor) leaves the text.
-            EditEvent::Cancel { reason: CancelReason::Escape, .. } => cancel(app),
-            _ => {}
+            commit_with(app, mods);
         }
-        if app.ui.text_edit.is_none() {
-            break;
-        }
+        Some(EditorEnd::Cancel) => cancel(app),
+        _ => {}
     }
 }
 
