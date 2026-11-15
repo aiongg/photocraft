@@ -8,7 +8,7 @@ use photocraft_geom::Rect;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::panels::layers_tree::{PhotoThumbs, settings};
+use crate::panels::layers_tree::PhotoThumbs;
 
 /// A 2000 by 1000 document with a 20 by 10 red speck on layer "Speck".
 fn app() -> (PhotocraftApp, LayerId) {
@@ -23,7 +23,7 @@ fn app() -> (PhotocraftApp, LayerId) {
 
 /// The contents the panel asks the speck's thumbnail for, the frame it shows and its revision.
 fn thumb(app: &PhotocraftApp, id: LayerId) -> (ThumbContents, Rect, u64) {
-    let contents = settings(app).options.thumbnail_contents;
+    let contents = crate::layers_panel_ui::thumbnail_contents(app);
     let doc = &app.session.active().unwrap().doc;
     let frame = crate::layer_thumb_frame(doc.layer(id).unwrap(), doc.bounds(), contents == ThumbContents::LayerBounds);
     let revision = PhotoThumbs::new(app, doc).revision(&LayerThumb::pixels(id, contents), &ThumbRequest::for_cell(32.0, 1.0));

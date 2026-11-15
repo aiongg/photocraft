@@ -1,7 +1,6 @@
-//! The Layers panel's Attribute filter (#10881) as `UiState` and the control channel name its
-//! attributes, and the app data it needs: which layers are empty. craft-layers lists the layers
-//! with one attribute (visible, locked, empty, linked, clipped, masks, effects, advanced blending)
-//! or without it.
+//! The app data the Layers panel's Attribute filter (#10881) needs: which layers are empty.
+//! craft-layers lists the layers with any other attribute (visible, locked, linked, clipped,
+//! masks, effects, advanced blending) or without it.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError, Weak};
@@ -10,82 +9,8 @@ use photocraft_color::SampleType;
 use photocraft_doc::{Document, Layer, LayerContent, LayerId};
 use photocraft_geom::{Rect, TILE_SIZE, TileCoord};
 use photocraft_raster::Surface;
-use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
-
-/// The attributes the Attribute filter picks from, in Photoshop's order: the nine attributes,
-/// then their opposites.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum Attribute {
-    #[default]
-    Visible,
-    Locked,
-    Empty,
-    Linked,
-    Clipped,
-    LayerMask,
-    VectorMask,
-    LayerEffects,
-    AdvancedBlending,
-    NotVisible,
-    NotLocked,
-    NotEmpty,
-    NotLinked,
-    NotClipped,
-    NoLayerMask,
-    NoVectorMask,
-    NoLayerEffects,
-    NoAdvancedBlending,
-}
-
-impl Attribute {
-    pub const ALL: [Attribute; 18] = [
-        Attribute::Visible,
-        Attribute::Locked,
-        Attribute::Empty,
-        Attribute::Linked,
-        Attribute::Clipped,
-        Attribute::LayerMask,
-        Attribute::VectorMask,
-        Attribute::LayerEffects,
-        Attribute::AdvancedBlending,
-        Attribute::NotVisible,
-        Attribute::NotLocked,
-        Attribute::NotEmpty,
-        Attribute::NotLinked,
-        Attribute::NotClipped,
-        Attribute::NoLayerMask,
-        Attribute::NoVectorMask,
-        Attribute::NoLayerEffects,
-        Attribute::NoAdvancedBlending,
-    ];
-
-    /// The id `ui.set {layerFilter: {attribute}}` takes.
-    pub fn id(self) -> &'static str {
-        match self {
-            Attribute::Visible => "visible",
-            Attribute::Locked => "locked",
-            Attribute::Empty => "empty",
-            Attribute::Linked => "linked",
-            Attribute::Clipped => "clipped",
-            Attribute::LayerMask => "layerMask",
-            Attribute::VectorMask => "vectorMask",
-            Attribute::LayerEffects => "layerEffects",
-            Attribute::AdvancedBlending => "advancedBlending",
-            Attribute::NotVisible => "notVisible",
-            Attribute::NotLocked => "notLocked",
-            Attribute::NotEmpty => "notEmpty",
-            Attribute::NotLinked => "notLinked",
-            Attribute::NotClipped => "notClipped",
-            Attribute::NoLayerMask => "noLayerMask",
-            Attribute::NoVectorMask => "noVectorMask",
-            Attribute::NoLayerEffects => "noLayerEffects",
-            Attribute::NoAdvancedBlending => "noAdvancedBlending",
-        }
-    }
-}
 
 /// Whether `l` is a pixel layer with no visible pixels; an empty group isn't listed. Stored pixels
 /// past the canvas count (they are the layer's, Reveal All brings them back); `canvas` only bounds
@@ -165,14 +90,11 @@ static EMPTY: Mutex<Option<EmptyCache>> = Mutex::new(None);
 
 type EmptyCache = (Weak<Document>, Arc<HashSet<LayerId>>);
 
-/// The empty layers of `app`'s active document while Empty or Not Empty is picked, found once per
-/// document: a layer erased to nothing has every pixel read, too much for every repaint of the
-/// Layers panel. Keyed by the document itself rather than its revision, which also moves when only
-/// the selection does.
-pub fn empty_layers(app: &PhotocraftApp, attribute: Attribute) -> Option<Arc<HashSet<LayerId>>> {
-    if !matches!(attribute, Attribute::Empty | Attribute::NotEmpty) {
-        return None;
-    }
+/// The empty layers of `app`'s active document (for the Empty and Not Empty attributes), found
+/// once per document: a layer erased to nothing has every pixel read, too much for every repaint
+/// of the Layers panel. Keyed by the document itself rather than its revision, which also moves
+/// when only the selection does.
+pub fn empty_layers(app: &PhotocraftApp) -> Option<Arc<HashSet<LayerId>>> {
     let d = app.session.active()?;
     let mut cache = EMPTY.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some((doc, set)) = cache.as_ref()
@@ -183,11 +105,4 @@ pub fn empty_layers(app: &PhotocraftApp, attribute: Attribute) -> Option<Arc<Has
     let set = Arc::new(empty_layers_of(&d.doc));
     *cache = Some((Arc::downgrade(&d.doc), set.clone()));
     Some(set)
-}
-
-/// `layerFilter.attribute`: the attribute named by `v`, or an error listing the ids.
-pub fn parse(v: &serde_json::Value) -> Result<Attribute, String> {
-    let ids = || Attribute::ALL.map(Attribute::id).join(", ");
-    let name = v.as_str().ok_or_else(|| format!("layerFilter.attribute must be one of {}", ids()))?;
-    Attribute::ALL.into_iter().find(|a| a.id() == name).ok_or_else(|| format!("layerFilter.attribute: unknown attribute `{name}` (attributes: {})", ids()))
 }

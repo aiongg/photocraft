@@ -1,6 +1,6 @@
 //! #10879: setting a Layers panel filter deselects the selected layers it hides, against the cases
-//! measured in Photoshop. The panel's own filter row does the same in craft-layers; these go through
-//! the control channel's `ui.set {layerFilter}`.
+//! measured in Photoshop. The panel's own filter row does the same in craft-layers; these set the
+//! filter as the control channel's `ui.set {layerFilter}` does: through `patched` and `apply`.
 
 use egui::vec2;
 use egui_kittest::Harness;
@@ -45,7 +45,7 @@ fn selection(h: &Harness<'_, PhotocraftApp>) -> (Vec<String>, Option<String>) {
 }
 
 enum Step {
-    /// `ui.set {layerFilter}` with this patch.
+    /// The `ui.set {layerFilter}` patch, applied to the filter.
     Filter(Value),
     /// Select these layers (the last one active).
     Select(&'static [&'static str]),
@@ -81,9 +81,8 @@ fn setting_a_filter_deselects_the_layers_it_hides() {
         for (step, selected, active) in steps {
             match step {
                 Filter(patch) => {
-                    let ctx = h.ctx.clone();
-                    let (r, _) = crate::control::ControlRequest::new("ui.set", json!({"layerFilter": patch}));
-                    crate::control::handle(h.state_mut(), &ctx, &r);
+                    let filter = crate::layer_filter_ui::patched(&h.state().ui.layer_filter, &patch).unwrap();
+                    crate::layer_filter_ui::apply(h.state_mut(), filter);
                 }
                 Select(names) => select(&mut h, names),
             }

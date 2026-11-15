@@ -6,7 +6,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use craft::layers::ui::filter::{EffectKind, FilterBy, FilterKind, LayerAttribute, LayerFilter, SmartKind, SmartSource};
-use craft::layers::ui::options::{LayersOptions, LayersSettings};
 use craft::layers::ui::panel::MenuTarget;
 use craft::layers::ui::thumbs::{LayerThumb, LayerThumbKind, ThumbContents};
 use craft::layers::ui::tree::{
@@ -16,14 +15,15 @@ use craft::layers::ui::tree::{
 use craft::theme::LabelColor as UiLabel;
 use craft::ui::contract::{Entry, ReorderMove};
 use craft::ui::list::ThumbSize;
+use craft::ui::patterns::blend_keys::{BlendKeyEntry, blend_entries};
 use craft::ui::primitives::textures::{Revision, ThumbRender, ThumbRequest, ThumbSource, thumb_image};
+use craft::ui::runtime::env::Label;
 use photocraft_color::BlendMode;
 use photocraft_doc::{Document, Effect, Fill, LabelColor, Layer, LayerContent, LayerId};
 use photocraft_engine::DocState;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::{LayerThumbnailContents, LayerThumbnailSize, LayersPanelOptions};
 
 /// The key the panel and the filter use for a blend mode: its label folded as the engine's
 /// `blend_from_str` reads it ("normal", "lineardodgeadd").
@@ -74,103 +74,11 @@ fn effect_kind(e: &Effect) -> Option<EffectKind> {
     })
 }
 
-/// The Panel Options and Show Filters as the panel's settings, read each pass.
-pub(crate) fn settings(app: &PhotocraftApp) -> LayersSettings {
-    let o: &LayersPanelOptions = &app.ui.layers_panel_options;
-    let mut options = LayersOptions::default();
-    options.thumbnail_size = match o.thumbnail_size {
-        LayerThumbnailSize::None => ThumbSize::None,
-        LayerThumbnailSize::Small => ThumbSize::Small,
-        LayerThumbnailSize::Medium => ThumbSize::Medium,
-        LayerThumbnailSize::Large => ThumbSize::Large,
-    };
-    options.thumbnail_contents = match crate::layers_panel_ui::thumbnail_contents(app) {
-        LayerThumbnailContents::LayerBounds => ThumbContents::LayerBounds,
-        LayerThumbnailContents::EntireDocument => ThumbContents::EntireDocument,
-    };
-    options.use_default_masks_on_fill_layers = o.use_default_masks_on_fill_layers;
-    options.expand_new_effects = o.expand_new_effects;
-    options.add_copy_to_copied_layers_and_groups = o.add_copy_to_copied_layers_and_groups;
-    options.preview_on_canvas_when_reordering = o.preview_on_canvas_when_reordering_layers;
-    options.show_layer_mask_badges = o.show_layer_mask_badges;
-    let mut settings = LayersSettings::default();
-    settings.options = options;
-    settings.show_filters = o.show_filters;
-    settings
-}
-
-/// The filter criteria `UiState` keeps, as the panel's filter.
-pub(crate) fn filter_of(ui: &crate::state::UiState) -> LayerFilter {
-    use crate::layer_filter_ui::FilterBy as Old;
-    let mut f = LayerFilter::default();
-    f.by = match ui.layer_filter_by {
-        Old::Kind => FilterBy::Kind,
-        Old::Name => FilterBy::Name,
-        Old::Effect => FilterBy::Effect,
-        Old::Mode => FilterBy::Mode,
-        Old::Attribute => FilterBy::Attribute,
-        Old::Color => FilterBy::Color,
-        Old::SmartObject => FilterBy::SmartObject,
-        Old::Artboard => FilterBy::Artboard,
-        Old::Group => FilterBy::Group,
-    };
-    f.kinds = ui.layer_filter.iter().filter_map(|k| FilterKind::ALL.into_iter().find(|f| f.name() == k)).collect();
-    f.name = ui.layer_filter_name.clone();
-    f.mode = blend_key(ui.layer_filter_mode);
-    f.effect = EffectKind::ALL
-        .into_iter()
-        .find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_effect.id()))
-        .unwrap_or_default();
-    f.attribute = LayerAttribute::ALL
-        .into_iter()
-        .find(|k| serde_json::to_value(k).ok().as_ref().and_then(Value::as_str) == Some(ui.layer_filter_attribute.id()))
-        .unwrap_or_default();
-    f.color = ui_label(ui.layer_filter_color);
-    f.smart = ui
-        .layer_filter_smart
-        .iter()
-        .filter_map(|k| SmartKind::ALL.into_iter().find(|s| serde_json::to_value(s).ok().as_ref().and_then(Value::as_str) == Some(k.as_str())))
-        .collect();
-    f
-}
-
-/// Writes the panel's filter back into `UiState`'s criteria.
-pub(crate) fn store_filter(ui: &mut crate::state::UiState, f: &LayerFilter) {
-    use crate::layer_filter_ui::FilterBy as Old;
-    let id = |v: serde_json::Result<Value>| v.ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
-    ui.layer_filter_by = match f.by {
-        FilterBy::Name => Old::Name,
-        FilterBy::Effect => Old::Effect,
-        FilterBy::Mode => Old::Mode,
-        FilterBy::Attribute => Old::Attribute,
-        FilterBy::Color => Old::Color,
-        FilterBy::SmartObject => Old::SmartObject,
-        FilterBy::Artboard => Old::Artboard,
-        FilterBy::Group => Old::Group,
-        _ => Old::Kind,
-    };
-    ui.layer_filter = f.kinds.iter().map(|k| k.name().to_string()).collect();
-    ui.layer_filter_name = f.name.clone();
-    if let Some(m) = blend_of(&f.mode) {
-        ui.layer_filter_mode = m;
-    }
-    let effect = id(serde_json::to_value(f.effect));
-    if let Some(k) = crate::layer_filter_ui::effect::EffectKind::ALL.into_iter().find(|k| k.id() == effect) {
-        ui.layer_filter_effect = k;
-    }
-    let attribute = id(serde_json::to_value(f.attribute));
-    if let Some(a) = crate::layer_filter_ui::attribute::Attribute::ALL.into_iter().find(|a| a.id() == attribute) {
-        ui.layer_filter_attribute = a;
-    }
-    ui.layer_filter_color = doc_label(f.color);
-    ui.layer_filter_smart = f.smart.iter().map(|s| id(serde_json::to_value(s))).collect();
-}
-
 /// The Smart Filter row selected on its own, while its smart object is active and the row is listed.
 pub(crate) fn listed_filter(app: &PhotocraftApp) -> Option<crate::smart_ui::FilterDrag> {
     let st = app.session.active()?;
     let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
-    PhotoLayers::new(app, st, &filter_of(&app.ui), false, picked).selected_filter()
+    PhotoLayers::new(app, st, &app.ui.layer_filter, false, picked).selected_filter()
 }
 
 /// The active document's layers as the panel shows them, built each pass.
@@ -193,9 +101,7 @@ impl<'a> PhotoLayers<'a> {
     pub(crate) fn new(app: &'a PhotocraftApp, st: &'a DocState, filter: &LayerFilter, foreign_drag: bool, picked: Option<crate::smart_ui::FilterDrag>) -> Self {
         let working_text = app.ui.text_edit.as_ref().filter(|ed| ed.mask).map(|ed| ed.layer);
         let empty = match (filter.by, filter.attribute) {
-            (FilterBy::Attribute, LayerAttribute::Empty | LayerAttribute::NotEmpty) => {
-                crate::layer_filter_ui::attribute::empty_layers(app, crate::layer_filter_ui::attribute::Attribute::Empty)
-            }
+            (FilterBy::Attribute, LayerAttribute::Empty | LayerAttribute::NotEmpty) => crate::layer_filter_ui::attribute::empty_layers(app),
             _ => None,
         };
         let missing = if filter.by == FilterBy::SmartObject { app.session.missing_links() } else { HashSet::new() };
@@ -237,8 +143,8 @@ impl<'a> PhotoLayers<'a> {
                 return None;
             }
         }
-        let filter = filter_of(&self.app.ui);
-        (self.effects_open(&layer) && (!filter.active() || self.listed(&layer, &filter))).then_some(picked)
+        let filter = &self.app.ui.layer_filter;
+        (self.effects_open(&layer) && (!filter.active() || self.listed(&layer, filter))).then_some(picked)
     }
 
     fn smart_filter_count(&self, id: &LayerId) -> usize {
@@ -473,14 +379,12 @@ impl LayerTree for PhotoLayers<'_> {
 
     fn blend_modes(&self, group: bool, current: &str) -> Vec<Entry<String>> {
         let current = blend_of(current).unwrap_or(BlendMode::Normal);
-        let mut out = Vec::new();
-        for (m, label) in super::layers::blend_options(group, current) {
-            if !out.is_empty() && super::starts_blend_group(m) {
-                out.push(Entry::separator());
-            }
-            out.push(Entry::new(blend_key(m), tl!(label).to_string()));
-        }
-        out
+        let modes: Vec<BlendKeyEntry<String>> =
+            super::layers::blend_options(group, current).into_iter().map(|(m, _)| super::blend_entry(blend_key(m), m)).collect();
+        blend_entries(&modes, |e| {
+            let label = blend_of(&e.key).map_or(e.key.as_str(), |m| tl!(m.label()));
+            Label::from(label.to_string())
+        })
     }
 
     fn footer(&self) -> LayersFooterState {
@@ -607,12 +511,12 @@ fn menu_kind(tree: &PhotoLayers<'_>, target: &MenuTarget<LayerId>) -> MenuKind {
 }
 
 /// The four thumbnail sizes, in menu order.
-fn thumbnail_sizes() -> [(LayerThumbnailSize, &'static str); 4] {
+fn thumbnail_sizes() -> [(ThumbSize, &'static str); 4] {
     [
-        (LayerThumbnailSize::None, tl!("No Thumbnails")),
-        (LayerThumbnailSize::Small, tl!("Small Thumbnails")),
-        (LayerThumbnailSize::Medium, tl!("Medium Thumbnails")),
-        (LayerThumbnailSize::Large, tl!("Large Thumbnails")),
+        (ThumbSize::None, tl!("No Thumbnails")),
+        (ThumbSize::Small, tl!("Small Thumbnails")),
+        (ThumbSize::Medium, tl!("Medium Thumbnails")),
+        (ThumbSize::Large, tl!("Large Thumbnails")),
     ]
 }
 
@@ -654,9 +558,10 @@ pub(crate) fn row_menu(tree: &PhotoLayers<'_>, target: &MenuTarget<LayerId>) -> 
         out
     };
     let thumbnail_items = |out: &mut Vec<Entry<String>>| {
-        let current = app.ui.layers_panel_options.thumbnail_size;
+        let current = app.ui.layers_settings.options.thumbnail_size;
         for (size, label) in thumbnail_sizes() {
-            let value = serde_json::to_value(size).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
+            // PLAN: assumed `crate::layers_panel_ui::thumb_size_key(ThumbSize) -> &'static str` (panels-w23), the key `menu_pick` parses
+            let value = crate::layers_panel_ui::thumb_size_key(size);
             out.push(Entry::new(format!("{THUMB_SIZE}{value}"), label.to_string()).checked(current == size));
         }
         out.push(Entry::separator());
@@ -793,7 +698,7 @@ impl ThumbSource<LayerThumb<LayerId>> for PhotoThumbs<'_> {
                     let rgba = crate::solid_fill_ui::thumbnail_color(self.app, self.doc.id, l.id, *color).to_rgba8();
                     ThumbRender::Ready(thumb_image(size(canvas), request.side, |_, _| rgba))
                 }
-                LayerContent::Fill(f @ Fill::Gradient { .. }) => crate::gradient_ui::thumbnail_image(f).map_or(ThumbRender::Blank, ThumbRender::Ready),
+                LayerContent::Fill(f @ Fill::Gradient { .. }) => crate::gradient_ui::thumbnail_image(f, request.side).map_or(ThumbRender::Blank, ThumbRender::Ready),
                 LayerContent::Fill(_) => ThumbRender::Ready(thumb_image(size(canvas), request.side, |_, _| [128, 128, 128, 255])),
                 _ => {
                     let Some(surface) = l.surface() else { return ThumbRender::Blank };

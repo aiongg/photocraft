@@ -45,8 +45,8 @@ pub(crate) fn layer_id(app: &PhotocraftApp, name: &str) -> LayerId {
 pub(crate) fn thumb_on(h: &Harness<'_, PhotocraftApp>, name: &str, row_name: &str, part: LayerPart) -> Option<Rect> {
     let app = h.state();
     let st = app.session.active().expect("a document");
-    let filter = crate::panels::layers_tree::filter_of(&app.ui);
-    let info = crate::panels::layers_tree::PhotoLayers::new(app, st, &filter, false, None).info(&layer_id(app, name));
+    let filter = &app.ui.layer_filter;
+    let info = crate::panels::layers_tree::PhotoLayers::new(app, st, filter, false, None).info(&layer_id(app, name));
     let node = h.get_by_role_and_label(Role::TreeItem, row_name).accesskit_node().locate().0;
     craft::layers::testing::thumb_rect(&h.ctx, node, &info, part)
 }

@@ -3,12 +3,11 @@
 //! selected, so typing replaces it. The layer selection is not changed. With a `name` param
 //! (scripts and agents) it sets the Name text to it instead of focusing the field.
 
+use craft::layers::ui::filter::FilterBy;
 use serde_json::{Value, json};
 
-use super::FilterBy;
 use crate::PhotocraftApp;
 
-/// The egui memory flag: focus the Name field the next time it is drawn.
 /// Run `select.findLayers`: the engine checks `params` and lists the layers the Name text matches;
 /// then the Name filter is applied. Without a `name` the text is kept, and the Layers panel is
 /// shown with the field focused.
@@ -18,18 +17,10 @@ pub fn invoke(app: &mut PhotocraftApp, params: Value) -> Result<Value, String> {
     // reply's Name filter ([`apply`]).
     let reply = app.run("select.findLayers", params)?;
     if !given {
-        // The panel docking layout (when on) shows the Layers panel itself, else the dock group.
-        if app.ui.docking.is_some() {
-            if let Some(shown) = crate::panel_docking::command(app, "window.panel.activate", &json!({"panel": "layers"})) {
-                shown?;
-            }
-        } else {
-            *crate::dock::Group::Layers.tab_mut(&mut app.ui.dock_tabs) = 0;
-            crate::dock::reveal(app, crate::dock::Group::Layers);
-        }
+        crate::panel_docking::show_panel(app, "layers", Some(true))?;
         // A hidden filter row (Filter Options › Hide) stays hidden, as in Photoshop, and showing it
         // later doesn't put the caret in the field: only a drawn row takes the focus.
-        app.find_layers_focus = app.ui.layers_panel_options.show_filters;
+        app.find_layers_focus = app.ui.layers_settings.show_filters;
     }
     Ok(reply)
 }
@@ -42,17 +33,17 @@ pub(crate) fn params_for_run(app: &PhotocraftApp, params: Value) -> Value {
         return params;
     }
     let mut params = if params.is_object() { params } else { json!({}) };
-    params["name"] = json!(app.ui.layer_filter_name);
+    params["name"] = json!(app.ui.layer_filter.name);
     params
 }
 
 /// Apply the Name filter in a `select.findLayers` reply to the Layers panel: switch to Name and set
 /// the text when the reply has one, which deselects the layers it hides. [`PhotocraftApp::run`] calls it after every Find Layers.
 pub(crate) fn apply(app: &mut PhotocraftApp, reply: &Value) {
-    let before = crate::panels::layers_tree::filter_of(&app.ui);
-    app.ui.layer_filter_by = FilterBy::Name;
+    let mut filter = app.ui.layer_filter.clone();
+    filter.by = FilterBy::Name;
     if let Some(name) = reply["layerFilter"]["name"].as_str() {
-        app.ui.layer_filter_name = name.to_string();
+        filter.name = name.to_string();
     }
-    super::deselect_hidden(app, &before);
+    super::apply(app, filter);
 }

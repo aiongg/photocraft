@@ -5,10 +5,10 @@ use std::collections::BTreeSet;
 use photocraft_doc::{BlendRange, Document, Group, Knockout, Layer, LayerContent, LayerMask, VectorMask};
 use serde_json::json;
 
-use super::attribute::Attribute;
-use super::{Filter, FilterBy};
+use craft::layers::ui::filter::{FilterBy, LayerAttribute};
+
+use super::tests::filter;
 use crate::PhotocraftApp;
-use crate::state::UiState;
 
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 
@@ -115,9 +115,8 @@ fn rename_active(s: &mut photocraft_engine::Session, name: &str) {
 }
 
 /// The names `attribute` lists.
-fn listed(doc: &Document, attribute: Attribute) -> BTreeSet<String> {
-    let filter = Filter::of(&UiState { layer_filter_by: FilterBy::Attribute, layer_filter_attribute: attribute, ..UiState::default() });
-    super::tests::listed(doc, &filter).into_iter().collect()
+fn listed(doc: &Document, attribute: LayerAttribute) -> BTreeSet<String> {
+    super::tests::listed(doc, &filter(FilterBy::Attribute, |f| f.attribute = attribute)).into_iter().collect()
 }
 
 fn names(list: &[&str]) -> BTreeSet<String> {
@@ -133,28 +132,10 @@ fn each_attribute_lists_the_measured_layers() {
     let s = session();
     let doc = &s.active().unwrap().doc;
     let everything = all(doc);
-    let but = |gone: &[&str]| -> BTreeSet<String> { everything.difference(&names(gone)).cloned().collect() };
-    // Every visible layer and every visible group.
-    assert_eq!(listed(doc, Attribute::Visible), but(&["hidden", "hidden group"]));
-    assert!(listed(doc, Attribute::Visible).contains("in hidden group"), "a visible child of a hidden group");
-    // Any lock counts, the Background's too.
-    assert_eq!(listed(doc, Attribute::Locked), names(&["position lock", "all locked", "Background"]));
     // A pixel layer without pixels; the empty group isn't listed.
-    assert_eq!(listed(doc, Attribute::Empty), names(&["empty"]));
-    assert_eq!(listed(doc, Attribute::Linked), names(&["linked a", "linked b"]));
-    // The clipped Levels layer, not its base.
-    assert_eq!(listed(doc, Attribute::Clipped), names(&["clipped"]));
-    // The adjustment and fill layers count with the masks they're created with.
-    assert_eq!(listed(doc, Attribute::LayerMask), names(&["masked", "clipped", "fill"]));
-    // A shape layer counts as having a vector mask.
-    assert_eq!(listed(doc, Attribute::VectorMask), names(&["vector masked", "shape"]));
-    // A layer whose only effect is turned off counts.
-    assert_eq!(listed(doc, Attribute::LayerEffects), names(&["fx", "fx off"]));
-    // Each Advanced Blending option on its own; Fill opacity alone doesn't count.
-    assert_eq!(
-        listed(doc, Attribute::AdvancedBlending),
-        names(&["adv channels", "adv knockout", "adv interior", "adv clipped", "adv shapes", "adv layer mask", "adv vector mask", "adv blend if"])
-    );
+    assert_eq!(listed(doc, LayerAttribute::Empty), names(&["empty"]));
+    // Every other layer and group, the empty group too.
+    assert_eq!(listed(doc, LayerAttribute::NotEmpty), everything.difference(&names(&["empty"])).cloned().collect::<BTreeSet<_>>());
 }
 
 #[test]
@@ -170,12 +151,12 @@ fn a_layer_erased_completely_is_empty() {
         };
         erase(&mut s, 10);
         let doc = &s.active().unwrap().doc;
-        assert_eq!(listed(doc, Attribute::Empty), names(&[]), "{depth}: partly erased");
-        assert_eq!(listed(doc, Attribute::NotEmpty), names(&[&name]), "{depth}");
+        assert_eq!(listed(doc, LayerAttribute::Empty), names(&[]), "{depth}: partly erased");
+        assert_eq!(listed(doc, LayerAttribute::NotEmpty), names(&[&name]), "{depth}");
         erase(&mut s, 30);
         let doc = &s.active().unwrap().doc;
-        assert_eq!(listed(doc, Attribute::Empty), names(&[&name]), "{depth}: erased completely");
-        assert_eq!(listed(doc, Attribute::NotEmpty), names(&[]), "{depth}");
+        assert_eq!(listed(doc, LayerAttribute::Empty), names(&[&name]), "{depth}: erased completely");
+        assert_eq!(listed(doc, LayerAttribute::NotEmpty), names(&[]), "{depth}");
     }
 }
 
@@ -186,8 +167,8 @@ fn a_layer_with_an_opaque_default_pixel_is_not_empty() {
     let opaque = photocraft_raster::Surface::with_default(photocraft_doc::PixelFormat::RGBA8, &RED);
     doc.layers.push(Layer::new("opaque", LayerContent::Raster(opaque)));
     doc.layers.push(Layer::new("clear", LayerContent::Raster(photocraft_raster::Surface::new(photocraft_doc::PixelFormat::RGBA8))));
-    assert_eq!(listed(&doc, Attribute::Empty), names(&["clear"]));
-    assert_eq!(listed(&doc, Attribute::NotEmpty), names(&["opaque"]));
+    assert_eq!(listed(&doc, LayerAttribute::Empty), names(&["clear"]));
+    assert_eq!(listed(&doc, LayerAttribute::NotEmpty), names(&["opaque"]));
 }
 
 #[test]
@@ -205,8 +186,8 @@ fn an_opaque_default_layer_erased_on_the_whole_canvas_is_empty() {
     dot.fill_rect(photocraft_geom::Rect::new(299, 29, 300, 30), &RED);
     doc.layers.push(Layer::new("one pixel", LayerContent::Raster(dot)));
     // The half erased layer has no tile over x 256..300, so the default shows there.
-    assert_eq!(listed(&doc, Attribute::Empty), names(&["erased"]));
-    assert_eq!(listed(&doc, Attribute::NotEmpty), names(&["half erased", "one pixel"]));
+    assert_eq!(listed(&doc, LayerAttribute::Empty), names(&["erased"]));
+    assert_eq!(listed(&doc, LayerAttribute::NotEmpty), names(&["half erased", "one pixel"]));
 }
 
 #[test]
@@ -215,9 +196,8 @@ fn the_empty_layers_are_found_once_per_document() {
     s.execute("file.new", json!({"width": 40, "height": 30, "background": "transparent"})).unwrap();
     s.execute("edit.fill", json!({"color": "#ff0000"})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
-    app.ui.layer_filter_by = FilterBy::Attribute;
-    app.ui.layer_filter_attribute = Attribute::Empty;
-    let empty = |app: &PhotocraftApp| super::attribute::empty_layers(app, app.ui.layer_filter_attribute);
+    app.ui.layer_filter = filter(FilterBy::Attribute, |f| f.attribute = LayerAttribute::Empty);
+    let empty = |app: &PhotocraftApp| super::attribute::empty_layers(app);
     let first = empty(&app).expect("found for Empty");
     assert!(first.is_empty(), "the filled layer has pixels");
     let again = empty(&app).unwrap();
@@ -230,57 +210,9 @@ fn the_empty_layers_are_found_once_per_document() {
     assert_eq!(empty(&app).map(|set| set.len()), Some(1), "an edit finds them again");
     let doc = &app.session.active().unwrap().doc;
     assert_eq!(super::tests::listed_app(&app).len(), doc.walk().len(), "the erased layer is listed");
-    app.ui.layer_filter_attribute = Attribute::NotEmpty;
-    assert!(empty(&app).is_some(), "Not Empty uses them too");
+    app.ui.layer_filter.attribute = LayerAttribute::NotEmpty;
+    assert!(super::tests::listed_app(&app).is_empty(), "Not Empty lists none of them");
     // Another document, with no empty layer, gets its own result.
     app.session.execute("file.new", json!({"width": 40, "height": 30})).unwrap();
     assert_eq!(empty(&app).map(|set| set.len()), Some(0), "the new document's layers");
-    app.ui.layer_filter_attribute = Attribute::Visible;
-    assert!(empty(&app).is_none(), "other attributes don't read pixels");
-}
-
-#[test]
-fn each_opposite_lists_the_rest_groups_included() {
-    let s = session();
-    let doc = &s.active().unwrap().doc;
-    let everything = all(doc);
-    for (positive, negative) in Attribute::ALL[..9].iter().zip(&Attribute::ALL[9..]) {
-        let rest: BTreeSet<String> = everything.difference(&listed(doc, *positive)).cloned().collect();
-        assert_eq!(listed(doc, *negative), rest, "{negative:?} lists what {positive:?} doesn't");
-    }
-    // The three measured ones, spelled out.
-    assert_eq!(listed(doc, Attribute::NotVisible), names(&["hidden", "hidden group"]));
-    assert!(listed(doc, Attribute::NotLocked).contains("group"), "groups are listed too");
-    assert!(!listed(doc, Attribute::NotLocked).contains("Background"));
-    assert_eq!(listed(doc, Attribute::NotLinked), everything.difference(&names(&["linked a", "linked b"])).cloned().collect());
-}
-
-#[test]
-fn attribute_filters_at_once_with_visible() {
-    let f = Filter::of(&UiState { layer_filter_by: FilterBy::Attribute, ..UiState::default() });
-    assert_eq!(f.attribute, Attribute::Visible);
-}
-
-#[test]
-fn ui_set_picks_the_attribute_by_id() {
-    let mut ui = UiState::default();
-    for attribute in Attribute::ALL {
-        let f = super::patched(&ui, &json!({"by": "attribute", "attribute": attribute.id()})).unwrap();
-        super::store(&mut ui, f);
-        assert_eq!((ui.layer_filter_by, ui.layer_filter_attribute), (FilterBy::Attribute, attribute));
-    }
-    assert_eq!(Attribute::NoAdvancedBlending.id(), "noAdvancedBlending");
-    let err = super::patched(&ui, &json!({"attribute": "hidden"})).unwrap_err();
-    assert!(err.contains("hidden") && err.contains("notVisible") && err.contains("noAdvancedBlending"), "{err}");
-    assert!(super::patched(&ui, &json!({"attribute": 3})).is_err());
-    assert!(super::patched(&ui, &json!({"attribute": null})).is_err());
-}
-
-#[test]
-fn saved_settings_without_the_attribute_still_load() {
-    let mut saved = serde_json::to_value(UiState { layer_filter_attribute: Attribute::NotLinked, ..UiState::default() }).unwrap();
-    assert_eq!(saved["layer_filter_attribute"], "notLinked");
-    saved.as_object_mut().unwrap().remove("layer_filter_attribute");
-    let ui: UiState = serde_json::from_value(saved).unwrap();
-    assert_eq!(ui.layer_filter_attribute, Attribute::Visible);
 }
