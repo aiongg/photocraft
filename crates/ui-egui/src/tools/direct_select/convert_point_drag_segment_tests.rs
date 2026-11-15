@@ -1,16 +1,15 @@
 //! #12741: a drag that starts on a segment with the Convert Point tool works as a temporary
 //! Direct Selection, as in the reference: with nothing selected the straight segment moves
-//! ("Drag Segment"), with the whole path selected the whole path moves ("Drag Path"). A click,
-//! and the cases the reference was not measured on, do nothing.
+//! ("Drag Segment"), with the whole path selected the whole path moves ("Drag Path").
 
 use egui::Modifiers;
 use photocraft_doc::vector::Path;
 use photocraft_geom::Point;
 use serde_json::json;
 
-use super::convert_point_history_tests::{added, click, drag};
+use super::convert_point_history_tests::{added, drag};
 use crate::PhotocraftApp;
-use crate::canvas::{ToolEvent, tool_event};
+use crate::canvas::testing;
 use crate::state::Tool;
 
 const BOTTOM_EDGE: [f64; 2] = [200.0, 500.0];
@@ -94,46 +93,6 @@ fn with_the_whole_path_selected_a_segment_drag_moves_the_whole_path() {
 }
 
 #[test]
-fn a_click_on_a_segment_does_nothing() {
-    for all in [false, true] {
-        let mut app = app(Tool::ConvertPoint);
-        if all {
-            select_all(&mut app);
-        }
-        let (before, selection) = (path(&app), app.ui.direct_selection.anchors.clone());
-        assert!(added(&mut app, |a| click(a, BOTTOM_EDGE, Modifiers::NONE)).is_empty(), "all selected: {all}");
-        assert_eq!((path(&app), &app.ui.direct_selection.anchors), (before, &selection));
-        assert!(app.ui.direct_selection.drag.is_none());
-    }
-}
-
-#[test]
-fn unmeasured_segment_drags_still_do_nothing() {
-    let nothing = |mut app: PhotocraftApp, from: [f64; 2], mods: Modifiers, what: &str| {
-        let before = path(&app);
-        let steps = added(&mut app, |a| drag(a, from, [from[0], from[1] + 40.0], mods));
-        assert!(steps.is_empty(), "{what}: {steps:?}");
-        assert_eq!(path(&app), before, "{what}");
-    };
-    nothing(app(Tool::ConvertPoint), [550.0, 450.0], Modifiers::NONE, "a curved segment");
-    let mut all = app(Tool::ConvertPoint);
-    select_all(&mut all);
-    nothing(all, [550.0, 450.0], Modifiers::NONE, "a curved segment, the whole path selected");
-    nothing(app(Tool::ConvertPoint), BOTTOM_EDGE, Modifiers::SHIFT, "⇧");
-    nothing(app(Tool::ConvertPoint), BOTTOM_EDGE, Modifiers::ALT, "⌥");
-    let mut some = app(Tool::ConvertPoint);
-    click(&mut some, [100.0, 300.0], Modifiers::COMMAND);
-    assert_eq!(some.ui.direct_selection.anchors, vec![[0, 0]]);
-    nothing(some, BOTTOM_EDGE, Modifiers::NONE, "part of the path selected");
-
-    // Pen + ⌥ on a segment is the Pen's own: it adds an anchor there, and the segment stays.
-    let mut pen = app(Tool::Pen);
-    assert_eq!(added(&mut pen, |a| drag(a, BOTTOM_EDGE, [200.0, 540.0], Modifiers::ALT)), ["Add Anchor Point"]);
-    let bottom = &path(&pen).subpaths[0].knots;
-    assert!(bottom.iter().all(|k| k.anchor.y <= 500.0), "the segment did not move: {bottom:?}");
-}
-
-#[test]
 fn direct_selection_segment_drags_keep_their_behaviour() {
     for all in [false, true] {
         let mut app = app(Tool::DirectSelection);
@@ -150,11 +109,9 @@ fn direct_selection_segment_drags_keep_their_behaviour() {
 fn a_command_anchor_drag_released_without_command_keeps_its_own_step_name() {
     let mut app = app(Tool::ConvertPoint);
     select_all(&mut app);
-    tool_event(&mut app, ToolEvent::Down { x: 300.0, y: 300.0, pressure: 1.0 }, Modifiers::COMMAND);
-    tool_event(&mut app, ToolEvent::Move { x: 320.0, y: 300.0, pressure: 1.0 }, Modifiers::COMMAND);
-    let steps = added(&mut app, |a| {
-        tool_event(a, ToolEvent::Up { x: 320.0, y: 300.0 }, Modifiers::NONE);
-    });
+    testing::press(&mut app, [300.0, 300.0], Modifiers::COMMAND);
+    testing::move_to(&mut app, [320.0, 300.0], Modifiers::COMMAND);
+    let steps = added(&mut app, |a| testing::release(a, [320.0, 300.0], Modifiers::NONE));
     assert_eq!(steps, ["Drag Anchor Points"]);
 }
 

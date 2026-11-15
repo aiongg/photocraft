@@ -7,7 +7,7 @@ use photocraft_doc::LayerContent;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::canvas::{ToolEvent, tool_event};
+use crate::canvas::testing;
 use crate::state::Tool;
 
 fn app(tool: Tool) -> PhotocraftApp {
@@ -30,13 +30,13 @@ fn with_path(app: &mut PhotocraftApp) {
 }
 
 pub(super) fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], mods: Modifiers) {
-    tool_event(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, mods);
-    tool_event(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, mods);
-    tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, mods);
+    testing::press(app, from, mods);
+    testing::move_to(app, to, mods);
+    testing::release(app, to, mods);
 }
 
 pub(super) fn click(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
-    drag(app, at, at, mods);
+    testing::click(app, at, mods);
 }
 
 fn names(app: &PhotocraftApp) -> Vec<String> {
@@ -146,7 +146,7 @@ fn other_tools_keep_their_step_names() {
     assert_eq!(added(&mut pen, |a| click(a, [120.0, 40.0], Modifiers::ALT)), convert, "Pen ⌥-click");
     assert_eq!(added(&mut pen, |a| drag(a, [40.0, 120.0], [40.0, 140.0], Modifiers::ALT)), convert, "Pen ⌥-drag");
     pen.ui.tool = Tool::CurvaturePen;
-    assert_eq!(added(&mut pen, |a| crate::vector_ui::curvature_toggle(a, 120.0, 120.0)), convert, "Curvature Pen double-click");
+    assert_eq!(added(&mut pen, |a| testing::double_click(a, [120.0, 120.0], Modifiers::NONE)), convert, "Curvature Pen double-click");
 }
 
 #[test]

@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use super::PathRef;
 use super::convert_point_history_tests::drag;
 use crate::PhotocraftApp;
-use crate::anchor_tools::delete_anchor_targeted_path_tests::{group_shape, select_layer, select_saved_path, setup, shape_path, steps};
+use crate::direct_select::edits::delete_anchor_targeted_path_tests::{group_shape, select_layer, select_saved_path, setup, shape_path, steps};
 use crate::state::Tool;
 
 const CORNER: [f64; 2] = [450.0, 100.0];

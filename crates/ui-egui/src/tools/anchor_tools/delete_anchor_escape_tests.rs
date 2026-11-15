@@ -2,6 +2,7 @@
 //! in the Paths panel, then deselects that path, so its outline and anchors go and clicks delete
 //! nothing. Esc never adds a History step.
 
+use craft::ui::shell::ScreenMode;
 use egui::{Key, Modifiers, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use photocraft_doc::vector::Path;
@@ -9,7 +10,8 @@ use serde_json::json;
 
 use super::tests::{click, steps};
 use crate::PhotocraftApp;
-use crate::direct_select::{Drag, PathRef, active_paths, candidates};
+use crate::canvas::testing;
+use crate::direct_select::{PathRef, active_paths, candidates, editing};
 use crate::state::Tool;
 
 /// The issue's document: 800 x 600 with the saved path "Path 1", a corner square with an anchor
@@ -25,12 +27,9 @@ fn app() -> PhotocraftApp {
     app
 }
 
+/// Esc as a frame delivers it: the overlay's session keys first, then the app's Escape order.
 fn escape(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
-    let key = egui::Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE };
-    ctx.begin_pass(egui::RawInput { events: vec![key], ..Default::default() });
-    crate::shortcuts::handle(app, &ctx);
-    ctx.end_pass().textures_delta.clear();
+    testing::key(app, Key::Escape, Modifiers::NONE);
 }
 
 fn path_1(app: &PhotocraftApp) -> Path {
@@ -92,9 +91,9 @@ fn anchors_selected_on_a_shape_layer_keep_todays_escape() {
 #[test]
 fn with_path_1_targeted_escape_still_leaves_full_screen_and_deselects_pixels_first() {
     let mut app = app();
-    app.ui.view.screen_mode = "fullScreen".into();
+    app.ui.view.screen_mode = ScreenMode::FullScreen;
     escape(&mut app);
-    assert_eq!(app.ui.view.screen_mode, "standard");
+    assert_eq!(app.ui.view.screen_mode, ScreenMode::Standard);
     assert_eq!(app.ui.selected_path.as_deref(), Some("Path 1"), "leaving full screen keeps Path 1 selected");
     app.run("select.all", json!({})).unwrap();
     escape(&mut app);
@@ -106,9 +105,9 @@ fn with_path_1_targeted_escape_still_leaves_full_screen_and_deselects_pixels_fir
 fn with_no_path_targeted_escape_still_leaves_full_screen_and_deselects_pixels() {
     let mut app = app();
     app.ui.selected_path = None;
-    app.ui.view.screen_mode = "fullScreen".into();
+    app.ui.view.screen_mode = ScreenMode::FullScreen;
     escape(&mut app);
-    assert_eq!(app.ui.view.screen_mode, "standard");
+    assert_eq!(app.ui.view.screen_mode, ScreenMode::Standard);
     app.run("select.all", json!({})).unwrap();
     escape(&mut app);
     assert!(app.session.active().unwrap().doc.selection.is_none());
@@ -122,7 +121,7 @@ fn escape_while_renaming_path_1_cancels_the_rename() {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = app();
         // Layers | Channels | Paths: the Paths tab.
-        app.ui.dock_tabs.layers = 2;
+        crate::panel_docking::show_panel(&mut app, "paths", Some(true)).unwrap();
         app
     });
     h.run_steps(8);
@@ -162,11 +161,14 @@ fn an_escape_during_a_direct_selection_drag_keeps_the_anchors() {
     // Cmd is Direct Selection while held: it selects the anchor instead of deleting it.
     click(&mut app, [300.0, 300.0], Modifiers::COMMAND);
     assert_eq!(app.ui.direct_selection.anchors, vec![[0, 1]]);
-    app.ui.direct_selection.drag = Some(Drag::Marquee { start: [200.0, 200.0], end: [400.0, 400.0], add: false });
+    // A marquee held with ⌘ over empty canvas.
+    testing::press(&mut app, [200.0, 200.0], Modifiers::COMMAND);
+    testing::move_to(&mut app, [400.0, 400.0], Modifiers::COMMAND);
+    assert!(testing::in_gesture(&app), "the marquee is held");
     escape(&mut app);
-    assert_eq!(app.ui.direct_selection.anchors, vec![[0, 1]], "the drag's release still moves them");
-    assert!(app.ui.direct_selection.drag.is_some(), "and Esc does not end the drag");
-    assert_eq!(app.ui.selected_path.as_deref(), Some("Path 1"), "nor deactivates the path");
+    assert!(!editing(&app), "Esc ends the drag");
+    assert_eq!(app.ui.direct_selection.anchors, vec![[0, 1]], "the anchors stay selected");
+    assert_eq!(app.ui.selected_path.as_deref(), Some("Path 1"), "and the path stays active");
 }
 
 #[test]

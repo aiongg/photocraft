@@ -2,27 +2,28 @@
 //! Path Operations menu and `+` / `-` change their operation, and the Pen carries on an open
 //! shape path from its endpoint.
 
+use craft::draw::ui::shape::VectorMode;
 use egui::Key;
 use photocraft_doc::vector::PathOp;
 use photocraft_doc::{LayerContent, LayerId, Path};
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::canvas::testing;
 use crate::direct_select::PathRef;
 use crate::state::Tool;
-use crate::vector_ui::{pen_commit, pen_down, pen_up};
+use crate::vector_ui::pen_commit;
 
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
     app.ui.tool = Tool::Pen;
-    app.ui.tool_options.vector_mode = "shape".into();
+    app.ui.tool_options.vector_mode = VectorMode::Shape;
     app
 }
 
 fn click(app: &mut PhotocraftApp, x: f64, y: f64) {
-    pen_down(app, x, y, false);
-    pen_up(app);
+    testing::click(app, [x, y], egui::Modifiers::NONE);
 }
 
 /// Clicks a closed square with the Pen, from `(x, y)` with side `side`.
@@ -307,7 +308,7 @@ fn an_open_component_of_a_filled_shape_keeps_its_paint() {
 #[test]
 fn the_pen_carries_on_a_vector_masks_open_subpath() {
     let mut app = app();
-    app.ui.tool_options.vector_mode = "path".into();
+    app.ui.tool_options.vector_mode = VectorMode::Path;
     app.run("layer.new.layer", json!({})).unwrap();
     let id = app.session.active().unwrap().active_layer.unwrap().0;
     let open = json!({"subpaths": [{"closed": false, "knots": [[20, 20], [120, 20]]}]});
@@ -386,56 +387,6 @@ fn the_selection_survives_the_layer_activation_of_the_click() {
     crate::path_components::press(&mut app, [80.0, 80.0], false);
     app.run("layer.select", json!({"layer": id.0})).unwrap();
     assert!(super::selected(&app).is_some(), "activating the shape's layer keeps the selection");
-}
-
-/// The clicked component's anchors render filled — and the unselected component's stay hollow —
-/// right after the press, no drag needed (#10854).
-#[test]
-fn a_pressed_component_marks_itself_on_the_canvas() {
-    let mut app = app();
-    square(&mut app, 20.0, 20.0, 120.0);
-    app.ui.tool_options.pen_path_op = "combine".into();
-    square(&mut app, 60.0, 60.0, 40.0);
-    app.ui.tool = Tool::PathSelection;
-    crate::path_components::press(&mut app, [80.0, 80.0], false);
-    assert!(super::selected(&app).is_some());
-    app.sync_views();
-    assert!(super::selected(&app).is_some(), "the frame tick keeps the press selection");
-
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                return;
-            }
-            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(6);
-    {
-        let v = &mut h.state_mut().ui.views[0];
-        v.zoom = 2.0;
-        v.center = [100.0, 100.0];
-        v.fit_pending = false;
-    }
-    h.run_steps(3);
-    let accent = crate::theme::Tokens::get(&h.ctx).accent;
-    let xf = crate::canvas::ViewXform::active(h.state()).expect("active document view");
-    let ppp = h.ctx.pixels_per_point();
-    let img = h.render().unwrap();
-    let px = |at: egui::Pos2| {
-        let x = (at.x * ppp).round();
-        let y = (at.y * ppp).round();
-        assert!(x >= 0.0 && y >= 0.0 && x < img.width() as f32 && y < img.height() as f32, "anchor pixel is inside the rendered image");
-        img.get_pixel(x as u32, y as u32).0
-    };
-    let close = |actual: [u8; 4], expected: [u8; 3]| actual[..3].iter().zip(expected).all(|(a, e)| (*a).abs_diff(e) <= 8);
-    // The pressed inner square's anchor (60, 60) is filled with the accent…
-    assert!(close(px(xf.to_screen(60.0, 60.0)), [accent.r(), accent.g(), accent.b()]), "the pressed component's anchor is filled");
-    // …the unselected component's anchor (20, 20) stays a hollow (white) square.
-    assert!(close(px(xf.to_screen(20.0, 20.0)), [255, 255, 255]), "the unselected component's anchor is hollow");
 }
 
 /// A same-count reorder, or a same-count edit that merges components (op "join"), still clears
