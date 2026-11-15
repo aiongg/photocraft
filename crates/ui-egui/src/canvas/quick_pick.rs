@@ -59,6 +59,7 @@ mod tests {
     /// A 64×64 document with A painted at (8..24)² and B at (40..56)²; B is active.
     fn app() -> (PhotocraftApp, photocraft_doc::LayerId) {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        testing::on_a_mac(&app);
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         let mut first = None;

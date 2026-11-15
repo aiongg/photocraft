@@ -149,6 +149,8 @@ fn shift_clicked_pencil_does_not_split_a_click_near_a_pixel_boundary() {
 #[test]
 fn ctrl_alt_drag_resizes_the_pencil_without_painting() {
     let mut app = app();
+    // ⌃⌥ is its own chord on a Mac only: elsewhere the window host reports Ctrl as ⌘.
+    crate::canvas::testing::on_a_mac(&app);
     let ctrl_alt = Modifiers { alt: true, ctrl: true, ..Default::default() };
     drag(&mut app, &[(50.0, 40.0), (60.0, 40.0)], ctrl_alt);
     assert_eq!(app.session.tools.brush.size, 23.0);
