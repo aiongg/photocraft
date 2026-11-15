@@ -77,6 +77,8 @@ fn run_waiting(app: &mut PhotocraftApp, wait: bool, run: impl FnOnce(&mut Photoc
     }
     match (result, app.jobs.last_started.take()) {
         (Ok(_), Some(job)) if wait => Reply::AfterJob(job.0),
+        // A dialog's confirm has no value of its own: the job it started is its reply.
+        (Ok(Value::Null), Some(job)) => Reply::from_result(Ok(json!({"job": job.0, "pending": true}))),
         (result, _) => Reply::from_result(result),
     }
 }

@@ -387,7 +387,8 @@ fn a_failing_preview_is_reported_once_not_restarted() {
     settle(&mut app, |d| d["previewReady"] == json!(true));
     // The selection goes away under the workspace: there is nothing to fill.
     app.session.execute("select.deselect", json!({})).unwrap();
-    let d = settle(&mut app, |d| d["previewError"].as_str().is_some_and(|e| e.contains("selection")));
+    // The replan refuses the empty selection before a new preview request exists, and says so as the panel's error.
+    let d = settle(&mut app, |d| d["error"].as_str().is_some_and(|e| e.contains("selection")));
     let runs = d["previewRuns"].as_u64().unwrap();
     for _ in 0..40 {
         pass(&mut app);
