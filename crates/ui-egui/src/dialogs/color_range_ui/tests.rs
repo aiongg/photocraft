@@ -135,7 +135,7 @@ fn eyedropper_hover_reuses_preview_textures_without_sampling() {
     let ctx = app.ctx().clone();
     // The first pass shows the canvas and builds the dialog's pictures.
     crate::canvas::testing::move_to(&mut app, [4.5, 15.5], Modifiers::NONE);
-    set_field(&mut app, "preview", json!(PreviewMode::QuickMask.id()));
+    set_field(&mut app, "selectionPreview", json!(PreviewMode::QuickMask.id()));
     crate::canvas::testing::move_to(&mut app, [4.5, 15.5], Modifiers::NONE);
     let cached = |app: &mut PhotocraftApp| {
         let revision = selection_preview(app, &ctx).expect("Quick Mask shows a preview").mask.revision();
@@ -184,7 +184,7 @@ fn preview_mode_is_view_state_and_cancel_preserves_selection() {
     let id = open(&mut app).unwrap();
     let ctx = app.ctx().clone();
     for mode in [PreviewMode::None, PreviewMode::Grayscale, PreviewMode::BlackMatte, PreviewMode::WhiteMatte, PreviewMode::QuickMask] {
-        set_field(&mut app, "preview", json!(mode.id()));
+        set_field(&mut app, "selectionPreview", json!(mode.id()));
         assert!(params(hosted(&app).value()).get("preview").is_none(), "the mode is not a command parameter");
         match selection_preview(&mut app, &ctx) {
             Some(p) => assert_eq!(p.mode, mode),

@@ -41,7 +41,7 @@ fn stack_editing_and_commit_match_the_engine() {
     let mut app = app();
     let ctx = app.ctx().clone();
     let r = crate::distort_ui::menu(&mut app, &ctx, KEY, &json!({})).unwrap().unwrap();
-    assert_eq!(r["effects"].as_array().unwrap().len(), 1);
+    assert_eq!(r["gallery"]["effects"].as_array().unwrap().len(), 1);
     ui(&mut app, json!({"filter": "cutout"})).unwrap();
     ui(&mut app, json!({"params": {"numberOfLevels": 3}})).unwrap();
     ui(&mut app, json!({"add": true})).unwrap();
@@ -98,7 +98,7 @@ fn smart_filter_double_click_edits_the_stored_gallery_stack() {
     let effects = effects_of(&app);
     assert_eq!(effects.len(), 1);
     assert_eq!(effects[0].filter, "chrome");
-    assert_eq!(describe(&app).unwrap()["effects"][0]["params"]["detail"], json!(2));
+    assert_eq!(describe(&app).unwrap()["effects"][0]["params"]["detail"].as_f64(), Some(2.0));
     // The preview starts from the pixels below the filter (no blur, no chrome).
     let below = photocraft_engine::smart_cmds::render_below_filter(&app.session.active().unwrap().doc, &sm, 0).unwrap().unwrap();
     let source = source_of(&app);
@@ -111,11 +111,11 @@ fn smart_filter_double_click_edits_the_stored_gallery_stack() {
     let sm = smart(&app);
     assert_eq!(sm.smart_filters.len(), 2, "edited in place, not added");
     assert_eq!(sm.smart_filters[0].command, KEY);
-    assert_eq!(sm.smart_filters[0].params["effects"][0]["params"]["detail"], json!(7));
+    assert_eq!(sm.smart_filters[0].params["effects"][0]["params"]["detail"].as_f64(), Some(7.0));
     assert_eq!(sm.smart_filters[0].params["foreground"], json!([1.0, 0.0, 0.0, 1.0]));
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
     app.run("edit.undo", json!({})).unwrap();
-    assert_eq!(smart(&app).smart_filters[0].params["effects"][0]["params"]["detail"], json!(2));
+    assert_eq!(smart(&app).smart_filters[0].params["effects"][0]["params"]["detail"].as_f64(), Some(2.0));
 
     // Not a gallery filter / no such filter: an error, no dialog.
     assert!(open_smart_filter(&mut app, layer, 1).is_err());

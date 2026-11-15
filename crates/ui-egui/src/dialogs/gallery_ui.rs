@@ -23,7 +23,7 @@ use craft::imaging::ui::wide_angle::PreviewDone;
 use craft::ui::dialog::HostedWorkspace;
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::dialog::{DialogId, DialogResult};
-use craft::ui::patterns::form_dialogs::Param;
+use craft::ui::patterns::form_dialogs::{Param, ParamKind};
 use craft::ui::primitives::textures::{Revision, ThumbRender, ThumbRequest, ThumbSource};
 use craft::ui::runtime::pending::Job;
 use egui::Color32;
@@ -120,7 +120,13 @@ impl FilterCatalog for PcCatalog {
 
     fn filter(&self, key: &str) -> Option<CatalogFilter> {
         let f = GalleryFilter::from_key(key)?;
-        Some(CatalogFilter::new(f.key(), tl!(f.name()).to_string(), f.category(), Param::parse_list(f.params_doc())).uses_colors(f.uses_colours()))
+        let mut params = Param::parse_list(f.params_doc());
+        // The registry notation leaves colour values as `json`, which the parser drops; the effect's own colour is a
+        // swatch row (the foreground and background are the session's, set by `uses_colors`).
+        if f.params_doc().contains("\"glowColor\":json") {
+            params.push(Param::new("glowColor", tl!("Glow Color"), ParamKind::color(None)));
+        }
+        Some(CatalogFilter::new(f.key(), tl!(f.name()).to_string(), f.category(), params).uses_colors(f.uses_colours()))
     }
 }
 
