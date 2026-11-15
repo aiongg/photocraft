@@ -4,7 +4,8 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::canvas::testing::in_gesture;
 use crate::canvas::{ToolEvent, tool_event};
-use crate::state::{Tool, VectorMode};
+use crate::state::Tool;
+use craft::draw::ui::VectorMode;
 
 fn app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

@@ -625,7 +625,7 @@ fn layer_style_dialog_previews_live_and_cancel_restores() {
 #[test]
 fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
     use craft::behavior::geometry::BoxState;
-    use craft::behavior::{EditEvent, GestureId};
+    use craft::behavior::{EditEvent, Mixed};
     use craft::draw::ui::transform::TransformEdit;
     for placed in [true, false] {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -642,7 +642,9 @@ fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
         } else {
             crate::transform_tool::begin(&mut app, &ctx).unwrap();
             let moved = BoxState::from_rect(craft::behavior::kurbo::Rect::new(28.0, 8.0, 44.0, 24.0));
-            app.ui.transform.as_mut().unwrap().session.apply(TransformEdit::Box(EditEvent::set(GestureId::new(1), moved)), 0.0);
+            let session = &mut app.ui.transform.as_mut().unwrap().session;
+            let before = Mixed::Same(session.state().clone());
+            session.apply(TransformEdit::Box(EditEvent::set(before, moved, "Move".into(), None)), 0.0);
             20
         };
         crate::layer_style::open(&mut app, Some("dropShadow")).expect("the dialog opens");
