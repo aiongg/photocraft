@@ -1,4 +1,5 @@
 use craft::theme::variant::Tone;
+use craft::ui::contract::Show as _;
 use craft::ui::notices::{Notice, NoticeLayout};
 
 use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, icons, vec2};
