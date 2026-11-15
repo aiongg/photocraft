@@ -1,3 +1,4 @@
+use crate::app::framework::{run_app, step_app_n};
 use craft::behavior::{EditEvent, GestureId, Mixed};
 use craft::keymap::Mods;
 use craft::ui::contract::ReorderMove;
@@ -261,7 +262,7 @@ fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftA
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     h
 }
 
@@ -269,21 +270,21 @@ fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftA
 fn options_bar_edits_are_one_set_brush_per_gesture() {
     let mut h = options_bar_harness(crate::state::Tool::Brush);
     let n = h.state().session.journal.len();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(h.state().session.journal.len(), n, "showing the bar issues nothing");
     // Drag the Opacity field left: many frames, one journal entry.
     let label = caption_rect(&h, "Opacity");
     let start = egui::pos2(label.right() + 40.0, label.center().y);
     h.hover_at(start);
-    h.run();
+    run_app(&mut h);
     h.drag_at(start);
-    h.run();
+    run_app(&mut h);
     for k in 1..=8 {
         h.hover_at(start - vec2(5.0 * k as f32, 0.0));
-        h.run();
+        run_app(&mut h);
     }
     h.drop_at(start - vec2(40.0, 0.0));
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     let opacity = h.state().session.tools.brush.opacity;
     assert!(opacity < 0.95, "the drag lowered the opacity: {opacity}");
     let j = &h.state().session.journal;
@@ -296,11 +297,11 @@ fn options_bar_edits_are_one_set_brush_per_gesture() {
     let was = h.state().session.tools.brush.pressure_size;
     let at = egui::pos2(label.left() - 18.0, label.center().y);
     h.hover_at(at);
-    h.run();
+    run_app(&mut h);
     h.drag_at(at);
-    h.run();
+    run_app(&mut h);
     h.drop_at(at);
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     assert_eq!(h.state().session.tools.brush.pressure_size, !was);
     assert_eq!(h.state().session.journal.len(), n + 2);
     assert_eq!(h.state().session.journal.last().unwrap().1["brush"], json!({"pressureSize": !was}));
@@ -320,7 +321,7 @@ fn brush_and_eraser_size_fields_keep_sizes_above_2500_px() {
         let mut h = options_bar_harness(tool);
         let n = h.state().session.journal.len();
         h.state_mut().session.tools.brush.size = 4000.0;
-        h.run_steps(4);
+        step_app_n(&mut h, 4);
         assert_eq!(h.state().session.tools.brush.size, 4000.0, "{tool:?}");
         let j = &h.state().session.journal;
         assert_eq!(j.len(), n, "showing the bar issues nothing: {:?}", &j[n..]);
@@ -340,23 +341,23 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     ] {
         h.state_mut().run(id, p).unwrap();
     }
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     for label in ["Current brush load", "Load the brush after each stroke", "Clean the brush after each stroke"] {
         assert!(h.get_by_label(label).rect().is_positive(), "missing Mixer Brush option {label}");
     }
 
     // Turn the automatic Load off: one tools.setBrush call.
     h.get_by_label("Load the brush after each stroke").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(!h.state().session.tools.brush.mixer.load_after_stroke);
     let (id, params) = last_journal(h.state()).unwrap();
     assert_eq!((id.as_str(), &params["brush"]["mixer"]["loadAfterStroke"]), ("tools.setBrush", &json!(false)));
 
     // Current Brush Load › Clean Brush empties the brush.
     h.get_by_label("Current brush load").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     h.get_by_label("Clean Brush").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(last_journal(h.state()).map(|(id, _)| id), Some("brush.mixer.clean".to_string()));
     assert_eq!(h.state().session.tools.mixer.reservoir, None);
 
@@ -370,9 +371,9 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
 
     // Load Brush fills it with the foreground again.
     h.get_by_label("Current brush load").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     h.get_by_label("Load Brush").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(h.state().session.tools.mixer.reservoir, Some([0.0, 0.0, 1.0, 1.0]));
 }
 
@@ -392,7 +393,7 @@ fn harness(panel: &'static str, section: usize) -> Harness<'static, PhotocraftAp
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     h
 }
 
@@ -408,18 +409,18 @@ fn checkbox_only_rows_cannot_restore_an_empty_properties_pane() {
 fn editing_the_options_bar_amount_reenables_smoothing() {
     let mut h = options_bar_harness(crate::state::Tool::Brush);
     h.state_mut().run("tools.setBrush", json!({"brush": {"smoothing": {"enabled": false, "amount": 0.4}}})).unwrap();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     let n = h.state().session.journal.len();
     let label = caption_rect(&h, "Smoothing");
     let at = egui::pos2(label.right() + 25.0, label.center().y);
     h.hover_at(at);
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     h.drag_at(at);
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     h.hover_at(at + vec2(20.0, 0.0));
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     h.drop_at(at + vec2(20.0, 0.0));
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     let smoothing = &h.state().session.tools.brush.smoothing;
     assert!(smoothing.enabled && smoothing.amount != 0.4);
     assert_eq!(h.state().session.journal.len(), n + 1, "one options-bar gesture");
@@ -442,7 +443,7 @@ fn every_section_draws_without_issuing_commands() {
             b.tip = TipShape::Sampled(GrayTile::from_fn(50, 40, |x, y| ((x ^ y) & 1) as f32));
             h.state_mut().session.tools.brush = b.clone();
             let n = h.state().session.journal.len();
-            h.run_steps(4);
+            step_app_n(&mut h, 4);
             // Merely showing the panel must not rewrite the brush (no rounding drift, no commands).
             assert_eq!(h.state().session.journal.len(), n, "{panel} {view:?} section {section}");
             assert_eq!(h.state().session.tools.brush, b, "{panel} {view:?} section {section}");
@@ -470,7 +471,7 @@ fn rows_of(app: PhotocraftApp, view: PresetView) -> Vec<PresetRow<BrushKey>> {
         (app, Vec::new()),
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     std::mem::take(&mut h.state_mut().1)
 }
 
@@ -612,7 +613,7 @@ fn app_harness_with_language(lang: crate::i18n::Lang) -> Harness<'static, Photoc
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::default());
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     h
 }
 
@@ -632,7 +633,7 @@ fn brush_sections_paint_simplified_chinese_labels() {
     let zh = crate::i18n::Lang::from_code("zh-hans").unwrap();
     let mut h = app_harness_with_language(zh);
     h.key_press(egui::Key::F5);
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     let mut painted = Vec::new();
     for shape in &h.output().shapes {
         collect_text(&shape.shape, &mut painted);
@@ -664,7 +665,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     let fresh = h.state().session.tools.brush.clone();
     assert!(!fresh.shape_dynamics.enabled && !fresh.transfer.enabled, "the default round brush has no dynamics yet");
     h.key_press(egui::Key::F5);
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(crate::panels::panel_docking::is_shown(h.state(), "brushSettings"), "F5 shows Brush Settings");
     // Every section is there for the built-in round brush, not only for sampled or imported ones.
     for (name, _) in SECTIONS {
@@ -673,7 +674,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     // Clicking a section's name shows it and turns it on: one tools.setBrush.
     let n = h.state().session.journal.len();
     h.get_by_label("Shape Dynamics").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(h.state().ui.brush_section, 1);
     assert!(h.state().session.tools.brush.shape_dynamics.enabled);
     assert_eq!(h.state().session.journal.len(), n + 1);
@@ -682,7 +683,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     assert_eq!(p["brush"]["shapeDynamics"]["enabled"], json!(true));
     // A section's box toggles it without showing it.
     h.get_by_label("Enable Transfer").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(h.state().session.tools.brush.transfer.enabled);
     assert_eq!(h.state().ui.brush_section, 1);
     assert_eq!(h.state().session.journal.len(), n + 2);
@@ -691,7 +692,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     assert_eq!((b.size, b.hardness, &b.tip), (fresh.size, fresh.hardness, &fresh.tip));
     // F5 again hides the panel.
     h.key_press(egui::Key::F5);
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     assert!(!crate::panels::panel_docking::is_shown(h.state(), "brushSettings"));
 }
 
@@ -701,19 +702,19 @@ fn update_current_brush_button_overwrites_the_picked_preset_in_place() {
     // Nothing picked yet: the button is disabled and clicking it does nothing.
     assert!(h.state().session.tools.current_preset.is_none());
     h.get_by_label("Update the current brush with these settings").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(!h.state().session.journal.iter().any(|(id, _)| id == "brush.presets.update"));
     // Pick a preset, then turn a section on.
     h.state_mut().run("tools.setBrush", json!({ "preset": "Chalk" })).unwrap();
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     let n = h.state().session.tools.presets.len();
     let at = h.state().session.tools.presets.iter().position(|p| p.name == "Chalk").unwrap();
     h.get_by_role_and_label(egui::accesskit::Role::Switch, "Enable Scattering").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(h.state().session.tools.brush.scattering.enabled);
     // The update button overwrites the picked preset in place: no new preset, position kept.
     h.get_by_label("Update the current brush with these settings").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert!(h.state().session.journal.iter().any(|(id, p)| id == "brush.presets.update" && p["brush"]["scattering"]["enabled"] == json!(true)));
     assert_eq!(h.state().session.tools.presets.len(), n);
     let chalk = h.state().session.tools.presets.get(at).unwrap();
@@ -758,15 +759,15 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     let has = |h: &Harness<'static, PhotocraftApp>, v: f64| h.query_all_by_role(Role::SpinButton).any(|n| n.accesskit_node().numeric_value() == Some(v));
     assert!(has(&h, 100.0) && has(&h, 50.0));
 
     // A right-click on Width lists the units; Millimeters shows both sides in mm.
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(100.0)).unwrap().click_secondary();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     h.get_by_label("Millimeters").click();
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     let o = &h.state().ui.tool_options;
     assert_eq!(o.marquee_unit, "mm");
     assert_eq!((o.marquee_width, o.marquee_height), (100.0, 50.0), "the size itself stays in pixels");
@@ -775,26 +776,26 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     // A number typed now is in mm.
     let field = h.query_all_by_role(Role::SpinButton).position(|n| n.accesskit_node().numeric_value() == Some(10.0)).unwrap();
     h.query_all_by_role(Role::SpinButton).nth(field).unwrap().click();
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
-    h.run_steps(1);
+    step_app_n(&mut h, 1);
     h.event(egui::Event::Text("20".into()));
-    h.run_steps(1);
+    step_app_n(&mut h, 1);
     h.key_press(egui::Key::Enter);
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(h.state().ui.tool_options.marquee_width, 200.0);
 
     // Entering and leaving a field without an edit keeps the pixels, even where the unit rounds
     // them (50 px at 254 ppi is 0.197 in, which reads back as 50.038 px).
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(5.0)).unwrap().click_secondary();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     h.get_by_label("Inches").click();
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     let field = h.query_all_by_role(Role::SpinButton).position(|n| n.accesskit_node().numeric_value().is_some_and(|v| (v - 0.19685).abs() < 1e-4)).unwrap();
     h.query_all_by_role(Role::SpinButton).nth(field).unwrap().click();
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     h.key_press(egui::Key::Enter);
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(h.state().ui.tool_options.marquee_unit, "inches");
     assert_eq!(h.state().ui.tool_options.marquee_height, 50.0);
 }

@@ -1,3 +1,4 @@
+use crate::app::framework::{run_app, step_app_n};
 use egui::{Modifiers, PointerButton, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::json;
@@ -122,8 +123,8 @@ fn stored_after_confirming_unedited(mode: &str, command: &str, recorded: &serde_
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
-    h.run_steps(2);
-    h.run_steps(3);
+    step_app_n(&mut h, 2);
+    step_app_n(&mut h, 3);
     confirm(h.state_mut());
     let after = smart(h.state(), layer);
     assert_eq!(after.smart_filters.len(), sm.smart_filters.len(), "{command}: no filter was stacked");
@@ -224,7 +225,7 @@ fn ctrl_i_uses_existing_invert_command_and_undo_redo_keep_the_source() {
     let source = photocraft_engine::smart_cmds::contents_of(&h.state().session.active().unwrap().doc, layer).unwrap();
     let steps = h.state().session.active().unwrap().history.past_len();
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::I);
-    h.run_steps(4);
+    step_app_n(&mut h, 4);
     let sm = smart(h.state(), layer);
     assert_eq!(sm.smart_filters.len(), 3);
     assert_eq!(sm.smart_filters[2].command, "image.adjustments.invert");
@@ -257,18 +258,18 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
-    h.run_steps(2);
-    h.run_steps(3);
+    step_app_n(&mut h, 2);
+    step_app_n(&mut h, 3);
     let shown = fields(h.state());
     assert_eq!(shown["reduceNoise"].as_f64(), Some(10.0), "the spec default, not the remembered 60");
     assert_eq!(shown["amount"].as_f64(), Some(125.0));
     assert_eq!(shown["radius"].as_f64(), Some(2.0), "recorded values beat the remembered 9");
     cancel(h.state_mut());
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
 
     // A plain Filter menu dialog still starts from the remembered values.
     crate::menus::invoke(h.state_mut(), &ctx, command, serde_json::Value::Null).unwrap();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     assert_eq!(fields(h.state())["reduceNoise"].as_f64(), Some(60.0));
 }
 
@@ -340,12 +341,12 @@ fn tone_filter_editor_ignores_current_channel_target() {
                 PhotocraftApp::setup_context(&h.ctx, Default::default());
                 let ctx = h.ctx.clone();
                 super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
-                h.run_steps(2);
+                step_app_n(&mut h, 2);
                 let values = fields(h.state());
                 assert_eq!(values.get("target"), None, "{mode} {kind} view={view}: no channel target is added to a Smart Filter");
                 let read = |p: &serde_json::Value| adjust_params::from_params(kind, p, None, color_mode).unwrap();
                 assert_eq!(read(&values), read(&recorded), "{mode} {kind} view={view}: recorded colour settings survive reopening");
-                h.run_steps(3);
+                step_app_n(&mut h, 3);
                 let names: Vec<_> = h.query_all_by_role(egui::accesskit::Role::ComboBox).filter_map(|n| n.value()).collect();
                 let expected = match mode {
                     "lab" => "Lightness",
@@ -428,12 +429,12 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         PhotocraftApp::setup_context(&h.ctx, Default::default());
         let ctx = h.ctx.clone();
         super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
-        h.run_steps(2);
-        h.run_steps(3);
+        step_app_n(&mut h, 2);
+        step_app_n(&mut h, 3);
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).any(|n| n.value().as_deref() == Some("RGB")));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":1}));
         crate::control::handle(h.state_mut(), &ctx, &req);
-        h.run_steps(3);
+        step_app_n(&mut h, 3);
         assert_eq!(h.state().framework.dialogs.open_dialogs().len(), 1);
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).next().is_none(), "stale targets cannot expose the other document's editor");
         assert!(h.query_by_label("The adjustment target is missing or unavailable.").is_some());
@@ -441,7 +442,7 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         assert!(std::sync::Arc::ptr_eq(&other, &h.state().session.active().unwrap().doc));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":0}));
         crate::control::handle(h.state_mut(), &ctx, &req);
-        h.run_steps(3);
+        step_app_n(&mut h, 3);
         assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).any(|n| n.value().as_deref() == Some("RGB")));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":1}));
@@ -532,8 +533,8 @@ fn edit_first_filter(app: PhotocraftApp, id: u64) -> Harness<'static, Photocraft
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, id, &sm, 0);
-    h.run_steps(2);
-    h.run_steps(3);
+    step_app_n(&mut h, 2);
+    step_app_n(&mut h, 3);
     h
 }
 
@@ -545,12 +546,12 @@ fn a_channel_mixer_smart_filter_turned_off_monochrome_keeps_its_red_row() {
     let mut h = edit_first_filter(app, id);
     let ctx = h.ctx.clone();
     h.get_by_label("Monochrome").click();
-    h.run_steps(3);
+    step_app_n(&mut h, 3);
     let shown = fields(h.state());
     assert_eq!(shown.get("monochrome"), Some(&json!(false)));
     assert!(shown.get("gray").is_none(), "the editor removed the gray row: {shown:?}");
     set(h.state_mut(), &ctx, "red", json!([70.0, 30.0, 0.0, 0.0]));
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     confirm(h.state_mut());
 
     let sm = recorded(h.state(), id);
@@ -604,7 +605,7 @@ fn a_color_lookup_smart_filter_with_its_data_cleared_uses_the_chosen_lut() {
     assert_eq!(fields(h.state()).get("data"), Some(&json!(cube)), "opens on the recorded settings");
     set(h.state_mut(), &ctx, "data", json!(""));
     set(h.state_mut(), &ctx, "lut", json!("warm"));
-    h.run_steps(2);
+    step_app_n(&mut h, 2);
     assert!(fields(h.state()).get("data").is_none_or(|data| data == ""), "the dialog holds the emptied field as empty text");
     confirm(h.state_mut());
 

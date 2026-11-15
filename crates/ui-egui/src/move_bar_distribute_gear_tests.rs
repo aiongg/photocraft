@@ -60,17 +60,8 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    steps(&mut h, 4);
+    crate::app::framework::step_app_n(&mut h, 4);
     h
-}
-
-/// `n` frames, each with the command states published before its input, as the app's frame does.
-fn steps(h: &mut Harness<'static, PhotocraftApp>, n: usize) {
-    for _ in 0..n {
-        let ctx = h.ctx.clone();
-        h.state_mut().framework_before_input(&ctx);
-        h.step();
-    }
 }
 
 #[test]
@@ -84,7 +75,7 @@ fn distribute_buttons_are_greyed_with_too_few_layers_like_the_menu() {
     // Align still works with two layers.
     assert!(!h.get_by_label("Align Left Edges").accesskit_node().is_disabled());
     select_all(h.state_mut(), &[a, b, c]);
-    steps(&mut h, 2);
+    crate::app::framework::step_app_n(&mut h, 2);
     assert!(!h.get_by_label("Distribute Vertically").accesskit_node().is_disabled());
 }
 

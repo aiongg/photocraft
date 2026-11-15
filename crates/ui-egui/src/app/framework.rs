@@ -617,6 +617,38 @@ pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -
     ctx.run_ui(input, |ui| embed::logic(ui.ctx(), || crate::discard_ui::close_decision(app)))
 }
 
+/// One pass of a kittest harness over the app, as the app's frame runs it: the runtime takes the app's command
+/// states, catalog and overrides before the pass, and what the pass fired (commands, popups) is collected and run
+/// after it (`shortcuts::handle`), so a command fired by a click or key takes effect in the same step.
+#[cfg(test)]
+pub(crate) fn step_app(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
+    let ctx = h.ctx.clone();
+    h.state_mut().framework_before_input(&ctx);
+    h.step();
+    h.state_mut().framework_before_input(&ctx);
+    crate::shortcuts::handle(h.state_mut(), &ctx);
+}
+
+/// `n` passes of [`step_app`].
+#[cfg(test)]
+pub(crate) fn step_app_n(h: &mut egui_kittest::Harness<'_, PhotocraftApp>, n: usize) {
+    for _ in 0..n {
+        step_app(h);
+    }
+}
+
+/// [`step_app`] until no immediate repaint is requested (the stepping of `Harness::run`), at most 32 passes.
+#[cfg(test)]
+pub(crate) fn run_app(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
+    for _ in 0..32 {
+        step_app(h);
+        if !h.ctx.has_requested_repaint() {
+            return;
+        }
+    }
+    panic!("the app did not settle within 32 passes");
+}
+
 /// Runs one frame of `input` on `ctx` as the app's runtime key pass: the runtime takes the input
 /// with the app's command states, catalog and overrides, `body` runs in the pass, and the commands
 /// the pass's keys fired go to `shortcuts::handle` in the same frame, as `raw_input_hook` and
