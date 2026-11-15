@@ -109,6 +109,9 @@ pub struct PenPath {
     /// Drawing carries on from an endpoint of this open subpath of a document path (#6593): the
     /// commit replaces that subpath instead of adding one.
     pub resumes: Option<Resumed>,
+    /// The open draft as it was before the press that closed it: a close drag pulls the first anchor's handles in the
+    /// closed path only, so Undo gives the path back as this.
+    pub(crate) before_close: Option<EditSubpath>,
 }
 
 /// The subpath a Pen path carries on: where it is and what it was when drawing resumed. The

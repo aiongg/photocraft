@@ -121,6 +121,7 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut VectorTools, _response:
     cancel_stale_pen(app);
     let events = state.pen.take_events();
     apply_pen(app, events);
+    end_for_other_tool(app);
     for event in state.shapes.take_events() {
         match event {
             ShapeDragEvent::Draw(EditEvent::Commit { after, .. }) => {
@@ -292,6 +293,12 @@ fn set_draft(app: &mut PhotocraftApp, value: EditSubpath) {
         return;
     }
     let grew = n > pen.draft.knots.len();
+    // Only the first anchor changing under a path of three or more is the press that closes it with a drag.
+    if n != pen.draft.knots.len() {
+        pen.before_close = None;
+    } else if pen.before_close.is_none() && n >= 3 && value.knots[1..] == pen.draft.knots[1..] && value.knots[0] != pen.draft.knots[0] {
+        pen.before_close = Some(pen.draft.clone());
+    }
     pen.draft = value;
     pen.commit_failed = false;
     if selection_on_draft {
@@ -319,6 +326,22 @@ fn finish(app: &mut PhotocraftApp, end: PenEnd, committed: bool) {
         PenEnd::Removed | PenEnd::Discarded => drop_draft(app),
         _ => {}
     }
+}
+
+/// Choosing a tool that does not work on the Pen's path finishes it, as the Pen's own end does. The tool host cancels
+/// only a gesture in progress, and an open path between presses is none, so the app ends it here once the Pen no
+/// longer runs.
+fn end_for_other_tool(app: &mut PhotocraftApp) {
+    let Some(pen) = app.ui.pen.as_ref() else { return };
+    let tool = crate::tool_memory::selected(app);
+    let works_on_path = matches!(
+        tool,
+        Tool::Pen | Tool::CurvaturePen | Tool::FreeformPen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::PathSelection | Tool::DirectSelection
+    );
+    if pen.commit_failed || pen.draft.knots.is_empty() || works_on_path {
+        return;
+    }
+    end_keeping(app);
 }
 
 /// ↩ with a Pen path in progress: finish it as an open path. Photoshop then deselects the Work Path it went into: still
