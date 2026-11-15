@@ -235,11 +235,24 @@ fn ensure_draft(app: &mut PhotocraftApp) -> Option<&mut PenPath> {
 }
 
 /// Drops the draft; the path stays as it was.
-fn drop_draft(app: &mut PhotocraftApp) {
+pub(crate) fn drop_draft(app: &mut PhotocraftApp) {
     app.ui.pen = None;
     app.ui.pen_doc = None;
     if app.ui.direct_selection.target == Some(PathRef::Pen) {
         app.ui.direct_selection = Default::default();
+    }
+    release_draft(app);
+}
+
+/// Ends the Pen's open run once the app has finished or dropped the draft itself (a commit, a menu command, a stale
+/// owner): the Pen keeps the draft it is drawing until its run ends, so the next press would otherwise carry on the
+/// ended draft. Inside a pass the app holds stand-in tools and this does nothing; there the Pen reported the end
+/// itself.
+pub(crate) fn release_draft(app: &mut PhotocraftApp) {
+    let pen = &mut app.canvas_tools.vector.pen;
+    if pen.discard() {
+        // The app has no draft left for the Pen's cancel and discard to end.
+        let _ = pen.take_events();
     }
 }
 
@@ -333,11 +346,8 @@ fn end_keeping(app: &mut PhotocraftApp) {
         // Drawn on another document that refused it (`cancel_stale`): left as it was.
         return;
     }
-    let Some(pen) = app.ui.pen.take() else { return };
-    app.ui.pen_doc = None;
-    if app.ui.direct_selection.target == Some(PathRef::Pen) {
-        app.ui.direct_selection = Default::default();
-    }
+    let Some(pen) = app.ui.pen.clone() else { return };
+    drop_draft(app);
     let draft = draft_before_finish(&pen);
     let refused = std::mem::take(&mut app.ui.status);
     let before = current_doc(app);

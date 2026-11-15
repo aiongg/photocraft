@@ -186,7 +186,6 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     #[cfg(test)]
     probe::record(ui.ctx(), id, ui.max_rect(), false);
     if entry.scrolls_itself {
-        ui.set_min_height(ui.available_height().max(0.0));
         (entry.body)(app, ui);
     } else {
         // No scroll fade: it darkens real colours, swatches and previews at the edge (#2726).

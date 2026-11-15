@@ -41,7 +41,7 @@ pub(crate) fn pen_replace(app: &mut PhotocraftApp, path: &Path) {
     }
     let draft = path.subpaths.first().map(edit_subpath).unwrap_or_default();
     if draft.knots.is_empty() {
-        app.ui.pen = None;
+        super::host::drop_draft(app);
         return;
     }
     super::replace_draft(app, &draft);
@@ -91,6 +91,7 @@ pub(super) fn try_pen_commit(app: &mut PhotocraftApp, closed: bool) -> Result<()
         return Err(e);
     }
     app.ui.pen_doc = None;
+    super::host::release_draft(app);
     // Undo back to this finish gives the path back to the Pen (`pen_resume_on_undo`).
     super::pen_resume::remember_finish(app, draft, &before);
     Ok(())
