@@ -8,6 +8,7 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
+use craft::draw::ui::VectorMode;
 
 /// The measured document: 800 × 600 px with the Freeform Pen in Path mode at `zoom`.
 fn app(zoom: f32) -> PhotocraftApp {
@@ -16,7 +17,7 @@ fn app(zoom: f32) -> PhotocraftApp {
     app.sync_views();
     app.ui.views[0].zoom = zoom;
     app.ui.tool = Tool::FreeformPen;
-    app.ui.tool_options.vector_mode = "path".into();
+    app.ui.tool_options.vector_mode = VectorMode::Path;
     app
 }
 
@@ -91,5 +92,5 @@ fn a_release_in_the_box_closes_even_when_fitting_moves_the_last_anchor() {
     let trace = [[100.0, 100.0], [200.0, 100.0], [200.0, 200.0], [103.01, 100.0], [103.0, 100.0]];
     let (pen, closed) = super::fit_with_straight_segments(&trace, &[1, 2, 3], 2.0, true);
     assert!(closed);
-    assert_eq!(pen.knots.len(), 3, "the last anchor became the first one");
+    assert_eq!(pen.triples().len(), 3, "the last anchor became the first one");
 }

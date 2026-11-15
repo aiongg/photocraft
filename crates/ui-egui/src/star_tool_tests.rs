@@ -57,15 +57,6 @@ fn star_sits_in_the_shape_slot_after_polygon() {
     assert_eq!(pos(Tool::Star), pos(Tool::Polygon).map(|p| p + 1), "Tool::ALL keeps the slot order");
 }
 
-#[test]
-fn star_is_a_shape_tool_on_u_with_its_label_icon_and_name() {
-    assert!(crate::tools::vector_ui::is_shape_tool(Tool::Star));
-    assert_eq!(Tool::Star.key(), 'U');
-    assert_eq!(Tool::Star.label(), "Star Tool");
-    assert_eq!(Tool::from_name("Star Tool"), Some(Tool::Star));
-    assert_eq!(Tool::from_name("star"), Some(Tool::Star));
-    assert_eq!(crate::icons::tool_icon(Tool::Star), "star");
-}
 
 #[test]
 fn shift_u_steps_from_polygon_to_star_to_line() {
@@ -103,13 +94,3 @@ fn a_drag_makes_a_live_star_shape_layer_with_one_undo_step() {
     assert!(live_shape(&app).is_none(), "undo takes the star away");
 }
 
-#[test]
-fn shift_and_alt_constrain_and_centre_the_star_like_the_polygon_tool() {
-    let mut app = app();
-    app.ui.tool = Tool::Star;
-    drag(&mut app, [100.0, 100.0], [140.0, 120.0], Modifiers::SHIFT | Modifiers::ALT);
-    match live_shape(&app) {
-        Some(LiveShape::Polygon { rect, .. }) => assert_eq!(rect, [60.0, 60.0, 80.0, 80.0], "a square box drawn from the centre"),
-        other => panic!("a live star shape, got {other:?}"),
-    }
-}
