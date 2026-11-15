@@ -1,7 +1,11 @@
+use craft::behavior::PixelSize;
+use craft::ui::patterns::form_dialogs::DocumentOptions;
+
 use super::{
-    DocId, ExportSettings, FormatChoices, PhotocraftApp, SAVE_OPTIONS_OPEN, SaveKind, Value, camera_raw_ui, dds_options_ui, file_open, jobs_ui,
-    jpeg_options_ui, json, notices, open_prompt, plain_raster, preset_files_ui, saved_revision_after_write, targa_options_ui, tiff_options_ui,
+    DocId, ExportSettings, FormatChoices, PhotocraftApp, SAVE_OPTIONS_OPEN, SaveKind, Value, file_open, jobs_ui, json, notices, open_prompt, plain_raster,
+    preset_files_ui, saved_revision_after_write,
 };
+use crate::{camera_raw_ui, dds_options_ui, jpeg_options_ui, targa_options_ui, tiff_options_ui};
 
 impl PhotocraftApp {
     /// Record `path` as the most-recently-opened file (File › Open Recent): de-duplicated, newest
@@ -430,14 +434,8 @@ impl PhotocraftApp {
     /// File › Save once answered. Only a step journaled at index `from` or later (by this save)
     /// is re-labeled.
     pub(crate) fn journal_as_plain_save(&mut self, path: &str, from: usize) {
-        let parked = [
-            self.targa_options.as_mut().map(|p| (&p.path, &mut p.record)),
-            self.dds_options.as_mut().map(|p| (&p.path, &mut p.record)),
-            self.jpeg_options.as_mut().map(|p| (&p.path, &mut p.record)),
-            self.tiff_options.as_mut().map(|p| (&p.path, &mut p.record)),
-        ];
-        if let Some((_, record)) = parked.into_iter().flatten().find(|(p, record)| p.as_str() == path && **record == "file.saveAs") {
-            *record = "file.save";
+        if let Some(parked) = self.parked_save.as_mut().filter(|p| p.path.as_str() == path && p.record == "file.saveAs") {
+            parked.record = "file.save";
             return;
         }
         // Only the path goes: a script's format answer stays, so a replay writes the file it is
@@ -753,7 +751,7 @@ impl PhotocraftApp {
 
     /// TIFF, Targa, DDS or JPEG Options is waiting on an answer before a save is written.
     pub(crate) fn save_options_open(&self) -> bool {
-        self.tiff_options.is_some() || self.targa_options.is_some() || self.dds_options.is_some() || self.jpeg_options.is_some()
+        self.parked_save.is_some()
     }
 
     /// Writes a save that waited on a format prompt (Targa, DDS, JPEG or TIFF Options) once answered:
@@ -840,51 +838,31 @@ impl PhotocraftApp {
     }
 }
 
-/// The New Document dialog's key in the preferences' `dialogs` map.
-const NEW_DOCUMENT: &str = "file.new";
-
-/// New Document fields its OK remembers (#1810): the size, resolution, mode, depth, background and
-/// display units. Not the name, the preset or the clipboard size.
-const NEW_DOCUMENT_REMEMBERED: [&str; 8] = ["width", "height", "resolution", "mode", "depth", "background", "__unit", "__resUnit"];
-
-/// A remembered value the dialog can show (a corrupt preference is ignored).
-fn remembered_new_document_value(key: &str, v: &serde_json::Value) -> bool {
-    match key {
-        "width" | "height" => v.as_u64().is_some_and(|n| (1..=300_000).contains(&n)),
-        "resolution" => v.as_f64().is_some_and(|r| r.is_finite() && r > 0.0 && r <= 30_000.0),
-        "depth" => v.as_u64().is_some_and(|d| matches!(d, 1 | 8 | 16 | 32)),
-        _ => v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 64),
-    }
-}
-
-/// Remember the New Document fields `f` its OK used, for the next New Document.
-pub(crate) fn remember_new_document(app: &mut PhotocraftApp, f: &serde_json::Map<String, serde_json::Value>) {
-    let kept: serde_json::Map<String, serde_json::Value> =
-        NEW_DOCUMENT_REMEMBERED.iter().filter_map(|k| f.get(*k).filter(|v| remembered_new_document_value(k, v)).map(|v| (k.to_string(), v.clone()))).collect();
-    app.session.prefs.edit(|p| p.dialogs.insert(NEW_DOCUMENT.into(), serde_json::Value::Object(kept)));
-}
+/// The name a new document starts with.
+const UNTITLED: &str = "Untitled-1";
 
 impl PhotocraftApp {
-    /// File › New's fields: the defaults, then the settings of the last document made with the
-    /// dialog (Photoshop starts from them, #1810), then the Clipboard preset (the clipboard image's
-    /// size, selected) when the clipboard holds an image. Opening the dialog is an explicit
-    /// request, so the OS clipboard is read here, as for a paste.
-    pub(crate) fn new_document_fields(&mut self) -> serde_json::Map<String, serde_json::Value> {
-        let mut f = crate::state::UiState::new_document_fields();
-        if let Some(serde_json::Value::Object(saved)) = self.session.prefs().dialogs.get(NEW_DOCUMENT) {
-            for k in NEW_DOCUMENT_REMEMBERED {
-                if let Some(v) = saved.get(k).filter(|v| remembered_new_document_value(k, v)) {
-                    f.insert(k.into(), v.clone());
-                }
-            }
-        }
-        if self.import_os_clipboard().is_err() {
-            return f;
-        }
-        if let Some(c) = self.session.clipboard.as_ref().filter(|c| !c.bounds.is_empty()) {
-            crate::new_doc_ui::set_clipboard(&mut f, c.bounds.width(), c.bounds.height());
-        }
-        f
+    /// File › New's settings: those of the last document made with the dialog (Photoshop starts from
+    /// them, #1810), else PhotoCraft's defaults. The name is always the default one. A stored value
+    /// the dialog cannot show is ignored.
+    #[allow(clippy::field_reassign_with_default)] // `DocumentOptions` is `#[non_exhaustive]`: it cannot be built with a struct expression here.
+    pub(crate) fn new_document_options(&mut self) -> DocumentOptions {
+        let last = craft::ui::runtime::memory::saved_value::<Option<DocumentOptions>>(self.ctx(), &crate::new_doc_ui::LAST_CREATED).filter(DocumentOptions::fits);
+        let mut options = last.unwrap_or_else(|| {
+            let mut defaults = DocumentOptions::default();
+            defaults.size = PixelSize::new(1920, 1080);
+            defaults.pixels_per_inch = 72.0;
+            defaults
+        });
+        options.name = UNTITLED.to_owned();
+        options
+    }
+
+    /// The size of the image on the clipboard, which File › New offers as its Clipboard preset.
+    /// Opening the dialog is an explicit request, so the OS clipboard is read here, as for a paste.
+    pub(crate) fn new_document_clipboard(&mut self) -> Option<PixelSize> {
+        self.import_os_clipboard().ok()?;
+        self.session.clipboard.as_ref().filter(|c| !c.bounds.is_empty()).map(|c| PixelSize::new(c.bounds.width(), c.bounds.height()))
     }
 }
 
