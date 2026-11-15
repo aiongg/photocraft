@@ -16,17 +16,17 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, field: &str, 
     app.framework.dialogs.set_json_field(ctx, id, field, value).unwrap_or_else(|e| panic!("{field}: {e}"));
 }
 
-/// Two actions of one name in sets A and B: Create Droplet starts on the selected action's set
-/// and saves that set's steps, not the first action of the name.
+/// Actions in sets A and B: Create Droplet starts on the selected action's set and saves that action's steps, not
+/// the first action's.
 #[test]
-fn create_droplet_saves_the_selected_sets_action_among_same_named_ones() {
+fn create_droplet_saves_the_selected_actions_set_and_steps() {
     let mut app = app();
     let ctx = app.ctx().clone();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("b.pcdroplet").to_string_lossy().into_owned();
     app.run("file.new", json!({"width": 2, "height": 1})).unwrap();
-    for (set_name, step) in [("A", "image.adjustments.invert"), ("B", "image.imageRotation.90cw")] {
-        let mut action = Action::new("Retouch", vec![ActionStep::new(step, json!({}))]);
+    for (set_name, name, step) in [("A", "Retouch", "image.adjustments.invert"), ("B", "Turn", "image.imageRotation.90cw")] {
+        let mut action = Action::new(name, vec![ActionStep::new(step, json!({}))]);
         action.set = Some(set_name.into());
         app.session.actions.list.push(action).unwrap();
     }
