@@ -21,7 +21,16 @@ fn app() -> PhotocraftApp {
     app
 }
 
-/// The painted shapes' order in one frame: the indices of the guide lines and of the ants' meshes.
+/// The leaf shapes of `shape`: a dashed line arrives as a `Shape::Vec` of segments.
+fn leaves<'a>(shape: &'a egui::Shape, out: &mut Vec<&'a egui::Shape>) {
+    match shape {
+        egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| leaves(s, out)),
+        other => out.push(other),
+    }
+}
+
+/// The painted shapes' order in one frame, across the paint layers (the document picture is below the canvas
+/// controls): the indices of the guide lines and of the ants' black and white dashes.
 fn painted(app: &mut PhotocraftApp, ppp: f32, zoom: f32, primary: bool) -> (Vec<usize>, Vec<usize>) {
     let ctx = egui::Context::default();
     PhotocraftApp::setup_context(&ctx, crate::theme::AppTheme::pro());
@@ -29,17 +38,26 @@ fn painted(app: &mut PhotocraftApp, ppp: f32, zoom: f32, primary: bool) -> (Vec<
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(700.0, 500.0));
     let view = View { zoom, center: [300.0, 200.0], doc_size: [600, 400], fit_pending: false, ..Default::default() };
     let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
-        canvas_view(app, ui, 0, rect, view.clone(), primary);
+        canvas_view(app, ui, super::document_display::CanvasHost::main(0), rect, view.clone(), primary);
     });
     output.textures_delta.clear();
     let (mut guides, mut ants) = (Vec::new(), Vec::new());
+    // The guide colour is the default of Preferences (the constant above) and the ants are the black and white dashes of the `SelectionOverlay`.
     for (i, s) in output.shapes.iter().enumerate() {
-        match &s.shape {
-            egui::Shape::LineSegment { stroke, .. } if stroke.color == GUIDE => guides.push(i),
-            egui::Shape::Mesh(m) if m.vertices.iter().any(|v| v.color == Color32::BLACK) && m.vertices.iter().any(|v| v.color == Color32::WHITE) => {
-                ants.push(i)
-            }
-            _ => {}
+        let mut parts = Vec::new();
+        leaves(&s.shape, &mut parts);
+        let stroke_of = |shape: &&egui::Shape| match shape {
+            egui::Shape::LineSegment { stroke, .. } => Some(stroke.color),
+            egui::Shape::Path(path) => match path.stroke.color {
+                egui::epaint::ColorMode::Solid(c) => Some(c),
+                _ => None,
+            },
+            _ => None,
+        };
+        if parts.iter().any(|p| stroke_of(p) == Some(GUIDE)) {
+            guides.push(i);
+        } else if parts.iter().any(|p| matches!(stroke_of(p), Some(c) if c == Color32::BLACK || c == Color32::WHITE)) {
+            ants.push(i);
         }
     }
     (guides, ants)

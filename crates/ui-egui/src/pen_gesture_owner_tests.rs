@@ -2,8 +2,9 @@ use egui::Modifiers;
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::canvas::testing::in_gesture;
 use crate::canvas::{ToolEvent, tool_event};
-use crate::state::Tool;
+use crate::state::{Tool, VectorMode};
 
 fn app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -14,11 +15,12 @@ fn app(tool: Tool) -> PhotocraftApp {
     app
 }
 
+
 fn down(app: &mut PhotocraftApp) {
     tool_event(app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Move { x: 50.0, y: 35.0, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Move { x: 90.0, y: 80.0, pressure: 1.0 }, Modifiers::NONE);
-    assert!(app.drag.is_some());
+    assert!(in_gesture(app));
 }
 
 #[test]
@@ -32,7 +34,7 @@ fn freeform_and_path_selection_releases_cannot_edit_a_different_document() {
         app.sync_views();
         let revision = app.session.active().unwrap().revision;
         tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
-        assert!(app.drag.is_none());
+        assert!(!in_gesture(&app));
         assert!(app.session.active().unwrap().doc.work_path.is_none());
         assert_eq!(app.session.active().unwrap().revision, revision);
         assert_eq!(app.session.documents()[0].doc.work_path, original);
@@ -49,12 +51,13 @@ fn freeform_release_cancels_after_revision_or_target_change() {
                 app.run("path.set", json!({"path": {"subpaths": [{"knots": [[10, 10], [15, 15]]}]}})).unwrap();
             }
             "selected" => app.ui.selected_path = Some("Another path".into()),
-            _ => app.ui.tool_options.vector_mode = "shape".into(),
+            // The app default is Path, so this assignment changes the mode.
+            _ => app.ui.tool_options.vector_mode = VectorMode::Shape,
         }
         let before = app.session.active().unwrap().doc.clone();
         let revision = app.session.active().unwrap().revision;
         tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
-        assert!(app.drag.is_none());
+        assert!(!in_gesture(&app));
         assert_eq!(app.session.active().unwrap().doc.work_path, before.work_path);
         assert_eq!(app.session.active().unwrap().doc.layers, before.layers);
         assert_eq!(app.session.active().unwrap().revision, revision);
@@ -80,13 +83,17 @@ fn frame_cancellation_consumes_old_events_after_switching_tools() {
     let mut app = app(Tool::FreeformPen);
     down(&mut app);
     app.ui.tool = Tool::PolygonLasso;
-    app.ui.polygon = vec![[10.0, 10.0], [20.0, 20.0]];
-    let polygon = app.ui.polygon.clone();
     app.sync_views();
-    assert!(app.drag.is_none());
+    assert!(!in_gesture(&app), "the tool switch cancels the Freeform Pen's gesture");
     let modifiers = Modifiers { alt: true, ..Modifiers::NONE };
     tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 100.0, pressure: 1.0 }, modifiers);
     tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, modifiers);
-    assert_eq!(app.ui.polygon, polygon, "old pointer events must not become a Polygonal Lasso gesture");
-    assert!(!app.cancelled_vector_drag);
+    let outline = &app.canvas_tools.selection;
+    assert!(!outline.outline_open() && !in_gesture(&app), "old pointer events must not become a Polygonal Lasso gesture");
+    // PLAN: the sheet opens the outline before the old press's move and release; a second press while the old one is held is not a click, so the outline is opened after them and the stale events are checked to start nothing.
+    for (x, y) in [(10.0, 10.0), (20.0, 20.0)] {
+        tool_event(&mut app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
+        tool_event(&mut app, ToolEvent::Up { x, y }, Modifiers::NONE);
+    }
+    assert!(app.canvas_tools.selection.outline_open(), "clicks open the Polygonal Lasso outline");
 }
