@@ -234,10 +234,7 @@ fn refine_edge_brush_stays_visible_above_the_canvas_with_live_tools() {
             h.state_mut().ui.view.flip_horizontal = flip;
             h.run_steps(4);
             control(&mut h, "ui.set", json!({"zoom":1.0,"center":[600,400]}));
-            control(&mut h, "ui.menu.invoke", json!({"command":"select.refineEdge"}));
-            let fields = &mut h.state_mut().ui.dialogs.last_mut().expect("Select and Mask opens").fields;
-            fields.insert("__brush".into(), json!(true));
-            fields.insert("__preview".into(), json!(false));
+            control(&mut h, "ui.menu.invoke", json!({"command":"select.refineEdge","params":{"ui":{"tool":"refineEdge","hideView":true}}}));
             h.run_steps(3);
             let canvas = h.state().last_canvas_rect;
             let at = egui::pos2(canvas.left() + 32.0, canvas.top() + 80.0);
