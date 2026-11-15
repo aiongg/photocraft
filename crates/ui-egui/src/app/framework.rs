@@ -549,6 +549,11 @@ impl PhotocraftApp {
     pub fn dialog_count(&self) -> usize {
         self.framework.dialogs.stack().ids().count()
     }
+
+    /// The id of the top open dialog.
+    pub fn top_dialog(&self) -> Option<craft::ui::dialog::DialogId> {
+        self.framework.dialogs.stack().top()
+    }
 }
 
 /// The framework's settings sections, kept in PhotoCraft's preferences (`Preferences::sections`).

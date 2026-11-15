@@ -103,7 +103,7 @@ fn open_on_canvas(app: PhotocraftApp, kind: &str) -> Harness<'static, Photocraft
 
 /// The top dialog of the stack.
 fn top(h: &Harness<'static, PhotocraftApp>) -> DialogId {
-    h.state().framework.dialogs.stack().top().expect("a dialog is open")
+    h.state().top_dialog().expect("a dialog is open")
 }
 
 /// One control request through the public channel, then a few frames; the reply is the request's answer.
