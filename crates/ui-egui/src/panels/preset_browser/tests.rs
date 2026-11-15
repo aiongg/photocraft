@@ -54,22 +54,63 @@ fn each_preset_event_runs_its_edit_command_for_every_prefix() {
     }
 }
 
+fn app() -> PhotocraftApp {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+    app.sync_views();
+    app
+}
+
 /// The events that use a preset: Patterns select on a click and fill on a double click or a drop; Styles apply,
-/// Shift adding the effects, and a drop styles the active layer.
+/// Shift adding the effects, and a drop styles the active layer; Gradients select and apply; Shapes pick, place and
+/// place at a drop; Tool Presets apply.
 #[test]
-fn patterns_and_styles_use_a_preset_their_own_way() {
+fn each_panel_uses_a_preset_its_own_way() {
+    let mut app = app();
+    crate::canvas::testing::frame(&mut app);
     let shift = Mods { shift: true, ..Mods::default() };
+    let none = Mods::default();
     let at = pos2(10.0, 20.0);
     let cases: Vec<(PresetPanel, PresetEvent<PresetKey>, Option<Act>)> = vec![
-        (PATTERNS, PresetEvent::select(item("p"), Mods::default()), run("pattern.presets.select", json!({"pattern": "p"}))),
-        (PATTERNS, PresetEvent::activate(item("p"), Mods::default()), run("pattern.presets.apply", json!({"pattern": "p"}))),
-        (PATTERNS, PresetEvent::drop_at(item("p"), at, Mods::default()), run("pattern.presets.apply", json!({"pattern": "p"}))),
-        (STYLES, PresetEvent::select(item("s"), Mods::default()), run("style.presets.apply", json!({"preset": "s", "add": false}))),
+        (PATTERNS, PresetEvent::select(item("p"), none), run("pattern.presets.select", json!({"pattern": "p"}))),
+        (PATTERNS, PresetEvent::activate(item("p"), none), run("pattern.presets.apply", json!({"pattern": "p"}))),
+        (PATTERNS, PresetEvent::drop_at(item("p"), at, none), run("pattern.presets.apply", json!({"pattern": "p"}))),
+        (STYLES, PresetEvent::select(item("s"), none), run("style.presets.apply", json!({"preset": "s", "add": false}))),
         (STYLES, PresetEvent::select(item("s"), shift), run("style.presets.apply", json!({"preset": "s", "add": true}))),
         (STYLES, PresetEvent::drop_at(item("s"), at, shift), run("style.presets.apply", json!({"preset": "s"}))),
-        (STYLES, PresetEvent::select(group("G"), Mods::default()), None),
+        (STYLES, PresetEvent::select(group("G"), none), None),
+        (GRADIENTS, PresetEvent::select(item("g"), none), run("gradient.presets.select", json!({"preset": "g"}))),
+        (GRADIENTS, PresetEvent::activate(item("g"), none), run("gradient.presets.apply", json!({"preset": "g"}))),
+        (GRADIENTS, PresetEvent::drop_at(item("g"), at, none), run("gradient.presets.apply", json!({"preset": "g"}))),
+        (SHAPES, PresetEvent::select(item("Star"), none), Some(Act::CustomShapeTool)),
+        (SHAPES, PresetEvent::activate(item("Star"), none), run("shape.presets.place", json!({"preset": "Star", "fill": shape_fill(&app)}))),
+        (TOOL_PRESETS, PresetEvent::select(item("T"), none), Some(Act::ToolPreset("T".into()))),
+        (TOOL_PRESETS, PresetEvent::activate(item("T"), none), Some(Act::ToolPreset("T".into()))),
+        (TOOL_PRESETS, PresetEvent::drop_at(item("T"), at, none), None),
     ];
     for (panel, event, expected) in cases {
-        assert_eq!(panel_act(panel, &event), expected, "{}: {event:?}", panel.id);
+        assert_eq!(panel_act(&app, panel, &event), expected, "{}: {event:?}", panel.id);
     }
+    // A shape dropped on the canvas lands in a square centred on the drop, of 30 % of the shorter side.
+    let drop = canvas_drop_rect(&app).center();
+    let c = crate::canvas::document_display::doc_point_at(&app, drop).expect("the drop is on the canvas");
+    let side = (48.0_f64 * 0.3).max(8.0);
+    let expected = json!({"preset": "Star", "fill": shape_fill(&app), "rect": [c.x - side / 2.0, c.y - side / 2.0, side, side]});
+    assert_eq!(panel_act(&app, SHAPES, &PresetEvent::drop_at(item("Star"), drop, none)), run("shape.presets.place", expected));
+}
+
+/// Regression: preset drops mapped the pointer through the raw widget rect, ignoring the rulers' inset — a dropped
+/// shape landed off the pointer, and a drop on the ruler strip counted as a canvas drop. Drops map through, and
+/// target, the same content rect the canvas draws with.
+#[test]
+fn preset_drops_map_through_the_ruler_inset() {
+    let mut app = app();
+    app.ui.extras.rulers = true;
+    crate::canvas::testing::frame(&mut app);
+    let rect = canvas_drop_rect(&app);
+    let centre = rect.center();
+    assert!(rect.contains(centre));
+    assert!(!rect.contains(pos2(rect.left() - 4.0, centre.y)), "the ruler strip is no drop target");
+    let doc = crate::canvas::document_display::doc_point_at(&app, centre).expect("the canvas centre is on the document");
+    assert!((doc.x - 32.0).abs() < 1.0 && (doc.y - 24.0).abs() < 1.0, "the canvas centre is the document centre: {doc:?}");
 }
