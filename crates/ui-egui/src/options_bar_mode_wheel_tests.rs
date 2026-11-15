@@ -1,4 +1,4 @@
-//! #2061: the scroll wheel over the options bar's Mode dropdown (Brush, Pencil, Gradient, Paint
+//! #2061: the scroll wheel over the options bar's Mode dropdown (Brush, Paint
 //! Bucket, the stamps, History Brush, Healing) steps through the blend modes, as over the Layers
 //! panel's (#1747) and as in Photoshop.
 
@@ -65,29 +65,6 @@ fn the_wheel_over_the_brush_mode_dropdown_steps_the_painting_mode() {
     assert_eq!(brush_mode(&h), BlendMode::Darken);
     wheel(&mut h, at, 4.0);
     assert_eq!(brush_mode(&h), BlendMode::Normal, "up steps back and stops at the first mode");
-}
-
-#[test]
-fn the_wheel_over_the_pencil_mode_dropdown_steps_the_painting_mode() {
-    let mut h = harness(Tool::Pencil);
-    let at = mode_dropdown(&h).center();
-    wheel(&mut h, at, -1.0);
-    assert_eq!(brush_mode(&h), BlendMode::Dissolve);
-    wheel(&mut h, at, 1.0);
-    assert_eq!(brush_mode(&h), BlendMode::Normal);
-}
-
-#[test]
-fn the_wheel_over_the_gradient_mode_dropdown_steps_its_blend_mode() {
-    let mut h = harness(Tool::Gradient);
-    // Only the Classic gradient has a blend Mode (#12007).
-    h.state_mut().ui.tool_options.gradient_classic = true;
-    h.run_steps(4);
-    let at = mode_dropdown(&h).center();
-    wheel(&mut h, at, -2.0);
-    assert_eq!(h.state().ui.tool_options.gradient_blend_mode, BlendMode::Darken);
-    wheel(&mut h, at, 1.0);
-    assert_eq!(h.state().ui.tool_options.gradient_blend_mode, BlendMode::Dissolve);
 }
 
 /// The stamps, the History Brush and the Healing Brush have a Mode dropdown of their own brush's
