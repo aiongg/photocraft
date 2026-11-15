@@ -96,9 +96,19 @@ fn stroke_width(h: &mut Harness<'_, PhotocraftApp>, width: &str) {
     h.run_steps(3);
 }
 
+/// The Fill or Stroke chip named `label` (a colour well; the popover's kind switch carries the same name).
+fn chip<'h>(h: &'h Harness<'_, PhotocraftApp>, label: &'h str) -> egui_kittest::Node<'h> {
+    h.get_by_role_and_label(egui::accesskit::Role::ColorWell, label)
+}
+
+/// The Stroke style button, which opens the Stroke Options popover.
+fn stroke_style_button<'h>(h: &'h Harness<'_, PhotocraftApp>) -> egui_kittest::Node<'h> {
+    h.get_by_role_and_label(egui::accesskit::Role::Button, "Stroke style")
+}
+
 /// Opens the chip `label` and picks its kind button `kind` ("No Color", "Solid", "Gradient").
 fn pick_kind(h: &mut Harness<'_, PhotocraftApp>, label: &str, kind: &str) {
-    h.get_by_label(label).click();
+    chip(h, label).click();
     h.run_steps(3);
     h.get_by_label(kind).click();
     h.run_steps(2);
@@ -117,14 +127,14 @@ fn click_swatch(h: &mut Harness<'_, PhotocraftApp>, folder: &str, name: &str) {
 /// Opens the chip `label`, its Color Picker… button, sets `color` (the colour it opened with when
 /// `None`) and presses OK.
 fn pick_in_full_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str, color: Option<Srgba>) {
-    h.get_by_label(label).click();
+    chip(h, label).click();
     h.run_steps(3);
     h.get_by_label("Color Picker…").click();
     h.run_steps(3);
     assert!(h.state().dialog_open(), "the Color Picker dialog");
     let id = h.state().framework.dialogs.stack().top().expect("the Color Picker dialog");
     if let Some(color) = color {
-        crate::color_picker_ui::testing::set_color(h.state_mut(), id, &color.to_hex());
+        crate::color_picker_ui::testing::set_color(h.state_mut(), id, &crate::color_picker_ui::rgb_hex(color));
         h.run_steps(2);
     }
     let ctx = h.ctx.clone();
@@ -190,7 +200,7 @@ fn zero_width_style_can_be_inspected_removed_or_reenabled_explicitly() {
         stroke_width(&mut h, "0");
         let zero = shape(h.state()).clone();
 
-        pick_kind(&mut h, if properties { "Set shape stroke type" } else { "Stroke color" }, "No Color");
+        pick_kind(&mut h, if properties { "Stroke" } else { "Stroke color" }, "No Color");
         assert!(shape(h.state()).stroke.is_none(), "No Color still removes the stroke");
         h.key_press(Key::Escape);
         h.run_steps(2);
@@ -198,7 +208,7 @@ fn zero_width_style_can_be_inspected_removed_or_reenabled_explicitly() {
         assert_eq!(shape(h.state()), &zero);
         h.run_steps(2);
 
-        h.get_by_label("Stroke Options").click();
+        stroke_style_button(&mut h).click();
         h.run_steps(3);
         h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
         h.run_steps(3);
@@ -254,7 +264,8 @@ fn picking_tool_colours_enables_paint_and_reaches_the_next_shape() {
     assert_eq!(h.state().session.tools.background, [0.0, 0.0, 1.0, 1.0]);
     // Both join the Recently Used Colors, newest first.
     let recent: Vec<[f32; 3]> = crate::paint_picker::recent_colors(&h.state().session).into_iter().collect();
-    assert_eq!(recent, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]);
+    // The Solid switches also remember their starting colours, which sit below the picks.
+    assert_eq!(recent[..2], [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]);
     draw(h.state_mut(), Tool::Rectangle, [20.0, 20.0], [100.0, 80.0]);
     assert_eq!(shape(h.state()).fill, Some(solid_paint([1.0, 0.0, 0.0, 1.0])));
     assert_eq!(shape(h.state()).stroke.as_ref().unwrap().paint, solid_paint([0.0, 0.0, 1.0, 1.0]));
@@ -352,12 +363,12 @@ fn selected_shape_style_is_available_when_absent_and_dismissal_does_not_enable_i
     let doc = app.session.active().unwrap().doc.clone();
     let before = history(&app);
     let mut h = harness(app, true);
-    h.get_by_label("Stroke Options").click();
+    stroke_style_button(&mut h).click();
     h.run_steps(3);
     h.key_press(Key::Escape);
     h.run_steps(2);
     assert_eq!(h.state().session.active().unwrap().doc, doc);
-    h.get_by_label("Stroke Options").click();
+    stroke_style_button(&mut h).click();
     h.run_steps(3);
     h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
     h.run_steps(3);
@@ -380,7 +391,7 @@ fn selected_shape_swatch_clicks_are_one_undo_step_each_and_keep_tool_defaults() 
     let defaults = (app.session.tools.foreground, app.session.tools.background, app.ui.tool_options.clone());
     let before = history(&app);
     let mut h = harness(app, true);
-    h.get_by_label("Set shape fill type").click();
+    chip(&h, "Fill").click();
     h.run_steps(4);
     assert_eq!(history(h.state()), before, "opening changes nothing");
     click_swatch(&mut h, "RGB", "RGB Green");
@@ -403,18 +414,18 @@ fn selected_shape_gradient_and_full_picker_edit_the_layer() {
     app.run("shape.create", json!({"rect": [20,20,80,60], "fill": "#3270c0", "stroke": null})).unwrap();
     let before = history(&app);
     let mut h = harness(app, true);
-    pick_kind(&mut h, "Set shape fill type", "Gradient");
+    pick_kind(&mut h, "Fill", "Gradient");
     assert!(matches!(shape(h.state()).fill, Some(photocraft_doc::Fill::Gradient { .. })), "Gradient fills the shape");
     assert_eq!(history(h.state()), before + 1);
     h.key_press(Key::Escape);
     h.run_steps(2);
     // The stroke is off: the Color Picker turns it on in the picked colour, as one edit.
-    pick_in_full_picker(&mut h, "Set shape stroke type", Some(Srgba::rgb(0.0, 1.0, 0.0)));
+    pick_in_full_picker(&mut h, "Stroke", Some(Srgba::rgb(0.0, 1.0, 0.0)));
     let stroke = shape(h.state()).stroke.clone().expect("the stroke is on");
     assert_eq!((stroke.paint, stroke.width), (solid_paint([0.0, 1.0, 0.0, 1.0]), 3.0));
     assert_eq!(history(h.state()), before + 2);
     // The fill's picker from the gradient: OK on the colour it opened with still makes it solid.
-    pick_in_full_picker(&mut h, "Set shape fill type", None);
+    pick_in_full_picker(&mut h, "Fill", None);
     assert_eq!(shape(h.state()).fill, Some(solid_paint(h.state().session.tools.foreground)));
 }
 
@@ -434,7 +445,7 @@ fn options_bar_fill_swatch_recolours_the_shape_just_drawn() {
     let before = history(&app);
     crate::paint_picker::remember(&mut app, [0.2, 0.4, 0.6]);
     let mut h = harness(app, false);
-    h.get_by_label("Fill color").click();
+    chip(&h, "Fill color").click();
     h.run_steps(4);
     h.get_by_label("#336699").click();
     h.run_steps(2);
@@ -532,7 +543,7 @@ fn properties_stroke_swatch_gives_the_selected_shape_a_gradient_stroke() {
     app.run("shape.create", json!({"rect": [20, 20, 60, 40], "stroke": {"width": 4, "color": [1.0, 0.0, 0.0, 1.0]}})).unwrap();
     let before = history(&app);
     let mut h = harness(app, true);
-    pick_kind(&mut h, "Set shape stroke type", "Gradient");
+    pick_kind(&mut h, "Stroke", "Gradient");
     let stroke = shape(h.state()).stroke.clone().unwrap();
     let photocraft_doc::Fill::Gradient { stops, .. } = &stroke.paint else { panic!("a gradient stroke, not {:?}", stroke.paint) };
     assert_eq!(stroke.width, 4.0);
@@ -560,7 +571,7 @@ fn gradient_stops(f: &photocraft_doc::Fill) -> photocraft_engine::presets::gradi
 
 /// Opens Options bar › Stroke › Gradient.
 fn open_stroke_gradient(h: &mut Harness<'_, PhotocraftApp>) {
-    h.get_by_label("Stroke color").click();
+    chip(&h, "Stroke color").click();
     h.run_steps(3);
     if h.state().ui.tool_options.shape_stroke_gradient.is_none() || h.state().ui.tool_options.stroke_width <= 0.0 {
         h.get_by_label("Gradient").click();
@@ -598,13 +609,13 @@ fn gradient_tab_align_with_layer_and_recent_row() {
 fn gradient_tab_edit_keeps_cmyk_stops_in_their_model() {
     let cmyk = |c: [f32; 4]| photocraft_doc::Color { mode: photocraft_doc::ColorMode::Cmyk, c, alpha: 1.0 };
     let stops = vec![(0.0, cmyk([0.1, 0.2, 0.3, 0.9])), (1.0, cmyk([0.75, 0.0, 0.5, 0.0]))];
-    for (properties, label) in [(true, "Set shape stroke type"), (false, "Stroke color")] {
+    for (properties, label) in [(true, "Stroke"), (false, "Stroke color")] {
         let mut app = app("cmyk", 8);
         let stroke = json!({"width": 4, "color": {"gradient": {"stops": [[0.0, stops[0].1], [1.0, stops[1].1]]}}});
         app.run("shape.create", json!({"rect": [20, 20, 60, 40], "stroke": stroke})).unwrap();
         assert_eq!(gradient_stops(&shape(&app).stroke.as_ref().unwrap().paint).0, stops);
         let mut h = harness(app, properties);
-        h.get_by_label(label).click();
+        chip(&h, label).click();
         h.run_steps(3);
         h.get_by_label("Reverse").click();
         h.run_steps(3);
@@ -627,7 +638,7 @@ fn width_and_stroke_type_give_a_strokeless_shape_the_tool_stroke_gradient() {
         if via_width {
             stroke_width(&mut h, "5");
         } else {
-            h.get_by_label("Stroke Options").click();
+            stroke_style_button(&mut h).click();
             h.run_steps(3);
             h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
             h.run_steps(3);
@@ -666,7 +677,7 @@ fn arrow_down_at_zero_width_keeps_a_strokeless_shape_strokeless() {
 fn a_refused_popover_swatch_is_not_a_recently_used_colour() {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
-    for (properties, popover) in [(true, "Set shape fill type"), (false, "Fill color")] {
+    for (properties, popover) in [(true, "Fill"), (false, "Fill color")] {
         let mut app = app("rgb", 8);
         app.run("shape.create", json!({"rect": [20,20,80,60], "fill": "#336699"})).unwrap();
         let original = shape(&app).clone();
@@ -691,7 +702,7 @@ fn a_refused_popover_swatch_is_not_a_recently_used_colour() {
             .unwrap();
         let photocraft_engine::jobs::Started::Job(job) = started else { panic!("the job ran inline") };
         let mut h = harness(app, properties);
-        h.get_by_label(popover).click();
+        chip(&h, popover).click();
         h.run_steps(3);
         click_swatch(&mut h, "RGB", "RGB Green");
         assert_eq!(shape(h.state()).fill, original.fill, "properties={properties}: the shape refused it");
@@ -702,7 +713,7 @@ fn a_refused_popover_swatch_is_not_a_recently_used_colour() {
         h.state_mut().session.cancel_job(job);
         h.state_mut().session.join_cancelled_jobs();
         h.run_steps(2);
-        h.get_by_label(popover).click();
+        chip(&h, popover).click();
         h.run_steps(3);
         click_swatch(&mut h, "RGB", "RGB Green");
         assert_eq!(shape(h.state()).fill, Some(solid_paint([0.0, 1.0, 0.0, 1.0])), "properties={properties}");

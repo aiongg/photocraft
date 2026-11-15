@@ -9,7 +9,19 @@ fn app(dpi: f64, depth: u64) -> PhotocraftApp {
 }
 
 fn open(app: &mut PhotocraftApp) -> craft::ui::dialog::DialogId {
-    crate::filter_dialog::open(app, COMMAND).expect("the Bitmap dialog opens")
+    let id = crate::filter_dialog::open(app, COMMAND).expect("the Bitmap dialog opens");
+    // The dialog is drawn once before its fields are set and answered, as the app's frame draws it.
+    crate::canvas::testing::frame(app);
+    id
+}
+
+/// OK, then the frames that take its answer and run the command.
+fn confirm(app: &mut PhotocraftApp, id: craft::ui::dialog::DialogId) {
+    let ctx = app.ctx().clone();
+    crate::dialogs::confirm(app, &ctx, id).unwrap();
+    for _ in 0..3 {
+        crate::canvas::testing::frame(app);
+    }
 }
 
 #[test]
@@ -20,7 +32,7 @@ fn ok_resamples_to_the_output_resolution() {
         let id = open(&mut app);
         app.framework.dialogs.set_json_field(&ctx, id, "method", json!("threshold")).unwrap();
         app.framework.dialogs.set_json_field(&ctx, id, "resolution", json!(144)).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
+        confirm(&mut app, id);
         let doc = &app.session.active().unwrap().doc;
         assert_eq!((doc.size.width, doc.size.height, doc.resolution_dpi, doc.mode), (80, 40, 144.0, photocraft_color::ColorMode::Bitmap), "{depth}");
     }
@@ -42,7 +54,7 @@ fn ok_with_custom_pattern_and_halftone_screen_converts() {
             set(&mut app, "angle", json!(30));
             set(&mut app, "shape", json!("line"));
         }
-        crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
+        confirm(&mut app, id);
         let doc = &app.session.active().unwrap().doc;
         assert_eq!((doc.size.width, doc.mode), (40, photocraft_color::ColorMode::Bitmap), "{method}");
     }

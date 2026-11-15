@@ -53,7 +53,7 @@ fn answer(h: &mut Harness<'_, PhotocraftApp>, label: &str, title: Option<&str>) 
     assert!(!egui::Popup::is_any_open(&h.ctx), "{label}: no egui colour popup");
     assert!(open_dialog(h.state(), id).key.is_some(), "{label}: the picker is a keyed hosted dialog");
     if let Some(title) = title {
-        assert!(h.query_by_label(title).is_some(), "{label}: the picker is titled {title}");
+        assert!(h.query_all_by_label(title).next().is_some(), "{label}: the picker is titled {title}");
     }
     let ctx = h.ctx.clone();
     h.state_mut().framework.dialogs.set_json_field(&ctx, id, "color", json!(PICKED)).unwrap();

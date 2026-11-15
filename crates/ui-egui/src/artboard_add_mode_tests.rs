@@ -87,21 +87,7 @@ fn another_tool_turns_the_mode_off() {
     assert!(!app.ui.artboard_tool.adding);
 
     app.ui.artboard_tool.adding = true;
-    let ctx = app.ctx().clone();
-    let press = |app: &mut PhotocraftApp, modifiers: Modifiers| {
-        let key = egui::Key::V;
-        let raw = egui::RawInput {
-            events: vec![
-                egui::Event::ModifiersChanged(modifiers),
-                egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers },
-                egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers },
-            ],
-            ..Default::default()
-        };
-        ctx.begin_pass(raw);
-        crate::shortcuts::handle(app, &ctx);
-        ctx.end_pass().textures_delta.clear();
-    };
+    let press = |app: &mut PhotocraftApp, modifiers: Modifiers| crate::canvas::testing::key(app, egui::Key::V, modifiers);
     press(&mut app, Modifiers::SHIFT);
     assert_eq!(app.ui.tool, Tool::Move);
     press(&mut app, Modifiers::SHIFT);

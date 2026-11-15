@@ -221,10 +221,18 @@ pub(crate) fn open_for_target(app: &mut PhotocraftApp, target: &str, label: &str
     Ok(open_for(app, label, Srgba::from_rgb_array(rgb), None, which))
 }
 
+/// `request` with its title in the app's form, "Color Picker (Vine Color)"; a request with no title keeps the dialog's own.
+fn titled(request: ColorRequest) -> ColorRequest {
+    match request.title.as_ref().map(|name| title_for(name.as_str())) {
+        Some(title) => request.title(title),
+        None => request,
+    }
+}
+
 /// Opens the colour child of `parent`'s `request`; its OK waits for [`answer_for`].
 pub(crate) fn open_for_request(app: &mut PhotocraftApp, parent: DialogId, request: ColorRequest) -> DialogId {
     let target = PickTarget::Request { parent, key: request.key.clone() };
-    launch(app, ColorPickerDialog::from_request(request), Some(parent), target)
+    launch(app, ColorPickerDialog::from_request(titled(request)), Some(parent), target)
 }
 
 /// The confirmed colour of the child opened for `parent`, once, with the request's key. The first answer
@@ -238,7 +246,7 @@ pub(crate) fn answer_for(app: &mut PhotocraftApp, parent: DialogId) -> Option<(S
 /// Opens the picker for a colour row of the app-held Preferences window (no parent dialog).
 pub(crate) fn open_for_window(app: &mut PhotocraftApp, request: ColorRequest) -> DialogId {
     let target = PickTarget::Window { key: request.key.clone() };
-    launch(app, ColorPickerDialog::from_request(request), None, target)
+    launch(app, ColorPickerDialog::from_request(titled(request)), None, target)
 }
 
 /// The oldest confirmed colour of the Preferences window's picker, once.
@@ -405,11 +413,12 @@ fn commit(app: &mut PhotocraftApp, _id: DialogId, target: PickTarget, picked: &P
 pub(crate) mod testing {
     use super::*;
 
-    /// Sets picker `id`'s colour to `hex`, as an edit would.
+    /// Sets picker `id`'s colour to `hex` (`#rrggbb`), as an edit would; the opacity stays what the picker shows.
     pub fn set_color(app: &mut PhotocraftApp, id: DialogId, hex: &str) {
         let rgb = parse_hex(hex).expect("a colour");
         let picker = app.framework.dialogs.get_mut_by_id::<ColorPickerDialog>(id).expect("the picker is open");
-        picker.set_color(PickedColor::rgb(Srgba::from_rgb_array(rgb)));
+        let alpha = picker.current().map_or(1.0, |c| c.color.a);
+        picker.set_color(PickedColor::rgb(Srgba { a: alpha, ..Srgba::from_rgb_array(rgb) }));
     }
 
     /// The colour picker `id` shows now.
@@ -445,7 +454,7 @@ mod screen_integration_tests {
         h.run_steps(8);
         let before = h.state().session.active().unwrap().history.entries().len();
         let fg = h.state().session.tools.foreground;
-        h.get_by_label("Set the text color").click();
+        h.get_all_by_role_and_label(egui::accesskit::Role::ColorWell, "Text color").next().expect("the text swatch").click();
         h.run_steps(6);
         let picker = top(h.state()).expect("the text swatch opens the Color Picker");
         assert!(matches!(target(h.state(), picker), Some(PickTarget::Command { command, .. }) if command == "type.setStyle"));

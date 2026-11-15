@@ -251,7 +251,7 @@ fn section_locks_round_trip_and_survive_preset_picks() {
 fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.tool = tool;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 60.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(2400.0, 60.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -341,7 +341,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
         h.state_mut().run(id, p).unwrap();
     }
     h.run_steps(3);
-    for label in ["Current Brush Load", "Load the brush after each stroke", "Clean the brush after each stroke"] {
+    for label in ["Current brush load", "Load the brush after each stroke", "Clean the brush after each stroke"] {
         assert!(h.get_by_label(label).rect().is_positive(), "missing Mixer Brush option {label}");
     }
 
@@ -353,7 +353,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     assert_eq!((id.as_str(), &params["brush"]["mixer"]["loadAfterStroke"]), ("tools.setBrush", &json!(false)));
 
     // Current Brush Load › Clean Brush empties the brush.
-    h.get_by_label("Current Brush Load").click();
+    h.get_by_label("Current brush load").click();
     h.run_steps(3);
     h.get_by_label("Clean Brush").click();
     h.run_steps(3);
@@ -369,7 +369,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     assert_eq!(h.state().session.tools.mixer.reservoir, None);
 
     // Load Brush fills it with the foreground again.
-    h.get_by_label("Current Brush Load").click();
+    h.get_by_label("Current brush load").click();
     h.run_steps(3);
     h.get_by_label("Load Brush").click();
     h.run_steps(3);
