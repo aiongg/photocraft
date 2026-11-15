@@ -22,20 +22,22 @@ fn app_for(tool: Tool) -> PhotocraftApp {
     app
 }
 
-/// The pen moves along the stroke, one frame per move; the paint tool feeds the live stroke once per
-/// frame, and the held thread keeps it busy.
-fn move_without_feeding(app: &mut PhotocraftApp) {
-    // With `LIVE_STROKE_WAIT` at `Duration::MAX` in tests, a feed into a held thread must not block; the paint tool feeds so.
-    for x in (30..=130).step_by(10) {
+/// The pen moves along the stroke to x 120, one pass per move. Each pass feeds the live stroke and,
+/// with `LIVE_STROKE_WAIT` at `Duration::MAX` in tests, waits until it has painted, so the moves run
+/// before the thread is held: a pass would wait for a held step for ever.
+fn move_along(app: &mut PhotocraftApp) {
+    for x in (30..=120).step_by(10) {
         tool_event(app, ToolEvent::Move { x: f64::from(x), y: 30.0, pressure: 1.0 }, M);
     }
 }
 
-/// Hands the stroke's pending points to the thread without waiting for its steps, as `tools::run`
-/// does with the paint state taken out of the app.
-fn feed_without_waiting(app: &mut PhotocraftApp) {
-    let state = std::mem::take(&mut app.canvas_tools.paint);
-    if let Some(stroke) = state.stroke.as_ref() {
+/// The pen's last point (x 130) reaches the drag between passes and is handed to the thread without
+/// waiting for its step, as `tools::run` does with the paint state taken out of the app: a held
+/// thread is then still painting it.
+fn feed_last_point_without_waiting(app: &mut PhotocraftApp) {
+    let mut state = std::mem::take(&mut app.canvas_tools.paint);
+    if let Some(stroke) = state.stroke.as_mut() {
+        stroke.points.push([130.0, 30.0, 1.0]);
         feed_live_stroke_waiting(app, stroke, Duration::ZERO);
     }
     app.canvas_tools.paint = state;
@@ -70,9 +72,9 @@ fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
         let mut app = app_for(tool);
         let steps = app.session.active().unwrap().history.past_len();
         tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 30.0, pressure: 1.0 }, M);
+        move_along(&mut app);
         let release = app.live_stroke.as_ref().unwrap().paint.hold();
-        move_without_feeding(&mut app);
-        feed_without_waiting(&mut app);
+        feed_last_point_without_waiting(&mut app);
         assert!(live_stroke_busy(&app), "{what}: the thread is still painting");
         // The slow step finishes while the release waits for it.
         let slow = std::thread::spawn(move || {
@@ -100,10 +102,10 @@ fn cancel_while_the_thread_is_busy_changes_nothing_and_the_thread_ends() {
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.past_len();
     tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 30.0, pressure: 1.0 }, M);
+    move_along(&mut app);
     let paint = &app.live_stroke.as_ref().unwrap().paint;
     let (release, alive) = (paint.hold(), paint.thread_alive());
-    move_without_feeding(&mut app);
-    feed_without_waiting(&mut app);
+    feed_last_point_without_waiting(&mut app);
     assert!(live_stroke_busy(&app), "the thread is still painting");
 
     // The host cancels the gesture on Escape.
