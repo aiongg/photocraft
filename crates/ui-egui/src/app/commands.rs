@@ -387,6 +387,12 @@ impl PhotocraftApp {
         self.navigator_textures.retain(|doc, _| ids.contains(doc));
         // Closing a document cancels its page work; its GPU pages go with `retain_gpu_documents`.
         self.streams.retain(|doc, _| ids.contains(doc));
+        // A parameter dialog holds a target in a document that has left the session: it closes with it.
+        let closed: Vec<DocId> = self.view_docs.iter().filter(|d| !ids.contains(d)).cloned().collect();
+        if !closed.is_empty() {
+            let ctx = self.ctx().clone();
+            crate::dialogs::cancel_for_closed(self, &ctx, &closed);
+        }
         self.view_docs = ids;
         self.sync_mask_targets();
         // With no document left, no canvas paints the Levels clipping display to drop its cache.
