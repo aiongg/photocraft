@@ -19,10 +19,10 @@ fn take_queued(app: &mut PhotocraftApp) -> Option<RawOpen> {
 }
 
 
-/// One pass of the hosted dialogs, as the app's frame runs them: the workspace shows, then
-/// `take` handles what it reports.
-fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    ctx.run_ui(egui::RawInput::default(), |ui| crate::dialogs::run(app, ui)).textures_delta.clear();
+/// One frame of the app, whose hosted dialogs show the workspace and `take` what it reports. The framework's job
+/// runtime delivers a develop only inside the app's frame.
+fn frame(app: &mut PhotocraftApp) {
+    crate::canvas::testing::frame(app);
 }
 
 /// The settings the open RAW Develop workspace holds. The workspace's session is `CameraRaw`
@@ -48,13 +48,13 @@ fn knows_raw_curve(app: &PhotocraftApp) -> bool {
 
 /// Runs frames until the develop of the settings in force has landed. The first pass after a
 /// change starts its develop; later passes wait for the runtime's job to deliver.
-fn settle(app: &mut PhotocraftApp, ctx: &egui::Context) {
+fn settle(app: &mut PhotocraftApp) {
     if app.raw.is_none() {
         return;
     }
-    frame(app, ctx);
+    frame(app);
     for _ in 0..2000 {
-        frame(app, ctx);
+        frame(app);
         if describe(app)["previewPending"] == false {
             return;
         }
@@ -70,7 +70,7 @@ fn develop(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Value
     if app.raw.is_none() {
         return reply;
     }
-    settle(app, ctx);
+    settle(app);
     describe(app)
 }
 
@@ -124,7 +124,7 @@ fn worker_app() -> (PhotocraftApp, egui::Context) {
     app.run("edit.fill", json!({"color": "#406080"})).unwrap();
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 40, "height": 30})).unwrap();
     open(&mut app, &ctx).unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     (app, ctx)
 }
 
@@ -144,9 +144,9 @@ fn worker_preview_matches_the_synchronous_render_and_ends_on_the_latest_settings
     let revision = describe(&app)["previewRevision"].as_u64().unwrap();
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"exposure": 1.0}}})).unwrap().unwrap();
     // The develop of the first request starts; a drag moves on while it runs.
-    frame(&mut app, &ctx);
+    frame(&mut app);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"highlights": -60, "shadows": 45}}})).unwrap().unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     let last = describe(&app);
     assert!(last["previewRevision"].as_u64().unwrap() > revision, "a develop landed");
     assert_eq!(last["previewPending"], false);
@@ -163,13 +163,13 @@ fn a_stale_worker_never_replaces_a_newer_synchronous_render() {
     let (mut app, ctx) = worker_app();
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"highlights": -80}}})).unwrap().unwrap();
     // The develop of the older request is running.
-    frame(&mut app, &ctx);
+    frame(&mut app);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"highlights": 0, "exposure": -1.0}}})).unwrap().unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     let landed = describe(&app);
     std::thread::sleep(std::time::Duration::from_millis(200));
-    frame(&mut app, &ctx);
-    frame(&mut app, &ctx);
+    frame(&mut app);
+    frame(&mut app);
     let later = describe(&app);
     assert_eq!((&later["previewRevision"], &later["histogram"]), (&landed["previewRevision"], &landed["histogram"]), "nothing replaced the newer frame");
     assert_eq!(landed["histogram"], single_develop_histogram(json!({"exposure": -1.0})), "the frame shown is the one for the latest settings");
@@ -291,7 +291,7 @@ fn mean_red(app: &PhotocraftApp) -> f32 {
 #[test]
 fn raw_opens_in_camera_raw_and_open_redevelops() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let warnings = app.open_bytes("IMG_0001.dng", &dng).unwrap();
     assert!(warnings.iter().any(|w| w.contains(photocraft_io::raw::DEVELOPED_NOTE)), "{warnings:?}");
     // A raw has no embedded profile (ProPhoto RGB is the space it is developed into), so Ask
@@ -323,7 +323,7 @@ fn pixels(app: &PhotocraftApp) -> Vec<f32> {
 #[test]
 fn the_demosaic_method_is_chosen_at_open() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("IMG_0002.dng", &dng).unwrap();
     let ahd = pixels(&app);
     let raw = take_queued(&mut app).unwrap();
@@ -372,7 +372,7 @@ fn shadows_of_a_raw_open_act_on_the_raw_data_and_the_preview_shows_it() {
     app.open_bytes("IMG_0002.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     assert!(knows_raw_curve(&app), "the preview knows how the raw was developed");
     let mean = |px: &[[f32; 4]]| px.iter().map(|p| p[0] + p[1] + p[2]).sum::<f32>() / px.len() as f32;
     let preview_before = mean(&processed(&app));
@@ -393,7 +393,7 @@ fn clarity_texture_and_dehaze_of_a_raw_open_act_on_the_raw_data() {
     app.open_bytes("IMG_0003.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     let before = mean_red(&app);
     let preview_before = processed(&app);
     develop(&mut app, &ctx, json!({"ui": {"set": {"clarity": 60, "texture": 40, "dehaze": 50}}}));
@@ -407,7 +407,7 @@ fn clarity_texture_and_dehaze_of_a_raw_open_act_on_the_raw_data() {
 #[test]
 fn background_redevelop_keeps_the_tab_position_and_view() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 10, "height": 10})).unwrap();
     app.open_bytes("mid.dng", &dng).unwrap();
     app.run("file.new", json!({"width": 12, "height": 12})).unwrap();
@@ -448,7 +448,7 @@ fn background_redevelop_keeps_the_tab_position_and_view() {
 #[test]
 fn a_raw_opens_and_redevelops_at_the_raw_defaults_resolution() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"path": "rawDefaults.resolution", "value": 240})).unwrap();
     app.open_bytes("IMG_0004.dng", &dng).unwrap();
     assert_eq!(app.session.active().unwrap().doc.resolution_dpi, 240.0);
@@ -468,7 +468,7 @@ fn a_raw_opens_and_redevelops_at_the_raw_defaults_resolution() {
 #[test]
 fn several_raws_share_the_dialog_and_keep_their_own_settings() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     app.open_bytes("three.dng", &dng).unwrap();
@@ -504,7 +504,7 @@ fn several_raws_share_the_dialog_and_keep_their_own_settings() {
 #[test]
 fn a_raw_that_fails_to_open_stays_in_the_filmstrip_with_its_settings() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     app.open_bytes("three.dng", &dng).unwrap();
@@ -543,7 +543,7 @@ fn a_raw_that_fails_to_open_stays_in_the_filmstrip_with_its_settings() {
 #[test]
 fn a_raw_that_cannot_be_shown_keeps_the_dialog_and_the_filmstrip() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     let ids: Vec<_> = app.raw_shelf.iter().map(|h| h.raw.document).collect();
@@ -574,7 +574,7 @@ fn a_raw_left_before_its_preview_lands_gets_a_thumbnail_of_its_settings() {
     // The develop of exposure 2 has not started: the thumbnail is made from the settings.
     filmstrip::keep_settings(&mut app);
     let thumb = app.raw_shelf[0].thumb.clone().expect("a thumbnail");
-    settle(&mut app, &ctx);
+    settle(&mut app);
     filmstrip::keep_settings(&mut app);
     assert!(thumb == app.raw_shelf[0].thumb.clone().unwrap(), "the thumbnail matches a finished develop of the same settings");
 }
@@ -584,7 +584,7 @@ fn a_raw_left_before_its_preview_lands_gets_a_thumbnail_of_its_settings() {
 #[test]
 fn a_raw_whose_background_develop_fails_comes_back_to_the_filmstrip() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     let ids: Vec<_> = app.raw_shelf.iter().map(|h| h.raw.document).collect();
@@ -648,7 +648,7 @@ fn auto_tone_of_a_never_shown_raw_matches_the_dialogs() {
 #[test]
 fn cancel_closes_the_raw_and_the_preference_skips_the_dialog() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("a.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
@@ -692,7 +692,7 @@ fn calibration_changes_the_preview_and_round_trips_through_xmp() {
     app.open_bytes("IMG_0005.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
-    settle(&mut app, &ctx);
+    settle(&mut app);
     let before = processed(&app);
     develop(&mut app, &ctx, json!({"ui": {"set": {"shadowTint": 100, "calibrationHue": [100, 0, 0], "calibrationSat": [0, 0, -100]}}}));
     assert!(
@@ -710,7 +710,7 @@ fn calibration_changes_the_preview_and_round_trips_through_xmp() {
 #[test]
 fn auto_sets_the_light_sliders_from_the_image() {
     let (mut app, dng) = raw_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("IMG_0006.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
@@ -750,7 +750,7 @@ fn a_sidecar_fills_the_dialog_and_open_writes_it_back() {
         sink.lock().unwrap().push((p.to_string(), b.to_vec()));
         Ok(())
     }));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("IMG_0008.cr2", &dng).unwrap();
     let mut raw = take_queued(&mut app).unwrap();
     raw.path = Some(raw_path.clone());
@@ -815,7 +815,7 @@ fn camera_raw_defaults_apply_when_a_raw_opens() {
     // The dialog's Open applies them too, and reports what it applied.
     app.run("prefs.set", json!({"values": {"rawDefaults.openInCameraRaw": true, "rawDefaults.openAsSmartObject": false, "rawDefaults.bitDepth": "16"}}))
         .unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_bytes("IMG_0011.dng", &dng).unwrap();
     let raw = take_queued(&mut app).unwrap();
     open_raw(&mut app, &ctx, raw).unwrap();
@@ -888,7 +888,7 @@ fn notice_titles(app: &PhotocraftApp) -> Vec<String> {
 #[test]
 fn a_foreign_sidecar_is_never_overwritten() {
     let (mut app, dng, dir, raw_path, written) = raw_with_sidecar("foreign", Some(LIGHTROOM_SIDECAR));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     assert_eq!(shown(&app).exposure, 1.0, "the sidecar's settings fill the dialog");
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"contrast": 15}}})).unwrap().unwrap();
@@ -906,7 +906,7 @@ fn a_foreign_sidecar_is_never_overwritten() {
 fn a_rating_only_sidecar_is_left_alone() {
     let bridge = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmp:Rating="5"/></rdf:RDF></x:xmpmeta>"#;
     let (mut app, dng, dir, raw_path, written) = raw_with_sidecar("rating", Some(bridge));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"commit": true}})).unwrap().unwrap();
     assert!(written.lock().unwrap().is_empty(), "Open with no change writes nothing");
@@ -925,7 +925,7 @@ fn a_rating_only_sidecar_is_left_alone() {
 fn a_sidecar_crop_crops_the_opened_raw() {
     let lightroom = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/" crs:RawFileName="IMG_0100.cr2" crs:HasCrop="True" crs:CropTop="0.25" crs:CropLeft="0.125" crs:CropBottom="0.75" crs:CropRight="0.625" crs:CropAngle="0"/></rdf:RDF></x:xmpmeta>"#;
     let (mut app, dng, dir, raw_path, written) = raw_with_sidecar("crop", Some(lightroom));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let size = |app: &PhotocraftApp| app.session.active().map(|st| (st.doc.size.width, st.doc.size.height));
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     assert!(app.ui.status.contains("IMG_0100.xmp") && !app.ui.status.contains("not supported"), "{}", app.ui.status);
@@ -970,7 +970,7 @@ fn filmstrip_raws_open_with_their_sidecar_crops() {
         std::fs::write(p, &dng).unwrap();
         std::fs::write(sidecar_path(p), lightroom).unwrap();
     }
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.open_file(&raw_path, &dng).unwrap();
     for p in &paths {
         app.open_file(p, &dng).unwrap();
@@ -1010,7 +1010,7 @@ fn a_control_request_never_writes_the_sidecar() {
     }
     let (mut app, dng, dir, raw_path, written) = raw_with_sidecar("control", None);
     app.services.automation_authorize = Some(allow);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     let commit = json!({"id": "filter.cameraRaw", "params": {"ui": {"set": {"contrast": 15}, "commit": true}}});
     let (req, _rx) = crate::control::ControlRequest::new("ui.menu.invoke", commit);
@@ -1030,7 +1030,7 @@ fn a_control_request_never_writes_the_sidecar() {
 fn a_sidecar_write_error_stays_reported() {
     let (mut app, dng, dir, raw_path, _) = raw_with_sidecar("readonly", None);
     app.services.write = Some(Box::new(|_: &str, _: &[u8]| Err("read-only volume".to_string())));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"exposure": 0.5, "contrast": 15}, "commit": true}})).unwrap().unwrap();
     let errors: Vec<_> = app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).map(|n| n.title.clone()).collect();
@@ -1056,8 +1056,8 @@ fn profile_name(app: &PhotocraftApp) -> String {
 /// the re-develop as a background job.
 #[test]
 fn the_camera_raw_step_runs_before_the_workflow_conversion() {
-    let ctx = egui::Context::default();
     let (mut app, dng) = raw_app();
+    let ctx = app.ctx().clone();
     open_with_settings(&mut app, &ctx, &dng, "a.dng");
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"commit": true}})).unwrap().unwrap();
     app.run("edit.convertToProfile", json!({"profile": "adobe-rgb-compat", "intent": "relative"})).unwrap();
@@ -1093,8 +1093,8 @@ fn the_camera_raw_step_runs_before_the_workflow_conversion() {
 /// background: each lands with its Camera Raw step and conversions and is left unmodified.
 #[test]
 fn two_raws_opened_back_to_back_both_finish_their_open() {
-    let ctx = egui::Context::default();
     let (mut app, dng) = raw_app();
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"path": "rawDefaults.colorSpace", "value": "adobeRgb"})).unwrap();
     open_with_settings(&mut app, &ctx, &dng, "a.dng");
     app.background_jobs = true;
@@ -1170,9 +1170,9 @@ fn save_and_load_settings_round_trip_through_xmp_files() {
     // The frames that deliver the pick: the workspace reports the event, `take` asks for the file,
     // and the app's poll hands the answer back.
     let deliver = |app: &mut PhotocraftApp| {
-        frame(app, &ctx);
+        frame(app);
         app.poll_file_dialog();
-        frame(app, &ctx);
+        frame(app);
     };
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -1219,7 +1219,7 @@ fn save_and_load_settings_round_trip_through_xmp_files() {
 #[test]
 fn done_saves_the_sidecar_and_opens_nothing() {
     let (mut app, dng, dir, raw_path, written) = raw_with_sidecar("done", None);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"path": "rawDefaults.writeXmpSidecars", "value": false})).unwrap();
     let before = app.session.documents().len();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
@@ -1253,7 +1253,7 @@ fn done_saves_the_sidecar_and_opens_nothing() {
 #[test]
 fn done_keeps_the_raws_open_when_a_sidecar_write_fails() {
     let (mut app, dng, dir, raw_path, _) = raw_with_sidecar("done-fails", None);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.services.write = Some(Box::new(|_: &str, _: &[u8]| Err("read-only volume".to_string())));
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     let docs = app.session.documents().len();
