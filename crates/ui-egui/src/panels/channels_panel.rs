@@ -10,7 +10,6 @@ use serde_json::{Value, json};
 
 // PLAN: assumed paths of the framework items (imaging channels, keymap, ui contract and runtime).
 use craft::imaging::ui::channels::{self as channels, ChannelKind, ChannelRow, ChannelsCommands, ChannelsEvent, ChannelsFooterButton, ChannelsPanel};
-use craft::behavior::geometry::SelectionOperation;
 use craft::keymap::Mods;
 use craft::ui::contract::{CommandSet, SweepStep};
 use craft::ui::menu::PanelRow;
@@ -217,16 +216,6 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The engine's name of a selection operation (`select.loadSelection`'s `operation`).
-pub(crate) fn operation_name(operation: SelectionOperation) -> &'static str {
-    match operation {
-        SelectionOperation::Add => "add",
-        SelectionOperation::Subtract => "subtract",
-        SelectionOperation::Intersect => "intersect",
-        _ => "new",
-    }
-}
-
 /// Runs the engine command of `event`. `ctx` serves the commands that ask first (`menus::invoke`).
 // PLAN: the sheet's `apply(app, event)` has no context; `menus::invoke` needs one, so it is a parameter.
 pub(crate) fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, event: ChannelsEvent<Row>) {
@@ -241,8 +230,8 @@ pub(crate) fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, event: Channel
         }
         ChannelsEvent::LoadSelection { key, operation, .. } => {
             let params = match key {
-                Row::LayerMask => json!({ "channel": "mask", "layer": masked_layer(app), "operation": operation_name(operation) }),
-                _ => json!({ "channel": key.reference(), "operation": operation_name(operation) }),
+                Row::LayerMask => json!({ "channel": "mask", "layer": masked_layer(app), "operation": operation.name() }),
+                _ => json!({ "channel": key.reference(), "operation": operation.name() }),
             };
             let _ = app.run("select.loadSelection", params);
         }

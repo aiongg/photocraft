@@ -118,10 +118,9 @@ pub(crate) fn begin_controls(app: &mut PhotocraftApp, ctx: &egui::Context) -> Co
 const CONTROLS_LABEL: &str = "Transform controls";
 
 /// Move › Show Transform Controls over the canvas body `rect`: a `TransformBox` on [`frame`] whose inside and outside
-/// (past the corner rotate bands) stay the Move tool's. Its first `Begin` runs [`begin_controls`]; once a session
-/// starts, this pass's box events go to the session, and from the next pass the session's `TransformOverlay` carries
-/// the drag on. The hand-off relies on both boxes having the same automatic id: the first `TransformBox` of the canvas
-/// body, since the overlay shows nothing before the session opens and this box shows nothing after.
+/// (past the corner rotate bands) and arrow keys stay the Move tool's. Its first `Begin` runs [`begin_controls`]; once
+/// a session starts, this pass's box events go to the session, and from the next pass the session's
+/// `TransformOverlay`, salted with the same [`BOX_ID_SALT`](crate::transform_tool::BOX_ID_SALT), carries the drag on.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
     let Some(start) = frame(app) else { return };
     let settings = crate::transform_tool::settings(app);
@@ -133,6 +132,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect)
         .rotate_zone(RotateZone::Band)
         .reference_point(false)
         .inside_moves(false)
+        .session_arrows(false)
+        .id_salt(crate::transform_tool::BOX_ID_SALT)
         .show_at(ui, rect);
     if !out.edit.events.iter().any(|event| matches!(event, EditEvent::Begin { .. })) {
         return;

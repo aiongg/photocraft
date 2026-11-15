@@ -35,8 +35,7 @@ fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: ChannelsCommands)
 
 fn enabled(app: &PhotocraftApp, command: ChannelsCommands) -> bool {
     let wanted = CommandRef::from(command);
-    // `CommandState` has no read for its flag: a state is enabled when forcing the flag on changes nothing.
-    command_states(app).into_iter().find(|(r, _)| *r == wanted).is_some_and(|(_, s)| s.clone().enabled(true) == s)
+    command_states(app).into_iter().find(|(r, _)| *r == wanted).is_some_and(|(_, s)| s.is_enabled())
 }
 
 /// The `channel` field of the newest open dialog.

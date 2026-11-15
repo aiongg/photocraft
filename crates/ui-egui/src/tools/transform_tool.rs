@@ -321,6 +321,10 @@ pub fn split_for_command(id: &str) -> Option<WarpSplit> {
     })
 }
 
+/// The id salt the session's `TransformOverlay` and the Move tool's transform controls share in the canvas body, so
+/// a drag begun on the controls carries on in the session's box.
+pub(crate) const BOX_ID_SALT: &str = "transform-box";
+
 /// The persisted Free Transform settings: the stored section with Use Legacy Free Transform from the preferences.
 pub(crate) fn settings(app: &PhotocraftApp) -> TransformSettings {
     // PLAN: `ToolOptions::transform: TransformSettings` is written by tools-w71 (M14); the errors in this set come from it and from hub-w1's `state.rs` re-exports, not from this file.
