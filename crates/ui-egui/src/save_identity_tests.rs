@@ -6,9 +6,15 @@ use serde_json::json;
 use std::{cell::RefCell, rc::Rc};
 
 fn app() -> PhotocraftApp {
+    app_over(None)
+}
+
+/// The app over the file service `files` (the framework takes it when the app is built).
+fn app_over(files: Option<std::sync::Arc<dyn craft::host::Files>>) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(
         Session::new(),
         Services {
+            files,
             import: Some(Box::new(|name, bytes, opts| {
                 photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
             })),
@@ -113,9 +119,7 @@ fn save_copy_and_export_keep_the_editable_document_identity() {
 
 #[test]
 fn web_download_and_automation_saves_use_the_same_identity_completion() {
-    let mut app = app();
-
-    app.services.files = Some(std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Paths(vec!["Untitled-1.psd".into()])])));
+    let mut app = app_over(Some(std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Paths(vec!["Untitled-1.psd".into()])]))));
     app.save_as(None).unwrap();
     app.poll_file_dialog();
     assert_eq!(app.session.active().unwrap().doc.name, "Untitled-1.psd");

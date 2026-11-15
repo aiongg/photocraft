@@ -368,7 +368,6 @@ pub(crate) const PROMPTS: &[PromptRow] = &[
     alerts::answer,
     crate::jobs_ui::answer,
     crate::gpu_status::answer,
-    crate::actions::dialogs::answer_stop,
 ];
 
 /// [`prompts_take`] over the rows `rows`.
@@ -422,6 +421,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     crate::slice_ui::take,
     crate::crop_presets::take,
     crate::variables_ui::take,
+    crate::actions::dialogs::take_stops,
 ];
 
 /// Runs the answers of every dialog that finished: parameter dialogs, prompts, then each family's own results. It runs

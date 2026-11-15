@@ -2,7 +2,7 @@
 
 use craft::automation::ui::actions::ActionSelection;
 use craft::ui::contract::Bind;
-use craft::ui::dialog::{DialogId, PromptAnswer, PromptChoice, StandardPrompt};
+use craft::ui::dialog::{DialogId, DialogResult, PromptAnswer, PromptChoice, StandardPrompt};
 use craft::ui::patterns::form_dialogs::{DialogFields, Param, ParamDialog, ParamKind, ParamResult};
 use photocraft_engine::{actions_cmds, actions_edit_cmds, atn_cmds};
 use serde_json::{Value, json};
@@ -110,7 +110,7 @@ struct StopTag {
 }
 
 /// The message of a Stop step shown to a person: Continue and Stop, or Stop alone when the step does not allow
-/// continuing. The answer reaches [`answer_stop`] through `PROMPTS`. The key router, not this prompt, keeps the Enter
+/// continuing. The host keeps its result apart (it is an instance), so [`take_stops`] takes it. The key router, not this prompt, keeps the Enter
 /// that started the play from answering it.
 pub(super) fn open_stop_message(app: &mut PhotocraftApp, message: &str, allow_continue: bool, token: u64) -> DialogId {
     let prompt = StandardPrompt::custom(message.to_owned()).title(tl!("Message"));
@@ -123,10 +123,26 @@ pub(super) fn open_stop_message(app: &mut PhotocraftApp, message: &str, allow_co
     app.framework.dialogs.open(prompt.instance(token).tag(StopTag { token }))
 }
 
+/// A `TAKERS` row: the answers of the open Stop messages. Each message is its own instance, so the host keeps its result
+/// apart from the plain prompts', and the paused playback names the dialog it waits at. An answer is
+/// [`answer_stop`]'s; a message closed from outside ends its playback like Stop.
+pub(crate) fn take_stops(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let waiting: Vec<(u64, DialogId)> = app.paused_playbacks.paused.iter().filter_map(|(token, paused)| paused.dialog.map(|dialog| (*token, dialog))).collect();
+    for (token, dialog) in waiting {
+        match app.framework.dialogs.take_by_id::<StandardPrompt>(dialog) {
+            Some(DialogResult::Ok(mut answer)) => {
+                answer_stop(app, ctx, &mut answer);
+            }
+            Some(_) => super::runner::stopped(app, token),
+            None => {}
+        }
+    }
+}
+
 /// Answers a Stop message: Continue resumes the paused playback when the step allows it, anything else ends it. What
 /// the step allows is read from the paused playback, never from the prompt, so an answer cannot turn a hard stop into
 /// Continue. `false` for another prompt's answer.
-pub(crate) fn answer_stop(app: &mut PhotocraftApp, _ctx: &egui::Context, answer: &mut PromptAnswer) -> bool {
+fn answer_stop(app: &mut PhotocraftApp, _ctx: &egui::Context, answer: &mut PromptAnswer) -> bool {
     let Some(StopTag { token }) = answer.take_tag::<StopTag>() else { return false };
     let allowed = app.paused_playbacks.paused.get(&token).is_some_and(|paused| paused.allow_continue);
     if answer.choice == PromptChoice::Proceed && allowed {

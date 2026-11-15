@@ -36,12 +36,16 @@ fn each_kind_writes_the_engines_pin_payload() {
     let bounds = [0.0, 0.0, 400.0, 300.0];
     let mut iris = BlurPin::new(0.5, 0.5, 20.0);
     iris.iris = Some(IrisShape::new(0.2, 0.1, 30.0, 40.0, 0.5));
+    // Spin has neither roundness nor feather, so its pin carries the Spin defaults for both.
+    let spin_shape = IrisShape::spin();
+    let mut spin = BlurPin::new(0.5, 0.5, 20.0);
+    spin.iris = Some(IrisShape::new(0.2, 0.1, 30.0, spin_shape.roundness, spin_shape.feather));
     let mut tilt = BlurPin::new(0.4, 0.6, 20.0);
     tilt.tilt = Some(TiltBand::new(20.0, 0.2, 0.3));
     let table = [
         (COMMAND, BlurPin::new(0.5, 0.5, 20.0), vec!["blur", "x", "y"]),
         (IRIS, iris, vec!["angle", "blur", "feather", "radiusX", "radiusY", "roundness", "x", "y"]),
-        (SPIN, iris, vec!["angle", "blurAngle", "radiusX", "radiusY", "x", "y"]),
+        (SPIN, spin, vec!["angle", "blurAngle", "radiusX", "radiusY", "x", "y"]),
     ];
     for (command, start, keys) in table {
         let kind = kind_of(command).unwrap();

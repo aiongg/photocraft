@@ -323,8 +323,14 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
             paths
         }
         BezierTool::AddAnchor | BezierTool::DeleteAnchor => {
-            let draft = drafted(app).map(|p| (PathRef::Pen, crate::vector_ui::pen_path(p)));
-            draft.into_iter().chain(active_paths(app).into_iter().filter(|(r, _)| !ignores(app, r))).collect()
+            let mut paths: Vec<(PathRef, Path)> = targeted(app).into_iter().filter(|(r, _)| !ignores(app, r)).collect();
+            // A path the Paths panel selects (a saved one or the work path) is the only target (#12762).
+            if let Some((index, _)) = crate::vector_ui::selected_saved_path_index(app) {
+                paths.retain(|(r, _)| *r == PathRef::Saved(index));
+            } else if app.ui.selected_path.as_deref() == Some("work") {
+                paths.retain(|(r, _)| *r == PathRef::Work);
+            }
+            paths
         }
         _ => active_paths(app).into_iter().take(1).collect(),
     };
@@ -429,7 +435,11 @@ pub(crate) fn writable(app: &PhotocraftApp, target: &PathRef) -> bool {
         PathRef::Layer(id) | PathRef::TypePath(id) => app.session.active().is_some_and(|st| {
             let id = photocraft_doc::LayerId(*id);
             let locks = st.doc.effective_locks(id);
-            st.doc.layer(id).is_some() && !locks.all && !locks.pixels
+            // A hidden layer's path (or one in a hidden group) shows nothing to edit.
+            let shown = st.doc.walk().iter().find(|(_, _, l)| l.id == id).is_some_and(|(path, _, l)| {
+                l.visible && (1..=path.len()).all(|n| st.doc.layer_at(&path[..n]).is_some_and(|a| a.visible))
+            });
+            shown && !locks.all && !locks.pixels
         }),
         _ => app.session.active().is_some(),
     }
