@@ -86,6 +86,8 @@ mod tests {
         app.sync_views();
         for v in &mut app.ui.views {
             v.zoom = 2.0;
+            // The first pass would otherwise fit the document to the window.
+            v.fit_pending = false;
         }
     }
 
@@ -94,6 +96,10 @@ mod tests {
         let mut app = app();
         // At 100 % a 3 by 3 Average is the 4 × 4 box from (2, 2): one black pixel of sixteen (#11751).
         app.sync_views();
+        for v in &mut app.ui.views {
+            v.zoom = 1.0;
+            v.fit_pending = false;
+        }
         app.ui.tool_options.eyedropper.size = size(3);
         click(&mut app, 3.5, 3.5, egui::Modifiers::NONE);
         let want = (255.0f32 * 15.0 / 16.0).round() / 255.0;
