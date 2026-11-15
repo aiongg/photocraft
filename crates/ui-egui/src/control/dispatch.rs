@@ -816,8 +816,16 @@ impl PanelSet {
             writes.push(Box::new(move |app| app.ui.chrome.status_info = key));
         }
         let dock_tabs = if p.get("dockTabs").is_some() {
-            let current = crate::panel_docking::legacy_view(app).get("dockTabs").cloned().unwrap_or(Value::Null);
-            merged_object(&current, p.get("dockTabs"), "dockTabs")?
+            // Every group is a known field, hidden ones too: the request may open the group and pick its tab at once.
+            let mut current = crate::panel_docking::legacy_view(app).get("dockTabs").and_then(Value::as_object).cloned().unwrap_or_default();
+            for (group, _) in crate::panels::registry::LEGACY_GROUPS {
+                current.entry((*group).to_owned()).or_insert(Value::Null);
+            }
+            let mut merged = merged_object(&Value::Object(current), p.get("dockTabs"), "dockTabs")?;
+            if let Some(Value::Object(tabs)) = merged.as_mut() {
+                tabs.retain(|_, tab| !tab.is_null());
+            }
+            merged
         } else {
             None
         };

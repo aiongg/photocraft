@@ -294,15 +294,21 @@ pub(crate) fn command(app: &mut PhotocraftApp, id: &str, params: &Value) -> Opti
         "type.panels.character" => toggled(app, "character", Some(true)),
         "type.panels.paragraph" => toggled(app, "paragraph", Some(true)),
         _ => {
-            let name = id
-                .strip_prefix("window.panel.")
-                .or_else(|| id.strip_prefix("window.toggle."))
-                .or_else(|| id.strip_prefix("type.panels.").filter(|name| matches!(*name, "characterStyles" | "paragraphStyles" | "glyphs")))?;
-            let panel = registry::normalize(name)?;
+            let panel = toggle_panel(id)?;
             show_param(params).and_then(|show| toggled(app, panel, show))
         }
     };
     Some(result)
+}
+
+/// The panel a toggle id names: `window.panel.<panel>`, `window.toggle.<panel>`, or `type.panels.<panel>` for the type
+/// panels that have no command of their own.
+pub(crate) fn toggle_panel(id: &str) -> Option<&'static str> {
+    let name = id
+        .strip_prefix("window.panel.")
+        .or_else(|| id.strip_prefix("window.toggle."))
+        .or_else(|| id.strip_prefix("type.panels.").filter(|name| matches!(*name, "characterStyles" | "paragraphStyles" | "glyphs")))?;
+    registry::normalize(name)
 }
 
 /// The `show` (or `on`) param of a panel toggle: `None` toggles.
@@ -811,7 +817,9 @@ fn legacy_on(layout: &Layout<String>, panels: Option<&Value>, dock_tabs: Option<
             return Err("cannot select a tab in a hidden group".into());
         }
         let panel = (*panel).to_owned();
-        actions.push(if layout.contains(&panel) { Action::activate(panel) } else { Action::open(panel, None) });
+        // A panel this request opens above is there for the pick that follows.
+        let present = layout.contains(&panel) || actions.contains(&Action::open(panel.clone(), None));
+        actions.push(if present { Action::activate(panel) } else { Action::open(panel, None) });
     }
     if let Some(collapsed) = dock.and_then(|dock| dock.get("collapsed")).and_then(Value::as_array) {
         let collapsed: Vec<&str> = collapsed.iter().filter_map(Value::as_str).collect();
