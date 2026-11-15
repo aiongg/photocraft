@@ -6,7 +6,7 @@
 
 use craft::host::Host;
 use craft::settings::Remembered;
-use craft::ui::dialog::{DialogId, DialogResult, PromptAnswer, StandardPrompt};
+use craft::ui::dialog::{DialogId, DialogResult, HeldOk, PromptAnswer, StandardPrompt};
 use photocraft_doc::DocId;
 use photocraft_engine::prefs::Preferences;
 use serde_json::Value;
@@ -182,7 +182,7 @@ pub(crate) mod params {
             drop_picks(app, ctx, id);
             app.framework.captured.remove(&key);
         }
-        answer_held(app, ctx);
+        answer_held(app);
         answer_requests(app, ctx);
     }
 
@@ -200,10 +200,8 @@ pub(crate) mod params {
         app.framework.dialogs.get_by_id::<HostedParamDialog>(id).and_then(|dialog| StackDialog::key(dialog).map(str::to_owned))
     }
 
-    /// Judges the OK each held dialog filed with its family's `check` (no check accepts) and answers the dialog. Returns
-    /// the last answer, for [`confirm`](super::confirm).
-    pub(crate) fn answer_held(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Option<(DialogId, Result<(), Label>)> {
-        let mut last = None;
+    /// Judges the OK each held dialog filed with its family's `check` (no check accepts) and answers the dialog.
+    fn answer_held(app: &mut PhotocraftApp) {
         for id in hosted(app) {
             let Some(result) = dialog_mut(app, id).and_then(HostedParamDialog::take_ok) else { continue };
             let answer = match family_for(&result.key).and_then(|family| family.check) {
@@ -211,11 +209,9 @@ pub(crate) mod params {
                 None => Ok(()),
             };
             if let Some(dialog) = dialog_mut(app, id) {
-                dialog.answer_ok(answer.clone());
+                dialog.answer_ok(answer);
             }
-            last = Some((id, answer));
         }
-        last
     }
 
     /// The file pickers started for a dialog and not answered yet, in the frame's memory: a pick answers on a later pass.
@@ -452,8 +448,9 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     take_results(app, &ui.ctx().clone());
 }
 
-/// Answers dialog `id` with OK, as its default button would, and runs what OK does. A held OK is judged at once: a
-/// refusal comes back as the error text.
+/// Answers dialog `id` with OK, as its default button would, and runs what OK does. A held OK is answered at once by the
+/// family that holds it: an accepted one closes the dialog in this call, a refusal comes back as the error text, and one
+/// that waits on a pick (Export's save dialog) is answered by the pick.
 pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
     if app.framework.dialogs.get_dyn(id).is_none() {
         return Err(format!("no dialog {}", id.value()));
@@ -466,16 +463,23 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
     {
         authorize(&command, &params)?;
     }
-    let mut answer = Ok(());
     if !app.framework.dialogs.confirm_by_id(ctx, id) {
-        answer = match params::answer_held(app, ctx) {
-            Some((held, Err(reason))) if held == id => Err(reason.as_str().to_owned()),
-            Some((held, Ok(()))) if held == id => Ok(()),
-            _ => Err(format!("dialog {} cannot be confirmed now", id.value())),
-        };
+        if app.framework.dialogs.held_state(id) != Some(HeldOk::Waiting) {
+            take_results(app, ctx);
+            return Err(format!("dialog {} cannot be confirmed now", id.value()));
+        }
+        // The family that holds the OK answers it among the results.
+        take_results(app, ctx);
+        match app.framework.dialogs.held_state(id) {
+            Some(HeldOk::Accepted) => {
+                app.framework.dialogs.confirm_by_id(ctx, id);
+            }
+            Some(HeldOk::Refused(reason)) => return Err(reason.as_str().to_owned()),
+            _ => {}
+        }
     }
     take_results(app, ctx);
-    answer
+    Ok(())
 }
 
 /// Cancels dialog `id`, as Cancel or Escape would, and runs what a cancel leaves to do.
