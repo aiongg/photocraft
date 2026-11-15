@@ -17,8 +17,8 @@ fn harness(paths: usize, size: egui::Vec2, ppp: f32) -> Harness<'static, Photocr
             app.run("select.toWorkPath", json!({"tolerance": 2})).unwrap();
             app.run("path.rename", json!({"name": "work", "to": format!("Path {}", i + 1)})).unwrap();
         }
-        // Layers | Channels | Paths: the Paths tab.
-        app.ui.dock_tabs.layers = 2;
+
+        crate::panel_docking::show_panel(&mut app, "paths", Some(true)).unwrap();
         app
     });
     h.run_steps(8);
@@ -58,13 +58,4 @@ fn scrolling_the_paths_list_does_not_move_the_footer() {
     }
 }
 
-/// Channels, Paths and Layers are siblings with the same own-scroll layout, so none is wrapped in
-/// the dock's scroll area.
-#[test]
-fn the_layers_group_tabs_all_scroll_themselves() {
-    use crate::dock::Group;
-    for tab in 0..=2 {
-        assert!(Group::Layers.scrolls_itself(false, tab), "Layers group tab {tab}");
-    }
-    assert!(!Group::Layers.scrolls_itself(false, 3), "a tab that does not exist is not special");
-}
+
