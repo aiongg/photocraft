@@ -32,7 +32,6 @@ flate2 = { workspace = true }
 parley = { version = "0.11", default-features = false, features = ["std", "complex-scripts"] }
 craft = { workspace = true, default-features = false, features = ["font-catalog-system"] }
 rayon = { workspace = true }
-craft = { workspace = true, default-features = false, features = ["font-catalog", "font-catalog-system"] }
 
 [build-dependencies]
 # Deflates the bundled fonts (build.rs); `flate2` above inflates them.
