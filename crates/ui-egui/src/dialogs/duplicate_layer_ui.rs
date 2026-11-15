@@ -124,6 +124,14 @@ mod tests {
         crate::menus::invoke(app, &ctx, "layer.duplicate", json!({})).unwrap();
         top(app)
     }
+    /// OK on `dialog`; the passes after it deliver the held answer to the family that runs it.
+    fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, dialog: DialogId) -> Result<(), String> {
+        let answered = crate::dialogs::confirm(app, ctx, dialog);
+        for _ in 0..2 {
+            crate::dialogs::testing::show(app);
+        }
+        answered
+    }
     fn names(app: &PhotocraftApp, i: usize) -> Vec<String> {
         app.session.documents()[i].doc.walk().into_iter().map(|(_, _, l)| l.name.clone()).collect()
     }
@@ -135,7 +143,7 @@ mod tests {
         let dialog = invoke(&mut app);
         assert_eq!(app.session.active().unwrap().doc.layer_count(), 2, "nothing is copied until OK");
         set(&mut app, dialog, "name", json!("Shadow")).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, dialog).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
         assert!(names(&app, 0).contains(&"Shadow".to_string()));
         assert_eq!(app.session.active().unwrap().doc.layer_count(), 3);
     }
@@ -148,7 +156,7 @@ mod tests {
         app.session.set_active(0);
         let dialog = invoke(&mut app);
         set(&mut app, dialog, "document", json!("1")).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, dialog).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
         assert_eq!(app.session.documents()[0].doc.layer_count(), 2);
         assert!(names(&app, 1).contains(&"Ink copy".to_string()));
     }
@@ -160,7 +168,7 @@ mod tests {
         let dialog = invoke(&mut app);
         set(&mut app, dialog, "document", json!("new")).unwrap();
         set(&mut app, dialog, "documentName", json!("Card")).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, dialog).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
         assert_eq!(app.session.documents().len(), 2);
         assert_eq!(app.session.active_index(), Some(1));
         assert_eq!(app.session.documents()[1].doc.name, "Card");
@@ -174,12 +182,12 @@ mod tests {
         let ctx = app.ctx().clone();
         let dialog = invoke(&mut app);
         set(&mut app, dialog, "document", json!("new")).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, dialog).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
         assert_eq!(app.session.documents()[1].doc.name, "Poster copy");
         let dialog = invoke(&mut app);
         // Either the select refuses the index or the held OK does.
         if set(&mut app, dialog, "document", json!("7")).is_ok() {
-            assert!(crate::dialogs::confirm(&mut app, &ctx, dialog).is_err());
+            assert!(confirm(&mut app, &ctx, dialog).is_err());
         }
         assert_eq!(app.session.documents().len(), 2);
     }
@@ -190,7 +198,7 @@ mod tests {
         let ctx = app.ctx().clone();
         let dialog = invoke(&mut app);
         app.session.execute("file.new", json!({"width":8,"height":8})).unwrap();
-        assert!(crate::dialogs::confirm(&mut app, &ctx, dialog).is_err());
+        assert!(confirm(&mut app, &ctx, dialog).is_err());
         assert!(app.framework.dialogs.stack().contains(dialog), "the dialog stays open");
         assert_eq!(app.session.documents()[0].doc.layer_count(), 2, "nothing was copied");
     }

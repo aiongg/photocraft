@@ -240,6 +240,20 @@ mod tests {
         user_presets(app).into_iter().map(|p| p.name).collect()
     }
 
+    /// OK on dialog `id`; the passes after it deliver the held answer to the family that runs it.
+    fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+        let answered = crate::dialogs::confirm(app, ctx, id);
+        settle(app);
+        answered
+    }
+
+    /// Runs the dialog passes a held answer needs to reach its family.
+    fn settle(app: &mut PhotocraftApp) {
+        for _ in 0..2 {
+            crate::dialogs::testing::show(app);
+        }
+    }
+
     /// Sets a field of the open dialog `id` as `ui.dialog.set` does.
     fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, field: &str, value: Value) -> Result<(), String> {
         app.framework.dialogs.set_json_field(ctx, id, field, value)
@@ -267,17 +281,17 @@ mod tests {
         // Bad names are refused and save nothing.
         for bad in ["", "   ", &"x".repeat(MAX_NAME + 1)] {
             set(&mut app, &ctx, id, "name", json!(bad)).unwrap();
-            assert!(crate::dialogs::confirm(&mut app, &ctx, id).is_err(), "{bad:?}");
+            assert!(confirm(&mut app, &ctx, id).is_err(), "{bad:?}");
         }
         assert!(names(&app).is_empty());
         set(&mut app, &ctx, id, "name", json!("  Poster  ")).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
+        confirm(&mut app, &ctx, id).unwrap();
         assert_eq!(names(&app), ["Poster"]);
 
         // A ratio preset too.
         app.ui.tool_options.crop.ratio = CropRatio::sides(3.0, 2.0);
         let id = open_new(&mut app).unwrap();
-        crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
+        confirm(&mut app, &ctx, id).unwrap();
         assert_eq!(names(&app), ["Poster", "3 : 2"]);
 
         // An old-format preset lists and applies; junk options are not listed.
@@ -306,7 +320,7 @@ mod tests {
         set(&mut fresh, &ctx, id, "selected", json!(["Poster", "not a preset"])).unwrap();
         assert!(set(&mut fresh, &ctx, id, "selected", json!(42)).is_err());
         set(&mut fresh, &ctx, id, "selected", json!(["Poster", "not a preset"])).unwrap();
-        crate::dialogs::confirm(&mut fresh, &ctx, id).unwrap();
+        confirm(&mut fresh, &ctx, id).unwrap();
         assert_eq!(names(&fresh), ["3 : 2", "Old"]);
         // Other tool presets are untouched.
         assert!(fresh.session.presets.tool_presets.iter().any(|p| p.name == "Soft Round 100 px"));
@@ -331,10 +345,12 @@ mod tests {
         let id = call(&mut app, "ui.dialog.open", json!({"kind": "newCropPreset"}))["result"]["dialog"].clone();
         assert_eq!(call(&mut app, "ui.dialog.set", json!({"dialog": id, "field": "name", "value": "Wide"}))["ok"], true);
         assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
+        settle(&mut app);
         assert_eq!(names(&app), ["Wide"]);
         let id = call(&mut app, "ui.dialog.open", json!({"kind": "deleteCropPreset"}))["result"]["dialog"].clone();
         call(&mut app, "ui.dialog.set", json!({"dialog": id, "field": "selected", "value": ["Wide"]}));
         assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
+        settle(&mut app);
         assert!(names(&app).is_empty());
     }
 }
