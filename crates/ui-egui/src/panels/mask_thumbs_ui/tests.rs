@@ -161,7 +161,7 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     assert_eq!((k.x, k.y), (25.0, 12.0));
     // The Pen adds a subpath to it.
     let owner = crate::vector_ui::capture_pen_owner(&app);
-    app.ui.pen = Some(crate::vector_ui::PenPath::corners(vec![[150.0, 10.0], [190.0, 10.0], [190.0, 40.0]], owner));
+    app.ui.pen = Some(crate::vector_ui::PenPath::corners(&[[150.0, 10.0], [190.0, 10.0], [190.0, 40.0]], owner));
     crate::vector_ui::pen_commit(&mut app, true);
     assert_eq!(layer(&app, masked).vector_mask.unwrap().path.subpaths.len(), 2);
     assert!(app.session.active().unwrap().doc.work_path.is_none(), "not a work path");
@@ -381,7 +381,7 @@ fn a_new_adjustment_layer_brings_properties_to_the_front() {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
     let mut h = harness(s, 1.0, 290.0);
-    let _ = crate::panel_docking::apply(h.state_mut(), Action::set_minimized("properties".into(), true));
+    let _ = crate::panel_docking::apply(h.state_mut(), vec![Action::set_minimized("properties".into(), true)]);
     h.run_steps(2);
     assert!(group_minimized(h.state(), "properties"), "the group starts minimized");
     h.state_mut().run("layer.newAdjustmentLayer.curves", json!({})).unwrap();
