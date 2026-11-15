@@ -5,6 +5,8 @@
 //! The Smart Filters row carries the filter mask thumbnail: click it to paint the filter mask,
 //! ⌥-click to view it, ⇧-click to disable it (FILE-215-3).
 
+use crate::app::framework::BuildApp;
+
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, SmartObject};
 use serde_json::{Value, json};
 
@@ -338,7 +340,7 @@ mod tests {
         };
         let sm = recorded(&app);
         assert_eq!(sm.smart_filters[0].params.get("cyan").and_then(Value::as_f64), Some(30.0), "recorded in the old form");
-        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).build_app(|ui, app| crate::dialogs::run(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         // The open dialog's fields, whatever its type.

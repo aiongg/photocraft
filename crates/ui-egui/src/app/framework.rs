@@ -617,36 +617,27 @@ pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -
     ctx.run_ui(input, |ui| embed::logic(ui.ctx(), || crate::discard_ui::close_decision(app)))
 }
 
-/// One pass of a kittest harness over the app, as the app's frame runs it: the runtime takes the app's command
-/// states, catalog and overrides before the pass, and what the pass fired (commands, popups) is collected and run
-/// after it (`shortcuts::handle`), so a command fired by a click or key takes effect in the same step.
+/// Builds a kittest harness whose every pass starts as the app's frame does (`raw_input_hook`, then `logic`): the
+/// runtime takes the app's command states, catalog and overrides, and the commands the last pass fired run. Harness
+/// stepping runs one pass per queued event, so the work belongs to the pass, not to the code that steps the harness.
 #[cfg(test)]
-pub(crate) fn step_app(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
-    let ctx = h.ctx.clone();
-    h.state_mut().framework_before_input(&ctx);
-    h.step();
-    h.state_mut().framework_before_input(&ctx);
-    crate::shortcuts::handle(h.state_mut(), &ctx);
+pub(crate) trait BuildApp {
+    fn build_app<'a>(self, body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'a, app: PhotocraftApp) -> egui_kittest::Harness<'a, PhotocraftApp>;
 }
 
-/// `n` passes of [`step_app`].
 #[cfg(test)]
-pub(crate) fn step_app_n(h: &mut egui_kittest::Harness<'_, PhotocraftApp>, n: usize) {
-    for _ in 0..n {
-        step_app(h);
+impl BuildApp for egui_kittest::HarnessBuilder<PhotocraftApp> {
+    fn build_app<'a>(self, mut body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'a, app: PhotocraftApp) -> egui_kittest::Harness<'a, PhotocraftApp> {
+        self.build_ui_state(
+            move |ui, app: &mut PhotocraftApp| {
+                let ctx = ui.ctx().clone();
+                app.framework_before_input(&ctx);
+                crate::shortcuts::handle(app, &ctx);
+                body(ui, app);
+            },
+            app,
+        )
     }
-}
-
-/// [`step_app`] until no immediate repaint is requested (the stepping of `Harness::run`), at most 32 passes.
-#[cfg(test)]
-pub(crate) fn run_app(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
-    for _ in 0..32 {
-        step_app(h);
-        if !h.ctx.has_requested_repaint() {
-            return;
-        }
-    }
-    panic!("the app did not settle within 32 passes");
 }
 
 /// Runs one frame of `input` on `ctx` as the app's runtime key pass: the runtime takes the input

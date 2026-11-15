@@ -2,13 +2,15 @@
 //! `tools.setColors` and one undo step of the recolour of what is selected, a background edit
 //! recolours nothing (G3, #5568, #5690). How the field and the chips draw and pick is craft-color's.
 
+use crate::app::framework::BuildApp;
+
 use super::*;
 use egui_kittest::kittest::Queryable;
 
 /// The Color tab (Hue Cube) for `app` in a 300 x 200 pt group that it fills.
 fn color_tab(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
     // 60 fps steps, so two clicks a frame apart are a double-click.
-    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(300.0, 200.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(300.0, 200.0)).with_step_dt(1.0 / 60.0).build_app(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::panels::color::panel(app, ui);
@@ -202,7 +204,7 @@ fn swap_and_default_colors_recolour_selected_type() {
             created: false,
             mask: false,
         });
-        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(80.0, 120.0)).build_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(80.0, 120.0)).build_app(
             |ui, app: &mut PhotocraftApp| {
                 let w = ui.available_width();
                 color_chips(app, ui, w)

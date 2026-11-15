@@ -1,6 +1,8 @@
 //! #12052: the Type options bar's font size field has the reference application's preset sizes. Picking one
 //! edits the same targets as typing a size.
 
+use crate::app::framework::BuildApp;
+
 use egui::{Modifiers, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -26,7 +28,7 @@ fn add_layer(app: &mut PhotocraftApp, size: f32) -> LayerId {
 /// in batches (see `canvas_tests::controls`).
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_context(ctx).with_size(vec2(1400.0, 300.0)).with_max_steps(16).build_ui_state(
+    let mut h = Harness::builder().with_context(ctx).with_size(vec2(1400.0, 300.0)).with_max_steps(16).build_app(
         move |ui, app| {
             ui.horizontal(|ui| super::options_bar(app, ui));
         },

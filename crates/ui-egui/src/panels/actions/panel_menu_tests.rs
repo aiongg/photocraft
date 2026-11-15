@@ -1,6 +1,7 @@
 //! Real panel controls compose the menu-item commands with consent and retained selection. These trials read the
 //! dialog host (`app.framework`), so they live in the crate; the ones that use only the public API stay in
 //! `tests/it/actions_panel_menu.rs`.
+use crate::app::framework::BuildApp;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
@@ -25,7 +26,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     app.session.actions.list.push(a).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Action(0));
     app.ui.actions.panel.expanded.insert("A".into());
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1100.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1100.0, 900.0)).build_app(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(3);
     h

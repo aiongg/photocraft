@@ -2,6 +2,8 @@
 //! form (no presets, search or gear) with the Tolerance control; other tools get the full picker. The
 //! two pen controls store apart: Tolerance with the tool, "Size:" with its brush.
 
+use crate::app::framework::BuildApp;
+
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
@@ -25,7 +27,7 @@ fn app(tool: Tool) -> PhotocraftApp {
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     crate::theme::install_fonts(app.ctx());
     crate::theme::apply(app.ctx(), &crate::theme::AppTheme::pro());
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_app(
         move |ui, app: &mut PhotocraftApp| {
             crate::paint_mouse::sync_tool_brush(app);
             egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));

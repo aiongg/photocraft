@@ -2,6 +2,8 @@
 //! hides the Character and Paragraph panels. It runs Window › Character, so the cases the issue
 //! leaves unmeasured keep that command's behaviour.
 
+use crate::app::framework::BuildApp;
+
 use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -26,7 +28,7 @@ fn app_with_layer() -> PhotocraftApp {
 /// The options bar in a row, once the app's fonts are set up (the first pass has none).
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_context(ctx).with_size(vec2(1400.0, 200.0)).with_max_steps(16).build_ui_state(
+    let mut h = Harness::builder().with_context(ctx).with_size(vec2(1400.0, 200.0)).with_max_steps(16).build_app(
         |ui, app| {
             ui.horizontal(|ui| super::options_bar::options_bar(app, ui));
         },

@@ -6,6 +6,8 @@
 //! app frame (the canvas editor holds the keys and the input method), and the session calls
 //! with the canvas pass's context.
 
+use crate::app::framework::BuildApp;
+
 use craft::ui::runtime::windows::WindowHost;
 use egui_kittest::Harness;
 use photocraft_doc::{LayerContent, LayerId};
@@ -48,7 +50,7 @@ pub(super) fn key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
 /// editor's focus are in place, then two frames after each of `events`.
 pub(super) fn frames(app: PhotocraftApp, events: Vec<egui::Event>) -> PhotocraftApp {
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_context(ctx).build_ui_state(
+    let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_context(ctx).build_app(
         |ui, app: &mut PhotocraftApp| {
             let mut frame = eframe::Frame::_new_kittest();
             app.logic_frame(ui.ctx(), &mut frame);

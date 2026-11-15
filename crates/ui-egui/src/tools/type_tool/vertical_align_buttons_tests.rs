@@ -3,6 +3,8 @@
 //! Horizontal Type Mask tool keeps the horizontal buttons (not measured); the Vertical Type Mask
 //! tool's are in `vertical_mask_align_buttons_tests` (#12088).
 
+use crate::app::framework::BuildApp;
+
 use egui::accesskit::Toggled;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
@@ -31,7 +33,7 @@ fn text_layer(app: &mut PhotocraftApp, orientation: &str) -> LayerId {
 
 pub(super) fn bar(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_context(ctx).with_size(egui::vec2(1200.0, 60.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(ctx).with_size(egui::vec2(1200.0, 60.0)).build_app(
         |ui, app: &mut PhotocraftApp| {
             ui.horizontal(|ui| super::options_bar(app, ui));
         },

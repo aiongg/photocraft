@@ -1,6 +1,8 @@
 //! Window › Timeline: the panel that creates and drives the document timeline. The registry shows `body` in the
 //! dock. All actions run the engine `timeline.*` commands, so the control channel drives it the same way.
 
+use crate::app::framework::BuildApp;
+
 use craft::behavior::IconId;
 use craft::theme::variant::Tone;
 use craft::timeline::PlaybackClock;
@@ -188,7 +190,7 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 100, "height": 80})).unwrap();
         app.run("timeline.create", json!({"duration": 10, "fps": 30.0})).unwrap();
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(0.001).build_ui_state(|ui, app| body(app, ui), app);
+        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(0.001).build_app(|ui, app| body(app, ui), app);
         h.run_steps(2);
 
         // The Play button starts playback.

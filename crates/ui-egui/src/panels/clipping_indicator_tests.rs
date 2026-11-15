@@ -1,5 +1,7 @@
 //! The Properties panel's Clip to Layer Below control on an adjustment layer.
 
+use crate::app::framework::BuildApp;
+
 use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -20,7 +22,7 @@ fn adjustment_harness(kind: &str, depth: u32) -> Harness<'static, PhotocraftApp>
     session.execute("select.deselect", json!({})).unwrap();
     let app = PhotocraftApp::new(session, Default::default());
     let mut properties = false;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 640.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 640.0)).build_app(
         move |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|fonts| fonts.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;

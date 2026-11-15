@@ -1,6 +1,7 @@
 //! #11381: the Move tool's options bar. The Distribute buttons gated by the layer count, the
 //! gear's switches (rollover outlines) and the group expansion on a click.
 
+use crate::app::framework::BuildApp as _;
 use craft::layers::ui::panel::Groups;
 use egui::vec2;
 use egui_kittest::Harness;
@@ -51,7 +52,7 @@ fn app() -> (PhotocraftApp, [LayerId; 3]) {
 /// The Move tool's align controls and gear, on the app's own context so command states reach them
 /// as in the running app.
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(700.0, 200.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(700.0, 200.0)).build_app(
         |ui, app: &mut PhotocraftApp| {
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.horizontal(|ui| crate::align_bar::show(app, ui));
@@ -60,7 +61,7 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    crate::app::framework::step_app_n(&mut h, 4);
+    h.run_steps(4);
     h
 }
 
@@ -75,7 +76,7 @@ fn distribute_buttons_are_greyed_with_too_few_layers_like_the_menu() {
     // Align still works with two layers.
     assert!(!h.get_by_label("Align Left Edges").accesskit_node().is_disabled());
     select_all(h.state_mut(), &[a, b, c]);
-    crate::app::framework::step_app_n(&mut h, 2);
+    h.run_steps(2);
     assert!(!h.get_by_label("Distribute Vertically").accesskit_node().is_disabled());
 }
 

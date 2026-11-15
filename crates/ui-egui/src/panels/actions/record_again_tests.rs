@@ -1,5 +1,6 @@
 //! Record Again uses the real editor while retaining the selected step and permissions. These trials read the dialog
 //! host (`app.framework`), so they live in the crate.
+use crate::app::framework::BuildApp;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
@@ -26,7 +27,7 @@ fn harness(command: &str, params: Value) -> Harness<'static, PhotocraftApp> {
     action.dialogs.insert(0);
     app.session.actions.list.push(action).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Step(0, 0));
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1000.0, 760.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1000.0, 760.0)).build_app(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(3);
     h
