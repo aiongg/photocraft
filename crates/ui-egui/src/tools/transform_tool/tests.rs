@@ -17,7 +17,8 @@ type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
 
 /// An app inside a window, run frame by frame as the desktop app is.
 fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness {
-    egui_kittest::Harness::builder().with_size(size).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |cc| {
+    // The harness runs on the app's own context, so what the app set up on it (the runtime, the command catalog) is there.
+    egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(size).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         app
     })
