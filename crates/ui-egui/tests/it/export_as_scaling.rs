@@ -69,9 +69,9 @@ fn control(h: &mut Harness, method: &str, params: Value) -> Value {
 /// Opens Export As and returns its dialog id.
 fn open_export_as(h: &mut Harness) -> String {
     let ctx = h.ctx.clone();
-    let reply = menus::invoke(h.state_mut(), &ctx, "file.export.exportAs", json!({})).expect("open Export As");
+    menus::invoke(h.state_mut(), &ctx, "file.export.exportAs", json!({})).expect("open Export As");
     h.run_steps(6);
-    reply["dialog"].as_str().expect("the menu opens a dialog").to_string()
+    h.state().top_dialog().expect("the menu opens a dialog").value().to_string()
 }
 
 fn set_field(h: &mut Harness, id: &str, field: &str, value: Value) {

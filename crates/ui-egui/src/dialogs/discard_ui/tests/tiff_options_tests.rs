@@ -18,12 +18,11 @@ fn asked(compression: &str, transparency: Option<bool>, pyramid: bool, layers: b
 /// A harness with one 8×8 document (`background`: "white" or "transparent") whose exports record
 /// their TIFF settings, showing TIFF Options and answering a save dialog with `to`.
 fn tiff_app(background: &str, to: &str) -> (Prompted, Writes) {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut app = app_with_docs_over(0, Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])]))));
     app.run("file.new", json!({"width": 8, "height": 8, "background": background})).unwrap();
     app.sync_views();
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.files = Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])])));
     app.services.export = Some(Box::new(|_, _, s| {
         Ok((asked(tiff_options_ui::compression_name(s.tiff_compression), s.tiff_transparency, s.tiff_pyramid, s.tiff_layers), Vec::new()))
     }));

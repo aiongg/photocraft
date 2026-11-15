@@ -14,13 +14,12 @@ fn tiff_prompt(command: &str) -> (Prompted, Writes, DocId, DocId) {
 /// [`tiff_prompt`] with a save dialog that answers each of `paths` in turn.
 fn tiff_prompt_answering(command: &str, paths: &[&str]) -> (Prompted, Writes, DocId, DocId) {
     let _gpu = photocraft_testkit::gpu_lock();
-    let mut app = app_with_docs(2);
+    let mut app = app_with_docs_over(2, Some(Arc::new(ScriptedFiles::answering(paths.iter().map(|p| Picked::Paths(vec![(*p).into()]))))));
     make_dirty(&mut app, 0);
     let (saved, other) = (doc_id(&app, 0), doc_id(&app, 1));
     app.session.active_mut().unwrap().path = Some("original.tif".into());
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.files = Some(Arc::new(ScriptedFiles::answering(paths.iter().map(|p| Picked::Paths(vec![(*p).into()])))));
     app.services.export = Some(Box::new(move |doc, _, settings| Ok((serde_json::to_vec(&(doc.id, settings.tiff_layers)).unwrap(), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));
@@ -38,7 +37,7 @@ fn tiff_prompt_answering(command: &str, paths: &[&str]) -> (Prompted, Writes, Do
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(egui::os::OperatingSystem::Windows);
     assert!(intercept(h.state_mut(), command, &Value::Null));
-    h.run_steps(2);
+    h.run_steps(3);
     (h, writes, saved, other)
 }
 

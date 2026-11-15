@@ -19,14 +19,13 @@ fn asked(bits: Option<u8>) -> Vec<u8> {
 /// One 8×8 RGB document (with an "Alpha 1" channel when `alpha_channel`) whose exports record
 /// their Targa bits, in a harness running the dialogs and answering a save dialog with `to`.
 fn targa_app(alpha_channel: bool, to: &str) -> (Prompted, Writes) {
-    let mut app = app_with_docs(1);
+    let mut app = app_with_docs_over(1, Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])]))));
     if alpha_channel {
         app.run("select.all", json!({})).unwrap();
         app.run("select.saveSelection", json!({})).unwrap();
     }
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.files = Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])])));
     app.services.export = Some(Box::new(|_, _, settings| Ok((asked(settings.tga_bits.map(TgaBits::bits)), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));

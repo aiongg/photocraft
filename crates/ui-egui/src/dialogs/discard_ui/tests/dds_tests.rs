@@ -16,11 +16,10 @@ const PLAIN: DdsOptions = DdsOptions { compression: DdsCompression::None, mipmap
 /// One 8×8 RGB document whose exports record their DDS options, in a harness running the dialogs
 /// and answering a save dialog with `to`.
 fn dds_app(to: &str) -> (Prompted, Writes) {
-    let mut app = app_with_docs(1);
+    let mut app = app_with_docs_over(1, Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])]))));
     let writes: Writes = Rc::default();
     let (asked, written) = (Rc::new(RefCell::new(PLAIN)), writes.clone());
     let seen = asked.clone();
-    app.services.files = Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])])));
     app.services.export = Some(Box::new(move |_, _, settings| {
         *seen.borrow_mut() = settings.dds;
         Ok((Vec::new(), Vec::new()))

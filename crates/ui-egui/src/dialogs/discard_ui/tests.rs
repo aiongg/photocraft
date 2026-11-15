@@ -1,12 +1,18 @@
 use super::*;
-use craft::host::{Picked, ScriptedFiles};
+use craft::host::{Files, Picked, ScriptedFiles};
 use craft::ui::dialog::DialogId;
 // The five format test modules below reach `Key` through this glob.
 use egui::Key;
 use std::sync::Arc;
 
 fn app_with_docs(n: usize) -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app_with_docs_over(n, None)
+}
+
+/// `n` new documents in an app whose host serves `files`: the host takes them when the app is made, so a
+/// later `services.files` assignment would not reach the pickers.
+fn app_with_docs_over(n: usize, files: Option<Arc<dyn Files>>) -> PhotocraftApp {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files, ..Default::default() });
     for _ in 0..n {
         app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     }
@@ -193,6 +199,8 @@ type Prompted = egui_kittest::Harness<'static, PhotocraftApp>;
 fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) -> Prompted {
     let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
+            // As `ui_frame` starts: a pass carrying injected input acts for the automation client.
+            app.automation_input = craft::ui::runtime::windows::WindowHost::of(ui.ctx()).injected_pass();
             crate::dialogs::run(app, ui);
             app.poll_file_dialog();
         },
@@ -201,7 +209,8 @@ fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) 
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(os);
     assert!(intercept(h.state_mut(), command, &Value::Null));
-    h.run_steps(2);
+    // The first pass opens the question, the second draws it, the third shows it to the access tree.
+    h.run_steps(3);
     h
 }
 
@@ -481,7 +490,7 @@ fn command_d_answers_the_prompt_rather_than_deselecting() {
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.ctx.set_os(egui::os::OperatingSystem::Mac);
     assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
-    h.run_steps(2);
+    h.run_steps(3);
     h.key_press_modifiers(egui::Modifiers::COMMAND, Key::D);
     h.run_steps(2);
     assert!(h.state().discard.is_none(), "⌘D answered the prompt");
@@ -497,14 +506,13 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
     let written: Rc<RefCell<Vec<String>>> = Rc::default();
     let w = written.clone();
     let files = Arc::new(ScriptedFiles::held());
-    let mut app = app_with_docs(1);
+    let mut app = app_with_docs_over(1, Some(files.clone()));
     make_dirty(&mut app, 0);
     app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
     app.services.write = Some(Box::new(move |p: &str, _: &[u8]| {
         w.borrow_mut().push(p.to_string());
         Ok(())
     }));
-    app.services.files = Some(files.clone());
     let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
     // Cancelling the save dialog brings the question back.
     answer(&mut h, "save", false);

@@ -686,23 +686,40 @@ fn tab_reorder_keeps_floating_documents_in_place() {
     assert_eq!(move_target_after_filter(&visible, 2, 0, 3), 0);
 }
 
+/// The `document` param naming the open document at index `i`: floating windows are keyed by document id.
+fn doc_param(app: &PhotocraftApp, i: usize) -> serde_json::Value {
+    serde_json::to_value(app.session.documents()[i].doc.id).unwrap()
+}
+
+/// Window › Arrange › Float in Window for the open document at index `i`.
+fn float_doc(app: &mut PhotocraftApp, ctx: &egui::Context, i: usize) -> Result<serde_json::Value, String> {
+    let document = doc_param(app, i);
+    crate::menus::invoke(app, ctx, "window.arrange.floatInWindow", json!({"document": document}))
+}
+
+/// The id of the first floating document window.
+fn first_window(app: &PhotocraftApp) -> u64 {
+    app.ui.document_windows.floating[0].0.id
+}
+
 #[test]
 fn arrange_layout_only_includes_docked_documents() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     for name in ["first", "floating", "last"] {
         app.run("file.new", json!({"width": 80, "height": 60, "name": name})).unwrap();
     }
+    app.sync_views();
     let app_ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &app_ctx, "window.arrange.threeUpStacked", json!({})).unwrap();
-    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
+    float_doc(&mut app, &app_ctx, 1).unwrap();
     let rect = Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
     let shown: Vec<_> = arranged_cells(&app, rect).unwrap().into_iter().map(|(doc, _)| doc).collect();
     assert_eq!(shown, vec![0, 2]);
 
     let app_ctx = app.ctx().clone();
-    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
+    float_doc(&mut app, &app_ctx, 0).unwrap();
     let app_ctx = app.ctx().clone();
-    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 2})).unwrap();
+    float_doc(&mut app, &app_ctx, 2).unwrap();
     assert!(arranged_cells(&app, rect).is_none(), "the main canvas should be blank when every document is floating");
 }
 
@@ -715,8 +732,8 @@ fn torn_off_document_is_not_drawn_again_in_the_main_window() {
         app.run("file.new", json!({"width": 80, "height": 60, "name": "docked"})).unwrap();
         app.sync_views();
         let ctx = app.ctx().clone();
-        crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
-        assert!(app.ui.windows[0].floating);
+        float_doc(&mut app, &ctx, 0).unwrap();
+        assert!(crate::view_cmds::document_is_floating(&app, app.session.documents()[0].doc.id));
         assert_eq!(app.session.active_index(), Some(0), "{kind:?}: the floated page remains active");
         assert_eq!(main_canvas_document(&app), Some(1), "{kind:?}: the main canvas picks a docked page instead");
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(680.0, 480.0)).with_context(app.ctx().clone()).build_ui_state(
@@ -753,14 +770,17 @@ fn float_all_keeps_one_window_per_floating_document() {
     app.run("file.new", json!({"width": 400, "height": 300, "name": "two"})).unwrap();
     app.sync_views();
     let ctx = app.ctx().clone();
-    let first = crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap()["window"].as_u64();
+    let first = float_doc(&mut app, &ctx, 0).unwrap()["window"].as_u64();
     for _ in 0..2 {
-        let all = crate::menus::invoke(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
-        assert_eq!(all["windows"][0].as_u64(), first, "the floating document keeps its window");
-        for doc in 0..2 {
-            let n = app.ui.windows.iter().filter(|w| w.open && w.floating && w.document == doc).count();
-            assert_eq!(n, 1, "document {doc}: one floating window");
-        }
+        crate::menus::invoke(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
+        let window_of = |app: &PhotocraftApp, doc: usize| {
+            let id = app.session.documents()[doc].doc.id;
+            let holding: Vec<u64> = app.ui.document_windows.floating.iter().filter(|(g, _)| g.documents.contains(&id)).map(|(g, _)| g.id).collect();
+            assert_eq!(holding.len(), 1, "document {doc}: one floating window");
+            holding[0]
+        };
+        assert_eq!(Some(window_of(&app, 0)), first, "the floating document keeps its window");
+        window_of(&app, 1);
     }
 }
 
@@ -772,10 +792,10 @@ fn consolidating_keeps_the_zoom_set_while_floating() {
     app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
     app.sync_views();
     let ctx = app.ctx().clone();
-    crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
+    float_doc(&mut app, &ctx, 0).unwrap();
     type_zoom(&mut app.ui.views[0], 200.0);
     crate::menus::invoke(&mut app, &ctx, "window.arrange.consolidateAllToTabs", json!({})).unwrap();
-    assert!(app.ui.windows.is_empty());
+    assert!(app.ui.document_windows.floating.is_empty());
     assert!((app.ui.views[0].zoom - 2.0).abs() < 1e-3, "the tab shows the floating zoom: {}", app.ui.views[0].zoom);
 }
 
@@ -799,15 +819,16 @@ fn a_new_window_for_document_keeps_its_own_view() {
     );
     h.state_mut().1 = true;
     h.run_steps(4);
-    assert!(h.state().0.ui.windows.iter().any(|w| w.open && !w.floating), "the extra window is open");
-    let window_zoom = |h: &egui_kittest::Harness<'_, (PhotocraftApp, bool)>| h.state().0.ui.windows[0].view.zoom;
+    assert!(!h.state().0.ui.document_windows.floating.is_empty(), "the extra window is open");
+    let window = first_window(&h.state().0);
+    let window_zoom = |h: &egui_kittest::Harness<'_, (PhotocraftApp, bool)>| h.state().0.ui.window_views[&window].zoom;
     let before = window_zoom(&h);
     type_zoom(&mut h.state_mut().0.ui.views[0], 300.0);
     h.run_steps(3);
     assert!((h.state().0.ui.views[0].zoom - 3.0).abs() < 1e-3, "the main canvas keeps its zoom");
     assert!((window_zoom(&h) - before).abs() < 1e-3, "the extra window keeps its own: {}", window_zoom(&h));
     let main = h.state().0.ui.views[0].zoom;
-    type_zoom(&mut h.state_mut().0.ui.windows[0].view, 50.0);
+    type_zoom(h.state_mut().0.ui.window_views.get_mut(&window).unwrap(), 50.0);
     h.run_steps(3);
     assert!((window_zoom(&h) - 0.5).abs() < 1e-3, "the extra window keeps its zoom");
     assert!((h.state().0.ui.views[0].zoom - main).abs() < 1e-3, "the main canvas is not written over");
@@ -857,8 +878,9 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 400, "height": 300, "name": "docked"})).unwrap();
+        app.sync_views();
         let app_ctx = app.ctx().clone();
-        crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
+        float_doc(&mut app, &app_ctx, 0).unwrap();
         app
     });
     h.run_steps(6);
@@ -887,8 +909,7 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         h.event(egui::Event::Text(typed.into()));
         h.key_press(egui::Key::Enter);
         h.run_steps(60);
-        let window = h.state().ui.windows[0].view.zoom;
-        assert!((window - want).abs() < 1e-3, "field {field}, typed {typed}: the window shows {window}");
+        assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
         assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window");
     }
 }

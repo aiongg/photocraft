@@ -27,10 +27,9 @@ fn pct(q: u8) -> Option<u8> {
 /// One 8×8 RGB document whose exports record their JPEG settings, in a harness running the
 /// dialogs and answering a save dialog with `to`.
 fn jpeg_app(to: &str) -> (Prompted, Writes) {
-    let mut app = app_with_docs(1);
+    let mut app = app_with_docs_over(1, Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])]))));
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.files = Some(Arc::new(ScriptedFiles::answering([Picked::Paths(vec![to.into()])])));
     app.services.export = Some(Box::new(|_, _, settings| Ok((asked(settings.jpeg_quality, settings.jpeg_format), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));
