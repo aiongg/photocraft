@@ -59,7 +59,7 @@ fn each_entry_sets_wet_load_and_mix_in_one_change_and_keeps_flow() {
     entry_node(&h, name).click();
     h.run_steps(3);
     let m = &h.state().session.tools.brush.mixer;
-    assert_eq!((f64::from(m.wet), f64::from(m.load), f64::from(m.mix)), (wet, load, mix));
+    assert_eq!((m.wet, m.load, m.mix), (wet as f32, load as f32, mix as f32), "the mixer stores f32");
     assert!((m.flow - 0.42).abs() < 1e-6, "Flow stays");
     assert_eq!(set_brush_count(&h), before + 1, "one tools.setBrush change");
     assert_eq!(h.state().ui.tool_options.mixer_combination, index);
