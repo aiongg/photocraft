@@ -142,7 +142,7 @@ fn show_box(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
         .rotate_zone(RotateZone::Band)
         .reference_point(false)
         .inside_moves(false)
-        .id_salt(salt)
+        .id_salt((BOX_LABEL, salt))
         .show_at(ui, rect);
     // Only this pass's events count: a second pass of the frame sees its own. The box has no session to apply
     // (`apply` and `discard` are ignored), and a key nudge moves nothing here because the box is re-given from
@@ -306,7 +306,7 @@ fn show_widgets(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
     if targets.is_empty() {
         return;
     }
-    let out = CornerWidgets::new(CORNERS_LABEL, Bind::given(targets.clone())).id_salt(salt).show_at(ui, rect);
+    let out = CornerWidgets::new(CORNERS_LABEL, Bind::given(targets.clone())).id_salt((CORNERS_LABEL, salt)).show_at(ui, rect);
     // Only this pass's events count: a second pass of the frame sees its own, so a commit is run once.
     let key = match out.edit.events.ended() {
         Some(EditEvent::Commit { id, .. }) => Some(format!("corner-radius-{}", id.0)),
