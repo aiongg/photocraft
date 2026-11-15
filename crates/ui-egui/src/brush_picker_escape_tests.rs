@@ -35,12 +35,12 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 /// Type `text` into the picker's `n`th spin field (0 Size, 1 Hardness), then Tab.
 fn type_into(h: &mut Harness<'static, PhotocraftApp>, n: usize, text: &str) {
     h.get_all_by_role(egui::accesskit::Role::SpinButton).nth(n).expect("the field").click();
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
     h.event(Event::Text(text.into()));
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     h.key_press(egui::Key::Tab);
-    step_app_n(&mut h, 2);
+    step_app_n(h, 2);
 }
 
 fn brush(h: &Harness<'static, PhotocraftApp>) -> (f32, f32, f32) {

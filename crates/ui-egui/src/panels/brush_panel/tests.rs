@@ -471,7 +471,7 @@ fn rows_of(app: PhotocraftApp, view: PresetView) -> Vec<PresetRow<BrushKey>> {
         (app, Vec::new()),
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    step_app_n(&mut h, 2);
+    h.run_steps(2);
     std::mem::take(&mut h.state_mut().1)
 }
 

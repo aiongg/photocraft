@@ -29,7 +29,7 @@ fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
 fn bar_pass(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
     let input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 800.0))), ..Default::default() };
-    let _ = ctx.run_ui(input, |ui| crate::type_tool::options_bar(app, ui));
+    let _ = crate::testing::run_ui(&ctx, input, |ui| crate::type_tool::options_bar(app, ui));
 }
 
 /// A lower Recent Fonts cap trims the existing list in the next pass, without waiting for a

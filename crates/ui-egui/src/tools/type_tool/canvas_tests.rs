@@ -67,7 +67,7 @@ fn set_view(h: &mut Harness<'static, PhotocraftApp>, zoom: f32, center: [f32; 2]
     let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"zoom": zoom, "center": center}));
     let app = h.state_mut();
     assert!(matches!(crate::control::handle(app, &ctx, &req), crate::control::Reply::Done(_)), "ui.set sets the view");
-    step_app_n(&mut h, 2);
+    step_app_n(h, 2);
 }
 
 /// Click (or drag out a box to `to`) with the current tool through the canvas pass.
@@ -222,11 +222,11 @@ mod panel_defaults {
     fn number(h: &mut Harness<'static, PhotocraftApp>, label: &str, value: &str) {
         let name = field_name(h, Role::SpinButton, label);
         h.get_by_role_and_label(Role::SpinButton, &name).click();
-        run_app(&mut h);
+        run_app(h);
         h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(value.into()));
         h.key_press(egui::Key::Enter);
-        run_app(&mut h);
+        run_app(h);
     }
 
     #[test]
@@ -447,37 +447,37 @@ fn glyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32)
 
 fn press(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, down: bool) {
     h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: down, modifiers: Modifiers::NONE });
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 fn click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.hover_at(p);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     press(h, p, true);
     press(h, p, false);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 /// Two clicks within egui's double-click delay (use [`fast_harness`]).
 fn double_click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.hover_at(p);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     for pressed in [true, false, true, false] {
         h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
     }
-    step_app_n(&mut h, 2);
+    step_app_n(h, 2);
 }
 
 fn drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2) {
     h.hover_at(a);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     press(h, a, true);
     for k in 1..=6 {
         h.hover_at(a + (b - a) * (k as f32 / 6.0));
-        step_app_n(&mut h, 1);
+        step_app_n(h, 1);
     }
     press(h, b, false);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 fn selection(h: &Harness<'static, PhotocraftApp>) -> (usize, usize) {
@@ -689,7 +689,7 @@ fn vglyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32
 
 fn key(h: &mut Harness<'static, PhotocraftApp>, k: egui::Key) {
     h.event(egui::Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 /// Vertical type (#199): clicks and drags land on the glyph under the pointer down the column,
@@ -866,25 +866,25 @@ fn held(h: &Harness<'static, PhotocraftApp>) -> Mods {
 
 fn hold(h: &mut Harness<'static, PhotocraftApp>, mods: Modifiers) {
     h.event(egui::Event::ModifiersChanged(mods));
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 fn transform_press(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, down: bool, mods: Modifiers) {
     h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: down, modifiers: mods });
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
 }
 
 fn transform_drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2, mods: Modifiers, release_command: bool) {
     hold(h, mods);
     h.hover_at(a);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     transform_press(h, a, true, mods);
     for k in 1..=6 {
         if release_command && k == 4 {
             hold(h, Modifiers { command: false, ctrl: false, mac_cmd: false, ..mods });
         }
         h.hover_at(a + (b - a) * (k as f32 / 6.0));
-        step_app_n(&mut h, 1);
+        step_app_n(h, 1);
     }
     transform_press(h, b, false, if release_command { Modifiers::NONE } else { mods });
     hold(h, Modifiers::NONE);
@@ -1474,25 +1474,25 @@ mod multi_layer_formatting {
         // its accessible name, so a font scan cannot shift this action onto another control.
         let name = field_name(h, Role::SpinButton, label);
         h.get_by_role_and_label(Role::SpinButton, &name).click();
-        run_app(&mut h);
+        run_app(h);
         h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(value.into()));
         h.key_press(egui::Key::Enter);
-        run_app(&mut h);
+        run_app(h);
     }
 
     fn preset(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
         // Presets near the end of the popup can be below its scroll viewport.
         h.get_by_label(label).scroll_to_me();
-        run_app(&mut h);
+        run_app(h);
         h.get_by_label(label).click();
-        run_app(&mut h);
+        run_app(h);
     }
 
     /// Opens a preset chevron by its accessible name and picks `label`.
     fn pick(h: &mut Harness<'static, PhotocraftApp>, menu: &str, label: &str) {
         open_presets(h, menu);
-        run_app(&mut h);
+        run_app(h);
         preset(h, label);
     }
 
@@ -2038,13 +2038,13 @@ fn quick_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 /// `n` quick clicks at `p`, then a pause long enough that the next click starts a new run.
 fn clicks(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, n: usize) -> (usize, usize) {
     h.hover_at(p);
-    step_app_n(&mut h, 1);
+    step_app_n(h, 1);
     for _ in 0..n {
         press(h, p, true);
         press(h, p, false);
     }
     let sel = selection(h);
-    step_app_n(&mut h, 40);
+    step_app_n(h, 40);
     sel
 }
 
@@ -2054,7 +2054,7 @@ fn centre_on(h: &mut Harness<'static, PhotocraftApp>, id: LayerId) {
     let b = l.bounds().unwrap();
     let m = aff.apply(Point::new(f64::from(b[0] + b[2]) / 2.0, f64::from(b[1] + b[3]) / 2.0));
     set_view(h, 0.5, [m.x as f32, m.y as f32]);
-    step_app_n(&mut h, 2);
+    step_app_n(h, 2);
 }
 
 /// Laid-out line (character range) holding character `i`.
