@@ -96,6 +96,8 @@ fn align_name(align: TextAlign) -> &'static str {
         TextAlign::JustifyCenter => "JustifyCenter",
         TextAlign::JustifyRight => "JustifyRight",
         TextAlign::JustifyAll => "JustifyAll",
+        // `TextAlign` is `#[non_exhaustive]`: a later alignment the engine has no name for is Left, the default.
+        _ => "Left",
     }
 }
 
@@ -123,58 +125,58 @@ pub(crate) fn character_values(style: &CharStyle) -> CharacterValues {
     if style.discretionary_ligatures {
         opentype.push("dlig");
     }
-    CharacterValues {
-        family: Some(family),
-        style: Some(crate::type_tool::selected_style(style)),
-        size: Some(style.size_pt),
-        leading: Some(style.leading_pt.map_or(Leading::Auto, Leading::Fixed)),
-        kerning: Some(match style.kerning {
-            d::Kerning::Metrics => Kerning::Metrics,
-            d::Kerning::Optical => Kerning::Optical,
-            d::Kerning::Off => Kerning::Manual(style.kern),
-        }),
-        tracking: Some(style.tracking),
-        vertical_scale: Some(style.vertical_scale * 100.0),
-        horizontal_scale: Some(style.horizontal_scale * 100.0),
-        baseline_shift: Some(style.baseline_shift_pt),
-        color: Some(Rgba(style.color.to_rgba8())),
-        faux_bold: Some(style.faux_bold),
-        faux_italic: Some(style.faux_italic),
-        caps: Some(match style.caps {
-            d::Caps::Normal => Caps::Normal,
-            d::Caps::SmallCaps => Caps::SmallCaps,
-            d::Caps::AllCaps => Caps::AllCaps,
-        }),
-        position: Some(match style.baseline {
-            d::FontBaseline::Normal => BaselinePosition::Normal,
-            d::FontBaseline::Superscript => BaselinePosition::Superscript,
-            d::FontBaseline::Subscript => BaselinePosition::Subscript,
-        }),
-        underline: Some(style.underline),
-        strikethrough: Some(style.strikethrough),
-        opentype,
-        language: style.language.clone(),
-        axes: None,
-    }
+    // The framework's value structs are `#[non_exhaustive]`: built from their default, field by field.
+    let mut values = CharacterValues::default();
+    values.family = Some(family);
+    values.style = Some(crate::type_tool::selected_style(style));
+    values.size = Some(style.size_pt);
+    values.leading = Some(style.leading_pt.map_or(Leading::Auto, Leading::Fixed));
+    values.kerning = Some(match style.kerning {
+        d::Kerning::Metrics => Kerning::Metrics,
+        d::Kerning::Optical => Kerning::Optical,
+        d::Kerning::Off => Kerning::Manual(style.kern),
+    });
+    values.tracking = Some(style.tracking);
+    values.vertical_scale = Some(style.vertical_scale * 100.0);
+    values.horizontal_scale = Some(style.horizontal_scale * 100.0);
+    values.baseline_shift = Some(style.baseline_shift_pt);
+    values.color = Some(Rgba(style.color.to_rgba8()));
+    values.faux_bold = Some(style.faux_bold);
+    values.faux_italic = Some(style.faux_italic);
+    values.caps = Some(match style.caps {
+        d::Caps::Normal => Caps::Normal,
+        d::Caps::SmallCaps => Caps::SmallCaps,
+        d::Caps::AllCaps => Caps::AllCaps,
+    });
+    values.position = Some(match style.baseline {
+        d::FontBaseline::Normal => BaselinePosition::Normal,
+        d::FontBaseline::Superscript => BaselinePosition::Superscript,
+        d::FontBaseline::Subscript => BaselinePosition::Subscript,
+    });
+    values.underline = Some(style.underline);
+    values.strikethrough = Some(style.strikethrough);
+    values.opentype = opentype;
+    values.language = style.language.clone();
+    values
 }
 
 /// The values the Paragraph controls show for `style`.
 pub(crate) fn paragraph_values(style: &ParagraphStyle) -> ParagraphValues {
     use photocraft_doc::text::TextDirection as D;
-    ParagraphValues {
-        align: Some(align_of(style.align)),
-        direction: Some(match style.direction {
-            D::Auto => ParagraphDirection::Automatic,
-            D::Ltr => ParagraphDirection::LeftToRight,
-            D::Rtl => ParagraphDirection::RightToLeft,
-        }),
-        start_indent: Some(style.start_indent_pt),
-        end_indent: Some(style.end_indent_pt),
-        first_line_indent: Some(style.first_line_indent_pt),
-        space_before: Some(style.space_before_pt),
-        space_after: Some(style.space_after_pt),
-        hyphenate: Some(style.hyphenate),
-    }
+    let mut values = ParagraphValues::default();
+    values.align = Some(align_of(style.align));
+    values.direction = Some(match style.direction {
+        D::Auto => ParagraphDirection::Automatic,
+        D::Ltr => ParagraphDirection::LeftToRight,
+        D::Rtl => ParagraphDirection::RightToLeft,
+    });
+    values.start_indent = Some(style.start_indent_pt);
+    values.end_indent = Some(style.end_indent_pt);
+    values.first_line_indent = Some(style.first_line_indent_pt);
+    values.space_before = Some(style.space_before_pt);
+    values.space_after = Some(style.space_after_pt);
+    values.hyphenate = Some(style.hyphenate);
+    values
 }
 
 /// The attributes one field change sets, in the engine's keys; `None` for a change the rows do not offer.
