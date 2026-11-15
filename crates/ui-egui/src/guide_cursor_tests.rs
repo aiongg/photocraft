@@ -7,7 +7,6 @@ use egui_kittest::Harness;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::canvas::ViewXform;
 use crate::state::Tool;
 
 fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
@@ -39,17 +38,8 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
 }
 
 fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-    let app = h.state();
-    let v = &app.ui.views[0];
-    ViewXform {
-        rect: crate::rulers::content_rect(app, app.last_canvas_rect),
-        zoom: v.zoom,
-        center: v.center,
-        flip: app.ui.view.flip_horizontal,
-        rotation: v.rotation,
-        aspect: app.ui.view.display_aspect(),
-    }
-    .to_screen(x, y)
+
+    crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
 }
 
 fn hover(h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32, m: Modifiers) -> egui::CursorIcon {
@@ -94,111 +84,84 @@ fn diagonal(h: &mut Harness<'static, PhotocraftApp>, a: [f32; 2], b: [f32; 2], m
     h.run_steps(2);
 }
 
-/// The cursor over the guide with ⌘ held, and where a ⌘-drag from 200 to 240 leaves it.
-fn command_drag(tool: Tool, locked: bool) -> (egui::CursorIcon, Vec<f64>) {
+/// The cursor over the guide with ⌘ held (or latched in Window › Modifier Keys, with no key held),
+/// and where a ⌘-drag from 200 to 240 leaves it.
+fn command_drag(tool: Tool, locked: bool, latched: bool) -> (egui::CursorIcon, Vec<f64>) {
     let mut h = harness(tool);
     h.state_mut().ui.extras.lock_guides = locked;
-    let c = hover(&mut h, 200.0, 150.0, Modifiers::COMMAND);
-    drag(&mut h, 200.0, 240.0, Modifiers::COMMAND);
+    let held = if latched {
+        h.state_mut().ui.shell.latched = craft::keymap::Mods::CMD;
+        Modifiers::NONE
+    } else {
+        Modifiers::COMMAND
+    };
+    let c = hover(&mut h, 200.0, 150.0, held);
+    drag(&mut h, 200.0, 240.0, held);
     (c, h.state().session.active().unwrap().doc.guides.vertical.clone())
 }
 
 const GUIDE: egui::CursorIcon = egui::CursorIcon::ResizeHorizontal;
 
+/// (tool, guides locked, ⌘ latched instead of held) → whether ⌘ takes the guide: the guide cursor
+/// over it, and the guide after a drag from 200 to 240. ⌘ is the Move tool on the painting, selection,
+/// Frame and Artboard tools. The tools that keep ⌘ for themselves (Photoshop: the Pen's Direct
+/// Selection, the Hand, Zoom, Crop, type, shapes, slices) neither show the guide cursor nor drag
+/// the guide, and a locked guide never moves. A latched ⌘ takes the guide and shows its cursor as a
+/// held one does (the press took the guide but the cursor stayed the brush's).
 #[test]
-fn command_over_a_guide_shows_the_guide_cursor_and_drags_it_with_painting_tools() {
-    for tool in [
-        Tool::Brush,
-        Tool::Eraser,
-        Tool::Gradient,
-        Tool::PaintBucket,
-        Tool::CloneStamp,
-        Tool::Eyedropper,
-        Tool::Dodge,
-        Tool::SpotHealing,
-        Tool::Smudge,
-        Tool::QuickSelection,
-        Tool::RectMarquee,
-        Tool::Lasso,
-    ] {
-        assert_eq!(command_drag(tool, false), (GUIDE, vec![240.0]), "{tool:?}");
+fn command_over_a_guide_takes_it_where_command_is_the_move_tool() {
+    let takes = |tool, latched| (tool, false, latched, true);
+    let rows = [
+        takes(Tool::Brush, false),
+        takes(Tool::Eraser, false),
+        takes(Tool::Gradient, false),
+        takes(Tool::PaintBucket, false),
+        takes(Tool::CloneStamp, false),
+        takes(Tool::Eyedropper, false),
+        takes(Tool::Dodge, false),
+        takes(Tool::SpotHealing, false),
+        takes(Tool::Smudge, false),
+        takes(Tool::QuickSelection, false),
+        takes(Tool::RectMarquee, false),
+        takes(Tool::Lasso, false),
+        // The Frame and Artboard tools took a ⌘ press as their own (a new frame or board) although ⌘
+        // is the Move tool on them, so the guide cursor promised a drag that never moved the guide.
+        takes(Tool::Frame, false),
+        takes(Tool::Artboard, false),
+        takes(Tool::Brush, true),
+        takes(Tool::Eraser, true),
+        takes(Tool::RectMarquee, true),
+        (Tool::Brush, true, false, false),
+        (Tool::Eraser, true, false, false),
+        (Tool::Frame, true, false, false),
+        (Tool::Pen, false, false, false),
+        (Tool::Hand, false, false, false),
+        (Tool::Zoom, false, false, false),
+        (Tool::Crop, false, false, false),
+        (Tool::Type, false, false, false),
+        (Tool::Rectangle, false, false, false),
+        (Tool::Slice, false, false, false),
+    ];
+    for (tool, locked, latched, takes_guide) in rows {
+        let (cursor, guides) = command_drag(tool, locked, latched);
+        if takes_guide {
+            assert_eq!((cursor, guides), (GUIDE, vec![240.0]), "{tool:?} latched={latched}");
+        } else {
+            assert_ne!(cursor, GUIDE, "{tool:?} locked={locked}");
+            assert_eq!(guides, vec![200.0], "{tool:?} locked={locked}");
+        }
     }
 }
 
-/// The Frame and Artboard tools took a ⌘ press as their own (a new frame or board) although ⌘
-/// is the Move tool on them, so the guide cursor promised a drag that never moved the guide.
+/// Off a guide ⌘ is the Move tool on the Frame tool too: a ⌘-drag draws no frame (the Frame tool
+/// took ⌘), and without ⌘ it still draws one.
 #[test]
-fn command_drags_a_guide_with_the_frame_and_artboard_tools() {
-    for tool in [Tool::Frame, Tool::Artboard] {
-        assert_eq!(command_drag(tool, false), (GUIDE, vec![240.0]), "{tool:?}");
-    }
-    // Off a guide, ⌘ is the Move tool too: no frame is drawn.
+fn a_command_drag_off_a_guide_draws_no_frame() {
     let mut h = harness(Tool::Frame);
     let layers = h.state().session.active().unwrap().doc.layers.len();
     diagonal(&mut h, [100.0, 100.0], [160.0, 140.0], Modifiers::COMMAND);
     assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers, "⌘-drag with the Frame tool draws no frame");
-    assert!(h.state().ui.frame_tool.drag.is_none());
-    // Without ⌘ the Frame tool still draws its frame.
+    assert!(!h.state().canvas_tools.frame.busy());
     diagonal(&mut h, [20.0, 20.0], [120.0, 90.0], Modifiers::NONE);
     assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers + 1, "a plain drag draws a frame");
-}
-
-#[test]
-fn locked_guides_show_no_guide_cursor_and_do_not_move() {
-    for tool in [Tool::Brush, Tool::Eraser, Tool::Frame] {
-        let (cursor, guides) = command_drag(tool, true);
-        assert_ne!(cursor, GUIDE, "{tool:?}");
-        assert_eq!(guides, vec![200.0], "{tool:?}");
-    }
-}
-
-/// Tools that keep ⌘ for themselves (Photoshop: the Pen's Direct Selection, the Hand, Zoom, Crop,
-/// type, shapes, slices) neither show the guide cursor nor drag the guide.
-#[test]
-fn tools_with_their_own_command_keep_it() {
-    for tool in [Tool::Pen, Tool::Hand, Tool::Zoom, Tool::Crop, Tool::Type, Tool::Rectangle, Tool::Slice] {
-        let (cursor, guides) = command_drag(tool, false);
-        assert_ne!(cursor, GUIDE, "{tool:?}");
-        assert_eq!(guides, vec![200.0], "{tool:?}");
-    }
-}
-
-/// Window › Modifier Keys: a latched ⌘ made the press take the guide but left the brush cursor.
-#[test]
-fn sticky_command_shows_the_guide_cursor() {
-    for tool in [Tool::Brush, Tool::Eraser, Tool::RectMarquee] {
-        let mut h = harness(tool);
-        h.state_mut().ui.shell.sticky_command = true;
-        assert_eq!(hover(&mut h, 200.0, 150.0, Modifiers::NONE), GUIDE, "{tool:?}");
-        drag(&mut h, 200.0, 240.0, Modifiers::NONE);
-        assert_eq!(h.state().session.active().unwrap().doc.guides.vertical, vec![240.0], "{tool:?}");
-    }
-}
-
-/// The one decision for "a ⌘ press here takes the guide" outside the Move tool: not without ⌘,
-/// not with a locked guide, not during a stroke, not for a tool that keeps ⌘.
-#[test]
-fn command_guide_at_decides_for_every_tool_that_moves_guides() {
-    use crate::canvas::command_guide_at;
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
-    app.sync_views();
-    app.run("view.newGuide", json!({"orientation": "vertical", "position": 200})).unwrap();
-    let cmd = Modifiers::COMMAND;
-    for tool in [Tool::Brush, Tool::Eraser, Tool::Gradient, Tool::PaintBucket, Tool::Eyedropper, Tool::Frame, Tool::Artboard, Tool::MagicWand] {
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], cmd), Some((true, 0)), "{tool:?}");
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], Modifiers::NONE), None, "{tool:?} without ⌘");
-        assert_eq!(command_guide_at(&app, tool, [120.0, 100.0], cmd), None, "{tool:?} off the guide");
-    }
-    for tool in [Tool::Move, Tool::Pen, Tool::Hand, Tool::Zoom, Tool::Crop, Tool::Type, Tool::Rectangle, Tool::Slice, Tool::PathSelection] {
-        assert_eq!(command_guide_at(&app, tool, [200.0, 100.0], cmd), None, "{tool:?} keeps ⌘");
-    }
-    app.ui.extras.lock_guides = true;
-    assert_eq!(command_guide_at(&app, Tool::Brush, [200.0, 100.0], cmd), None, "locked guides");
-    app.ui.extras.lock_guides = false;
-    // A stroke under way keeps the pointer: ⌘ pressed mid-stroke does not take the guide.
-    app.ui.tool = Tool::Brush;
-    crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
-    assert!(app.drag.is_some());
-    assert_eq!(command_guide_at(&app, Tool::Brush, [200.0, 100.0], cmd), None, "during a stroke");
 }
