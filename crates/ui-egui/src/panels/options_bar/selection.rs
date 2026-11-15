@@ -11,6 +11,7 @@ use craft::ui::choice::{Checkbox, Segmented};
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _, SideLabel, Sizing, clicked};
 use craft::ui::display::{Divider, Shade, Text};
 use craft::ui::form::Field;
+use craft::ui::runtime::commands::{CommandRef, CommandState};
 use craft::ui::runtime::env::{Env, Label, UnitKind};
 use craft::ui::text::NumberField;
 use photocraft_engine::prefs::Unit;
@@ -100,9 +101,17 @@ fn anti_alias(app: &mut PhotocraftApp, ui: &mut egui::Ui, enabled: bool) {
     }
 }
 
-/// The Select and Mask… button; its enabled state is the command's, which the frame input publishes.
+/// The command the Select and Mask… button runs.
+const SELECT_AND_MASK: &str = "select.selectAndMask";
+
+/// The Select and Mask… button's state for the frame input: the command's, as the Select menu reads it.
+pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
+    vec![(CommandRef::new(SELECT_AND_MASK), CommandState::new().enabled(crate::menus::is_enabled(app, SELECT_AND_MASK)))]
+}
+
+/// The Select and Mask… button; its enabled state is [`command_states`]'.
 fn select_and_mask(ui: &mut egui::Ui) {
-    Button::command("select.selectAndMask").show(ui);
+    Button::command(SELECT_AND_MASK).show(ui);
 }
 
 /// The marquee's Style, Width, swap and Height cells over the stored tool options.
