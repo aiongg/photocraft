@@ -250,10 +250,11 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Mods, style: ConstrainSt
     (ToolAction::Claimed, Some(run))
 }
 
-/// The drag to `pointer`: the ⇧ lock, the snap of the moving box, the ⌥ duplicate and the readout.
+/// The drag to `pointer`: the ⇧ lock, the snap of the moving box, the ⌥ duplicate and, while the button is down
+/// (`readout`), the readout; the release applies its last sample without one.
 /// A pass applies only its own pointer sample, so a second pass of a frame moves the offset to
 /// the sample it is given and never re-applies an earlier one.
-fn follow(run: &mut Run, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
+fn follow(run: &mut Run, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>, readout: bool) {
     let Some(space) = cx.space() else { return };
     let Some(gesture) = run.gesture.as_mut() else { return };
     let zoom = space.view.zoom;
@@ -271,7 +272,9 @@ fn follow(run: &mut Run, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mu
     run.offset = (dx, dy);
     run.delta = [f64::from(dx), f64::from(dy)];
     run.moved = true;
-    cx.readout(vec![(Label::from("ΔX"), format!("{dx} px")), (Label::from("ΔY"), format!("{dy} px"))]);
+    if readout {
+        cx.readout(vec![(Label::from("ΔX"), format!("{dx} px")), (Label::from("ΔY"), format!("{dy} px"))]);
+    }
 }
 
 impl CanvasTool for MoveRun<'_> {
@@ -297,7 +300,7 @@ impl CanvasTool for MoveRun<'_> {
                     self.scope.with_app(crate::move_lock::prompt);
                 }
             }
-            Kind::Layers | Kind::Pixels => self.scope.with_app(|app| follow(run, app, pointer, cx)),
+            Kind::Layers | Kind::Pixels => self.scope.with_app(|app| follow(run, app, pointer, cx, true)),
         }
     }
 
@@ -313,7 +316,7 @@ impl CanvasTool for MoveRun<'_> {
             Kind::Layers | Kind::Pixels => {
                 // A click (released with no travel) never moves: the snap would nudge the layer.
                 if run.moved {
-                    follow(&mut run, app, pointer, cx);
+                    follow(&mut run, app, pointer, cx, false);
                 }
                 let (dx, dy) = run.offset;
                 if run.kind == Kind::Layers {

@@ -103,9 +103,7 @@ fn answer_ok(app: &mut PhotocraftApp, value: u64) -> Result<(), String> {
 fn answer_cancel(app: &mut PhotocraftApp, value: u64) -> Result<(), String> {
     let id = open_id(app, value).ok_or_else(|| format!("no dialog {value}"))?;
     let ctx = app.ctx().clone();
-    if !app.framework.dialogs.cancel_by_id(&ctx, id) {
-        return Err(format!("dialog {value} did not accept Cancel"));
-    }
+    crate::dialogs::cancel(app, &ctx, id)?;
     settle(app, &ctx);
     Ok(())
 }
@@ -792,10 +790,11 @@ fn a_set_paused_at_a_step_dialog_plays_its_other_actions_after_ok() {
             assert_eq!(layer_names(&app), ["a"], "Cancel stops the set");
             continue;
         }
+        let first_token = token(&app, first);
         answer_ok(&mut app, first).unwrap();
-        // The second dialog of A pauses again; the rest of the set waits behind it.
+        // The second dialog of A pauses again (a dialog of one command keeps its id); the rest of the set waits behind it.
         let second = last_dialog(&app);
-        assert_ne!(first, second);
+        assert_ne!(first_token, token(&app, second), "the second dialog holds a new continuation");
         answer_ok(&mut app, second).unwrap();
         let mut names = layer_names(&app);
         names.sort();
