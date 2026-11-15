@@ -189,7 +189,12 @@ fn draw_crop(app: &mut PhotocraftApp) -> [f64; 4] {
     tool_event(app, ToolEvent::Move { x: 28.0, y: 28.0, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Up { x: 28.0, y: 28.0 }, Modifiers::NONE);
     assert!(crate::crop_ui::pending(app), "the drag draws a pending frame");
-    app.ui.crop_rect.unwrap()
+    frame_of(app).unwrap()
+}
+
+/// The Crop tool's frame as `[x0, y0, x1, y1]`, `None` while it shows none.
+fn frame_of(app: &PhotocraftApp) -> Option<[f64; 4]> {
+    crate::crop_ui::frame(app).map(|f| [f.rect.x0, f.rect.y0, f.rect.x1, f.rect.y1])
 }
 
 fn aspect(r: [f64; 4]) -> f64 {
@@ -794,7 +799,7 @@ fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
     h.set_size(vec2(1000.0, 1400.0));
     draw_crop(h.state_mut());
     h.run_steps(2);
-    let r = h.state().ui.crop_rect.unwrap();
+    let r = frame_of(h.state()).unwrap();
     let center = h.state().last_canvas_rect.center();
     right_click(&mut h, center, Modifiers::NONE);
     h.get_by_label("Crop").click();
@@ -803,7 +808,7 @@ fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
     assert_eq!((f64::from(size.width), f64::from(size.height)), ((r[2] - r[0]).round(), (r[3] - r[1]).round()), "cropped to the frame");
     assert!(h.state().ui.canvas_tool_menu.is_none());
     assert_eq!(h.state().ui.tool, Tool::Crop);
-    assert_eq!(h.state().ui.crop_rect, None, "no frame around the cropped image");
+    assert_eq!(frame_of(h.state()), None, "no frame around the cropped image");
     // A click on the canvas brings back a frame around the whole cropped image.
     let center = h.state().last_canvas_rect.center();
     h.event(egui::Event::PointerMoved(center));
@@ -812,12 +817,12 @@ fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
     h.run_steps(1);
     h.event(egui::Event::PointerButton { pos: center, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
     h.run_steps(2);
-    assert_eq!(h.state().ui.crop_rect, Some([0.0, 0.0, f64::from(size.width), f64::from(size.height)]), "the click brings a frame back");
+    assert_eq!(frame_of(h.state()), Some([0.0, 0.0, f64::from(size.width), f64::from(size.height)]), "the click brings a frame back");
 }
 
 #[test]
 fn crop_menu_rows_act_like_the_options_bar() {
-    use crate::crop_overlay::{CropOverlay, OverlayShow};
+    use craft::behavior::geometry::{CropGuide, GuideShow};
     let mut app = crop_app();
     let ctx = app.ctx().clone();
     draw_crop(&mut app);
@@ -833,20 +838,20 @@ fn crop_menu_rows_act_like_the_options_bar() {
     choose(&mut app, &ctx, "crop.ratio.preset:4x5in");
     let menu = reopen(&mut app);
     assert!(mode_checked(&app, &menu, "crop.ratio.whr") && !mode_checked(&app, &menu, "crop.ratio.preset:4x5in"));
-    assert!((aspect(app.ui.crop_rect.unwrap()) - 0.8).abs() < 1e-9);
+    assert!((aspect(frame_of(&app).unwrap()) - 0.8).abs() < 1e-9);
     assert!(entry_enabled(&app, &menu, CROP_NEW));
     // Clear empties W x H x Resolution, as the bar's Clear.
     choose(&mut app, &ctx, CROP_CLEAR);
     assert_eq!(app.ui.tool_options.crop_width, "");
     // Overlays: another overlay starts at its first orientation; when it shows.
-    app.ui.tool_options.crop_overlay = CropOverlay::GoldenSpiral;
-    app.ui.tool_options.crop_overlay_orientation = 2;
+    app.ui.tool_options.crop.guide = CropGuide::GoldenSpiral;
+    app.ui.tool_options.crop.guide_orientation = 2;
     reopen(&mut app);
     choose(&mut app, &ctx, "crop.overlay.triangle");
-    assert_eq!((app.ui.tool_options.crop_overlay, app.ui.tool_options.crop_overlay_orientation), (CropOverlay::Triangle, 0));
+    assert_eq!((app.ui.tool_options.crop.guide, app.ui.tool_options.crop.guide_orientation), (CropGuide::Triangle, 0));
     reopen(&mut app);
     choose(&mut app, &ctx, "crop.overlayShow.never");
-    assert_eq!(app.ui.tool_options.crop_overlay_show, OverlayShow::Never);
+    assert_eq!(app.ui.tool_options.crop.guide_show, GuideShow::Never);
     let menu = reopen(&mut app);
     assert!(mode_checked(&app, &menu, "crop.overlay.triangle") && mode_checked(&app, &menu, "crop.overlayShow.never"));
     // A saved preset is listed by name; picking it refits the frame to its W x H, though the
@@ -856,11 +861,11 @@ fn crop_menu_rows_act_like_the_options_bar() {
     let saved = json!({"crop_ratio": "whr", "crop_width": "300 px", "crop_height": "100 px", "crop_resolution": "72", "crop_resolution_unit": "px/in"});
     app.run("tool.presets.new", json!({"name": "Banner", "tool": "crop", "options": {"toolOptions": saved}})).unwrap();
     let menu = reopen(&mut app);
-    let banner = crop_rows(&menu).into_iter().flatten().find(|(l, _)| l == "Banner").expect("the saved preset is a row").1;
+    let banner = crop_rows(&app, &menu).into_iter().flatten().find(|(l, _)| l == "Banner").expect("the saved preset is a row").1;
     assert!(entry_enabled(&app, &menu, CROP_DELETE));
     choose(&mut app, &ctx, &banner);
     assert_eq!(app.ui.tool_options.crop_width, "300 px");
-    assert!((aspect(app.ui.crop_rect.unwrap()) - 3.0).abs() < 1e-9, "the frame follows the preset: {:?}", app.ui.crop_rect);
+    assert!((aspect(frame_of(&app).unwrap()) - 3.0).abs() < 1e-9, "the frame follows the preset: {:?}", frame_of(&app));
     let menu = reopen(&mut app);
     assert!(mode_checked(&app, &menu, &banner));
     // Crop commits as ↵ does: the preset's size.
@@ -874,6 +879,6 @@ fn crop_menu_rows_act_like_the_options_bar() {
     assert!(!crate::crop_ui::pending(&app));
     // ...and, as Esc does, hides the frame without cropping (#10370).
     crate::crop_ui::ensure_frame(&mut app);
-    assert_eq!(app.ui.crop_rect, None);
+    assert_eq!(frame_of(&app), None);
     assert_eq!(app.session.active().unwrap().doc.size, size);
 }
