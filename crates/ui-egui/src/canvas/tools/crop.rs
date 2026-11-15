@@ -12,6 +12,19 @@ pub(crate) fn pass<'a>(tool: &'a mut CropTool, run: &'a CropRun, ctx: &'a egui::
     tool.pass(run.input(ctx))
 }
 
+/// Shows the Crop tool's frame in the canvas body at `rect`, on a pass of its own over the same tool, and applies what
+/// it reported. The host's pass of this canvas runs after the body, so the tool is not lent to both at once.
+pub(crate) fn show_frame(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
+    let Some(run) = CropRun::of(app) else { return };
+    let mut tool = std::mem::take(&mut app.canvas_tools.crop.tool);
+    let ctx = ui.ctx().clone();
+    let mut pass = pass(&mut tool, &run, &ctx);
+    pass.show_frame(ui, rect);
+    let output = CropToolPass::finish(pass);
+    app.canvas_tools.crop.tool = tool;
+    finish(app, output);
+}
+
 /// Applies what the pass reported to the document and the crop options.
 pub(crate) fn finish(app: &mut PhotocraftApp, output: CropOutput) {
     crate::crop_ui::finish(app, output);
