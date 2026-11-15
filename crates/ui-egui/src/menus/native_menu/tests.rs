@@ -154,6 +154,10 @@ fn themes_move_to_the_app_menus_appearance() {
 /// switches, and an unknown code is an error.
 #[test]
 fn the_app_menu_switches_the_ui_language() {
+    // The offered languages are the embedded catalogs'.
+    if !crate::i18n::needs_catalogs() {
+        return;
+    }
     let mut a = app(false);
     let ctx = a.ctx().clone();
     // PLAN: assumed the fired command is `app.language` with `{"lang": code}` (top-w12's `LanguageChoice` handling in `invoke`).
