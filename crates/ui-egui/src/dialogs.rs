@@ -611,6 +611,7 @@ pub(crate) mod bitmap_dialog;
 pub mod blur_pins;
 pub mod brush_preset_dialog;
 pub mod caf_ui;
+pub(crate) mod canvas_input;
 pub(super) mod camera_raw_detail_ui;
 pub(super) mod camera_raw_gpu;
 pub(super) mod camera_raw_scope_ui;

@@ -9,6 +9,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use photocraft_ui_egui::PhotocraftApp;
 use serde_json::json;
 
+/// Cancels the open dialog `id` names (the `dialog` of a menu invoke reply), as its Cancel button does.
+fn close_dialog(harness: &mut egui_kittest::Harness<'_, PhotocraftApp>, id: serde_json::Value) {
+    let ctx = harness.ctx.clone();
+    let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.dialog.cancel", json!({"dialog": id}));
+    let photocraft_ui_egui::control::Reply::Done(reply) = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request) else {
+        panic!("ui.dialog.cancel did not finish")
+    };
+    assert_eq!(reply["ok"], true, "the dialog closes: {reply}");
+}
+
 /// Renders the UI with one 512² document of `rgb` tagged with `profile`; returns the median
 /// colour of a patch at the centre of the canvas, for the GPU and the CPU canvas.
 fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3])> {
@@ -72,7 +82,9 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id":"filter.blur.gaussianBlur"}));
         let ctx = harness.ctx.clone();
         let response = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request);
-        assert!(matches!(response, photocraft_ui_egui::control::Reply::Done(_)));
+        let photocraft_ui_egui::control::Reply::Done(opened) = response else { panic!("the filter dialog did not open") };
+        let filter_dialog = opened["result"]["dialog"].clone();
+        assert!(filter_dialog.is_u64(), "the menu reply names the dialog: {opened}");
         harness.run_steps(6);
         let preview = id.0 ^ (1u64 << 61);
         assert!(observer.has(preview, [512, 512]), "filter preview uploaded");
@@ -85,18 +97,23 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         harness.state_mut().sync_views();
         harness.run_steps(6);
         assert!(observer.has(preview, [512, 512]), "same-ID reopen uploads the still-open filter preview again");
-        harness.state_mut().retain_dialogs(|_| false);
+        // PLAN: the sheet names `app.framework.dialogs.close(id)`; an integration test sees only the public API and the host has no `close`, so the dialog closes through the `ui.dialog.cancel` request.
+        close_dialog(&mut harness, filter_dialog);
         let after_reopen = sample(&mut harness);
         assert!((0..3).all(|i| gpu[i].abs_diff(after_reopen[i]) <= 1), "GPU native reopen changed display color: {gpu:?} -> {after_reopen:?}");
         let (request, _) = photocraft_ui_egui::control::ControlRequest::new("ui.menu.invoke", json!({"id":"image.adjustments.brightnessContrast"}));
-        photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request);
+        let photocraft_ui_egui::control::Reply::Done(opened) = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request) else {
+            panic!("the adjustment dialog did not open")
+        };
+        let adjustment_dialog = opened["result"]["dialog"].clone();
+        assert!(adjustment_dialog.is_u64(), "the menu reply names the dialog: {opened}");
         photocraft_ui_egui::adjust_preview::display_doc(harness.state_mut(), 0).expect("adjustment preview");
         harness.state_mut().run("file.close", json!({})).expect("close adjustment owner");
         assert!(photocraft_ui_egui::adjust_preview::shown_key(harness.state()).is_none(), "close drops adjustment preview state before same-ID reopen");
         harness.state_mut().session.add_document(photocraft_format::load_from_bytes(&bytes).expect("reopen adjustment owner"), None);
         harness.state_mut().sync_views();
         photocraft_ui_egui::adjust_preview::display_doc(harness.state_mut(), 0).expect("rebuilt adjustment preview");
-        harness.state_mut().retain_dialogs(|_| false);
+        close_dialog(&mut harness, adjustment_dialog);
     }
     harness.state_mut().ui.view.flip_horizontal = true;
     let cpu = sample(&mut harness);
