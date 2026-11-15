@@ -43,7 +43,7 @@ pub fn park(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static 
 /// [`park`], returning the id of the dialog it opened: it starts uncompressed without mipmaps.
 pub fn park_dialog(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static str) -> Result<DialogId, String> {
     let doc = app.active_doc_id()?;
-    let dialog = HostedFormatOptions::new(ExportOptionsKind::Dds).initial(FormatOptions::Dds(UiDdsOptions::default()));
+    let dialog = HostedFormatOptions::new(app.ctx(), ExportOptionsKind::Dds).initial(FormatOptions::Dds(UiDdsOptions::default()));
     format_prompts::park(app, ParkedSave { doc, path, copy, record, format: ParkedFormat::Dds }, dialog)
 }
 

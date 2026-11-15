@@ -42,7 +42,7 @@ pub fn park(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static 
 pub fn park_dialog(app: &mut PhotocraftApp, path: String, copy: bool, record: &'static str) -> Result<DialogId, String> {
     let doc = app.active_doc_id()?;
     let bits = app.session.active().map_or(TgaBits::Bits24, |st| photocraft_io::tga_default_bits(&st.doc));
-    let dialog = HostedFormatOptions::new(ExportOptionsKind::Targa).initial(FormatOptions::Targa(TargaOptions::new(bits.bits())));
+    let dialog = HostedFormatOptions::new(app.ctx(), ExportOptionsKind::Targa).initial(FormatOptions::Targa(TargaOptions::new(bits.bits())));
     format_prompts::park(app, ParkedSave { doc, path, copy, record, format: ParkedFormat::Targa }, dialog)
 }
 
