@@ -6,6 +6,8 @@ use photocraft_doc::LayerId;
 
 fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
     let m = egui::Modifiers::NONE;
+    // The frame's handles take presses from the pass that drew them: the state a test set is shown first.
+    crate::canvas::testing::frame(app);
     tool_event(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, m);
     tool_event(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, m);
     tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, m);
@@ -13,6 +15,7 @@ fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
 
 fn click(app: &mut PhotocraftApp, at: [f64; 2]) {
     let m = egui::Modifiers::NONE;
+    crate::canvas::testing::frame(app);
     tool_event(app, ToolEvent::Down { x: at[0], y: at[1], pressure: 1.0 }, m);
     tool_event(app, ToolEvent::Up { x: at[0], y: at[1] }, m);
 }
@@ -100,6 +103,8 @@ fn frame_tool_draws_rectangular_and_elliptical_frames() {
     assert_eq!((m.value(20, 30), m.value(119, 109), m.value(19, 30), m.value(120, 109)), (1.0, 1.0, 0.0, 0.0));
     app.run("edit.undo", json!({})).unwrap();
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers, "one undo takes the frame back");
+    // The frame's handles take presses from the pass that drew them: show the undone state first.
+    crate::canvas::testing::frame(&mut app);
 
     app.ui.frame_tool.ellipse = true;
     drag(&mut app, [20.0, 30.0], [120.0, 110.0]);
@@ -137,6 +142,7 @@ fn dragging_border_moves_only_frame_and_escape_discards_live_preview() {
     let before = selected(&app).unwrap().frame.clone();
     let entries = app.session.active().unwrap().history.entries();
     let m = egui::Modifiers::NONE;
+    crate::canvas::testing::frame(&mut app);
     tool_event(&mut app, ToolEvent::Down { x: 50., y: 30., pressure: 1. }, m);
     tool_event(&mut app, ToolEvent::Move { x: 80., y: 50., pressure: 1. }, m);
     assert_eq!(selected(&app).unwrap().frame, before, "preview never changes document");
@@ -351,11 +357,15 @@ fn overhanging_content_handles_start_transform_and_cancel() {
     assert!(b.x0 < 20, "image must overhang the frame: {b:?}");
     let entries = st.history.entries();
     for (x, y) in [(f64::from(b.x0), f64::from(b.y0)), (f64::from(b.x0), f64::from(b.y0 + b.y1) / 2.)] {
+        crate::canvas::testing::frame(&mut app);
         tool_event(&mut app, ToolEvent::Down { x, y, pressure: 1. }, egui::Modifiers::NONE);
+        // The transform box begins its edit when the drag starts, not at the press.
+        tool_event(&mut app, ToolEvent::Move { x: x - 15., y: y - 15., pressure: 1. }, egui::Modifiers::NONE);
         assert!(app.ui.transform.is_some());
         assert!(app.ui.frame_tool.auto_transform);
         crate::transform_tool::cancel(&mut app);
         assert!(app.ui.transform.is_none());
+        tool_event(&mut app, ToolEvent::Up { x: x - 15., y: y - 15. }, egui::Modifiers::NONE);
     }
     assert_eq!(app.session.active().unwrap().history.entries(), entries);
 }

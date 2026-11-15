@@ -299,6 +299,8 @@ fn modal_dialogs_do_not_start_move_transform_controls() {
         let (mut app, ctx, _) = fixture();
         crate::menus::invoke(&mut app, &ctx, command, json!({})).unwrap();
         assert_eq!(dialog_count(&app), 1, "{command} opened its modal");
+        // The modal gates input from the frame after it first shows.
+        crate::canvas::testing::frame(&mut app);
         let before = app.session.active().unwrap().doc.clone();
         let steps = app.session.active().unwrap().history.past_len();
         let selected = app.session.active().unwrap().selected_layers();

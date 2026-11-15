@@ -32,6 +32,8 @@ fn drag(app: &mut PhotocraftApp, points: &[[f64; 2]]) {
     let (x, y) = at(points[0]);
     // The frame's handles take presses from the pass that drew them: a frame set since the last pass is shown first.
     frame(app);
+    // The pointer is over a handle before it presses it.
+    tool_event(app, ToolEvent::Move { x, y, pressure: 1.0 }, NONE);
     tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, NONE);
     for p in &points[1..] {
         let (x, y) = at(*p);
