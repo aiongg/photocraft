@@ -1,0 +1,365 @@
+//! The Vector family of the tool host: the Pen, Curvature Pen, Freeform Pen, Path Selection and the Shape tools.
+//!
+//! [`tool`] builds the selected tool for one pass from the app's options; [`drain`] turns what the tools reported into
+//! the draft in `app.ui.pen`, engine commands and dialogs after the run. A tool switch cancels the Pen through
+//! `ToolHost::cancel`, which ends it with `PenEnd::Interrupted`; the next `drain` commits the draft.
+
+use craft::behavior::EditEvent;
+use craft::draw::geometry::ShapeGeometry;
+use craft::draw::ui::pen::{PenEvent, PenTool};
+use craft::draw::ui::{EditSubpath, KnotRef, PenEnd, PenMode, ShapeDragEvent, ShapeDragOptions, ShapeDragTool, ShapeKind};
+use craft::ui::canvas::ToolHostResponse;
+use serde_json::json;
+
+use super::freeform::{Admit, FreeformPenTool, freeform_locked_shape};
+use super::path_ops::{PathSelectionEvent, PathSelectionTool};
+use super::pen::{self, pen_path};
+use super::pen_resume::{current_doc, draft_before_finish, remember_finish};
+use super::{PenPath, PhotocraftApp, VectorOwner, cancel_stale_pen, capture_pen_owner};
+use crate::canvas::document_display::CanvasHost;
+use crate::canvas::tools::{FamilyTool, ToolScope};
+use crate::direct_select::PathRef;
+use crate::state::Tool;
+
+/// The state of every vector tool, kept across passes in `CanvasTools::vector`.
+pub(crate) struct VectorTools {
+    /// The Pen and the Curvature Pen.
+    pub(crate) pen: PenTool,
+    /// The Shape tools.
+    pub(crate) shapes: ShapeDragTool,
+    /// The Freeform Pen.
+    pub(crate) freeform: FreeformPenTool,
+    /// Path Selection.
+    pub(crate) path_selection: PathSelectionTool,
+}
+
+impl Default for VectorTools {
+    fn default() -> Self {
+        Self { pen: PenTool::new(), shapes: ShapeDragTool::new(), freeform: FreeformPenTool::default(), path_selection: Default::default() }
+    }
+}
+
+/// Whether the Vector family runs `tool`.
+pub(crate) fn handles(tool: Tool) -> bool {
+    matches!(tool, Tool::Pen | Tool::CurvaturePen | Tool::FreeformPen | Tool::PathSelection) || super::shapes::is_shape_tool(tool)
+}
+
+/// Which of the family's tools a pass runs.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Which {
+    Pen,
+    Shapes,
+    Freeform,
+    PathSelection,
+}
+
+/// Configures the tool the app has selected from the app's options and returns which one it is.
+fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
+    let tool = app.ui.tool;
+    let o = &app.ui.tool_options;
+    if super::shapes::is_shape_tool(tool) {
+        let (sides, ratio) = match tool {
+            Tool::Triangle => (3, 1.0),
+            Tool::Star => (5, 0.5),
+            _ => (o.polygon_sides, 1.0),
+        };
+        let options = ShapeDragOptions::new(super::kind_of(tool))
+            .corner_radius(f64::from(o.corner_radius))
+            .sides(sides)
+            .star_ratio(ratio)
+            .line_weight(f64::from(o.line_weight));
+        state.shapes.options(options).preview(true);
+        return Which::Shapes;
+    }
+    match tool {
+        Tool::FreeformPen => {
+            let admit = if freeform_locked_shape(app) {
+                Admit::Locked
+            } else if app.ui.pen.is_some() {
+                Admit::Busy
+            } else {
+                Admit::Open
+            };
+            state.freeform.admission(admit);
+            Which::Freeform
+        }
+        Tool::PathSelection => Which::PathSelection,
+        _ => {
+            let curvature = tool == Tool::CurvaturePen;
+            let pen = app.ui.pen.as_ref();
+            // ⌘ makes the pointer Direct Selection: the draft is drawn and keeps its keys, but takes no presses.
+            let sensing = !craft::ui::runtime::pointer::frame(&app.ctx()).mods.cmd;
+            state
+                .pen
+                .mode(if curvature { PenMode::Curvature } else { PenMode::Pen })
+                .sensing(sensing)
+                .auto_add_delete(!curvature && o.pen_auto_add_delete)
+                .path_options(o.path_options.clone())
+                .ends(&if pen.is_none_or(|p| p.draft.knots.is_empty()) { pen::ends(app) } else { Vec::new() })
+                .draft(pen.map(|p| &p.draft))
+                .kept(pen.map_or(0, |p| p.kept));
+            Which::Pen
+        }
+    }
+}
+
+/// The Vector family's tool for one pass: the selected tool, configured from the app.
+pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut VectorTools, _host: CanvasHost) -> FamilyTool<'a> {
+    let which = scope.with_app(|app| configure(app, state));
+    // `&mut T` is a `CanvasTool` where `T` is (R92): the selected tool runs as it is.
+    match which {
+        Which::Pen => Box::new(&mut state.pen),
+        Which::Shapes => Box::new(&mut state.shapes),
+        Which::Freeform => Box::new(&mut state.freeform),
+        Which::PathSelection => Box::new(&mut state.path_selection),
+    }
+}
+
+/// After the run: the owner check, then what each tool reported. Every tool is drained, whichever is selected: a tool
+/// switch ends the Pen's gesture with an event of the old tool.
+pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut VectorTools, _response: &ToolHostResponse) {
+    cancel_stale_pen(app);
+    let events = state.pen.take_events();
+    apply_pen(app, events);
+    for event in state.shapes.take_events() {
+        match event {
+            ShapeDragEvent::Draw(EditEvent::Commit { after, .. }) => {
+                let mods = craft::ui::runtime::pointer::frame(&app.ctx()).mods;
+                super::shapes::finish_drag(app, state.shapes.kind(), &after, mods);
+            }
+            ShapeDragEvent::Click { at, kind, .. } => {
+                super::shapes::click(app, kind, [at.x, at.y]);
+            }
+            _ => {}
+        }
+    }
+    if state.freeform.take_refused() {
+        app.ui.status = tl!("Locked").into();
+        app.ui.status_error = true;
+    }
+    // The destination is the one in effect when the trace began: this pass, as the trace's press ran in it.
+    if state.freeform.owner.is_none() && (state.freeform.draft.is_open() || state.freeform.closed.is_some()) {
+        state.freeform.owner = capture_pen_owner(app);
+    }
+    if let Some((points, straight, owner)) = state.freeform.take_finished() {
+        pen::freeform_finish_owned(app, &points, &straight, owner);
+    }
+    // PLAN: assumed `PathSelectionTool::owned_by(&mut self, owner: Option<VectorOwner>)` (tools-w35, R94).
+    for event in state.path_selection.take_events() {
+        match event {
+            PathSelectionEvent::Press { at, shift } => {
+                crate::path_components::press(app, at, shift);
+                state.path_selection.owned_by(VectorOwner::capture(app));
+            }
+            PathSelectionEvent::Release { start, end, owner } => {
+                if owner.is_none_or(|o| o.valid(app)) {
+                    super::path_selection_finish(app, start, end);
+                }
+            }
+        }
+    }
+}
+
+/// Gives back the open draft's last anchor (Edit › Undo while a draft is open). A resumed path's own anchors are not
+/// the draft's to take back: undoing past the ones added since drawing resumed drops the draft and leaves the path as it
+/// was (#6593). `false` with no draft.
+pub(crate) fn remove_last(app: &mut PhotocraftApp) -> bool {
+    if cancel_stale_pen(app) || !super::cancel_stale(app) {
+        return false;
+    }
+    let Some(pen) = app.ui.pen.as_ref() else { return false };
+    if pen.resumes.as_ref().is_some_and(|r| pen.draft.knots.len() <= r.was.knots.len()) {
+        drop_draft(app);
+        return true;
+    }
+    let (draft, kept) = (pen.draft.clone(), pen.kept);
+    with_pen(app, |tool| {
+        tool.kept(kept).replace(&draft);
+        tool.remove_last()
+    })
+}
+
+/// Replaces the open draft with `draft` (an edit of it with Direct Selection): the app's copy and the Pen's. A Curvature
+/// Pen draft keeps following its anchors. `false` with no draft or while a press is down. Called between passes: a call
+/// inside a run would reach the stand-in tools the run left in the app.
+pub(crate) fn replace_draft(app: &mut PhotocraftApp, draft: &EditSubpath) -> bool {
+    let Some(pen) = app.ui.pen.as_mut() else { return false };
+    let mut next = draft.clone();
+    if pen.curvature {
+        next.reflow_kept(pen.kept);
+    }
+    pen.draft = next.clone();
+    let kept = pen.kept;
+    with_pen(app, |tool| tool.kept(kept).replace(&next))
+}
+
+/// Runs `f` on the Pen outside a pass and applies the events it raised.
+fn with_pen<R>(app: &mut PhotocraftApp, f: impl FnOnce(&mut PenTool) -> R) -> R {
+    let mut tools = std::mem::take(&mut app.canvas_tools);
+    let result = f(&mut tools.vector.pen);
+    let events = tools.vector.pen.take_events();
+    app.canvas_tools = tools;
+    apply_pen(app, events);
+    result
+}
+
+/// The shape the Shape tool is drawing and its kind, while a drag has begun: the outline the app paints as a preview.
+pub(crate) fn shape_preview(app: &PhotocraftApp) -> Option<(ShapeKind, &ShapeGeometry)> {
+    let shapes = &app.canvas_tools.vector.shapes;
+    shapes.shape().map(|geometry| (shapes.kind(), geometry))
+}
+
+/// Applies one pass's Pen events in order. The Pen reports an edit's `Commit` before the `Finished` that follows it.
+fn apply_pen(app: &mut PhotocraftApp, events: Vec<PenEvent>) {
+    let mut committed = false;
+    for event in events {
+        match event {
+            PenEvent::Edit(edit) => committed |= edit_draft(app, edit),
+            PenEvent::Finished(end) => finish(app, end, std::mem::take(&mut committed)),
+            PenEvent::Resumed(key, knot) => resume(app, key, knot),
+            _ => {}
+        }
+    }
+}
+
+/// The app's draft, created at the first edit with the destination captured then.
+fn ensure_draft(app: &mut PhotocraftApp) -> Option<&mut PenPath> {
+    if app.ui.pen.is_none() {
+        let owner = capture_pen_owner(app)?;
+        app.ui.pen_doc = app.session.active().map(|st| st.doc.id);
+        app.ui.pen = Some(PenPath { owner: Some(owner), curvature: app.ui.tool == Tool::CurvaturePen, ..Default::default() });
+    }
+    app.ui.pen.as_mut()
+}
+
+/// Drops the draft; the path stays as it was.
+fn drop_draft(app: &mut PhotocraftApp) {
+    app.ui.pen = None;
+    app.ui.pen_doc = None;
+    if app.ui.direct_selection.target == Some(PathRef::Pen) {
+        app.ui.direct_selection = Default::default();
+    }
+}
+
+/// Keeps the draft the Pen reports. Drawing on deselects an anchor Auto Add put on the draft, and a shorter draft loses
+/// the selection of the removed anchors. Returns whether the draft was committed (the pen ended it with anchors).
+fn edit_draft(app: &mut PhotocraftApp, edit: EditEvent<EditSubpath>) -> bool {
+    match edit {
+        EditEvent::Begin { .. } => {
+            ensure_draft(app);
+            false
+        }
+        EditEvent::Update { value, .. } => {
+            set_draft(app, value);
+            false
+        }
+        EditEvent::Commit { after, .. } => {
+            // An empty commit removes the path a resumed draft held: nothing is left to commit.
+            if after.knots.is_empty() {
+                drop_draft(app);
+                return false;
+            }
+            set_draft(app, after);
+            true
+        }
+        EditEvent::Cancel { .. } => {
+            drop_draft(app);
+            false
+        }
+        _ => false,
+    }
+}
+
+fn set_draft(app: &mut PhotocraftApp, value: EditSubpath) {
+    let n = value.knots.len();
+    let selection_on_draft = app.ui.direct_selection.target == Some(PathRef::Pen);
+    let Some(pen) = ensure_draft(app) else { return };
+    if pen.draft == value {
+        return;
+    }
+    let grew = n > pen.draft.knots.len();
+    pen.draft = value;
+    pen.commit_failed = false;
+    if selection_on_draft {
+        let ds = &mut app.ui.direct_selection;
+        if grew {
+            ds.anchors.clear();
+        } else {
+            ds.anchors.retain(|a| a[1] < n);
+            ds.segment = ds.segment.filter(|s| s[1] + 1 < n);
+        }
+    }
+}
+
+/// The Pen ended the draft. A draft whose commit failed waits for the user: Enter or Escape on it commits again.
+fn finish(app: &mut PhotocraftApp, end: PenEnd, committed: bool) {
+    let waiting = app.ui.pen.as_ref().is_some_and(|p| p.commit_failed);
+    let has_draft = committed || waiting;
+    match end {
+        PenEnd::Submit if has_draft => submit(app),
+        PenEnd::Escape if has_draft => end_keeping(app),
+        PenEnd::Closed if has_draft => {
+            pen::pen_commit(app, true);
+        }
+        PenEnd::Interrupted if committed => end_keeping(app),
+        PenEnd::Removed | PenEnd::Discarded => drop_draft(app),
+        _ => {}
+    }
+}
+
+/// ↩ with a Pen path in progress: finish it as an open path. Photoshop then deselects the Work Path it went into: still
+/// listed in the Paths panel, but not drawn, and the next path replaces it instead of joining it (#12892). Esc
+/// ([`end_keeping`]) keeps it selected. The Curvature Pen, which shares the draft, keeps its Work Path selected.
+fn submit(app: &mut PhotocraftApp) {
+    let work_path = |app: &PhotocraftApp| app.session.active().and_then(|st| st.doc.work_path.clone());
+    let curvature = app.ui.pen.as_ref().is_some_and(|p| p.curvature);
+    let before = work_path(app);
+    if pen::pen_commit(app, false) && !curvature && work_path(app) != before {
+        pen::deselect_finished_work_path(app);
+    }
+}
+
+/// End the Pen path for good (Esc, or switching to another tool): commit it, and when the document refuses that (a
+/// locked shape layer or vector mask to add to…) keep it as the Work Path instead, so what was drawn is neither lost nor
+/// retried on every frame. A draft even the Work Path refuses is dropped; the status bar says which happened.
+fn end_keeping(app: &mut PhotocraftApp) {
+    if pen::pen_commit(app, false) {
+        return;
+    }
+    let active = app.session.active().map(|st| st.doc.id);
+    if app.ui.pen_doc.is_some_and(|d| Some(d) != active) {
+        // Drawn on another document that refused it (`cancel_stale`): left as it was.
+        return;
+    }
+    let Some(pen) = app.ui.pen.take() else { return };
+    app.ui.pen_doc = None;
+    if app.ui.direct_selection.target == Some(PathRef::Pen) {
+        app.ui.direct_selection = Default::default();
+    }
+    let draft = draft_before_finish(&pen);
+    let refused = std::mem::take(&mut app.ui.status);
+    let before = current_doc(app);
+    let path = photocraft_engine::vector_cmds::path_json(&pen_path(&pen));
+    let kept = app.run("path.set", json!({"name": "work", "op": "combine", "path": path})).is_ok();
+    if kept {
+        app.ui.selected_path = Some("work".into());
+        // Undo gives the path back to the Pen here too (`pen_resume_on_undo`).
+        remember_finish(app, draft, &before);
+    }
+    let outcome = if kept { tl!("The path was kept as the Work Path") } else { tl!("The path was discarded") };
+    app.ui.status = format!("{refused} ({outcome})");
+    app.ui.status_error = true;
+}
+
+/// A press on the end of an open path carries it on: its subpath becomes the draft, which the next pass hands to the Pen.
+fn resume(app: &mut PhotocraftApp, key: u64, knot: KnotRef) {
+    if app.ui.pen.as_ref().is_some_and(|p| !p.draft.knots.is_empty()) {
+        return;
+    }
+    let Some(mut pen) = pen::resume_key(app, key, knot) else { return };
+    let Some(owner) = capture_pen_owner(app) else { return };
+    pen.owner = Some(owner);
+    pen.curvature = app.ui.tool == Tool::CurvaturePen;
+    app.ui.pen_doc = app.session.active().map(|st| st.doc.id);
+    app.ui.pen = Some(pen);
+}

@@ -8,96 +8,54 @@ use egui::{Color32, Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Affine;
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use craft::draw::ui::{EditSubpath, VectorMode};
+
 use crate::PhotocraftApp;
-use crate::canvas::ViewXform;
-use crate::shape_gradient_ui::GradientChoices;
-use crate::shape_paint_ui::{PaintChange, paint_param, swatch};
+use crate::shape_gradient_ui::ShapeGradients;
+use crate::shape_paint_ui::{PaintChange, paint_param};
 use crate::state::{Tool, ToolOptions};
 use crate::theme::Tokens;
 
-mod curvature;
+mod freeform;
+pub(crate) mod host;
 mod options;
 mod overlay;
+mod path_menus;
 mod path_ops;
 mod paths_panel;
 mod pen;
 mod pen_resume;
 mod shapes;
 
-pub(crate) use curvature::curvature_anchor_at;
-pub use curvature::{curvature_down, curvature_move, curvature_toggle, curvature_up};
 #[cfg(test)]
 use options::{corner_radii_patch, solid_paint};
-pub(crate) use options::{draws_path, enabled_stroke_width, paint_gesture};
+pub(crate) use options::{draws_path, enabled_stroke_width};
 pub use options::{options_bar, shape_properties};
-pub use overlay::draw_overlay;
 pub(crate) use overlay::selected_saved_path_index;
+pub(crate) use overlay::{BezierShown, show_paths};
 #[cfg(test)]
-use overlay::{MAX_CURVE_PIECES, bezier};
-#[cfg(test)]
-pub(crate) use overlay::{curve_points, path_lines, selected_saved_path, shows_anchors};
-pub(crate) use overlay::{draw_anchor, draw_handle, draw_outline};
-#[cfg(test)]
-use path_ops::target_path;
+pub(crate) use overlay::{selected_saved_path, shows_anchors};
 pub use path_ops::{
     active_path_name, make_shape, path_selection_finish, path_to_selection, pick_shape_at, selected_document_path, takes_path_mask, with_active_path,
 };
 pub(crate) use path_ops::{
-    active_shape_path, active_type_path, delete_key_deletes_anchor, delete_key_deletes_work_path, deselect_loaded_path, free_transform_path,
-    targeted_vector_mask, work_path_shown,
+    active_shape_path, active_type_path, delete_key_deletes_work_path, deselect_loaded_path, doc_path, edit_path, free_transform_path, targeted_vector_mask,
+    work_path_shown,
 };
+pub(crate) use paths_panel::command_params;
+pub use paths_panel::{PathEntry, PathRow, path_rows, paths_panel};
+pub(crate) use pen::{PATH_OPS, freeform_finish_owned, path_op_field, pen_path, pen_replace};
 #[cfg(test)]
-use paths_panel::path_context_actions;
-pub(crate) use paths_panel::path_renaming;
-pub use paths_panel::{PathEntry, PathRow, path_rows, paths_footer, paths_panel};
+use pen::pen_path_op;
+pub use pen::{cancel_stale, pen_commit};
+pub use shapes::is_shape_tool;
+pub(crate) use shapes::{create_geometry, kind_of};
 #[cfg(test)]
-pub(crate) use pen::over_first_anchor;
-#[cfg(test)]
-use pen::pen_to_json;
-pub(crate) use pen::{PATH_OPS, path_op_field, pen_path, pen_replace};
-pub use pen::{
-    cancel_stale, closes_path_at, continues_path_at, freeform_finish, pen_break_handle, pen_commit, pen_down, pen_end, pen_enter, pen_grab_handle, pen_move,
-    pen_undo_last_point, pen_up,
-};
-#[cfg(test)]
-use pen::{closing, pen_path_op};
-pub use shapes::{create_shape, draw_shape_preview, finish_shape, is_shape_tool, shape_bounds};
-#[cfg(test)]
-use shapes::{shape_geometry, shape_preview};
+use shapes::shape_geometry;
 
-// "Set as default" is a temporary UI choice, not a document property.
-#[derive(Clone, Copy, Default)]
-struct ArrowDefaultLink {
-    target: Option<(u64, u64)>,
-    enabled: bool,
-}
-
-fn arrow_default_link_id() -> egui::Id {
-    egui::Id::unique("arrow-default-link")
-}
-
-/// Reset the checkbox whenever the selected document, layer or shape changes.
-pub(crate) fn track_arrow_default_selection(app: &PhotocraftApp, ctx: &egui::Context) {
-    let target = app.session.active().and_then(|st| {
-        let id = st.active_layer?;
-        let layer = st.doc.layer(id)?;
-        match &layer.content {
-            LayerContent::Shape(sh) if matches!(sh.live.as_ref(), Some(photocraft_doc::vector::LiveShape::ArrowLine { .. })) => Some((st.doc.id.0, id.0)),
-            _ => None,
-        }
-    });
-
-    ctx.data_mut(|data| {
-        let key = arrow_default_link_id();
-        let previous = data.get_temp::<ArrowDefaultLink>(key).unwrap_or_default();
-        if previous.target != target {
-            data.insert_temp(key, ArrowDefaultLink { target, enabled: false });
-        }
-    });
-}
+pub(crate) use host::{VectorTools, remove_last, replace_draft};
 
 /// Copy only the selected arrow's live parameters into new-arrow defaults.
 /// Existing shapes and geometry are not modified.
@@ -135,63 +93,40 @@ fn copy_arrow_to_tool_defaults(app: &mut PhotocraftApp, id: photocraft_doc::Laye
     }
 }
 
-/// Pen tool path under construction: knots as [anchor, in, out] (document px).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+/// Pen tool path under construction. The draft is the framework's [`EditSubpath`] (document px); the tool reports it
+/// whole and the app keeps it here between passes. It is never serialised.
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PenPath {
-    pub knots: Vec<[[f64; 2]; 3]>,
-    /// Indices of cusp knots whose incoming and outgoing handles are not linked.
-    #[serde(default)]
-    pub unlinked: Vec<usize>,
-    #[serde(skip)]
-    pub dragging: bool,
-    /// Re-dragging the final anchor changes its outgoing control only; the incoming curve stays put.
-    #[serde(skip)]
-    pub adjusting_last: bool,
-    /// Space moves the anchor and both handles together during a Pen drag.
-    #[serde(skip)]
-    pub reposition: bool,
-    #[serde(skip)]
-    pub last_pointer: Option<[f64; 2]>,
-    /// ⌥/Alt-dragging the final anchor's incoming handle: it turns alone (#6077).
-    #[serde(skip)]
-    pub adjusting_in: bool,
-    /// Drawn with the Curvature Pen: handles follow the anchors (`curvature_refresh`) and
-    /// `unlinked` lists its corner points.
-    #[serde(default)]
+    /// The anchors, their handles and whether the path is closed.
+    pub draft: EditSubpath,
+    /// The leading anchors that keep their handles when the Curvature Pen reflows the draft
+    /// (`EditSubpath::reflow_kept`): those of the path a press carried on.
+    pub kept: usize,
+    /// Drawn with the Curvature Pen: handles follow the anchors.
     pub curvature: bool,
-    /// Curvature Pen: the anchor being dragged.
-    #[serde(skip)]
-    pub moving: Option<usize>,
-    /// The document and target the first anchor was placed on; a draft without one (restored
-    /// from settings) is never committed.
-    #[serde(skip)]
+    /// The document and target the first anchor was placed on; a draft without one is never committed.
     pub(crate) owner: Option<PenOwner>,
     /// The last commit failed: the draft stays as it was and isn't retried on its own.
-    #[serde(skip)]
     pub(crate) commit_failed: bool,
     /// Drawing carries on from an endpoint of this open subpath of a document path (#6593): the
     /// commit replaces that subpath instead of adding one.
-    #[serde(default)]
     pub resumes: Option<Resumed>,
-    /// The Curvature Pen carrying on a path: its knots as they were, which keep their shape while
-    /// the new anchors' handles follow them (`curvature_refresh`, #10726). The last one is the
-    /// endpoint drawing carries on from; only its outgoing handle bends into the new segment.
-    #[serde(default)]
-    pub fixed: Vec<[[f64; 2]; 3]>,
 }
 
 /// The subpath a Pen path carries on: where it is and what it was when drawing resumed. The
 /// commit replaces it only while it is still that subpath of that document; otherwise (another
 /// document, or the path changed meanwhile) the drawing is added as a new subpath.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Resumed {
+    /// The document the path belongs to.
     pub doc: u64,
     /// A document path's name ("work" or a saved path's), or "layer" for `layer`'s.
     pub path: String,
     /// The shape layer (Shape mode) or targeted vector mask whose path it is.
-    #[serde(default)]
     pub layer: Option<u64>,
+    /// The subpath's index in the path.
     pub index: usize,
+    /// The subpath as it was when drawing resumed.
     pub was: photocraft_doc::vector::Subpath,
 }
 
@@ -199,6 +134,20 @@ impl PenPath {
     /// Does `tool` keep drawing this path? Another tool finishes it.
     pub fn drawn_with(&self, tool: Tool) -> bool {
         tool == if self.curvature { Tool::CurvaturePen } else { Tool::Pen }
+    }
+}
+
+#[cfg(test)]
+impl PenPath {
+    /// A draft of corner anchors at `points`, owned by `owner`.
+    pub(crate) fn corners(points: &[[f64; 2]], owner: Option<PenOwner>) -> Self {
+        let knots = points.iter().map(|p| craft::draw::ui::Knot::corner(craft::behavior::kurbo::Point::new(p[0], p[1]))).collect();
+        Self { draft: EditSubpath::new(knots, false), owner, ..Default::default() }
+    }
+
+    /// The knots as anchor, in handle and out handle.
+    pub(crate) fn triples(&self) -> Vec<[[f64; 2]; 3]> {
+        self.draft.knots.iter().map(|k| [[k.anchor.x, k.anchor.y], [k.in_ctrl.x, k.in_ctrl.y], [k.out_ctrl.x, k.out_ctrl.y]]).collect()
     }
 }
 
@@ -227,21 +176,17 @@ mod paint_tests;
 mod pen_resume_tests;
 
 #[cfg(test)]
-mod add_anchor_options_bar_tests;
-
-#[cfg(test)]
-mod delete_anchor_options_bar_tests;
-
-#[cfg(test)]
 mod pen_enter_deselects_tests;
-
-#[cfg(test)]
-mod pen_mode_menu_tests;
 
 #[cfg(test)]
 mod ellipse_path_menus_tests;
 
-pub(crate) use pen::freeform_locked_shape;
+#[cfg(test)]
+mod shape_properties_tests;
+
+#[cfg(test)]
+mod test_input;
+
 #[cfg(test)]
 use pen_resume::pen_finish_on_redo;
 pub(crate) use pen_resume::{FinishedPen, box_steps, pen_history_enabled, pen_history_step};
@@ -287,7 +232,7 @@ enum PenTarget {
 /// Work Path that replaces the old one.
 pub(crate) fn capture_pen_owner(app: &PhotocraftApp) -> Option<PenOwner> {
     let st = app.session.active()?;
-    let target = if app.ui.tool_options.vector_mode == "shape" {
+    let target = if app.ui.tool_options.vector_mode == VectorMode::Shape {
         let mut open_stroke = app.ui.tool_options.shape_stroke.params();
         open_stroke["width"] = json!(app.ui.tool_options.stroke_width.max(1.0));
         open_stroke["color"] = json!(app.session.tools.foreground);
@@ -318,11 +263,55 @@ impl PenOwner {
     }
 }
 
+/// The document, revision and target a vector gesture began on, for a tool that must not preview or finish on another
+/// document or target.
+#[derive(Clone, Debug)]
+pub(crate) struct VectorOwner {
+    doc: DocId,
+    document: Weak<Document>,
+    revision: u64,
+    layer: Option<photocraft_doc::LayerId>,
+    selected_path: Option<String>,
+    vector_mask: bool,
+    mode: VectorMode,
+    tool: Tool,
+}
+
+impl VectorOwner {
+    /// The owner of a gesture that begins now; `None` with no document.
+    pub(crate) fn capture(app: &PhotocraftApp) -> Option<Self> {
+        let st = app.session.active()?;
+        Some(Self {
+            doc: st.doc.id,
+            document: Arc::downgrade(&st.doc),
+            revision: st.revision,
+            layer: st.active_layer,
+            selected_path: app.ui.selected_path.clone(),
+            vector_mask: app.ui.vector_mask_target,
+            mode: app.ui.tool_options.vector_mode,
+            tool: app.ui.tool,
+        })
+    }
+
+    /// Whether the document, revision and target are still the ones the gesture began on.
+    pub(crate) fn valid(&self, app: &PhotocraftApp) -> bool {
+        Self::capture(app).is_some_and(|now| {
+            self.doc == now.doc
+                && self.document.ptr_eq(&now.document)
+                && self.revision == now.revision
+                && self.layer == now.layer
+                && self.selected_path == now.selected_path
+                && self.vector_mask == now.vector_mask
+                && self.mode == now.mode
+                && self.tool == now.tool
+        })
+    }
+}
+
 use photocraft_doc::DocId;
 use std::sync::{Arc, Weak};
 
 use path_ops::{selected_document_geometry, targeted_vector_mask_id};
-pub(crate) use pen::{finish_pen_if_left, freeform_finish_owned};
 use shapes::{fill_param, stroke_param};
 
 /// Commit a valid source-owned draft on a tab switch; otherwise cancel with an actionable diagnostic.
