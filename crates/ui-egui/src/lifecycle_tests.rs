@@ -47,6 +47,10 @@ fn queued_input_is_withdrawn_only_when_the_active_document_changes() {
         let reply = queue_key(&mut app, &ctx);
         app.run(command, params).expect(command);
         app.withdraw_stale_input(&ctx);
+        if withdrawn {
+            // The window host carries the withdrawal out in the next pass's input hook.
+            ctx.run_ui(RawInput::default(), |_| {}).textures_delta.clear();
+        }
         app.poll_input(&ctx);
         let host = WindowHost::of(&ctx);
         if withdrawn {
