@@ -1389,12 +1389,12 @@ fn preferences_apply_rejects_invalid_drafts_and_keeps_them_open() {
 
 #[test]
 fn shortcut_dialog_moves_shortcuts_and_shell_dispatch_follows() {
-    use super::shortcuts::{assign, press_ok};
+    use super::shortcuts::{press_ok, rebind};
     let (mut app, _) = app_with_store();
     let ctx = egui::Context::default();
     let steal = |app: &mut PhotocraftApp, id: &str, key: &str| {
         open_shortcuts(app, 0);
-        assign(app, &CommandRef::new(id), Binding::parse(key).unwrap(), Policy::Steal).unwrap();
+        rebind(app, &CommandRef::new(id), Binding::parse(key).unwrap(), Policy::Steal).unwrap();
         press_ok(app, &ctx);
     };
     // ⌘O (File › Open, a shell command) given to Layer › New › Layer.

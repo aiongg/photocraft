@@ -292,8 +292,8 @@ fn options_bar_edits_are_one_set_brush_per_gesture() {
     let (id, p) = j.last().unwrap();
     assert_eq!(id, "tools.setBrush");
     assert_eq!(p["brush"]["opacity"].as_f64().map(|v| v as f32), Some(opacity));
-    // A click is its own gesture: the Pressure for Size switch sits left of its label.
-    let label = h.get_by_label("Pressure for Size").rect();
+    // A click is its own gesture: the Pressure controls size switch sits left of its label.
+    let label = h.get_by_label("Pressure controls size").rect();
     let was = h.state().session.tools.brush.pressure_size;
     let at = egui::pos2(label.left() - 18.0, label.center().y);
     h.hover_at(at);
@@ -358,6 +358,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     h.run_steps(3);
     h.get_by_label("Clean Brush").click();
     h.run_steps(3);
+    eprintln!("DBG journal tail {:?}", h.state().session.journal.iter().rev().take(3).map(|(i, _)| i.clone()).collect::<Vec<_>>());
     assert_eq!(last_journal(h.state()).map(|(id, _)| id), Some("brush.mixer.clean".to_string()));
     assert_eq!(h.state().session.tools.mixer.reservoir, None);
 
@@ -673,7 +674,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     }
     // Clicking a section's name shows it and turns it on: one tools.setBrush.
     let n = h.state().session.journal.len();
-    h.get_by_label("Shape Dynamics").click();
+    h.get_all_by_label("Shape Dynamics").next().unwrap().click();
     h.run_steps(3);
     assert_eq!(h.state().ui.brush_section, 1);
     assert!(h.state().session.tools.brush.shape_dynamics.enabled);
