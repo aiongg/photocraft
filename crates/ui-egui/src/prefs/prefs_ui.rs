@@ -72,7 +72,7 @@ use appearance::{display_scale, selected_theme};
 pub use dialogs::{apply_window, invoke, open_preferences, show, window_open};
 #[cfg(test)]
 pub(crate) use dialogs::set_draft;
-pub(crate) use presets::{open_io, open_manager, take as take_presets};
+pub(crate) use presets::{PRESETS_FAMILY, open_io, open_manager, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};
 pub use shortcuts::{open as open_shortcuts, recording, show as show_shortcuts, shortcuts_open};

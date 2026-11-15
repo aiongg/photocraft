@@ -71,11 +71,11 @@ pub(crate) struct CanvasTools {
     /// Ruler, Color Sampler, Count and Note.
     pub(crate) analysis: crate::analysis::canvas::AnalysisTools,
     /// The Artboard tool.
-    pub(crate) artboard: crate::artboard_tool::ArtboardTool,
+    pub(crate) artboard: craft::draw::ui::artboard::ArtboardTool,
     /// The Frame tool.
     pub(crate) frame: crate::frame_tool::FrameTool,
     /// The Slice and Slice Select tools.
-    pub(crate) slice: crate::slice_ui::SliceTool,
+    pub(crate) slice: craft::draw::ui::slice::SliceTool,
     /// Patch, Content-Aware Move, Red Eye, Object Selection and the Clone Stamp and Healing source pick.
     pub(crate) retouch: retouch::RetouchTools,
     /// The Perspective Crop tool.
@@ -280,7 +280,7 @@ fn hidden_target(app: &PhotocraftApp, tool: Tool) -> Option<&'static str> {
 fn press_refused(app: &mut PhotocraftApp, tool: Tool) -> bool {
     let hidden = hidden_target(app, tool);
     if let Some(message) = crate::brush_refusal::alert(app, tool, hidden.is_some()) {
-        crate::brush_refusal::prompt(app, &message);
+        let _ = crate::dialogs::alerts::alert(app, message);
         return true;
     }
     if let Some(why) = hidden {
@@ -445,7 +445,7 @@ fn with_rig<R>(
     // Tools that own state the app lends nobody are built before the scope takes the app.
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
-    let mut transform = app.ui.transform.is_some().then(|| crate::transform_tool::canvas_tool(app));
+    let mut transform = crate::transform_tool::canvas_tool(app);
     let mut symmetry = if fam == Family::Paint { crate::symmetry_ui::session_tool(app) } else { None };
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx)),
@@ -618,7 +618,6 @@ pub(crate) fn end_foreign_gesture(app: &mut PhotocraftApp, ctx: &egui::Context, 
 pub(crate) fn after_run(app: &mut PhotocraftApp, tools: &mut CanvasTools, response: &ToolHostResponse) {
     super::paint_tool::drain(app, &mut tools.paint, response);
     selection::drain(app, &mut tools.selection, response);
-    move_tool::drain(app, &mut tools.mover, response);
     super::eyedropper_tool::drain(app, &mut tools.eyedropper, response);
     crate::vector_ui::host::drain(app, &mut tools.vector, response);
     crate::type_tool::drain(app, &mut tools.type_tool, response);

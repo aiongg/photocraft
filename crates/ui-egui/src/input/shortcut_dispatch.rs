@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use craft::keymap::{Binding, CommandDef, CommandKind, Overrides, Scope};
+use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, FirePhase, FireSource, Fired};
@@ -221,6 +221,18 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
         }
     }
     rows
+}
+
+/// The keys the app binds outside its menus, for the menu layout: the default keys of every catalog row that is not a
+/// menu item (the tool letters, the held keys, the canvas keys, commands without a row), as chords with their command.
+/// A system menu item gives way to one of these as to a menu shortcut.
+pub(crate) fn extra_shortcuts(app: &PhotocraftApp) -> Vec<(Chord, CommandRef)> {
+    let in_menu: HashSet<&str> = crate::menu_catalog::CATALOG.iter().filter(|(_, label, ..)| *label != "---").map(|&(.., id)| id).collect();
+    command_rows(app)
+        .into_iter()
+        .filter(|def| !in_menu.contains(def.command.id.as_str()))
+        .flat_map(|def| def.defaults.into_iter().map(move |binding| (binding.trigger.chord, def.command.clone())))
+        .collect()
 }
 
 /// The app's command catalog over `rows` ([`command_rows`]). The runtime rebuilds its keymap when `generation`

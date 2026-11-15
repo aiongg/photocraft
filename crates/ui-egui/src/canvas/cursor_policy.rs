@@ -1,7 +1,8 @@
 //! The rules the tools' cursors and the Alt stand-in share: which tools show a brush-tip centre,
 //! which let ⌥ sample or load paint, and the Pencil's tip shape.
 
-use super::{PhotocraftApp, Tool};
+use super::PhotocraftApp;
+use crate::state::Tool;
 
 /// Whether an aliased (Pencil) dab of `size` pixels is round rather than its whole square. The dab
 /// fills the pixels whose centres lie within its radius of the grid centre

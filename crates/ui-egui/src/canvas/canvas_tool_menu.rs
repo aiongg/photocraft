@@ -3,10 +3,11 @@
 //! pending crop, the layer list and the painting tools' mode list. The menu is state in
 //! `UiState::canvas_tool_menu`; [`run`] shows it on the framework's menu layer every pass.
 
-use craft::draw::ui::crop::{CROP_RATIOS, CROP_SIZES, CropBarWords, CropPresetChoice, CropRatio};
+use craft::behavior::IconId;
+use craft::draw::ui::crop::{CROP_RATIOS, CROP_SIZES, CropBarWords, CropPresetChoice, CropRatio, CropSettings, CropSizeFields};
 use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasOutput, MomentaryTool, ToolHostResponse};
-use craft::ui::canvas_controls::guides::GuidesOutput;
+use craft::ui::canvas_controls::GuidesOutput;
 use craft::ui::contract::overlay::{Anchor, Trigger};
 use craft::ui::contract::{Bind, Entry};
 use craft::ui::menu::Menu;
@@ -328,6 +329,74 @@ fn crop_choices(users: usize) -> impl Iterator<Item = CropPresetChoice> {
         .chain([CropPresetChoice::FrontImage])
 }
 
+/// The name of a built-in preset-list entry, as the options bar's list shows it: the ratio words, or a size preset's values
+/// named as New Crop Preset… would name them.
+fn choice_name(words: &CropBarWords, choice: CropPresetChoice, units: &craft::ui::runtime::env::Units) -> String {
+    match choice {
+        CropPresetChoice::Free => words.ratio.as_str().to_owned(),
+        CropPresetChoice::Size => words.size_mode.as_str().to_owned(),
+        CropPresetChoice::Ratio(i) => match i {
+            0 => words.ratio_original.as_str(),
+            1 => words.ratio_square.as_str(),
+            2 => words.ratio_4_5.as_str(),
+            3 => words.ratio_5_7.as_str(),
+            4 => words.ratio_2_3.as_str(),
+            _ => words.ratio_16_9.as_str(),
+        }
+        .to_owned(),
+        CropPresetChoice::SizePreset(i) => {
+            let Some(preset) = CROP_SIZES.get(i) else { return String::new() };
+            let mut size = CropSizeFields::default();
+            size.width = Some(preset.width);
+            size.height = Some(preset.height);
+            size.resolution = preset.resolution.to_owned();
+            let mut settings = CropSettings::default();
+            settings.ratio = CropRatio::Size;
+            settings.size = size;
+            settings.preset_name(words, units).unwrap_or_default()
+        }
+        CropPresetChoice::FrontImage => words.front_image.as_str().to_owned(),
+        CropPresetChoice::Selection => words.selection.as_str().to_owned(),
+        _ => String::new(),
+    }
+}
+
+/// The overlay's name in the bar's words.
+fn guide_name(words: &CropBarWords, guide: craft::behavior::geometry::CropGuide) -> &str {
+    use craft::behavior::geometry::CropGuide;
+    match guide {
+        CropGuide::Grid => words.grid.as_str(),
+        CropGuide::Diagonal => words.diagonal.as_str(),
+        CropGuide::Triangle => words.triangle.as_str(),
+        CropGuide::GoldenRatio => words.golden_ratio.as_str(),
+        CropGuide::GoldenSpiral => words.golden_spiral.as_str(),
+        _ => words.thirds.as_str(),
+    }
+}
+
+/// The show rule's name in the bar's words.
+fn show_name(words: &CropBarWords, show: craft::behavior::geometry::GuideShow) -> &str {
+    use craft::behavior::geometry::GuideShow;
+    match show {
+        GuideShow::Always => words.show_always.as_str(),
+        GuideShow::Never => words.show_never.as_str(),
+        _ => words.show_auto.as_str(),
+    }
+}
+
+/// The overlay's glyph, the one the options bar's overlay menu draws.
+fn guide_icon(guide: craft::behavior::geometry::CropGuide) -> IconId {
+    use craft::behavior::geometry::CropGuide;
+    IconId::new(match guide {
+        CropGuide::Grid => "crop_overlay_grid",
+        CropGuide::Diagonal => "crop_overlay_diagonal",
+        CropGuide::Triangle => "crop_overlay_triangle",
+        CropGuide::GoldenRatio => "crop_overlay_golden_ratio",
+        CropGuide::GoldenSpiral => "crop_overlay_golden_spiral",
+        _ => "crop_overlay_thirds",
+    })
+}
+
 /// The key of a built-in entry in its row id, the options bar's dropdown key since before the
 /// bar was the framework's, so saved scripts keep working: `""` Ratio, `whr`, `original`, `4:5`,
 /// `preset:4x5in`, `preset:1024x768px`, `front`, `selection`.
@@ -370,7 +439,7 @@ pub fn crop_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row<String>>
         .map(|choice| {
             let label = match choice {
                 CropPresetChoice::User(i) => users.get(i).cloned().unwrap_or_default(),
-                choice => words.choice_name(choice, &units), // PLAN: assumed `CropBarWords::choice_name(&self, CropPresetChoice, &Units) -> String`, public, over `ratio_name`/`size_name` (tools-w14)
+                choice => choice_name(&words, choice, &units),
             };
             Some((label, crop_id(choice)))
         })
@@ -380,9 +449,9 @@ pub fn crop_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row<String>>
     rows.push(Some((words.new_preset.as_str().to_owned(), CROP_NEW.into())));
     rows.push(Some((words.delete_preset.as_str().to_owned(), CROP_DELETE.into())));
     rows.push(None);
-    rows.extend(CropGuide::ALL.iter().map(|k| Some((words.guide_name(*k).to_owned(), format!("{CROP_OVERLAY}{}", serde_id(k))))));
+    rows.extend(CropGuide::ALL.iter().map(|k| Some((guide_name(&words, *k).to_owned(), format!("{CROP_OVERLAY}{}", serde_id(k))))));
     rows.push(None);
-    rows.extend(GuideShow::ALL.iter().map(|k| Some((words.show_name(*k).to_owned(), format!("{CROP_SHOW}{}", serde_id(k))))));
+    rows.extend(GuideShow::ALL.iter().map(|k| Some((show_name(&words, *k).to_owned(), format!("{CROP_SHOW}{}", serde_id(k))))));
     rows.push(None);
     rows.push(Some((tl!("Cancel").to_string(), CROP_CANCEL.into())));
     rows.push(Some((tl!("Crop").to_string(), CROP_COMMIT.into())));
@@ -437,7 +506,9 @@ fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) ->
     let users = crop_presets(menu).map_or(0, <[String]>::len);
     match command {
         CROP_CANCEL => crate::crop_ui::discard(app),
-        CROP_COMMIT => crate::crop_ui::apply(app),
+        CROP_COMMIT => {
+            crate::crop_ui::apply(app);
+        }
         CROP_NEW => {
             crate::crop_presets::open_new(app);
         }
@@ -457,7 +528,7 @@ fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) ->
                 app.ui.tool_options.crop.guide_show = k;
             }
             // As the options bar does: a ratio or W x H change refits the frame.
-            crate::crop_ui::refit(app);
+            crate::crop_ui::refit(app, false);
         }
     }
     Ok(())
@@ -779,7 +850,7 @@ pub fn applies(tool: Tool) -> bool {
 /// over it, and the border stays live, as in Photoshop (#11689). A border left on another
 /// document doesn't count, and neither does an ⌥-drag's freehand segment (not measured).
 pub fn magnetic_drawing(app: &PhotocraftApp) -> bool {
-    crate::magnetic_lasso_ui::drawing(app)
+    app.canvas_tools.selection.outline_open()
 }
 
 /// Tools whose canvas right-click opens the path menu ([`PEN_MENU`]): the Pen, and the Path
@@ -1300,7 +1371,7 @@ fn capture(app: &mut PhotocraftApp, menu: &mut CanvasToolMenu, doc: [f64; 2], po
 /// A view menu row: the canvas's own command when the row is one (zoom, fit, 100%, Fill Screen: the
 /// same command its chord fires, zooming about the centre), else the View menu's item.
 fn choose_view(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result<(), String> {
-    if crate::shortcut_dispatch::fire_view_owned(ctx, command).is_some() {
+    if crate::shortcut_dispatch::fire_bridged(ctx, command).is_some() {
         return Ok(());
     }
     crate::menus::invoke(app, ctx, command, json!({})).map(|_| ())
@@ -1497,7 +1568,7 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         let mut entry = Entry::new(command.clone(), label).enabled(entry_enabled(app, menu, &command)).checked(mode_checked(app, menu, &command));
         // The overlay rows carry their own glyph (#10889); the rest stay text-only.
         if let Some(kind) = command.strip_prefix(CROP_OVERLAY).and_then(from_serde_id::<craft::behavior::geometry::CropGuide>) {
-            entry = entry.icon(craft::draw::ui::crop::guide_icon(kind));
+            entry = entry.icon(guide_icon(kind));
         }
         out.push(entry);
     }

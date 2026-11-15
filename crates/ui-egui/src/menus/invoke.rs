@@ -207,15 +207,8 @@ fn invoke_shell_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str,
     if let Some(r) = crate::view_cmds::invoke(app, ctx, id, params) {
         return Some(r);
     }
-    // Liquify dialog, Puppet Warp and Perspective Warp modes (and their control params).
+    // Liquify dialog, Puppet Warp and Perspective Warp modes, Filter Gallery and Vanishing Point (and their control params).
     if let Some(r) = crate::distort_ui::menu(app, ctx, id, params) {
-        return Some(r);
-    }
-    // PLAN: assumed `gallery_ui::menu` and `vp_ui::menu` (dialogs-03) take the arguments of `distort_ui::menu`.
-    if let Some(r) = crate::gallery_ui::menu(app, ctx, id, params) {
-        return Some(r);
-    }
-    if let Some(r) = crate::vp_ui::menu(app, ctx, id, params) {
         return Some(r);
     }
     // Camera Raw Filter dialog (and its control params).
@@ -320,7 +313,7 @@ fn invoke_file_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, 
                             let title = crate::i18n::fmt(tl!("{name} can't keep everything in this document"), &[("name", name.as_str())]);
                             let mut lines = losses;
                             lines.push(tl!("Choose a format that keeps it, such as Photoshop (PSD), or save a copy.").to_string());
-                            crate::notices::post(app, title, lines, false, None);
+                            crate::notices::post(app, title, lines, craft::theme::variant::Tone::Neutral, None);
                             app.save_as_with(None, choices)
                         }
                         // Its own flat file, while it still keeps the whole document (one plain

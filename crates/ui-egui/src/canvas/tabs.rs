@@ -9,7 +9,8 @@ use egui::{Pos2, Response};
 use photocraft_doc::DocId;
 use photocraft_engine::jobs::JobId;
 
-use super::{PhotocraftApp, fmt_zoom, json, mode_label};
+use super::{PhotocraftApp, fmt_zoom, mode_label};
+use serde_json::json;
 use crate::file_open::DropTo;
 
 /// A tab of the document strip.

@@ -21,13 +21,13 @@ use crate::theme::Tokens;
 mod freeform;
 pub(crate) mod host;
 mod options;
-mod overlay;
+pub(crate) mod overlay;
 mod path_menus;
 mod path_ops;
 mod paths_panel;
 mod pen;
 mod pen_resume;
-mod shapes;
+pub(crate) mod shapes;
 
 #[cfg(test)]
 use options::{corner_radii_patch, solid_paint};

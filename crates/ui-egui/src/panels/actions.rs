@@ -20,7 +20,7 @@ use crate::PhotocraftApp;
 use host::PhotoActions;
 
 pub(crate) mod menu;
-mod dialogs;
+pub(crate) mod dialogs;
 pub(crate) mod runner;
 mod files;
 mod host;

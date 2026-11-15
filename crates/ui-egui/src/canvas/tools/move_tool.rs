@@ -287,7 +287,9 @@ impl CanvasTool for MoveRun<'_> {
         let Some(space) = cx.space() else { return };
         let at = space.view.to_doc(pointer.pos);
         match run.kind {
-            Kind::Marquee => self.scope.with_app(|app| crate::move_box::drag_to(app, [at.x, at.y])),
+            Kind::Marquee => {
+                self.scope.with_app(|app| crate::move_box::drag_to(app, [at.x, at.y]));
+            }
             Kind::Refused => {
                 if !std::mem::replace(&mut run.prompted, true) {
                     self.scope.with_app(crate::move_lock::prompt);
@@ -302,7 +304,9 @@ impl CanvasTool for MoveRun<'_> {
         let Some(space) = cx.space() else { return };
         let at = space.view.to_doc(pointer.pos);
         self.scope.with_app(|app| match run.kind {
-            Kind::Marquee => crate::move_box::release(app, [at.x, at.y]),
+            Kind::Marquee => {
+                crate::move_box::release(app, [at.x, at.y]);
+            }
             Kind::Refused => {}
             Kind::Layers | Kind::Pixels => {
                 // A click (released with no travel) never moves: the snap would nudge the layer.

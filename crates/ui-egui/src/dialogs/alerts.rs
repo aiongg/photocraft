@@ -104,6 +104,11 @@ pub(crate) fn open_prompt(app: &mut PhotocraftApp, prompt: StandardPrompt) -> Re
     }
 }
 
+/// Takes the answer of a closed alert: it carries nothing, and the host keeps one plain result per dialog type.
+pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    let _ = app.framework.dialogs.take::<HostedAlert>();
+}
+
 /// The ids of the alerts open now: the plain alert and the prompt of [`alert_once`]. For tests.
 #[cfg(test)]
 pub(crate) fn alerts(app: &PhotocraftApp) -> Vec<DialogId> {

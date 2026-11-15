@@ -20,7 +20,8 @@ use egui::{Color32, Pos2, Rect};
 
 use super::gpu_picture::{GpuPicture, GpuRequest, gpu_picture};
 use super::raster_source::{CompositePrep, OverlayPrep};
-use super::{DRect, Document, PhotocraftApp, View, tools};
+use super::{Document, PhotocraftApp, View, tools};
+use photocraft_geom::Rect as DRect;
 
 impl View {
     /// This view as the framework's canvas view of `rect` at `ppp` device pixels per point, mirrored by View › Flip
@@ -273,11 +274,18 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         // Under the controls, through the canvas's reserved paint slot.
         let mut under = Vec::new();
         if primary {
-            under.extend(crate::levels_clipping::shapes(app, &space, idx));
+            under.extend(crate::levels_clipping::shapes(app, ctx, &space.view, idx));
         }
-        under.extend(crate::color_range_ui::selection_preview(app, ctx));
         if !under.is_empty() {
             space.paint_picture(ctx, under);
+        }
+        // Color Range's Selection Preview: the dialog's proxy mask, drawn by the selection overlay without ants.
+        if let Some(preview) = crate::color_range_ui::selection_preview(app, ctx) {
+            SelectionOverlay::new(format!("{label} Selection Preview"), &*preview.mask)
+                .visible(false)
+                .reduction(preview.reduction)
+                .preview(preview.mode)
+                .show_at(ui, body.rect);
         }
         if app.ui.view.tile_grid {
             super::tile_overlay::show(ui, app, idx);
@@ -387,7 +395,7 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
     }
     if app.ui.view.shows(app.ui.view.show.pixel_grid) {
         let composite = super::display_doc(app, idx).0;
-        craft::ui::canvas::PixelGrid::new(label.to_owned(), &composite).show_at(ui, rect);
+        craft::ui::canvas_controls::PixelGrid::new(label.to_owned(), &composite).show_at(ui, rect);
     }
 }
 
@@ -400,7 +408,7 @@ fn canvas_controls(
     host: CanvasHost,
     space: &CanvasSpace,
     turned: &mut Option<CanvasView>,
-) -> Option<(photocraft_doc::LayerId, photocraft_engine::Fill)> {
+) -> Option<(photocraft_doc::LayerId, photocraft_doc::Fill)> {
     let pointer = ui.input(|i| i.pointer.hover_pos());
     let now = ui.input(|i| i.time);
     crate::distort_ui::show_in_canvas(app, ui, rect);
@@ -419,12 +427,12 @@ fn canvas_controls(
     super::transform_controls::show(app, ui, rect);
     crate::move_box::show(app, ui, rect);
     crate::move_hover::show(app, ui, rect, pointer);
-    crate::move_distance::show(app, ui, rect);
+    crate::move_distance::show(app, ui, rect, pointer);
     crate::artboard_tool::show_overlay(app, ui, rect);
     crate::frame_tool::show(app, ui, rect);
     crate::shape_controls::show(app, ui);
     let live = crate::gradient_ui::live_overlay::show(app, ui, rect);
-    crate::slice_ui::canvas_controls(app, ui, rect);
+    crate::slice_ui::canvas_controls(ui, app, rect);
     crate::symmetry_ui::canvas_controls(ui, app, rect);
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
@@ -432,8 +440,7 @@ fn canvas_controls(
     crate::frame_tool::task_bar::show(ui, app, rect);
     crate::crop_ui::each_pass(app);
     crate::vector_ui::shapes::show_preview(app, ui, rect, &space.view);
-    // PLAN: `brush_feedback` is tools-w61's file in `crate::tools` (re-exported at the crate root like `move_hover`), not a canvas::tools module.
-    crate::brush_feedback::show(ui, app, rect, pointer);
+    crate::tools::brush_feedback::show(ui, app, rect, pointer);
     // The scroll bars (Standard Screen Mode only) and the rotation compass change the view they are bound to.
     let mut shown = space.view;
     if !app.ui.view.hides_chrome() {

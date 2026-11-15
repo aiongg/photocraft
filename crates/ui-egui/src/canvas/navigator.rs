@@ -1,7 +1,8 @@
 use super::display::{canvas_display, display_doc, display_image};
 use super::strokes::live_stroke;
 use super::textures::effect_reach;
-use super::{Document, PhotocraftApp, Rect, TextureOptions};
+use super::{Document, PhotocraftApp, Rect};
+use egui::TextureOptions;
 
 /// Longest side of the Navigator panel's image (about twice the panel's width, for HiDPI).
 pub const NAVIGATOR_SIDE: u32 = 512;

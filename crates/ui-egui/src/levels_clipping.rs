@@ -287,31 +287,31 @@ fn view_area(view: &CanvasView, bounds: Rect, ppp: f32, max_side: u32) -> Option
     }
 }
 
-/// Draw the Levels clipping display over the image in canvas `view` of document `idx`, if one
-/// is asked for. Drops the cache once no Levels dialog is open. Only the main canvas calls it:
+/// The Levels clipping display over the image in canvas `view` of document `idx`, if one
+/// is asked for: the shapes the canvas paints under its controls. Drops the cache once no Levels dialog is open. Only the main canvas calls it:
 /// the one cache follows that view.
-pub fn paint(app: &mut PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter, view: &CanvasView, idx: usize) {
+pub fn shapes(app: &mut PhotocraftApp, ctx: &egui::Context, view: &CanvasView, idx: usize) -> Vec<egui::Shape> {
     if dialog(app).is_none() {
         app.levels_clipping = None;
-        return;
+        return Vec::new();
     }
     // A background job holds the workers and may replace the document: no thresholds, scan or
     // image until it ends.
     if app.session.has_jobs() {
-        return;
+        return Vec::new();
     }
-    let Some(req) = request(app, idx) else { return };
-    let Some(thr) = thresholds(&req.adj, req.doc.pixel_format().sample) else { return };
+    let Some(req) = request(app, idx) else { return Vec::new() };
+    let Some(thr) = thresholds(&req.adj, req.doc.pixel_format().sample) else { return Vec::new() };
     let max_side = (ctx.input(|i| i.max_texture_side) as u32).clamp(256, 8192);
-    let Some((rect, factor)) = view_area(view, req.doc.bounds(), ctx.pixels_per_point(), max_side) else { return };
+    let Some((rect, factor)) = view_area(view, req.doc.bounds(), ctx.pixels_per_point(), max_side) else { return Vec::new() };
     let key = (req.doc.id, req.revision, req.target, rect, factor);
     if app.levels_clipping.as_ref().is_none_or(|c| c.key != key) {
-        let Some(LayerContent::Raster(surface)) = req.doc.layer(req.target).map(|l| &l.content) else { return };
+        let Some(LayerContent::Raster(surface)) = req.doc.layer(req.target).map(|l| &l.content) else { return Vec::new() };
         let stats = scan(surface, req.doc.selection.as_ref(), rect, factor);
         let tex = app.levels_clipping.take().and_then(|c| c.tex);
         app.levels_clipping = Some(Cache { key, stats, drawn: None, tex });
     }
-    let Some(cache) = app.levels_clipping.as_mut() else { return };
+    let Some(cache) = app.levels_clipping.as_mut() else { return Vec::new() };
     if cache.drawn != Some((req.end, thr)) || cache.tex.is_none() {
         let img = egui::ColorImage::new(cache.stats.size, image(&cache.stats, &thr, req.end));
         match &mut cache.tex {
@@ -320,7 +320,7 @@ pub fn paint(app: &mut PhotocraftApp, ctx: &egui::Context, painter: &egui::Paint
         }
         cache.drawn = Some((req.end, thr));
     }
-    let Some(tex) = cache.tex.as_ref().map(egui::TextureHandle::id) else { return };
+    let Some(tex) = cache.tex.as_ref().map(egui::TextureHandle::id) else { return Vec::new() };
     // The texture covers whole blocks; the last row and column may reach past the area.
     let s = &cache.stats;
     let f = s.factor as f32;
@@ -332,7 +332,13 @@ pub fn paint(app: &mut PhotocraftApp, ctx: &egui::Context, painter: &egui::Paint
     }
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(0, 2, 3);
-    painter.add(egui::Shape::mesh(mesh));
+    vec![egui::Shape::mesh(mesh)]
+}
+
+/// [`shapes`] added to `painter`.
+#[cfg(test)]
+pub fn paint(app: &mut PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter, view: &CanvasView, idx: usize) {
+    painter.extend(shapes(app, ctx, view, idx));
 }
 
 #[cfg(test)]

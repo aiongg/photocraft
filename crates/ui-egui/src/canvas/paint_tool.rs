@@ -25,7 +25,9 @@ use super::strokes::{
     strokes_live, tap_at_peak_pressure,
 };
 use super::tools::{FamilyTool, ToolScope};
-use super::{PhotocraftApp, Tool, json};
+use super::PhotocraftApp;
+use crate::state::Tool;
+use serde_json::json;
 
 /// Plain Enter and Escape: what applies or drops the Remove tool's pending strokes.
 const PENDING_KEYS: &[Chord] = &[Chord::plain(Key::Enter), Chord::plain(Key::Escape)];

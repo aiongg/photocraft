@@ -9,7 +9,8 @@ use craft::ui::canvas::AppPaint;
 use super::display::{LiveProposal, hdr_preview, sync_display_lut};
 use super::filter_preview::{ensure_adjust_proxy, ensure_filter_preview, ensure_proxy_preview, filter_preview_display_doc};
 use super::textures::{ensure_gpu, preview_bounds, redraw_focus};
-use super::{DRect, Document, PhotocraftApp, viewport_pages};
+use super::{Document, PhotocraftApp, viewport_pages};
+use photocraft_geom::Rect as DRect;
 use crate::gpu_canvas::ViewParams;
 
 #[cfg(test)]

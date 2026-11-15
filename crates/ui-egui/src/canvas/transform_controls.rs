@@ -1,5 +1,6 @@
 use super::tools::selection::floating_outline;
-use super::{PhotocraftApp, Tool};
+use super::PhotocraftApp;
+use crate::state::Tool;
 use craft::behavior::kurbo::{self, BezPath};
 
 // The hit-zone tests (`transform_hit_zone_tests.rs`, tools-w31) read `super::*`.

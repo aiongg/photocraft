@@ -1,5 +1,6 @@
 use super::strokes::live_stroke;
-use super::{Document, LayerContent, PhotocraftApp};
+use super::{Document, PhotocraftApp};
+use photocraft_doc::LayerContent;
 
 /// The gradient a tool proposes this pass, shown over the document before it is committed: the layer it fills and the
 /// fill (`gradient_ui::live_overlay::show`'s answer).

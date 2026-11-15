@@ -1,13 +1,14 @@
 //! Edit › Presets › Preset Manager and Export/Import Presets, as hosted dialogs read back by `take`.
 
 use craft::ui::contract::{Bind, Entry};
-use craft::ui::dialog::{DialogId, DialogResult, dialog_id};
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, HostedParamDialog, Param, ParamDialog, ParamKind};
+use craft::ui::dialog::DialogId;
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, HostedParamDialog, Param, ParamDialog, ParamKind, ParamResult};
 use craft::ui::patterns::presets::{HostedPresetManager, PresetEvent, PresetRow};
 use craft::ui::runtime::env::Label;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
+use crate::dialogs::params::ParamFamily;
 
 /// The Preset Manager: the preset kind picked by its id, and the preset by its index in that kind's list.
 type Manager = HostedPresetManager<String, usize>;
@@ -81,12 +82,12 @@ pub(crate) fn open_io(app: &mut PhotocraftApp) -> DialogId {
 }
 
 /// Reads what the preset dialogs did since the last pass and runs it.
-// PLAN: `params::take` runs before the `TAKERS` rows; it must leave a result whose key no `ParamFamily` owns for `take_io`
-// (dialogs-w19), or this dialog needs a `ParamFamily` row with `confirm_io` as its `run`.
 pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
     take_manager(app);
-    take_io(app);
 }
+
+/// Export/Import Presets as a family of the parameter dialogs: OK runs the export or import.
+pub(crate) const PRESETS_FAMILY: ParamFamily = ParamFamily::new(|key| key == IO, run_io);
 
 fn take_manager(app: &mut PhotocraftApp) {
     let Some(manager) = app.framework.dialogs.get_mut::<Manager>() else { return };
@@ -123,11 +124,9 @@ fn take_manager(app: &mut PhotocraftApp) {
     }
 }
 
-fn take_io(app: &mut PhotocraftApp) {
-    if let Some(DialogResult::Ok(result)) = app.framework.dialogs.take_by_id::<HostedParamDialog>(dialog_id(IO)) {
-        if let Err(error) = confirm_io(app, &result.fields) {
-            app.ui.status = error;
-        }
+fn run_io(app: &mut PhotocraftApp, _ctx: &egui::Context, result: ParamResult) {
+    if let Err(error) = confirm_io(app, &result.fields) {
+        app.ui.status = error;
     }
 }
 

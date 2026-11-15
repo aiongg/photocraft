@@ -5,11 +5,11 @@ use std::cell::RefCell;
 
 use craft::behavior::cursor::{Cursor, PaintedCursor};
 use craft::behavior::value::CancelReason;
+use craft::behavior::PointerButton;
 use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectionShape};
 use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};
 use craft::ui::primitives::Draw;
-use egui::PointerButton;
 
 use super::dialog::doc_point;
 use super::selection::PcSelection;
@@ -55,6 +55,28 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut RetouchTools, _h
     let tool = scope.with_app(|app| app.ui.tool);
     let probe = scope.with_app(|app| PcSelection::of(app));
     Box::new(RetouchTool { scope, state: RefCell::new(state), tool, probe })
+}
+
+/// A Red Eye click. CMYK, Grayscale and Indexed Color documents get the reference's alert (#12575); the alert host
+/// shows one alert per message, so more clicks while it is open add nothing.
+fn red_eye_click(app: &mut PhotocraftApp, at: [f64; 2]) {
+    use photocraft_engine::redeye_cmds::MODE_REFUSAL;
+    let o = app.ui.tool_options.clone();
+    let result = app.run(
+        "paint.redEye",
+        serde_json::json!({
+            "x": at[0].floor(),
+            "y": at[1].floor(),
+            "pupilSize": o.red_eye_pupil_size.clamp(1.0, 100.0),
+            "darken": o.red_eye_darken.clamp(0.0, 100.0),
+            "target": crate::canvas::strokes::paint_target(app),
+        }),
+    );
+    if result.is_err_and(|e| e == MODE_REFUSAL) {
+        app.ui.status.clear();
+        app.ui.status_error = false;
+        let _ = crate::dialogs::alerts::alert(app, tl!(MODE_REFUSAL).to_string());
+    }
 }
 
 /// The Alt-click source of Clone Stamp and Healing: the stand-in `tools::run` installs for `StandInKey::Alt`.
@@ -105,17 +127,14 @@ impl CanvasTool for RetouchTool<'_> {
         let (tool, mods) = (self.tool, pointer.mods);
         let mut state = self.state.borrow_mut();
         if tool == Tool::RedEye {
-            // PLAN: assumed `red_eye_click(app, at: [f64; 2])` (tools-w54).
-            self.scope.with_app(|app| retouch_ui::red_eye_click(app, at));
+            self.scope.with_app(|app| red_eye_click(app, at));
             return ToolAction::Done;
         }
-        // PLAN: assumed `cancel_stale(app, &mut Option<PatchPress>)` and `PatchPress::new(start, mods)` (tools-w54).
-        let drags = self.scope.with_app(|app| {
-            retouch_ui::cancel_stale(app, &mut state.press);
-            tool == Tool::ObjectSelection || retouch_ui::patch_drags_selection(app, at, mods)
-        });
+        // A press of another document never reaches here: the canvas pass ends it (`end_foreign_gesture`), which
+        // cancels this tool and drops its press.
+        let drags = self.scope.with_app(|app| tool == Tool::ObjectSelection || retouch_ui::patch_drags_selection(app, at, mods));
         if drags {
-            state.press = Some(PatchPress::new(at, mods));
+            state.press = Some(PatchPress::new(tool, at, mods));
             state.last = at;
             state.shift = mods.shift;
             return ToolAction::Claimed;
@@ -146,7 +165,7 @@ impl CanvasTool for RetouchTool<'_> {
         };
         let end = doc_point(pointer, cx);
         let (tool, mods) = (self.tool, pointer.mods);
-        let start = press.start();
+        let start = press.start;
         state.last = end;
         state.shift = mods.shift;
         self.scope.with_app(|app| match tool {

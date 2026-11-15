@@ -100,11 +100,11 @@ pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
     crate::guide_select::selected(app).hash(&mut h);
     // The dock workspace's revision moves only on `replace`, so the arrangement is read as the panels in the layout and
     // the keys of the hidden and floating ones; the shown flags cover panels opened or closed.
-    let workspace = &app.ui.docking.layout;
-    workspace.layout.panels().hash(&mut h);
-    workspace.hidden.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
-    workspace.floated.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
-    for panel in crate::registry::PANELS {
+    let docking = &app.ui.docking;
+    docking.layout.panels().hash(&mut h);
+    docking.hidden.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
+    docking.floated.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
+    for panel in crate::panels::registry::PANELS {
         crate::panel_docking::is_shown(app, panel.id).hash(&mut h);
     }
     serde_json::to_string(&(&ui.extras, &ui.view, ui.theme.id().as_str(), ui.theme.is_dark(), ui.tool)).unwrap_or_default().hash(&mut h);

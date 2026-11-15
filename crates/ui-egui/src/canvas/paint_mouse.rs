@@ -220,7 +220,7 @@ pub(crate) fn context_popup(app: &mut PhotocraftApp, tool: Tool, mods: Mods, doc
         return None;
     }
     if tool == Tool::Crop && crate::crop_ui::pending(app) {
-        let presets = crate::crop_presets::user_presets(app).into_iter().map(|(name, _)| name).collect();
+        let presets = crate::crop_presets::user_presets(app).into_iter().map(|preset| preset.name).collect();
         return Some(ContextPopup::Menu(MenuKind::Crop { presets }));
     }
     if menu::pasteboard_at(app, tool, doc) {

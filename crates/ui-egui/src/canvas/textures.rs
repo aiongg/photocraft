@@ -4,7 +4,10 @@ use super::display::{GPU_OUTPUT, LiveProposal, canvas_display, display_doc_live,
 use super::filter_preview::filter_channel_preview;
 use super::navigator::navigator_waits_for_drag;
 use super::strokes::live_stroke;
-use super::{DRect, Document, LayerContent, PhotocraftApp, TextureOptions};
+use super::{Document, PhotocraftApp};
+use egui::TextureOptions;
+use photocraft_doc::LayerContent;
+use photocraft_geom::Rect as DRect;
 
 /// Largest texture side we upload; bigger pictures are uploaded downsampled.
 pub const MAX_TEXTURE: u32 = 4096;

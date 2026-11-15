@@ -69,25 +69,23 @@ pub(crate) mod params {
         ParamFamily::new(history_options_ui::owns, history_options_ui::run),
         ParamFamily::new(brush_preset_dialog::owns, brush_preset_dialog::run),
         ParamFamily { check: Some(equalize_ui::check), ..ParamFamily::new(equalize_ui::owns, equalize_ui::run) },
-        ParamFamily::new(bitmap_dialog::owns, bitmap_dialog::run),
         ParamFamily::new(channel_options_ui::owns, channel_options_ui::run),
         ParamFamily { check: Some(merge_channels_ui::check), ..ParamFamily::new(merge_channels_ui::owns, merge_channels_ui::run) },
-        ParamFamily { footer: Some(color_table_ui::footer), ..ParamFamily::new(color_table_ui::owns, color_table_ui::run) },
-        ParamFamily::new(file_forms::owns, file_forms::run),
+        ParamFamily { check: Some(filter_dialog::check), footer: Some(color_table_ui::footer_action), ..ParamFamily::new(|key| key == "image.mode.colorTable", filter_dialog::run) },
+        ParamFamily::new(file_forms::owns, filter_dialog::run),
         ParamFamily { listing: Some(stack_dialog::listing), ..ParamFamily::new(stack_dialog::owns, stack_dialog::run) },
         ParamFamily { check: Some(crate::canvas_tool_menu::pen_dialogs::check), ..ParamFamily::new(crate::canvas_tool_menu::pen_dialogs::owns, crate::canvas_tool_menu::pen_dialogs::run) },
         ParamFamily::new(crate::analysis::dialogs::owns, crate::analysis::dialogs::run),
         ParamFamily::new(crate::layers_panel_ui::owns, crate::layers_panel_ui::run),
-        ParamFamily::new(crate::view_cmds::is_form, filter_dialog::run_command),
+        ParamFamily::new(crate::view_cmds::dialogs::is_form, filter_dialog::run),
         crate::prefs_ui::PRESETS_FAMILY,
         ParamFamily { check: Some(crate::crop_presets::check), ..ParamFamily::new(crate::crop_presets::owns, crate::crop_presets::run) },
-        crate::panels::variables_ui::FAMILY,
         crate::actions::dialogs::NEW_SET_FAMILY,
         crate::actions::dialogs::INSERT_STOP_FAMILY,
         crate::actions::playback::FAMILY,
         crate::actions::menu_item::FAMILY,
         crate::smart_svg_ui::family(),
-        ParamFamily { check: Some(filter_dialog::check), ..ParamFamily::new(filter_dialog::owns, filter_dialog::run_command) },
+        ParamFamily { check: Some(filter_dialog::check), ..ParamFamily::new(filter_dialog::owns, filter_dialog::run) },
     ];
 
     /// The family that owns the dialog `key`.
@@ -325,7 +323,9 @@ pub(crate) mod params {
                 }
             }
         }
-        ctx.data_mut(|data| data.get_temp_mut_or_default::<Picks>(picks_id()).0.splice(0..0, still));
+        ctx.data_mut(|data| {
+            data.get_temp_mut_or_default::<Picks>(picks_id()).0.splice(0..0, still);
+        });
     }
 
     /// Forgets the picks of the dialog `id`, which closed.
@@ -339,7 +339,9 @@ pub(crate) mod params {
         for (ticket, ..) in closed {
             host.files().forget(ticket);
         }
-        ctx.data_mut(|data| data.get_temp_mut_or_default::<Picks>(picks_id()).0.splice(0..0, kept));
+        ctx.data_mut(|data| {
+            data.get_temp_mut_or_default::<Picks>(picks_id()).0.splice(0..0, kept);
+        });
     }
 
     /// A bare command form: a dialog without rows that the generic filter family runs.
@@ -393,7 +395,6 @@ pub(crate) fn prompts_take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// The families that take their own results (one `take(app, ctx)` each), in order.
 pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
-    filter_dialog::take,
     alerts::take,
     discard_ui::take,
     open_prompt::take,
@@ -425,6 +426,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     crate::layers_panel_ui::take,
     crate::slice_ui::take,
     crate::crop_presets::take,
+    crate::variables_ui::take,
 ];
 
 /// Runs the answers of every dialog that finished: parameter dialogs, prompts, then each family's own results. It runs
@@ -507,7 +509,7 @@ pub(crate) fn cancel_for_closed(app: &mut PhotocraftApp, ctx: &egui::Context, cl
 /// bare command form. The error is an opener's refusal text.
 pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) -> Result<DialogId, String> {
     if command == "view.newGuideLayout" {
-        return guide_layout_ui::open(app);
+        return guide_layout_ui::open(app).ok_or_else(|| "no document".to_string());
     }
     if command == stroke_ui::COMMAND {
         return stroke_ui::open(app);
@@ -579,8 +581,8 @@ fn convert_blend_mode(key: &str, value: &mut Value) {
         return;
     }
     let Some(mode) = value.get_mut("mode") else { return };
-    if let Some(blend) = mode.as_str().and_then(crate::layers_tree::blend_of) {
-        *mode = Value::String(crate::layers_tree::blend_key(blend));
+    if let Some(blend) = mode.as_str().and_then(crate::panels::layers_tree::blend_of) {
+        *mode = Value::String(crate::panels::layers_tree::blend_key(blend));
     }
 }
 

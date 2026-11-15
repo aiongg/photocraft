@@ -5,7 +5,8 @@ use craft::ui::patterns::form_dialogs::HostedParamDialog;
 
 use super::display::canvas_display;
 use super::textures::texture_buffer;
-use super::{Document, LayerContent, PhotocraftApp};
+use super::{Document, PhotocraftApp};
+use photocraft_doc::LayerContent;
 
 #[cfg(test)]
 mod tests;
@@ -49,22 +50,20 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         return None;
     }
     // The open parameter dialog with its Preview box on; its key is the command.
-    // PLAN: the command is the hosted dialog's key (dialogs-w24 deletes the `__command` route field), and the
-    // Match Color helpers take the field map as at the base; their owner (dialogs-w24) settles the field type.
-    let (id, key, mut fields) = {
+    let (id, key, dialog_fields, mut fields) = {
         let d = app.framework.dialogs.get::<HostedParamDialog>()?;
         if !d.is_previewing() {
             return None;
         }
         let serde_json::Value::Object(fields) = serde_json::to_value(d.fields()).ok()? else { return None };
-        (d.id(), d.key()?.to_owned(), fields)
+        (d.id(), d.key()?.to_owned(), d.fields().clone(), fields)
     };
     crate::filter_dialog::refresh_match_color_sources(&app.session, &mut fields);
-    crate::filter_dialog::validate_match_color_destination(app, &fields).ok()?;
     // Previews edit what the command will: a targeted layer mask included (#780).
     let target = crate::dialogs::params::captured(app, &key);
+    crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
     let (cmd, params) = if crate::smart_filter_dialog::owns(&key) {
-        crate::smart_filter_dialog::blend_command(app, &target, &fields).ok()?
+        crate::smart_filter_dialog::blend_command(app, &target, &dialog_fields).ok()?
     } else if !target.is_null() {
         crate::smart_filter_dialog::params_command(app, &target, &key, crate::filter_dialog::params_of(&fields)).ok()?
     } else {
@@ -79,7 +78,7 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         doc: st.doc.id,
         revision: st.revision,
         sources: crate::filter_dialog::preview_source_revisions(&app.session, &cmd, &params),
-        dialog: id.value(),
+        dialog: id,
         active: st.active_layer,
         target: st.channel_view.target,
         command: cmd,
@@ -212,7 +211,7 @@ fn session_of(key: &crate::filter_dialog::FilterPreviewKey) -> PreviewSession {
     let layer = key.active.map_or(0, |l| u64::from(l.0) + 1);
     let source_layer = key.params.get("sourceLayer");
     let target = format!("{:?}|{:?}|{}|{:?}|{:?}", key.target, key.sources, key.command, key.tool_colors, source_layer);
-    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog).and(settings_hash(&[target.as_bytes()]))
+    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog.value()).and(settings_hash(&[target.as_bytes()]))
 }
 
 /// Whether `key` is a preview of the open dialog's target, at any proxy factor (a frame is drawn at its own factor,

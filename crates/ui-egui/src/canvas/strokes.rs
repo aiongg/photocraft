@@ -9,7 +9,10 @@ use super::display::{canvas_display, display_image};
 use super::paint_thread::{PaintThread, Step};
 use super::paint_tool::PaintStroke;
 use super::textures::shown_as_document;
-use super::{DRect, PhotocraftApp, Tool, json};
+use super::PhotocraftApp;
+use crate::state::Tool;
+use photocraft_geom::Rect as DRect;
+use serde_json::json;
 
 /// The clone overlay's pixels for the last hover point, kept because the dab coverage and
 /// `clone_preview_periodic` are the expensive part and the key includes the hover point.

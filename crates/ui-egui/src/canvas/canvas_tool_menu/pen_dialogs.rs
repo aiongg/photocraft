@@ -4,7 +4,8 @@
 //! the remembered-values key `photocraft.<command>`. Only Stroke Path's Simulate Pressure is
 //! remembered (#10527); every other row opens at its default.
 
-use craft::ui::patterns::form_dialogs::{DialogFields, Param, ParamKind, ParamResult};
+use craft::ui::contract::Bind;
+use craft::ui::patterns::form_dialogs::{DialogFields, Param, ParamDialog, ParamKind, ParamResult};
 use craft::ui::runtime::env::Label;
 use serde_json::{Value, json};
 
@@ -135,8 +136,25 @@ pub(crate) fn open(app: &mut PhotocraftApp, command: &str, name: &str) {
         "edit.defineCustomShape" => fields.set("path", name),
         _ => fields.set("name", name),
     }
-    // PLAN: assumed `open_param(app, key, fields: DialogFields, build: fn(&PhotocraftApp) -> Vec<Param>) -> DialogId` (dialogs-w19)
-    crate::dialogs::params::open_param(app, command, fields, build);
+    let rows = build(app);
+    let key = command.to_owned();
+    let title = title(command);
+    crate::dialogs::params::open_param(app, command, fields, Value::Null, move |fields: &mut DialogFields| {
+        ParamDialog::command(key.clone(), tl!(title).to_string(), rows.clone()).values(Bind::bound(fields))
+    });
+}
+
+/// The title of the dialog of `command`: the name of its menu row.
+fn title(command: &str) -> &'static str {
+    match command {
+        "edit.defineCustomShape" => "Define Custom Shape",
+        "path.toSelection" => "Make Selection",
+        "path.fill" => "Fill Path",
+        "path.stroke" => "Stroke Path",
+        "path.clippingPath.set" => "Clipping Path",
+        "path.transform" => "Transform Path",
+        _ => "Make Work Path",
+    }
 }
 
 /// OK in a dialog of this family: runs the command with the confirmed values. A combining Make

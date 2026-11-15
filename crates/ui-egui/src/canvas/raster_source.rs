@@ -14,7 +14,8 @@ use photocraft_engine::display_color::CanvasDisplay;
 use super::channel_view::Overlay;
 use super::display::{LiveProposal, cache_key, display_image};
 use super::textures::{CanvasPicture, ProxyPreview, canvas_picture, damage_since};
-use super::{DRect, Document, PhotocraftApp};
+use super::{Document, PhotocraftApp};
+use photocraft_geom::Rect as DRect;
 
 /// How many of the revisions a source handed out it can still tell damage since: a display's whole-document and
 /// detail textures may each lag a few passes behind.
