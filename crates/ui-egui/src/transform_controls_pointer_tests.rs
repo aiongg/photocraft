@@ -8,21 +8,11 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::canvas::testing::{key, move_to, press, release};
-use crate::control::{ControlRequest, Reply};
 use crate::state::Tool;
 
-/// Sends a control request and returns its reply. `ui.pointer` answers at once and queues its events for the canvas's
-/// tool host; frames run until the window host has taken them all.
-pub(crate) fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
-    let (request, _receiver) = ControlRequest::new(method, params);
-    let Reply::Done(reply) = crate::control::handle(app, ctx, &request) else { panic!("{method}: expected an immediate reply") };
-    for _ in 0..8 {
-        if craft::ui::runtime::windows::WindowHost::of(ctx).injected_idle() {
-            break;
-        }
-        crate::canvas::testing::frame(app);
-    }
-    reply
+/// Sends a control request and returns its reply, through the canvas driver's control channel (`testing::control`).
+pub(crate) fn call(app: &mut PhotocraftApp, _ctx: &egui::Context, method: &str, params: Value) -> Value {
+    crate::canvas::testing::control(app, method, params)
 }
 
 /// `call` that asserts the reply is ok.
@@ -42,7 +32,7 @@ fn fixture() -> (PhotocraftApp, egui::Context, [LayerId; 2]) {
     }
     app.run("layer.select", json!({"layer": layers[0].0, "mode": "add"})).unwrap();
     app.sync_views();
-    app.last_canvas_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1400.0, 900.0));
+    crate::canvas::testing::window(&mut app, egui::vec2(1400.0, 900.0));
     app.ui.tool_options.move_auto_select = false;
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;

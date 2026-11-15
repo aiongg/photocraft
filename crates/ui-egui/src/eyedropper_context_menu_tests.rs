@@ -121,20 +121,12 @@ fn over_the_control_channel_the_menu_is_listed_and_choose_picks_a_row() {
     let mut app = app();
     app.sync_views();
     let ctx = crate::canvas::testing::ctx(&app).clone();
-    let r = call(
+    let r = crate::canvas::testing::control(
         &mut app,
-        &ctx,
         "ui.pointer",
         json!({"button": "secondary", "events": [{"kind": "down", "x": 200, "y": 200}, {"kind": "up", "x": 200, "y": 200}]}),
     );
     assert_eq!(r["ok"], true, "{r}");
-    // The injected press reaches the canvas on the app's own frames.
-    for _ in 0..6 {
-        if app.ui.canvas_tool_menu.is_some() {
-            break;
-        }
-        crate::canvas::testing::frame(&mut app);
-    }
     assert!(app.ui.canvas_tool_menu.is_some(), "the secondary press opened the menu");
     let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
     let ids: Vec<&str> =

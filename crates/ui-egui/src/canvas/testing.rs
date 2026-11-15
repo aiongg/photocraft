@@ -203,6 +203,26 @@ pub(crate) fn frame(app: &mut PhotocraftApp) {
     run_frame(app);
 }
 
+/// The window the following frames run in is `size` points (at least 800 × 600); the document area and its canvas
+/// fill it as they fill the app's window.
+pub(crate) fn window(app: &mut PhotocraftApp, size: egui::Vec2) {
+    let ctx = ctx(app);
+    app.canvas_tools.frames.get_or_insert_with(|| Frames::over(ctx)).screen(size);
+}
+
+/// Sends the control request `method` with `params` and returns its reply, then runs frames until the window host has
+/// delivered what the request queued (`ui.pointer` queues its events for the canvas's tool host). A request maps
+/// document points through the view the canvas last showed, so the canvas shows one first.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn control(app: &mut PhotocraftApp, method: &str, params: serde_json::Value) -> serde_json::Value {
+    shown(app);
+    let ctx = ctx(app);
+    let (request, _receiver) = crate::control::ControlRequest::new(method, params);
+    let crate::control::Reply::Done(reply) = crate::control::handle(app, &ctx, &request) else { panic!("{method}: expected an immediate reply") };
+    settle(app);
+    reply
+}
+
 /// Whether the active canvas has a gesture in progress.
 pub(crate) fn in_gesture(app: &PhotocraftApp) -> bool {
     tools::in_gesture(app)

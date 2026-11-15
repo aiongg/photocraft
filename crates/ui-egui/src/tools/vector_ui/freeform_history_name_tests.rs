@@ -206,16 +206,12 @@ fn history_name_is_validated_before_mutation_and_defaults_are_preserved() {
 /// Drives the control channel to check release-only commits, including a selected endpoint start.
 #[test]
 fn control_pointer_strokes_commit_only_on_release_with_the_freeform_label() {
-    use crate::control::{ControlRequest, Reply, handle};
     for mode in [VectorMode::Path, VectorMode::Shape] {
         let mut app = app(mode);
-        let ctx = app.ctx().clone();
-        // `ui.pointer` queues its input for the next pass, so each call runs that pass.
+        // `ui.pointer` queues its input for the canvas, which takes it in the passes `testing::control` runs.
         let call = |app: &mut PhotocraftApp, params| {
-            let (req, _rx) = ControlRequest::new("ui.pointer", params);
-            let Reply::Done(reply) = handle(app, &ctx, &req) else { panic!("expected pointer reply") };
+            let reply = testing::control(app, "ui.pointer", params);
             assert_eq!(reply["ok"], true, "{reply}");
-            testing::frame(app);
         };
         for offset in [0.0, 90.0] {
             let n = steps(&app);

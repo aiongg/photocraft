@@ -268,7 +268,6 @@ fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
     select(&mut app, a, "replace");
     select(&mut app, bg, "add");
     app.sync_views();
-    app.last_canvas_rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 300.0));
     app.ui.tool_options.move_auto_select = true;
     let ctx = crate::canvas::testing::ctx(&mut app);
     accepted(&mut app, &ctx, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [100, 100]}));
