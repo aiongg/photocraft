@@ -3,7 +3,6 @@
 //! as its body.
 
 use craft::behavior::canvas::zoom::wrapped_canvas;
-use craft::behavior::dock::DocumentWindows;
 use craft::behavior::kurbo::Size;
 use photocraft_doc::DocId;
 use craft::ui::contract::{ShowContainer as _, SizeLimits};
@@ -52,15 +51,8 @@ pub(crate) fn sync_documents(app: &mut PhotocraftApp, ids: &[DocId]) {
     for id in emptied {
         close_window(app, id);
     }
-    let windows = &mut app.ui.document_windows;
-    let held = |windows: &DocumentWindows<DocId>, id: &DocId| {
-        windows.docked.iter().chain(windows.floating.iter().map(|(group, _)| group)).any(|group| group.documents.contains(id))
-    };
     for id in ids {
-        if !held(windows, id) {
-            let window = windows.new_window_for(id, Rect::NOTHING);
-            windows.close_window(window);
-        }
+        app.ui.document_windows.add_document(id);
     }
 }
 
