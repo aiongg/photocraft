@@ -108,13 +108,14 @@ pub(crate) fn canvas_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas
         outline(app, ui, canvas, id);
     }
     crate::type_transform::show(app, ui, canvas, false);
+    // The text frame sits below the editor: a drag inside the box selects text, and the frame's body takes none of it.
+    if !transform_shown {
+        frame_box(app, ui, canvas, id);
+    }
     editor(app, ui, &view, id);
     // The editor may have ended the session.
     if app.ui.text_edit.is_none() {
         return;
-    }
-    if !transform_shown {
-        frame_box(app, ui, canvas, id);
     }
     crate::type_transform::show(app, ui, canvas, true);
 }
@@ -214,6 +215,7 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
         }
         editor.show_at(ui, rect)
     };
+
     if let Some(ed) = app.ui.text_edit.as_mut() {
         (ed.anchor, ed.caret) = (selection.anchor, selection.caret);
     }
