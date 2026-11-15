@@ -61,16 +61,11 @@ fn options(app: &PhotocraftApp) -> BrushResizeOptions {
     options.tint(DataColor::new(egui::Color32::from_rgba_unmultiplied(r, g, b, TINT_ALPHA)))
 }
 
-/// Shift+Alt with the secondary button is the HUD Color Picker's gesture, not a resize: the resize chord is Alt alone.
-fn hud_chord(button: PointerButton, mods: Mods) -> bool {
-    button == PointerButton::Secondary && mods.shift && mods.alt
-}
-
 impl PaintResize {
     /// Whether the painting `tool` takes a press of `button` with `mods` held: the gesture's buttons and chords, on a
     /// tool the gesture resizes.
     pub(crate) fn takes(tool: Tool, button: PointerButton, mods: Mods) -> bool {
-        applies(tool) && !hud_chord(button, mods) && BrushResize::takes(button, mods)
+        applies(tool) && BrushResize::takes(button, mods)
     }
 
     /// Whether a resize runs.
@@ -81,7 +76,7 @@ impl PaintResize {
     /// A press: begins a resize when it is the gesture's chord on a tool it resizes, and says whether it did, so the
     /// tool paints nothing.
     pub(crate) fn press(&mut self, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> bool {
-        if !applies(app.ui.tool) || hud_chord(pointer.button, pointer.mods) || !BrushResize::chord(pointer.button, pointer.mods) {
+        if !applies(app.ui.tool) || !BrushResize::chord(pointer.button, pointer.mods) {
             return false;
         }
         let Some(space) = cx.space() else { return false };
