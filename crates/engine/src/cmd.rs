@@ -366,7 +366,7 @@ fn build() -> Vec<CommandSpec> {
             "edit.clear",
             "Clear",
             ["Edit"],
-            Some("Delete"),
+            None,
             r##"{"target":"mask"|{"color":i}|{"colors":[i,…]}?=Channels panel target,"layer":id|name?=active} (a targeted mask, channel or Quick Mask is cleared alone)"##,
             has_pixel_or_channel,
             |s, p| {
