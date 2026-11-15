@@ -48,7 +48,7 @@ fn ctx(app: &PhotocraftApp) -> egui::Context {
 /// One pass of the host with the app's taker, as a frame runs them.
 fn pass(app: &mut PhotocraftApp) {
     let ctx = ctx(app);
-    ctx.run_ui(egui::RawInput::default(), |ui| {
+    crate::testing::run_ui(&ctx, egui::RawInput::default(), |ui| {
         app.framework.dialogs.run(ui);
     });
     take(app, &ctx);

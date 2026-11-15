@@ -66,13 +66,13 @@ fn app() -> PhotocraftApp {
 /// One pass of the Keyboard Shortcuts dialog.
 fn pass(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
-    let _ = ctx.run_ui(Default::default(), |ui| crate::prefs_ui::show_shortcuts(app, ui));
+    crate::testing::run_ui(&ctx, Default::default(), |ui| crate::prefs_ui::show_shortcuts(app, ui));
 }
 
 /// One pass of the dialog host: a queued startup prompt opens in it.
 fn host_pass(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
-    let _ = ctx.run_ui(Default::default(), |ui| app.framework.dialogs.run(ui));
+    crate::testing::run_ui(&ctx, Default::default(), |ui| app.framework.dialogs.run(ui));
 }
 
 fn set_of(rows: &str) -> String {

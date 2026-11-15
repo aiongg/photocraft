@@ -742,6 +742,14 @@ pub(crate) mod testing {
         let options = OpenOptions::new(Location::Dir(DIR.into())).debounce(Duration::ZERO).files(files.clone());
         Services { settings: Some(SettingsStore::<photocraft_engine::prefs::SavedPrefs>::open_with(options)), ..Default::default() }
     }
+
+    /// One pass of `ui` on `ctx` with `input`, its output taken as the window's renderer takes it: no renderer applies
+    /// the texture changes in a test, so they are consumed here and the output drops clean.
+    pub(crate) fn run_ui(ctx: &egui::Context, input: egui::RawInput, ui: impl FnMut(&mut egui::Ui)) -> egui::FullOutput {
+        let mut output = ctx.run_ui(input, ui);
+        output.textures_delta.clear();
+        output
+    }
 }
 
 #[cfg(test)]

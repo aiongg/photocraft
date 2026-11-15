@@ -38,7 +38,7 @@ pub(crate) fn cancel(app: &mut PhotocraftApp, id: DialogId) {
 pub(crate) fn pass(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
     let input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0))), ..Default::default() };
-    let _ = ctx.run_ui(input, |ui| crate::dialogs::run(app, ui));
+    crate::testing::run_ui(&ctx, input, |ui| crate::dialogs::run(app, ui));
 }
 
 /// The values of the hosted dialog `id`.

@@ -333,5 +333,5 @@ pub(crate) fn assign(
 /// Test hook: presses OK in the open dialog and handles the outcome, in one pass on `ctx`.
 #[cfg(test)]
 pub(crate) fn press_ok(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let _ = ctx.run_ui(Default::default(), |ui| pass(app, ui, true));
+    crate::testing::run_ui(ctx, Default::default(), |ui| pass(app, ui, true));
 }

@@ -618,7 +618,7 @@ pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -
 #[cfg(test)]
 pub(crate) fn keys_pass(app: &mut PhotocraftApp, ctx: &egui::Context, input: egui::RawInput, body: impl FnMut(&mut egui::Ui)) {
     app.framework_before_input(ctx);
-    ctx.run_ui(input, body);
+    crate::testing::run_ui(ctx, input, body);
     // Collects what this pass fired.
     app.framework_before_input(ctx);
     crate::shortcuts::handle(app, ctx);
