@@ -816,9 +816,9 @@ fn brush_settings_hamburger_menu_actions() {
     assert!(!run_fired(&mut app, &ctx, &CommandRef::new("file.save")), "another panel's command is not run");
 
     // 2. New Brush Preset… opens the New Brush Preset dialog and saves nothing yet.
-    let (dialogs, presets) = (app.ui.dialogs.len(), app.session.tools.presets.len());
+    let (dialogs, presets) = (app.dialog_count(), app.session.tools.presets.len());
     assert!(run_fired(&mut app, &ctx, &command(BrushSettingsCommand::NewPreset)));
-    assert_eq!(app.ui.dialogs.len(), dialogs + 1);
+    assert_eq!(app.dialog_count(), dialogs + 1);
     assert_eq!(app.session.tools.presets.len(), presets);
 
     // 3. Clear Brush Controls resets dynamics, keeps locked sections and smoothing.
