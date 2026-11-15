@@ -38,6 +38,13 @@ pub struct ValueCx {
     pub isolated: Option<IsolatedCurveChannel>,
 }
 
+/// An RGB context over no parameters: what a value nothing opened yet converts in.
+impl Default for ValueCx {
+    fn default() -> Self {
+        Self::new(ColorMode::Rgb, Value::Object(serde_json::Map::new()))
+    }
+}
+
 impl ValueCx {
     /// A context over `base` with no isolated channel.
     pub fn new(mode: ColorMode, base: Value) -> Self {

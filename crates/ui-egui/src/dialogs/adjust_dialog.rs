@@ -2,8 +2,9 @@
 //! [`AdjustValue`], with the kind's editor from `adjust_editors` (the editors the adjustment-layer Properties panel
 //! uses too).
 //!
-//! The dialog host keeps the value. What the app keeps beside it is [`OpenAdjust`] (`app.adjust_open`): the command
-//! and target the dialog opened with and the parameters it addresses. While it is open the canvas previews the
+//! The dialog host keeps the value and the parameters it converts over ([`DialogValue`]), so the dialog lists the
+//! command's parameters itself. What the app keeps beside it is [`OpenAdjust`] (`app.adjust_open`): the command and
+//! target the dialog opened with. While it is open the canvas previews the
 //! settings as a temporary adjustment layer clipped to the target (`adjust_preview`, composited on the GPU); where
 //! that can't match the command, the *real command* runs on the proxy document through the filter-preview machinery.
 //! OK runs the command once (one history step) and Cancel drops the preview, leaving the document untouched.
@@ -20,6 +21,7 @@ use craft::ui::runtime::env::Label;
 use craft::ui::runtime::memory::{SaveKey, saved_value, set_saved_value};
 use photocraft_doc::ColorMode;
 use photocraft_engine::channel_cmds::ToneTarget;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::PhotocraftApp;
@@ -30,7 +32,33 @@ use crate::tone::{self, HistSource};
 const PREFIX: &str = "image.adjustments.";
 
 /// The hosted adjustment dialog the app opens.
-pub(crate) type HostedAdjustDialog = FrameworkDialog<AdjustValue, AdjustAsk>;
+pub(crate) type HostedAdjustDialog = FrameworkDialog<DialogValue, AdjustAsk>;
+
+/// What the hosted dialog holds: the editor's value and the context it converts to the command's parameters in, so
+/// the dialog lists its own parameters. The context is not the user's to edit: an opening or a retarget seeds it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub(crate) struct DialogValue {
+    #[serde(flatten)]
+    pub(crate) value: AdjustValue,
+    /// The parameters the dialog was opened with, addressing included, and the value's conversion context.
+    #[serde(skip)]
+    pub(crate) cx: ValueCx,
+}
+
+impl DialogValue {
+    /// The command's parameters: the value over the parameters the dialog opened with ([`values::to_params`]).
+    pub(crate) fn params(&self, edited: bool) -> Value {
+        values::to_params(&self.value, &self.cx, edited)
+    }
+}
+
+/// The dialog's automation fields: the command's parameters.
+fn json_form(value: &DialogValue, edited: bool) -> Map<String, Value> {
+    match value.params(edited) {
+        Value::Object(params) => params,
+        _ => Map::new(),
+    }
+}
 
 /// The open adjustment dialog's context in the app: what it was opened for, not what it shows (the value is the host's).
 pub(crate) struct OpenAdjust {
@@ -55,8 +83,6 @@ pub(crate) struct OpenAdjust {
     picked: Option<(TonePicker, Value)>,
     /// What the editor reads: histograms, channels, swatches. Rebuilt only when the target changes.
     pub(crate) setup: Arc<Mutex<EditorSetup>>,
-    /// The parameters the dialog was opened with, addressing included, and the value's conversion context.
-    pub(crate) cx: ValueCx,
     /// The recorded parameters the value was seeded from, for seeding again when an unresolved target resolves.
     recorded: Value,
     /// The captured parameters a Smart Filter edit lays over the recorded ones through the engine's normal form.
@@ -99,7 +125,7 @@ pub(crate) fn hosted_mut(app: &mut PhotocraftApp, id: DialogId) -> &mut HostedAd
 pub(crate) fn open_params(app: &PhotocraftApp) -> Option<Value> {
     let open = open_value(app)?;
     let dialog = hosted(app, open.id)?;
-    Some(values::to_params(dialog.value(), &open.cx, dialog.edited()))
+    Some(dialog.value().params(dialog.edited()))
 }
 
 /// Whether `command` opens an adjustment dialog (when run without params).
@@ -134,7 +160,7 @@ fn curve_mode(app: &PhotocraftApp, kind: &str, target: &ToneTarget) -> ColorMode
 pub(crate) fn picker_applies(app: &PhotocraftApp, open: &OpenAdjust, picker: TonePicker) -> bool {
     matches!(open.kind.as_str(), "levels" | "curves")
         && app.session.active().is_some()
-        && target_context(app, open.smart_filter.as_ref(), &open.cx.base).is_ok()
+        && hosted(app, open.id).is_some_and(|dialog| target_context(app, open.smart_filter.as_ref(), &dialog.value().cx.base).is_ok())
         && picker.supported(open.mode == ColorMode::Rgb, adjust_editors::is_gray(open.mode))
 }
 
@@ -171,27 +197,29 @@ enum Change {
 
 fn set_params(app: &mut PhotocraftApp, id: DialogId, params: &Value, change: Change) -> bool {
     let Some(open) = app.adjust_open.as_mut().filter(|open| open.id == id) else { return false };
+    let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) else { return false };
+    let mut shown = dialog.value().clone();
     let mut retargeted = false;
     for (key, address) in addressing(params) {
-        if open.cx.base.get(&key) != Some(&address) {
+        if shown.cx.base.get(&key) != Some(&address) {
             retargeted = true;
-            for held in [&mut open.cx.base, &mut open.recorded] {
+            for held in [&mut shown.cx.base, &mut open.recorded] {
                 if let Some(object) = held.as_object_mut() {
                     object.insert(key.clone(), address.clone());
                 }
             }
         }
     }
-    if retargeted && open.unresolved {
-        return true;
+    let read = if retargeted && open.unresolved { None } else { values::from_params(&open.kind, params, &shown.cx).ok() };
+    let taken = read.is_some();
+    match read {
+        Some(value) if change == Change::Edit => *dialog.value_mut() = DialogValue { value, ..shown },
+        Some(value) => dialog.seed(DialogValue { value, ..shown }),
+        // The address is the dialog's context, not a setting: a refused value keeps the retarget.
+        None if retargeted => dialog.seed(shown),
+        None => {}
     }
-    let Ok(value) = values::from_params(&open.kind, params, &open.cx) else { return false };
-    let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) else { return false };
-    match change {
-        Change::Edit => *dialog.value_mut() = value,
-        Change::Seed => dialog.seed(value),
-    }
-    true
+    taken || (retargeted && open.unresolved)
 }
 
 /// The parameter keys that address the command (not settings): they stay when parameters are replaced.
@@ -214,7 +242,8 @@ pub(crate) fn pick(app: &mut PhotocraftApp, at: [f64; 2]) -> bool {
     }
     let (kind, mode) = (open.kind.clone(), open.mode);
     let gray = open.target.channel.as_ref().is_some_and(|c| c.gray.is_some());
-    let resolved = target_context(app, open.smart_filter.as_ref(), &open.cx.base).err().map(|error| error.to_string());
+    let base = hosted(app, id).map_or(Value::Null, |dialog| dialog.value().cx.base.clone());
+    let resolved = target_context(app, open.smart_filter.as_ref(), &base).err().map(|error| error.to_string());
     let current = open_params(app).unwrap_or(Value::Null);
     let base = match open.picked.as_ref() {
         Some((last, result)) if *last == picker && *result == current => open.picker_base.clone().unwrap_or_else(|| current.clone()),
@@ -251,8 +280,8 @@ pub(crate) fn pick(app: &mut PhotocraftApp, at: [f64; 2]) -> bool {
     // Scalar samples retain their native precision. The colour picker keeps its existing hundredth-level
     // curve-point convention, independently of source sample depth.
     let mut params = if gray { photocraft_engine::adjust_params::to_dialog_params(&adjustment) } else { photocraft_engine::adjust_params::to_params(&adjustment) };
-    if let (Value::Object(object), Some(open)) = (&mut params, app.adjust_open.as_ref()) {
-        object.extend(addressing(&open.cx.base));
+    if let (Value::Object(object), Some(dialog)) = (&mut params, hosted(app, id)) {
+        object.extend(addressing(&dialog.value().cx.base));
     }
     if !apply_params(app, id, &params) {
         return true;
@@ -283,7 +312,8 @@ fn curve_levels(points: &[[f32; 2]]) -> Vec<f32> {
 pub(crate) fn add_point(app: &mut PhotocraftApp, at: [f64; 2], every_channel: bool) -> bool {
     let Some(open) = open_value(app).filter(|open| open.kind == "curves") else { return false };
     let id = open.id;
-    let names_plane = open.cx.base.get("target").is_some_and(|target| matches!(target.as_str(), Some("mask" | "filterMask" | "quickMask")) || target.get("channel").is_some());
+    let Some(base) = hosted(app, id).map(|dialog| &dialog.value().cx.base) else { return false };
+    let names_plane = base.get("target").is_some_and(|target| matches!(target.as_str(), Some("mask" | "filterMask" | "quickMask")) || target.get("channel").is_some());
     // A mask, saved channel or Quick Mask holds its own gray levels, not the composite's.
     let gray_plane = open.target.channel.as_ref().is_some_and(|c| c.gray.is_some());
     let isolated = open.target.channel.clone();
@@ -303,7 +333,7 @@ pub(crate) fn add_point(app: &mut PhotocraftApp, at: [f64; 2], every_channel: bo
     let channels = values::tone_channels(photocraft_engine::adjust_params::default_space(mode), adjust_editors::is_gray(mode), isolated.as_ref());
     let shown = dialog.channel();
     let mut value = dialog.value().clone();
-    let AdjustValue::Curves { curves, .. } = &mut value else { return true };
+    let AdjustValue::Curves { curves, .. } = &mut value.value else { return true };
     let added = CurvesPanel::add_point_from_sample(curves, &channels, shown, Srgba::from_rgb_array(sample), every_channel, &curve_levels);
     if let Some(index) = added {
         *dialog.value_mut() = value;
@@ -518,31 +548,33 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
 }
 
 /// The kind's editor over a setup the app can replace when the target changes.
-fn shared_editor(kind: String, setup: Arc<Mutex<EditorSetup>>) -> impl for<'b> Fn(&mut egui::Ui, &mut AdjustValue, &mut AdjustDialogCx<'b>) -> Option<AdjustAsk> + Send + 'static {
+fn shared_editor(kind: String, setup: Arc<Mutex<EditorSetup>>) -> impl for<'b> Fn(&mut egui::Ui, &mut DialogValue, &mut AdjustDialogCx<'b>) -> Option<AdjustAsk> + Send + 'static {
     move |ui, value, cx| {
         let setup = setup.lock().ok()?.clone();
         if setup.stale {
             ui.label(tl!("The adjustment target is missing or unavailable.").to_string());
             return None;
         }
-        adjust_editors::dialog_editor(&kind, setup)(ui, value, cx)
+        adjust_editors::dialog_editor(&kind, setup)(ui, &mut value.value, cx)
     }
 }
 
-/// Alt+Cancel (Reset): engine defaults for the kind and mode; Color Balance keeps the user's Preserve Luminosity
-/// (Photoshop 25.4). The dialog stays open.
-fn reset_target(kind: String, mode: ColorMode, isolated: Option<photocraft_engine::channel_cmds::IsolatedCurveChannel>) -> impl Fn(&AdjustValue, &AdjustValue) -> AdjustValue + Send + 'static {
+/// Alt+Cancel (Reset): engine defaults for the kind and the dialog's mode; Color Balance keeps the user's Preserve
+/// Luminosity (Photoshop 25.4). The dialog stays open, in its context.
+fn reset_target(kind: String) -> impl Fn(&DialogValue, &DialogValue) -> DialogValue + Send + 'static {
     move |_opening, current| {
+        let (mode, isolated) = (current.cx.mode, current.cx.isolated.clone());
         let Ok(defaults) = photocraft_engine::adjust_params::default_for(&kind, mode) else { return current.clone() };
         let mut params = photocraft_engine::adjust_params::to_params(&defaults);
-        let cx = value_cx(mode, isolated.clone(), params.clone());
+        let cx = value_cx(mode, isolated, params.clone());
         if kind == "colorBalance"
-            && let Some(preserve) = values::to_params(current, &cx, true).get("preserveLuminosity").cloned()
+            && let Some(preserve) = values::to_params(&current.value, &cx, true).get("preserveLuminosity").cloned()
             && let Some(object) = params.as_object_mut()
         {
             object.insert("preserveLuminosity".into(), preserve);
         }
-        values::from_params(&kind, &params, &cx).unwrap_or_else(|_| current.clone())
+        let value = values::from_params(&kind, &params, &cx).unwrap_or_else(|_| current.value.clone());
+        DialogValue { value, cx: current.cx.clone() }
     }
 }
 
@@ -561,9 +593,11 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     let setup = Arc::new(Mutex::new(build_setup(app, &kind, &seeded.target, seeded.mode, seeded.unresolved)));
     let gray = gray_context(app, &kind, &seeded.target);
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
-    let mut dialog = HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), seeded.value, shared_editor(kind.clone(), setup.clone()))
+    let value = DialogValue { value: seeded.value, cx: seeded.cx };
+    let mut dialog = HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), value, shared_editor(kind.clone(), setup.clone()))
         .context(dynamic, gray)
-        .reset_with(reset_target(kind.clone(), seeded.mode, seeded.target.channel.clone()))
+        .reset_with(reset_target(kind.clone()))
+        .json_form(json_form)
         .held_ok();
     if let Some(idx) = app.session.active_index() {
         dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
@@ -583,7 +617,6 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
         picker_base: None,
         picked: None,
         setup,
-        cx: seeded.cx,
         recorded,
         normalized,
     });
@@ -617,7 +650,8 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, Str
     let mut restored = photocraft_engine::adjust_params::to_dialog_params(&adjustment);
     // The target `open` captured, as `remember` reads it: a viewed layer mask wins over the
     // Channels panel's colour set, so its settings are restored as saved.
-    let captured_set = combined_lab_target(&open.cx.base);
+    let Some(base) = hosted(app, id).map(|dialog| dialog.value().cx.base.clone()) else { return Ok(id) };
+    let captured_set = combined_lab_target(&base);
     if mode == ColorMode::Lab && matches!(kind, "levels" | "curves") && captured_set {
         // The parser validates all records, but ordinary Lab serialization aliases the master
         // to Lightness. A partial set keeps the separately saved combined record.
@@ -633,7 +667,7 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, Str
         }
     }
     if let Value::Object(object) = &mut restored {
-        object.extend(addressing(&open.cx.base));
+        object.extend(addressing(&base));
     }
     seed_params(app, id, &restored);
     Ok(id)
@@ -663,7 +697,7 @@ fn combined_lab_target(params: &Value) -> bool {
 
 /// Remember an adjustment dialog's settings after a successful OK, for [`open_last`]: the engine parameters without
 /// the addressing keys, in the saved tier. Editing a smart filter's settings is not a use of the dialog's own.
-fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, params: &Value) {
+fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, cx: &ValueCx, params: &Value) {
     if open.smart_filter.is_some() {
         return;
     }
@@ -673,7 +707,7 @@ fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, params:
             object.remove(key);
         }
     }
-    if app.session.active().is_some_and(|st| st.doc.mode == ColorMode::Lab) && combined_lab_target(&open.cx.base) && matches!(open.kind.as_str(), "levels" | "curves") {
+    if app.session.active().is_some_and(|st| st.doc.mode == ColorMode::Lab) && combined_lab_target(&cx.base) && matches!(open.kind.as_str(), "levels" | "curves") {
         settings["__combinedLab"] = json!(true);
     }
     set_saved_value(ctx, &last_key(&open.kind), Some(settings));
@@ -681,8 +715,8 @@ fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, params:
 
 /// Validate tone edits before the Smart Filter renderer uses them for preview or commit: the parameters the edit
 /// sends, or the engine's refusal of them. `edited` is the dialog's [`edited`](FrameworkDialog::edited).
-pub(crate) fn smart_filter_params(app: &PhotocraftApp, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<Value, String> {
-    let params = values::to_params(value, &open.cx, edited);
+pub(crate) fn smart_filter_params(app: &PhotocraftApp, open: &OpenAdjust, value: &DialogValue, edited: bool) -> Result<Value, String> {
+    let params = value.params(edited);
     if matches!(open.kind.as_str(), "levels" | "curves") {
         photocraft_engine::adjust_params::from_params(&open.kind, &params, None, curve_mode(app, &open.kind, &open.target)).map_err(|error| error.to_string())?;
     }
@@ -720,7 +754,7 @@ fn answer_asks(app: &mut PhotocraftApp, id: DialogId) {
     }
     while let Some((key, color)) = crate::color_picker_ui::answer_for(app, id) {
         if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) {
-            adjust_editors::answer_color(dialog.value_mut(), &key, color);
+            adjust_editors::answer_color(&mut dialog.value_mut().value, &key, color);
         }
     }
 }
@@ -748,9 +782,9 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
         if let Ok(mut shared) = open.setup.lock() {
             *shared = setup;
         }
-        (open.mode, open.target, open.cx, open.unresolved, open.picker_base, open.picked) = (seeded.mode, seeded.target, seeded.cx, false, None, None);
+        (open.mode, open.target, open.unresolved, open.picker_base, open.picked) = (seeded.mode, seeded.target, false, None, None);
         if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) {
-            dialog.seed(seeded.value);
+            dialog.seed(DialogValue { value: seeded.value, cx: seeded.cx });
         }
         return;
     }
@@ -764,27 +798,31 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
     if let Ok(mut shared) = open.setup.lock() {
         *shared = setup;
     }
-    open.cx = value_cx(smart_mode, target.channel.clone(), open.cx.base.clone());
+    if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) {
+        let mut shown = dialog.value().clone();
+        shown.cx = value_cx(smart_mode, target.channel.clone(), shown.cx.base.clone());
+        dialog.seed(shown);
+    }
     (open.mode, open.target, open.picker_base, open.picked) = (smart_mode, target, None, None);
 }
 
 /// Authorizes and runs the confirmed command (one history step), then remembers the settings.
-fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<(), String> {
+fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &DialogValue, edited: bool) -> Result<(), String> {
     let params = match open.smart_filter {
         Some(_) => smart_filter_params(app, open, value, edited)?,
-        None => values::to_params(value, &open.cx, edited),
+        None => value.params(edited),
     };
     crate::actions::authorize_panel_preview(app, open.id, &open.command, &params)?;
     let captured = open.smart_filter.as_ref().map_or(Value::Null, |(_, target)| target.clone());
     let (command, run_params) = crate::smart_ui::confirm_command(app, &captured, open.command.clone(), params.clone())?;
     crate::actions::run_step_dialog(app, open.id, &command, run_params)?;
-    remember(app, ctx, open, &params);
+    remember(app, ctx, open, &value.cx, &params);
     Ok(())
 }
 
 /// The hooks of a playing Action around a confirmed step dialog: the action continues after the command. A refused
 /// command keeps the dialog open and the step paused: the user can change the values and press OK again, or cancel.
-fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<(), String> {
+fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &DialogValue, edited: bool) -> Result<(), String> {
     // Taken before the command runs: the step dialog's playback is looked up by the dialog's id.
     let token = crate::actions::token_of(app, open.id);
     run_confirmed(app, ctx, open, value, edited)?;
