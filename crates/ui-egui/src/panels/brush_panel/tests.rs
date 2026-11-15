@@ -295,7 +295,7 @@ fn options_bar_edits_are_one_set_brush_per_gesture() {
     // A click is its own gesture: the Pressure controls size switch sits left of its label.
     let label = h.get_by_label("Pressure controls size").rect();
     let was = h.state().session.tools.brush.pressure_size;
-    let at = egui::pos2(label.left() - 18.0, label.center().y);
+    let at = egui::pos2(label.left() + 6.0, label.center().y);
     h.hover_at(at);
     h.run();
     h.drag_at(at);
@@ -328,6 +328,14 @@ fn brush_and_eraser_size_fields_keep_sizes_above_2500_px() {
     }
 }
 
+/// Runs the menu row `label` from the keyboard: focus it, then Enter.
+fn click_menu_item(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
+    h.get_by_label(label).focus();
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+}
+
 #[test]
 fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     let mut h = options_bar_harness(crate::state::Tool::MixerBrush);
@@ -356,9 +364,8 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     // Current Brush Load › Clean Brush empties the brush.
     h.get_by_label("Current brush load").click();
     h.run_steps(3);
-    h.get_by_label("Clean Brush").click();
+    click_menu_item(&mut h, "Clean Brush");
     h.run_steps(3);
-    eprintln!("DBG journal tail {:?}", h.state().session.journal.iter().rev().take(3).map(|(i, _)| i.clone()).collect::<Vec<_>>());
     assert_eq!(last_journal(h.state()).map(|(id, _)| id), Some("brush.mixer.clean".to_string()));
     assert_eq!(h.state().session.tools.mixer.reservoir, None);
 
@@ -373,7 +380,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     // Load Brush fills it with the foreground again.
     h.get_by_label("Current brush load").click();
     h.run_steps(3);
-    h.get_by_label("Load Brush").click();
+    click_menu_item(&mut h, "Load Brush");
     h.run_steps(3);
     assert_eq!(h.state().session.tools.mixer.reservoir, Some([0.0, 0.0, 1.0, 1.0]));
 }
@@ -683,7 +690,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     assert_eq!(id, "tools.setBrush");
     assert_eq!(p["brush"]["shapeDynamics"]["enabled"], json!(true));
     // A section's box toggles it without showing it.
-    h.get_by_label("Enable Transfer").click();
+    h.get_all_by_label("Enable Transfer").next().unwrap().click();
     h.run_steps(3);
     assert!(h.state().session.tools.brush.transfer.enabled);
     assert_eq!(h.state().ui.brush_section, 1);
@@ -767,7 +774,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     // A right-click on Width lists the units; Millimeters shows both sides in mm.
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(100.0)).unwrap().click_secondary();
     h.run_steps(3);
-    h.get_by_label("Millimeters").click();
+    click_menu_item(&mut h, "Millimeters");
     h.run_steps(4);
     let o = &h.state().ui.tool_options;
     assert_eq!(o.marquee_unit, "mm");
@@ -790,7 +797,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     // them (50 px at 254 ppi is 0.197 in, which reads back as 50.038 px).
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(5.0)).unwrap().click_secondary();
     h.run_steps(3);
-    h.get_by_label("Inches").click();
+    click_menu_item(&mut h, "Inches");
     h.run_steps(4);
     let field = h.query_all_by_role(Role::SpinButton).position(|n| n.accesskit_node().numeric_value().is_some_and(|v| (v - 0.19685).abs() < 1e-4)).unwrap();
     h.query_all_by_role(Role::SpinButton).nth(field).unwrap().click();
