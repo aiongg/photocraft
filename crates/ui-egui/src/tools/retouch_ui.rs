@@ -377,19 +377,6 @@ pub fn patch_drags_selection(app: &PhotocraftApp, at: [f64; 2], mods: Mods) -> b
     sel.sample_channel(at[0].floor() as i32, at[1].floor() as i32, 0) > 0.0
 }
 
-/// A Patch or Content-Aware Move lasso that makes a new selection is being drawn: the selection it
-/// replaces is hidden from the press on, as in Photoshop, rather than shown beside the new outline
-/// until the release (#11024). Adding, subtracting and intersecting keep it visible. The host ends
-/// a press whose canvas is no longer the one in use, so the press carries no document of its own.
-pub(crate) fn patch_replaces_selection(app: &PhotocraftApp, press: Option<&PatchPress>) -> bool {
-    use crate::canvas::tool_feedback::{has_selection, selection_op};
-    press.is_some_and(|p| {
-        matches!(p.tool, Tool::Patch | Tool::ContentAwareMove)
-            && !patch_drags_selection(app, p.start, p.modifiers)
-            && selection_op(p.tool, app.ui.selection_mode, p.modifiers, has_selection(app)) == craft::behavior::geometry::SelectionOperation::New
-    })
-}
-
 /// The Patch or Content-Aware Move press.
 #[derive(Clone, Debug)]
 pub(crate) struct PatchPress {

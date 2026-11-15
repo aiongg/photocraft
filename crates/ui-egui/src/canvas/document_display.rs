@@ -99,7 +99,7 @@ pub(crate) fn ants_shown(app: &PhotocraftApp, idx: usize) -> Option<(i32, i32)> 
     }
     let active = app.session.active_index() == Some(idx);
     let floating = super::tools::selection::floating_outline(app, idx).is_some();
-    if active && !floating && crate::retouch_ui::patch_replaces_selection(app, app.canvas_tools.retouch.press()) {
+    if active && !floating && app.canvas_tools.retouch.replaces_selection() {
         return None;
     }
     Some(if active { super::tools::selection::shown_offset(app).unwrap_or((0, 0)) } else { (0, 0) })

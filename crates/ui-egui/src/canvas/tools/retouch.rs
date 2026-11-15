@@ -24,6 +24,12 @@ use crate::state::Tool;
 pub(crate) struct RetouchTools {
     /// The press of a Patch or Content-Aware Move selection drag, or of an Object Selection rectangle.
     press: Option<PatchPress>,
+    /// A lasso outline that makes a new selection is being drawn: the selection it replaces is hidden from the press
+    /// on (#11024). Adding, subtracting and intersecting keep it visible.
+    pub(crate) fn replaces_selection(&self) -> bool {
+        self.lasso.replaces_selection()
+    }
+
     /// The last drag point in document units.
     last: [f64; 2],
     /// Shift at the last drag sample.
@@ -33,7 +39,7 @@ pub(crate) struct RetouchTools {
 }
 
 impl RetouchTools {
-    /// The press of the selection drag in progress, for `patch_replaces_selection`, `cam_preview::wanted` and
+    /// The press of the selection drag in progress, for `cam_preview::wanted` and
     /// `patch_preview::drag_offset`.
     pub(crate) fn press(&self) -> Option<&PatchPress> {
         self.press.as_ref()

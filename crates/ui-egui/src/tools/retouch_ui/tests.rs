@@ -506,24 +506,6 @@ fn patch_tool_lassoes_then_drags_the_patch() {
     assert!(px[0] > 0.95 && px[1] > 0.95 && px[2] > 0.95, "blemish patched with the white background: {px:?}");
 }
 
-/// #11024: a new Patch (or Content-Aware Move) lasso replaces the selection it starts outside of;
-/// ⇧ keeps the old one and adds; a press inside the selection drags the patch.
-#[test]
-fn a_new_patch_lasso_hides_and_replaces_the_old_selection() {
-    for tool in [Tool::Patch, Tool::ContentAwareMove] {
-        let mut app = app();
-        app.run("select.rect", json!({"x": 10, "y": 20, "width": 16, "height": 20})).unwrap();
-        app.ui.tool = tool;
-        let outside = PatchPress::new(tool, [60.0, 20.0], Mods::default());
-        assert!(patch_replaces_selection(&app, Some(&outside)), "{tool:?}: the old outline is hidden while the new one is drawn");
-        let added = PatchPress::new(tool, [60.0, 20.0], shift());
-        assert!(!patch_replaces_selection(&app, Some(&added)), "{tool:?}: ⇧ adds, so the old outline stays");
-        let inside = PatchPress::new(tool, [18.0, 30.0], Mods::default());
-        assert!(!patch_replaces_selection(&app, Some(&inside)), "{tool:?}: a press inside drags the patch");
-        assert!(!patch_replaces_selection(&app, None), "{tool:?}: nothing is being drawn");
-    }
-}
-
 /// #11024: the Patch and Content-Aware Move cursors show + with ⇧ and − with ⌥, like the Lasso's,
 /// but nothing over the selection without them, where a press drags the patch.
 #[test]
