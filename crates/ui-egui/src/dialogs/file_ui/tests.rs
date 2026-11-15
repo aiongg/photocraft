@@ -168,7 +168,9 @@ fn print_drag_uses_the_resolved_layout_and_travel_in_paper_points_without_accumu
                 ]);
                 let start = layout(&f);
                 let press = top_left(&start);
-                assert!(drag_print_position(&mut f, press, &start), "a press without travel is a valid update");
+                let before = serde_json::to_value(&f).unwrap();
+                assert!(!drag_print_position(&mut f, press, &start), "a press without travel changes nothing, so a click leaves Center on");
+                assert_eq!(serde_json::to_value(&f).unwrap(), before);
                 let manual = layout(&f);
                 assert!((manual.rect.0 - start.rect.0).abs() < 1e-9, "no jump on the first update");
                 assert!((manual.rect.1 - start.rect.1).abs() < 1e-9);
