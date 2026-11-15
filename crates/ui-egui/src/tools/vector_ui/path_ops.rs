@@ -87,11 +87,7 @@ pub fn make_shape(app: &mut PhotocraftApp) -> Result<Value, String> {
     super::cancel_stale_pen(app);
     if let Some(pen) = app.ui.pen.clone().filter(|p| p.draft.knots.len() >= 2) {
         let r = super::pen::make_shape_from_draft(app, &pen)?;
-        app.ui.pen = None;
-        app.ui.pen_doc = None;
-        if app.ui.direct_selection.target == Some(crate::direct_select::PathRef::Pen) {
-            app.ui.direct_selection = Default::default();
-        }
+        super::host::drop_draft(app);
         return Ok(r);
     }
     let name =

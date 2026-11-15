@@ -57,11 +57,11 @@ fn harness() -> (Harness<'static, PhotocraftApp>, LayerId) {
     (h, paint)
 }
 
-/// A document tab, found by its accessible title ("name @ 100% (…)", see `pro_tabs`). The document's canvas carries
-/// the same title, so the query takes the tab's button.
+/// A document tab of the strip, found by its accessible name (the document's name, then its detail). The document's
+/// canvas carries the name too, so the query takes the tab.
 fn tab(h: &Harness<'_, PhotocraftApp>, name: &str) -> Pos2 {
-    let title = format!("{name} @");
-    h.get_by(move |n| n.role() == egui::accesskit::Role::Button && n.label().is_some_and(|l| l.contains(&title))).rect().center()
+    let name = name.to_owned();
+    h.get_by(move |n| n.role() == egui::accesskit::Role::Tab && n.label().is_some_and(|l| l.starts_with(&name))).rect().center()
 }
 
 /// Press at `path[0]`, move through the rest (a few frames at each) and release at the last

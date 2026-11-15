@@ -358,11 +358,7 @@ pub(crate) fn cancel_stale_pen(app: &mut PhotocraftApp) -> bool {
             return true;
         }
     }
-    app.ui.pen = None;
-    app.ui.pen_doc = None;
-    if app.ui.direct_selection.target == Some(crate::direct_select::PathRef::Pen) {
-        app.ui.direct_selection = Default::default();
-    }
+    host::drop_draft(app);
     app.ui.status = "Pen draft cancelled because its source document or path changed; newer work was preserved".into();
     app.ui.status_error = true;
     true

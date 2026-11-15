@@ -158,10 +158,7 @@ pub(crate) fn pen_finish_on_redo(app: &mut PhotocraftApp) -> Result<bool, String
         app.ui.pen_doc = pen_doc;
         return redone.map(|_| true);
     }
-    if app.ui.direct_selection.target == Some(crate::direct_select::PathRef::Pen) {
-        app.ui.direct_selection = Default::default();
-    }
-    app.ui.pen_doc = None;
+    super::host::drop_draft(app);
     let doc = current_doc(app);
     if let Some(finished) = app.finished_pens.get_mut(i) {
         finished.doc = doc;
