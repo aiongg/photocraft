@@ -8,7 +8,7 @@ mod fixture;
 use fixture::{Fixture, assert_denied, cube, path_params};
 use photocraft_automation::{Headless, workspace::authorize_desktop_engine_step};
 use photocraft_doc::LayerContent;
-use photocraft_engine::{Session, actions_cmds::Action, jobs::Started, smart_cmds};
+use photocraft_engine::{Session, actions_cmds::{Action, ActionStep}, jobs::Started, smart_cmds};
 use serde_json::json;
 
 #[test]
@@ -41,8 +41,8 @@ fn action_playback_cannot_hide_a_smart_filter_path_edit() {
     let doc = h.session.active().unwrap().doc.clone();
     h.session.actions.list.push(Action::new(
         "edit filter",
-        vec![("layer.smartFilter.setParams".into(), json!({"layer": layer.0, "params": path_params(false, &f.outside("white.png"))}))],
-    ));
+        vec![ActionStep::new("layer.smartFilter.setParams", json!({"layer": layer.0, "params": path_params(false, &f.outside("white.png"))}))],
+    )).unwrap();
     let result = h.session.execute("actions.play", json!({"action": "edit filter"})).unwrap();
     assert!(result["failed"]["error"].as_str().unwrap().contains("ambient filesystem"), "{result}");
     assert!(Arc::ptr_eq(&doc, &h.session.active().unwrap().doc));
