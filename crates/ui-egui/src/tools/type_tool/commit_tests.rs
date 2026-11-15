@@ -6,6 +6,7 @@
 //! app frame (the canvas editor holds the keys and the input method), and the session calls
 //! with the canvas pass's context.
 
+use craft::ui::runtime::windows::WindowHost;
 use egui_kittest::Harness;
 use photocraft_doc::{LayerContent, LayerId};
 use serde_json::json;
@@ -34,6 +35,8 @@ fn text_of(app: &PhotocraftApp, doc: usize, id: LayerId) -> Option<String> {
 pub(super) fn edit_active(app: &mut PhotocraftApp) {
     let ctx = testing::ctx(app);
     super::edit_active(app, &ctx).unwrap();
+    // The editor shows and takes the keyboard in the next pass.
+    testing::frame(app);
 }
 
 /// A key press event.
@@ -53,18 +56,58 @@ pub(super) fn frames(app: PhotocraftApp, events: Vec<egui::Event>) -> Photocraft
         },
         app,
     );
-    h.run_steps(8);
+    // Between passes, as eframe's input hook does: the runtime's output of the pass is taken (the
+    // commands it fired run in the next frame's logic) and its input for the next is set.
+    let step = |h: &mut Harness<'_, PhotocraftApp>, n: usize| {
+        for _ in 0..n {
+            h.step();
+            let ctx = h.ctx.clone();
+            h.state_mut().framework_before_input(&ctx);
+        }
+    };
+    step(&mut h, 8);
     for event in events {
         h.event(event);
-        h.run_steps(2);
+        step(&mut h, 2);
     }
     h.into_state()
+}
+
+/// Queues input with `inject` and runs frames until the window host has delivered it, so it reaches the focused
+/// editor as the platform's would.
+pub(super) fn deliver(app: &mut PhotocraftApp, inject: impl FnOnce(&WindowHost)) {
+    let host = WindowHost::of(&testing::ctx(app));
+    inject(&host);
+    for _ in 0..64 {
+        testing::frame(app);
+        if host.injected_idle() {
+            return;
+        }
+    }
+    panic!("the injected input was not taken");
+}
+
+/// Types `s` through the focused editor.
+pub(super) fn type_keys(app: &mut PhotocraftApp, s: &str) {
+    deliver(app, |host| host.inject_text(egui::ViewportId::ROOT, s));
+}
+
+/// An input-method event, delivered to the focused editor.
+pub(super) fn ime(app: &mut PhotocraftApp, event: egui::ImeEvent) {
+    deliver(app, |host| host.inject_ime(egui::ViewportId::ROOT, event));
 }
 
 /// Start a new type layer with a click and type `s` into it, as the canvas does.
 pub(super) fn type_new(app: &mut PhotocraftApp, s: &str) -> LayerId {
     click(app, 50.0, 100.0, egui::Modifiers::NONE);
-    super::host::type_text(app, s);
+    // The editor shows and takes the keyboard in the next pass.
+    testing::frame(app);
+    if s.is_empty() {
+        // The placeholder is selected: deleting it leaves the text empty.
+        testing::key(app, egui::Key::Backspace, egui::Modifiers::NONE);
+    } else {
+        type_keys(app, s);
+    }
     LayerId(app.ui.text_edit.as_ref().unwrap().layer)
 }
 

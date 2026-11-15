@@ -8,7 +8,7 @@ use photocraft_doc::{LayerContent, LayerId};
 use photocraft_raster::Surface;
 use serde_json::json;
 
-use super::commit_tests::{edit_active, frames, key, type_new};
+use super::commit_tests::{edit_active, type_new};
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
@@ -23,8 +23,9 @@ fn new_app(tool: Tool) -> PhotocraftApp {
 }
 
 
-fn press(app: PhotocraftApp, k: egui::Key, modifiers: Modifiers) -> PhotocraftApp {
-    frames(app, vec![key(k, modifiers)])
+fn press(mut app: PhotocraftApp, k: egui::Key, modifiers: Modifiers) -> PhotocraftApp {
+    crate::canvas::testing::key(&mut app, k, modifiers);
+    app
 }
 
 fn command_period(app: PhotocraftApp) -> PhotocraftApp {
@@ -88,7 +89,7 @@ fn command_period_restores_edited_text() {
         let id = LayerId(made["layer"].as_u64().unwrap());
         let before = snapshot(&app);
         edit_active(&mut app);
-        super::host::type_text(&mut app, "CD");
+        super::commit_tests::type_keys(&mut app, "CD");
         assert_ne!(text_of(&app, id), "Hello", "{tool:?}: typed");
         let app = command_period(app);
         assert!(app.ui.text_edit.is_none(), "{tool:?}: the session ends");

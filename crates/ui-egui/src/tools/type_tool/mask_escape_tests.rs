@@ -8,7 +8,7 @@ use egui::Modifiers;
 use photocraft_raster::Surface;
 use serde_json::json;
 
-use super::commit_tests::{frames, key, type_new};
+use super::commit_tests::type_new;
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
@@ -24,8 +24,13 @@ fn new_app(tool: Tool, use_esc_to_commit: bool) -> PhotocraftApp {
 }
 
 
+fn press(mut app: PhotocraftApp, k: egui::Key, modifiers: Modifiers) -> PhotocraftApp {
+    crate::canvas::testing::key(&mut app, k, modifiers);
+    app
+}
+
 pub(super) fn escape(app: PhotocraftApp) -> PhotocraftApp {
-    frames(app, vec![key(egui::Key::Escape, Modifiers::NONE)])
+    press(app, egui::Key::Escape, Modifiers::NONE)
 }
 
 /// The selection (compared pixel for pixel, shown by its bounds), the history (oldest first) and
@@ -63,7 +68,7 @@ fn escape_commits_a_type_mask_as_command_return_does() {
             let (app, before) = session();
             let escaped = escape(app);
             let (app, _) = session();
-            let returned = frames(app, vec![key(egui::Key::Enter, Modifiers::COMMAND)]);
+            let returned = press(app, egui::Key::Enter, Modifiers::COMMAND);
             assert!(escaped.ui.text_edit.is_none(), "{what}: the session ends");
             let after = snapshot(&escaped);
             let bounds = after.selection.as_ref().map(Surface::content_bounds);
