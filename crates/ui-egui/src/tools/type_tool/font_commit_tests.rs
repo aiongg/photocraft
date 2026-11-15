@@ -57,6 +57,7 @@ fn surrender_focus(h: &H) {
 fn fixture(pattern: usize, content: &str) -> (H, LayerId) {
     let content = content.to_owned();
     let mut h = Harness::builder().with_size(vec2(1600.0, 1000.0)).with_max_steps(64).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Services::default());
         app.session.edit_prefs(|p| p.type_.font_preview = photocraft_engine::prefs::FontPreview::Off);
         app.run("file.new", json!({"width": 240, "height": 160})).unwrap();

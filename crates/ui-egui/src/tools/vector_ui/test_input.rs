@@ -15,6 +15,7 @@ pub(super) fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
     let mut h = Harness::builder().with_size(vec2(WIDTH, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
     h.run_steps(6);
