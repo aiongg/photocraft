@@ -372,6 +372,7 @@ impl PhotocraftApp {
             }
         }
         self.ui.views = views.into_iter().map(Option::unwrap_or_default).collect();
+        canvas::document_windows::sync_documents(self, &ids);
         if !self.session.prefs().workspace.open_documents_as_tabs {
             let new_docs: Vec<DocId> = ids.iter().filter(|id| !self.view_docs.contains(id)).copied().collect();
             let ctx = self.ctx().clone();

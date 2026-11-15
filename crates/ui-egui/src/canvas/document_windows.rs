@@ -3,7 +3,9 @@
 //! as its body.
 
 use craft::behavior::canvas::zoom::wrapped_canvas;
+use craft::behavior::dock::DocumentWindows;
 use craft::behavior::kurbo::Size;
+use photocraft_doc::DocId;
 use craft::ui::contract::{ShowContainer as _, SizeLimits};
 use craft::ui::canvas::ToolHost;
 use craft::ui::shell::{DocumentWindow, Wrapped};
@@ -31,6 +33,35 @@ fn wants_wrap(preference: bool, before: &View, after: &View) -> bool {
 fn close_window(app: &mut PhotocraftApp, id: u64) {
     app.ui.window_views.remove(&id);
     app.ui.document_windows.close_window(id);
+}
+
+/// Puts `app.ui.document_windows` in step with the open documents: a document no group holds joins the docked
+/// group (the first one, or a new one), and a closed document leaves every group, the windows it empties going with
+/// it. The framework keeps groups of document ids and has no add of its own, so a new document floats in a
+/// throwaway window and closing that window docks it.
+pub(crate) fn sync_documents(app: &mut PhotocraftApp, ids: &[DocId]) {
+    let windows = &mut app.ui.document_windows;
+    for group in windows.docked.iter_mut().chain(windows.floating.iter_mut().map(|(group, _)| group)) {
+        group.documents.retain(|id| ids.contains(id));
+        if group.shown.is_some_and(|shown| !group.documents.contains(&shown)) {
+            group.shown = group.documents.first().copied();
+        }
+    }
+    windows.docked.retain(|group| !group.documents.is_empty());
+    let emptied: Vec<u64> = windows.floating.iter().filter(|(group, _)| group.documents.is_empty()).map(|(group, _)| group.id).collect();
+    for id in emptied {
+        close_window(app, id);
+    }
+    let windows = &mut app.ui.document_windows;
+    let held = |windows: &DocumentWindows<DocId>, id: &DocId| {
+        windows.docked.iter().chain(windows.floating.iter().map(|(group, _)| group)).any(|group| group.documents.contains(id))
+    };
+    for id in ids {
+        if !held(windows, id) {
+            let window = windows.new_window_for(id, Rect::NOTHING);
+            windows.close_window(window);
+        }
+    }
 }
 
 /// The floating document windows, each in its own OS window (or on the fallback layer where there is
