@@ -5,7 +5,7 @@ use craft::behavior::kurbo::Size;
 use craft::theme::variant::Tone;
 use craft::ui::notices::{Notice, NoticeLayout};
 use craft::ui::canvas::{AppPaint, NavigatorPreview};
-use craft::ui::contract::Bind;
+use craft::ui::contract::{Bind, Show as _};
 use craft::ui::patterns::canvas::NavigatorPanel;
 use craft::ui::primitives::ContentPainterCx;
 use egui::{Pos2, Rect, pos2};
