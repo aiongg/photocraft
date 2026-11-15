@@ -473,6 +473,8 @@ pub(crate) fn run_commit(app: &mut PhotocraftApp, tool: Tool, shape: SelectionSh
             }
             run(app, "select.lasso", params);
         }
+        // `SelectionShape` is `#[non_exhaustive]`: a shape the app has no engine command for commits nothing.
+        _ => {}
     }
 }
 
