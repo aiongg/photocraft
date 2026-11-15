@@ -416,6 +416,20 @@ fn canvas_controls(
 ) -> Option<(photocraft_doc::LayerId, photocraft_doc::Fill)> {
     let pointer = ui.input(|i| i.pointer.hover_pos());
     let now = ui.input(|i| i.time);
+    // The scroll bars (Standard Screen Mode only) and the rotation compass change the view they are bound to. They
+    // are shown first: a control shown later is above the earlier ones, and a body part such as the text editor
+    // takes no press under a member that covers the whole canvas.
+    let mut shown = space.view;
+    if !app.ui.view.hides_chrome() {
+        let size = app.session.documents()[host.idx].doc.size;
+        let bounds = Rect64::from_origin_size(Point::ZERO, Size::new(f64::from(size.width), f64::from(size.height)));
+        CanvasScrollbars::new("Scroll bars", Bind::bound(&mut shown), bounds).show_at(ui, rect);
+    }
+    if RotateView::visible(shown.rotation) {
+        let mut rotation = shown.rotation;
+        RotateView::new("Rotate View", Bind::bound(&mut rotation), shown.flip_x).show_at(ui, RotateView::compass_rect(ui, rect));
+        shown.rotation = rotation;
+    }
     crate::distort_ui::show_in_canvas(app, ui, rect);
     crate::blur_pins::overlay(app, ui, rect);
     let doc = app.session.documents()[host.idx].doc.id;
@@ -444,18 +458,6 @@ fn canvas_controls(
     crate::crop_ui::each_pass(app);
     crate::vector_ui::shapes::show_preview(app, ui, rect, &space.view);
     crate::tools::brush_feedback::show(ui, app, rect, pointer);
-    // The scroll bars (Standard Screen Mode only) and the rotation compass change the view they are bound to.
-    let mut shown = space.view;
-    if !app.ui.view.hides_chrome() {
-        let size = app.session.documents()[host.idx].doc.size;
-        let bounds = Rect64::from_origin_size(Point::ZERO, Size::new(f64::from(size.width), f64::from(size.height)));
-        CanvasScrollbars::new("Scroll bars", Bind::bound(&mut shown), bounds).show_at(ui, rect);
-    }
-    if RotateView::visible(shown.rotation) {
-        let mut rotation = shown.rotation;
-        RotateView::new("Rotate View", Bind::bound(&mut rotation), shown.flip_x).show_at(ui, RotateView::compass_rect(ui, rect));
-        shown.rotation = rotation;
-    }
     if shown != space.view {
         *turned = Some(shown);
     }
