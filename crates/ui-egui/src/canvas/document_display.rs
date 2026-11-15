@@ -439,6 +439,9 @@ fn canvas_controls(
     crate::symmetry_ui::canvas_controls(ui, app, rect);
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
+    if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
+        super::tools::crop::show_frame(app, ui, rect);
+    }
     crate::crop_task_bar::show(app, ui, rect);
     crate::frame_tool::task_bar::show(ui, app, rect);
     crate::crop_ui::each_pass(app);

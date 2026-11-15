@@ -125,10 +125,18 @@ pub(crate) fn to_screen(app: &PhotocraftApp, at: [f64; 2]) -> Pos2 {
     view(app).expect("the canvas shows a view of the active document").to_screen(Point::new(at[0], at[1]))
 }
 
-/// Runs a frame when the canvas has shown nothing yet, so an input has a view to map through.
+/// Runs frames until the canvas's view holds still, so an input maps through the layout the next pass shows: the first
+/// passes lay the window out (the document area is resized once the chrome has its room), and an input mapped through
+/// an earlier pass's view would land on the later layout.
 fn shown(app: &mut PhotocraftApp) {
-    if view(app).is_none() {
+    let mut last = view(app).map(|v| v.rect);
+    for _ in 0..MAX_FRAMES {
         run_frame(app);
+        let now = view(app).map(|v| v.rect);
+        if now.is_some() && now == last {
+            return;
+        }
+        last = now;
     }
 }
 
