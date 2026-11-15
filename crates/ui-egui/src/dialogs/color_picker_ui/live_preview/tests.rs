@@ -19,7 +19,9 @@ fn past(app: &PhotocraftApp) -> usize {
 /// One pass of the dialog host alone, with no taker: a request the dialogs filed stays for the test to take.
 fn host_pass(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
-    let _ = ctx.run_ui(egui::RawInput::default(), |ui| app.framework.dialogs.run(ui));
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| app.framework.dialogs.run(ui));
+    // No renderer takes the pass's texture uploads.
+    output.textures_delta.clear();
 }
 
 /// The values hosted dialog `id` holds, in their JSON form.
