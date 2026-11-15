@@ -496,8 +496,7 @@ fn footer_and_drop_events_follow_the_targets() {
     s.execute("layer.layerMask.hideAll", json!({"layer": shape})).unwrap();
     let app = app_of(s);
     let st = app.session.active().unwrap();
-    let filter = layers_tree::filter_of(&app.ui);
-    let tree = PhotoLayers::new(&app, st, &filter, false, None);
+    let tree = PhotoLayers::new(&app, st, &app.ui.layer_filter, false, None);
     assert!(!tree.accepts_mask_drop(&LayerId(masked), LayerPart::LayerMask, &LayerId(shape)), "onto a masked row");
     assert!(!tree.accepts_mask_drop(&LayerId(masked), LayerPart::LayerMask, &LayerId(masked)), "onto its own row");
 
@@ -569,7 +568,6 @@ fn menu_pick_values_run_their_rules() {
 /// is a view change only.
 #[test]
 fn activate_and_fx_events_open_the_right_editor() {
-    use crate::canvas::ToolEvent;
     let top = |app: &PhotocraftApp| app.framework.dialogs.open_dialogs().pop().expect("a dialog opened");
     let (s, a, _, c) = smart_session();
     let mut app = app_of(s);
@@ -604,11 +602,10 @@ fn activate_and_fx_events_open_the_right_editor() {
     app.run("layer.select", json!({"layer": c})).unwrap();
     let row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, photocraft_engine::distort_cmds::LIQUIFY)));
     send(&mut app,vec![LayersEvent::activate(row, ActivateOn::Row)]);
-    assert!(app.distort.liquify.is_some(), "the Liquify workspace opens");
-    for ev in [ToolEvent::Down { x: 6.0, y: 4.0, pressure: 1.0 }, ToolEvent::Move { x: 10.0, y: 4.0, pressure: 1.0 }, ToolEvent::Up { x: 10.0, y: 4.0 }] {
-        crate::liquify_ui::pointer(&mut app, ev, egui::Modifiers::NONE);
-    }
-    crate::liquify_ui::control(&mut app, &json!({"commit": true})).unwrap();
+    assert!(app.liquify.is_some(), "the Liquify workspace opens");
+    crate::liquify_ui::record_stroke(&mut app, &[[6.0, 4.0, 1.0], [10.0, 4.0, 1.0]]);
+    let ctx = app.ctx().clone();
+    crate::control::dialogs::workspace_ui(&mut app, &ctx, "filter.liquify", &json!({"commit": true})).unwrap();
     assert!(!app.ui.status_error, "{}", app.ui.status);
     let LayerContent::Smart(sm) = &layer(&app, a).content else { panic!("smart object") };
     let liquify = sm.smart_filters.iter().find(|f| f.command == photocraft_engine::distort_cmds::LIQUIFY).unwrap();
@@ -643,7 +640,8 @@ fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
             let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
             let other = LayerId(app.run("layer.new.layer", json!({"name": "Other pixels"})).unwrap()["layer"].as_u64().unwrap());
             app.run("layer.select", json!({"layer": text.0})).unwrap();
-            crate::type_tool::edit_active(&mut app).unwrap();
+            let ctx = app.ctx().clone();
+            crate::type_tool::edit_active(&mut app, &ctx).unwrap();
             let session = app.ui.text_edit.as_ref().unwrap().session.clone();
             app.run("type.edit", json!({"layer": text.0, "text": "Preserved edit", "coalesce": session})).unwrap();
             let target = if same { text } else { other };

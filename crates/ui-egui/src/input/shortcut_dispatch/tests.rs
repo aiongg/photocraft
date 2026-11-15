@@ -622,11 +622,9 @@ fn alt_reopens_the_last_adjustment_settings() {
     let defaults = to_params(&default_for("levels", ColorMode::Rgb).unwrap());
     assert_ne!(levels["inBlack"], defaults["inBlack"]);
     // The top dialog's id and values, and closing it with Cancel (which remembers nothing).
-    // PLAN: dialogs-w19 owns the open dialogs' values; `dialogs::top(app)` and `dialogs::fields(app, id)` are assumed.
     let top = |h: &Harness<'_, PhotocraftApp>| {
-        let app = h.state();
-        let id = crate::dialogs::top(app).expect("a dialog is open");
-        (id, crate::dialogs::fields(app, id))
+        let open = h.state().framework.dialogs.open_dialogs().pop().expect("a dialog is open");
+        (open.id, open.fields.expect("the dialog lists its fields"))
     };
     let cancel = |h: &mut Harness<'_, PhotocraftApp>, id| {
         let ctx = h.ctx.clone();
@@ -737,19 +735,17 @@ fn keyboard_zoom_works_with_a_dialog_open() {
 /// same frame runs only what its own input fired: ⌘J duplicates the layer once.
 #[test]
 fn a_second_pass_in_one_frame_runs_no_command_twice() {
-    let app = PhotocraftApp::new(realistic(), services());
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            crate::app::framework::keys_pass(app, ui, |_| {});
-            crate::app::framework::keys_pass(app, ui, |_| {});
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&h.ctx, Default::default());
-    h.run_steps(4);
-    let count = |h: &Harness<'_, PhotocraftApp>| h.state().session.active().unwrap().doc.walk().len();
-    let n = count(&h);
-    h.key_press_modifiers(Modifiers::COMMAND, Key::J);
-    h.run_steps(4);
-    assert_eq!(count(&h), n + 1, "one press, one duplicate");
+    let mut app = PhotocraftApp::new(realistic(), services());
+    let ctx = app.ctx().clone();
+    PhotocraftApp::setup_context(&ctx, Default::default());
+    let count = |app: &PhotocraftApp| app.session.active().unwrap().doc.walk().len();
+    let n = count(&app);
+    let press = egui::RawInput {
+        modifiers: Modifiers::COMMAND,
+        events: vec![egui::Event::Key { key: Key::J, physical_key: Some(Key::J), pressed: true, repeat: false, modifiers: Modifiers::COMMAND }],
+        ..Default::default()
+    };
+    crate::app::framework::keys_pass(&mut app, &ctx, press, |_| {});
+    crate::app::framework::keys_pass(&mut app, &ctx, egui::RawInput::default(), |_| {});
+    assert_eq!(count(&app), n + 1, "one press, one duplicate");
 }

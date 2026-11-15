@@ -25,8 +25,7 @@ fn action_set_bytes(set: &str, action: &str) -> Vec<u8> {
 
 /// Delivers the answer of the pick the last call asked for.
 fn settle(app: &mut PhotocraftApp) {
-    let ctx = app.ctx().clone();
-    app.poll_file_dialog(&ctx, None);
+    app.poll_file_dialog();
 }
 
 fn names(app: &PhotocraftApp) -> Vec<&str> {

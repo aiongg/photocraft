@@ -146,6 +146,32 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     }
 }
 
+/// What the box draws for the styled layer at `zoom`, as the framework's styled preview builds it: the composite and its
+/// plan, or `None` when the box draws the bare pixels (no style, a warp, a part of the layer, the Frame tool). Tests
+/// read the pixels here; the preview keeps them as a texture.
+#[cfg(test)]
+pub(crate) fn styled_composite(app: &PhotocraftApp, zoom: f32) -> Option<(egui::ColorImage, craft::imaging::ui::transform_preview::StylePlan)> {
+    use craft::behavior::geometry::Homography;
+    use craft::imaging::ui::transform_preview::{PreviewTextures, StyledFrame, StyledSource as _, resample};
+    let (t, pv) = (app.ui.transform.as_ref()?, app.transform_preview.as_ref()?);
+    if crate::frame_tool::frame_transform(t) || t.session.phase() != TransformPhase::Box || t.session.warp().is_some() {
+        return None;
+    }
+    pv.styled.as_ref()?;
+    let source = LayerStyleSource::new(app)?;
+    let frame = StyledFrame::new(&pv.textures, texture_quad(t, pv), [pv.doc.size.width, pv.doc.size.height], zoom);
+    let plan = craft::imaging::ui::transform_preview::StylePlan::new(frame.quad, frame.canvas, frame.zoom, frame.budget.pixels(source.pixel_cost_ns(), false), |scale| {
+        source.reach(scale)
+    })?;
+    let level = PreviewTextures::choose(plan.scale as f32, frame.quad_scale, frame.nearest).level;
+    let (image, uv) = frame.textures.level_image(level)?;
+    let scaled = frame.quad.map(|p| Point::new(p.x * plan.scale, p.y * plan.scale));
+    let to_unit = Homography::unit_to_quad(scaled)?.inverse()?;
+    let inside = Point::new(scaled.iter().map(|p| p.x / 4.0).sum(), scaled.iter().map(|p| p.y / 4.0).sum());
+    let content = resample(&image, uv, &to_unit, inside, plan.content, frame.nearest);
+    Some((source.compose(&plan, &content)?, plan))
+}
+
 /// The warp grid, or the cylinder editor for a cylinder, with its events for the caller to apply.
 fn show_warp(t: &FreeTransform, pv: &OpenPreview, w: &SessionWarp, ui: &mut egui::Ui, rect: egui::Rect, out: &mut Shown) {
     if w.warp.style == WarpStyle::Cylinder {

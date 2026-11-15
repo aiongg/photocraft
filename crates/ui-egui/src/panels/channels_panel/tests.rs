@@ -35,15 +35,14 @@ fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: ChannelsCommands)
 
 fn enabled(app: &PhotocraftApp, command: ChannelsCommands) -> bool {
     let wanted = CommandRef::from(command);
-    // PLAN: assumed `CommandState::is_enabled`.
-    command_states(app).into_iter().find(|(r, _)| *r == wanted).is_some_and(|(_, s)| s.is_enabled())
+    // `CommandState` has no read for its flag: a state is enabled when forcing the flag on changes nothing.
+    command_states(app).into_iter().find(|(r, _)| *r == wanted).is_some_and(|(_, s)| s.clone().enabled(true) == s)
 }
 
 /// The `channel` field of the newest open dialog.
 fn newest_dialog_channel(app: &PhotocraftApp) -> Value {
-    // PLAN: assumed dialogs-w19 test helpers `open_dialogs` and `json_field`.
-    let id = *app.framework.dialogs.open_dialogs().last().expect("a dialog is open");
-    crate::dialogs::testing::json_field(app, id, "channel")
+    let open = app.framework.dialogs.open_dialogs().pop().expect("a dialog is open");
+    open.fields.expect("the dialog lists its fields")["channel"].clone()
 }
 
 /// The thumbnail revision of a colour key follows the pixels and Show Channels in Color, not the selection (#4518).
@@ -152,7 +151,7 @@ fn channel_events_run_their_commands() {
 
     // The mask row on the trash asks first and deletes nothing.
     apply_footer_drop(&mut app, ChannelsFooterButton::Delete, &[Row::LayerMask]);
-    assert!(crate::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(&app).is_some(), "the prompt is open");
+    assert!(crate::dialogs::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(&app).is_some(), "the prompt is open");
     assert!(masked_layer(&app).is_some(), "nothing deleted yet");
 }
 
@@ -298,8 +297,8 @@ fn channel_commands_follow_the_target() {
     let mut app = app_with("rgb");
     fire(&mut app, &ctx, ChannelsCommands::NewChannel);
     assert!(app.dialog_open());
-    let id = *app.framework.dialogs.open_dialogs().last().unwrap();
-    crate::dialogs::testing::confirm(&mut app, id);
+    let id = app.framework.dialogs.open_dialogs().pop().unwrap().id;
+    crate::dialogs::testing::confirm(&mut app, id).unwrap();
     assert_eq!(alpha_names(&app).len(), 1, "OK in New Channel adds a channel");
 }
 
@@ -339,10 +338,9 @@ fn panel_menu_merge_channels_opens_its_dialog() {
     fire(&mut app, &ctx, ChannelsCommands::MergeChannels);
     assert_eq!(app.session.documents().len(), 3, "nothing is merged before OK");
     assert!(app.dialog_open());
-    // PLAN: assumed dialogs-w19 `testing::{set_json_field, confirm}` over the newest open dialog.
-    let id = *app.framework.dialogs.open_dialogs().last().unwrap();
-    crate::dialogs::testing::set_json_field(&mut app, id, "mode", json!("lab"));
-    crate::dialogs::testing::confirm(&mut app, id);
+    let id = app.framework.dialogs.open_dialogs().pop().unwrap().id;
+    app.framework.dialogs.set_json_field(&ctx, id, "mode", json!("lab")).unwrap();
+    crate::dialogs::testing::confirm(&mut app, id).unwrap();
     let docs = app.session.documents();
     assert_eq!(docs.len(), 1, "the sources close");
     assert_eq!(docs[0].doc.mode, photocraft_doc::ColorMode::Lab, "in the mode picked");

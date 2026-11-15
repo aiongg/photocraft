@@ -127,8 +127,7 @@ fn panels_never_panic_on_odd_documents() {
         s.execute("layer.vectorMask.revealAll", json!({})).unwrap();
         let app = app_of(s);
         let st = app.session.active().unwrap();
-        let filter = layers_tree::filter_of(&app.ui);
-        let tree = PhotoLayers::new(&app, st, &filter, false, None);
+        let tree = PhotoLayers::new(&app, st, &app.ui.layer_filter, false, None);
         let info = tree.info(&LayerId(id));
         assert!(!info.name.is_empty(), "{w}×{hgt}");
         let thumbs = PhotoThumbs::new(&app, &st.doc);

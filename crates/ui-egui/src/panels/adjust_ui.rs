@@ -149,7 +149,7 @@ mod lookup_picker_tests {
     fn chosen_lut_is_embedded_into_the_requested_adjustment_layer() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let layer = color_lookup_layer(&mut app);
-        let mut lut = craft_cms::lutfile::parse("custom.cube", CUBE.as_bytes()).unwrap();
+        let mut lut = craft::cms::lutfile::parse("custom.cube", CUBE.as_bytes()).unwrap();
         lut.title = "custom".into();
         apply_loaded(&mut app, layer, Ok(lut));
         let adj = adjustment(&app, layer);

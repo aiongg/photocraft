@@ -417,7 +417,6 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     new_guide_ui::take,
     export_dialog::take,
     file_ui::take,
-    file_ui::print::take,
     format_prompts::take,
     pattern_fill_ui::take,
     crate::workspace_ui::take,
@@ -512,10 +511,10 @@ pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) 
         return guide_layout_ui::open(app).ok_or_else(|| "no document".to_string());
     }
     if command == stroke_ui::COMMAND {
-        return stroke_ui::open(app);
+        return Ok(stroke_ui::open(app));
     }
     if command == equalize_ui::COMMAND && equalize_ui::asks(app) {
-        return equalize_ui::open(app);
+        return Ok(equalize_ui::open(app));
     }
     if new_group_ui::fronts(command) {
         return new_group_ui::open(app, command);

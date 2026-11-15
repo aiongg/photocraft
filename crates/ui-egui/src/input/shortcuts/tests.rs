@@ -18,10 +18,9 @@ fn a_tool_key_passes_over_a_remapped_tool_to_the_last_one_it_picks() {
     assert_eq!(h.state().ui.tool, Tool::MagneticLasso);
 }
 
-/// The Pen's unfinished points: the Pen tool's own `draft`, as the tool host keeps it.
-// PLAN: tools-w33 names the Pen's draft; `canvas_tools.vector.pen.draft.knots` is assumed.
+/// The Pen's unfinished points: the draft in `ui.pen`, as the tool host keeps it.
 fn pen_knots(app: &PhotocraftApp) -> usize {
-    app.canvas_tools.vector.pen.draft.knots.len()
+    app.ui.pen.as_ref().map_or(0, |pen| pen.draft.knots.len())
 }
 
 /// A document with the Pen tool selected and its points placed by clicks at `points`.

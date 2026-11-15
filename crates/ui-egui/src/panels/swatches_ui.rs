@@ -53,7 +53,10 @@ pub fn use_swatch(app: &mut PhotocraftApp, name: &str, background: bool) {
 /// The converter that shows CMYK swatches and the colour models behind them: the working CMYK profile's.
 /// `CmykConverter::new` shares the transforms of a profile, so building it per use costs a lookup.
 fn cmyk_converter(app: &PhotocraftApp) -> Option<CmykConverter> {
-    CmykConverter::new(app.session.color.working(photocraft_doc::ColorMode::Cmyk)).ok()
+    // The engine's profile type is `photocraft_cms`'s and the framework's converter takes `craft::cms`'s: the ICC bytes
+    // carry it over.
+    let working = app.session.color.working(photocraft_doc::ColorMode::Cmyk);
+    craft::cms::Profile::parse(&working.to_bytes()).ok().and_then(|profile| CmykConverter::new(std::sync::Arc::new(profile)).ok())
 }
 
 /// The words of the panel and of its file entries, from the context's environment, so the names a menu command makes
@@ -243,7 +246,8 @@ pub(crate) fn apply_file_event(app: &mut PhotocraftApp, ctx: &egui::Context, eve
         return;
     }
     let (swatch_words, preset_words) = words(ctx);
-    let out = SwatchesPanel::apply_file(&mut app.ui.swatches, event, &swatch_words, &preset_words, &Default::default());
+    let env = craft::ui::runtime::env::Env::of_root(ctx);
+    let out = SwatchesPanel::apply_file(&mut app.ui.swatches, event, &swatch_words, &preset_words, env.format());
     match &out.status {
         Some(status) => show_status(app, status),
         None => {
@@ -360,9 +364,6 @@ mod tests {
             session: "s".into(),
             created: false,
             mask: false,
-            dragging: false,
-            resize: None,
-            preedit: None,
         });
         use_swatch(&mut app, "Red", false);
         let red = [230.0 / 255.0, 40.0 / 255.0, 40.0 / 255.0, 1.0];
@@ -412,18 +413,27 @@ mod tests {
         let mut app = app();
         let aco = craft_psd::aco::write(&[craft_psd::aco::AcoSwatch { name: "Teal".into(), color: craft_psd::aco::AcoColor::Rgb([0, 32768, 32768]) }]).unwrap();
         let ctx = app.ctx().clone();
-        // PLAN: assumed top-w28 `Files` fake: it answers a pick with the queued file and records every write.
-        let files = crate::Files::fake();
-        app.services.files = files.service();
-        files.answer_open("Ocean.aco", aco.clone());
+        let files = std::sync::Arc::new(craft::host::ScriptedFiles::answering([
+            craft::host::Picked::Contents(vec![("Ocean.aco".into(), aco.clone())]),
+            craft::host::Picked::Contents(vec![("Ocean.aco".into(), aco)]),
+            craft::host::Picked::Paths(vec!["Swatches.ase".into()]),
+        ]));
+        app.services.files = Some(files);
+        let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
+        let sink = written.clone();
+        app.services.write = Some(Box::new(move |path, bytes| {
+            sink.lock().unwrap().push((path.to_owned(), bytes.to_vec()));
+            Ok(())
+        }));
         assert!(run_fired(&mut app, &ctx, &CommandRef::from(SwatchesCommand::Import)));
+        app.poll_file_dialog();
         assert_eq!(app.session.presets.swatches.last().unwrap().name, "Ocean");
-        files.answer_open("Ocean.aco", aco);
         assert!(run_fired(&mut app, &ctx, &CommandRef::from(SwatchesCommand::Replace)));
+        app.poll_file_dialog();
         assert_eq!(app.session.presets.swatches.len(), 1, "replace");
-        files.answer_save("Swatches.ase");
         assert!(run_fired(&mut app, &ctx, &CommandRef::from(SwatchesCommand::ExportExchange)));
-        let written = files.written();
+        app.poll_file_dialog();
+        let written = written.lock().unwrap();
         assert_eq!(written.len(), 1, "one file written");
         assert!(written[0].1.starts_with(b"ASEF"));
         assert!(!run_fired(&mut app, &ctx, &CommandRef::new("not.swatches")));

@@ -66,20 +66,28 @@ fn top_pixel(app: &PhotocraftApp) -> [f32; 4] {
     app.session.active().unwrap().doc.layers.last().unwrap().surface().unwrap().rgba(1, 1)
 }
 
+/// Whether the newest open dialog is New Snapshot.
+fn snapshot_dialog_open(app: &PhotocraftApp) -> bool {
+    app.framework.dialogs.open_dialogs().last().is_some_and(|d| d.key.as_deref().is_some_and(crate::snapshot_dialog::owns))
+}
+
 #[test]
 fn clicking_a_state_jumps_there_with_one_command() {
     let mut app = app();
     let (past, redo, rev) = state(&app);
     assert_eq!((past, redo), (4, 0));
     // Back three states: one command, one revision (the canvas sees one change).
-    apply(&mut app, HistoryEvent::Select(state_key(&app, 1)));
+    let event = HistoryEvent::Select(state_key(&app, 1));
+    apply(&mut app, event);
     assert_eq!(state(&app), (1, 3, rev + 1));
     assert_eq!(app.perf.last_command, "history.selectState");
     // Forward to the last (dimmed) state, again in one step.
-    apply(&mut app, HistoryEvent::Select(state_key(&app, 4)));
+    let event = HistoryEvent::Select(state_key(&app, 4));
+    apply(&mut app, event);
     assert_eq!(state(&app), (4, 0, rev + 2));
     // The current state: nothing to do.
-    apply(&mut app, HistoryEvent::Select(state_key(&app, 4)));
+    let event = HistoryEvent::Select(state_key(&app, 4));
+    apply(&mut app, event);
     assert_eq!(state(&app), (4, 0, rev + 2));
 }
 
@@ -114,7 +122,8 @@ fn history_rows_wait_for_an_open_transform() {
             crate::transform_tool::begin(&mut app, &app_ctx).unwrap();
         }
         let before = steps(&app);
-        apply(&mut app, HistoryEvent::Select(state_key(&app, 0)));
+        let event = HistoryEvent::Select(state_key(&app, 0));
+        apply(&mut app, event);
         let after = steps(&app);
         if transforming {
             assert_eq!(after, before, "the document's history is untouched");
@@ -141,7 +150,8 @@ fn snapshot_rows_select_rename_and_delete() {
 
     // Clicking the current state while a snapshot is selected only clears the selection.
     let revision = state(&app).2;
-    apply(&mut app, HistoryEvent::Select(state_key(&app, state(&app).0)));
+    let event = HistoryEvent::Select(state_key(&app, state(&app).0));
+    apply(&mut app, event);
     assert_eq!(selected_snapshot(&app), None);
     assert_eq!(state(&app).2, revision, "and runs no command");
 
@@ -162,7 +172,8 @@ fn snapshot_rows_select_rename_and_delete() {
 #[test]
 fn the_trash_deletes_the_selected_snapshot() {
     let mut app = with_snapshot();
-    apply(&mut app, HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app))));
+    let event = HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app)));
+    apply(&mut app, event);
     let before = steps(&app);
     apply(&mut app, HistoryEvent::Delete(None));
     assert_eq!(snapshots(&app), 1, "the trash deleted the snapshot, leaving the first one");
@@ -170,7 +181,8 @@ fn the_trash_deletes_the_selected_snapshot() {
 
     // An edit after the click deselects the snapshot: the trash deletes the state.
     let mut app = with_snapshot();
-    apply(&mut app, HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app))));
+    let event = HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app)));
+    apply(&mut app, event);
     app.run("edit.fill", json!({"color": "#00ff00"})).unwrap();
     assert_eq!(selected_snapshot(&app), None, "an edit deselects the snapshot");
     let before = steps(&app);
@@ -185,7 +197,8 @@ fn rows_dragged_onto_the_trash_are_deleted() {
     let mut app = with_snapshot();
     let before = steps(&app);
     assert!(can_delete(&app, &HistoryKey::Snapshot(last_snapshot(&app))));
-    apply(&mut app, HistoryEvent::Delete(Some(HistoryKey::Snapshot(last_snapshot(&app)))));
+    let event = HistoryEvent::Delete(Some(HistoryKey::Snapshot(last_snapshot(&app))));
+    apply(&mut app, event);
     assert_eq!(snapshots(&app), 1, "the dragged snapshot is deleted, leaving the first one");
     assert_eq!(steps(&app), before, "no state is");
 
@@ -193,7 +206,8 @@ fn rows_dragged_onto_the_trash_are_deleted() {
     let mut app = with_snapshot();
     assert_eq!(steps(&app), 4);
     assert!(!can_delete(&app, &state_key(&app, 0)), "the oldest state stays");
-    apply(&mut app, HistoryEvent::Delete(Some(state_key(&app, 0))));
+    let event = HistoryEvent::Delete(Some(state_key(&app, 0)));
+    apply(&mut app, event);
     assert_eq!(steps(&app), 4, "a refused row deletes nothing");
     let key = state_key(&app, 1);
     assert!(can_delete(&app, &key));
@@ -229,7 +243,8 @@ fn non_linear_trash_click_never_targets_the_oldest_state() {
     assert!(!app.ui.status_error, "and reports no error: {}", app.ui.status);
 
     // The last dimmed Fill dragged onto the trash: only it goes.
-    apply(&mut app, HistoryEvent::Delete(Some(last(&app))));
+    let event = HistoryEvent::Delete(Some(last(&app)));
+    apply(&mut app, event);
     assert_eq!(counts(&app), (0, 2), "the dragged later state is deleted");
 
     // A past state again: the click deletes the current one.
@@ -300,7 +315,8 @@ fn a_new_state_at_the_history_limit_still_scrolls_into_view() {
 fn a_selected_snapshot_asks_for_no_reveal() {
     let mut app = with_snapshot();
     let before = history::mark(&app);
-    apply(&mut app, HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app))));
+    let event = HistoryEvent::Select(HistoryKey::Snapshot(last_snapshot(&app)));
+    apply(&mut app, event);
     history::file(&mut app, before);
     assert_eq!(history::take(&mut app), None, "selecting a snapshot adds a state but shows the snapshot row");
 }
@@ -334,8 +350,7 @@ fn alt_click_on_the_camera_opens_new_snapshot() {
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
     apply(&mut app, HistoryEvent::NewSnapshot { mods: Mods::ALT });
     assert_eq!(snapshots(&app), 1, "⌥-click opens the dialog instead");
-    // PLAN: reads the dialog through `ui.dialogs` as the base does; dialogs-w22's hosted dialog may need another read.
-    assert!(app.ui.dialogs.last().is_some_and(|d| crate::snapshot_dialog::owns(&d.fields)));
+    assert!(snapshot_dialog_open(&app));
 }
 
 /// History Options › Show New Snapshot Dialog by Default (#2966): a plain click on the camera opens New
@@ -348,7 +363,7 @@ fn show_new_snapshot_dialog_by_default_makes_a_click_open_the_dialog() {
         app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
         app.run("history.options", json!({"showNewSnapshotDialogByDefault": dialog_by_default})).unwrap();
         apply(&mut app, HistoryEvent::NewSnapshot { mods });
-        let dialog = app.ui.dialogs.last().is_some_and(|d| crate::snapshot_dialog::owns(&d.fields));
+        let dialog = snapshot_dialog_open(&app);
         if dialog_by_default {
             assert!(dialog, "{mods:?}: the dialog opens");
             assert_eq!(snapshots(&app), 1, "{mods:?}: no snapshot until OK");

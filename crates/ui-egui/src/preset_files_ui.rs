@@ -172,8 +172,7 @@ mod tests {
 
     /// The open prompt that asks what to do with a preset group the import clashes with.
     fn prompt(app: &PhotocraftApp) -> Option<DialogId> {
-        // PLAN: assumed `alerts::prompt_tagged::<T>(app) -> Option<(DialogId, String)>` (the prompt's id and message), tagged by dialogs-w21's `preset_group_prompt::PresetClash`.
-        crate::alerts::prompt_tagged::<crate::preset_group_prompt::PresetClash>(app).map(|(id, _)| id)
+        crate::dialogs::alerts::prompt_tagged::<crate::preset_group_prompt::PresetClash>(app)
     }
 
     /// Presses the button of the open preset prompt named `label`: Import as New Group is the

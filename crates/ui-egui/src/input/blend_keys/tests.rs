@@ -243,22 +243,21 @@ fn keys_follow_the_tool_while_a_transform_is_open() {
     a.run("select.deselect", json!({})).unwrap();
     a.sync_views();
     crate::transform_tool::begin(&mut a, &ctx).unwrap();
-    // PLAN: assumed `a.ui.transform` holds a `FreeTransform` with `session.box_state()` and `session.apply(edit, now)`, and `Mixed::One`.
     let moved = {
         use craft::behavior::kurbo::Vec2;
         use craft::behavior::{EditEvent, Mixed};
         use craft::draw::ui::transform::TransformEdit;
         let session = &mut a.ui.transform.as_mut().unwrap().session;
-        let before = session.box_state();
+        let before = *session.state();
         let after = before.moved(Vec2::new(3.0, 2.0));
-        session.apply(TransformEdit::Box(EditEvent::set(Mixed::One(before), after.clone(), "Move".into(), None)), 0.0);
+        session.apply(TransformEdit::Box(EditEvent::set(Mixed::Same(before), after, "Move".into(), None)), 0.0);
         after
     };
     key(&mut a, BlendShortcut::Multiply);
     assert_eq!(a.session.tools.brush.mode, BlendMode::Multiply, "the Brush's own mode");
     assert_eq!(layer_blend(&a), BlendMode::Normal, "the layer is left alone");
     assert!(a.ui.transform.is_some(), "the box stays open");
-    assert_eq!(a.ui.transform.as_ref().unwrap().session.box_state(), moved, "the box keeps its place");
+    assert_eq!(*a.ui.transform.as_ref().unwrap().session.state(), moved, "the box keeps its place");
     assert_eq!(a.ui.tool, Tool::Brush, "no tool letter");
     a.ui.tool = Tool::Move;
     key(&mut a, BlendShortcut::Difference);

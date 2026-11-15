@@ -120,7 +120,7 @@ fn automation_cannot_turn_a_hard_stop_into_continue() {
     let v = play(&mut app, &json!({"action": "Stop Test"})).unwrap();
     assert_eq!(v["paused"]["step"], 1, "{v}");
     // Continue is answered on a stop that does not allow it: the paused playback decides, not the prompt.
-    answer(&mut app, stop_prompt(&app), true).unwrap();
+    { let prompt = stop_prompt(&app); answer(&mut app, prompt, true).unwrap(); }
     assert_eq!(names(&app), ["Prefix"], "the step's own Allow Continue decides");
     assert_idle(&app);
 }
@@ -164,7 +164,7 @@ fn a_stop_restores_a_suspended_recording_once_for_every_exit() {
             let v = play(&mut app, &json!({"action": "Stop Test"})).unwrap();
             assert_eq!(v["paused"]["step"], 1, "{v}");
             assert!(app.session.actions.recording.is_none());
-            answer(&mut app, stop_prompt(&app), confirm).unwrap();
+            { let prompt = stop_prompt(&app); answer(&mut app, prompt, confirm).unwrap(); }
             assert!(app.session.actions.recording.is_some());
             app.run("actions.stop", json!({})).unwrap();
             let owner = app.session.actions.list.actions().iter().find(|a| a.name == "Owner").unwrap();
@@ -217,7 +217,7 @@ fn stop_a_hard_stop_or_a_failing_child_ends_every_caller() {
         }
         let v = play(&mut app, &json!({"action": "Grandparent"})).unwrap();
         assert_eq!(v["paused"]["step"], 1, "{v}");
-        let _ = answer(&mut app, stop_prompt(&app), confirm);
+        { let prompt = stop_prompt(&app); let _ = answer(&mut app, prompt, confirm); }
         assert!(!names(&app).iter().any(|n| n.ends_with("uffix")), "{allow} {confirm} {fail}: {:?}", names(&app));
         assert_eq!(app.ui.status_error, fail, "{}", app.ui.status);
         assert_idle(&app);
@@ -241,7 +241,7 @@ fn a_resumed_called_action_still_refuses_to_call_its_paused_callers() {
     app.session.actions.list.replace_step(0, 2, ActionStep::new("actions.play", json!({"action": "Grandparent"}))).unwrap();
     let v = play(&mut app, &json!({"action": "Grandparent"})).unwrap();
     assert_eq!(v["paused"]["step"], 1, "{v}");
-    let _ = answer(&mut app, stop_prompt(&app), true);
+    { let prompt = stop_prompt(&app); let _ = answer(&mut app, prompt, true); }
     assert!(app.ui.status_error);
     assert!(app.ui.status.contains("recursive"), "{}", app.ui.status);
     assert_eq!(count(&app, "Grandparent prefix"), 1, "no caller's prefix runs again");
@@ -288,7 +288,7 @@ fn a_conditional_branch_plays_through_the_panel_and_its_stop_shows_its_message()
         assert!(v["paused"].is_object(), "the branch's Stop waits at its message: {v}");
         assert_eq!(prompts_open(&app), 1);
         assert_eq!(names(&app), ["Before", "Prefix"]);
-        answer(&mut app, stop_prompt(&app), confirm).unwrap();
+        { let prompt = stop_prompt(&app); answer(&mut app, prompt, confirm).unwrap(); }
         let expected: &[&str] = if confirm { &["Before", "Prefix", "Suffix", "After"] } else { &["Before", "Prefix"] };
         assert_eq!(names(&app), expected, "confirm {confirm}: Continue finishes the branch, then its caller");
         assert!(!app.ui.status_error, "{}", app.ui.status);

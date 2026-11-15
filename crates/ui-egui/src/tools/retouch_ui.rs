@@ -498,7 +498,7 @@ pub fn finish_content_aware_move(app: &mut PhotocraftApp, start: [f64; 2], end: 
 }
 
 /// The Content-Aware Move tool's "Don't show again" for [`content_aware_move_no_pixels`].
-const CAM_NO_PIXELS_PREF: &str = "contentAwareMove.noPixelsSelected";
+pub(crate) const CAM_NO_PIXELS_PREF: &str = "contentAwareMove.noPixelsSelected";
 
 /// Content-Aware Move Tool with no selection: a drag whose lasso would select no pixel (a click,
 /// a straight line) selects nothing and adds no History state, and says so in the alert "No pixels

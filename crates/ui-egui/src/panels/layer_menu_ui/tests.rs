@@ -2,6 +2,7 @@ use super::*;
 use craft::layers::ui::panel::MenuTarget;
 use craft::ui::contract::Entry;
 use craft::ui::list::ThumbSize;
+use photocraft_doc::LayerId;
 use photocraft_engine::Session;
 use serde_json::json;
 

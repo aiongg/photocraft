@@ -265,8 +265,7 @@ fn footer_buttons_run_photocraft_commands() {
             mods: Modifiers::NONE,
             after: |h| {
                 assert!(layer(h, "Masked").is_some());
-                // PLAN: assumed `alerts::prompt_tagged::<T>(app)` answers `Some` while a prompt tagged `T` is open.
-                assert!(crate::alerts::prompt_tagged::<crate::delete_layer_prompt::PendingDelete>(h.state()).is_some());
+                assert!(crate::dialogs::alerts::prompt_tagged::<crate::delete_layer_prompt::PendingDelete>(h.state()).is_some());
                 h.get_by_label("Delete").click();
                 h.run_steps(3);
                 assert!(layer(h, "Masked").is_none());
@@ -334,9 +333,8 @@ fn footer_buttons_run_photocraft_commands() {
 
 /// The prompt a drop on the trash opened, with `message`; nothing changed before the answer.
 fn trash_prompt(h: &H, message: &str) -> craft::ui::dialog::DialogId {
-    // PLAN: assumed `alerts::prompt_tagged::<T>(app) -> Option<(DialogId, String)>`: the prompt's id and message.
-    let (id, text) = crate::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(h.state()).expect("the prompt is open");
-    assert_eq!(text, message);
+    let id = crate::dialogs::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(h.state()).expect("the prompt is open");
+    assert!(h.query_by_label_contains(message).is_some(), "the prompt asks: {message}");
     let l = layer(h, "Masked").expect("the layer stays");
     assert!(l.mask.is_some() && l.vector_mask.is_some(), "nothing changes before the answer");
     id

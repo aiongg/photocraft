@@ -163,9 +163,6 @@ mod tests {
             session: "glyphs".into(),
             created: false,
             mask: false,
-            dragging: false,
-            resize: None,
-            preedit: None,
         });
         assert!(insert(&mut app, "→"));
         assert!(insert(&mut app, "€"));

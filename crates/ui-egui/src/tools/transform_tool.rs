@@ -39,6 +39,8 @@ pub(crate) use commit::{SAVE_FOR_WEB, committing};
 pub use commit::{apply_click, auto_commit, cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event};
 pub(crate) use draw::{carries_selection_of, moves_selection, selection_map};
 pub use draw::show_in_canvas;
+#[cfg(test)]
+pub(crate) use draw::styled_composite;
 pub use options_bar::{options_bar, reset_warp};
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};

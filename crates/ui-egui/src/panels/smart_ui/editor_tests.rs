@@ -25,6 +25,20 @@ fn harness(width: f32, scale: f32, theme: crate::theme::AppTheme) -> Harness<'st
 }
 
 /// Click `at` with the primary button, hovering first so the row reacts.
+/// Whether the open adjustment dialog has a tone picker armed.
+fn picker_armed(app: &PhotocraftApp) -> bool {
+    crate::adjust_dialog::open_value(app).and_then(|open| crate::adjust_dialog::hosted(app, open.id)).is_some_and(|dialog| dialog.picker().is_some())
+}
+
+/// The Curves graph of channel `channel`: the smallest group the dialog labels with it (the editor around it carries
+/// the same label).
+fn curve_graph(h: &Harness<'_, PhotocraftApp>, channel: &str) -> egui::Rect {
+    h.query_all_by_role_and_label(egui::accesskit::Role::Group, channel)
+        .map(|node| node.rect())
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+        .expect("the Curves graph is shown")
+}
+
 fn click(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2) {
     h.hover_at(at);
     h.run_steps(1);
@@ -394,7 +408,7 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         assert_eq!(h.state().framework.dialogs.open_dialogs().len(), 1);
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).next().is_none(), "stale targets cannot expose the other document's editor");
         assert!(h.query_by_label("The adjustment target is missing or unavailable.").is_some());
-        assert!(!crate::adjust_dialog::picker_armed(h.state()));
+        assert!(!picker_armed(h.state()));
         assert!(std::sync::Arc::ptr_eq(&other, &h.state().session.active().unwrap().doc));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":0}));
         crate::control::handle(h.state_mut(), &ctx, &req);
@@ -524,7 +538,7 @@ fn a_lab_curves_smart_filter_keeps_a_lightness_edit() {
     let (app, id) = adjustment_filter("lab", "image.adjustments.curves", json!({"points": old, "lightness": old}));
     let mut h = edit_first_filter(app, id);
     // Add a point on the Lightness curve, the channel the dialog shows first.
-    let graph = h.ctx.data(|d| d.get_temp::<egui::Rect>(crate::adjust_dialog::dialog_mem("curves").with("curves-graph"))).unwrap();
+    let graph = curve_graph(&h, "Lightness");
     click(&mut h, egui::pos2(graph.left() + graph.width() * 0.75, graph.top() + graph.height() * 0.1));
     let shown = fields(h.state());
     assert!(shown.get("points").is_none(), "the editor removed the alias: {shown:?}");

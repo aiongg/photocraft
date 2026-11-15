@@ -894,6 +894,17 @@ fn commit(app: &mut PhotocraftApp, done: &LiquifyDone) -> Result<(), String> {
     app.run("filter.liquify", p).map(|_| ())
 }
 
+/// Records a Forward Warp stroke through `points` (x, y, pressure) in the open workspace, as a drag with the
+/// default brush would, and lets the app apply it. For tests of other panels that need a stroke to commit.
+#[cfg(test)]
+pub(crate) fn record_stroke(app: &mut PhotocraftApp, points: &[[f64; 3]]) {
+    let ctx = app.ctx().clone();
+    let brush = craft::imaging::ui::liquify::LiquifySettings::default().brush;
+    let stroke = StepStroke::new(StepTool::ForwardWarp, &brush, points.to_vec());
+    app.framework.dialogs.get_mut::<Hosted>().expect("the Liquify workspace is open").workspace_mut().perform(LiquifyStep::Stroke(stroke));
+    take(app, &ctx);
+}
+
 /// The document the open workspace belongs to.
 pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
     app.liquify.as_ref().map(|l| l.document)

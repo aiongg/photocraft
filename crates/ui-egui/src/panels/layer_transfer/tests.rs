@@ -12,7 +12,7 @@ use crate::state::Tool;
 
 /// Document `d`'s view of `rect` (the canvas area, or a tile of it), as the transfer maps the pointer.
 fn view_of(app: &PhotocraftApp, d: usize, rect: Rect) -> craft::behavior::CanvasView {
-    app.ui.views[d].canvas_view(crate::rulers::content_rect(app, rect), app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect())
+    app.ui.views[d].canvas_view(rect, app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect())
 }
 
 /// The active document's view of the canvas area.
@@ -35,7 +35,7 @@ fn tile(h: &mut Harness<'_, PhotocraftApp>) -> Vec<(usize, Rect)> {
     let ctx = h.ctx.clone();
     crate::menus::invoke(h.state_mut(), &ctx, "window.arrange.twoUpVertical", json!({})).unwrap();
     h.run_steps(3);
-    crate::canvas::tabs::arranged_cells(h.state(), h.state().last_canvas_rect).expect("the documents are tiled")
+    crate::canvas::arranged_cells(h.state(), h.state().last_canvas_rect).expect("the documents are tiled")
 }
 
 /// "source-doc" (40×30) with a red 10×10 square at (4, 6) on layer "paint", and "dest-doc"

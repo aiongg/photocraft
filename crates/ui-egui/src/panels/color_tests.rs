@@ -244,8 +244,7 @@ fn a_click_on_the_edited_well_opens_its_color_picker() {
         let (&id, target) = h.state().color_targets.iter().next().unwrap();
         let expected = if foreground { matches!(target, PickTarget::Foreground) } else { matches!(target, PickTarget::Background) };
         assert!(expected, "{well_name}: the picker edits the clicked well");
-        let ctx = h.ctx.clone();
-        crate::dialogs::testing::cancel(h.state_mut(), &ctx, id).unwrap();
+        crate::dialogs::testing::cancel(h.state_mut(), id).unwrap();
         h.run_steps(2);
         assert!(!h.state().dialog_open(), "{well_name}: cancel closes the picker");
     }

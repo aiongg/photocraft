@@ -1,5 +1,6 @@
 use super::*;
 use crate::canvas_tool_menu::MenuKind;
+use craft::color::ui::{SampleSize, SampleSource};
 use craft::automation::actions::{Action, ActionList, ActionStep};
 use craft::keymap::CommandRef;
 
@@ -116,7 +117,7 @@ fn brush_mode_control_routes_modifiers_and_reports_choices_without_history() {
             json!({"tool": tool, "button": "right", "modifiers": modifiers,
             "events": [{"kind": "down", "x": 20, "y": 20}]}),
         );
-        let menu_kind = |app: &PhotocraftApp| app.ui.canvas_tool_menu.as_ref().map(|m| m.kind);
+        let menu_kind = |app: &PhotocraftApp| app.ui.canvas_tool_menu.as_ref().map(|m| m.kind.clone());
         assert_eq!(menu_kind(&app) == Some(MenuKind::BrushMode), expected == "mode", "{tool}: {modifiers}");
         let painted = |app: &PhotocraftApp, since: usize| app.session.journal.iter().skip(since).any(|(id, _)| id == "paint.stroke");
         match expected {
@@ -136,7 +137,7 @@ fn brush_mode_control_routes_modifiers_and_reports_choices_without_history() {
                 assert_eq!(app.session.journal.len(), journal, "control dismissal cannot paint");
             }
             "preset" => assert!(!inspect(&app, &ctx)["brushPicker"].is_null()),
-            "layer" => assert_eq!(menu_kind(&app), Some(MenuKind::Layers)),
+            "layer" => assert!(matches!(menu_kind(&app), Some(MenuKind::Layers { .. }))),
             "resize" => assert!(app.brush_resize.active()),
             "erase" => {
                 assert!(crate::canvas::testing::in_gesture(&mut app));
@@ -193,7 +194,7 @@ fn camera_raw_control_updates_and_commits_or_cancels_an_open_raw() {
         let ctx = app.ctx().clone();
         PhotocraftApp::setup_context(&ctx, Default::default());
         app.open_bytes("control.dng", &dng).unwrap();
-        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(&mut app, ui.ctx())).textures_delta.clear();
+        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(&mut app, ui)).textures_delta.clear();
         assert_eq!(crate::distort_ui::modal_workspace(&app), Some("filter.cameraRaw"));
         // A developed raw has no embedded profile to ask about (`open_prompt`), so no profile
         // prompt stands between the open and the Camera Raw dialog.
@@ -696,7 +697,7 @@ fn agent_space_right_click_opens_the_hand_view_menu() {
         assert_eq!(pointer(&mut app, click(true, true))["ok"], true, "{tool:?}");
         // ⌘ still makes it a ⌘/Ctrl+right-click, which lists the layers under the pointer (#307):
         // the Zoom held by ⌘Space has no menu of its own, so the only menu is the layer list.
-        assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.kind), Some(MenuKind::Layers), "{tool:?}: ⌘+right-click lists the layers");
+        assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "{tool:?}: ⌘+right-click lists the layers");
         app.ui.canvas_tool_menu = None;
         // ⌥Space holds the Zoom too: no view menu, and not the Move tool's layer list.
         let alt = json!({"space": true, "alt": true, "button": "secondary", "events": [{"kind":"down","x":8,"y":8},{"kind":"up","x":8,"y":8}]});
@@ -741,7 +742,7 @@ fn agent_space_right_click_with_a_text_field_focused_keeps_the_tool() {
     let click = json!({"space": true, "button": "secondary", "events": [{"kind":"down","x":8,"y":8},{"kind":"up","x":8,"y":8}]});
     assert_eq!(pointer(&mut app, click)["ok"], true);
     assert!(app.ui.canvas_tool_menu.as_ref().is_none_or(|m| !matches!(m.kind, MenuKind::View)), "no view menu while a field has focus");
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.kind), Some(MenuKind::Layers), "the Move tool's layer list");
+    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "the Move tool's layer list");
 }
 
 /// #6561: an agent's right-click on a pending crop opens the crop menu, as on the canvas.
@@ -766,13 +767,13 @@ fn agent_right_click_on_a_pending_crop_opens_and_runs_the_crop_menu() {
     );
     assert_eq!(result["ok"], true);
     let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.kind), Some(MenuKind::Crop));
+    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Crop { .. })));
     let entries = inspected.pointer("/result/canvasToolMenu/entries").and_then(Value::as_array).unwrap();
     assert!(entries.iter().any(|row| row.get("id") == Some(&json!("crop.commit")) && row.get("enabled") == Some(&json!(true))));
     assert_eq!(crate::crop_ui::frame(&app), Some(frame), "the right-click leaves the frame alone");
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"crop.commit"}))["ok"], true);
     let size = app.session.active().unwrap().doc.size;
-    assert_eq!([f64::from(size.width), f64::from(size.height)], [frame[2] - frame[0], frame[3] - frame[1]], "cropped to the frame");
+    assert_eq!([f64::from(size.width), f64::from(size.height)], [frame.rect.width(), frame.rect.height()], "cropped to the frame");
 }
 
 /// An agent's right-click while its own crop frame drag is still down opens no menu over it;
@@ -808,7 +809,7 @@ fn agent_right_click_during_its_crop_drag_opens_no_menu() {
     act(&mut app, "left", json!([{"kind":"up","x":18,"y":14}]));
     assert!(!crate::canvas::testing::in_gesture(&mut app));
     act(&mut app, "secondary", right_click.clone());
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.kind), Some(MenuKind::Crop), "after the release it opens");
+    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Crop { .. })), "after the release it opens");
     // Nor over a Straighten line still being drawn.
     app.ui.canvas_tool_menu = None;
     crate::crop_ui::toggle_straighten(&mut app);
@@ -957,9 +958,9 @@ fn ui_set_drives_the_eyedropper_options() {
     );
     assert_eq!(good["ok"], true, "{good}");
     let o = &app.ui.tool_options.eyedropper;
-    assert_eq!((o.size, o.sample.as_str(), o.show_ring), (11, "currentAndBelow", false));
+    assert_eq!((o.size, o.source, o.show_ring), (SampleSize::Avg11, SampleSource::CurrentAndBelow, false));
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"eyedropperSampleSize": "point"}))["ok"], true);
-    assert_eq!(app.ui.tool_options.eyedropper.size, 1);
+    assert_eq!(app.ui.tool_options.eyedropper.size, SampleSize::Point);
     for bad in [
         json!({"eyedropperSampleSize": 4}),
         json!({"eyedropperSampleSize": "big"}),
@@ -973,7 +974,7 @@ fn ui_set_drives_the_eyedropper_options() {
     // A rejected call applies none of its fields.
     let r = call(&mut app, &ctx, "ui.set", json!({"eyedropperSampleSize": 101, "eyedropperSample": "nope"}));
     assert_eq!(r["ok"], false, "{r}");
-    assert_eq!(app.ui.tool_options.eyedropper.size, 1);
+    assert_eq!(app.ui.tool_options.eyedropper.size, SampleSize::Point);
 }
 
 /// #3823: the Crop tool's Fill over the control channel, reported by `ui.inspect`.
@@ -2257,7 +2258,7 @@ fn ui_pointer_rejects_bad_params_before_acting() {
         );
         assert_eq!(r["ok"], true, "{button}: {r}");
     }
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.kind), Some(MenuKind::Layers), "a right click with Move still opens the layer menu");
+    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "a right click with Move still opens the layer menu");
 }
 
 #[test]

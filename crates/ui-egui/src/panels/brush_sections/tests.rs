@@ -17,7 +17,7 @@ struct State {
 fn harness(section: usize, brush: BrushSettings, tool: Tool) -> Harness<'static, State> {
     let mut ready = false;
     let state = State { app: PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()), brush, tool };
-    let mut h = Harness::builder().with_context(state.ctx().clone()).with_size(vec2(340.0, 1400.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(state.app.ctx().clone()).with_size(vec2(340.0, 1400.0)).build_ui_state(
         move |ui, state: &mut State| {
             if !ready {
                 PhotocraftApp::setup_context(ui.ctx(), AppTheme::pro_medium());
