@@ -16,7 +16,7 @@ use craft::ui::text::NumberField;
 use photocraft_engine::prefs::Unit;
 
 use crate::state::Tool;
-use crate::{PhotocraftApp, tl};
+use crate::PhotocraftApp;
 
 /// The ruler units Fixed Size can show, with the framework's kind of each.
 const FIXED_SIZE_UNITS: [(Unit, UnitKind); 7] = [
