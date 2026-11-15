@@ -29,7 +29,7 @@
 #![allow(clippy::needless_range_loop)] // index loops mirror the maths (pixels × channels)
 
 // The settings are the framework's: one model, with its validation and identity rules.
-pub use craft::imaging::raw::{GradeWheel as Wheel, MAX_CURVE_POINTS, RawDevelopSettings as CameraRaw, validate_curve};
+pub use craft::imaging::raw::{GradeWheel as Wheel, MAX_CURVE_POINTS, RawDevelopSettings as CameraRaw, VignetteStyle as StoredVignetteStyle, validate_curve};
 
 // PLAN: `develop`, `per_pixel` and `white_black_points` now take `&DevelopInputs`; their callers outside this set's files need it:
 // crates/gpu/tests/it/camera_raw.rs and examples/bench_camera_raw.rs (spatial(p) is a free function now), dialogs-w51's
@@ -936,6 +936,20 @@ fn vignette(px: &mut [[f32; 4]], w: usize, h: usize, p: &CameraRaw) {
 mod tests {
     use super::*;
 
+    /// `CameraRaw` with the named fields set (the type is `#[non_exhaustive]`, so no struct expression), or a copy of a base with them set.
+    macro_rules! cr {
+        ($($f:ident : $v:expr),* $(,)?) => {{
+            let mut s = CameraRaw::default();
+            $(s.$f = $v;)*
+            s
+        }};
+        ($base:expr => $($f:ident : $v:expr),* $(,)?) => {{
+            let mut s: CameraRaw = $base;
+            $(s.$f = $v;)*
+            s
+        }};
+    }
+
     /// [`super::develop`] with the default inputs (full scale, sRGB encoding, seed 0).
     fn develop(px: &mut [[f32; 4]], w: usize, h: usize, p: &CameraRaw, float: bool) {
         super::develop(px, w, h, p, &DevelopInputs::default(), float);
@@ -962,7 +976,7 @@ mod tests {
                 [c[0], c[1], c[2], 1.0]
             })
             .collect();
-        let d = Dehaze::new(&CameraRaw { dehaze: 100.0, ..Default::default() }, w, h).unwrap();
+        let d = Dehaze::new(&cr! { dehaze: 100.0}, w, h).unwrap();
         dehaze(&mut px, w, h, &d);
         let sky = |xs: std::ops::Range<usize>| {
             let v: Vec<f32> =
@@ -1007,9 +1021,9 @@ mod tests {
         legacy.insert(5, [60.0, 200.0]);
         let p: CameraRaw = serde_json::from_value(serde_json::json!({"pointCurve": legacy})).unwrap();
         assert!(p.validate().is_err());
-        let edited = CameraRaw { exposure: 1.0, ..p.clone() };
+        let edited = cr! { p.clone() => exposure: 1.0};
         assert!(edited.validate_changes(&p).is_ok(), "an unchanged stored curve stays editable");
-        let broken = CameraRaw { point_curve: vec![[10.0, 10.0]], ..p.clone() };
+        let broken = cr! { p.clone() => point_curve: vec![[10.0, 10.0]]};
         assert!(broken.validate_changes(&p).is_err(), "a changed curve is validated");
         let mut px = img(4, 4);
         develop(&mut px, 4, 4, &p, false);
@@ -1046,29 +1060,29 @@ mod tests {
             develop(&mut a, w, h, &p, false);
             a
         };
-        let warm = run(CameraRaw { temperature: 50.0, ..Default::default() });
+        let warm = run(cr! { temperature: 50.0});
         assert!(mean(&warm, 0) > mean(&base, 0) && mean(&warm, 2) < mean(&base, 2));
-        let bright = run(CameraRaw { exposure: 1.0, ..Default::default() });
+        let bright = run(cr! { exposure: 1.0});
         assert!(mean(&bright, 1) > mean(&base, 1) + 0.1);
-        let shadows = run(CameraRaw { shadows: 100.0, ..Default::default() });
+        let shadows = run(cr! { shadows: 100.0});
         let dark_px = |a: &[[f32; 4]]| a[0][1];
         assert!(dark_px(&shadows) > dark_px(&base));
-        let hl = run(CameraRaw { highlights: -100.0, ..Default::default() });
+        let hl = run(cr! { highlights: -100.0});
         assert!(hl[w * h - 1][0] < base[w * h - 1][0]);
-        let con = run(CameraRaw { contrast: 100.0, ..Default::default() });
+        let con = run(cr! { contrast: 100.0});
         // More contrast: darker darks, brighter brights.
         assert!(con[0][1] < base[0][1] && con[w * h - 1][0] > base[w * h - 1][0]);
-        let desat = run(CameraRaw { saturation: -100.0, ..Default::default() });
+        let desat = run(cr! { saturation: -100.0});
         assert!(desat.iter().all(|q| (q[0] - q[1]).abs() < 1e-4 && (q[1] - q[2]).abs() < 1e-4));
-        let vib = run(CameraRaw { vibrance: 100.0, ..Default::default() });
+        let vib = run(cr! { vibrance: 100.0});
         let spread = |q: [f32; 4]| q[0].max(q[1]).max(q[2]) - q[0].min(q[1]).min(q[2]);
         assert!(spread(vib[w * h / 2]) > spread(base[w * h / 2]));
         for p in [
-            CameraRaw { clarity: 80.0, ..Default::default() },
-            CameraRaw { texture: 80.0, ..Default::default() },
-            CameraRaw { dehaze: 60.0, ..Default::default() },
-            CameraRaw { dehaze: -60.0, ..Default::default() },
-            CameraRaw { whites: 50.0, blacks: -50.0, ..Default::default() },
+            cr! { clarity: 80.0},
+            cr! { texture: 80.0},
+            cr! { dehaze: 60.0},
+            cr! { dehaze: -60.0},
+            cr! { whites: 50.0, blacks: -50.0},
         ] {
             let out = run(p.clone());
             assert!(out.iter().all(|q| q[..3].iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v))), "{p:?}");
@@ -1092,19 +1106,19 @@ mod tests {
         let mut a = reds.clone();
         let mut hs = [0.0; 8];
         hs[0] = -100.0;
-        develop(&mut a, w, h, &CameraRaw { hsl_sat: hs, ..Default::default() }, false);
+        develop(&mut a, w, h, &cr! { hsl_sat: hs}, false);
         assert!(a[0][0] - a[0][1] < 0.1, "reds desaturated: {:?}", a[0]);
         let blues: Vec<[f32; 4]> = vec![[0.2, 0.2, 0.8, 1.0]; w * h];
         let mut b = blues.clone();
-        develop(&mut b, w, h, &CameraRaw { hsl_sat: hs, ..Default::default() }, false);
+        develop(&mut b, w, h, &cr! { hsl_sat: hs}, false);
         assert!((b[0][2] - 0.8).abs() < 1e-4, "blues untouched");
         // Grading: blue shadows tint dark pixels, leave bright ones nearly alone.
         let mut g: Vec<[f32; 4]> = vec![[0.1, 0.1, 0.1, 1.0], [0.95, 0.95, 0.95, 1.0]];
-        develop(&mut g, 2, 1, &CameraRaw { grade_shadows: Wheel { hue: 220.0, sat: 80.0, lum: 0.0 }, ..Default::default() }, false);
+        develop(&mut g, 2, 1, &cr! { grade_shadows: Wheel { hue: 220.0, sat: 80.0, lum: 0.0 }}, false);
         assert!(g[0][2] > g[0][0] + 0.05 && (g[1][2] - g[1][0]).abs() < 0.02, "{g:?}");
         // Point curve + parametric.
         let mut c = img(w, h);
-        develop(&mut c, w, h, &CameraRaw { point_curve: vec![[0.0, 30.0], [255.0, 255.0]], curve_shadows: 50.0, ..Default::default() }, false);
+        develop(&mut c, w, h, &cr! { point_curve: vec![[0.0, 30.0], [255.0, 255.0]], curve_shadows: 50.0}, false);
         assert!(c.iter().all(|q| q[1] >= 30.0 / 255.0 - 1e-4));
         // Noise reduction reduces variance; sharpening increases it; grain is deterministic.
         let noisy: Vec<[f32; 4]> = (0..w * h)
@@ -1118,20 +1132,20 @@ mod tests {
             a.iter().map(|q| (q[1] - m).powi(2)).sum::<f32>() / a.len() as f32
         };
         let mut nr = noisy.clone();
-        develop(&mut nr, w, h, &CameraRaw { noise_luminance: 80.0, ..Default::default() }, false);
+        develop(&mut nr, w, h, &cr! { noise_luminance: 80.0}, false);
         assert!(var(&nr) < var(&noisy) * 0.5);
         // Out-of-range noise settings are held to their 0..=100 range, not turned into huge radii.
         let mut wild = noisy.clone();
         let hostile =
-            CameraRaw { noise_luminance: 1.0e30, noise_color: 1.0e30, noise_luminance_detail: 1.0e30, noise_color_detail: 1.0e30, ..Default::default() };
+            cr! { noise_luminance: 1.0e30, noise_color: 1.0e30, noise_luminance_detail: 1.0e30, noise_color_detail: 1.0e30};
         develop(&mut wild, w, h, &hostile, false);
         assert!(wild.iter().all(|q| q[0].is_finite()));
         let mut sh = noisy.clone();
-        develop(&mut sh, w, h, &CameraRaw { sharpen_amount: 100.0, ..Default::default() }, false);
+        develop(&mut sh, w, h, &cr! { sharpen_amount: 100.0}, false);
         assert!(var(&sh) > var(&noisy));
         let mut g1 = img(w, h);
         let mut g2 = img(w, h);
-        let gp = CameraRaw { grain_amount: 50.0, ..Default::default() };
+        let gp = cr! { grain_amount: 50.0};
         let seeded = DevelopInputs { seed: 4, ..Default::default() };
         super::develop(&mut g1, w, h, &gp, &seeded, false);
         super::develop(&mut g2, w, h, &gp, &seeded, false);
@@ -1140,7 +1154,7 @@ mod tests {
         // Post-crop vignette darkens corners, leaves the centre.
         let flat = vec![[0.5f32, 0.5, 0.5, 1.0]; w * h];
         let mut v = flat.clone();
-        develop(&mut v, w, h, &CameraRaw { vignette_amount: -80.0, ..Default::default() }, false);
+        develop(&mut v, w, h, &cr! { vignette_amount: -80.0}, false);
         assert!(v[0][0] < 0.35 && (v[(h / 2) * w + w / 2][0] - 0.5).abs() < 0.01, "{:?}", v[0]);
     }
 
@@ -1149,14 +1163,14 @@ mod tests {
         // The per-pixel stages (the Camera Raw dialog's GPU preview) don't run Calibration, so
         // settings with it must fall back to the CPU develop instead of previewing without it.
         for p in [
-            CameraRaw { shadow_tint: 40.0, ..Default::default() },
-            CameraRaw { calibration_hue: [0.0, 0.0, 30.0], whites: 20.0, ..Default::default() },
-            CameraRaw { calibration_sat: [-50.0, 0.0, 0.0], exposure: 0.5, ..Default::default() },
+            cr! { shadow_tint: 40.0},
+            cr! { calibration_hue: [0.0, 0.0, 30.0], whites: 20.0},
+            cr! { calibration_sat: [-50.0, 0.0, 0.0], exposure: 0.5},
         ] {
             assert!(!spatial(&p));
             assert!(per_pixel(&p, 2, 2, false, Some((0.0, 1.0))).is_none(), "{p:?}");
         }
-        assert!(per_pixel(&CameraRaw { exposure: 0.5, ..Default::default() }, 2, 2, false, None).is_some());
+        assert!(per_pixel(&cr! { exposure: 0.5}, 2, 2, false, None).is_some());
     }
 
     #[test]
@@ -1246,7 +1260,7 @@ mod tests {
     #[test]
     fn float_documents_keep_overrange() {
         let mut a = vec![[2.0f32, 1.5, 0.5, 1.0]; 16];
-        develop(&mut a, 4, 4, &CameraRaw { exposure: 0.5, ..Default::default() }, true);
+        develop(&mut a, 4, 4, &cr! { exposure: 0.5}, true);
         assert!(a[0][0] > 2.0);
     }
 
@@ -1262,11 +1276,11 @@ mod tests {
         assert_eq!(box_means(&v, w, h, &[]), v);
         assert_ne!(gauss(&v, w, h, 1.0), v);
         let src: Vec<[f32; 4]> = v.iter().map(|&x| [x, 1.0 - x, 0.5 * x, 1.0]).collect();
-        let base = CameraRaw { contrast: 10.0, ..Default::default() };
+        let base = cr! { contrast: 10.0};
         let scaled = DevelopInputs { pixel_scale: 0.1, ..Default::default() };
         let (mut plain, mut textured) = (src.clone(), src);
         super::develop(&mut plain, w, h, &base, &scaled, false);
-        super::develop(&mut textured, w, h, &CameraRaw { texture: 80.0, ..base }, &scaled, false);
+        super::develop(&mut textured, w, h, &cr! { base => texture: 80.0}, &scaled, false);
         assert_eq!(plain, textured);
     }
 }

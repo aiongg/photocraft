@@ -147,9 +147,23 @@ pub(crate) fn gauss_radii(sigma: f32) -> Vec<usize> {
 mod tests {
     use super::*;
 
+    /// `CameraRaw` with the named fields set (the type is `#[non_exhaustive]`, so no struct expression), or a copy of a base with them set.
+    macro_rules! cr {
+        ($($f:ident : $v:expr),* $(,)?) => {{
+            let mut s = CameraRaw::default();
+            $(s.$f = $v;)*
+            s
+        }};
+        ($base:expr => $($f:ident : $v:expr),* $(,)?) => {{
+            let mut s: CameraRaw = $base;
+            $(s.$f = $v;)*
+            s
+        }};
+    }
+
     #[test]
     fn stages_resolve_for_the_dialogs_proxy_and_are_off_at_zero() {
-        let p = CameraRaw { dehaze: 40.0, clarity: -50.0, texture: 50.0, ..Default::default() };
+        let p = cr! { dehaze: 40.0, clarity: -50.0, texture: 50.0};
         let scale = |pixel_scale| DevelopInputs { pixel_scale, ..Default::default() };
         let d = Dehaze::new(&p, 858, 572).unwrap();
         assert_eq!((d.factor, d.size, d.radius, d.guide_radius, d.top), (2, [429, 286], 7, 14, 122));
@@ -159,14 +173,14 @@ mod tests {
         assert_eq!(Texture::new(&p, &scale(0.143), 858, 572).unwrap().radii, [1, 1, 2]);
         // Small frames: the plain guided filter, a blur too narrow to change anything.
         assert_eq!(fast_guided_steps(3), (1, 3));
-        assert!(Texture::new(&CameraRaw { texture: 10.0, ..Default::default() }, &scale(0.1), 64, 48).unwrap().radii.is_empty());
+        assert!(Texture::new(&cr! { texture: 10.0}, &scale(0.1), 64, 48).unwrap().radii.is_empty());
         let off = CameraRaw::default();
         assert!(Dehaze::new(&off, 858, 572).is_none() && Clarity::new(&off, 858, 572).is_none() && Texture::new(&off, &scale(1.0), 858, 572).is_none());
     }
 
     #[test]
     fn dehaze_cells_average_blocks_after_white_balance_and_refuse_a_wrong_size() {
-        let d = Dehaze::new(&CameraRaw { dehaze: 10.0, ..Default::default() }, 3, 1).unwrap();
+        let d = Dehaze::new(&cr! { dehaze: 10.0}, 3, 1).unwrap();
         let px = [[0.2, 0.4, 1.5, 1.0], [0.4, 0.0, 0.5, 1.0], [0.9, 0.9, 0.9, 1.0]];
         assert_eq!(d.cells(&px, 3, 1, None), vec![[0.2, 0.4, 1.0], [0.4, 0.0, 0.5], [0.9, 0.9, 0.9]]);
         let brighter = d.cells(&px, 3, 1, Some([2.0, 2.0, 2.0]));
