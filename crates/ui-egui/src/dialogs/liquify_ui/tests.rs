@@ -24,9 +24,9 @@ fn is_open(app: &PhotocraftApp) -> bool {
     app.framework.dialogs.is_open::<Hosted>()
 }
 
-/// Applies the events the workspace has queued to the app's field.
-fn settle(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    take(app, ctx);
+/// Runs one frame: the workspace's pass reports the events it queued, and the app applies them to its field.
+fn settle(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    crate::canvas::testing::frame(app);
 }
 
 /// The open workspace's facts (`describe`).
@@ -42,9 +42,12 @@ fn ctl(app: &mut PhotocraftApp, v: Value) -> Result<Value, String> {
     r
 }
 
+/// Opens the workspace and runs its first frame: the pass reads the remembered settings and asks for the backdrop.
 fn open_ws(app: &mut PhotocraftApp) -> Result<(), String> {
     let ctx = app.ctx().clone();
-    open(app, &ctx).map(|_| ())
+    open(app, &ctx)?;
+    crate::canvas::testing::frame(app);
+    Ok(())
 }
 
 /// The workspace's stroke of `tool` with the default brush at `size`.
@@ -202,7 +205,7 @@ fn backdrop_use_and_mode() {
     remembered.backdrop = BackdropUse::Layer(42);
     remembered.backdrop_mode = BackdropMode::Blend;
     set_saved_value(&ctx, &REMEMBERED, Some(remembered));
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     let s = ws(&mut app).settings();
     assert!(matches!(s.backdrop, BackdropUse::AllLayers), "the layer is not kept");
     assert!(matches!(s.backdrop_mode, BackdropMode::Blend), "the mode is kept");
@@ -213,7 +216,7 @@ fn backdrop_use_and_mode() {
 fn brush_settings_are_remembered_between_uses() {
     let mut app = app_with_layer();
     let ctx = app.ctx().clone();
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     let fresh = ws(&mut app).settings().clone();
     assert_eq!((fresh.brush.density, fresh.tool), (50.0, StepTool::ForwardWarp), "first use: the defaults");
     let set = json!({"tool": "twirlCw", "size": 37, "density": 85, "pressure": 60, "rate": 30, "showMesh": true, "meshSize": "large", "showBackdrop": true, "backdropOpacity": 25});
@@ -222,12 +225,12 @@ fn brush_settings_are_remembered_between_uses() {
     assert_ne!(changed, serde_json::to_value(&fresh).unwrap());
     ctl(&mut app, json!({"cancel": true})).unwrap();
     assert!(!is_open(&app));
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     assert_eq!(serde_json::to_value(ws(&mut app).settings()).unwrap(), changed, "Cancel keeps the settings");
     // OK and Esc keep the latest settings too.
     ctl(&mut app, json!({"density": 90})).unwrap();
     ctl(&mut app, json!({"commit": true})).unwrap();
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     assert_eq!(ws(&mut app).settings().brush.density, 90.0);
     ctl(&mut app, json!({"density": 70})).unwrap();
     ctl(&mut app, json!({"cancel": true})).unwrap();
@@ -505,7 +508,7 @@ fn workspaces_open_on_the_layer_with_a_mask_channel_or_quick_mask_targeted() {
         assert!(crate::canvas::paint_target(&app).get("colors").is_none(), "{case}");
         opens_and_cancels(&mut app, "filter.adaptiveWideAngle", &format!("{case}: Adaptive Wide Angle"), |app| crate::wide_angle_ui::open(app, &ctx));
         opens_and_cancels(&mut app, "filter.filterGallery", &format!("{case}: Filter Gallery"), |app| crate::gallery_ui::open(app));
-        open(&mut app, &ctx).unwrap_or_else(|e| panic!("{case}: Liquify: {e}"));
+        open_ws(&mut app).unwrap_or_else(|e| panic!("{case}: Liquify: {e}"));
         assert_eq!(crate::distort_ui::modal_workspace(&app), Some(KEY), "{case}: Liquify");
         let stroke = stroke_with(StepTool::ForwardWarp, 30.0, &[[20.0, 24.0], [36.0, 24.0]]);
         perform(&mut app, stroke.clone());
@@ -536,7 +539,7 @@ fn workspaces_open_on_a_smart_object_with_its_filter_mask_targeted() {
     let ctx = app.ctx().clone();
     opens_and_cancels(&mut app, "filter.adaptiveWideAngle", "Adaptive Wide Angle", |app| crate::wide_angle_ui::open(app, &ctx));
     opens_and_cancels(&mut app, "filter.filterGallery", "Filter Gallery", |app| crate::gallery_ui::open(app));
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     perform(&mut app, stroke_with(StepTool::ForwardWarp, 30.0, &[[20.0, 24.0], [36.0, 24.0]]));
     ctl(&mut app, json!({"commit": true})).unwrap();
     let st = app.session.active().unwrap();
@@ -673,7 +676,7 @@ fn a_targeted_channels_preview_shows_liquify_only_inside_the_selection() {
     let ctx = app.ctx().clone();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 60, "height": 80})).unwrap();
     app.run("channel.target", json!({"channel": {"color": 0}})).unwrap();
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     assert!(eng(&app).native_proxy.is_some());
     let view_before = read_view(&app);
     sweep(&mut app, 40.0);
@@ -695,7 +698,7 @@ fn the_preview_shows_liquify_only_inside_the_selection() {
     let mut app = app_with_layer();
     let ctx = app.ctx().clone();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 60, "height": 80})).unwrap();
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     let view_before = read_view(&app);
     sweep(&mut app, 40.0);
     {
@@ -720,7 +723,7 @@ fn the_preview_on_a_smart_object_follows_its_filter_mask() {
     app.session.execute("select.rect", json!({"x": 60, "y": 0, "width": 60, "height": 80})).unwrap();
     app.session.execute("filter.blur.gaussianBlur", json!({"radius": 0.5})).unwrap();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 60, "height": 80})).unwrap();
-    open(&mut app, &ctx).unwrap();
+    open_ws(&mut app).unwrap();
     sweep(&mut app, 40.0);
     // Reopened as a smart filter above the blur, it edits the blurred pixels.
     ctl(&mut app, json!({"commit": true})).unwrap();
