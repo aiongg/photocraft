@@ -17,7 +17,8 @@ use photocraft_engine::prefs::{self, CanvasColor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::direct_select::{BezierHit, PathRef}; // PLAN: assumed path of `BezierHit` (tools-w39)
+use crate::direct_select::PathRef;
+use craft::draw::ui::BezierHit;
 use crate::{PhotocraftApp, state::Tool};
 
 pub(crate) mod pen_dialogs;
@@ -360,7 +361,7 @@ fn crop_id(choice: CropPresetChoice) -> String {
 /// Built from the bar's own entries and words, so the two cannot disagree. The labels are shown
 /// as given. Empty for any other menu.
 pub fn crop_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row<String>> {
-    use crate::crop_overlay::{CropGuide, GuideShow}; // PLAN: assumed names and path (tools-w45)
+    use craft::behavior::geometry::{CropGuide, GuideShow};
     let Some(users) = crop_presets(menu) else { return Vec::new() };
     let env = Env::of_root(app.ctx());
     let words = env.words::<CropBarWords>();
@@ -419,7 +420,7 @@ fn crop_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bo
 
 /// A crop row: each runs what its options-bar twin runs.
 fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
-    use crate::crop_overlay::{CropGuide, GuideShow}; // PLAN: assumed names and path (tools-w45)
+    use craft::behavior::geometry::{CropGuide, GuideShow};
     let users = crop_presets(menu).map_or(0, <[String]>::len);
     match command {
         CROP_CANCEL => crate::crop_ui::discard(app),
@@ -786,9 +787,10 @@ fn point_menu(tool: Tool) -> bool {
 /// handle, or the Pen draft, which the engine doesn't edit.
 fn point_at(app: &PhotocraftApp, target: PathRef, hit: BezierHit) -> Option<(String, Value, (u64, u64))> {
     let (command, mut params) = match hit {
-        BezierHit::Anchor([subpath, knot]) => (POINT_DELETE, json!({"subpath": subpath, "knot": knot})),
-        BezierHit::Segment([subpath, knot], t) => (POINT_ADD, json!({"subpath": subpath, "knot": knot, "t": t})),
-        BezierHit::Handle(..) => return None,
+        BezierHit::Anchor { knot, .. } => (POINT_DELETE, json!({"subpath": knot.subpath, "knot": knot.knot})),
+        BezierHit::Segment { segment, t, .. } => (POINT_ADD, json!({"subpath": segment.subpath, "knot": segment.knot, "t": t})),
+        // A handle, or a hit the framework adds later: no point entry.
+        _ => return None,
     };
     if target == PathRef::Pen || crate::direct_select::ignores(app, &target) {
         return None;
@@ -1132,7 +1134,7 @@ pub fn entry_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) 
     let saved = menu.path_name.as_deref().is_some_and(|n| n != "work" && n != "layer");
     let has_path = menu.has_path;
     let pending = pen_pending(app);
-    let pending_layer = pending && (app.ui.tool_options.vector_mode == crate::state::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
+    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
     match command {
         "layer.vectorMask.fromPath" => has_path && can_mask && !pending_layer,
         "path.delete" => has_path && !pending_layer && (pending || menu.path_name.as_deref() != Some("layer")),
@@ -1410,7 +1412,7 @@ fn choose_pen(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, com
         return Ok(());
     }
     let pending = pen_pending(app);
-    let pending_layer = pending && (app.ui.tool_options.vector_mode == crate::state::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
+    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
     if pending && !crate::vector_ui::pen_commit(app, false) {
         return Err(app.ui.status.clone());
     }
