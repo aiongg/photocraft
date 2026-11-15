@@ -517,7 +517,7 @@ pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) 
         return Ok(equalize_ui::open(app));
     }
     if new_group_ui::fronts(command) {
-        return new_group_ui::open(app, command);
+        return Ok(new_group_ui::open(app, command));
     }
     if command == color_range_ui::COMMAND {
         return color_range_ui::open(app);

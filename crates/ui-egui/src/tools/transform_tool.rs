@@ -329,9 +329,10 @@ pub(crate) fn settings(app: &PhotocraftApp) -> TransformSettings {
     settings
 }
 
-/// The canvas tool while a session is open (Enter and Escape in the Warp phase); `None` with no session.
-pub fn canvas_tool(app: &PhotocraftApp) -> Option<TransformTool<'_, SessionWarp>> {
-    app.ui.transform.as_ref().map(|t| TransformTool::new(&t.session))
+/// The canvas tool of an open session (Enter and Escape in the Warp phase). The canvas pass holds the session while it
+/// runs, so the tool borrows it, not the app.
+pub fn canvas_tool(session: &FreeTransform) -> TransformTool<'_, SessionWarp> {
+    TransformTool::new(&session.session)
 }
 
 /// Applies what the tool's keys asked for: `(apply, discard)` from `TransformTool::take_keys`.

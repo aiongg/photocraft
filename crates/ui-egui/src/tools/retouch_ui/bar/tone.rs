@@ -34,7 +34,7 @@ pub(super) fn dodge_burn(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<R
     let o = &mut app.ui.tool_options;
     let ranges = string_entries(&[("shadows", tl!("Shadows")), ("midtones", tl!("Midtones")), ("highlights", tl!("Highlights"))]);
     choose(ui, tl!("Range"), &mut o.tone_range, &ranges, true, Some(tl!("Painting Mode")));
-    let exposure = number(tl!("Exposure"), &mut o.exposure, 1.0..=100.0).unit("%").tooltip(tl!("Set exposure for stroke")).show(ui);
+    let exposure = number(tl!("Exposure"), &mut o.exposure, 1.0..=100.0).unit("%").tooltip(tl!("Set exposure for stroke")).show(ui).out_of_range;
     check(
         ui,
         tl!("Protect Tones"),
@@ -50,7 +50,7 @@ pub(super) fn sponge(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<Range
     let o = &mut app.ui.tool_options;
     let modes = string_entries(&[("desaturate", tl!("Desaturate")), ("saturate", tl!("Saturate"))]);
     choose(ui, tl!("Mode"), &mut o.sponge_mode, &modes, true, None);
-    let flow = number(tl!("Flow"), &mut o.sponge_flow, 1.0..=100.0).whole().unit("%").popup_slider().show(ui);
+    let flow = number(tl!("Flow"), &mut o.sponge_flow, 1.0..=100.0).whole().unit("%").popup_slider().show(ui).out_of_range;
     check(ui, tl!("Vibrance"), &mut o.vibrance, true, None);
     flow
 }
@@ -62,7 +62,7 @@ pub(super) fn blur_sharpen_smudge(ui: &mut egui::Ui, app: &mut PhotocraftApp, to
         choose(ui, tl!("Mode"), &mut o.smudge_mode, &smudge_modes(), true, Some(tl!("Painting Mode")));
     }
     // The cell writes only on a commit, so a shared fraction is not rounded (#12650).
-    let strength = number(tl!("Strength"), &mut o.strength, 1.0..=100.0).whole().unit("%").show(ui);
+    let strength = number(tl!("Strength"), &mut o.strength, 1.0..=100.0).whole().unit("%").show(ui).out_of_range;
     if let Some(all) = o.sample_all.slot(tool) {
         check(ui, tl!("Sample All Layers"), all, true, None);
     }
@@ -93,7 +93,7 @@ pub(super) fn color_replacement(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> O
     let limits = string_entries(&[("discontiguous", tl!("Discontiguous")), ("contiguous", tl!("Contiguous")), ("findEdges", tl!("Find Edges"))]);
     choose(ui, tl!("Limits"), &mut o.cr_limits, &limits, true, Some(tl!("Determines the spread of replaced color")));
     let tolerance =
-        number(tl!("Tolerance"), &mut o.cr_tolerance, 1.0..=100.0).whole().unit("%").tooltip(tl!("Tolerance for choosing related colors")).show(ui);
+        number(tl!("Tolerance"), &mut o.cr_tolerance, 1.0..=100.0).whole().unit("%").tooltip(tl!("Tolerance for choosing related colors")).show(ui).out_of_range;
     check(ui, tl!("Anti-alias"), &mut o.cr_anti_alias, true, Some(tl!("Anti-alias brush application")));
     tolerance
 }

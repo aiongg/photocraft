@@ -68,8 +68,8 @@ pub(super) fn art_history(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<
     Field::new(tl!("Style")).side(SideLabel::new().scrub(true)).sizing(Sizing::Content).show(ui, |ui, _| {
         Select::new(tl!("Style"), Bind::bound(&mut o.art_history_style), &styles).show(ui);
     });
-    let area = number(tl!("Area"), &mut o.art_history_area, 0.0..=100.0).show(ui);
-    let tolerance = number(tl!("Tolerance"), &mut o.art_history_tolerance, 0.0..=100.0).show(ui);
+    let area = number(tl!("Area"), &mut o.art_history_area, 0.0..=100.0).show(ui).out_of_range;
+    let tolerance = number(tl!("Tolerance"), &mut o.art_history_tolerance, 0.0..=100.0).show(ui).out_of_range;
     Divider::vertical().show(ui);
     hint(ui, tl!("Stylized dabs from a history state"));
     area.or(tolerance)
@@ -91,8 +91,8 @@ pub(super) fn pattern_stamp(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Optio
             Select::new(tl!("Pattern"), Bind::bound(&mut picked), &patterns).show(ui);
         });
     }
-    let scale = number(tl!("Scale"), &mut o.pattern_stamp_scale, 1.0..=1000.0).unit("%").show(ui);
-    let angle = number(tl!("Angle"), &mut o.pattern_stamp_angle, -180.0..=180.0).unit("°").show(ui);
+    let scale = number(tl!("Scale"), &mut o.pattern_stamp_scale, 1.0..=1000.0).unit("%").show(ui).out_of_range;
+    let angle = number(tl!("Angle"), &mut o.pattern_stamp_angle, -180.0..=180.0).unit("°").show(ui).out_of_range;
     if !patterns.is_empty() && held.as_deref() != Some(picked.as_str()) {
         let _ = app.run("pattern.presets.select", json!({"pattern": picked}));
     }
@@ -102,8 +102,8 @@ pub(super) fn pattern_stamp(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Optio
 /// Red Eye: Pupil Size and Darken Amount.
 pub(super) fn red_eye(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<RangeAlert> {
     let o = &mut app.ui.tool_options;
-    let pupil = number(tl!("Pupil Size"), &mut o.red_eye_pupil_size, 1.0..=100.0).show(ui);
-    let darken = number(tl!("Darken Amount"), &mut o.red_eye_darken, 0.0..=100.0).show(ui);
+    let pupil = number(tl!("Pupil Size"), &mut o.red_eye_pupil_size, 1.0..=100.0).show(ui).out_of_range;
+    let darken = number(tl!("Darken Amount"), &mut o.red_eye_darken, 0.0..=100.0).show(ui).out_of_range;
     Divider::vertical().show(ui);
     hint(ui, tl!("Click a red pupil to neutralize it"));
     pupil.or(darken)

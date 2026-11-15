@@ -445,7 +445,9 @@ fn with_rig<R>(
     // Tools that own state the app lends nobody are built before the scope takes the app.
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
-    let mut transform = crate::transform_tool::canvas_tool(app);
+    // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
+    let free_transform = app.ui.transform.take();
+    let mut transform = free_transform.as_ref().map(crate::transform_tool::canvas_tool);
     let mut symmetry = if fam == Family::Paint { crate::symmetry_ui::session_tool(app) } else { None };
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx)),
@@ -540,8 +542,11 @@ fn with_rig<R>(
         }
         f(&mut pre, tool_host)
     };
-    if let Some(mut t) = transform {
-        crate::transform_tool::tool_keys(app, t.take_keys());
+    let transform_keys = transform.as_mut().map(|t| t.take_keys());
+    drop(transform);
+    app.ui.transform = free_transform;
+    if let Some(keys) = transform_keys {
+        crate::transform_tool::tool_keys(app, keys);
     }
     if let Some(mut t) = symmetry {
         crate::symmetry_ui::finish_tool(app, t.take_events());

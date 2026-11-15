@@ -166,7 +166,8 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
             .whole()
             .unit("%")
             .tooltip(tl!("Erase range of similar colors"))
-            .show(ui);
+            .show(ui)
+            .out_of_range;
         if tolerance != shown {
             o.bg_tolerance = tolerance;
         }
@@ -177,15 +178,16 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
     let before = app.session.tools.brush.clone();
     let mut brush = before.clone();
     let mut angle = brush.angle;
-    let alert = option_cells::number(tl!("Angle"), &mut angle, -180.0..=180.0)
+    let angle_out = option_cells::number(tl!("Angle"), &mut angle, -180.0..=180.0)
         .whole()
         .unit("°")
         .icon(IconSpec::svg(IconId::new("rotate_cw")))
         .tooltip(tl!("Set the brush angle"))
         .show(ui);
-    let mut key = None;
+    // One scrub is one gesture, so one history step.
+    let mut key = angle_out.events.iter().find_map(|e| crate::history_keys::coalesce("brush", e));
     brush.angle = angle;
-    alerts.extend(alert);
+    alerts.extend(angle_out.out_of_range);
 
     check(ui, tl!("Protect Foreground Color"), &mut app.ui.tool_options.bg_protect_fg, Some(tl!("Do not erase the foreground swatch color")));
 

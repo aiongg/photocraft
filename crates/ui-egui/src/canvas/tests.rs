@@ -609,7 +609,7 @@ fn layer_style_dialog_previews_live_and_cancel_restores() {
     let (shown, key2) = display_doc(&mut app, 0);
     assert_eq!(fx(&shown), 2);
     assert_ne!(key, key2, "an edit re-renders the canvas");
-    let ctx = app.ctx();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.cancel_by_id(&ctx, id);
     let (shown, key) = display_doc(&mut app, 0);
     assert_eq!((fx(&shown), key), (0, 0));

@@ -741,7 +741,6 @@ fn a_second_pass_in_one_frame_runs_no_command_twice() {
     let count = |app: &PhotocraftApp| app.session.active().unwrap().doc.walk().len();
     let n = count(&app);
     let press = egui::RawInput {
-        modifiers: Modifiers::COMMAND,
         events: vec![egui::Event::Key { key: Key::J, physical_key: Some(Key::J), pressed: true, repeat: false, modifiers: Modifiers::COMMAND }],
         ..Default::default()
     };

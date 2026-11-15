@@ -98,8 +98,8 @@ pub(super) fn patch(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<RangeA
     choose(ui, tl!("Patch"), &mut o.patch_content_aware, &kinds, true, None);
     let mut alert = None;
     if o.patch_content_aware {
-        let structure = number(tl!("Structure"), &mut o.patch_structure, 1.0..=7.0).whole().show(ui);
-        let color = number(tl!("Color"), &mut o.patch_color, 0.0..=10.0).whole().show(ui);
+        let structure = number(tl!("Structure"), &mut o.patch_structure, 1.0..=7.0).whole().show(ui).out_of_range;
+        let color = number(tl!("Color"), &mut o.patch_color, 0.0..=10.0).whole().show(ui).out_of_range;
         check(ui, tl!("Sample All Layers"), &mut o.sample_all.patch, true, None);
         alert = first(structure, color);
     } else {
@@ -119,8 +119,8 @@ pub(super) fn content_aware_move(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> 
     let modes = string_entries(&[("move", tl!("Move")), ("extend", tl!("Extend"))]);
     choose(ui, tl!("Mode"), &mut o.cam_mode, &modes, !live, Some(tl!("Choose a remix mode")));
     let structure =
-        number(tl!("Structure"), &mut o.cam_structure, 1.0..=7.0).whole().popup_slider().tooltip(tl!(STRUCTURE_TIP)).enabled(!live).show(ui);
-    let color = number(tl!("Color"), &mut o.cam_color, 0.0..=10.0).whole().popup_slider().tooltip(tl!(COLOR_TIP)).enabled(!live).show(ui);
+        number(tl!("Structure"), &mut o.cam_structure, 1.0..=7.0).whole().popup_slider().tooltip(tl!(STRUCTURE_TIP)).enabled(!live).show(ui).out_of_range;
+    let color = number(tl!("Color"), &mut o.cam_color, 0.0..=10.0).whole().popup_slider().tooltip(tl!(COLOR_TIP)).enabled(!live).show(ui).out_of_range;
     check(ui, tl!("Sample All Layers"), &mut o.sample_all.content_aware_move, !live, Some(tl!("Enable to remix all layers")));
     check(ui, tl!("Transform On Drop"), &mut o.cam_transform_on_drop, !live, Some(tl!("Allows rotation and scaling of selection")));
     if !live {
