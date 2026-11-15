@@ -60,7 +60,11 @@ pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<De
     // The icons the interface draws are registered before the runtime reads its first frame.
     crate::icons::register();
     match embed::install(ctx, spec, fonts) {
-        Ok(_) => pen.keep_on(ctx),
+        Ok(_) => {
+            pen.keep_on(ctx);
+            #[cfg(test)]
+            crate::testing::announce_modifiers(ctx);
+        }
         Err(InstallError::AlreadyInstalled) => {}
         Err(error) => log::error!("the craft runtime could not be installed: {error}"),
     }

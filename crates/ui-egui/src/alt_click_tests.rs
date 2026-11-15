@@ -6,14 +6,13 @@ use egui_kittest::Harness;
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::app::framework::BuildApp as _;
 use craft::keymap::Mods;
 use crate::state::Tool;
 
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).build_app(
         |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            crate::shortcuts::handle(app, &ctx);
             egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,

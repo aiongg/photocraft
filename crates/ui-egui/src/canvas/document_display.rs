@@ -362,6 +362,12 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     if let Some(next) = turned.as_ref() {
         view.set_from(next, ppp);
     }
+    // An ⌥-click the window manager took never arrives; say so (alt_grab.rs). Tools run in the main window only.
+    if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
+        let tool = app.ui.tool;
+        let active = !app.dialog_open();
+        crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), canvas_output.response.rect, tool, active);
+    }
     let response = tools::run(app, ui, host, &canvas_output);
     // A view a tool set (the Crop tool's slide) is the one the app keeps; the canvas's own otherwise.
     if let Some(next) = response.view.as_ref() {

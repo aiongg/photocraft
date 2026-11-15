@@ -1599,10 +1599,11 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
 pub(crate) fn run(ui: &mut egui::Ui, app: &mut PhotocraftApp, canvas: &CanvasOutput, host: &ToolHostResponse, guides: Option<&GuidesOutput>) {
     close_stale(app);
     if let Some(request) = host.context {
-        // A Space-held Hand opens the Hand's menu over the current tool; a momentary Zoom opens none.
+        // A Space-held Hand opens the Hand's menu over the current tool. A momentary Zoom opens no menu of its own, but
+        // with ⌘ held the right-click is still the one that lists the layers under the pointer (#307).
         let tool = match request.momentary {
             Some(MomentaryTool::Hand) => Some(Tool::Hand),
-            Some(_) => None,
+            Some(_) => crate::layer_pick_ui::is_gesture(Tool::Zoom, request.mods).then_some(app.ui.tool),
             None => Some(app.ui.tool),
         };
         if let Some(tool) = tool

@@ -743,6 +743,45 @@ pub(crate) mod testing {
         Services { settings: Some(SettingsStore::<photocraft_engine::prefs::SavedPrefs>::open_with(options)), ..Default::default() }
     }
 
+    /// Makes the input a test hands `ctx` carry its modifiers as the window's does. egui reads the held modifiers only
+    /// from `Event::ModifiersChanged`; the window's integration announces each change before the press, key or wheel
+    /// that carries it, and stamps every event with the held set. A kittest event carries its modifiers on the event
+    /// alone, so this announces them where they differ from the held ones. It runs after the runtime's input hook and
+    /// sees the input egui will read, the runtime's injected events included.
+    pub(crate) fn announce_modifiers(ctx: &egui::Context) {
+        ctx.add_plugin(AnnouncedModifiers::default());
+    }
+
+    /// The modifiers each viewport's input has held so far.
+    #[derive(Default)]
+    struct AnnouncedModifiers(std::collections::HashMap<egui::ViewportId, egui::Modifiers>);
+
+    impl egui::Plugin for AnnouncedModifiers {
+        fn debug_name(&self) -> &'static str {
+            "photocraft.testing.announced_modifiers"
+        }
+
+        fn input_hook(&mut self, _ctx: &egui::Context, input: &mut egui::RawInput) {
+            let held = self.0.entry(input.viewport_id).or_default();
+            let mut events = Vec::with_capacity(input.events.len());
+            for event in std::mem::take(&mut input.events) {
+                match &event {
+                    egui::Event::ModifiersChanged(now) => *held = *now,
+                    egui::Event::WindowFocused(false) => *held = egui::Modifiers::NONE,
+                    egui::Event::PointerButton { modifiers, .. } | egui::Event::Key { modifiers, .. } | egui::Event::MouseWheel { modifiers, .. }
+                        if *modifiers != *held =>
+                    {
+                        *held = *modifiers;
+                        events.push(egui::Event::ModifiersChanged(*modifiers));
+                    }
+                    _ => {}
+                }
+                events.push(event);
+            }
+            input.events = events;
+        }
+    }
+
     /// One pass of `ui` on `ctx` with `input`, its output taken as the window's renderer takes it: no renderer applies
     /// the texture changes in a test, so they are consumed here and the output drops clean.
     pub(crate) fn run_ui(ctx: &egui::Context, input: egui::RawInput, ui: impl FnMut(&mut egui::Ui)) -> egui::FullOutput {
