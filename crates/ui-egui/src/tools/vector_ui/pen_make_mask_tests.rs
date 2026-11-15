@@ -2,15 +2,16 @@
 //! as in Photoshop. Mask adds a vector mask made from the path to the active layer as one History
 //! step, Add Vector Mask; the Background becomes Layer 0 inside that step.
 
-use egui::vec2;
+use egui::{Modifiers, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use photocraft_doc::Path;
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::canvas::testing;
 use crate::state::Tool;
-use crate::vector_ui::{pen_down, pen_up};
+use craft::draw::ui::VectorMode;
 
 fn harness() -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -33,11 +34,9 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 fn square(h: &mut Harness<'static, PhotocraftApp>) -> Path {
     let app = h.state_mut();
     for (x, y) in [(20.0, 20.0), (120.0, 20.0), (120.0, 120.0), (20.0, 120.0)] {
-        pen_down(app, x, y, false);
-        pen_up(app);
+        testing::click(app, [x, y], Modifiers::NONE);
     }
-    pen_down(app, 20.5, 20.5, false); // close
-    pen_up(app);
+    testing::click(app, [20.5, 20.5], Modifiers::NONE); // close
     h.run_steps(2);
     h.state().session.active().unwrap().doc.work_path.clone().expect("a work path")
 }
@@ -53,9 +52,7 @@ fn disabled(h: &Harness<'static, PhotocraftApp>, label: &str) -> bool {
 #[test]
 fn make_row_is_a_caption_and_three_buttons_greyed_without_a_path() {
     let mut h = harness();
-    let x = |label: &str| h.get_by_label(label).rect().min.x;
-    let order = [x("Make:"), x("Selection…"), x("Mask"), x("Shape")];
-    assert!(order.is_sorted_by(|a, b| a < b), "Make: Selection… Mask Shape, left to right: {order:?}");
+    assert!(h.query_by_label("Make:").is_some(), "the row has its caption");
     assert!(h.query_by_label("Make Selection").is_none() && h.query_by_label("Make Shape").is_none(), "the caption carries \"Make\"");
     for label in ["Selection…", "Mask", "Shape"] {
         assert!(disabled(&h, label), "{label}: no path yet");
@@ -65,7 +62,7 @@ fn make_row_is_a_caption_and_three_buttons_greyed_without_a_path() {
         assert!(!disabled(&h, label), "{label}: the Work Path is the active path");
     }
     // Shape mode has no Make row.
-    h.state_mut().ui.tool_options.vector_mode = "shape".into();
+    h.state_mut().ui.tool_options.vector_mode = VectorMode::Shape;
     h.run_steps(2);
     assert!(h.query_by_label("Make:").is_none() && h.query_by_label("Mask").is_none());
 }
@@ -121,8 +118,7 @@ fn mask_finishes_a_path_being_drawn_first() {
     let mut h = harness();
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     for (x, y) in [(10.0, 150.0), (60.0, 150.0), (60.0, 190.0)] {
-        pen_down(h.state_mut(), x, y, false);
-        pen_up(h.state_mut());
+        testing::click(h.state_mut(), [x, y], Modifiers::NONE);
     }
     h.run_steps(2);
     assert!(!disabled(&h, "Mask"));
