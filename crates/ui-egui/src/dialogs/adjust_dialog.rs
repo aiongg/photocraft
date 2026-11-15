@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use craft::theme::Srgba;
 use craft::imaging::ui::adjust::{AdjustDialogCx, CurvesPanel, HostedAdjustDialog as FrameworkDialog, TonePicker};
 use craft::ui::dialog::{DialogId, DialogResult};
+use craft::ui::runtime::env::Label;
 use craft::ui::runtime::memory::{SaveKey, saved_value, set_saved_value};
 use photocraft_doc::ColorMode;
 use photocraft_engine::channel_cmds::ToneTarget;
@@ -536,7 +537,8 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let mut dialog = HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), seeded.value, shared_editor(kind.clone(), setup.clone()))
         .context(dynamic, gray)
-        .reset_with(reset_target(kind.clone(), seeded.mode, seeded.target.channel.clone()));
+        .reset_with(reset_target(kind.clone(), seeded.mode, seeded.target.channel.clone()))
+        .held_ok();
     if let Some(idx) = app.session.active_index() {
         dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     }
@@ -754,20 +756,29 @@ fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust
     Ok(())
 }
 
-/// The hooks of a playing Action around a confirmed step dialog: the action continues after the command, and ends at
-/// this step when the command is refused.
+/// The hooks of a playing Action around a confirmed step dialog: the action continues after the command. A refused
+/// command keeps the dialog open and the step paused: the user can change the values and press OK again, or cancel.
 fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue) -> Result<(), String> {
     // Taken before the command runs: the step dialog's playback is looked up by the dialog's id.
     let token = crate::actions::token_of(app, open.id);
-    if let Err(error) = run_confirmed(app, ctx, open, value) {
-        if let Some(token) = token {
-            crate::actions::abandoned(app, token);
-        }
-        return Err(error);
-    }
+    run_confirmed(app, ctx, open, value)?;
     match token {
         Some(token) => crate::actions::resume(app, token),
         None => Ok(()),
+    }
+}
+
+/// The held OK of the dialog `id`: runs its command and answers the dialog. A refusal keeps the dialog open, showing
+/// why, with the adjustment still open; an accepted OK ends it, and the dialog closes at its next pass.
+fn answer_held(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) {
+    let Some(value) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id).and_then(FrameworkDialog::take_ok) else { return };
+    let Some(open) = app.adjust_open.take() else { return };
+    let answer = confirm(app, ctx, &open, &value);
+    if answer.is_err() {
+        app.adjust_open = Some(open);
+    }
+    if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) {
+        dialog.answer_ok(answer.map_err(Label::from));
     }
 }
 
@@ -779,26 +790,23 @@ fn abandon_step(app: &mut PhotocraftApp, id: DialogId) {
 }
 
 /// The result pump's entry for the adjustment dialog (`dialogs::run`, once per pass): answers the editor's asks,
-/// follows the target, and turns the host's OK or Cancel into the command run (one history step) or the Actions step
-/// abandoned. A Cancel that arrives while the dialog is still open is the one an opening of the same kind replaced:
-/// that step ended when the new dialog opened.
+/// follows the target, runs the command of a held OK (one history step) and answers the dialog with it, and turns the
+/// host's Cancel into the Actions step abandoned. A Cancel that arrives while the dialog is still open is the one an
+/// opening of the same kind replaced: that step ended when the new dialog opened.
 pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let Some(id) = app.adjust_open.as_ref().map(|open| open.id) else { return };
-    if hosted(app, id).is_some() {
+    if let Some(id) = app.adjust_open.as_ref().map(|open| open.id)
+        && hosted(app, id).is_some()
+    {
         answer_asks(app, id);
         follow_target(app, id);
+        answer_held(app, ctx, id);
     }
     let Some((result, _)) = app.framework.dialogs.take_keyed::<HostedAdjustDialog>() else { return };
+    // The accepted OK's command ran when it was held (`answer_held`), which ended the open adjustment.
+    let Some(id) = app.adjust_open.as_ref().map(|open| open.id) else { return };
     let still_open = hosted(app, id).is_some();
     match result {
-        DialogResult::Ok(value) => {
-            if let Some(open) = app.adjust_open.take()
-                && let Err(error) = confirm(app, ctx, &open, &value)
-            {
-                app.adjust_refusal = Some(error.clone());
-                crate::notices::error(app, error);
-            }
-        }
+        DialogResult::Ok(_) => {}
         _ if still_open => {}
         _ => {
             abandon_step(app, id);

@@ -478,12 +478,8 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
             _ => {}
         }
     }
-    app.adjust_refusal = None;
     take_results(app, ctx);
-    match app.adjust_refusal.take() {
-        Some(refusal) => Err(refusal),
-        None => Ok(()),
-    }
+    Ok(())
 }
 
 /// Cancels dialog `id`, as Cancel or Escape would, and runs what a cancel leaves to do.

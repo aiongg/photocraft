@@ -544,9 +544,6 @@ pub struct PhotocraftApp {
     /// The reply of the Camera Raw finish or cancel the result pump ran last, for the menu request that confirmed it:
     /// the request clears it when it starts and takes it when it ends (`camera_raw_ui::menu`).
     pub(crate) raw_reply: Option<Result<serde_json::Value, String>>,
-    /// The refusal of the adjustment command the result pump ran last for a confirmed Levels/Curves-style dialog, for the
-    /// request that confirmed it (`dialogs::confirm` takes it).
-    pub(crate) adjust_refusal: Option<String>,
     /// Raws just opened interactively, waiting in the open-time Camera Raw dialog (shown on the
     /// next frame, which has the egui context); several share it in a filmstrip.
     pub(crate) raw_shelf: Vec<camera_raw_ui::HeldRaw>,
