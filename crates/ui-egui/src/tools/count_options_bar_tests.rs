@@ -92,12 +92,12 @@ fn count_bar_greys_what_cannot_act() {
     }
 }
 
-/// Drags the visible "Marker Size:" caption `dx` points right in four moves.
+/// Drags the visible "Marker Size" caption `dx` points right in four moves.
 fn scrub_marker_size(h: &mut Harness<'static, PhotocraftApp>, dx: f32) {
     let from = h
-        .query_all(egui_kittest::kittest::by().label("Marker Size:").include_labels())
+        .query_all(egui_kittest::kittest::by().label("Marker Size").include_labels())
         .find(|n| n.accesskit_node().role() == egui::accesskit::Role::Label)
-        .expect("the Marker Size: caption")
+        .expect("the Marker Size caption")
         .rect()
         .center();
     h.hover_at(from);

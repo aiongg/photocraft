@@ -115,7 +115,7 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
         Select::new(Label::from(tl!("Group")), Bind::given(0usize), &entries).enabled(false).show(ui);
     }
     let eye = IconId::new(if g.visible { "eye" } else { "eye_off" });
-    if IconButton::new(eye).label(Label::from(tl!("Toggle visibility of count group"))).enabled(group.is_some()).show(ui).clicked()
+    if IconButton::new(eye).label(Label::from(tl!("Toggle visibility of count group"))).show(ui).clicked()
         && let Some(gi) = group
     {
         run(app, "count.setGroup", json!({"group": gi, "visible": !g.visible}));
@@ -123,7 +123,7 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     if IconButton::new(IconId::new("new_folder")).label(Label::from(tl!("Create a new count group"))).show(ui).clicked() {
         run(app, "count.newGroup", json!({}));
     }
-    if IconButton::new(IconId::new("trash")).label(Label::from(tl!("Delete the currently selected count group"))).enabled(group.is_some()).show(ui).clicked()
+    if IconButton::new(IconId::new("trash")).label(Label::from(tl!("Delete the currently selected count group"))).enabled(m.count_groups.len() >= 2).show(ui).clicked()
         && let Some(gi) = group
     {
         run(app, "count.deleteGroup", json!({"group": gi}));
@@ -142,14 +142,17 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     Divider::vertical().show(ui);
     let (marker, label) = (g.marker_size as f32, g.label_size as f32);
     let (mut new_marker, mut new_label) = (marker, label);
-    option_cells::number(tl!("Marker Size"), &mut new_marker, MARKER_SIZE).whole().show(ui);
-    option_cells::number(tl!("Label Size"), &mut new_label, LABEL_SIZE).whole().show(ui);
+    let marker_out = option_cells::number(tl!("Marker Size"), &mut new_marker, MARKER_SIZE).whole().show(ui);
+    let label_out = option_cells::number(tl!("Label Size"), &mut new_label, LABEL_SIZE).whole().show(ui);
     let Some(gi) = group else { return };
     if new_marker != marker || new_label != label {
-        // PLAN: `NumberCell` (tools-w54) returns no edit events, so a scrub cannot share a `history_keys::coalesce`
-        // key; until the cell reports its gesture each change is its own undo step.
         let mut params = count_size_params(new_marker, new_label);
         params["group"] = json!(gi);
+        // A scrub's edits share one key, so the drag is one history step.
+        let events = marker_out.events.iter().chain(label_out.events.iter());
+        if let Some(key) = events.into_iter().find_map(|e| crate::history_keys::coalesce("count-size", e)) {
+            params["coalesce"] = json!(key);
+        }
         run(app, "count.setGroup", params);
     }
 }

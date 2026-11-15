@@ -103,11 +103,13 @@ mod tests {
     fn a_crop_tool_preset_fits_the_frame_to_its_ratio() {
         let mut app = app();
         app.ui.tool = Tool::Crop;
-        crate::crop_ui::refit(&mut app, false);
+        // The tool draws its default frame in its first pass.
+        crate::canvas::testing::frame(&mut app);
         let size = |app: &PhotocraftApp| crate::crop_ui::frame(app).and_then(|frame| frame.crop_size());
         assert_eq!(size(&app), Some((64.0, 48.0)));
         app.run("tool.presets.new", json!({"name": "Square", "tool": "crop", "options": {"toolOptions": {"crop_ratio": "1:1"}}})).unwrap();
         select(&mut app, "Square");
+        crate::canvas::testing::frame(&mut app);
         assert_eq!(size(&app), Some((48.0, 48.0)));
     }
 
