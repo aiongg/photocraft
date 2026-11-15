@@ -29,13 +29,9 @@ const MODES: [(ColorMode, DialogMode); 4] =
 
 /// Opens File › New on the last created settings and returns the dialog's id.
 pub(crate) fn open(app: &mut PhotocraftApp) -> DialogId {
-    let mut options = app.new_document_options();
+    let options = app.new_document_options();
+    // An image on the clipboard is offered as the Clipboard preset; the dialog opens on it, at its size.
     let clipboard = app.new_document_clipboard();
-    // An image on the clipboard is offered as the Clipboard preset, and the dialog opens with it selected.
-    if let Some(size) = clipboard {
-        options.size = size;
-        options.pixels_per_inch = 72.0;
-    }
     let background = app.session.tools.background;
     let background = Srgba::from_rgb_array([background[0], background[1], background[2]]);
     let units = app.session.prefs().units_and_rulers.clone();
@@ -43,7 +39,7 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> DialogId {
     let usable = |ppi: f64| Some(ppi).filter(|ppi| ppi.is_finite() && *ppi > 0.0);
     let (print, screen) = (usable(units.print_resolution as f64), usable(units.screen_resolution as f64));
     let profiles = profiles(app);
-    let dialog = HostedNewDocument::new(options, move |options| {
+    let dialog = HostedNewDocument::new(app.ctx(), options, move |options| {
         let mut dialog = NewDocumentDialog::new(Bind::bound(options)).background_color(background).profiles(profiles.clone()).app_name("PhotoCraft").remember(WINDOW);
         if let Some(size) = clipboard {
             dialog = dialog.clipboard(size);
