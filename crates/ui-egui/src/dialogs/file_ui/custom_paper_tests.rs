@@ -85,12 +85,26 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
     h.run_steps(3);
 }
 
+/// Scrolls the open paper list until the row `label` is shown: the list draws only the rows in view, so a row near
+/// the end is not in the access tree until the wheel has brought it into view.
+fn reveal(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
+    for _ in 0..40 {
+        if h.query_by_label(label).is_some() {
+            return;
+        }
+        let list = h.query_all_by_role(egui::accesskit::Role::ListBox).last().expect("an open list").rect();
+        h.hover_at(list.center());
+        h.event(Event::MouseWheel { source: egui::MouseWheelSource::Unknown, unit: egui::MouseWheelUnit::Line, delta: vec2(0.0, -3.0), phase: egui::TouchPhase::Move, modifiers: Modifiers::NONE });
+        h.run_steps(2);
+    }
+    panic!("the row {label} never came into view");
+}
+
 /// Chooses an option from the open paper menu. The Japanese presets made the list longer than
 /// the dropdown shows, so it scrolls (and reopens where it was left): bring the row into view
 /// before clicking it.
 fn choose_paper(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
-    h.get_by_label(label).scroll_to_me();
-    h.run_steps(3);
+    reveal(h, label);
     h.get_by_label(label).click();
     h.run_steps(3);
 }
@@ -185,7 +199,7 @@ fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
     // ("Letter", "A4", …), while the dialog stores the engine key ("letter", "a4", …).
     click(&mut h, "Letter");
     assert!(shown(&h, "A4"), "the real preset menu must be open");
-    assert!(shown(&h, "Custom"), "the paper menu must offer editable custom dimensions");
+    reveal(&mut h, "Custom");
     choose_paper(&mut h, "Custom");
     assert_eq!(fields(&h, id)["paper"], json!([612.0, 792.0]), "Custom starts at the current preset dimensions");
     click(&mut h, "Centimeters");

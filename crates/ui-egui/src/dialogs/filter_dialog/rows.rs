@@ -440,9 +440,13 @@ fn droppers_row() -> Param {
     Param::custom(SAMPLE_TOOL, Label::from(tl!("Eyedroppers")), |ui, fields, cx| {
         if !fields.contains(SAMPLE_TOOL) {
             fields.set(SAMPLE_TOOL, "sample");
-            cx.arm_eyedropper(EyedropperRequest::new("color"));
         }
         let armed = fields.text(SAMPLE_TOOL).unwrap_or_default().to_owned();
+        // The body can run more than once in a pass and each run starts clean, so the request is filed on every run
+        // while a dropper is armed: the host's arming is idempotent.
+        if !armed.is_empty() {
+            cx.arm_eyedropper(EyedropperRequest::new("color"));
+        }
         let tools = [
             ("sample", Label::from(tl!("Pick Color From Image")), IconSpec::svg(IconId::new("eyedropper"))),
             ("add", Label::from(tl!("Add to Sample")), IconSpec::mark(CursorBadge::Add)),
@@ -455,7 +459,6 @@ fn droppers_row() -> Param {
                     match toggle.value().copied() {
                         Some(true) => {
                             fields.set(SAMPLE_TOOL, id);
-                            cx.arm_eyedropper(EyedropperRequest::new("color"));
                         }
                         Some(false) => fields.set(SAMPLE_TOOL, ""),
                         None => {}

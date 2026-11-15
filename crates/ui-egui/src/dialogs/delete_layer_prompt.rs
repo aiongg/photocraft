@@ -144,7 +144,9 @@ mod tests {
         assert!(h.state().session.active().unwrap().doc.layer(id).is_none());
         let clear = photocraft_engine::commands::find("edit.clear").unwrap();
         let delete = photocraft_engine::commands::find(COMMAND).unwrap();
-        assert_eq!(clear.shortcut, Some("Delete"));
+        // The Delete key is the framework's `edit.delete` binding, which `shortcut_dispatch` runs as Clear: the engine's
+        // command specs carry no key of their own, so Delete Layer has none either.
+        assert_eq!(clear.shortcut, None);
         assert_eq!(delete.shortcut, None);
     }
 }
