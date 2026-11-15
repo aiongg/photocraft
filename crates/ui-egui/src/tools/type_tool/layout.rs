@@ -1,3 +1,5 @@
+use photocraft_text::warp::Warp;
+
 use super::{Affine, Arc, Document, LayerContent, LayerId, PhotocraftApp, Point, PoisonError, TextLayer, TextLayout, text_layer};
 
 /// Layout of a type layer (cached per document revision) and its text → document transform.
@@ -67,22 +69,47 @@ pub(crate) fn shows_own_layout(doc: &Document, t: &TextLayer) -> bool {
     [(ours.x0, have.x0), (ours.y0, have.y0), (ours.x1, have.x1), (ours.y1, have.y1)].iter().all(|(a, b)| (a - b).abs() <= 1)
 }
 
-pub(super) fn hit_offset(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> usize {
-    offset_at(app, id, x, y)
+/// Whether layer `id` runs its text vertically.
+pub(super) fn is_vertical(app: &PhotocraftApp, id: LayerId) -> bool {
+    app.session.active().and_then(|s| text_layer(&s.doc, id)).is_some_and(|t| t.orientation == photocraft_doc::text::Orientation::Vertical)
+}
+
+/// The warp of a layer set on a path (type on a path), `None` for any other text. The path carries the line, so
+/// carets, selections and hits go through it.
+pub(super) fn path_warp(app: &PhotocraftApp, id: LayerId, l: &TextLayout) -> Option<Warp> {
+    let t = text_layer(&app.session.active()?.doc, id)?;
+    let text_start = l.line_bounds().map_or(0.0, |bounds| f64::from(bounds[0]));
+    Warp::on_path_oriented(&t.shape, text_start, l.vertical)
+}
+
+/// A line-space point (along the line, across it) in document space: the line turns to text space, bends along the
+/// path when there is one, and the layer's transform places it.
+pub(super) fn doc_point(l: &TextLayout, aff: &Affine, warp: Option<&Warp>, x: f32, y: f32) -> Point {
+    let (tx, ty) = l.to_text(x, y);
+    let (tx, ty) = match warp {
+        Some(w) => {
+            let (wx, wy) = w.apply(f64::from(tx), f64::from(ty));
+            (wx as f32, wy as f32)
+        }
+        None => (tx, ty),
+    };
+    aff.apply(Point::new(f64::from(tx), f64::from(ty)))
+}
+
+/// The character offset of the caret position nearest document point (`x`, `y`) in layer `id`, and the laid-out
+/// line the point is on.
+pub(super) fn hit_at(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> (usize, usize) {
+    let Some((l, aff, text)) = layout(app, id) else { return (0, 0) };
+    let (tx, ty) = to_text(&aff, x, y);
+    // Type on a path: the point's place along the path is the position in the (single) line.
+    let text_end = l.line_bounds().map_or(0.0, |bounds| f64::from(bounds[2]));
+    let (tx, ty) = path_warp(app, id, &l)
+        .and_then(|warp| warp.path_text_x_near_text(f64::from(tx), f64::from(ty), text_end))
+        .map_or((tx, ty), |offset| l.to_text(offset as f32, -1.0));
+    photocraft_text::hit_char(&l, &text, tx, ty)
 }
 
 /// The character offset of the caret position nearest document point (`x`, `y`) in layer `id`.
 pub(crate) fn offset_at(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> usize {
-    let Some((l, aff, text)) = layout(app, id) else { return 0 };
-    let (tx, ty) = to_text(&aff, x, y);
-    // Type on a path: the point's place along the path is the position in the (single) line.
-    let shape = app.session.active().and_then(|s| text_layer(&s.doc, id).map(|t| t.shape.clone()));
-    let text_start = l.line_bounds().map_or(0.0, |bounds| f64::from(bounds[0]));
-    let text_end = l.line_bounds().map_or(0.0, |bounds| f64::from(bounds[2]));
-    let (tx, ty) = shape
-        .as_ref()
-        .and_then(|shape| photocraft_text::warp::Warp::on_path_oriented(shape, text_start, l.vertical))
-        .and_then(|warp| warp.path_text_x_near_text(f64::from(tx), f64::from(ty), text_end))
-        .map_or((tx, ty), |offset| l.to_text(offset as f32, -1.0));
-    photocraft_text::hit_char(&l, &text, tx, ty).0
+    hit_at(app, id, x, y).0
 }
