@@ -1029,16 +1029,25 @@ fn ui_set_drives_the_crop_overlay_options() {
 /// #1919: the Crop tool's gear menu (Show Cropped Area, crop shield) over the control channel.
 #[test]
 fn ui_set_drives_the_crop_shield_options() {
-    use crate::crop_shield::{CropShield, ShieldColor};
+    use craft::ui::canvas::{CropShield, ShieldColor};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
     let good = call(&mut app, &ctx, "ui.set", json!({"cropShield": {"color": "custom", "custom_color": [255, 0, 0], "opacity": 40}}));
     assert_eq!(good["ok"], true, "{good}");
-    let want = CropShield { color: ShieldColor::Custom, custom_color: [255, 0, 0], opacity: 40.0, ..Default::default() };
+    let mut want = CropShield::default();
+    want.color = ShieldColor::Custom;
+    want.custom_color = [255, 0, 0];
+    want.opacity = 40.0;
+    // `CropShield` is non-exhaustive, so a variation is the value with one field set.
+    let hidden_area = |shield: &CropShield| {
+        let mut shield = shield.clone();
+        shield.show_cropped_area = false;
+        shield
+    };
     assert_eq!(app.ui.tool_options.crop.shield, want);
     // A patch: the other fields stay.
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"cropShield": {"show_cropped_area": false}}))["ok"], true);
-    assert_eq!(app.ui.tool_options.crop.shield, CropShield { show_cropped_area: false, ..want.clone() });
+    assert_eq!(app.ui.tool_options.crop.shield, hidden_area(&want));
     let t = &call(&mut app, &ctx, "ui.inspect", json!({}))["result"]["toolOptions"]["crop"]["shield"];
     assert_eq!((t["color"].as_str(), t["opacity"].as_f64(), t["show_cropped_area"].as_bool()), (Some("custom"), Some(40.0), Some(false)));
     for bad in [
@@ -1054,7 +1063,7 @@ fn ui_set_drives_the_crop_shield_options() {
         let r = call(&mut app, &ctx, "ui.set", bad.clone());
         assert_eq!(r["ok"], false, "{bad}: {r}");
     }
-    assert_eq!(app.ui.tool_options.crop.shield, CropShield { show_cropped_area: false, ..want }, "a rejected call applies none of its fields");
+    assert_eq!(app.ui.tool_options.crop.shield, hidden_area(&want), "a rejected call applies none of its fields");
 }
 
 #[test]
