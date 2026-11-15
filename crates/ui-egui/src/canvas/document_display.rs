@@ -405,8 +405,10 @@ fn canvas_controls(
     let now = ui.input(|i| i.time);
     crate::distort_ui::show_in_canvas(app, ui, rect);
     crate::blur_pins::overlay(app, ui, rect);
-    let paths = crate::vector_ui::overlay::show_paths(app, ui, rect);
-    crate::direct_select::edits::apply(app, paths);
+    if let Some(shown) = crate::vector_ui::overlay::show_paths(app, ui, rect) {
+        let mods = ui.input(|i| i.modifiers);
+        crate::direct_select::edits::apply(app, &shown.output, &shown.refs, app.ui.tool, mods);
+    }
     crate::type_tool::canvas_controls(app, ui, rect);
     crate::type_path_placement::show(app, ui, rect);
     crate::transform_tool::show_in_canvas(app, ui, rect, now);

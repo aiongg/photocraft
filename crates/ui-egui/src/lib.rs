@@ -269,6 +269,7 @@ pub use tools::move_hover;
 pub use tools::move_lock;
 pub use tools::move_mods;
 pub use tools::object_finder;
+pub use tools::option_cells;
 use tools::paint_picker;
 use tools::path_components;
 pub use tools::perspective_crop_ui;
