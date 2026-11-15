@@ -7,9 +7,6 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
-/// The Channels panel's layer mask thumbnail in `PhotocraftApp::thumbs`.
-pub const THUMB_MASK: u8 = 1;
-
 /// Which of a layer's masks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MaskKind {
@@ -61,13 +58,13 @@ pub fn click_command(l: &Layer, kind: MaskKind, m: egui::Modifiers) -> Option<(S
 }
 
 /// The `select.loadSelection` params for a ⌘-click on mask thumbnail `kind` (⌘⇧ add, ⌘⌥
-/// subtract, ⌘⇧⌥ intersect).
-pub fn load_params(l: &Layer, kind: MaskKind, m: egui::Modifiers) -> Value {
+/// subtract, ⌘⇧⌥ intersect); `mods` are the click's framework modifiers.
+pub fn load_params(l: &Layer, kind: MaskKind, mods: craft::keymap::Mods) -> Value {
     let channel = match kind {
         MaskKind::Pixel => "mask",
         MaskKind::Vector => "vectorMask",
     };
-    json!({"channel": channel, "layer": l.id.0, "operation": crate::channels_panel::load_operation(m)})
+    json!({"channel": channel, "layer": l.id.0, "operation": craft::behavior::geometry::SelectionOperation::from_mods(mods).name()})
 }
 
 /// What double-clicking a mask thumbnail does: pixel mask launches Select and Mask if preference is enabled.

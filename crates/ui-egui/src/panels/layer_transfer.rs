@@ -11,11 +11,14 @@
 //!
 //! A Move drag with a pixel selection copies only those pixels into a new layer.
 
+use craft::layers::ui::panel::{LayersDrag, document_hash};
+use craft::ui::runtime::drag;
 use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::state::Tool;
+use crate::canvas::document_display::CanvasHost;
+use crate::canvas::tools::move_tool::MoveLayerDrag;
 
 /// The layers being dragged and where from.
 #[derive(Clone, Debug)]
@@ -33,6 +36,8 @@ fn key() -> egui::Id {
     egui::Id::unique("pc-layer-transfer")
 }
 
+/// The Move-tool transfer [`arm_move_transfer`] started, kept until the drag ends. A Layers panel
+/// drag has no slot: the runtime drag is its record ([`panel_transfer`]).
 fn get(ctx: &egui::Context) -> Option<Transfer> {
     ctx.data(|d| d.get_temp::<Transfer>(key()))
 }
@@ -41,47 +46,69 @@ fn clear(ctx: &egui::Context) {
     ctx.data_mut(|d| d.remove::<Transfer>(key()));
 }
 
-/// Starts a transfer of `layers` from the active document; `grab` is the document point a Move
-/// drag grabbed.
-fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: Option<[f64; 2]>) -> bool {
-    let Some(st) = app.session.active() else { return false };
-    let label = match layers.as_slice() {
-        [one] => st.doc.layer(*one).map_or_else(String::new, |l| l.name.clone()),
+/// The transfer under way: the Move tool's, else the Layers panel drag the runtime holds.
+fn transfer(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Transfer> {
+    get(ctx).or_else(|| panel_transfer(app, ctx))
+}
+
+/// The layers' name, or their count, for the ghost and the drag badge.
+fn label_of(doc: &photocraft_doc::Document, layers: &[LayerId]) -> String {
+    match layers {
+        [one] => doc.layer(*one).map_or_else(String::new, |l| l.name.clone()),
         many => crate::i18n::trn(crate::i18n::current(), many.len() as u64, "{n} layer", "{n} layers"),
-    };
+    }
+}
+
+/// The transfer of a Layers panel row drag: the layers it carries, from the document it started in
+/// (`LayersDrag::document`, the hash the panel was given with `.document(doc_id)`). A drag that
+/// carries effects, filters or a mask is no transfer.
+fn panel_transfer(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Transfer> {
+    let payload = drag::active::<LayersDrag<LayerId>>(ctx)?;
+    let layers: Vec<LayerId> = payload.layers().into_iter().copied().collect();
+    if layers.is_empty() {
+        return None;
+    }
+    let hash = payload.document()?;
+    let source = app.session.documents().iter().find(|d| document_hash(d.doc.id) == hash)?;
+    Some(Transfer { source: source.doc.id, layers: layers.iter().map(|l| l.0).collect(), grab: None, label: label_of(&source.doc, &layers), selection_only: false })
+}
+
+/// Starts a Move-tool transfer of `layers` from the active document; `grab` is the document point
+/// the drag grabbed.
+fn begin(app: &PhotocraftApp, ctx: &egui::Context, layers: Vec<LayerId>, grab: [f64; 2]) -> bool {
+    let Some(st) = app.session.active() else { return false };
     // Several selected layers move whole; the engine's selected-pixel copy intentionally accepts
     // exactly one raster layer.
-    let selection_only = grab.is_some() && layers.len() == 1 && st.doc.selection.is_some();
-    let t = Transfer { source: st.doc.id, layers: layers.iter().map(|l| l.0).collect(), grab, label, selection_only };
+    let selection_only = layers.len() == 1 && st.doc.selection.is_some();
+    let t = Transfer { source: st.doc.id, layers: layers.iter().map(|l| l.0).collect(), grab: Some(grab), label: label_of(&st.doc, &layers), selection_only };
     ctx.data_mut(|d| d.insert_temp(key(), t));
     true
 }
 
-/// A Layers panel row drag of `layers` is under way (the panel's drag payload): they can be
-/// dropped on another document. Starts the transfer once per drag.
-pub fn begin_from_panel(app: &PhotocraftApp, ctx: &egui::Context, layers: &[LayerId]) {
-    if get(ctx).is_none() && !layers.is_empty() {
-        begin(app, ctx, layers.to_vec(), None);
-    }
-}
-
 /// The document a transfer under way started in.
-pub fn source(ctx: &egui::Context) -> Option<DocId> {
-    get(ctx).map(|t| t.source)
+pub fn source(app: &PhotocraftApp, ctx: &egui::Context) -> Option<DocId> {
+    transfer(app, ctx).map(|t| t.source)
 }
 
-/// A Move-tool drag of whole layers (not a selection or a floating piece) under way.
-fn move_drag(app: &PhotocraftApp) -> Option<[f64; 2]> {
-    let d = app.drag.as_ref().filter(|d| d.tool == Tool::Move && d.sel_move != Some(false))?;
+/// The Move tool's drag, if it moves whole layers.
+fn layer_drag(app: &PhotocraftApp) -> Option<MoveLayerDrag> {
+    app.canvas_tools.mover.layer_drag()
+}
+
+/// A Move-tool drag of whole layers (not a selection or a floating piece) under way: the document
+/// point it grabbed.
+fn move_drag(app: &PhotocraftApp, ctx: &egui::Context) -> Option<[f64; 2]> {
+    let d = layer_drag(app)?;
     let st = app.session.active()?;
-    let plain = app.ui.transform.is_none() && app.guide_drag.is_none() && ((st.doc.selection.is_none() && st.floating.is_none()) || d.sel_move == Some(true));
+    let canvas = CanvasHost::main(app.session.active_index()?).canvas_id();
+    let plain = app.ui.transform.is_none() && craft::ui::canvas_controls::reading::running(ctx, canvas).is_none() && ((st.doc.selection.is_none() && st.floating.is_none()) || d.moves_selection);
     plain.then_some(d.start)
 }
 
 /// The pointer, while layers are dragged (or a Move drag could become a transfer): tabs only
 /// hit-test it then.
 pub fn pointer_if_armed(app: &PhotocraftApp, ctx: &egui::Context) -> Option<egui::Pos2> {
-    if get(ctx).is_none() && move_drag(app).is_none() {
+    if transfer(app, ctx).is_none() && move_drag(app, ctx).is_none() {
         return None;
     }
     ctx.input(|i| i.pointer.latest_pos())
@@ -91,13 +118,13 @@ pub fn pointer_if_armed(app: &PhotocraftApp, ctx: &egui::Context) -> Option<egui
 /// transfer (the source layers stay where they were), the tab's document is shown, and a release
 /// right here drops the layers into it.
 fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) -> bool {
-    if get(ctx).is_none() {
-        let Some(grab) = move_drag(app) else { return false };
+    if transfer(app, ctx).is_none() {
+        let Some(grab) = move_drag(app, ctx) else { return false };
         let Some(active) = app.session.active().and_then(|st| st.active_layer) else { return false };
         if app.session.active_index() == Some(index) {
             return false;
         }
-        let Some(previous) = app.drag.as_ref().map(|d| d.transfer_floating_before.clone()) else { return false };
+        let Some(previous) = layer_drag(app).map(|d| d.floating_before) else { return false };
         // An Option-drag of an existing float first drops it and floats a copy. Take that
         // compound start back before restoring the captured float, so document, history and
         // floating revision remain one consistent source state.
@@ -114,9 +141,11 @@ fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize)
                 return false;
             }
         }
-        // The Move drag ends without moving anything; an ⌥-drag's copy is taken back.
-        app.drag = None;
-        app.move_preview = None;
+        // The Move drag ends without moving anything (the tool also drops its preview); an ⌥-drag's
+        // copy is taken back.
+        if let Some(index) = app.session.active_index() {
+            crate::canvas::tools::tool_changed(app, ctx, CanvasHost::main(index));
+        }
         crate::move_mods::abandon(app);
         // The rollback raised the revision; the restored document is the one the float was
         // over, so it floats over the new revision (else `floating()` drops it as stale).
@@ -128,7 +157,7 @@ fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize)
             Some(st) if st.is_layer_selected(active) => st.selected_layers(),
             _ => vec![active],
         };
-        if !begin(app, ctx, layers, Some(grab)) {
+        if !begin(app, ctx, layers, grab) {
             return false;
         }
     }
@@ -149,9 +178,13 @@ pub fn over_tab(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize) {
 }
 
 /// Every frame after the document area: a release over another document's canvas drops the
-/// layers there; while the button is held a ghost follows the pointer.
+/// layers there; while the button is held over another document the cursor says Copy, and a
+/// Move-tool transfer's ghost follows the pointer (a Layers panel drag shows the runtime's badge).
+///
+/// A second pass of a frame gets no release event (egui gives a frame's input events to its
+/// first pass), so a release drops once; the first pass also clears the Move-tool transfer.
 pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let Some(t) = get(ctx) else { return };
+    let Some(t) = transfer(app, ctx) else { return };
     let (pos, released, down) = ctx.input(|i| (i.pointer.latest_pos(), i.pointer.any_released(), i.pointer.primary_down()));
     let target = pos.and_then(|p| target_at(app, p));
     if !released {
@@ -160,7 +193,9 @@ pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
         } else if let Some(p) = pos
             && app.session.active().is_some_and(|st| st.doc.id != t.source)
         {
-            ghost(ctx, p, &t.label);
+            if t.grab.is_some() {
+                ghost(ctx, p, &t.label);
+            }
             if target.is_some() {
                 ctx.set_cursor_icon(egui::CursorIcon::Copy);
             }
@@ -176,7 +211,7 @@ pub fn finish(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// Run before canvases process release: a tiled destination must take over the
 /// drag before the source can commit it as an ordinary move.
 pub(crate) fn prepare(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if get(ctx).is_some() {
+    if transfer(app, ctx).is_some() {
         return;
     }
     // Do not consume a source drag merely because it passes over another tile. On release this
@@ -199,28 +234,25 @@ fn target_at(app: &PhotocraftApp, p: egui::Pos2) -> Option<(usize, Option<[f64; 
     if !app.last_canvas_rect.contains(p) {
         return None;
     }
-    match crate::canvas::arranged_cells(app, app.last_canvas_rect) {
-        Some(cells) => cells.into_iter().find(|(_, r)| r.contains(p)).and_then(|(d, r)| {
-            let view = app.ui.views.get(d)?;
-            let ppp = app.canvas_ppp();
-            let xf = crate::canvas::ViewXform {
-                rect: crate::rulers::content_rect(app, r.shrink(1.0)),
-                zoom: view.zoom / ppp,
-                center: view.center,
-                flip: app.ui.view.flip_horizontal,
-                rotation: view.rotation,
-                aspect: app.ui.view.display_aspect(),
-            }
-            .shown(app, ppp);
-            Some((d, Some(xf.to_doc(p))))
-        }),
-        None => Some((app.session.active_index()?, crate::canvas::ViewXform::active(app).map(|xf| xf.to_doc(p)))),
+    // The document point under `p` in document `d`'s view of `rect`.
+    let doc_point = |d: usize, rect: egui::Rect| -> Option<[f64; 2]> {
+        let view = app.ui.views.get(d)?;
+        let canvas = view.canvas_view(crate::rulers::content_rect(app, rect), app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect());
+        let at = canvas.to_doc(p);
+        Some([at.x, at.y])
+    };
+    match crate::canvas::tabs::arranged_cells(app, app.last_canvas_rect) {
+        Some(cells) => cells.into_iter().find(|(_, r)| r.contains(p)).map(|(d, r)| (d, doc_point(d, r.shrink(1.0)))),
+        None => {
+            let d = app.session.active_index()?;
+            Some((d, doc_point(d, app.last_canvas_rect)))
+        }
     }
 }
 
 /// Copy the dragged layers into document `dest`, at document point `at` (see the module docs).
 fn drop(app: &mut PhotocraftApp, ctx: &egui::Context, dest: usize, at: Option<[f64; 2]>) {
-    let Some(t) = get(ctx) else { return };
+    let Some(t) = transfer(app, ctx) else { return };
     clear(ctx);
     let docs = app.session.documents();
     let Some(src) = docs.iter().position(|d| d.doc.id == t.source) else { return };
@@ -255,8 +287,8 @@ fn drop(app: &mut PhotocraftApp, ctx: &egui::Context, dest: usize, at: Option<[f
     }
 }
 
-/// The dragged layers' name next to the pointer (also the Layers panel's reorder drag).
-pub fn ghost(ctx: &egui::Context, p: egui::Pos2, label: &str) {
+/// The dragged layers' name next to the pointer, for a Move-tool transfer.
+fn ghost(ctx: &egui::Context, p: egui::Pos2, label: &str) {
     let t = crate::theme::Tokens::get(ctx);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("layer-transfer-ghost")));
     let g = painter.layout_no_wrap(label.to_string(), egui::FontId::proportional(12.0), t.text);

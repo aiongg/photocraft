@@ -109,9 +109,9 @@ pub(crate) fn trash_action((layer, filter): FilterDrag) -> (String, Value) {
 /// Smart Filters row: all of them), as the panel's Delete button does (#4751), instead of
 /// deleting the smart object or reaching Edit › Clear.
 pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    use crate::shortcut_dispatch::Focus;
-    // Text fields and widgets that delete with these keys themselves keep them (#1534).
-    if app.ui.text_edit.is_some() || matches!(Focus::of(ctx), Focus::Text | Focus::DeletingWidget) {
+    // A text edit keeps its keys. Text fields and widgets that delete with these keys themselves
+    // take them before the key reaches here (#1534).
+    if app.ui.text_edit.is_some() {
         return false;
     }
     let Some(doc) = app.session.active().map(|st| st.doc.id) else { return false };
@@ -135,7 +135,7 @@ pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 }
 
 /// Re-opens a smart filter's dialog with its recorded parameters; OK runs
-/// `layer.smartFilter.setParams` instead of adding another filter (see `dialogs::confirm`).
+/// `layer.smartFilter.setParams` instead of adding another filter (see [`confirm_command`]).
 pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm: &SmartObject, index: usize) {
     let Some(f) = sm.smart_filters.get(index) else { return };
     // Camera Raw has its own full-window dialog rather than a generic parameter form.
@@ -169,32 +169,24 @@ pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm:
             return;
         }
     };
-    let Some(id) = crate::adjust_dialog::open_smart_filter(app, &f.command, &f.params, target.clone()).or_else(|| {
-        let id = crate::filter_dialog::has_dialog(&f.command).then(|| crate::filter_dialog::open(app, &f.command)).flatten()?;
-        // The filter dialog opens on the user's last-used values; a recorded filter that lacks a
-        // key must show (and save) the schema default instead.
-        let mut fields = app.ui.dialog_mut(id)?.fields.clone();
-        crate::filter_dialog::reset_fields(app, &mut fields);
-        if let Value::Object(p) = &f.params {
-            fields.extend(p.iter().filter(|(key, _)| !key.starts_with("__")).map(|(key, value)| (key.clone(), value.clone())));
-        }
-        app.ui.dialog_mut(id)?.fields = fields;
-        Some(id)
-    }) else {
+    if crate::adjust_dialog::open_smart_filter(app, &f.command, &f.params, target.clone()).is_some() || !crate::filter_dialog::has_dialog(&f.command) {
         return;
-    };
-    if let Some(d) = app.ui.dialog_mut(id) {
-        d.fields.insert("__smartFilter".into(), target);
+    }
+    // The hosted filter dialog carries the target as its captured value; the recorded parameters
+    // overlay the schema defaults, not the user's last-used values.
+    if let Err(e) = crate::filter_dialog::open_smart_edit(app, &f.command, &f.params, target) {
+        crate::notices::error(app, e);
     }
 }
 
-/// The command a filter dialog's live preview runs ([`confirm_command`]'s): the Smart Filter blending
-/// command for its Blending Options dialog, `layer.smartFilter.setParams` while it edits a smart filter
-/// (#6324), else `command`.
-pub fn preview_command<'a>(fields: &serde_json::Map<String, Value>, command: &'a str) -> &'a str {
-    if crate::smart_filter_dialog::owns(fields) {
+/// The command a hosted filter dialog's live preview runs ([`confirm_command`]'s): the Smart Filter
+/// blending command for the dialog `key` names (its Blending Options dialog),
+/// `layer.smartFilter.setParams` while the dialog edits a smart filter (`captured` is a smart-filter
+/// target, #6324), else `command`.
+pub fn preview_command<'a>(key: &str, command: &'a str, captured: &Value) -> &'a str {
+    if crate::smart_filter_dialog::owns(key) {
         crate::smart_filter_dialog::COMMAND
-    } else if fields.contains_key("__smartFilter") {
+    } else if crate::smart_filter_dialog::is_target(captured) {
         "layer.smartFilter.setParams"
     } else {
         command
@@ -202,10 +194,10 @@ pub fn preview_command<'a>(fields: &serde_json::Map<String, Value>, command: &'a
 }
 
 /// The command a confirmed filter dialog runs: smart-filter edits update the recorded filter.
-pub fn confirm_command(app: &PhotocraftApp, fields: &serde_json::Map<String, Value>, command: String, params: Value) -> Result<(String, Value), String> {
+pub fn confirm_command(app: &PhotocraftApp, captured: &Value, command: String, params: Value) -> Result<(String, Value), String> {
     // One builder for the preview and for OK, so the two cannot differ.
-    if fields.contains_key("__smartFilter") {
-        return crate::smart_filter_dialog::edit_command(app, fields);
+    if crate::smart_filter_dialog::is_target(captured) {
+        return crate::smart_filter_dialog::params_command(app, captured, command, params);
     }
     Ok((command, params))
 }
@@ -309,13 +301,13 @@ mod tests {
         };
         assert_eq!(sm.smart_filters.len(), 1);
         open_editor(&mut app, &egui::Context::default(), id, &sm, 0);
-        let d = app.ui.dialogs.last().expect("the adjustment editor opened");
-        assert_eq!(d.fields.get("__adjust").and_then(Value::as_str), Some("brightnessContrast"));
-        assert_eq!(d.fields.get("brightness").and_then(Value::as_f64), Some(40.0), "the recorded settings");
-        assert_eq!(d.fields.get("contrast").and_then(Value::as_f64), Some(-10.0));
+        let d = app.framework.dialogs.open_dialogs().pop().expect("the adjustment editor opened");
+        let fields = d.fields.expect("the editor's fields");
+        assert_eq!(fields["brightness"].as_f64(), Some(40.0), "the recorded settings");
+        assert_eq!(fields["contrast"].as_f64(), Some(-10.0));
         let dialog = d.id;
         // OK updates the recorded filter (one history step), it does not add a second filter.
-        crate::dialogs::confirm(&mut app, dialog).unwrap();
+        crate::dialogs::testing::confirm(&mut app, dialog);
         let LayerContent::Smart(sm) = &app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else {
             panic!("the layer stays a smart object");
         };
@@ -343,23 +335,24 @@ mod tests {
         };
         let sm = recorded(&app);
         assert_eq!(sm.smart_filters[0].params.get("cyan").and_then(Value::as_f64), Some(30.0), "recorded in the old form");
-        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
+        // The open dialog's fields, whatever its type.
+        let fields_of = |app: &PhotocraftApp, dialog| app.framework.dialogs.open_dialogs().into_iter().find(|d| d.id == dialog).and_then(|d| d.fields).unwrap();
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
-        let dialog = h.state().ui.dialogs.last().unwrap().id;
+        let dialog = h.state().framework.dialogs.open_dialogs().pop().unwrap().id;
         h.run_steps(3);
-        let fields = &h.state_mut().ui.dialog_mut(dialog).unwrap().fields;
-        assert!(!fields.contains_key("cyan") && !fields.contains_key("relative"), "folded: {fields:?}");
+        let fields = fields_of(h.state(), dialog);
+        assert!(fields.get("cyan").is_none() && fields.get("relative").is_none(), "folded: {fields:?}");
         assert_eq!(fields["colors"], json!("blues"), "normalization keeps the selected colour");
         assert_eq!(fields["blues"][0].as_f64(), Some(30.0));
         assert_eq!(fields["method"], json!("absolute"));
         // Edit the row and the Method, then OK.
-        let fields = &mut h.state_mut().ui.dialog_mut(dialog).unwrap().fields;
-        fields.insert("blues".into(), json!([10.0, 0.0, 0.0, 0.0]));
-        fields.insert("method".into(), json!("relative"));
+        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "blues", json!([10.0, 0.0, 0.0, 0.0])).unwrap();
+        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "method", json!("relative")).unwrap();
         h.run_steps(2);
-        crate::dialogs::confirm(h.state_mut(), dialog).unwrap();
+        crate::dialogs::testing::confirm(h.state_mut(), dialog);
         let sm = recorded(h.state());
         assert_eq!(sm.smart_filters.len(), 1, "no filter was stacked");
         let photocraft_doc::Adjustment::SelectiveColor { relative, adjustments } =
@@ -371,9 +364,9 @@ mod tests {
         assert_eq!(adjustments[4], [10.0, 0.0, 0.0, 0.0], "the edited row renders");
         // And reopens as edited.
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
-        let dialog = h.state().ui.dialogs.last().unwrap().id;
+        let dialog = h.state().framework.dialogs.open_dialogs().pop().unwrap().id;
         h.run_steps(3);
-        let fields = &h.state_mut().ui.dialog_mut(dialog).unwrap().fields;
+        let fields = fields_of(h.state(), dialog);
         assert_eq!(fields["colors"], json!("blues"), "reopening keeps the selected colour");
         assert_eq!(fields["blues"][0].as_f64(), Some(10.0));
         assert_eq!(fields["method"], json!("relative"));
@@ -398,26 +391,27 @@ mod tests {
             other => panic!("expected a smart object, got {other:?} ({})", app.ui.status),
         };
         let sm = smart(&app, &app.session.active().unwrap().doc);
-        open_editor(&mut app, &egui::Context::default(), id, &sm, 0);
-        let d = app.ui.dialogs.last_mut().expect("the filter's dialog opened");
-        assert_eq!(d.fields.get("__preview"), Some(&json!(true)), "the dialog previews");
-        d.fields.insert("radius".into(), json!(6.0));
-        let dialog = d.id;
+        let ctx = egui::Context::default();
+        open_editor(&mut app, &ctx, id, &sm, 0);
+        let open = app.framework.dialogs.open_dialogs().pop().expect("the filter's dialog opened");
+        let (dialog, key) = (open.id, open.key.unwrap_or_default());
+        app.framework.dialogs.set_json_field(&ctx, dialog, "radius", json!(6.0)).unwrap();
 
-        crate::canvas::ensure_filter_preview(&mut app, 0, &egui::Context::default()).expect("a preview");
+        crate::canvas::ensure_filter_preview(&mut app, 0, &ctx).expect("a preview");
+        // The target builder takes the app mutably, so it runs before the preview is borrowed.
+        let captured = crate::smart_filter_dialog::target(&mut app, LayerId(id), 0).unwrap();
         let preview = app.filter_preview.as_ref().unwrap();
         assert_eq!(preview.key.command, "layer.smartFilter.setParams");
         // The dialog's own preview window matches it to the dialog by that command.
-        let fields = &app.ui.dialogs.last().unwrap().fields;
-        assert_eq!(preview_command(fields, "filter.blur.gaussianBlur"), preview.key.command);
-        assert_eq!(preview_command(&serde_json::Map::new(), "filter.blur.gaussianBlur"), "filter.blur.gaussianBlur");
+        assert_eq!(preview_command(&key, "filter.blur.gaussianBlur", &captured), preview.key.command);
+        assert_eq!(preview_command(&key, "filter.blur.gaussianBlur", &Value::Null), "filter.blur.gaussianBlur");
         let shown = preview.result.clone().expect("the preview's document");
         let filters = smart(&app, &shown).smart_filters;
         assert_eq!(filters.len(), 1, "the edited filter is replaced, not stacked");
         assert_eq!(filters[0].params.get("radius").and_then(Value::as_f64), Some(6.0));
         assert_eq!(smart(&app, &app.session.active().unwrap().doc).smart_filters[0].params["radius"], json!(1.0), "the document is untouched");
 
-        crate::dialogs::confirm(&mut app, dialog).unwrap();
+        crate::dialogs::testing::confirm(&mut app, dialog);
         let doc = &app.session.active().unwrap().doc;
         assert_eq!(smart(&app, doc).smart_filters.len(), 1);
         assert!(photocraft_compose::flatten(&shown).px == photocraft_compose::flatten(doc).px, "OK gives what the preview showed");
