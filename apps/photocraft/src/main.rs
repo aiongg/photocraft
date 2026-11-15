@@ -17,7 +17,7 @@
 //! crashes inside the driver also falls back by itself next time (see `gpu_startup`).
 //!
 //! `--in-window-menus` (or `PHOTOCRAFT_IN_WINDOW_MENUS=1`) keeps the menus inside the window on
-//! macOS instead of the macOS menu bar (`mac_menu`).
+//! macOS instead of the macOS menu bar (`photocraft_ui_egui::native_menu`).
 //!
 //! `--control <port>` (or `PHOTOCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control server.
 //! The first line must authenticate; subsequent request lines get reply lines.
@@ -35,17 +35,11 @@ mod appearance;
 #[cfg(target_os = "macos")]
 mod apple_events;
 mod caps_lock;
-mod caption_style;
 mod control_server;
 mod crash_guard;
 mod cursor;
-mod file_dialog_probe;
 mod gpu_startup;
-#[cfg(target_os = "linux")]
-mod icon_theme;
 mod launch_args;
-#[cfg(target_os = "macos")]
-mod mac_menu;
 #[cfg(target_os = "macos")]
 mod mac_window;
 // Pure logic is tested on every platform; only Linux runs the check.
@@ -56,14 +50,10 @@ mod linux_libs;
 mod logging;
 mod monitor_profile;
 mod photoshop_settings;
-// Save As through the desktop portal, which reports the file type picked (#6121).
-#[cfg(target_os = "linux")]
-mod portal_save;
 mod presentation;
 // The print portal needs the session bus (zbus, Linux only); its pure helpers are tested everywhere.
 #[cfg(any(target_os = "linux", test))]
 mod print_portal;
-mod screen_color;
 mod services;
 // macOS gets one instance from LaunchServices (open-documents Apple events).
 #[cfg(any(not(target_os = "macos"), test))]
@@ -72,29 +62,27 @@ mod startup_report;
 // Tablet support (macOS AppKit monitor, Linux X11/Wayland, Windows barrel button).
 mod tablet;
 mod ui_state;
-mod updates;
 mod window_frame;
 
 use photocraft_engine::Session;
 use photocraft_ui_egui::PhotocraftApp;
+use photocraft_ui_egui::window_policy::{self, Backend, Frame, Prefix, TitleBarPref};
 
 use photocraft_ui_egui::os_window::APP_ID;
 
-/// Windows and Linux can use the app's title bar, with its own caption buttons and edge resizing
-/// (`photocraft_ui_egui::titlebar`); the preference below selects the mode. macOS always keeps its
-/// system traffic lights over the integrated title strip.
-const CUSTOM_TITLEBAR: bool = !cfg!(target_os = "macos");
+/// The smallest the main window may be, in points.
+const MIN_WINDOW_SIZE: [f32; 2] = [760.0, 480.0];
 
-/// Whether this start draws its own title bar: Windows and Linux do, unless Preferences ›
-/// Interface › System Title Bar asks for the system's (#1271, #1316). Read from the saved
-/// preferences before the window opens; a missing or unreadable file keeps the default.
-fn custom_titlebar(prefs_file: Option<&std::path::Path>) -> bool {
+/// Which title bar Preferences › Interface › System Title Bar asks for (#1271, #1316). Read from the
+/// saved preferences before the window opens; a missing or unreadable file keeps the default. The frame
+/// decision (`window_policy::decide_for`) turns it into the frame the platform allows.
+fn title_bar_pref(prefs_file: Option<&std::path::Path>) -> TitleBarPref {
     let prefs: photocraft_engine::prefs::Preferences =
         prefs_file.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-    CUSTOM_TITLEBAR && !prefs.interface.system_title_bar
+    if prefs.interface.system_title_bar { TitleBarPref::System } else { TitleBarPref::Integrated }
 }
 
-/// Preferences › Integrations, read before the window opens the way [`custom_titlebar`] is:
+/// Preferences › Integrations, read before the window opens the way [`title_bar_pref`] is:
 /// whether agents may drive this launch at all, and the port to listen on when no `--control`
 /// was given (0 = only with `--control`). A missing or unreadable file keeps the defaults.
 ///
@@ -146,19 +134,12 @@ fn control_port_for(cli: Option<u16>, prefs: &photocraft_engine::prefs::Integrat
 /// `centered`, Windows cascades each new window from the top-left corner, so it opened at a
 /// different offset every launch (#419). A later launch restores the saved position instead
 /// (`main` turns `centered` off, #4826). Wayland compositors place windows themselves.
-fn native_options(custom_titlebar: bool) -> eframe::NativeOptions {
+fn native_options(frame: &Frame) -> eframe::NativeOptions {
     let viewport = egui::ViewportBuilder::default().with_icon(app_icon::viewport_icon(std::env::current_exe().ok().as_deref()));
+    let viewport =
+        viewport.with_app_id(APP_ID).with_title("PhotoCraft").with_inner_size([1440.0, 900.0]).with_min_inner_size(MIN_WINDOW_SIZE).with_drag_and_drop(true);
     eframe::NativeOptions {
-        viewport: viewport
-            .with_app_id(APP_ID)
-            .with_title("PhotoCraft")
-            .with_inner_size([1440.0, 900.0])
-            .with_min_inner_size(photocraft_ui_egui::MIN_WINDOW_SIZE)
-            .with_drag_and_drop(true)
-            .with_decorations(!custom_titlebar)
-            .with_fullsize_content_view(true)
-            .with_titlebar_shown(false)
-            .with_title_shown(false),
+        viewport: window_policy::apply(viewport, frame),
         centered: true,
         // PhotoCraft owns its fallback fonts (`cjk_fonts`, craft-fonts): eframe's system-font
         // provider would compete with it and make glyph choice machine-dependent (#8512).
@@ -174,8 +155,8 @@ fn native_options(custom_titlebar: bool) -> eframe::NativeOptions {
 /// The window eframe restores from `ui.ron`, corrected before it is created: at least the
 /// minimum size, and never full screen. PhotoCraft always starts in Standard Screen Mode, but
 /// eframe also saves and restores full screen, and a window closed in a full-screen mode is
-/// saved full screen and maximized at once: the overlap `view_cmds::screen_mode_commands` keeps
-/// apart at run time. [OBSERVED 2026-10-12, Windows 11] Restored that way, View › Screen Mode ›
+/// saved full screen and maximized at once: the overlap the window's screen-mode sequence
+/// (`AppShell`'s `ScreenModeFollow`) keeps apart at run time. [OBSERVED 2026-10-12, Windows 11] Restored that way, View › Screen Mode ›
 /// Full Screen did nothing until `F` had cycled through Standard.
 fn restored_window(builder: egui::ViewportBuilder) -> egui::ViewportBuilder {
     at_least_min_size(builder).with_fullscreen(false)
@@ -432,8 +413,11 @@ fn main() -> eframe::Result {
     let monitor = monitor_profile::detect_async();
     // Brush presets load in the background; the app attaches them when they arrive.
     let presets = services::presets_dir().map(photocraft_engine::preset_store::open_dir_async);
-    let custom_titlebar = custom_titlebar(services::prefs_file().as_deref());
-    let mut options = native_options(custom_titlebar);
+    // Who draws the window frame, decided once: the viewport below and the runtime's root frame both follow it.
+    // `PHOTOCRAFT_TITLEBAR`, `PHOTOCRAFT_CAPTION_STYLE` and `PHOTOCRAFT_CAPTION_LAYOUT` are read by the decision.
+    let decision = window_policy::decide_for(Prefix::new("PHOTOCRAFT"), Backend::from_env(), title_bar_pref(services::prefs_file().as_deref()));
+    let integrated_frame = matches!(decision.frame, Frame::Integrated(_));
+    let mut options = native_options(&decision.frame);
     // winit picks Wayland whenever `WAYLAND_DISPLAY` is set; open on X11 when that was chosen.
     #[cfg(target_os = "linux")]
     if session == linux_libs::DisplaySession::X11 {
@@ -500,14 +484,18 @@ fn main() -> eframe::Result {
         Box::new(move |cc| {
             created_in_callback.store(true, std::sync::atomic::Ordering::Relaxed);
             let automation = control.as_ref().map(|(_, _, workspace)| workspace.clone());
-            let mut services = services::native(automation);
+            // PLAN: top-w30 gives `services::native` its `wake` parameter; the closure wakes the window's event loop.
+            let wake = {
+                let ctx = cc.egui_ctx.clone();
+                move || ctx.request_repaint()
+            };
+            let mut services = services::native(automation, wake);
             services.preset_store = presets;
             #[cfg(target_os = "linux")]
             let display = tablet::DisplayKind::of(cc);
             #[cfg(target_os = "linux")]
             {
                 services.is_wayland = display == Some(tablet::DisplayKind::Wayland);
-                file_dialog_probe::start();
                 if services.is_wayland {
                     let var = |name| std::env::var(name).ok();
                     services.xwayland_command =
@@ -522,14 +510,12 @@ fn main() -> eframe::Result {
             };
             #[cfg(not(target_os = "linux"))]
             let session = Session::new();
-            // Before the first pass: the craft runtime it installs must see every pass from the
-            // first (logic styles the context again with the saved theme).
-            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            let mut app = PhotocraftApp::new(session, services);
+            // Before the first pass: the one install of the craft runtime must see every pass from
+            // the first (R71); the app then runs on that context.
+            PhotocraftApp::setup_window(&cc.egui_ctx, Default::default(), decision);
+            let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services);
             app.open_suite(&cc.egui_ctx);
             app.min_frame_ms = uncapped.then_some(1000.0 / 240.0);
-            app.integrated_titlebar = cfg!(target_os = "macos");
-            app.custom_titlebar = custom_titlebar;
             // Only the title bar's free gap drags the window, never the menus (mac_window.rs).
             #[cfg(target_os = "macos")]
             mac_window::disable_native_title_drag();
@@ -630,7 +616,7 @@ fn main() -> eframe::Result {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
-                    app.services.native_menu = mac_menu::install(&cc.egui_ctx, &app);
+                    app.services.native_menu = photocraft_ui_egui::native_menu::install(&cc.egui_ctx, &app);
                 }
             }
             #[cfg(not(target_os = "macos"))]
@@ -644,22 +630,10 @@ fn main() -> eframe::Result {
             app.services.cursor_pos = cursor::service(cc);
             // The custom title bar's undecorated window must stay borderless, or its caption and
             // border offset the content and the pointer on some Windows systems (#2246).
-            app.services.window_frame = window_frame::service(cc, custom_titlebar);
-            // Linux: the desktop's caption buttons (GNOME's, KDE's) on the sides its layout puts them.
-            if custom_titlebar {
-                app.services.caption_style = caption_style::service();
-            }
+            app.services.window_frame = window_frame::service(cc, integrated_frame);
             // Caps Lock state (X11/Windows/macOS; `None` on native Wayland): the canvas shows the
             // precise crosshair for painting tools while it is toggled on (#1758).
             app.services.caps_lock = caps_lock::service(cc);
-            // Pick through the portal on a Wayland desktop even when the window went through
-            // Xwayland (a pen, or the X11 display-server preference): Xwayland's root window has
-            // no desktop pixels to read (#8977).
-            #[cfg(target_os = "linux")]
-            let portal = screen_color::uses_portal(native_session);
-            #[cfg(not(target_os = "linux"))]
-            let portal = false;
-            app.services.screen_pick = screen_color::service(cc, portal);
             // Tablet pressure/tilt/eraser (winit drops them): the macOS monitor and the X11 reader
             // write into the stylus feed. The monitor goes in here, not before the event loop:
             // AppKit's shared application only exists once winit created it (#759).
@@ -683,7 +657,6 @@ fn main() -> eframe::Result {
             tablet::spawn_x11(&app.stylus.feed, display);
             app.services.right_button_down = tablet::right_button_service();
             app.services.pen_end = tablet::pen_end_service();
-            app.services.pen_screen_px = tablet::pen_screen_service();
             // Paths on the command line (Linux/Windows file associations, `photocraft a.psd`).
             app.open_paths(&files);
             if !unreadable_paths.is_empty() {
@@ -775,107 +748,6 @@ pub(crate) fn no_child_spawns() -> std::sync::RwLockWriteGuard<'static, ()> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn window_and_panel_geometry_survive_a_restart() {
-        let options = super::native_options(super::CUSTOM_TITLEBAR);
-        assert!(options.persist_window);
-        assert_eq!(options.persistence_path, super::services::config_dir().map(|dir| dir.join("ui.ron")));
-
-        #[derive(Default)]
-        struct Storage(std::collections::BTreeMap<String, String>);
-        impl eframe::Storage for Storage {
-            fn get_string(&self, key: &str) -> Option<String> {
-                self.0.get(key).cloned()
-            }
-            fn set_string(&mut self, key: &str, value: String) {
-                self.0.insert(key.into(), value);
-            }
-            fn remove_string(&mut self, key: &str) {
-                self.0.remove(key);
-            }
-            fn flush(&mut self) {}
-        }
-        let ctx = egui::Context::default();
-        let input = || egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 800.0))), ..Default::default() };
-        let mut output = ctx.run_ui(input(), |ui| {
-            egui::Panel::right("dock").exact_size(410.0).show(ui, |ui| ui.set_min_width(ui.available_width()));
-        });
-        output.textures_delta.clear();
-        let mut storage = Storage::default();
-        ctx.memory(|memory| eframe::set_value(&mut storage, "egui", memory));
-        let restored = egui::Context::default();
-        restored.memory_mut(|memory| *memory = eframe::get_value(&storage, "egui").unwrap());
-        let mut output = restored.run_ui(input(), |ui| {
-            egui::Panel::right("dock").default_size(290.0).show(ui, |ui| ui.set_min_width(ui.available_width()));
-        });
-        output.textures_delta.clear();
-        let panel = egui::containers::panel::PanelState::load(&restored, photocraft_ui_egui::panels::panel_state_id(&restored, "dock")).unwrap();
-        assert_eq!(panel.size().x, 410.0);
-    }
-
-    /// A 0.36 `ui.ron` saved panel widths under `Id::new("dock")`; the first 0.37 launch copies
-    /// them to the parent-scoped key, leaves the old one for a rollback, and a later resize
-    /// survives two more restarts.
-    #[test]
-    fn saved_036_panel_widths_migrate_and_survive_two_restarts() {
-        #[derive(Default)]
-        struct Storage(std::collections::BTreeMap<String, String>);
-        impl eframe::Storage for Storage {
-            fn get_string(&self, key: &str) -> Option<String> {
-                self.0.get(key).cloned()
-            }
-            fn set_string(&mut self, key: &str, value: String) {
-                self.0.insert(key.into(), value);
-            }
-            fn remove_string(&mut self, key: &str) {
-                self.0.remove(key);
-            }
-            fn flush(&mut self) {}
-        }
-        let state = |width: f32| egui::containers::panel::PanelState { outer_rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, 600.0)) };
-        let input = || egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 800.0))), ..Default::default() };
-        let draw = |ctx: &egui::Context| {
-            let mut output = ctx.run_ui(input(), |ui| {
-                egui::Panel::right("dock").default_size(290.0).show(ui, |ui| ui.set_min_width(ui.available_width()));
-            });
-            output.textures_delta.clear();
-        };
-        let save = |ctx: &egui::Context| {
-            let mut storage = Storage::default();
-            ctx.memory(|memory| eframe::set_value(&mut storage, "egui", memory));
-            storage
-        };
-        let restore = |storage: &Storage| {
-            let ctx = egui::Context::default();
-            ctx.memory_mut(|memory| *memory = eframe::get_value(storage, "egui").expect("the saved memory"));
-            ctx
-        };
-
-        // The real 0.14/0.15 shape: the panel state under the old key inside the egui memory.
-        let ctx = egui::Context::default();
-        ctx.data_mut(|d| d.insert_persisted(egui::Id::unique("dock"), state(410.0)));
-        let storage = save(&ctx);
-
-        let first = restore(&storage);
-        photocraft_ui_egui::panels::migrate_panel_state(&first);
-        draw(&first);
-        let key = photocraft_ui_egui::panels::panel_state_id(&first, "dock");
-        assert_eq!(egui::containers::panel::PanelState::load(&first, key).map(|p| p.size().x), Some(410.0));
-        assert!(egui::containers::panel::PanelState::load(&first, egui::Id::unique("dock")).is_some(), "the 0.36 key is kept");
-        // Resize in 0.37: the new key wins from now on.
-        first.data_mut(|d| d.insert_persisted(key, state(500.0)));
-        let storage = save(&first);
-
-        for restart in 0..2 {
-            let next = restore(&storage);
-            photocraft_ui_egui::panels::migrate_panel_state(&next);
-            draw(&next);
-            let key = photocraft_ui_egui::panels::panel_state_id(&next, "dock");
-            let width = egui::containers::panel::PanelState::load(&next, key).map(|p| p.size().x).unwrap_or_default();
-            assert!((width - 500.0).abs() < 0.5, "restart {restart}: the old 410 key must not win (got {width})");
-        }
-    }
-
     /// Schema-probe `ui.ron` shapes *reconstructed* from the documented 0.14/0.15/0.37 layouts,
     /// not recorded machine saves: 0.14 and 0.15 both store the flat window entry, which the
     /// first 0.37 launch rewrites; a 0.37 file is left alone. Keeping all three probes makes a
@@ -906,7 +778,7 @@ mod tests {
 
     #[test]
     fn the_window_opens_centred_at_its_default_size() {
-        let o = super::native_options(super::CUSTOM_TITLEBAR);
+        let o = super::native_options(&super::Frame::Native);
         assert!(o.centered, "#419: centred, not cascaded from the top-left corner");
         assert_eq!(o.viewport.inner_size, Some(egui::vec2(1440.0, 900.0)));
         // eframe shrinks the start size to the monitor, so the centred position is on-screen.
@@ -915,31 +787,31 @@ mod tests {
 
     #[test]
     fn a_window_saved_while_minimized_reopens_at_the_minimum_size() {
-        let hook = super::native_options(super::CUSTOM_TITLEBAR).window_builder.expect("a window builder hook");
+        let hook = super::native_options(&super::Frame::Native).window_builder.expect("a window builder hook");
         // Saved minimized on Windows, then centred on a 1920 × 1080 monitor by eframe.
-        let saved = super::native_options(super::CUSTOM_TITLEBAR).viewport.with_inner_size([160.0, 64.0]).with_position([880.0, 508.0]);
+        let saved = super::native_options(&super::Frame::Native).viewport.with_inner_size([160.0, 64.0]).with_position([880.0, 508.0]);
         let opened = hook(saved);
         assert_eq!(opened.inner_size, Some(egui::vec2(760.0, 480.0)));
         assert_eq!(opened.position, Some(egui::pos2(580.0, 300.0)), "still centred");
         // Too narrow only: only the width grows.
-        let opened = super::at_least_min_size(super::native_options(false).viewport.with_inner_size([500.0, 900.0]));
+        let opened = super::at_least_min_size(super::native_options(&super::Frame::Native).viewport.with_inner_size([500.0, 900.0]));
         assert_eq!(opened.inner_size, Some(egui::vec2(760.0, 900.0)));
         // A window at or above the minimum, or with no size, is left alone.
         for size in [[760.0, 480.0], [1100.0, 760.0]] {
-            let builder = super::native_options(false).viewport.with_inner_size(size).with_position([10.0, 20.0]);
+            let builder = super::native_options(&super::Frame::Native).viewport.with_inner_size(size).with_position([10.0, 20.0]);
             let opened = super::at_least_min_size(builder);
             assert_eq!((opened.inner_size, opened.position), (Some(egui::Vec2::from(size)), Some(egui::pos2(10.0, 20.0))));
         }
-        let mut builder = super::native_options(false).viewport;
+        let mut builder = super::native_options(&super::Frame::Native).viewport;
         builder.inner_size = None;
         assert_eq!(super::at_least_min_size(builder).inner_size, None);
     }
 
     #[test]
     fn a_window_saved_in_full_screen_reopens_maximized_not_full_screen() {
-        let hook = super::native_options(super::CUSTOM_TITLEBAR).window_builder.expect("a window builder hook");
+        let hook = super::native_options(&super::Frame::Native).window_builder.expect("a window builder hook");
         // What eframe restores from a ui.ron saved in a full-screen mode on Windows.
-        let saved = super::native_options(super::CUSTOM_TITLEBAR)
+        let saved = super::native_options(&super::Frame::Native)
             .viewport
             .with_inner_size([2560.0, 1392.0])
             .with_position([0.0, 0.0])
@@ -952,26 +824,22 @@ mod tests {
     }
 
     #[test]
-    fn the_system_title_bar_preference_keeps_the_window_decorations() {
-        // #1271, #1316: Preferences › Interface › System Title Bar gives the window back its
-        // system decorations on Windows and Linux; macOS always has them.
+    fn the_system_title_bar_preference_is_read_from_the_saved_preferences() {
+        // #1271, #1316: Preferences › Interface › System Title Bar asks for the system's bar; the frame
+        // decision (craft-window) turns the preference into the frame the platform allows.
+        use super::TitleBarPref;
         let dir = std::env::temp_dir().join(format!("pc-titlebar-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("prefs.json");
-        let default_custom = super::CUSTOM_TITLEBAR;
-        assert_eq!(super::custom_titlebar(None), default_custom, "no preferences file: the platform default");
+        assert_eq!(super::title_bar_pref(None), TitleBarPref::default(), "no preferences file: the default");
         std::fs::write(&file, "not json").unwrap();
-        assert_eq!(super::custom_titlebar(Some(&file)), default_custom, "an unreadable file: the platform default");
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::default(), "an unreadable file: the default");
         std::fs::write(&file, r#"{"interface":{}}"#).unwrap();
-        assert_eq!(super::custom_titlebar(Some(&file)), default_custom, "an older preference file: the platform default");
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::default(), "an older preference file: the default");
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":true}}"#).unwrap();
-        assert!(!super::custom_titlebar(Some(&file)));
-        assert_eq!(super::native_options(false).viewport.decorations, Some(true));
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::System);
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":false}}"#).unwrap();
-        assert_eq!(super::custom_titlebar(Some(&file)), super::CUSTOM_TITLEBAR);
-        if super::CUSTOM_TITLEBAR {
-            assert_eq!(super::native_options(true).viewport.decorations, Some(false));
-        }
+        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::Integrated);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
