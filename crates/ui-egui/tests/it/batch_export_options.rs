@@ -3,12 +3,21 @@
 
 use egui_kittest::kittest::Queryable;
 use photocraft_codecs::{ChannelLayout, EncodeOptions, Format, Image};
+use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::{PhotocraftApp, menus};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
+
+/// The open form's values as `ui.inspect` lists the top dialog's fields.
+fn form_fields(h: &mut Harness) -> Value {
+    let ctx = h.ctx.clone();
+    let (req, _rx) = ControlRequest::new("ui.inspect", json!({}));
+    let Reply::Done(inspect) = handle(h.state_mut(), &ctx, &req) else { panic!("ui.inspect: expected an immediate reply") };
+    inspect["result"]["dialogs"].as_array().and_then(|d| d.last()).expect("a form is open")["fields"].clone()
+}
 
 fn harness() -> Harness {
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).wgpu().build_eframe(|cc| {
@@ -184,24 +193,24 @@ fn batch_custom_quality_is_bounded_dialog_local_and_reversible() {
     let _gpu = photocraft_testkit::gpu_lock();
     let mut h = harness();
     open(&mut h, "file.automate.batch");
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null(), "default command quality remains unset");
+    assert!(form_fields(&mut h)["quality"].is_null(), "default command quality remains unset");
     h.get_by_label("Custom").click();
     h.run_steps(3);
     edit_quality(&mut h, "-5");
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(0.0));
+    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(0.0));
     edit_quality(&mut h, "99");
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(12.0));
+    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(12.0));
     edit_quality(&mut h, "5");
     h.get_by_label("Custom").click();
     h.run_steps(3);
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+    assert!(form_fields(&mut h)["quality"].is_null());
     h.get_by_label("Custom").click();
     h.run_steps(3);
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["quality"].as_f64(), Some(5.0), "switching defaults does not lose the dialog's custom value");
+    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(5.0), "switching defaults does not lose the dialog's custom value");
     h.get_by_label("Cancel").click();
     h.run_steps(3);
     open(&mut h, "file.automate.batch");
-    assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null(), "reopening returns to the existing default");
+    assert!(form_fields(&mut h)["quality"].is_null(), "reopening returns to the existing default");
 }
 
 /// Actual folder-mode controls must pass both WebP quality endpoints to the encoder while
@@ -219,18 +228,18 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
     let revision = h.state().session.active().unwrap().revision;
     let history = h.state().session.active().unwrap().history.entries();
     let prefs = serde_json::to_value(h.state().session.prefs()).unwrap();
-    let actions = serde_json::to_value(&h.state().session.actions.list).unwrap();
+    let actions = serde_json::to_value(h.state().session.actions.list.to_file()).unwrap();
     for (command, prefix) in [("file.automate.batch", "batch"), ("file.scripts.imageProcessor", "processor")] {
         let mut outputs = Vec::new();
         for quality in [0, 12] {
             let output = dir.0.join(format!("{prefix}-{quality}"));
             open(&mut h, command);
             if prefix == "batch" {
-                assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+                assert!(form_fields(&mut h)["quality"].is_null());
                 h.get_by_label("Custom").click();
                 h.run_steps(3);
             } else {
-                let fields = &h.state().ui.dialogs.last().unwrap().fields;
+                let fields = form_fields(&mut h);
                 assert_eq!(fields["quality"], json!(8));
                 assert_eq!(fields["width"], json!(0));
                 assert_eq!(fields["height"], json!(0));
@@ -247,7 +256,7 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
             evidence(&mut h, &format!("{prefix}-webp-quality-{quality}"));
             h.get_by_label("OK").click();
             h.run_steps(5);
-            assert!(h.state().ui.dialogs.is_empty());
+            assert!(!h.state().dialog_open());
             let bytes = std::fs::read(output.join("owned-pattern.webp")).expect("the actual dialog confirmation writes the selected WebP");
             let decoded = photocraft_codecs::decode_as(Format::WebP, &bytes).unwrap();
             assert_eq!(decoded.dimensions(), (64, 48));
@@ -265,7 +274,7 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
     assert!(Arc::ptr_eq(&active.doc, &doc));
     assert_eq!((active.revision, active.history.entries()), (revision, history));
     assert_eq!(serde_json::to_value(h.state().session.prefs()).unwrap(), prefs);
-    assert_eq!(serde_json::to_value(&h.state().session.actions.list).unwrap(), actions);
+    assert_eq!(serde_json::to_value(h.state().session.actions.list.to_file()).unwrap(), actions);
 }
 
 #[test]
@@ -289,7 +298,7 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     h.run_steps(3);
     assert!(!output.exists());
     open(&mut h, "file.automate.batch");
-    let fields = &h.state().ui.dialogs.last().unwrap().fields;
+    let fields = form_fields(&mut h);
     assert_eq!(fields["naming"], "");
     assert_eq!(fields["startingSerial"], 1);
     edit_path(&mut h, "Input", &input);
@@ -303,11 +312,11 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     h.run_steps(3);
     h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial").click();
     h.run_steps(3);
-    assert_eq!(h.state().ui.dialogs.last().unwrap().fields["startingSerial"], 7, "typing changes the starting serial");
+    assert_eq!(form_fields(&mut h)["startingSerial"], 7, "typing changes the starting serial");
     evidence(&mut h, "batch-naming");
     h.get_by_label("OK").click();
     h.run_steps(5);
-    assert!(h.state().ui.dialogs.is_empty());
+    assert!(!h.state().dialog_open());
     let expected: Vec<_> = source.data().iter().map(|v| 255 - v).collect();
     for name in ["007_first.png", "008_second.png"] {
         let bytes = std::fs::read(output.join(name)).expect("dialog naming reaches the exporter");
@@ -340,7 +349,7 @@ fn batch_default_quality_keeps_lossless_webp_and_existing_jpeg_bytes() {
         }
         edit_path(&mut h, "Input", &input);
         edit_path(&mut h, "Output", &output);
-        assert!(h.state().ui.dialogs.last().unwrap().fields["quality"].is_null());
+        assert!(form_fields(&mut h)["quality"].is_null());
         evidence(&mut h, &format!("batch-default-{format}"));
         h.get_by_label("OK").click();
         h.run_steps(5);
