@@ -151,8 +151,13 @@ pub(crate) fn same_inks(a: [f32; 4], b: [f32; 4]) -> bool {
 
 /// The CMYK converter of the document colour settings; the built-in coated one when the profile is unusable.
 fn converter(app: &PhotocraftApp) -> CmykConverter {
+    // The engine's profile type is `photocraft_cms`'s and the framework's converter takes `craft::cms`'s: the ICC bytes
+    // carry it over.
     let working = app.session.color.working(photocraft_doc::ColorMode::Cmyk);
-    CmykConverter::new(working).unwrap_or_else(|_| CmykConverter::coated().clone())
+    craft::cms::Profile::parse(&working.to_bytes())
+        .ok()
+        .and_then(|profile| CmykConverter::new(std::sync::Arc::new(profile)).ok())
+        .unwrap_or_else(|| CmykConverter::coated().clone())
 }
 
 /// Opens `dialog` for `target` with the app's picker features, under `parent` when it has one.
@@ -186,7 +191,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, target: &str) -> DialogId {
 
 /// Opens the picker on `rgb` titled `label` for `target`, with `kept` inks as the model values it shows.
 pub(crate) fn open_for(app: &mut PhotocraftApp, label: &str, color: Srgba, kept: Option<ModelValues>, target: PickTarget) -> DialogId {
-    let mut dialog = ColorPickerDialog::new(target.key(), label, color);
+    let mut dialog = ColorPickerDialog::new(target.key(), label.to_owned(), color);
     if let Some(kept) = kept {
         dialog = dialog.kept(kept);
     }
@@ -299,7 +304,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::swatches_ui::add_from_picker(app, picked);
         }
         if let Some(request) = dropper {
-            crate::canvas_input::arm_dropper(app, id, request.key);
+            crate::dialogs::canvas_input::arm_dropper(app, id, request.key);
         }
     }
     live_preview::sync(app);
@@ -321,7 +326,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn close(app: &mut PhotocraftApp, id: DialogId, picked: Option<PickedColor>) {
     live_preview::end(app, id);
     // The dropper is one app-wide arm; a closing picker releases it.
-    crate::canvas_input::disarm_dropper(app);
+    crate::dialogs::canvas_input::disarm_dropper(app);
     let Some(target) = app.color_targets.remove(&id) else { return };
     let Some(picked) = picked else { return };
     match commit(app, id, target, &picked) {

@@ -404,7 +404,7 @@ impl PhotocraftApp {
     /// always add the suggested extension to a bare name (the format follows the extension).
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn pump_files(&mut self, parent: &eframe::Frame) {
-        let policy = craft::dialogs::ExtensionPolicy { lowercase: self.session.prefs().file_handling.lowercase_extension, add_suggested: true };
+        let policy = craft::dialogs::service::ExtensionPolicy { lowercase: self.session.prefs().file_handling.lowercase_extension, add_suggested: true };
         // PLAN: `Services::file_panels: Option<craft::dialogs::FilePanels>` is dialogs-w59's field.
         let Some(panels) = self.services.file_panels.as_mut() else { return };
         panels.set_extension_policy(policy);

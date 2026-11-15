@@ -14,7 +14,7 @@ use std::time::Duration;
 use craft::behavior::kurbo::Point;
 use craft::imaging::ui::wide_angle::{PreviewDone, WideAngleGeometry, WideAngleOpen, WideAngleSource, WideAngleWorkspace};
 use craft::imaging::wide_angle::WideAngleSession;
-use craft::ui::canvas::full_window::HostedWorkspace;
+use craft::ui::dialog::HostedWorkspace;
 use craft::ui::canvas::RasterSource;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::runtime::pending::Job;
@@ -205,14 +205,14 @@ pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
 }
 
 /// The open workspace's fields for automation, with the layer it edits.
-pub(crate) fn describe(app: &PhotocraftApp) -> Value {
-    let Some(w) = app.wide_angle.as_ref() else { return Value::Null };
+pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
+    let w = app.wide_angle.as_ref()?;
     let mut v: Value = crate::distort_ui::workspace_fields(app, KEY).unwrap_or_else(|| json!({}));
     if let Some(o) = v.as_object_mut() {
         o.insert("document".into(), json!(w.document.0));
         o.insert("layer".into(), json!(w.layer.0));
     }
-    v
+    Some(v)
 }
 
 /// Runs OK's session as `filter.adaptiveWideAngle` when the workspace finished. The constraint
@@ -276,7 +276,7 @@ pub fn menu(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Val
         return None;
     }
     if params.as_object().is_none_or(|o| o.is_empty()) {
-        return Some(open(app, ctx).map(|_| describe(app)));
+        return Some(open(app, ctx).map(|_| describe(app).unwrap_or(Value::Null)));
     }
     None
 }

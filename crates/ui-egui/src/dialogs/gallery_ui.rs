@@ -20,7 +20,7 @@ use craft::imaging::ui::filter_gallery::{
     GalleryFilter as CatalogFilter, GalleryThumb,
 };
 use craft::imaging::ui::wide_angle::PreviewDone;
-use craft::ui::canvas::full_window::HostedWorkspace;
+use craft::ui::dialog::HostedWorkspace;
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::patterns::form_dialogs::Param;
@@ -238,15 +238,15 @@ pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
 }
 
 /// The open gallery's fields for automation, with the document, layer and smart filter it edits.
-pub(crate) fn describe(app: &PhotocraftApp) -> Value {
-    let Some(g) = app.gallery.as_ref() else { return Value::Null };
+pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
+    let g = app.gallery.as_ref()?;
     let mut v: Value = crate::distort_ui::workspace_fields(app, KEY).unwrap_or_else(|| json!({}));
     if let Some(o) = v.as_object_mut() {
         o.insert("document".into(), json!(g.document.0));
         o.insert("layer".into(), json!(g.layer.0));
         o.insert("smartFilter".into(), json!(g.smart_filter));
     }
-    v
+    Some(v)
 }
 
 /// Acts on what the gallery reported this frame: opens the colour picker for a swatch, hands the

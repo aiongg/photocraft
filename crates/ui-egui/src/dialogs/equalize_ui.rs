@@ -103,8 +103,7 @@ pub fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), Label>
 pub fn run(app: &mut PhotocraftApp, _ctx: &egui::Context, result: ParamResult) {
     let only = result.fields.text(KEY) != Some(ENTIRE);
     if let Err(e) = app.run(COMMAND, json!({ KEY: only })) {
-        // PLAN: assumed `dialogs::alerts::report(app: &mut PhotocraftApp, message: impl Into<String>)` (dialogs-w21)
-        crate::dialogs::alerts::report(app, e);
+        crate::dialogs::alerts::report_error(app, e);
     }
 }
 

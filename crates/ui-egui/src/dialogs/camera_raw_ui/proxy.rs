@@ -50,7 +50,7 @@ pub(crate) struct ProxyFrame {
 /// `px` (straight RGBA, `w` × `h`) as the canvas shows it, converted in bands across cores (#4682),
 /// not as a whole copy on one thread.
 pub(crate) fn display_pixels(px: &[[f32; 4]], w: usize, h: usize, display: &photocraft_engine::display_color::CanvasDisplay) -> egui::ColorImage {
-    crate::camera_raw_detail_ui::display_image(photocraft_geom::Rect::new(0, 0, w as i32, h as i32), display, |r, out| {
+    crate::dialogs::camera_raw_detail_ui::display_image(photocraft_geom::Rect::new(0, 0, w as i32, h as i32), display, |r, out| {
         let start = (r.y0.max(0) as usize).saturating_mul(w);
         if let Some(src) = px.get(start..start.saturating_add(out.len())) {
             out.copy_from_slice(src);

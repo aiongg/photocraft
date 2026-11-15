@@ -50,7 +50,7 @@ fn subject(app: &PhotocraftApp, dialog: &HostedParamDialog) -> Option<Subject> {
 fn filtered_preview(app: &PhotocraftApp, id: DialogId, doc: photocraft_doc::DocId, previewed: &str, previewing: bool) -> Option<(FilterPreviewKey, std::sync::Arc<Document>)> {
     let preview = app.filter_preview.as_ref()?;
     let key = &preview.key;
-    (previewing && key.dialog == id.value() && key.doc == doc && key.command == previewed)
+    (previewing && key.dialog == id && key.doc == doc && key.command == previewed)
         .then(|| preview.result.clone().map(|result| (key.clone(), result)))
         .flatten()
 }

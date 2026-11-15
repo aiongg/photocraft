@@ -357,7 +357,7 @@ pub struct UiState {
     pub type_panels: crate::type_panels_ui::TypePanelsUi,
     /// The font menus' filter bar (classes, favourites, variable, similar); kept for the session.
     #[serde(skip)]
-    pub(crate) font_filters: crate::text::font_filters::FontFilters,
+    pub(crate) font_filters: craft::font_manager::picker::FontFilters,
     /// Ruler/Count/Note tools, Measurement Log and Notes panels (see `analysis`).
     #[serde(default)]
     pub analysis: crate::analysis::AnalysisUi,

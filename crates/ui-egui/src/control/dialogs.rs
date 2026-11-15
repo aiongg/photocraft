@@ -48,13 +48,12 @@ pub(crate) const KINDS: &[(&str, Opener)] = &[
         };
         opened.ok_or_else(|| "no channel to show options for".to_string())
     }),
-    ("mergeChannels", |app, _, _| crate::merge_channels_ui::open(app).ok_or_else(|| "Merge Channels needs open documents".to_string())),
-    ("formatOptions", |app, _, p| {
-        let (Some(format), Some(path)) = (p.get("format").and_then(Value::as_str), p.get("path").and_then(Value::as_str)) else {
+    ("mergeChannels", |app, _, _| crate::dialogs::merge_channels_ui::open(app).ok_or_else(|| "Merge Channels needs open documents".to_string())),
+    ("formatOptions", |app, ctx, p| {
+        if p.get("format").and_then(Value::as_str).is_none() || p.get("path").and_then(Value::as_str).is_none() {
             return Err("formatOptions needs `format` and `path`".into());
-        };
-        // PLAN: assumed `file_ui::open_format_options(app, format, path) -> Result<DialogId, String>` (dialogs-w59).
-        crate::file_ui::open_format_options(app, format, path)
+        }
+        crate::dialogs::format_prompts::open(app, ctx, p)
     }),
 ];
 
@@ -150,12 +149,12 @@ pub(crate) struct FieldKey {
 }
 
 fn is_prompt<T: std::any::Any>(app: &PhotocraftApp, id: DialogId) -> bool {
-    crate::alerts::prompt_tagged::<T>(app) == Some(id)
+    crate::dialogs::alerts::prompt_tagged::<T>(app) == Some(id)
 }
 
 fn is_unsaved(app: &PhotocraftApp, id: DialogId) -> bool {
 
-    host(app).get_by_id::<craft::ui::panels::dialog::UnsavedChangesDialog>(id).is_some()
+    host(app).get_by_id::<craft::ui::dialog::UnsavedChangesDialog>(id).is_some()
 }
 
 fn is_profile(app: &PhotocraftApp, id: DialogId) -> bool {
@@ -166,6 +165,11 @@ fn is_profile(app: &PhotocraftApp, id: DialogId) -> bool {
 fn is_color_picker(app: &PhotocraftApp, id: DialogId) -> bool {
     // PLAN: assumed facade path of `ColorPickerDialog`.
     host(app).get_by_id::<craft::color::ui::ColorPickerDialog>(id).is_some()
+}
+
+/// The mask-trash prompt of a vector mask (the layer-mask prompt has the same tag type, other answers).
+fn is_vector_trash(app: &PhotocraftApp, id: DialogId) -> bool {
+    host(app).get_by_id::<craft::ui::dialog::StandardPrompt>(id).is_some_and(|prompt| matches!(prompt.kind(), craft::ui::dialog::PromptKind::TrashVectorMask))
 }
 
 const CANCEL: (&str, &str) = ("cancel", "cancel");
@@ -194,8 +198,7 @@ fn blend_id(value: &Value) -> Value {
     value
         .as_str()
         .and_then(photocraft_engine::commands::blend_from_str)
-        // PLAN: assumed `layers_tree::blend_key(BlendMode) -> impl ToString`.
-        .map(|mode| json!(crate::layers_tree::blend_key(mode).to_string()))
+        .map(|mode| json!(crate::panels::layers_tree::blend_key(mode).to_string()))
         .unwrap_or_else(|| value.clone())
 }
 
@@ -247,16 +250,15 @@ fn liquify_backdrop(_: &Value, v: &Value) -> Vec<(String, Value)> {
 
 /// Production names to framework field ids, for every dialog type; the first row whose dialog and `from` match wins.
 pub(crate) const FIELD_KEYS: &[FieldKey] = &[
-    // PLAN: the prompt tag types below are assumed (dialogs-w21, dialogs-w22).
-    prompt!(crate::dialogs::mask_trash_prompt::VectorTag, &[("delete", "proceed"), CANCEL]),
-    prompt!(crate::dialogs::mask_trash_prompt::Tag, &[("apply", "proceed"), ("delete", "alternate"), CANCEL]),
-    prompt!(crate::dialogs::rasterize_prompt::Tag, &[("rasterize", "proceed"), ("smartObject", "alternate"), CANCEL]),
-    prompt!(crate::dialogs::preset_group_prompt::Tag, &[("new", "proceed"), ("replace", "alternate"), CANCEL]),
-    prompt!(crate::dialogs::live_shape_prompt::Tag, &[("yes", "proceed"), ("no", "cancel"), CANCEL]),
-    prompt!(crate::dialogs::delete_layer_prompt::Tag, &[("delete", "proceed"), CANCEL]),
-    prompt!(crate::dialogs::open_prompt::DamagedTag, &[("continue", "proceed"), ("open", "proceed"), CANCEL]),
+    FieldKey { which: Which::Is(is_vector_trash), from: "choice", to: "choice", values: &[("delete", "proceed"), CANCEL], with: None },
+    prompt!(crate::dialogs::mask_trash_prompt::MaskTrash, &[("apply", "proceed"), ("delete", "alternate"), CANCEL]),
+    prompt!(crate::dialogs::rasterize_prompt::Rasterize, &[("rasterize", "proceed"), ("smartObject", "alternate"), CANCEL]),
+    prompt!(crate::dialogs::preset_group_prompt::PresetClash, &[("new", "proceed"), ("replace", "alternate"), CANCEL]),
+    prompt!(crate::dialogs::live_shape_prompt::LiveShapeAsk, &[("yes", "proceed"), ("no", "cancel"), CANCEL]),
+    prompt!(crate::dialogs::delete_layer_prompt::PendingDelete, &[("delete", "proceed"), CANCEL]),
+    prompt!(crate::dialogs::open_prompt::DamageTag, &[("continue", "proceed"), ("open", "proceed"), CANCEL]),
     prompt!(crate::dialogs::open_prompt::MemoryTag, &[("continue", "proceed"), ("open", "proceed"), CANCEL]),
-    prompt!(crate::dialogs::disk_change_prompt::Tag, &[CANCEL]),
+    prompt!(crate::dialogs::disk_change_prompt::HeldSave, &[CANCEL]),
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[], with: None },
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[("saveAll", "save")], with: Some(save_all) },
     FieldKey { which: Which::Is(is_profile), from: "action", to: "action", values: &[("preserve", "useEmbedded"), ("convert", "convertToWorking"), ("discard", "discard")], with: None },
@@ -313,8 +315,7 @@ fn command_of(app: &PhotocraftApp, id: DialogId, choice: &str) -> Option<(String
     match key.as_str() {
         "workspace.new" => Some(("window.workspace.newWorkspace".into(), fields)),
         "workspace.delete" => Some(("window.workspace.deleteWorkspace".into(), json!({"name": fields.get("name")}))),
-        _ if host(app).get_by_id::<craft::ui::patterns::HostedParamDialog>(id).is_some() && photocraft_engine::commands::find(&key).is_some() => {
-            // PLAN: assumed facade path of `HostedParamDialog`.
+        _ if host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedParamDialog>(id).is_some() && photocraft_engine::commands::find(&key).is_some() => {
             Some((key, fields))
         }
         _ => None,
@@ -402,7 +403,6 @@ fn apply(app: &mut PhotocraftApp, id: DialogId) -> Reply {
 
 /// The `describe(app)` of each hosted workspace, by its dialog key (L-21). Facts that live in app data stay in the
 /// module's adapter; this table only merges them into the workspace's `json_fields`.
-// PLAN: assumed `describe(app: &PhotocraftApp) -> Option<Value>` in each module (dialogs-w41..w50); Camera Raw's is a bare `Value`.
 const DESCRIBE: &[(&str, fn(&PhotocraftApp) -> Option<Value>)] = &[
     ("select.selectAndMask", crate::select_mask_ui::describe),
     ("edit.contentAwareFill", crate::caf_ui::describe),

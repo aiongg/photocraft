@@ -29,7 +29,7 @@ fn ui(app: &mut PhotocraftApp, v: Value) -> Result<Value, String> {
 
 /// The open gallery's stack as the workspace holds it.
 fn effects_of(app: &PhotocraftApp) -> Vec<EffectLayer> {
-    serde_json::from_value(describe(app)["effects"].clone()).unwrap()
+    serde_json::from_value(describe(app).unwrap()["effects"].clone()).unwrap()
 }
 
 fn source_of(app: &PhotocraftApp) -> Arc<PcGallerySource> {
@@ -51,7 +51,7 @@ fn stack_editing_and_commit_match_the_engine() {
     ui(&mut app, json!({"filter": "glowingEdges"})).unwrap();
     ui(&mut app, json!({"toggle": 2})).unwrap();
     ui(&mut app, json!({"move": {"from": 1, "to": 0}})).unwrap();
-    let d = describe(&app);
+    let d = describe(&app).unwrap();
     let keys: Vec<&str> = d["effects"].as_array().unwrap().iter().map(|e| e["filter"].as_str().unwrap()).collect();
     assert_eq!(keys, ["texturizer", "cutout", "glowingEdges"]);
     assert_eq!(d["effects"][2]["visible"], json!(false));
@@ -98,7 +98,7 @@ fn smart_filter_double_click_edits_the_stored_gallery_stack() {
     let effects = effects_of(&app);
     assert_eq!(effects.len(), 1);
     assert_eq!(effects[0].filter, "chrome");
-    assert_eq!(describe(&app)["effects"][0]["params"]["detail"], json!(2));
+    assert_eq!(describe(&app).unwrap()["effects"][0]["params"]["detail"], json!(2));
     // The preview starts from the pixels below the filter (no blur, no chrome).
     let below = photocraft_engine::smart_cmds::render_below_filter(&app.session.active().unwrap().doc, &sm, 0).unwrap().unwrap();
     let source = source_of(&app);
@@ -371,7 +371,7 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
             app,
         );
     let glow = |app: &PhotocraftApp| -> Vec<f64> {
-        describe(app)["effects"][0]["params"]["glowColor"].as_array().unwrap().iter().filter_map(Value::as_f64).collect()
+        describe(app).unwrap()["effects"][0]["params"]["glowColor"].as_array().unwrap().iter().filter_map(Value::as_f64).collect()
     };
     let exact = [0.123456, 0.234567, 0.345678];
     let near = |got: &[f64], want: &[f64], eps: f64| got.iter().zip(want).all(|(a, b)| (a - b).abs() < eps);

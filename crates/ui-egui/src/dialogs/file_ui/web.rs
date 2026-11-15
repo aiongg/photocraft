@@ -198,7 +198,8 @@ fn original_texture(ctx: &egui::Context, doc: &photocraft_doc::Document) -> Size
     let k = (2048.0 / w.max(h)).min(1.0);
     let resample = web_preview::proxy_resample(&json!({}), k);
     let size = json!({"width": (w * k).round().max(1.0), "height": (h * k).round().max(1.0), "resample": resample});
-    let image = web_cmds::web_document(doc, &size, &WebSettings::default())
+    let settings = WebSettings::default();
+    let image = web_cmds::web_document(doc, &size, &settings)
         .map(|(proxy, _, _)| {
             let (pw, ph) = (proxy.size.width as usize, proxy.size.height as usize);
             let rgba: Vec<u8> = photocraft_compose::flatten(&proxy).into_px().iter().flat_map(|q| q.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8)).collect();

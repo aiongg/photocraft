@@ -134,8 +134,7 @@ pub(crate) fn pick_dropper(app: &mut PhotocraftApp, at: [f64; 2], mods: Mods) ->
     let Some((id, key)) = app.dialog_dropper.clone() else { return false };
     let replace_color = app.framework.dialogs.get_by_id::<HostedParamDialog>(id).and_then(|dialog| dialog.key()) == Some(crate::filter_dialog::REPLACE_COLOR);
     if replace_color {
-        // PLAN: `REPLACE_COLOR` and `replace_color_sample(app, id, at, mods) -> bool` are dialogs-w25's names, assumed from the base's `filter_dialog` tests and the sheet.
-        return crate::filter_dialog::rows::replace_color_sample(app, id, at, mods);
+        return crate::filter_dialog::replace_color_sample(app, id, at, mods);
     }
     let Some(color) = sampled(app, at) else { return true };
     let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(id) else { return false };

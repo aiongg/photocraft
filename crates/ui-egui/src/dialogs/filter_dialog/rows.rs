@@ -36,10 +36,10 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 
 const INDEXED_COLOR: &str = "image.mode.indexedColor";
-const LENS_BLUR: &str = "filter.blur.lensBlur";
+pub(crate) const LENS_BLUR: &str = "filter.blur.lensBlur";
 const MATCH_COLOR: &str = "image.adjustments.matchColor";
 const COLOR_LOOKUP: &str = "image.adjustments.colorLookup";
-const REPLACE_COLOR: &str = "image.adjustments.replaceColor";
+pub(crate) const REPLACE_COLOR: &str = "image.adjustments.replaceColor";
 const RADIAL_BLUR: &str = "filter.blur.radialBlur";
 
 /// Where Indexed Color's custom matte colour is kept; `matte` is `custom` while it applies.

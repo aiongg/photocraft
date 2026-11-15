@@ -213,13 +213,13 @@ fn open_session(
     let float = surf.format().sample == photocraft_color::SampleType::F32;
     // Builds the GPU pass the first time any Camera Raw dialog opens.
     let gpu = crate::camera_raw_gpu::for_app(app);
-    let detail = crate::camera_raw_detail_ui::DetailPreview::new(
+    let detail = crate::dialogs::camera_raw_detail_ui::DetailPreview::new(
         surf,
         area,
         match coverage {
-            Coverage::Selection => st.doc.selection.clone().map(crate::camera_raw_detail_ui::Coverage::Selection).unwrap_or(crate::camera_raw_detail_ui::Coverage::None),
-            Coverage::Mask(mask) => crate::camera_raw_detail_ui::Coverage::Mask(mask),
-            Coverage::None => crate::camera_raw_detail_ui::Coverage::None,
+            Coverage::Selection => st.doc.selection.clone().map(crate::dialogs::camera_raw_detail_ui::Coverage::Selection).unwrap_or(crate::dialogs::camera_raw_detail_ui::Coverage::None),
+            Coverage::Mask(mask) => crate::dialogs::camera_raw_detail_ui::Coverage::Mask(mask),
+            Coverage::None => crate::dialogs::camera_raw_detail_ui::Coverage::None,
         },
     );
     let navigation = crate::canvas::document_display::navigation(app);

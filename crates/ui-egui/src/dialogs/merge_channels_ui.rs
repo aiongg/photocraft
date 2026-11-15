@@ -167,7 +167,7 @@ pub fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
 /// open is refused) and runs the merge. The engine's refusal is the reason the dialog shows.
 pub fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), Label> {
     let sources = sources_of(&params::captured(app, &result.key));
-    let merge = params(app, &sources, &result.fields).map_err(|why| Label::from(tl!(&why)))?;
+    let merge = params(app, &sources, &result.fields).map_err(Label::from)?;
     app.run(COMMAND, merge).map(drop).map_err(Label::from)
 }
 

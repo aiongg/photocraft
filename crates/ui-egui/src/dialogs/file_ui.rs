@@ -56,8 +56,8 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
             Ok(opened(open_print(app)))
         }
         "file.export.exportPreferences" => return crate::prefs_ui::invoke(app, ctx, "edit.preferences.export", &json!({})),
-        "file.automate.contactSheetII" => Ok(opened(crate::file_forms::open_contact_sheet(app))),
-        "file.automate.createDroplet" => crate::file_forms::open_create_droplet(app).map(opened),
+        "file.automate.contactSheetII" => Ok(opened(crate::dialogs::file_forms::open_contact_sheet(app))),
+        "file.automate.createDroplet" => crate::dialogs::file_forms::open_create_droplet(app).map(opened),
         "file.scripts.statistics" => Ok(opened(crate::stack_dialog::open_statistics(app))),
         "file.scripts.browse" => {
             return Some(app.pick_file_bytes_filtered(SCRIPT_EXTENSIONS, |app, name, bytes| {
@@ -69,9 +69,9 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
                 r
             }));
         }
-        "file.scripts.scriptEventsManager" => Ok(opened(crate::file_forms::open_script_events(app))),
-        "file.package" => Ok(opened(crate::file_forms::open_package(app))),
-        "file.export.pathsToIllustrator" => Ok(opened(crate::file_forms::open_paths_to_file(app))),
+        "file.scripts.scriptEventsManager" => Ok(opened(crate::dialogs::file_forms::open_script_events(app))),
+        "file.package" => Ok(opened(crate::dialogs::file_forms::open_package(app))),
+        "file.export.pathsToIllustrator" => Ok(opened(crate::dialogs::file_forms::open_paths_to_file(app))),
         _ => return None,
     })
 }

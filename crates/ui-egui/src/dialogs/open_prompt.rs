@@ -14,7 +14,7 @@ use photocraft_doc::{ColorMode, Document};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::alerts;
+use super::alerts;
 
 /// Tags the damaged-file prompt: the front of `held_opens` is the damaged file.
 pub(crate) struct DamageTag;

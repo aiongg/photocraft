@@ -306,13 +306,13 @@ fn develop(source: &Surface, curve: Option<&[[f32; 2]]>, area: PixelRect, params
                 }
                 out.write_region(rect, &data);
             }
-            let rest = CameraRaw { shadows: 0.0, highlights: 0.0, clarity: 0.0, texture: 0.0, dehaze: 0.0, ..params.clone() };
+            let mut rest = params.clone();
+            (rest.shadows, rest.highlights, rest.clarity, rest.texture, rest.dehaze) = (0.0, 0.0, 0.0, 0.0, 0.0);
             (Some(out), rest)
         }
         _ => (None, params.clone()),
     };
     let base = retoned.as_ref().unwrap_or(source);
-    // PLAN: assumed `camera_raw_surface(&Surface, Rect, &CameraRaw, &DevelopInputs)` (dialogs-w46 owns lens_cmds)
     let mut result = photocraft_engine::lens_cmds::camera_raw_surface(base, area, &params, inputs);
     if matches!(coverage, Coverage::None) {
         return result;
@@ -394,6 +394,12 @@ mod tests {
     use super::*;
     use photocraft_color::PixelFormat;
 
+    fn exposure_only(exposure: f32) -> CameraRaw {
+        let mut params = CameraRaw::default();
+        params.exposure = exposure;
+        params
+    }
+
     /// The refinement's inputs: full resolution, so pixel scale 1.
     fn inputs() -> DevelopInputs {
         DevelopInputs { pixel_scale: 1.0, ..Default::default() }
@@ -408,7 +414,8 @@ mod tests {
             p.copy_from_slice(&[if i % 2 == 0 { 0.1 } else { 0.8 }, 0.3, 0.6, 1.0]);
         }
         source.write_region(area, &values);
-        let params = CameraRaw { exposure: 0.5, texture: 15.0, grain_amount: 30.0, ..Default::default() };
+        let mut params = CameraRaw::default();
+        (params.exposure, params.texture, params.grain_amount) = (0.5, 15.0, 30.0);
         let expected = photocraft_engine::lens_cmds::camera_raw_surface(&source, area, &params, &inputs());
         assert_eq!(develop(&source, None, area, &params, &inputs(), &Coverage::None), expected);
         let mask = Surface::with_default(PixelFormat::GRAY8, &[0.0]);
@@ -427,7 +434,8 @@ mod tests {
         }
         source.write_region(area, &values);
         let curve = [[0.01, 0.01], [0.05, 0.12], [0.3, 0.6], [1.0, 1.0]];
-        let params = CameraRaw { shadows: 80.0, exposure: 0.25, ..Default::default() };
+        let mut params = CameraRaw::default();
+        (params.shadows, params.exposure) = (80.0, 0.25);
         let refined = develop(&source, Some(&curve), area, &params, &inputs(), &Coverage::None);
         let mut px = vec![[0.0f32; 4]; 96 * 64];
         source.read_rgba_into(area, &mut px);
@@ -436,7 +444,7 @@ mod tests {
         let mut retoned = source.clone();
         let flat: Vec<f32> = px.iter().flatten().copied().collect();
         retoned.write_region(area, &flat);
-        let expected = photocraft_engine::lens_cmds::camera_raw_surface(&retoned, area, &CameraRaw { exposure: 0.25, ..Default::default() }, &inputs());
+        let expected = photocraft_engine::lens_cmds::camera_raw_surface(&retoned, area, &exposure_only(0.25), &inputs());
         let (a, b) = (refined.rgba(10, 30), expected.rgba(10, 30));
         assert!(a.iter().zip(&b).all(|(x, y)| (x - y).abs() < 2e-4), "{a:?} vs {b:?}");
         assert!(
@@ -489,7 +497,8 @@ mod tests {
                     pixel[channels - 1] = 1.0;
                 }
                 source.write_region(area, &pixels);
-                let params = CameraRaw { exposure: 0.5, sharpen_amount: 20.0, grain_amount: 30.0, ..Default::default() };
+                let mut params = CameraRaw::default();
+                (params.exposure, params.sharpen_amount, params.grain_amount) = (0.5, 20.0, 30.0);
                 let full = develop(&source, None, area, &params, &inputs(), &Coverage::None);
                 let expected = photocraft_engine::lens_cmds::camera_raw_surface(&source, area, &params, &inputs());
                 assert_eq!(full, expected);
@@ -529,7 +538,7 @@ mod tests {
     fn huge_sparse_images_keep_the_proxy_without_starting_an_unbounded_worker() {
         let source = Surface::new(PixelFormat::RGBA8);
         let mut preview = DetailPreview::new(source, PixelRect::new(0, 0, 8001, 8000), Coverage::None);
-        preview.request(&Context::default(), 1, &CameraRaw { exposure: 1.0, ..Default::default() }, &inputs());
+        preview.request(&Context::default(), 1, &exposure_only(1.0), &inputs());
         assert!(!preview.pending());
         assert!(preview.error.as_deref().unwrap().contains("64 megapixels"));
         assert_eq!(preview.failed_revision, Some(1));

@@ -38,7 +38,7 @@ use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::camera_raw_detail_ui::DetailPreview;
+use crate::dialogs::camera_raw_detail_ui::DetailPreview;
 use crate::camera_raw_gpu::CameraRawGpu;
 use crate::dialogs::shared_picture::SharedPicture;
 
@@ -92,7 +92,7 @@ pub(crate) struct Developed {
     /// Where the develop ran: "gpu" or "cpu".
     pub(crate) backend: &'static str,
     /// The scope's counts and clipping mask over the developed pixels.
-    pub(crate) scope: crate::camera_raw_scope_ui::ScopeData,
+    pub(crate) scope: crate::dialogs::camera_raw_scope_ui::ScopeData,
 }
 
 /// Counts the develop jobs that are queued or running; a job that is dropped unrun counts down too.
@@ -323,7 +323,7 @@ impl RawDevelopSource for PcRawSource {
             if cancel.is_cancelled() {
                 return Err("RAW Develop preview cancelled".to_string());
             }
-            let scope = crate::camera_raw_scope_ui::ScopeData::new(crate::camera_raw_scope_ui::ScopeInputs {
+            let scope = crate::dialogs::camera_raw_scope_ui::ScopeData::new(crate::dialogs::camera_raw_scope_ui::ScopeInputs {
                 revision: order,
                 size: [pw, ph],
                 proxy: &proxy,
@@ -364,15 +364,15 @@ impl RawDevelopSource for PcRawSource {
 
     fn scope(&self, before: bool, region: bool, at: Option<[f64; 2]>, show: &mut dyn FnMut(Option<ScopeFrame<'_>>)) {
         // PLAN: assumed (dialogs-w51 names): the scope data functions of `camera_raw_scope_ui` take `&PcRawSource`.
-        crate::camera_raw_scope_ui::scope(self, before, region, at, show);
+        crate::dialogs::camera_raw_scope_ui::scope(self, before, region, at, show);
     }
 
     fn clipping(&self) -> Option<(Arc<ClippingMask>, Revision)> {
-        crate::camera_raw_scope_ui::clipping(self)
+        crate::dialogs::camera_raw_scope_ui::clipping(self)
     }
 
     fn sample(&self, at: [f64; 2], before: bool, lab: bool) -> Option<ScopeReadout> {
-        crate::camera_raw_scope_ui::sample(self, at, before, lab)
+        crate::dialogs::camera_raw_scope_ui::sample(self, at, before, lab)
     }
 
     fn has_selection(&self) -> bool {
@@ -445,7 +445,7 @@ pub(crate) fn command_params(settings: &CameraRaw) -> Value {
 /// `px` (`w`×`h`) as a display image. Bands are copied straight from `px` and converted in parallel (#4682), not a
 /// whole copy of the proxy converted on one thread.
 pub(crate) fn image(px: &[[f32; 4]], w: usize, h: usize, display: &photocraft_engine::display_color::CanvasDisplay) -> ColorImage {
-    crate::camera_raw_detail_ui::display_image(Rect::new(0, 0, w as i32, h as i32), display, |r, out| {
+    crate::dialogs::camera_raw_detail_ui::display_image(Rect::new(0, 0, w as i32, h as i32), display, |r, out| {
         let start = (r.y0.max(0) as usize).saturating_mul(w);
         if let Some(src) = px.get(start..start.saturating_add(out.len())) {
             out.copy_from_slice(src);
@@ -498,7 +498,7 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
     // PLAN: assumed (dialogs-w51 names): `vectorscope_reply` is the vectorscope's counts for the Before/region pair, `readout` is
     // today's `CameraRawDialog::readout` over `PcRawSource`. The workspace exposes neither the samplers' points nor the pointer, so
     // the two readout keys stay empty until the framework's `json_fields` carries them (owner: dialogs-w17).
-    result["vectorscope"] = developed.as_ref().map_or(Value::Null, |d| crate::camera_raw_scope_ui::vectorscope_reply(&d.scope, before, region));
+    result["vectorscope"] = developed.as_ref().map_or(Value::Null, |d| crate::dialogs::camera_raw_scope_ui::vectorscope_reply(&d.scope, before, region));
     result["pointerReadout"] = Value::Null;
     result["samplerReadouts"] = json!([]);
     if let (Value::Object(out), Value::Object(own)) = (&mut result, fields) {

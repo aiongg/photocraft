@@ -98,7 +98,7 @@ fn zeroed(mut value: AdjustValue) -> AdjustValue {
 /// in the first case, Midtones shown in the second); either way it is part of the layer's edit
 /// step. Other kinds go to the defaults for the document's mode.
 pub fn layer_reset(app: &mut PhotocraftApp, id: LayerId, adj: &Adjustment) -> Value {
-    let kind = adjust_params::adjustment_kind(adj);
+    let kind = photocraft_engine::commands::adjustment_kind(adj);
     let mode = app.session.active().map_or(ColorMode::Rgb, |s| s.doc.mode);
     let committed = adjust_params::to_params(adj);
     let mut params = if photoshop_session(kind) {
@@ -151,7 +151,7 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
         }
         _ => {}
     }
-    let kind = adjust_params::adjustment_kind(adj);
+    let kind = photocraft_engine::commands::adjustment_kind(adj);
     let Some((doc, mode)) = app.session.active().map(|s| (s.doc.id.0, s.doc.mode)) else { return };
     let committed_params = adjust_params::to_params(adj);
     let vcx = value_cx(mode, &committed_params);
@@ -186,17 +186,12 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
 
     let gray = is_gray(mode);
     let space = adjust_params::default_space(mode);
-    // PLAN: assumed `EditorSetup` fields `channels`, `histograms`, `gradients`, `swatches`,
-    // `dynamic_color_sliders`, `gray`, `tone` (dialogs-w31 and its decisions) and `Default` for the rest.
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let setup = EditorSetup {
         channels: values::tone_channels(space, gray, None),
-        // PLAN: assumed `values::panel_histograms(&Arc<Histograms>) -> Vec<[u32; 256]>` (dialogs-w31 item 2a).
-        histograms: if has_histogram(kind) { values::panel_histograms(&tone::histograms(app, HistSource::BelowLayer(id), space)) } else { Vec::new() },
+        histograms: if has_histogram(kind) { values::panel_histograms(&tone::histograms(app, HistSource::BelowLayer(id), space), space, gray, None) } else { Vec::new() },
         gradients: if kind == "gradientMap" { gradient_presets(app) } else { Vec::new() },
         swatches: swatches(app),
-        dynamic_color_sliders: dynamic,
-        gray,
         tone: record.tone.take(),
         ..Default::default()
     };

@@ -23,6 +23,7 @@ use serde_json::{Map, Value, json};
 use crate::PhotocraftApp;
 
 mod rows;
+pub(crate) use rows::{REPLACE_COLOR, replace_color_sample};
 
 const MATCH_COLOR: &str = "image.adjustments.matchColor";
 pub(crate) const MATCH_COLOR_DESTINATION: &str = "__matchColorDestination";
@@ -265,7 +266,7 @@ fn document_derived(command: &str, key: &str) -> bool {
 
 /// The rows of `command`'s dialog for the parameter notation `spec`: the framework's parse of it,
 /// then the app's rows (documents, angle dials, units, the rows only the open document can fill).
-pub(crate) fn params(app: &PhotocraftApp, command: &str, spec: &str) -> Vec<Param> {
+pub(crate) fn params(app: &mut PhotocraftApp, command: &str, spec: &str) -> Vec<Param> {
     let documents = document_keys(spec);
     let names: Vec<String> = app.session.documents().iter().map(|d| d.doc.name.clone()).collect();
     let allowed = (command == "edit.assignProfile").then(|| {
@@ -835,7 +836,6 @@ fn finish(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str, params: V
             return Err(error);
         }
     };
-    let revision = app.session.active().map(|st| st.revision);
     let outcome = crate::actions::run_step_dialog(app, result.id, &cmd, params.clone());
     if let Ok(r) = &outcome {
         report_file_errors(app, command, r);
@@ -847,14 +847,6 @@ fn finish(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str, params: V
     match app.filter_preview.as_mut() {
         Some(p) if outcome.is_ok() && running => p.committing = true,
         _ => app.filter_preview = None,
-    }
-    if outcome.is_ok() && cmd == "path.toSelection" {
-        // PLAN: the Make Selection dialog's fields (its `__deselectPath` marker included) belong to canvas-widgets-w23's family; the plain map is passed.
-        crate::canvas_tool_menu::name_make_selection_step(app, &fields_map(&result.fields), &params, revision);
-    }
-    if outcome.is_ok() && cmd == "path.stroke" {
-        // The Stroke Path dialog reopens with the Simulate Pressure that was just applied (#10527).
-        crate::canvas_tool_menu::remember_simulate_pressure(app, &params);
     }
     if outcome.is_ok() && cmd == "view.newGuideLayout" {
         app.ui.view.guide_layout = params;

@@ -64,7 +64,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     caf.set_base(base, &caf.known.strokes.clone());
     caf.dirty = false;
     let source = caf.source(2048);
-    let host = craft::ui::canvas::full_window::HostedWorkspace::new(workspace, source).held_ok();
+    let host = craft::ui::dialog::HostedWorkspace::new(workspace, source).held_ok();
     let id = app.framework.dialogs.open(host);
     caf.id = id;
     app.caf = Some(caf);

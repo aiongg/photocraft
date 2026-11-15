@@ -81,7 +81,7 @@ pub(super) fn store_sidecar(app: &mut PhotocraftApp, raw: &RawOpen, params: &Cam
     match existing_sidecar_is_ours(&sidecar) {
         Some(false) => {
             let kept = crate::i18n::fmt(tl!("Kept {name}: written by another application"), &[("name", &name)]);
-            crate::notices::post(app, kept, Vec::new(), false, None);
+            crate::notices::post(app, kept, Vec::new(), craft::theme::variant::Tone::Neutral, None);
             return Stored::Skipped;
         }
         None if params.is_identity() => return Stored::Defaults,

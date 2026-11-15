@@ -90,8 +90,7 @@ pub fn command_params(fields: &DialogFields, mut params: Value) -> Value {
     params
 }
 
-// PLAN: assumed `dialogs::alerts::report(app: &mut PhotocraftApp, message: impl Into<String>)` (dialogs-w21)
-use crate::dialogs::alerts::report;
+use crate::dialogs::alerts::report_error;
 
 /// A Load… or Save… footer button of the dialog `id` was pressed (`action` is `"load"` or `"save"`).
 pub fn footer_action(app: &mut PhotocraftApp, _ctx: &egui::Context, id: DialogId, action: &str) {
@@ -111,17 +110,17 @@ pub fn footer_action(app: &mut PhotocraftApp, _ctx: &egui::Context, id: DialogId
                 Ok(Value::Null)
             }) && e != crate::file_dialog::CANCELLED
             {
-                report(app, e);
+                report_error(app, e);
             }
         }
         "save" => {
             let Some(fields) = app.framework.dialogs.get_by_id::<HostedParamDialog>(id).map(|d| d.fields().clone()) else { return };
             let Some((colors, transparent)) = pending(app, &fields) else {
-                return report(app, tl!("There is no color table to save."));
+                return report_error(app, tl!("There is no color table to save."));
             };
             let bytes = match photocraft_engine::swatch_cmds::act_bytes(&colors, transparent) {
                 Ok(bytes) => bytes,
-                Err(e) => return report(app, e),
+                Err(e) => return report_error(app, e),
             };
             let n = colors.len() as u64;
             if let Err(e) = app.pick_save("Table.act", move |app, path| {
@@ -134,7 +133,7 @@ pub fn footer_action(app: &mut PhotocraftApp, _ctx: &egui::Context, id: DialogId
                 );
                 Ok(json!({"path": path}))
             }) {
-                report(app, e);
+                report_error(app, e);
             }
         }
         _ => {}

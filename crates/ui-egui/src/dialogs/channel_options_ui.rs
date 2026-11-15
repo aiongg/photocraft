@@ -228,8 +228,7 @@ pub fn run(app: &mut PhotocraftApp, ctx: &egui::Context, result: ParamResult) {
         app.run(&result.key, params(&result.fields, &channel))
     };
     if let Err(e) = outcome {
-        // PLAN: assumed `dialogs::alerts::report(app: &mut PhotocraftApp, message: impl Into<String>)` (dialogs-w21)
-        crate::dialogs::alerts::report(app, e);
+        crate::dialogs::alerts::report_error(app, e);
     }
 }
 

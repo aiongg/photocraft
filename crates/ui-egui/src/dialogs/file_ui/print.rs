@@ -181,7 +181,7 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
 
     // Photoshop's Printer Profile menu: the built-ins, then every installed printer (output class)
     // profile by its description.
-    let mut profiles: Vec<(String, craft::ui::runtime::Label)> = vec![
+    let mut profiles: Vec<(String, craft::ui::runtime::env::Label)> = vec![
         ("coated-cmyk".into(), tl!("Coated CMYK").into()),
         ("srgb".into(), "sRGB IEC61966-2.1".into()),
         ("adobe-rgb-compat".into(), tl!("Adobe RGB (1998) compatible").into()),
@@ -202,7 +202,7 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         profiles.push((current.to_string(), stem.into()));
     }
 
-    let mut papers: Vec<(String, craft::ui::runtime::Label)> =
+    let mut papers: Vec<(String, craft::ui::runtime::env::Label)> =
         photocraft_engine::print_cmds::PAPERS.iter().map(|p| (p.0.to_string(), print_paper_label(p.0).into())).collect();
     papers.push(("custom".into(), tl!("Custom").into()));
 
