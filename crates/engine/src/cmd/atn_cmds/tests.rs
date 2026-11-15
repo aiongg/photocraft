@@ -457,8 +457,9 @@ fn load_maps_events_keeps_flags_and_plays() {
     assert_eq!(s.actions.list.actions()[2].set.as_deref(), Some("Other"));
 }
 
-/// Renames that chain ("A" becomes "A 2" while the file's own "A 2" becomes "A 2 2") rewrite
-/// each Play and Conditional target once, to the renamed copy of the action it named.
+/// A name the file shares with the list is renamed to the first free one, and the file's own names stay: "A" becomes
+/// "A 3" while the file's "A 2" keeps its name. Each Play and Conditional target is rewritten once, to the renamed
+/// copy of the action it named.
 #[test]
 fn load_renames_each_play_target_once() {
     let mut s = Session::new();
@@ -470,12 +471,12 @@ fn load_renames_each_play_target_once() {
     let keys = [("A".to_string(), "F4".to_string())];
     let (bytes, _) = export("File", &[&a, &a2], &keys, false).unwrap();
     let r = s.execute("actions.load", json!({"data": b64(&bytes)})).unwrap();
-    assert_eq!(r["actions"], json!(["A 2", "A 2 2"]));
+    assert_eq!(r["actions"], json!(["A 3", "A 2"]));
     let get = |n: &str| s.actions.list.actions().iter().find(|a| a.name == n && a.set.as_deref() == Some("File")).unwrap();
-    assert_eq!(get("A 2 2").steps[0].params["action"], "A 2", "plays the file's A, not its A 2");
-    let cond = &get("A 2").steps[0].params;
-    assert_eq!((&cond["then"], &cond["else"]), (&json!("A 2"), &json!("A 2 2")), "{cond}");
-    assert_eq!(r["functionKeys"], json!([{"action": "A 2", "key": "F4"}]));
+    assert_eq!(get("A 2").steps[0].params["action"], "A 3", "plays the file's A, which is now A 3");
+    let cond = &get("A 3").steps[0].params;
+    assert_eq!((&cond["then"], &cond["else"]), (&json!("A 3"), &json!("A 2")), "{cond}");
+    assert_eq!(r["functionKeys"], json!([{"action": "A 3", "key": "F4"}]));
 
     // Adding to a set of the same name leaves the Play steps already in it alone.
     let mut s = Session::new();
