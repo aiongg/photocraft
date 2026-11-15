@@ -286,7 +286,14 @@ impl CanvasTool for TypeTool<'_> {
         let Some(start) = self.state.press.take() else { return };
         let Some(space) = cx.space() else { return };
         let end = space.view.to_doc(pointer.pos);
-        self.scope.with_app(|app| create_text(app, [start.x, start.y], [end.x, end.y]));
+        let ctx = self.scope.ctx().clone();
+        self.scope.with_app(|app| {
+            create_text(app, [start.x, start.y], [end.x, end.y]);
+            // The new session's editor takes the keyboard from the pass it opens, as an edit of existing text does.
+            if app.ui.text_edit.is_some() {
+                super::editing::focus_editor(&ctx);
+            }
+        });
     }
 
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {
