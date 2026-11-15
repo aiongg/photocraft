@@ -51,15 +51,15 @@ fn a_move_drag_reads_out_the_offset_it_will_commit() {
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;
     let m = egui::Modifiers::NONE;
-    assert_eq!(super::offset_readout(&app), None, "no drag");
+    let rows = |r: craft::ui::canvas::ToolHostResponse| r.readout.map(|r| r.rows.into_iter().map(|(_, v)| v).collect::<Vec<_>>());
     // Pressed on the red square (16..32): with Auto-Select (on by default) an empty spot would
     // start the layer marquee instead of a move.
-    crate::canvas::tool_event(&mut app, ToolEvent::Down { x: 24.0, y: 24.0, pressure: 1.0 }, m);
-    assert_eq!(super::offset_readout(&app), None, "pressed, not moved yet");
-    crate::canvas::tool_event(&mut app, ToolEvent::Move { x: 34.4, y: 20.8, pressure: 1.0 }, m);
-    assert_eq!(super::offset_readout(&app), Some(["10 px".to_string(), "-3 px".to_string()]));
-    crate::canvas::tool_event(&mut app, ToolEvent::Up { x: 34.4, y: 20.8 }, m);
-    assert_eq!(super::offset_readout(&app), None, "released");
+    let r = crate::canvas::tool_event(&mut app, ToolEvent::Down { x: 24.0, y: 24.0, pressure: 1.0 }, m);
+    assert_eq!(rows(r), None, "pressed, not moved yet");
+    let r = crate::canvas::tool_event(&mut app, ToolEvent::Move { x: 34.4, y: 20.8, pressure: 1.0 }, m);
+    assert_eq!(rows(r), Some(vec!["10 px".to_string(), "-3 px".to_string()]));
+    let r = crate::canvas::tool_event(&mut app, ToolEvent::Up { x: 34.4, y: 20.8 }, m);
+    assert_eq!(rows(r), None, "released");
 }
 
 /// A release past the ±10,000,000 px the preview and the readout show commits the offset they
