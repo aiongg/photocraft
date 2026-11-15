@@ -3,7 +3,6 @@
 //! the document while it is off. Skips when no GPU adapter exists (like `color_managed_canvas.rs`).
 
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::canvas::ViewXform;
 use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
@@ -33,8 +32,8 @@ fn harness() -> Option<Harness> {
 /// The colour on screen at document point `at` (which may lie past the document).
 fn sample(h: &mut Harness, at: [f32; 2]) -> [u8; 3] {
     h.run_steps(6);
-    let xf = ViewXform::active(h.state()).expect("canvas view");
-    let p = xf.to_screen(at[0], at[1]);
+    let xf = photocraft_ui_egui::canvas::active_view(h.state()).expect("canvas view");
+    let p = xf.to_screen(craft::behavior::kurbo::Point::new(f64::from(at[0]), f64::from(at[1])));
     let img = h.render().expect("render");
     let px = img.get_pixel(p.x.round() as u32, p.y.round() as u32);
     [px[0], px[1], px[2]]

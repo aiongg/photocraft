@@ -14,7 +14,8 @@
 
 use egui::{Modifiers, PointerButton, Pos2};
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::canvas::ViewXform;
+use craft::behavior::CanvasView;
+use craft::behavior::kurbo::Point;
 use photocraft_ui_egui::control::{ControlRequest, handle};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -83,15 +84,14 @@ fn setup(h: &mut Harness, background: &str, tool: &str) {
     h.run_steps(3);
 }
 
-fn xf(h: &Harness) -> ViewXform {
-    // The same mapping the canvas draws with: `View::zoom` is device pixels per document pixel,
-    // and the transform works in the viewport's egui points.
-    ViewXform::active(h.state()).expect("an active document view")
+fn xf(h: &Harness) -> Option<CanvasView> {
+    // The same mapping the canvas draws with, in the viewport's egui points.
+    photocraft_ui_egui::canvas::active_view(h.state())
 }
 
 /// Screen point (egui points) of document point `(x, y)`.
 fn screen(h: &Harness, x: f32, y: f32) -> Pos2 {
-    xf(h).to_screen(x, y)
+    xf(h).expect("an active document view").to_screen(Point::new(f64::from(x), f64::from(y)))
 }
 
 fn pointer_move(h: &mut Harness, x: f32, y: f32) {

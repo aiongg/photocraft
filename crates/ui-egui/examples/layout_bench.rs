@@ -27,7 +27,6 @@ use std::time::Instant;
 use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::{LayerContent, LayerId};
-use photocraft_ui_egui::canvas::ViewXform;
 use photocraft_ui_egui::state::Tool;
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::{Value, json};
@@ -82,11 +81,8 @@ fn settle(h: &mut H, n: usize) -> f64 {
 
 /// Screen position of document point (x, y) in the main canvas.
 fn screen(h: &H, x: f64, y: f64) -> Pos2 {
-    let app = h.state();
-    let idx = app.session.active_index().unwrap_or(0);
-    let v = &app.ui.views[idx];
-    let rect = photocraft_ui_egui::rulers::content_rect(app, app.last_canvas_rect);
-    ViewXform { rect, zoom: v.zoom, center: v.center, flip: app.ui.view.flip_horizontal, rotation: v.rotation, aspect: 1.0 }.to_screen(x as f32, y as f32)
+    let view = photocraft_ui_egui::canvas::active_view(h.state()).expect("an active document view");
+    view.to_screen(craft::behavior::kurbo::Point::new(x, y))
 }
 
 fn select(h: &mut H, id: LayerId) {
@@ -220,7 +216,7 @@ fn main() {
         }
         app.session.open_document(doc, Some("layout.psd".into()));
         app.sync_views();
-        app.ui.panels.navigator = navigator;
+        photocraft_ui_egui::panels::panel_docking::show_panel(&mut app, "navigator", Some(navigator)).expect("the navigator shows");
         app
     });
     settle(&mut h, 4);

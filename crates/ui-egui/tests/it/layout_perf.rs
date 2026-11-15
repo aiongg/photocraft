@@ -12,7 +12,6 @@ use egui_kittest::Harness;
 use photocraft_doc::{Document, LayerContent, LayerId};
 use photocraft_engine::layer_multi_cmds::{layer_bounds, move_targets, moved};
 use photocraft_geom::Rect;
-use photocraft_ui_egui::canvas::ViewXform;
 use photocraft_ui_egui::state::Tool;
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::json;
@@ -43,10 +42,8 @@ fn bounds(h: &H, id: LayerId) -> Rect {
 }
 
 fn screen(h: &H, p: [f64; 2]) -> Pos2 {
-    let app = h.state();
-    let v = &app.ui.views[0];
-    let rect = photocraft_ui_egui::rulers::content_rect(app, app.last_canvas_rect);
-    ViewXform { rect, zoom: v.zoom, center: v.center, flip: false, rotation: v.rotation, aspect: 1.0 }.to_screen(p[0] as f32, p[1] as f32)
+    let view = photocraft_ui_egui::canvas::active_view(h.state()).expect("an active document view");
+    view.to_screen(craft::behavior::kurbo::Point::new(p[0], p[1]))
 }
 
 /// A point where `id` (or, for a group, one of its layers) is the topmost layer with pixels.
