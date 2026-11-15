@@ -114,6 +114,9 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
         }
         if let Some(frame) = row.frame {
             tool(&mut app).crop_to(frame);
+        } else {
+            // The default frame (the selection's bounds) is made by the tool's first pass.
+            crate::canvas::testing::frame(&mut app);
         }
         let before = (crop_ui::frame(&app), doc_size(&app));
         // The engine names a crop that filled new area after the fill.
