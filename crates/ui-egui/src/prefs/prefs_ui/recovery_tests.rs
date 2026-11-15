@@ -122,6 +122,8 @@ fn recovery_keeps_frames_and_editing_live_and_adopts_the_admitted_document() {
         .iter()
         .map(|st| craft::platform::autosave::AutosaveDoc { id: st.doc.id.0, revision: st.revision, dirty: st.is_dirty() })
         .collect();
+    // The test's services have no autosave writer, so the frame never set the timer's interval.
+    app.autosave.set_interval(craft::platform::autosave::interval_for_minutes(10));
     app.autosave.autosave_now();
     let due = app.autosave.due(std::time::Instant::now(), docs);
     assert!(!due.save.contains(&recovered.doc.id.0), "{due:?}");

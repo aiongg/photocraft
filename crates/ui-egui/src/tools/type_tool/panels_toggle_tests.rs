@@ -63,6 +63,8 @@ fn with_a_type_layer_it_opens_the_group_with_character_in_front_then_closes_it()
 fn with_paragraph_in_front_it_brings_character_forward_like_window_character() {
     let mut app = app_with_layer();
     let ctx = app.ctx().clone();
+    // Character and Paragraph start closed: the group opens with Character, then Paragraph comes to its front.
+    crate::menus::invoke(&mut app, &ctx, "window.panel.character", json!({})).unwrap();
     crate::menus::invoke(&mut app, &ctx, "window.panel.paragraph", json!({})).unwrap();
     let mut h = harness(app);
     assert_eq!(group(&h), (true, true));
