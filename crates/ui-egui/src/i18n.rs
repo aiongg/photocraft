@@ -23,7 +23,7 @@
 //! 2. Add one row to [`LANGUAGES`].
 //!
 //! That is all: the Preferences dropdown and the system-locale match pick it up from the registry.
-//! A right-to-left language (Arabic, Hebrew, Persian, Urdu, see [`dir_for_code`]) also mirrors the
+//! A right-to-left language (Arabic, Hebrew, Persian, Urdu, see [`Lang::dir`]) also mirrors the
 //! window's chrome ([`crate::direction`]).
 //!
 //! # Looking strings up
@@ -33,7 +33,6 @@
 //! - [`trn`]: plural-aware (`{n}` is filled in). [`fmt`]: fill `{name}` placeholders after [`tr`];
 //!   translators may reorder placeholders freely.
 
-mod casing;
 mod system;
 
 #[cfg(test)]
@@ -80,21 +79,7 @@ pub struct LangInfo {
 }
 
 /// A script's reading direction.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Dir {
-    Ltr,
-    Rtl,
-}
-
-/// Languages written right to left, by primary subtag: Arabic, Sorani Kurdish, Dhivehi, Persian,
-/// Hebrew, Pashto, Sindhi, Uyghur, Urdu, Yiddish.
-const RTL_LANGUAGES: [&str; 10] = ["ar", "ckb", "dv", "fa", "he", "ps", "sd", "ug", "ur", "yi"];
-
-/// The reading direction of a language code (`ar`, `fa-ir`, `he`; any case).
-pub fn dir_for_code(code: &str) -> Dir {
-    let primary = code.split(['-', '_']).next().unwrap_or("");
-    if RTL_LANGUAGES.iter().any(|l| l.eq_ignore_ascii_case(primary)) { Dir::Rtl } else { Dir::Ltr }
-}
+pub use craft::i18n::Direction as Dir;
 
 /// How many languages [`LANGUAGES`] lists.
 const LANGUAGE_COUNT: usize = 35;
@@ -143,7 +128,7 @@ pub static LANGUAGES: [LangInfo; LANGUAGE_COUNT] = [
     // Hindi; `hi`, `hi-IN` locales resolve here.
     LangInfo { code: "hi", complete_menus: false },
     // Arabic (Modern Standard); `ar-SA`, `ar-EG` and the other regional locales resolve here. The
-    // chrome mirrors right to left (`dir_for_code`), and egui lays each label out right to left.
+    // chrome mirrors right to left (`Lang::dir`), and egui lays each label out right to left.
     LangInfo { code: "ar", complete_menus: true },
     // Swedish; `sv-SE` and `sv-FI` locales resolve here.
     LangInfo { code: "sv", complete_menus: true },
@@ -155,10 +140,10 @@ pub static LANGUAGES: [LangInfo; LANGUAGE_COUNT] = [
     // Norwegian Bokmål; `nb-NO`, and the macrolanguage `no` and Nynorsk `nn` from POSIX locales,
     // resolve here (see `candidates`).
     LangInfo { code: "nb", complete_menus: true },
-    // Hebrew; `he-il` and `he_IL` resolve here. The chrome mirrors right to left (`dir_for_code`),
+    // Hebrew; `he-il` and `he_IL` resolve here. The chrome mirrors right to left (`Lang::dir`),
     // like Arabic. Its `two` plural form repeats `other`, as modern Hebrew software UI does.
     LangInfo { code: "he", complete_menus: true },
-    // Urdu; written right to left like Arabic (`dir_for_code`).
+    // Urdu; written right to left like Arabic (`Lang::dir`).
     LangInfo { code: "ur", complete_menus: true },
     // Romanian; `ro-RO` and `ro-MD` resolve here.
     LangInfo { code: "ro", complete_menus: true },
@@ -256,7 +241,7 @@ impl Lang {
 
     /// The language's reading direction.
     pub fn dir(self) -> Dir {
-        dir_for_code(self.code())
+        craft::i18n::direction(self.code())
     }
 
     /// Whether `translated`, the lookup's text for (`context`, `source`), comes from PhotoCraft's
