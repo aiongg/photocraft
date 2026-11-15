@@ -19,6 +19,7 @@ fn app() -> PhotocraftApp {
     app.sync_views();
     app.ui.tool = crate::state::Tool::Type;
     click(&mut app, 50.0, 100.0, Modifiers::NONE);
+    testing::frame(&mut app);
     type_keys(&mut app, "abc");
     app
 }
@@ -116,6 +117,7 @@ fn document_replacement_cannot_reuse_the_previous_documents_reset() {
     assert!(app.ui.text_edit.is_none(), "the new document starts without the previous edit target");
     app.ui.tool = crate::state::Tool::Type;
     click(&mut app, 50.0, 100.0, Modifiers::NONE);
+    testing::frame(&mut app);
     type_keys(&mut app, "new");
     let mut app = app;
     testing::frame(&mut app);
