@@ -69,6 +69,10 @@ pub struct DocState {
     /// type layer keeps such a name although it looks like a copy's ("Title copy 2"), while a
     /// name Duplicate Layer made still follows the text (#9023). Kept for the session only.
     pub(crate) typed_names: std::collections::HashMap<LayerId, String>,
+    /// The count of steps whose damage was not empty: pixel thumbnails (the Channels panel's composite and colour
+    /// rows) change only when it moves, so a selection-only or view-only step keeps them. Written only by
+    /// `Session::dispatch` and the job apply path.
+    pub pixel_revision: u64,
 }
 
 impl DocState {
@@ -127,6 +131,7 @@ impl DocState {
             save_snapshot: None,
             source_snapshot: None,
             typed_names: Default::default(),
+            pixel_revision: 0,
         }
     }
     /// The selected layers in bottom-to-top document order, always including the active layer.
