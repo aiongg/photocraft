@@ -30,7 +30,7 @@ fn cancel_competing_edits_tool_document_and_focus_changes_drop_only_the_preview(
     let mut app = app();
     app.run("paint.setSymmetry", json!({"mode":"vertical"})).unwrap();
     open(&mut app);
-    assert!(session_tool(&app).is_some());
+    assert!(app.ui.symmetry_transform.as_ref().and_then(|t| session_tool(&app, t)).is_some());
     app.run("document.inspect", json!({})).unwrap();
     assert!(is_valid(&app));
     finish_tool(&mut app, vec![SymmetryEvent::Discard]);

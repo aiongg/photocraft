@@ -218,10 +218,10 @@ pub fn canvas_controls(ui: &mut egui::Ui, app: &mut PhotocraftApp, at: egui::Rec
     }
 }
 
-/// The session's canvas tool, while the open session belongs to the active document. The canvas runs it ahead of the
-/// painting tool, so a press away from the handles never paints.
-pub fn session_tool(app: &PhotocraftApp) -> Option<SymmetryTool<'_>> {
-    let t = app.ui.symmetry_transform.as_ref()?;
+/// The canvas tool over a session taken out of the app for the pass, while it belongs to the active document. The
+/// canvas runs it ahead of the painting tool, so a press away from the handles never paints. The tool borrows the
+/// session only, so the pass can take the app.
+pub fn session_tool<'a>(app: &PhotocraftApp, t: &'a Transform) -> Option<SymmetryTool<'a>> {
     (app.session.active_index() == Some(t.document)).then(|| SymmetryTool::new(&t.session, valid(app, t)))
 }
 

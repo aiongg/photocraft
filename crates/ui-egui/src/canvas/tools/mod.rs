@@ -307,16 +307,16 @@ fn refuse_group(app: &mut PhotocraftApp, tool: Tool) -> bool {
 
 /// The press preflight around the pass's tool (M21): the quick-pick chord and the press refusals come before any tool
 /// or stand-in sees the press, and an arrow key the tool did not take nudges as the Move tool does.
-struct Preflight<'a> {
+struct Preflight<'a, 'x> {
     scope: &'a ToolScope<'a>,
-    inner: DynTool<'a>,
+    inner: DynTool<'x>,
     tool: Tool,
     /// The selection tools' outline is open (a Polygonal or Magnetic Lasso being drawn): an arrow nudges it, not the
     /// layer. Read before the pass takes the families' state out of the app.
     outline_open: bool,
 }
 
-impl CanvasTool for Preflight<'_> {
+impl CanvasTool for Preflight<'_, '_> {
     fn each_pass(&mut self, cx: &mut ToolContext<'_>) {
         self.inner.each_pass(cx);
     }
@@ -408,7 +408,7 @@ impl CanvasTool for Preflight<'_> {
     }
 }
 
-impl Preflight<'_> {
+impl Preflight<'_, '_> {
     /// The refusals of a painting press: a hidden or locked target, a layer that must be rasterized first, a group, a
     /// Clone Stamp with no source. Each says why itself; true when the press is refused.
     fn refused(&self, pointer: &ToolPointer, at: [f64; 2]) -> bool {
@@ -448,7 +448,9 @@ fn with_rig<R>(
     // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
     let free_transform = app.ui.transform.take();
     let mut transform = free_transform.as_ref().map(crate::transform_tool::canvas_tool);
-    let mut symmetry = if fam == Family::Paint { crate::symmetry_ui::session_tool(app) } else { None };
+    // The symmetry session moves into the pass the same way.
+    let symmetry_transform = if fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
+    let mut symmetry = symmetry_transform.as_ref().and_then(|t| crate::symmetry_ui::session_tool(app, t));
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx)),
         _ => None,
@@ -548,8 +550,13 @@ fn with_rig<R>(
     if let Some(keys) = transform_keys {
         crate::transform_tool::tool_keys(app, keys);
     }
-    if let Some(mut t) = symmetry {
-        crate::symmetry_ui::finish_tool(app, t.take_events());
+    let symmetry_events = symmetry.as_mut().map(|t| t.take_events());
+    drop(symmetry);
+    if symmetry_transform.is_some() {
+        app.ui.symmetry_transform = symmetry_transform;
+    }
+    if let Some(events) = symmetry_events {
+        crate::symmetry_ui::finish_tool(app, events);
     }
     if let Some(pass) = crop_pass {
         let output = CropToolPass::finish(pass);
