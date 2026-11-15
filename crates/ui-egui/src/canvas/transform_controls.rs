@@ -44,12 +44,18 @@ pub(crate) fn layer_edges(app: &PhotocraftApp, idx: usize) -> Option<BezPath> {
 /// controls are an Extra, hidden and inert until Extras comes back, while Show Transform Controls
 /// keeps its setting.
 pub(crate) fn frame_layers(app: &PhotocraftApp) -> Vec<&photocraft_doc::Layer> {
+    framed_layers(app, false)
+}
+
+/// [`frame_layers`], with `pressed` keeping the frame while a canvas control holds a press: the
+/// press that began on the controls' own box is one, and [`begin_controls`] still frames its layers.
+fn framed_layers(app: &PhotocraftApp, pressed: bool) -> Vec<&photocraft_doc::Layer> {
     if app.ui.tool != Tool::Move
         || !app.ui.tool_options.move_show_transform
         || !app.ui.view.extras
         || app.ui.transform.is_some()
         || app.canvas_tools.mover.dragging()
-        || crate::shape_controls::editing(app)
+        || (!pressed && crate::shape_controls::editing(app))
     {
         return Vec::new();
     }
@@ -62,8 +68,12 @@ pub(crate) fn frame_layers(app: &PhotocraftApp) -> Vec<&photocraft_doc::Layer> {
 /// Move tool › Show Transform Controls: the boxes Free Transform would open on the selected
 /// layers, joined into one, in document units.
 pub(crate) fn frame(app: &PhotocraftApp) -> Option<kurbo::Rect> {
+    framed(app, false)
+}
+
+fn framed(app: &PhotocraftApp, pressed: bool) -> Option<kurbo::Rect> {
     let st = app.session.active()?;
-    let layers = frame_layers(app);
+    let layers = framed_layers(app, pressed);
     let b = layers.iter().map(|l| photocraft_engine::transform_cmds::transform_frame(&st.doc, l)).filter(|b| !b.is_empty()).reduce(|a, b| a.union(&b))?;
     // Floating selected pixels are framed by their outline, as their ants are (#7538), not by the
     // selection they were cut with; a frame round other selected layers too keeps them all.
@@ -96,7 +106,7 @@ pub(crate) enum ControlsPress {
 /// selected layer, as the frame shows them (#6501). With the Background among them it shows the
 /// locked-layer alert and changes nothing (#11101).
 pub(crate) fn begin_controls(app: &mut PhotocraftApp, ctx: &egui::Context) -> ControlsPress {
-    if frame(app).is_none() {
+    if framed(app, true).is_none() {
         return ControlsPress::Missed;
     }
     let background = app.session.active().is_some_and(|st| photocraft_engine::transform_cmds::background_among(&st.doc, &st.selected_layers()).is_some());
@@ -121,7 +131,10 @@ const CONTROLS_LABEL: &str = "Transform controls";
 /// (past the corner rotate bands) and arrow keys stay the Move tool's. Its first `Begin` runs [`begin_controls`]; once
 /// a session starts, this pass's box events go to the session, and from the next pass the session's
 /// `TransformOverlay`, salted with the same [`BOX_ID_SALT`](crate::transform_tool::BOX_ID_SALT), carries the drag on.
-pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
+pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect, session_box_shown: bool) {
+    if session_box_shown {
+        return;
+    }
     let Some(start) = frame(app) else { return };
     let settings = crate::transform_tool::settings(app);
     // The rules a new session starts with (`TransformSession::box_rules` in Free mode), so the drag reads the same
