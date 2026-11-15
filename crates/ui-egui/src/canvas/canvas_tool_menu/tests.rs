@@ -823,6 +823,7 @@ fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
 #[test]
 fn crop_menu_rows_act_like_the_options_bar() {
     use craft::behavior::geometry::{CropGuide, GuideShow};
+    use craft::draw::ui::crop::{CropLength, CropRatio, CropSettings};
     let mut app = crop_app();
     let ctx = app.ctx().clone();
     draw_crop(&mut app);
@@ -837,12 +838,13 @@ fn crop_menu_rows_act_like_the_options_bar() {
     // A size preset fills W x H x Resolution, which the menu checks, as the dropdown does.
     choose(&mut app, &ctx, "crop.ratio.preset:4x5in");
     let menu = reopen(&mut app);
-    assert!(mode_checked(&app, &menu, "crop.ratio.whr") && !mode_checked(&app, &menu, "crop.ratio.preset:4x5in"));
+    assert_eq!(app.ui.tool_options.crop.ratio, CropRatio::Size);
+    assert!(mode_checked(&app, &menu, "crop.ratio.preset:4x5in") && !mode_checked(&app, &menu, "crop.ratio.whr"));
     assert!((aspect(frame_of(&app).unwrap()) - 0.8).abs() < 1e-9);
     assert!(entry_enabled(&app, &menu, CROP_NEW));
     // Clear empties W x H x Resolution, as the bar's Clear.
     choose(&mut app, &ctx, CROP_CLEAR);
-    assert_eq!(app.ui.tool_options.crop_width, "");
+    assert_eq!(app.ui.tool_options.crop.size.width, None);
     // Overlays: another overlay starts at its first orientation; when it shows.
     app.ui.tool_options.crop.guide = CropGuide::GoldenSpiral;
     app.ui.tool_options.crop.guide_orientation = 2;
@@ -857,14 +859,19 @@ fn crop_menu_rows_act_like_the_options_bar() {
     // A saved preset is listed by name; picking it refits the frame to its W x H, though the
     // ratio key is "whr" before and after.
     app.ui.canvas_tool_menu = None;
-    app.ui.tool_options.crop_ratio = crate::crop_size::WHR.into();
-    let saved = json!({"crop_ratio": "whr", "crop_width": "300 px", "crop_height": "100 px", "crop_resolution": "72", "crop_resolution_unit": "px/in"});
+    let mut banner_settings = CropSettings::default();
+    banner_settings.ratio = CropRatio::Size;
+    banner_settings.size.width = Some(CropLength::new(300.0, UnitKind::Pixels));
+    banner_settings.size.height = Some(CropLength::new(100.0, UnitKind::Pixels));
+    banner_settings.size.resolution = "72".into();
+    let saved = json!({"crop": banner_settings});
     app.run("tool.presets.new", json!({"name": "Banner", "tool": "crop", "options": {"toolOptions": saved}})).unwrap();
+    assert!(crate::crop_presets::user_presets(&app).iter().any(|p| p.name == "Banner" && p.ratio == CropRatio::Size));
     let menu = reopen(&mut app);
     let banner = crop_rows(&app, &menu).into_iter().flatten().find(|(l, _)| l == "Banner").expect("the saved preset is a row").1;
     assert!(entry_enabled(&app, &menu, CROP_DELETE));
     choose(&mut app, &ctx, &banner);
-    assert_eq!(app.ui.tool_options.crop_width, "300 px");
+    assert_eq!(app.ui.tool_options.crop.size.width, Some(CropLength::new(300.0, UnitKind::Pixels)));
     assert!((aspect(frame_of(&app).unwrap()) - 3.0).abs() < 1e-9, "the frame follows the preset: {:?}", frame_of(&app));
     let menu = reopen(&mut app);
     assert!(mode_checked(&app, &menu, &banner));
