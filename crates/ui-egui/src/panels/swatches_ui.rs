@@ -410,15 +410,15 @@ mod tests {
     /// replace), an export is written as `.ase` bytes.
     #[test]
     fn import_and_export_through_the_services() {
-        let mut app = app();
         let aco = craft_psd::aco::write(&[craft_psd::aco::AcoSwatch { name: "Teal".into(), color: craft_psd::aco::AcoColor::Rgb([0, 32768, 32768]) }]).unwrap();
-        let ctx = app.ctx().clone();
-        let files = std::sync::Arc::new(craft::host::ScriptedFiles::answering([
+        let files: std::sync::Arc<dyn craft::host::Files> = std::sync::Arc::new(craft::host::ScriptedFiles::answering([
             craft::host::Picked::Contents(vec![("Ocean.aco".into(), aco.clone())]),
             craft::host::Picked::Contents(vec![("Ocean.aco".into(), aco)]),
             craft::host::Picked::Paths(vec!["Swatches.ase".into()]),
         ]));
-        app.services.files = Some(files);
+        // The host takes its file service when the app is made.
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: Some(files), ..Default::default() });
+        let ctx = app.ctx().clone();
         let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
         let sink = written.clone();
         app.services.write = Some(Box::new(move |path, bytes| {
