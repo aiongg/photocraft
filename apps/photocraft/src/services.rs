@@ -459,7 +459,7 @@ pub fn native(automation: Option<photocraft_automation::AuthorizedWorkspace>, wa
             crate::crash_guard::guard("Export", || photocraft_io::export(doc, path, &opts).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string()))
         })),
         save_file: Some(Arc::new(save_file)),
-        files: Some(files),
+        files: Some(Arc::new(files)),
         file_panels: Some(file_panels),
         settings: Some(settings_store()),
         write: Some(Box::new(|path: &str, bytes: &[u8]| write_atomic(Path::new(path), bytes))),
