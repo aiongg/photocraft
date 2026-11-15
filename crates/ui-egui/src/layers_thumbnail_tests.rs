@@ -230,7 +230,7 @@ fn double_clicks_open_what_the_part_shows() {
             |h| {
                 assert!(h.state().ui.mask_target);
                 let w = crate::distort_ui::workspace_fields(h.state(), "select.selectAndMask").expect("the Select and Mask workspace is open");
-                assert_eq!(w["settings"]["output"].as_str(), Some("layerMask"), "Select and Mask opens on the mask: {w}");
+                assert_eq!(w["refine"]["output"].as_str(), Some("layerMask"), "Select and Mask opens on the mask: {w}");
             },
         ),
         (

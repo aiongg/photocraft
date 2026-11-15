@@ -20,6 +20,7 @@ pub fn is_live(id: &str) -> bool {
         || crate::tool_shortcuts::tool(id).is_some()
         || UI_IDS.get_or_init(|| UI_COMMANDS.iter().map(|c| c.0).collect()).contains(id)
         || panel_alias(id).is_some()
+        || crate::panel_docking::toggle_panel(id).is_some()
         || workspace_id(id).is_some()
         || proof_preset(id).is_some()
         || id == "view.proofSetup.custom"

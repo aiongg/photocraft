@@ -1,6 +1,7 @@
 //! Real panel controls compose the remaining commands with consent and retained selection. The trials that read
 //! the dialog host are unit tests in `panels/actions/panel_menu_tests.rs`.
-use craft::automation::ui::actions::ActionSelection;
+use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
+use craft::ui::runtime::commands::CommandRef;
 use egui_kittest::Harness;
 use photocraft_engine::{
     Session,
@@ -39,10 +40,10 @@ fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: V
     }
 }
 
-/// Fire the panel menu row of `command` (`duplicate`, `insertMenuItem`, …) as a click on it would.
-fn fire(h: &mut Harness<'static, PhotocraftApp>, command: &str) -> Value {
+/// Fire the panel menu row of `command` as a click on it would.
+fn fire(h: &mut Harness<'static, PhotocraftApp>, command: ActionsPanelCommands) -> Value {
     let ctx = h.ctx.clone();
-    let reply = control(h.state_mut(), &ctx, "ui.menu.invoke", json!({"id": format!("actionsPanel.{command}")}));
+    let reply = control(h.state_mut(), &ctx, "ui.menu.invoke", json!({"id": CommandRef::from(command).id}));
     h.run_steps(3);
     reply
 }
@@ -58,7 +59,7 @@ fn allow_tool_recording_checkbox_records_only_enabled_strokes() {
     let mut h = harness();
     h.state_mut().run("actions.record", json!({"action":"A"})).unwrap();
     for enabled in [true, false] {
-        fire(&mut h, "toolRecording");
+        fire(&mut h, ActionsPanelCommands::ToolRecording);
         assert_eq!(h.state().session.actions.record_tools, enabled);
         h.state_mut().run("paint.stroke", json!({"points":[[2,3],[10,3]],"size":2,"color":if enabled {"#ff0000"} else {"#00ff00"}})).unwrap();
     }
@@ -73,13 +74,13 @@ fn allow_tool_recording_checkbox_records_only_enabled_strokes() {
 fn duplicate_selected_set_keeps_folder_and_disclosure_ownership() {
     let mut h = harness();
     h.state_mut().ui.actions.panel.selected = Some(ActionSelection::Set("S".into()));
-    fire(&mut h, "duplicate");
+    fire(&mut h, ActionsPanelCommands::Duplicate);
     assert_eq!(h.state().ui.actions.panel.selected, Some(ActionSelection::Set("S copy".into())));
     assert_eq!(actions_edit_cmds::set_names(&h.state().session), ["S", "S copy"]);
     assert_eq!(h.state().ui.actions.panel.expanded.iter().collect::<Vec<_>>(), ["A"], "the copied action starts closed");
     h.state_mut().run("actions.newSet", json!({"name":"Empty"})).unwrap();
     h.state_mut().ui.actions.panel.selected = Some(ActionSelection::Set("Empty".into()));
-    fire(&mut h, "duplicate");
+    fire(&mut h, ActionsPanelCommands::Duplicate);
     assert_eq!(h.state().ui.actions.panel.selected, Some(ActionSelection::Set("Empty copy".into())));
 }
 
@@ -92,7 +93,7 @@ fn insert_path_uses_actual_selected_saved_path() {
     h.state_mut().ui.selected_path = Some("Curve".into());
     h.run_steps(3);
     let revision = h.state().session.active().unwrap().revision;
-    fire(&mut h, "insertPath");
+    fire(&mut h, ActionsPanelCommands::InsertPath);
     assert_eq!(steps(h.state())[0].command, "path.set");
     assert_eq!(steps(h.state())[0].params["path"]["subpaths"][0]["knots"][0]["out"], json!([4.0, 5.0]));
     assert_eq!(h.state().session.active().unwrap().revision, revision);

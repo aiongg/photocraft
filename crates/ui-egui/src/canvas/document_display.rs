@@ -267,6 +267,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     }
     let mut guides = None;
     let mut turned = None;
+    // What the CPU display read from the composite this pass, and how long its pass took.
+    let mut cpu_read: Option<(PixelRect, f64)> = None;
     let shown = canvas.show_at(ui, rect, |ui, body| {
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
@@ -333,7 +335,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         if let Some(picture) = &gpu {
             frame.apply(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).show_at(ui, body.rect);
         } else if let Some(composite) = &composite {
-            frame.apply(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).show_at(ui, body.rect);
+            let started = crate::gpu_canvas::now_ms();
+            let out = frame.apply(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).show_at(ui, body.rect);
+            cpu_read = out.read.map(|read| (read, crate::gpu_canvas::now_ms() - started));
         }
         if let Some(overlay) = &overlay {
             let display = RasterDisplay::new(Label::Empty, overlay as &dyn RasterSource).id_salt("pc-channel-view");
@@ -344,6 +348,12 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             display.show_at(ui, body.rect);
         }
     });
+    // The refresh the CPU display made is the app's to record: the display reports what it read.
+    if let Some((read, ms)) = cpu_read.filter(|(read, _)| !read.is_empty()) {
+        let px = u64::from(read.width().unsigned_abs()) * u64::from(read.height().unsigned_abs());
+        let whole = u64::from(doc.size.width) * u64::from(doc.size.height);
+        app.perf.record(if px >= whole { "full" } else { "rect" }, px, ms, 0.0);
+    }
     let canvas_output = shown.output;
     if let Some(next) = canvas_output.view.as_ref() {
         view.set_from(next, ppp);

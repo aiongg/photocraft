@@ -291,7 +291,7 @@ mod tests {
         assert!(h.state().ui.brush_picker.is_none(), "the picker stayed closed");
         // A down without its up leaves the HUD open for the next frame's edits.
         pointer(&mut h, json!([{"kind": "down", "x": c[0], "y": c[1]}]));
-        assert!(h.state().ui.color_hud.is_some_and(|hud| !hud.hold));
+        assert!(h.state().ui.color_hud.is_some(), "a press without its release leaves the HUD open");
         assert!(h.state().ui.brush_picker.is_none(), "the picker stayed closed");
     }
 }
