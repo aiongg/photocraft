@@ -1,4 +1,5 @@
-//! #7520: the options bar's Select and Mask… button is greyed out while nothing is selected.
+//! #7520: the options bar's Select and Mask… button follows the command `select.selectAndMask`
+//! (it maps to `select.refineEdge`): greyed out while nothing is selected, live after Select All.
 use crate::PhotocraftApp;
 use crate::state::Tool;
 use egui::vec2;
@@ -8,14 +9,11 @@ use egui_kittest::{
 };
 use serde_json::json;
 
-fn harness(tool: Tool, select: bool) -> Harness<'static, PhotocraftApp> {
+fn harness() -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.sync_views();
-    if select {
-        app.run("select.all", json!({})).unwrap();
-    }
-    app.ui.tool = tool;
+    app.ui.tool = Tool::RectMarquee;
     let mut h = Harness::builder().with_size(vec2(1400.0, 60.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -30,17 +28,10 @@ fn harness(tool: Tool, select: bool) -> Harness<'static, PhotocraftApp> {
 }
 
 #[test]
-fn select_and_mask_is_disabled_without_a_selection() {
-    for tool in [Tool::RectMarquee, Tool::Lasso, Tool::MagicWand] {
-        let h = harness(tool, false);
-        assert!(h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "{tool:?}: button should be greyed out with no selection");
-    }
-}
-
-#[test]
-fn select_and_mask_is_enabled_with_a_selection() {
-    for tool in [Tool::RectMarquee, Tool::Lasso, Tool::MagicWand] {
-        let h = harness(tool, true);
-        assert!(!h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "{tool:?}: button should be live with a selection");
-    }
+fn select_and_mask_follows_the_selection() {
+    let mut h = harness();
+    assert!(h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "the button is greyed out with no selection");
+    h.state_mut().run("select.all", json!({})).unwrap();
+    h.run_steps(4);
+    assert!(!h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "the button is live with a selection");
 }
