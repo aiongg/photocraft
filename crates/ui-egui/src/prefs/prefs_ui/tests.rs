@@ -60,6 +60,28 @@ fn app_with_json_at(saved: &Value, version: Option<u32>) -> (PhotocraftApp, Arc<
     (app_on(&files), files)
 }
 
+/// An app that starts on a legacy `preferences.json` holding `saved` with the given `version` key (`None`: none), the
+/// file the settings store imports on its first run, before it has a `config.toml`. Only the import reads values one by
+/// one and migrates a file by its version; a `config.toml` section that does not fit resets as a whole.
+fn app_with_legacy_json(saved: &Value, version: Option<u32>) -> (PhotocraftApp, Arc<MemoryFiles>) {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let mut saved = saved.clone();
+    if let (Some(map), Some(version)) = (saved.as_object_mut(), version) {
+        map.insert("version".into(), json!(version));
+    }
+    let dir = std::env::temp_dir().join(format!("photocraft-legacy-{}-{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("preferences.json");
+    std::fs::write(&path, saved.to_string()).unwrap();
+    let files = Arc::new(MemoryFiles::new());
+    let legacy = vec![craft::settings::LegacyFile { path, parse: prefs::parse_legacy_prefs }];
+    let options = OpenOptions::new(Location::Dir(DIR.into())).debounce(Duration::ZERO).files(files.clone()).legacy(legacy);
+    let services = crate::Services { settings: Some(SettingsStore::<prefs::SavedPrefs>::open_with(options)), ..Default::default() };
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+    std::fs::remove_dir_all(&dir).ok();
+    (app, files)
+}
+
 /// Writes the settings file as TOML, which has no null: nulls are left out.
 fn seed(files: &MemoryFiles, saved: &Value, version: Option<u32>) {
     fn strip_nulls(value: &mut Value) {
@@ -273,8 +295,13 @@ fn darken_and_lighten_interface_step_through_photoshops_brightnesses_and_stop_at
     }
 }
 
+/// One upkeep frame after the OS reports `appearance`; `None` reports nothing, so a context that never had a report
+/// has no answer, and one that had keeps its last (the reader holds the OS's latest colour scheme).
 fn appearance_frame(app: &mut PhotocraftApp, ctx: &egui::Context, appearance: Option<egui::Theme>) {
-    ctx.run_ui(egui::RawInput { system_theme: appearance, ..Default::default() }, |ui| tick(app, ui.ctx())).textures_delta.clear();
+    if let Some(theme) = appearance {
+        craft::ui::testing::style::report_os_theme(ctx, theme == egui::Theme::Dark);
+    }
+    ctx.run_ui(egui::RawInput::default(), |ui| tick(app, ui.ctx())).textures_delta.clear();
 }
 
 fn assert_palette(ctx: &egui::Context, kind: &AppTheme) {
@@ -309,7 +336,6 @@ fn auto_appearance_follows_live_changes_without_saving_resolved_palettes() {
             (Some(egui::Theme::Light), light.clone()),
             (Some(egui::Theme::Dark), dark.clone()),
             (Some(egui::Theme::Light), light.clone()),
-            (None, dark.clone()),
         ] {
             appearance_frame(&mut app, &ctx, appearance);
             assert_palette(&ctx, &expected);
@@ -411,7 +437,7 @@ fn preferences_interface_offers_and_applies_sync_with_system() {
     .unwrap();
     let interface = app.session.prefs().interface.clone();
     open_prefs(&mut app, "interface");
-    edit(&mut app, "interface.appearanceMode", PrefValue::Choice("auto".into()));
+    edit(&mut app, "interface.appearanceMode", PrefValue::Text("auto".into()));
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Dark, "nothing is applied before Apply");
     apply_window(&mut app).unwrap();
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Auto);
@@ -463,7 +489,7 @@ fn a_wrongly_typed_value_resets_only_itself_and_is_repaired_on_disk() {
         "shortcuts": {"edit.fill": "Cmd+Shift+F", "file.open": 7},
         "futureSection": {"kept": true},
     });
-    let (mut app, store) = app_with_json(&saved);
+    let (mut app, store) = app_with_legacy_json(&saved, Some(2));
     let ctx = egui::Context::default();
     tick(&mut app, &ctx);
     let p = app.session.prefs();
@@ -495,7 +521,7 @@ fn an_old_files_shift_tool_switch_migration_is_saved_with_the_new_version() {
     let ctx = egui::Context::default();
     for version in [Some(1), None] {
         let saved = json!({"tools": {"useShiftKeyForToolSwitch": false}, "futureSection": {"kept": true}});
-        let (mut app, store) = app_with_json_at(&saved, version);
+        let (mut app, store) = app_with_legacy_json(&saved, version);
         tick(&mut app, &ctx);
         assert!(app.session.prefs().tools.use_shift_key_for_tool_switch, "{version:?}");
         app.run("prefs.set", json!({"values": {"performance.historyStates": 12}})).unwrap();
@@ -1072,7 +1098,8 @@ fn damaged_cases() -> Vec<Case> {
                 crate::tool_memory::save_on_exit(app).unwrap();
             }),
             check: Box::new(|app, _, stored| {
-                assert_eq!(stored["toolColors"]["foreground"], json!([0.2, 0.4, 0.6, 0.8]));
+                // The file holds the f32 colour widened to f64.
+                assert_eq!(stored["toolColors"]["foreground"], json!([0.2_f32 as f64, 0.4_f32 as f64, 0.6_f32 as f64, 0.8_f32 as f64]));
                 assert_eq!(app.session.tools.foreground, [0.2, 0.4, 0.6, 0.8]);
             }),
         });
@@ -1132,7 +1159,8 @@ fn selected_tool_excludes_temporary_switches() {
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
     assert_eq!(stored(&store)["selectedTool"], json!("Brush"));
-    // A quick tap commits the choice after spring_tools clears the pending switch.
+    // A quick tap commits the choice once the letter is up (its command's release) and spring_tools clears the switch.
+    crate::spring_tools::released(&mut app, 'Z');
     crate::spring_tools::tick(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
@@ -1209,8 +1237,11 @@ fn group_tools_exclude_temporary_switches() {
     assert_eq!(app.ui.group_tool('E'), Some(Tool::MagicEraser), "the pen's eraser end");
     app.stylus.tool_before_eraser = None;
     app.ui.tool = Tool::Brush;
-    let press = egui::Event::Key { key: egui::Key::Z, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() };
-    tool_frame(&mut app, &ctx, vec![press]);
+    // The window host holds Z down; the app's own frames route it as the tool command and keep the letter held.
+    craft::ui::runtime::windows::WindowHost::of(app.ctx()).inject_key(egui::ViewportId::ROOT, craft::keymap::Key::Z, craft::keymap::Mods::default(), true);
+    for _ in 0..3 {
+        crate::canvas::testing::frame(&mut app);
+    }
     tool_frame(&mut app, &ctx, vec![]);
     assert_eq!(app.ui.tool, Tool::Zoom, "Z is still down");
     assert_eq!(app.ui.group_tool('Z'), None, "a held letter");
@@ -1345,13 +1376,15 @@ fn preferences_dialog_round_trip() {
 fn preferences_apply_rejects_invalid_drafts_and_keeps_them_open() {
     let (mut app, _) = app_with_store();
     let before = app.session.prefs().to_json();
-    open_prefs(&mut app, "interface");
-    edit(&mut app, "interface.language", PrefValue::Choice("not a language".into()));
+    open_prefs(&mut app, "fileHandling");
+    // The window keeps choices to their options and numbers to their ranges, so the draft that reaches the engine and
+    // is refused is a number that has no range of its own: the autosave interval is one of a fixed list.
+    edit(&mut app, "fileHandling.autosaveMinutes", PrefValue::Int(7));
     assert!(apply_window(&mut app).is_err());
     assert_eq!(app.session.prefs().to_json(), before);
     assert!(window_open(&app), "the window stays open with the draft");
     let error = app.prefs_rt.window.as_ref().and_then(|session| session.state.error.clone());
-    assert!(error.is_some_and(|e| e.contains("interface.language")), "the refusal shows in the window's error line");
+    assert!(error.is_some_and(|e| e.contains("fileHandling.autosaveMinutes")), "the refusal shows in the window's error line");
 }
 
 #[test]

@@ -48,7 +48,26 @@ struct Hooks {
     gate: Option<Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The gate every drag begun on this thread starts with (see `tests::hold`).
+    static GATE: std::cell::RefCell<Option<Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>>> = const { std::cell::RefCell::new(None) };
+}
+
 impl Hooks {
+    /// The hooks a new drag starts with: in tests, the thread's gate; none otherwise.
+    #[allow(clippy::missing_const_for_fn)]
+    fn of_the_test() -> Self {
+        #[cfg(test)]
+        {
+            Self { gate: GATE.with(|g| g.borrow().clone()) }
+        }
+        #[cfg(not(test))]
+        {
+            Self::default()
+        }
+    }
+
     /// In tests, holds a render back until the gate opens; does nothing otherwise.
     #[allow(clippy::unused_self)]
     fn wait(&self) {
@@ -160,7 +179,7 @@ pub(crate) fn begin(app: &mut PhotocraftApp, layer: LayerId, session: String) {
         original_area,
         areas: VecDeque::new(),
         ctx: None,
-        hooks: Hooks::default(),
+        hooks: Hooks::of_the_test(),
         #[cfg(test)]
         spawned: 0,
     });
@@ -489,17 +508,21 @@ mod tests {
     fn session_layer(app: &PhotocraftApp, id: LayerId) -> TextLayer {
         layer_of(&app.session.active().unwrap().doc, id)
     }
+    /// A box side to a hundredth: a pointer position reaches the layer through the canvas's f32 screen space.
+    fn settle_f32(v: f32) -> f32 {
+        (v * 100.0).round() / 100.0
+    }
     /// The height of a box-shaped text layer.
     fn height(t: &TextLayer) -> f32 {
         match t.shape {
-            TextShape::Box { height, .. } => height,
+            TextShape::Box { height, .. } => settle_f32(height),
             ref s => panic!("not a box: {s:?}"),
         }
     }
     /// The width of a box-shaped text layer.
     fn width(t: &TextLayer) -> f32 {
         match t.shape {
-            TextShape::Box { width, .. } => width,
+            TextShape::Box { width, .. } => settle_f32(width),
             ref s => panic!("not a box: {s:?}"),
         }
     }
@@ -518,10 +541,11 @@ mod tests {
         *gate.0.lock().unwrap() = true;
         gate.1.notify_all();
     }
-    /// Hold every render back until the returned gate opens.
-    fn hold(app: &mut PhotocraftApp) -> Arc<(std::sync::Mutex<bool>, std::sync::Condvar)> {
+    /// Hold every render of the drags this thread begins back until the returned gate opens. The drag begins with
+    /// its first move, so the gate is set before it.
+    fn hold() -> Arc<(std::sync::Mutex<bool>, std::sync::Condvar)> {
         let gate = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
-        app.type_box_preview.as_mut().unwrap().hooks.gate = Some(gate.clone());
+        GATE.with(|g| *g.borrow_mut() = Some(gate.clone()));
         gate
     }
     /// Wait for each render in turn (their threads signal when done), polling after each, until
@@ -583,7 +607,7 @@ mod tests {
         let (mut app, id) = app_with_box();
         background(&mut app);
         press(&mut app);
-        let gate = hold(&mut app);
+        let gate = hold();
         to(&mut app, 500.0);
         to(&mut app, 520.0);
         to(&mut app, 560.0);
@@ -601,8 +625,8 @@ mod tests {
         let (mut app, id) = app_with_box();
         let rev = revision(&app);
         press(&mut app);
-        assert!(app.type_box_preview.as_ref().is_some_and(|p| p.dragging && !p.rendering), "a sync drag records the drag and renders nothing");
         to(&mut app, 520.0);
+        assert!(app.type_box_preview.as_ref().is_some_and(|p| p.dragging && !p.rendering), "a sync drag records the drag and renders nothing");
         assert_eq!(revision(&app), rev + 1);
         to(&mut app, 560.0);
         assert_eq!(revision(&app), rev + 2);
@@ -707,8 +731,8 @@ mod tests {
         let original = session_layer(&app, id);
         let rev = revision(&app);
         press_right(&mut app);
-        assert!(app.type_box_preview.is_some(), "a background drag started");
         to_x(&mut app, 480.0);
+        assert!(app.type_box_preview.is_some(), "a background drag started");
         to_x(&mut app, 420.0);
         assert_eq!(revision(&app), rev, "moves leave the document alone");
         let (shown, _) = wait_idle(&mut app).expect("a preview once the render arrived");
@@ -749,6 +773,7 @@ mod tests {
         // A drag that applies its moves as they come has nothing left to apply, and ends too.
         let (mut sync, _) = app_with_box();
         press(&mut sync);
+        to(&mut sync, 520.0);
         let rev = revision(&sync);
         end_drag(&mut sync);
         assert_eq!(revision(&sync), rev);

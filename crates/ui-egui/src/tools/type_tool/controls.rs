@@ -301,7 +301,13 @@ fn frame_box(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rect, id:
                     apply_box(app, id, boxed);
                 }
             }
-            Some(GesturePhase::Commit) => crate::type_box_preview::end_drag(app),
+            // The pass that commits carries the final box (a pass folds the `Update` before a `Commit` into it).
+            Some(GesturePhase::Commit) => {
+                if let Some(boxed) = event.value().and_then(|state| box_of(state, &aff)) {
+                    apply_box(app, id, boxed);
+                }
+                crate::type_box_preview::end_drag(app);
+            }
             Some(GesturePhase::Cancel) => {
                 // A background drag never touched the document; a drag applied as it came goes back to where it began.
                 let untouched = crate::type_box_preview::discard(app);

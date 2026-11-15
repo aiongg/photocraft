@@ -53,7 +53,7 @@ fn evidence(h: &mut Harness, name: &str) {
 fn open_format_choices(h: &mut Harness) {
     // The caption is a separate Label node with the same text; the accessible ComboBox name
     // identifies the actual form field without guessing from coordinates.
-    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Format").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "File Type").click();
     h.run_steps(3);
 }
 
@@ -250,8 +250,8 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
                 h.run_steps(3);
             }
             choose_webp(&mut h);
-            edit_path(&mut h, "Input", &input);
-            edit_path(&mut h, "Output", &output);
+            edit_path(&mut h, "Input Folder", &input);
+            edit_path(&mut h, "Output Folder", &output);
             edit_quality(&mut h, &quality.to_string());
             evidence(&mut h, &format!("{prefix}-webp-quality-{quality}"));
             h.get_by_label("OK").click();
@@ -301,16 +301,16 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     let fields = form_fields(&mut h);
     assert_eq!(fields["naming"], "");
     assert_eq!(fields["startingSerial"], 1);
-    edit_path(&mut h, "Input", &input);
-    edit_path(&mut h, "Output", &output);
+    edit_path(&mut h, "Input Folder", &input);
+    edit_path(&mut h, "Output Folder", &output);
     h.get_by_role_and_label(egui::accesskit::Role::TextInput, "File Naming").click();
     h.run_steps(2);
     replace_text(&mut h, "{serial}_{name}.{ext}");
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting serial").click();
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Starting Serial Number").click();
     h.run_steps(2);
     h.event(egui::Event::Text("7".into()));
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting serial").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting Serial Number").click();
     h.run_steps(3);
     assert_eq!(form_fields(&mut h)["startingSerial"], 7, "typing changes the starting serial");
     evidence(&mut h, "batch-naming");
@@ -344,11 +344,11 @@ fn batch_default_quality_keeps_lossless_webp_and_existing_jpeg_bytes() {
             choose_webp(&mut h);
         } else {
             open_format_choices(&mut h);
-            h.get_by_label("Jpg").click();
+            h.get_by_label("JPEG").click();
             h.run_steps(3);
         }
-        edit_path(&mut h, "Input", &input);
-        edit_path(&mut h, "Output", &output);
+        edit_path(&mut h, "Input Folder", &input);
+        edit_path(&mut h, "Output Folder", &output);
         assert!(form_fields(&mut h)["quality"].is_null());
         evidence(&mut h, &format!("batch-default-{format}"));
         h.get_by_label("OK").click();

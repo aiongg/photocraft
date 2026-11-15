@@ -37,7 +37,7 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 }
 
 fn click(h: &mut Harness<'static, PhotocraftApp>) {
-    h.get_by_label(TOGGLE).click();
+    h.get_by_role_and_label(egui::accesskit::Role::Button, TOGGLE).click();
     h.run();
 }
 

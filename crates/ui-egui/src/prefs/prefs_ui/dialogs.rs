@@ -65,7 +65,12 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
             crate::panels::toolbar::open_drawer(app);
             Some(Ok(json!({})))
         }
-        "edit.colorSettings" => dialog(crate::filter_dialog::open(app, "edit.colorSettings")),
+        "edit.colorSettings" => {
+            // What Monitor Profile resolves to, so a fallback to sRGB is visible (#569): read the displays again now. The
+            // dialog draws the line from the note's cell, which `read_now` fills before the dialog's first frame.
+            crate::monitor_status::read_now(app);
+            dialog(crate::filter_dialog::open(app, "edit.colorSettings"))
+        }
         "edit.fade" | "edit.findAndReplaceText" | "edit.defineBrushPreset" | "edit.defineCustomShape" | "edit.autoAlignLayers" | "edit.autoBlendLayers" => {
             if !app.session.is_enabled(id) {
                 return Some(Err(photocraft_engine::commands::find(id)
