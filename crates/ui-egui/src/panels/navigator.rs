@@ -2,19 +2,21 @@
 //! with the document's picture in its preview box.
 
 use craft::behavior::kurbo::Size;
+use craft::theme::variant::Tone;
+use craft::ui::notices::{Notice, NoticeLayout};
 use craft::ui::canvas::{AppPaint, NavigatorPreview};
 use craft::ui::contract::Bind;
 use craft::ui::patterns::canvas::NavigatorPanel;
 use craft::ui::primitives::ContentPainterCx;
 use egui::{Pos2, Rect, pos2};
 
-use super::{PhotocraftApp, empty};
+use super::PhotocraftApp;
 use crate::canvas::document_display;
 
 pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     let Some(idx) = app.session.active_index() else {
-        empty(ui, tl!("No document"));
+        let _ = Notice::new(Tone::Neutral, tl!("No document")).layout(NoticeLayout::Centred).show(ui);
         return;
     };
     // The canvas as its last pass showed it, the eased camera of an Animated Zoom included.
