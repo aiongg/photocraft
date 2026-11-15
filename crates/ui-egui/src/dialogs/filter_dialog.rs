@@ -568,6 +568,10 @@ pub(crate) fn command_params(command: &str, fields: &DialogFields) -> Value {
     if matches!(command, "file.export.artboardsToFiles" | "file.export.layersToFiles" | "file.export.layerCompsToFiles") && map.get("format").and_then(Value::as_str) != Some("jpg") {
         map.remove("quality");
     }
+    // An emptied embedded LUT is no data: a stored empty `data` would be read over the chosen `lut`.
+    if command == "image.adjustments.colorLookup" && map.get("data").and_then(Value::as_str).is_some_and(str::is_empty) {
+        map.remove("data");
+    }
     if command == "image.mode.indexedColor" {
         // The matte colour row belongs to the "custom" choice, which the command takes as the colour itself.
         let color = map.remove(rows::MATTE_COLOR);

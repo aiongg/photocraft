@@ -390,8 +390,42 @@ fn read_gradient_map(v: &Value) -> GradientMap {
 // ---------------------------------------------------------------------------------------------
 // Value -> params
 
+/// The engine's name of the kind `value` edits.
+fn kind_name(value: &AdjustValue) -> &'static str {
+    match value {
+        AdjustValue::BrightnessContrast { .. } => "brightnessContrast",
+        AdjustValue::Levels { .. } => "levels",
+        AdjustValue::Curves { .. } => "curves",
+        AdjustValue::Exposure { .. } => "exposure",
+        AdjustValue::Vibrance { .. } => "vibrance",
+        AdjustValue::Posterize { .. } => "posterize",
+        AdjustValue::HueSaturation { .. } => "hueSaturation",
+        AdjustValue::ColorBalance { .. } => "colorBalance",
+        AdjustValue::BlackWhite { .. } => "blackWhite",
+        AdjustValue::PhotoFilter { .. } => "photoFilter",
+        AdjustValue::ChannelMixer { .. } => "channelMixer",
+        AdjustValue::Threshold { .. } => "threshold",
+        AdjustValue::GradientMap { .. } => "gradientMap",
+        AdjustValue::SelectiveColor { .. } => "selectiveColor",
+    }
+}
+
 /// The complete params of `value`: its fields written over [`ValueCx::base`], so what no editor shows is kept.
+///
+/// A base the engine cannot read opens the editor on the neutral value; while the user has not edited it, the base
+/// itself is the params, so the engine refuses it at OK instead of the dialog turning it into a neutral setting.
 pub fn to_params(value: &AdjustValue, cx: &ValueCx) -> Value {
+    let kind = kind_name(value);
+    if from_params(kind, &cx.base, cx).is_err()
+        && let Ok(defaults) = adjust_params::default_for(kind, cx.tone_mode())
+        && from_params(kind, &adjust_params::to_params(&defaults), cx).is_ok_and(|neutral| neutral == *value)
+    {
+        return cx.base.clone();
+    }
+    write_params(value, cx)
+}
+
+fn write_params(value: &AdjustValue, cx: &ValueCx) -> Value {
     let mut out = object(&cx.base);
     match value {
         AdjustValue::BrightnessContrast { value } => {

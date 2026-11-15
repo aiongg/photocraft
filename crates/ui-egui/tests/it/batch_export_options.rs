@@ -240,7 +240,8 @@ fn batch_and_processor_real_controls_write_the_chosen_webp_quality() {
                 h.run_steps(3);
             } else {
                 let fields = form_fields(&mut h);
-                assert_eq!(fields["quality"], json!(8));
+                // The first open shows the default; the second shows the quality the first confirmed.
+                assert_eq!(fields["quality"], json!(if quality == 0 { 8 } else { 0 }));
                 assert_eq!(fields["width"], json!(0));
                 assert_eq!(fields["height"], json!(0));
                 assert_eq!(fields["convertToSrgb"], json!(true));

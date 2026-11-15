@@ -586,7 +586,7 @@ fn a_lab_curves_smart_filter_keeps_a_lightness_edit() {
     assert_eq!(sm.smart_filters[0].params["points"], edited, "the stored alias is the edit, never the old curve");
 }
 
-/// Emptying a text field removes its key from the Color Lookup dialog, which draws from the
+/// Emptying a text field leaves no data in the Color Lookup dialog's result, which draws from the
 /// command's schema. A stored `data` would be read over the `lut` chosen instead.
 #[test]
 fn a_color_lookup_smart_filter_with_its_data_cleared_uses_the_chosen_lut() {
@@ -605,7 +605,7 @@ fn a_color_lookup_smart_filter_with_its_data_cleared_uses_the_chosen_lut() {
     set(h.state_mut(), &ctx, "data", json!(""));
     set(h.state_mut(), &ctx, "lut", json!("warm"));
     h.run_steps(2);
-    assert!(fields(h.state()).get("data").is_none(), "the dialog removed the emptied field");
+    assert!(fields(h.state()).get("data").is_none_or(|data| data == ""), "the dialog holds the emptied field as empty text");
     confirm(h.state_mut());
 
     let sm = recorded(h.state(), id);
