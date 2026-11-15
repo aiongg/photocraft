@@ -88,8 +88,10 @@ fn open_color_picker(app: &mut PhotocraftApp, _ctx: &egui::Context, p: &Value) -
         return crate::type_panels_ui::color_picker::open(app, kind, id);
     }
     if p.get("parent").is_some() {
-        let (Some(parent), Some(effect), Some(field)) = (p.get("parent").and_then(Value::as_u64), s("effect"), s("field")) else {
-            return Err("need integer `parent` and string `effect` and `field`".into());
+        // The parent is the dialog id `ui.inspect` lists (a string of its number).
+        let parent = p.get("parent").and_then(|id| id.as_u64().or_else(|| id.as_str().and_then(|id| id.parse().ok())));
+        let (Some(parent), Some(effect), Some(field)) = (parent, s("effect"), s("field")) else {
+            return Err("need the Layer Style dialog's id as `parent` and string `effect` and `field`".into());
         };
         let stop = match p.get("stop") {
             None | Some(Value::Null) => None,

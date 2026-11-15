@@ -225,6 +225,13 @@ fn invoke_shell_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str,
     if let Some(alias) = panel_alias(id) {
         return Some(invoke(app, ctx, alias, params.clone()));
     }
+    // The four commands the framework's workspace set owns keep their menu ids on this path.
+    let owned = photocraft_engine::prefs::theme_ids::command_id(id);
+    if owned != id
+        && let Some(result) = crate::workspace_ui::run_command(app, ctx, &CommandRef::with_params(owned, params.clone()))
+    {
+        return Some(result);
+    }
     if let Some(workspace) = workspace_id(id) {
         return Some(crate::workspace_ui::select(app, workspace).map(|()| json!({"workspace": app.workspaces.set.current})));
     }

@@ -749,6 +749,14 @@ pub(crate) fn legacy_actions(
     dock_tabs: Option<&Value>,
     dock: Option<&Value>,
 ) -> Result<Vec<Action<String>>, String> {
+    // The old dock words: a request names only these (order and heights are refused below).
+    const DOCK_KEYS: [&str; 7] = ["order", "heights", "collapsed", "hidden_tabs", "hiddenTabs", "tab_order", "tabOrder"];
+    if let Some(dock) = dock.filter(|dock| !dock.is_null()) {
+        let Some(map) = dock.as_object() else { return Err("`dock` must be an object".into()) };
+        if let Some(unknown) = map.keys().find(|key| !DOCK_KEYS.contains(&key.as_str())) {
+            return Err(format!("unknown `dock` field `{unknown}`"));
+        }
+    }
     if dock.is_some_and(|dock| dock.get("order").is_some() || dock.get("heights").is_some()) {
         return Err("dock order/heights cannot replace a customized layout; use window.panel.layout".into());
     }

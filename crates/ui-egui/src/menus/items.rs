@@ -26,6 +26,7 @@ pub fn is_live(id: &str) -> bool {
         || crate::view_cmds::handles(id)
         || crate::analysis::handles(id)
         || crate::workspace_ui::handles(id)
+        || id.starts_with(super::DOCUMENT_ITEM)
 }
 
 /// Commands outside the catalogue that belong right after a catalogue item: `(id, after)`.

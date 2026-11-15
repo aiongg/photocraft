@@ -25,6 +25,10 @@ fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Valu
 /// later pass, so the loop runs to idle rather than for one pass.
 fn pointer(app: &mut PhotocraftApp, params: Value) -> Value {
     let ctx = app.ctx().clone();
+    // The pointer maps document points through the view the canvas last showed, so the canvas shows one first.
+    if crate::canvas::document_display::active_view(app).is_none() {
+        crate::canvas::testing::frame(app);
+    }
     let reply = call(app, &ctx, "ui.pointer", params);
     for _ in 0..8 {
         if nothing_queued(&ctx) {
@@ -462,6 +466,7 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     assert!(prompt(&mut app).is_none());
     // Closing a dirty document: listed with its choices; a bad choice and Cancel keep the document.
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
+    crate::dialogs::take_results(&mut app, &ctx);
     let d = prompt(&mut app).expect("the prompt is listed");
     assert_eq!(d["fields"]["command"], "file.close");
     assert_eq!(d["fields"]["choices"], json!(["save", "dontSave", "cancel"]));
@@ -472,12 +477,14 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": "top"}))["ok"], false, "nothing left to answer");
     // Don't Save closes it.
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
+    crate::dialogs::take_results(&mut app, &ctx);
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["ok"], true);
     assert_eq!(app.session.documents().len(), 1);
     // Quitting asks about each dirty document, then lets the window close.
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     assert!(crate::discard_ui::intercept(&mut app, "file.exit", &Value::Null));
+    crate::dialogs::take_results(&mut app, &ctx);
     let d = prompt(&mut app).expect("the quit prompt is listed");
     assert_eq!((d["fields"]["command"].as_str(), d["fields"]["remaining"].as_u64()), (Some("file.exit"), Some(2)));
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["result"]["open"], true);
@@ -491,7 +498,6 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
 #[test]
 fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
     use craft::ui::contract::Bind;
-    use craft::ui::dialog::{DialogResult, PromptChoice, PromptKind, StandardPrompt};
     use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
@@ -506,30 +512,36 @@ fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
     assert_eq!(ok(&mut app, "ui.dialog.set", json!({"dialog": blur, "field": "angle", "value": 1})), false, "no such field");
     assert_eq!(top(&mut app).expect("still open")["fields"]["radius"], 4.5);
     assert_eq!(ok(&mut app, "ui.dialog.confirm", json!({"dialog": blur})), true);
-    let Some(DialogResult::Ok(result)) = app.framework.dialogs.take::<HostedParamDialog>() else { panic!("the blur dialog answers OK") };
-    assert_eq!(result.fields.number("radius"), Some(4.5));
+    // The request runs the answer itself (the family takes the result), so the dialog is gone.
+    assert!(top(&mut app).is_none(), "the confirmed dialog closed");
+    assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": blur})), false, "nothing left to cancel");
 
-    // (method, extra params, accepted, the prompt's answer: Some(choice) for OK, None for Cancel or still open)
-    let routes: [(&str, Value, bool, Option<PromptChoice>); 3] = [
-        ("ui.dialog.confirm", json!({"choice": "alternate"}), true, Some(PromptChoice::Alternate)),
-        ("ui.dialog.confirm", json!({"choice": "maybe"}), false, None),
-        ("ui.dialog.cancel", json!({}), true, None),
+    // A real prompt family answers each route: the mask-trash prompt of a layer mask. A refused choice
+    // leaves the prompt open, Cancel keeps the mask, Alternate deletes it.
+    app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("layer.layerMask.revealAll", json!({})).unwrap();
+    let layer = app.session.active().and_then(|state| state.active_layer).expect("an active layer");
+    let has_mask = |app: &PhotocraftApp| app.session.active().and_then(|s| s.doc.layer(layer)).is_some_and(|l| l.mask.is_some());
+    assert!(has_mask(&app));
+    // (method, extra params, accepted, the mask survives)
+    let routes: [(&str, Value, bool, bool); 3] = [
+        ("ui.dialog.confirm", json!({"choice": "maybe"}), false, true),
+        ("ui.dialog.cancel", json!({}), true, true),
+        ("ui.dialog.confirm", json!({"choice": "delete"}), true, false),
     ];
-    for (method, extra, accepted, answer) in routes {
-        app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+    for (method, extra, accepted, kept) in routes {
+        let (command, mark) = crate::mask_trash_prompt::drop_action(layer.0, crate::mask_thumbs_ui::MaskKind::Layer);
+        crate::mask_trash_prompt::intercept(&mut app, &command, &mark).expect("the drop opens the prompt").unwrap();
         let prompt = top(&mut app).expect("the prompt is listed")["id"].clone();
         let mut params = extra.clone();
         params["dialog"] = prompt.clone();
         assert_eq!(ok(&mut app, method, params), accepted, "{method} {extra}");
-        match (app.framework.dialogs.take::<StandardPrompt>(), answer) {
-            (Some(DialogResult::Ok(got)), Some(want)) => assert_eq!(got.choice, want, "{method} {extra}"),
-            (Some(DialogResult::Cancel), None) => assert_eq!(method, "ui.dialog.cancel"),
-            (None, None) => {
-                assert!(!accepted, "{method} {extra}: a refused answer leaves the prompt open");
-                assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": prompt})), true);
-                app.framework.dialogs.take::<StandardPrompt>();
-            }
-            _ => panic!("{method} {extra}: the prompt answered otherwise"),
+        assert_eq!(has_mask(&app), kept, "{method} {extra}");
+        if accepted {
+            assert!(top(&mut app).is_none(), "{method} {extra}: an answered prompt closed");
+        } else {
+            assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": prompt})), true);
         }
         assert_eq!(ok(&mut app, "ui.dialog.cancel", json!({"dialog": prompt})), false, "nothing left to cancel");
     }
@@ -542,7 +554,7 @@ fn a_value_reaches_the_top_dialog() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
-    let opened = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "command", "command": "filter.gaussianBlur"}));
+    let opened = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "command", "command": "filter.blur.gaussianBlur"}));
     assert_eq!(opened["ok"], true, "{opened}");
     let set = call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": "top", "field": "radius", "value": 7.5}));
     assert_eq!(set["ok"], true, "{set}");
@@ -560,12 +572,17 @@ fn a_value_reaches_the_top_dialog() {
 /// counts as an open dialog.
 #[test]
 fn inspect_lists_hosted_dialogs_in_stack_order() {
+    use craft::ui::contract::Bind;
     use craft::ui::dialog::{PromptKind, StandardPrompt};
+    use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog};
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
-    // Each dialog takes its place when it opens, with no pass between the opens.
+    // Each dialog takes its place when it opens, with no pass between the opens. The host keeps one dialog
+    // per type, so the two are of different types.
     let lower = app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
-    let upper = app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
+    let upper = app.framework.dialogs.open(HostedParamDialog::new("gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
+        ParamDialog::new("gaussianBlur", "Gaussian Blur", Param::parse_list(r#"{"radius":0.1..1000=1}"#)).values(Bind::bound(fields))
+    }));
     let (lower_id, upper_id) = (json!(lower.value().to_string()), json!(upper.value().to_string()));
     let listed = |app: &mut PhotocraftApp| -> Vec<Value> { dialogs(app, &ctx).iter().map(|d| d["id"].clone()).collect() };
     assert_eq!(listed(&mut app), [lower_id.clone(), upper_id.clone()]);
@@ -631,8 +648,8 @@ fn opening_new_document_through_control_matches_clipboard_image_size() {
     let id = opened["result"]["dialog"].as_str().expect("the hosted dialog's id is returned").to_owned();
     let listed = dialogs(&mut app, &ctx);
     let dialog = listed.iter().find(|d| d["id"] == id.as_str()).expect("the dialog is listed by that id");
-    let fields = &dialog["fields"];
-    assert_eq!((fields["width"].as_u64(), fields["height"].as_u64()), (Some(100), Some(200)));
+    let size = &dialog["fields"]["size"];
+    assert_eq!((size["width"].as_u64(), size["height"].as_u64()), (Some(100), Some(200)));
 }
 
 #[test]
@@ -663,7 +680,7 @@ fn agent_right_click_with_the_zoom_tool_opens_and_runs_the_view_menu() {
     app.sync_views();
     let result = pointer(&mut app, json!({"tool": "Zoom", "button": "secondary", "events": [{"kind":"down","x":8,"y":8},{"kind":"up","x":8,"y":8}]}));
     assert_eq!(result["ok"], true);
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.pos), Some([8.0, 8.0]));
+    assert_eq!(app.ui.canvas_tool_menu.as_ref().map(|m| m.pos), Some(screen_point(&app, 8.0, 8.0)));
     assert!(app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::View)));
     let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
     let entries = inspected.pointer("/result/canvasToolMenu/entries").and_then(Value::as_array).unwrap();
@@ -825,7 +842,6 @@ fn agent_can_inspect_and_choose_pen_make_selection_from_full_context_menu() {
     let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.run("path.set", json!({"name":"work","path":{"subpaths":[{"closed":true,"knots":[[2,2],[20,2],[20,20]]}]}})).unwrap();
-    let expected_pos = screen_point(&app, 8.0, 8.0);
     let result = pointer(
         &mut app,
         json!({
@@ -834,7 +850,7 @@ fn agent_can_inspect_and_choose_pen_make_selection_from_full_context_menu() {
     );
     assert_eq!(result["ok"], true);
     let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
-    assert_eq!(app.ui.canvas_tool_menu.as_ref().unwrap().pos, expected_pos);
+    assert_eq!(app.ui.canvas_tool_menu.as_ref().unwrap().pos, screen_point(&app, 8.0, 8.0));
     let entries = inspected.pointer("/result/canvasToolMenu/entries").and_then(Value::as_array).unwrap();
     assert_eq!(entries.iter().filter(|row| row.get("separator") == Some(&json!(true))).count(), 9);
     assert!(entries.iter().any(|row| row.get("id") == Some(&json!("path.toSelection")) && row.get("enabled") == Some(&json!(true))));
@@ -1009,7 +1025,7 @@ fn ui_set_drives_the_crop_overlay_options() {
     let seen = call(&mut app, &ctx, "ui.inspect", json!({}));
     let t = &seen["result"]["toolOptions"]["crop"];
     assert_eq!(
-        (t["guide"].as_str(), t["guide_show"].as_str(), t["guide_orientation"].as_u64()),
+        (t["guide"].as_str(), t["guideShow"].as_str(), t["guideOrientation"].as_u64()),
         (Some("goldenSpiral"), Some("always"), Some(2))
     );
     for bad in [
@@ -1630,6 +1646,8 @@ fn dirty_close_prompted() -> (PhotocraftApp, egui::Context, std::rc::Rc<std::cel
     app.session.active_mut().unwrap().path = Some(own_file.clone());
     app.session.execute("layer.new.layer", json!({})).unwrap();
     let r = call(&mut app, &ctx, "ui.menu.invoke", json!({"command": "file.close"}));
+    // The frame after the request opens the question.
+    crate::dialogs::take_results(&mut app, &ctx);
     assert!(!dialogs(&mut app, &ctx).is_empty(), "closing a dirty document asks first: {r}");
     (app, ctx, written, own_file)
 }
@@ -2155,6 +2173,8 @@ fn synthetic_input_families_hold_what_they_name() {
     let r = call(&mut app, &ctx, "ui.move", json!({"x": 4, "y": 4, "coordinates": "document"}));
     assert!(r["error"].as_str().is_some_and(|e| e.contains("no document canvas")), "{r}");
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+    // The canvas shows the view in its first pass.
+    crate::canvas::testing::frame(&mut app);
     let Some(view) = crate::canvas::document_display::active_view(&app) else { panic!("the new document has a view") };
     queued(&mut app, &mut frames, "ui.move", json!({"x": 16, "y": 8, "coordinates": "document"}));
     assert_eq!(ctx.input(|i| i.pointer.latest_pos()), Some(view.to_screen(craft::behavior::kurbo::Point::new(16.0, 8.0))));

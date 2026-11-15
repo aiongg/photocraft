@@ -264,20 +264,25 @@ pub fn run(app: &mut PhotocraftApp, _ctx: &egui::Context, command: WorkspaceComm
     Ok(if command == WorkspaceCommands::Lock { json!({"locked": app.workspaces.set.locked}) } else { json!({"workspace": app.workspaces.set.current}) })
 }
 
-/// The `run` of the workspace command source: a fired `WorkspaceCommands` row or key. New and Delete with a `name`
-/// param act on it at once (the control protocol's form); without one they ask.
-pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, command: &CommandRef) -> bool {
-    let Some(parsed) = WorkspaceCommands::from_ref(command) else { return false };
+/// Runs the workspace command `command` and says what it did; `None` when it is not a workspace command. New and
+/// Delete with a `name` param act on it at once (the control protocol's form); without one they ask.
+pub(crate) fn run_command(app: &mut PhotocraftApp, ctx: &egui::Context, command: &CommandRef) -> Option<Result<Value, String>> {
+    let parsed = WorkspaceCommands::from_ref(command)?;
     let name = command.params.get("name").and_then(Value::as_str).map(str::to_owned);
     let flag = |key: &str| command.params.get(key).and_then(Value::as_bool).unwrap_or(false);
-    let result = match (parsed, name) {
+    Some(match (parsed, name) {
         (WorkspaceCommands::New, Some(name)) => {
             let keeps = WorkspaceKeeps::new(flag("keyboardShortcuts"), flag("menus"), flag("toolbar"));
             save_keeping(app, &name, keeps).map(|id| json!({"workspace": id}))
         }
         (WorkspaceCommands::Delete, Some(name)) => delete(app, &name).map(|()| json!({"deleted": name})),
         (parsed, _) => run(app, ctx, parsed),
-    };
+    })
+}
+
+/// The `run` of the workspace command source: a fired `WorkspaceCommands` row or key. A refusal shows in the status.
+pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, command: &CommandRef) -> bool {
+    let Some(result) = run_command(app, ctx, command) else { return false };
     if let Err(message) = result {
         app.ui.status = message;
         app.ui.status_error = true;
