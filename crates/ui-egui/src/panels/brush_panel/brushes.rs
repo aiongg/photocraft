@@ -11,7 +11,7 @@ use craft::ui::contract::{Bind, ReorderMove, Show as _};
 use craft::ui::patterns::presets::{PresetEvent, PresetRow, PresetView};
 use craft::ui::primitives::ContentPainterCx;
 use craft::ui::primitives::textures::TextureCache;
-use craft::ui::runtime::Env;
+use craft::ui::runtime::env::Env;
 use egui::{ColorImage, Pos2, Rect, pos2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::brush_key_cmds::panel_layout;
