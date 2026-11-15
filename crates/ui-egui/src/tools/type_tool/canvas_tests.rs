@@ -150,6 +150,19 @@ fn show_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
+/// Clicks the presets chevron of the number field named `menu` minus " presets" ("Font size presets"): the button
+/// inside that field's spin button.
+fn open_presets(h: &Harness<'static, PhotocraftApp>, menu: &str) {
+    let field = menu.strip_suffix(" presets").unwrap_or(menu);
+    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, field).get_by_role_and_label(egui::accesskit::Role::Button, "Presets").click();
+}
+
+/// The accessible name of the field `label` of the Properties panel, or of the options bar's own name for it
+/// ("Font size" is "Set font size" there).
+fn field_name(h: &Harness<'static, PhotocraftApp>, role: egui::accesskit::Role, label: &str) -> String {
+    if h.query_by_role_and_label(role, label).is_some() { label.to_owned() } else { format!("Set {}", label.to_lowercase()) }
+}
+
 fn panel_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     // Wait for the font scan: while it runs the panels repaint every 100 ms and `Harness::run` gives up.
     let _ = photocraft_text::shared();
@@ -190,14 +203,14 @@ mod panel_defaults {
         let app = new_app();
         let steps = app.session.active().unwrap().history.entries().len();
         let mut h = panel_harness(app);
-        h.get_by_role_and_label(Role::ComboBox, "Font size presets").click();
+        open_presets(&h, "Font size presets").click();
         h.run();
         h.get_by_label("72 pt").scroll_to_me();
         h.run();
         h.get_by_label("72 pt").click();
         h.run();
         assert_eq!(h.state().ui.tool_options.type_size, 72.0);
-        h.get_by_role_and_label(Role::ComboBox, "Leading presets").click();
+        open_presets(&h, "Leading presets").click();
         h.run();
         h.get_by_label("Auto").click();
         h.run();
@@ -206,7 +219,8 @@ mod panel_defaults {
     }
 
     fn number(h: &mut Harness<'static, PhotocraftApp>, label: &str, value: &str) {
-        h.get_by_role_and_label(Role::SpinButton, label).click();
+        let name = field_name(h, Role::SpinButton, label);
+        h.get_by_role_and_label(Role::SpinButton, &name).click();
         h.run();
         h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(value.into()));
@@ -639,7 +653,8 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
     let steps = history_len(&h);
     let mut last = 20.0;
     for d in 0..2 {
-        let field = h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Font size").rect().center();
+        let name = field_name(&h, egui::accesskit::Role::SpinButton, "Font size");
+        let field = h.get_by_role_and_label(egui::accesskit::Role::SpinButton, &name).rect().center();
         h.hover_at(field);
         h.run_steps(1);
         press(&mut h, field, true);
@@ -1456,7 +1471,8 @@ mod multi_layer_formatting {
     fn number(h: &mut Harness<'static, PhotocraftApp>, label: &str, value: &str) {
         // Variable-font axes add numeric fields before size/leading. Select the setting by
         // its accessible name, so a font scan cannot shift this action onto another control.
-        h.get_by_role_and_label(Role::SpinButton, label).click();
+        let name = field_name(h, Role::SpinButton, label);
+        h.get_by_role_and_label(Role::SpinButton, &name).click();
         h.run();
         h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(value.into()));
@@ -1474,7 +1490,7 @@ mod multi_layer_formatting {
 
     /// Opens a preset chevron by its accessible name and picks `label`.
     fn pick(h: &mut Harness<'static, PhotocraftApp>, menu: &str, label: &str) {
-        h.get_by_role_and_label(Role::ComboBox, menu).click();
+        open_presets(h, menu);
         h.run();
         preset(h, label);
     }
@@ -1541,9 +1557,10 @@ mod multi_layer_formatting {
         let (app, ids) = fixture();
         let before = ids.map(|id| style(&app, id, 0));
         let mut h = controls(app, false);
-        h.get_all_by_role(Role::TextInput).next().unwrap().click();
+        h.get_by_role_and_label(Role::ComboBox, "Font family").click();
         h.run();
-        h.get_by_role(Role::TextInput).type_text("JetBrains");
+        h.event(egui::Event::Text("JetBrains".into()));
+        h.run();
         h.key_press(egui::Key::ArrowDown);
         h.run();
         h.key_press(egui::Key::Enter);
@@ -1595,7 +1612,7 @@ mod multi_layer_formatting {
         assert_eq!((style(&app, id, 0).font_family.as_str(), style(&app, id, 5).font_family.as_str()), ("Inter", "JetBrains Mono"));
         let mut h = controls(app, false);
         let shown = |h: &Harness<'static, PhotocraftApp>| {
-            (h.get_all_by_role(Role::TextInput).next().and_then(|n| n.value()).unwrap_or_default(), h.get_by_role_and_label(Role::ComboBox, "Style").value())
+            (h.get_by_role_and_label(Role::ComboBox, "Font family").value().unwrap_or_default(), h.get_by_role_and_label(Role::ComboBox, &field_name(h, Role::ComboBox, "Style")).value())
         };
         let steps = history_len(&h);
         let (inter, mono) = (("Inter".to_string(), Some("Medium".to_string())), ("JetBrains Mono".to_string(), Some("Regular".to_string())));
