@@ -182,7 +182,7 @@ fn copy_commands_and_add_to_swatches() {
 
     app.ui.color_panel.panel.background = false;
     app.ui.color_panel.panel.mode = ColorPanelMode::ColorWheel;
-    let count = |app: &PhotocraftApp| app.session.presets.swatches.iter().map(|group| group.items.len()).sum::<usize>();
+    let count = |app: &PhotocraftApp| app.session.presets.swatches.iter().map(|group| group.entries.len()).sum::<usize>();
     let before = count(&app);
     let mut h = color_tab_of(AppTheme::pro(), app);
     h.get_by_label("Add to Swatches").click();
