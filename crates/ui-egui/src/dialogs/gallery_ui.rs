@@ -124,7 +124,7 @@ impl FilterCatalog for PcCatalog {
         // The registry notation leaves colour values as `json`, which the parser drops; the effect's own colour is a
         // swatch row (the foreground and background are the session's, set by `uses_colors`).
         if f.params_doc().contains("\"glowColor\":json") {
-            params.push(Param::new("glowColor", tl!("Glow Color"), ParamKind::color(None)));
+            params.push(Param::new("glowColor", tl!("Glow Color").to_string(), ParamKind::color(None)));
         }
         Some(CatalogFilter::new(f.key(), tl!(f.name()).to_string(), f.category(), params).uses_colors(f.uses_colours()))
     }
