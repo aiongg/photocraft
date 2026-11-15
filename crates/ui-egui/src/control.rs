@@ -8,15 +8,18 @@
 //! Methods:
 //! - `engine.execute {command, params}`: run any engine or UI command by id
 //! - `engine.commands`: list commands with enablement
-//! - `ui.inspect`: full UI state (tool, panels, views, dialogs, windows, window size); `dialogs`
-//!   lists PhotoCraft's dialogs and the framework `DialogHost`'s in their one stack order (top
-//!   last), then the shell dialog and the unsaved-changes prompt; the menu tree is `ui.menu.list`
-//! - `ui.set {tool?, panels?, dock?, dockTabs?, dockWidth?, colorPanel?, maskTarget?, vectorMaskTarget?, filterMaskTarget?, selectionMode?, zoom?, center?, rotation?, fit?, theme?, brushSection?, brushTab?, brushesView?, brushPicker?, brushPickerName?, brushPickerStroke?, brushPickerTip?, brushPickerScale?, brushSize?}`:
+//! - `ui.inspect`: full UI state (tool, panels, views, dialogs, windows, window size, `rects`);
+//!   `dialogs` lists the framework `DialogHost`'s dialogs in their one stack order (top last);
+//!   `rects` maps each canvas, hosted dialog and the task bar's id to its last on-screen rect;
+//!   the menu tree is `ui.menu.list`
+//! - `ui.set {tool?, panels?, dock?, dockTabs?, dockWidth?, colorPanel?, maskTarget?, vectorMaskTarget?, filterMaskTarget?, selectionMode?, zoom?, center?, rotation?, fit?, theme?, brushSection?, brushTab?, brushesView?, brushPicker?, brushPickerName?, brushPickerStroke?, brushPickerTip?, brushPickerScale?, brushSize?, statusInfo?, marqueeStyle?, marqueeSize?, actionsPanel?, presetBrowsers?, toolbarColumns?, recentView?}`:
 //!   change UI state; any other field is an error ([`UI_SET_FIELDS`])
-//! - `ui.dialog.open {kind, fields?}` (kinds: newDocument, about, layerStyle {effect?}, colorPicker {target: foreground|background}, command {command}) / `ui.dialog.set {dialog, field, value}` / `ui.dialog.confirm {dialog, wait?}` / `ui.dialog.cancel {dialog}`
+//! - `ui.dialog.open {kind, fields?}` / `ui.dialog.set {dialog, field, value}` / `ui.dialog.confirm {dialog, wait?}` / `ui.dialog.cancel {dialog}`:
+//!   `dialog` is an id as `ui.inspect` lists it, or `"top"` for the top hosted dialog
 //! - `ui.dialog.apply {dialog}`: commit Preferences changes without closing the dialog
+//! - `ui.notice.post {title, lines?, tone?}`: show a notice; replies `{id}`
 //! - `ui.window.open {document?}` / `ui.window.close {window}`: extra document windows
-//! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], tool?, modifiers?, button?}`: drive the active tool in document coordinates (`button: "secondary"` opens the tool's canvas context menu (the pasteboard colour menu outside the image) or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
+//! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], tool?, modifiers?, button?}`: drive the active tool in document coordinates. The events are queued for the canvas, which takes them on its next pass; the reply does not wait for them (`button: "secondary"` opens the tool's canvas context menu (the pasteboard colour menu outside the image) or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
 //! - `ui.click {x, y, coordinates?, button?, count?, hold?, modifiers?}` / `ui.move {x, y, coordinates?, rest?, modifiers?}` /
 //!   `ui.wheel {x, y, coordinates?, dx?, dy?, modifiers?}` / `ui.release {button?, key?, x?, y?, coordinates?}`: synthetic
 //!   pointer input in screen points, or document points with `coordinates: "document"` (the main canvas maps them);
@@ -32,8 +35,8 @@
 //!   session, as on a real loss. For testing the fallback; returns whether a GPU canvas was active.
 //!   `destroy: true` destroys the window's real device instead, as a driver reset does: the app
 //!   saves its unsaved documents for recovery and closes (#3438); returns `destroyed`
-//! - `ui.screenshot {path?, focus?}`: capture the main window (PNG). Raises the window first (default)
-//!   because occluded macOS windows stop rendering
+//! - `ui.screenshot {path?, focus?, window?}`: capture the main window, or the document window `window` (PNG).
+//!   Raises the window first (default) because occluded macOS windows stop rendering
 //! - `ui.focus`: bring the main window to the front
 //! - `app.open {path}` / `app.save {path}`: relative file I/O under the automation roots; reply with `warnings`
 //! - `app.quit`
@@ -45,9 +48,9 @@ pub use craft::automation::{ControlRequest, ControlResponse, REPLY_DEADLINE, Rep
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::canvas::{ToolEvent, tool_event};
-use crate::state::{DialogKind, Tool};
+use crate::state::Tool;
 
+mod dialogs;
 mod dispatch;
 mod inspect;
 mod params;
@@ -78,11 +81,7 @@ fn run_waiting(app: &mut PhotocraftApp, wait: bool, run: impl FnOnce(&mut Photoc
     }
 }
 
-/// The `dialog` id of the shell's own dialog (`workspace_ui`) in `ui.inspect` and `ui.dialog.*`.
-const SHELL_DIALOG: &str = "shell";
-
 pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
-    app.canvas_ctx = Some(ctx.clone());
     let saved = app.session.authorize;
     if let Some(gate) = app.services.automation_authorize {
         app.session.authorize = Some(gate);
@@ -118,6 +117,7 @@ pub(super) const METHODS: &[&str] = &[
     "ui.menu.invoke",
     "ui.menu.list",
     "ui.move",
+    "ui.notice.post",
     "ui.pointer",
     "ui.release",
     "ui.resize",

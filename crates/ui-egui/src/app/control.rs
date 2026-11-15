@@ -6,7 +6,7 @@
 use std::sync::mpsc::Receiver;
 
 use craft::automation::control::{ControlChannel, ControlRequest, ControlResponse};
-use craft::automation::screenshot::{CaptureGeometry, DocumentId, settle_ms};
+use craft::automation::screenshot::{DocumentId, settle_ms};
 use craft::ui::runtime::motion;
 use craft::ui::runtime::windows::WindowHost;
 
@@ -24,11 +24,10 @@ impl PhotocraftApp {
     pub(crate) fn drain_control(&mut self, ctx: &egui::Context) {
         let Some(mut channel) = self.control.take() else { return };
         let document = self.document_identity();
-        // begin_pass supplied the new RawInput before App::logic: observe the geometry before
-        // any completed callback is collected.
-        channel.captures.note_geometry(CaptureGeometry::from_facts(WindowHost::of(ctx).screenshot_facts(), document));
-        let observed = channel.captures.last_geometry();
-        let finished = channel.captures.drain(motion::now(), observed, document);
+        // begin_pass supplied the new RawInput before App::logic: observe every window's geometry
+        // before any completed callback is collected.
+        channel.captures.note_windows(&WindowHost::of(ctx), document);
+        let finished = channel.captures.drain(motion::now(), document);
         self.finish_captures(&mut channel, finished);
         let settle = settle_ms(ctx.global_style().animation_time);
         while let Some(req) = channel.next_request() {
@@ -45,7 +44,7 @@ impl PhotocraftApp {
     pub(super) fn note_capture_pass(&mut self, ctx: &egui::Context) {
         let document = self.document_identity();
         if let Some(channel) = self.control.as_mut() {
-            channel.captures.note_geometry(CaptureGeometry::from_facts(WindowHost::of(ctx).screenshot_facts(), document));
+            channel.captures.note_windows(&WindowHost::of(ctx), document);
             channel.captures.note_pass();
         }
     }

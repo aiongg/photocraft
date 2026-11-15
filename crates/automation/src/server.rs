@@ -410,7 +410,12 @@ pub struct UiSetParams {
     /// "selectedLayer" or "adjustmentComposite") for the Histogram panel), histogramRange ([from,
     /// to] levels 0..255 whose Count and Percentile the panel shows, or null) and histogramRefresh
     /// (true: an Uncached Refresh); `ui.inspect` reports them and the statistics under
-    /// `histogram`. Other fields are an error.
+    /// `histogram`. statusInfo (the status bar's item next to the zoom field), marqueeStyle
+    /// ("normal", "fixedRatio" or "fixedSize") and marqueeSize ([width, height] for that style),
+    /// actionsPanel (an object patching buttonMode and collapsed for the Actions panel),
+    /// presetBrowsers (an object keyed by preset panel, each patching view ("grid" or "list") and
+    /// zoom of its browser), toolbarColumns (1 or 2, the tool rail's columns) and recentView
+    /// ("grid" or "list", the Home screen's recent files). Other fields are an error.
     pub fields: Value,
 }
 
