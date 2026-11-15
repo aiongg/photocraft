@@ -19,15 +19,9 @@ fn app() -> PhotocraftApp {
     app
 }
 
+/// A key press through the canvas passes, as the app's key route takes it.
 fn press(app: &mut PhotocraftApp, key: Key, modifiers: Modifiers) {
-    let ctx = app.ctx().clone();
-    let raw = egui::RawInput {
-        events: vec![egui::Event::ModifiersChanged(modifiers), egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }],
-        ..Default::default()
-    };
-    ctx.begin_pass(raw);
-    crate::shortcuts::handle(app, &ctx);
-    ctx.end_pass().textures_delta.clear();
+    crate::canvas::testing::key(app, key, modifiers);
 }
 
 fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], mods: Modifiers) {
