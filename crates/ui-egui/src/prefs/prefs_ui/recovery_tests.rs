@@ -48,7 +48,7 @@ fn gated(doc: Document) -> (Recoverable, mpsc::Receiver<()>, mpsc::Sender<()>, m
 
 fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
     ctx.run_ui(egui::RawInput::default(), |ui| {
-        tick(app, ui.ctx());
+        super::save::tick(app, ui.ctx(), Instant::now());
         crate::jobs_ui::tick(app, ui.ctx());
     })
     .textures_delta
@@ -115,7 +115,17 @@ fn recovery_keeps_frames_and_editing_live_and_adopts_the_admitted_document() {
     assert_eq!(recovered.path.as_deref(), Some("original.psb"));
     assert!(recovered.is_dirty());
     assert_eq!(recovered.doc.layers, original.layers);
-    assert_eq!(app.prefs_rt.autosaved.get(&recovered.doc.id), Some(&recovered.revision));
+    // The recovered document's copy is current: even a forced autosave does not write it again.
+    let docs: Vec<_> = app
+        .session
+        .documents()
+        .iter()
+        .map(|st| craft::platform::autosave::AutosaveDoc { id: st.doc.id.0, revision: st.revision, dirty: st.is_dirty() })
+        .collect();
+    app.autosave.autosave_now();
+    let due = app.autosave.due(std::time::Instant::now(), docs);
+    assert!(!due.save.contains(&recovered.doc.id.0), "{due:?}");
+    assert!(due.save.contains(&working_id.0), "the edited working document is due: {due:?}");
     assert_eq!(*log.lock().unwrap(), [format!("adopt {} pending", recovered.doc.id.0)]);
 }
 
