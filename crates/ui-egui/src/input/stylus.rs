@@ -31,10 +31,8 @@
 //! Automation simulates a pen with `ui.pointer` events carrying `pressure`, `tiltX`, `tiltY`
 //! and `rotation`.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex, PoisonError};
-
 use craft::behavior::PointerSample;
+use craft::ui::runtime::pen::PenSource;
 
 /// One stylus reading. Tilt is in degrees (-90..90, W3C Pointer Events convention), rotation in
 /// degrees 0..360.
@@ -67,47 +65,65 @@ impl PenSample {
             eraser: self.eraser,
         }
     }
+
+    /// The reading as the runtime's pointer feed carries it (radians).
+    fn pointer(self) -> PointerSample {
+        let mut p = PointerSample::new(self.pressure);
+        p.tilt = [self.tilt_x.to_radians(), self.tilt_y.to_radians()];
+        p.rotation = self.rotation.to_radians();
+        p.eraser = self.eraser;
+        p
+    }
+
+    /// The runtime's reading `p` in degrees, in the documented ranges.
+    fn of_pointer(p: PointerSample) -> Self {
+        let p = p.sanitized();
+        PenSample { pressure: p.pressure, tilt_x: p.tilt[0].to_degrees(), tilt_y: p.tilt[1].to_degrees(), rotation: p.rotation.to_degrees(), eraser: p.eraser }
+            .sanitized()
+    }
 }
 
-/// Most samples a [`StylusFeed`] keeps between two frames (a stalled UI drops the oldest).
-const FEED_QUEUE: usize = 1024;
+/// The pen readings a platform backend writes: the runtime's pen source (`InstallSpec::pen`), which gives each pointer
+/// move the canvas takes its own reading. Cloning shares it.
+#[derive(Clone, Default)]
+pub struct StylusFeed(PenSource);
 
-#[derive(Debug, Default)]
-struct FeedState {
-    /// The current sample (`None` = no pen down).
-    latest: Option<PenSample>,
-    /// Every sample set since the canvas last drained them, oldest first.
-    queue: VecDeque<PenSample>,
+impl std::fmt::Debug for StylusFeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("StylusFeed").field(&self.get()).finish()
+    }
 }
-
-/// Shared state a platform backend writes pen samples into. Cloning shares it. Each sample both
-/// becomes the current one and is queued, so a frame sees every sample the pen reported, in
-/// order, not just the last one (the pressure of each pointer move is interpolated from them).
-#[derive(Clone, Debug, Default)]
-pub struct StylusFeed(Arc<Mutex<FeedState>>);
 
 impl StylusFeed {
-    /// The current sample (`None` = no pen down); a sample is also queued for [`Self::drain`].
+    /// The feed installed with the runtime on `ctx` (`app::framework::install`); a feed of its own, which reaches no
+    /// pointer, on a context without one.
+    pub(crate) fn of(ctx: &egui::Context) -> Self {
+        ctx.data(|d| d.get_temp::<StylusFeed>(feed_id())).unwrap_or_default()
+    }
+
+    /// Keeps `self` as the feed of `ctx`, the one the runtime was installed with.
+    pub(crate) fn keep_on(&self, ctx: &egui::Context) {
+        ctx.data_mut(|d| d.insert_temp(feed_id(), self.clone()));
+    }
+
+    /// The runtime's pen source behind the feed.
+    pub(crate) fn source(&self) -> PenSource {
+        self.0.clone()
+    }
+
+    /// Queues one reading in order; `None` = the pen left the tablet (a mouse).
     pub fn set(&self, s: Option<PenSample>) {
-        let mut g = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        let s = s.map(PenSample::sanitized);
-        g.latest = s;
-        if let Some(s) = s {
-            if g.queue.len() >= FEED_QUEUE {
-                g.queue.pop_front();
-            }
-            g.queue.push_back(s);
-        }
+        self.0.set(s.map(|s| s.sanitized().pointer()));
     }
 
+    /// The current reading (`None` = no pen down).
     pub fn get(&self) -> Option<PenSample> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).latest
+        self.0.current().map(PenSample::of_pointer)
     }
+}
 
-    /// The samples set since the last drain, oldest first.
-    pub fn drain(&self) -> Vec<PenSample> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).queue.drain(..).collect()
-    }
+fn feed_id() -> egui::Id {
+    egui::Id::new("photocraft::stylus::feed")
 }
 
 /// Per-app stylus state.
@@ -142,8 +158,15 @@ pub struct Stylus {
 
 impl Default for Stylus {
     fn default() -> Self {
+        Self::over(StylusFeed::default())
+    }
+}
+
+impl Stylus {
+    /// The stylus state of an app whose platform writes the pen into `feed`.
+    pub(crate) fn over(feed: StylusFeed) -> Self {
         Self {
-            feed: StylusFeed::default(),
+            feed,
             use_pressure: true,
             pressure_curve: None,
             curve_points: Vec::new(),
@@ -166,11 +189,7 @@ impl Stylus {
     /// that records the same pointer again changes nothing.
     pub fn record_pointer(&mut self, time_ms: f64, sample: Option<PointerSample>) {
         self.time_ms = time_ms;
-        self.pose = sample.map(|s| {
-            let s = s.sanitized();
-            PenSample { pressure: s.pressure, tilt_x: s.tilt[0].to_degrees(), tilt_y: s.tilt[1].to_degrees(), rotation: s.rotation.to_degrees(), eraser: s.eraser }
-                .sanitized()
-        });
+        self.pose = sample.map(PenSample::of_pointer);
         if let Some(p) = self.pose {
             self.peak = self.peak.max(p.pressure);
         }
