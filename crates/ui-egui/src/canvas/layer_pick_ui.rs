@@ -103,8 +103,16 @@ mod tests {
         let open = |app: &mut PhotocraftApp, x: f64, y: f64| crate::canvas_tool_menu::open_at(app, Tool::Move, Mods::NONE, pos2(0.0, 0.0), [x, y], None);
         for (x, y) in [(-5.0, 10.0), (500.0, 500.0), (f64::NAN, 1.0), (1.0, f64::INFINITY), (1e300, -1e300)] {
             assert!(layers_at(&mut a, x, y).is_empty(), "({x}, {y})");
+        }
+        for (x, y) in [(f64::NAN, 1.0), (1.0, f64::INFINITY)] {
             assert!(!open(&mut a, x, y), "({x}, {y})");
             assert!(a.ui.canvas_tool_menu.is_none());
+        }
+        // Off the canvas a right-click lists no layers: it opens the pasteboard menu.
+        for (x, y) in [(-5.0, 10.0), (500.0, 500.0), (1e300, -1e300)] {
+            assert!(open(&mut a, x, y), "({x}, {y})");
+            assert!(a.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::Pasteboard)), "({x}, {y})");
+            a.ui.canvas_tool_menu = None;
         }
         // A transparent document: nothing to list.
         let mut b = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -173,6 +181,6 @@ mod tests {
         assert_eq!(layer_ids(h.state()).and_then(|l| l.first().copied()), Some(red));
         let (req, _rx) = crate::control::ControlRequest::new("ui.inspect", Value::Null);
         let crate::control::Reply::Done(v) = crate::control::handle(h.state_mut(), &ctx, &req) else { panic!("inspect") };
-        assert_eq!(v["result"]["layerMenu"]["layers"][0][1], "Red");
+        assert_eq!(v["result"]["layerMenu"]["layers"][0]["name"], "Red");
     }
 }
