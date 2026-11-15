@@ -328,7 +328,7 @@ fn gradient_map_picker_imports_grd_without_editing_the_map() {
     assert_eq!(h.state().session.presets.gradient, tool);
     assert!(!h.state().ui.status_error);
     assert!(h.state().ui.status.contains("Imported 1 gradient"));
-    let preset = label_rect(&h, "Preset:").unwrap();
+    let preset = label_rect(&h, "Preset").unwrap();
     click(&mut h, Pos2::new(preset.right() + 60.0, preset.center().y));
     h.get_by_label("My Gradients");
     h.get_by_label("Imported Teal").click();

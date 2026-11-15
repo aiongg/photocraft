@@ -80,6 +80,8 @@ fn filters(app: &PhotocraftApp, layer: LayerId) -> Vec<SmartFilter> {
 fn closing_the_document_cancels_its_open_smart_filter_dialog() {
     let (mut app, layer) = app(8, "rgb");
     let saved = app.session.active().unwrap().doc.as_ref().clone();
+    // The open document is one the app's views already know, as after any frame.
+    app.sync_views();
     open(&mut app, layer, 0).unwrap();
     assert_eq!(open_count(&app), 1);
     app.run("file.close", json!({"save": false})).unwrap();

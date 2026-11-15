@@ -48,7 +48,7 @@ fn undo_shortcut_remains_available_and_invalidates_the_open_stroke_editor() {
     let original = app.session.active().unwrap().doc.clone();
     let history = app.session.active().unwrap().history.past_len();
     let mut h = harness(app);
-    h.get_by_role_and_label(egui::accesskit::Role::Button, "Stroke Options").click();
+    h.get_by_role_and_label(egui::accesskit::Role::Button, "Stroke style").click();
     h.run_steps(3);
     assert!(h.state().ui.shape_stroke_open);
     h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
