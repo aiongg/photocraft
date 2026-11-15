@@ -56,6 +56,8 @@ use photocraft_paint::{BrushPreset, BrushSettings, GrayTile, Pattern, PresetCapt
 use serde::{Deserialize, Serialize};
 
 use crate::Session;
+use crate::actions_cmds::{ActionList, ActionsFile};
+use craft::automation::actions::ActionsFileError;
 
 mod patterns;
 pub use patterns::{Loaded as LoadedPattern, MAX_PATTERN_BYTES, PATTERNS_FILE, PREVIEW_SIDE as PATTERN_PREVIEW_SIDE};
@@ -569,7 +571,7 @@ pub struct PresetStore {
     /// Tip hash → file size, for every tip file the store owns.
     tips: HashMap<String, u64>,
     index: Option<IndexFile>,
-    /// [`crate::actions_cmds::ActionState::rev`] last written (or loaded).
+    /// [`ActionList::revision`] last written (or loaded).
     actions_rev: u64,
     /// `actions.json` exists but failed to load: left on disk untouched, so it is never written.
     actions_skipped: bool,
@@ -595,7 +597,7 @@ pub struct Opened {
     /// Files that were skipped (corrupt, oversized, missing tips).
     pub warnings: Vec<String>,
     /// Recorded actions (`actions.json`). Empty when the file is missing or unreadable.
-    pub actions: Vec<crate::actions_cmds::Action>,
+    pub actions: ActionList,
     /// Imported and defined patterns (`patterns.json`), in library order; large ones as previews.
     pub patterns: Vec<patterns::Loaded>,
 }
@@ -748,19 +750,26 @@ pub fn open(backend: Box<dyn PresetBackend>) -> Opened {
 
 /// `actions.json`: a missing file is an empty list. Anything else unreadable is a warning.
 /// The saved actions; `None` when `actions.json` exists but could not be loaded.
-fn load_actions(backend: &dyn PresetBackend, warnings: &mut Vec<String>) -> Option<Vec<crate::actions_cmds::Action>> {
+fn load_actions(backend: &dyn PresetBackend, warnings: &mut Vec<String>) -> Option<ActionList> {
     let bytes = match backend.read(ACTIONS_FILE, MAX_ACTIONS_BYTES) {
         Ok(b) => b,
-        Err(e) if missing_file(&e) => return Some(Vec::new()),
+        Err(e) if missing_file(&e) => return Some(ActionList::new()),
         Err(e) => {
             warnings.push(format!("actions: {ACTIONS_FILE} skipped: {e}"));
             return None;
         }
     };
-    match serde_json::from_slice::<crate::actions_cmds::ActionsFile>(&bytes) {
-        Ok(file) if file.version == 1 => Some(file.actions),
-        Ok(file) => {
-            warnings.push(format!("actions: {ACTIONS_FILE} skipped: unsupported version {}", file.version));
+    let text = match std::str::from_utf8(&bytes) {
+        Ok(text) => text,
+        Err(e) => {
+            warnings.push(format!("actions: {ACTIONS_FILE} skipped: {e}"));
+            return None;
+        }
+    };
+    match ActionsFile::from_json(text) {
+        Ok(file) => Some(ActionList::from_file(file)),
+        Err(ActionsFileError::Version(version)) => {
+            warnings.push(format!("actions: {ACTIONS_FILE} skipped: unsupported version {version}"));
             None
         }
         Err(e) => {
@@ -1101,7 +1110,8 @@ impl PresetStore {
     /// Write the Actions list when `rev` differs from the last load or write.
     /// An oversized list is warned once and not retried. An I/O error is warned and retried
     /// on the next command.
-    pub fn sync_actions(&mut self, list: &[crate::actions_cmds::Action], rev: u64) {
+    pub fn sync_actions(&mut self, list: &ActionList) {
+        let rev = list.revision();
         if self.actions_rev == rev {
             return;
         }
@@ -1110,9 +1120,8 @@ impl PresetStore {
             self.actions_rev = rev;
             return;
         }
-        let file = crate::actions_cmds::ActionsFile { version: 1, actions: list.to_vec() };
-        let bytes = match serde_json::to_vec_pretty(&file) {
-            Ok(b) => b,
+        let bytes = match list.to_file().to_json() {
+            Ok(text) => text.into_bytes(),
             Err(e) => {
                 self.warnings.push(format!("Couldn't save actions: {e}"));
                 self.actions_rev = rev;
@@ -1188,19 +1197,22 @@ impl Session {
         self.preset_store = Some(store);
         // In-memory actions (created before the store finished loading) win on name. Disk-only
         // names are appended. An empty session takes the disk list and does not rewrite it.
-        if self.actions.list.is_empty() {
-            self.actions.list = disk;
-            self.actions.rev = 1;
+        if self.actions.list.actions().is_empty() && self.actions.list.sets().is_empty() {
+            self.actions.list.replace(disk);
             if let Some(st) = self.preset_store.as_mut() {
-                st.actions_rev = 1;
+                st.actions_rev = self.actions.list.revision();
             }
         } else {
-            for action in disk {
-                if !self.actions.list.iter().any(|have| have.name == action.name) {
-                    self.actions.list.push(action);
-                }
+            let ActionsFile { actions, sets, .. } = disk.to_file();
+            for action in actions {
+                // A name the session already has is refused: the session's wins.
+                let _ = self.actions.list.push(action);
             }
-            self.actions.rev = self.actions.rev.saturating_add(1).max(1);
+            for set in sets {
+                let _ = self.actions.list.new_set(&set);
+            }
+            // The merged list differs from the file even when nothing was added.
+            self.actions.list.touch();
         }
         self.brush_presets_changed();
         self.sync_preset_store();
@@ -1218,7 +1230,6 @@ impl Session {
     /// Write pending brush preset, Actions and pattern changes to the attached store (no-op without one).
     pub fn sync_preset_store(&mut self) {
         let rev = self.tools.presets_rev;
-        let actions_rev = self.actions.rev;
         if let Some(st) = self.preset_store.as_mut() {
             if st.synced_rev != Some(rev) {
                 st.sync(&mut self.tools.presets);
@@ -1229,7 +1240,7 @@ impl Session {
                     self.tools.brush_changed();
                 }
             }
-            st.sync_actions(&self.actions.list, actions_rev);
+            st.sync_actions(&self.actions.list);
             st.sync_patterns(&self.patterns);
         }
     }

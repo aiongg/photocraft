@@ -10,9 +10,7 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 
 [workspace.dependencies]
-craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
-# The craft framework through its facade (`craft::ui::…`). Its `craft-ui` package shares the name of the
-# one above; nothing depends on both under that name. The egui `[patch]` below must match
+# The craft framework through its facade (`craft::ui::…`). The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
 craft = { git = "https://github.com/aiongg/craft-libs", rev = "84683709fd5aceb9a2d78d3a53d7b87afbd9a0e2" }
 # internal
@@ -63,7 +61,7 @@ craft-jpeg = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf
 craft-pcraft-format = { git = "https://github.com/storytold/craft-libs", rev = "b8f7d93b00dfb8f172938f3d2d796ae62dcfe123" }
 # Interface translations: lookup, fallback, CLDR plurals and language names over the craft-i18n
 # catalogs that `crates/ui-egui/build.rs` embeds from `CRAFT_I18N_DIR` (storytold/craft-i18n, at
-# the commit in `craft-i18n.rev`). Already in the tree through craft-ui.
+# the commit in `craft-i18n.rev`). Already in the tree through craft.
 craft-i18n = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b" }
 # craft-update: app-specific pretend versions apply to startup and manual checks.
 craft-update = { git = "https://github.com/storytold/craft-libs", version = "=0.1.0", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", features = ["ui"] }

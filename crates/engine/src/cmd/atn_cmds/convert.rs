@@ -1,6 +1,8 @@
 use super::descriptors::{desc, get_obj, jstr};
 use super::events::{event_and_descriptor, event_for};
 use super::fields::Mapped;
+use crate::actions_cmds::ActionStep;
+
 use super::{Action, AtnAction, AtnEvent, AtnFile, AtnItem, D, DEFAULT_SET, Descriptor, PHOTOSHOP_STEP, UnicodeString, Value, atn, json};
 
 // ------------------------------------------------------------------ import
@@ -92,7 +94,7 @@ fn convert_action(file: &AtnFile, a: &AtnAction, set: &str, unsupported: &mut Ve
         for mut s in new_steps {
             normalise(&mut s.1);
             let idx = action.steps.len();
-            action.steps.push(s);
+            action.steps.push(s.into());
             if !enabled {
                 action.disabled.insert(idx);
             }
@@ -277,7 +279,7 @@ pub fn export(
         if let Some((n, shift, command)) = function_keys.iter().find(|(n, _)| n == &a.name).and_then(|(_, key)| parse_function_key(key)) {
             (out.function_key, out.shift, out.command) = (n, shift, command);
         }
-        for (i, (id, params)) in a.steps.iter().enumerate() {
+        for (i, ActionStep { command: id, params }) in a.steps.iter().enumerate() {
             let Some(items) = export_items(id, params, set) else {
                 if skip_unsupported {
                     skipped.push(Skipped { action: a.name.clone(), step: i, id: id.clone() });
@@ -304,36 +306,4 @@ pub fn export(
     }
     let bytes = atn::write(&file).map_err(|e| e.to_string())?;
     Ok((bytes, skipped))
-}
-
-// ------------------------------------------------------------------ commands
-
-/// Assigns names not already used, as `name`, `name 2`, `name 3`… A plain linear scan of the
-/// taken list per candidate is cubic when an action file repeats one base name many times, so
-/// membership uses a set and the next suffix to try is cached per base name.
-pub(crate) struct UniqueNames {
-    taken: std::collections::HashSet<String>,
-    next_suffix: std::collections::HashMap<String, u32>,
-}
-
-impl UniqueNames {
-    pub(crate) fn new<I: IntoIterator<Item = String>>(existing: I) -> Self {
-        UniqueNames { taken: existing.into_iter().collect(), next_suffix: std::collections::HashMap::new() }
-    }
-
-    /// Reserves and returns a unique name derived from `name`, recording it as taken.
-    pub(crate) fn claim(&mut self, name: &str) -> String {
-        if self.taken.insert(name.to_string()) {
-            return name.to_string();
-        }
-        let mut i = self.next_suffix.get(name).copied().unwrap_or(2);
-        loop {
-            let candidate = format!("{name} {i}");
-            i += 1;
-            if self.taken.insert(candidate.clone()) {
-                self.next_suffix.insert(name.to_string(), i);
-                return candidate;
-            }
-        }
-    }
 }
