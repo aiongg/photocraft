@@ -350,7 +350,8 @@ fn a_hidden_work_path_stays_hidden_when_another_tile_is_clicked() {
             app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
         }
         app.sync_views();
-        app.run("window.arrange.tileAllVertically", json!({})).unwrap();
+        let ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &ctx, "window.arrange.tileAllVertically", json!({})).unwrap();
         app.ui.tool = Tool::Pen;
         app.run("path.set", json!({"name": "work", "path": rect_path(40.0, 30.0, 100.0, 80.0)})).unwrap();
         crate::vector_ui::path_to_selection(&mut app, json!({})).unwrap();

@@ -432,7 +432,7 @@ fn context_popup_table() {
 /// Whether `id` is a row id the menu itself handles (`engine_call` maps it).
 fn menu_local(id: &str) -> bool {
     [GUIDE_EDIT, GUIDE_CLEAR, FAUX_BOLD, FAUX_ITALIC, PASTEBOARD_PICK].contains(&id)
-        || ["pasteboard.", "crop.", "canvasMenu.eyedropper.size."].iter().any(|p| id.starts_with(p))
+        || ["pasteboard.", "crop.", "canvasMenu.eyedropper.size.", "colorSampler.readout."].iter().any(|p| id.starts_with(p))
         || id.starts_with(SPELLING_REPLACE)
         || id == SPELLING_ADD
         || [EYEDROPPER_COPY_HTML, EYEDROPPER_COPY_HEX].contains(&id)
