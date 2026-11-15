@@ -221,6 +221,12 @@ fn build_host(sections: &Arc<PrefSections>, lang: &str, files: Option<&Arc<dyn F
 }
 
 impl Framework {
+    /// The host the framework's components read services from. A window that previews another language
+    /// takes a copy with `Host::with_lang`.
+    pub(crate) fn host(&self) -> &Arc<Host> {
+        &self.host
+    }
+
     /// The framework state of a new app, its host serving `files` where the app has file services.
     pub(crate) fn new(files: Option<Arc<dyn Files>>) -> Self {
         let sections = Arc::new(PrefSections::default());
@@ -398,7 +404,7 @@ impl Framework {
         AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
-    /// The suite client: the theme library and its watcher.
+    /// The suite, for tests that put themes in its library.
     pub(crate) fn suite(&self) -> &SuiteClient {
         &self.suite
     }
