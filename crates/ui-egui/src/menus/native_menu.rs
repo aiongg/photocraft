@@ -14,6 +14,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use craft::menu::{Layout, LayoutOptions, NativeMenu, mac_layout};
 use craft::ui::runtime::commands::{FireSource, fire};
+use craft::ui::runtime::windows::WindowHost;
 
 use crate::PhotocraftApp;
 use crate::menus::items;
@@ -64,7 +65,7 @@ pub fn sync(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // Taken out for the pass: the layout borrows the whole app.
     let Some(mut native) = app.services.native_menu.take() else { return };
     let (gate, rules) = crate::menus::menu_gate(app);
-    native.set_gate(gate.text_editing(ctx.egui_wants_keyboard_input()));
+    native.set_gate(gate.text_editing(WindowHost::of(ctx).typing()));
     native.set_modal_rules(rules);
     let state = state_hash(app, craft::menu::had_input(ctx).then_some(app.frame));
     for c in native.sync_with(state, || laid_out(app, ctx)) {
