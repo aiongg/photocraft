@@ -332,6 +332,7 @@ fn keys_run_their_commands() {
     assert!(!clipped(&h), "the second press releases it");
     press(&mut h, "Cmd+Z");
     assert!(clipped(&h), "one undo puts the clip back");
+    assert_eq!(logged(&h), ["edit.undo"]);
     // With several layers selected the key clips every one above the lowest, and releases them once they all are.
     let s = &mut h.state_mut().session;
     let base = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "Hello").unwrap().2.id;
