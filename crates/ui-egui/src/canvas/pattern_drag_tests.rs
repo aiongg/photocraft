@@ -8,7 +8,7 @@ use photocraft_doc::{Document, Fill, LayerContent, LayerId, Pattern};
 use serde_json::json;
 
 use super::document_display::CanvasHost;
-use super::testing::{ctx, frame, in_gesture, move_to, press, release, view};
+use super::testing::{clear_of_dialogs, ctx, frame, in_gesture, move_to, press, release, view};
 use super::tools::ToolScope;
 use super::tools::dialog::{DialogTools, dialog_tool};
 use crate::PhotocraftApp;
@@ -47,6 +47,7 @@ fn pattern_drag_app(depth: u64, create: bool) -> (PhotocraftApp, craft::ui::dial
     };
     let dialog = if create { crate::pattern_fill_ui::open_new(&mut app).unwrap() } else { crate::pattern_fill_ui::open(&mut app).unwrap() };
     frame(&mut app);
+    clear_of_dialogs(&mut app, [20.0, 15.0]);
     (app, dialog, layer)
 }
 
@@ -87,6 +88,7 @@ fn a_linked_pattern_fill_drag_moves_in_document_space_at_any_view() {
                 app.ui.views[0].zoom = zoom;
                 app.ui.views[0].rotation = rotation;
                 app.ui.view.flip_horizontal = flip;
+                clear_of_dialogs(&mut app, [20.0, 15.0]);
                 let before = app.session.active().unwrap().doc.clone();
                 let count = app.session.active().unwrap().history.entries().len();
                 let start = [20.0, 15.0];
@@ -249,6 +251,7 @@ fn a_pattern_drag_previews_without_editing_masks_selection_or_the_tool() {
     app.ui.tool = Tool::Brush;
     let dialog = crate::pattern_fill_ui::open(&mut app).unwrap();
     frame(&mut app);
+    clear_of_dialogs(&mut app, [20.0, 15.0]);
     let before = app.session.active().unwrap().doc.clone();
     let count = app.session.active().unwrap().history.entries().len();
     let revision = app.session.active().unwrap().revision;
@@ -347,6 +350,7 @@ fn a_drag_moves_the_visible_pattern_not_only_its_phase() {
     app.run(photocraft_engine::pattern_fill_cmds::CREATE, json!({"pattern": pattern, "phase": [0.0, 0.0], "scale": 100, "angle": 0, "link": true})).unwrap();
     let dialog = crate::pattern_fill_ui::open(&mut app).unwrap();
     frame(&mut app);
+    clear_of_dialogs(&mut app, [4.0, 1.0]);
     let band = |doc: &Document| {
         let buf = photocraft_compose::render(doc, photocraft_geom::Rect::new(0, 0, 8, 1));
         (0..8).filter(|x| buf.px[*x as usize][0] > 0.5 && buf.px[*x as usize][1] < 0.5).collect::<Vec<i32>>()

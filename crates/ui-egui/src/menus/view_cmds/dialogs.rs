@@ -686,6 +686,7 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
                 })
             }))
         }
+        "layer.lockLayers" => Some(Ok(opened(crate::layers_panel_ui::open_lock_layers(app)))),
         "view.newGuideLayout" => Some(crate::guide_layout_ui::open(app).map(opened).ok_or_else(|| "no document".into())),
         "type.warpText" => Some(crate::dialogs::open_command_dialog(app, id, label).map(opened)),
         "file.scripts.loadFilesIntoStack" => Some(Ok(json!({"dialog": crate::stack_dialog::open(app).value().to_string()}))),

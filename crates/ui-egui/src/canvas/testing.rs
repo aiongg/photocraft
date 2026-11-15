@@ -86,6 +86,12 @@ pub(crate) fn ctx(app: &PhotocraftApp) -> egui::Context {
     app.ctx().clone()
 }
 
+/// Makes the window the app shows a Mac's: the window host then reports ⌘ as `mac_cmd` and leaves Ctrl its own key, which the
+/// ⌘⌥⌃ gestures need (off macOS the host reports Ctrl as ⌘ and never sets both).
+pub(crate) fn on_a_mac(app: &PhotocraftApp) {
+    craft::ui::testing::windows::set_os(app.ctx(), craft::host::target::Os::Mac);
+}
+
 /// `mods` as the window host takes them: the macOS reading of egui's modifiers (⌘ is `mac_cmd`, or `command` on a
 /// platform where egui folds Ctrl into it; Ctrl is its own key only where it is not the command key).
 fn held(mods: Modifiers) -> Mods {
@@ -126,6 +132,22 @@ fn settle(app: &mut PhotocraftApp) {
 /// The active document's main canvas view as its last pass showed it, rect included.
 pub(crate) fn view(app: &PhotocraftApp) -> Option<CanvasView> {
     active_view(app)
+}
+
+/// Pans the active view so the document point `at` shows in the strip at the canvas's left edge: a dialog opens centred
+/// over the canvas and takes the presses that land on it, so a test whose gesture must reach the canvas starts there.
+pub(crate) fn clear_of_dialogs(app: &mut PhotocraftApp, at: [f64; 2]) {
+    shown(app);
+    let Some(shown_view) = view(app) else { return };
+    let (here, goal) = (shown_view.to_screen(Point::new(at[0], at[1])), Pos2::new(shown_view.rect.left() + 40.0, shown_view.rect.center().y));
+    let moved = shown_view.to_doc(goal) - shown_view.to_doc(here);
+    if let Some(i) = app.session.active_index().filter(|i| *i < app.ui.views.len()) {
+        let v = &mut app.ui.views[i];
+        v.center = [v.center[0] - moved.x as f32, v.center[1] - moved.y as f32];
+        v.fit_pending = false;
+        v.fill_pending = false;
+    }
+    shown(app);
 }
 
 /// The screen point of the document point `at` through the view the canvas last showed.
@@ -204,6 +226,8 @@ pub(crate) fn key(app: &mut PhotocraftApp, key: egui::Key, mods: Modifiers) {
     let Some(key) = Key::from_egui(key) else { panic!("{key:?} has no key of the window host") };
     WindowHost::of(&ctx(app)).inject_key(egui::ViewportId::ROOT, key, held(mods), false);
     settle(app);
+    // The command the key fired in the last pass runs at its end; the pass after it shows what it opened.
+    run_frame(app);
 }
 
 /// Changes the held modifiers with no pointer event: the pointer stays where it is.
