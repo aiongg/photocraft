@@ -55,12 +55,23 @@ fn settle(app: &mut PhotocraftApp) {
     frame(app);
     for _ in 0..2000 {
         frame(app);
-        if describe(app)["previewPending"] == false {
+        // The workspace's window draws a pass or two after it opens, and its first develop starts then: the frame
+        // holds no histogram until that develop has landed.
+        let state = describe(app);
+        if state["previewPending"] == false && !state["histogram"].is_null() {
             return;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     panic!("the RAW Develop preview never finished");
+}
+
+/// Done on the open raw: the request queues it and the workspace's next pass answers it, so the reply is the one the
+/// result pump of that frame left.
+fn done(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<Value, String> {
+    menu(app, ctx, "filter.cameraRaw", &json!({"ui": {"done": true}})).unwrap()?;
+    frame(app);
+    app.raw_reply.take().expect("the frame answered Done")
 }
 
 /// A `menu` request followed by the develop it asks for. The reply describes the open dialog
@@ -1225,7 +1236,7 @@ fn done_saves_the_sidecar_and_opens_nothing() {
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     let set = json!({"contrast": 20, "clarity": 15});
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": set}})).unwrap().unwrap();
-    let r = menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"done": true}})).unwrap().unwrap();
+    let r = done(&mut app, &ctx).unwrap();
     assert_eq!(r["saved"], json!(["IMG_0100.xmp"]), "{r}");
     assert!(app.raw.is_none() && app.raw_shelf.is_empty());
     assert_eq!(app.session.documents().len(), before, "Done opens nothing");
@@ -1258,14 +1269,14 @@ fn done_keeps_the_raws_open_when_a_sidecar_write_fails() {
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     let docs = app.session.documents().len();
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"contrast": 20}}})).unwrap().unwrap();
-    let r = menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"done": true}})).unwrap().unwrap();
-    assert_eq!(r["done"], false, "{r}");
+    let refused = done(&mut app, &ctx).unwrap_err();
+    assert!(!refused.is_empty(), "the refusal names the write error");
     assert_eq!(app.raw.as_ref().map(|_| shown(&app).contrast), Some(20.0), "the edit is still there");
     assert_eq!(app.session.documents().len(), docs, "the raw stays open");
     assert!(app.ui.status_error);
     // At the defaults there is nothing to write: Done closes, without an error.
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"contrast": 0}}})).unwrap().unwrap();
-    let r = menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"done": true}})).unwrap().unwrap();
+    let r = done(&mut app, &ctx).unwrap();
     assert_eq!((r["done"].clone(), r["saved"].clone()), (json!(true), json!([])), "{r}");
     assert!(app.raw.is_none() && !app.ui.status_error, "{}", app.ui.status);
     let _ = std::fs::remove_dir_all(&dir);

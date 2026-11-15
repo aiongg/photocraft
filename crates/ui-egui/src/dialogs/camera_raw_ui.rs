@@ -502,7 +502,7 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
             Target::SmartFilter(index) => Some(index),
             Target::NewFilter | Target::OpenRaw => None,
         },
-        "openingRaw": session.raw_open.as_ref().map(|r| json!({"name": r.name, "path": r.path, "demosaic": r.demosaic.id()})),
+        "openingRaw": session.raw_open.as_ref().map(|r| json!({"name": r.name, "path": r.path, "demosaic": workspace_demosaic(hosted).unwrap_or(r.demosaic).id()})),
         "sourceSize": [source.full_w, source.full_h],
         "previewPending": source.pending(),
         "previewApproximate": !detail.ready && (source.pw != source.full_w || source.ph != source.full_h),
