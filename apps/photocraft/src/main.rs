@@ -484,10 +484,9 @@ fn main() -> eframe::Result {
         Box::new(move |cc| {
             created_in_callback.store(true, std::sync::atomic::Ordering::Relaxed);
             let automation = control.as_ref().map(|(_, _, workspace)| workspace.clone());
-            // PLAN: top-w30 gives `services::native` its `wake` parameter; the closure wakes the window's event loop.
             let wake = {
                 let ctx = cc.egui_ctx.clone();
-                move || ctx.request_repaint()
+                craft::host::Wake::new(move || ctx.request_repaint())
             };
             let mut services = services::native(automation, wake);
             services.preset_store = presets;

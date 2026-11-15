@@ -17,7 +17,7 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let item = chrome_ui::status_item(&app.ui.chrome);
     let document = app.session.active().map(|st| Size::new(st.doc.size.width as f64, st.doc.size.height as f64));
     // The active document's main canvas as its last pass showed it; a document not yet shown has no readout.
-    let mut view = crate::document_display::active_view(app);
+    let mut view = crate::canvas::active_view(app);
     let message = (!app.ui.status.is_empty()).then(|| {
         StatusMessage::new(app.ui.status.clone()).tone(if app.ui.status_error { Tone::Warn } else { Tone::Neutral })
     });
