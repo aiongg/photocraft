@@ -278,10 +278,10 @@ fn params(svg: bool) -> Vec<Param> {
 
 /// The editor-choice dialog over `pending`'s choice. "Stop syncing" is offered while an editor
 /// session for the same contents runs (`running`).
-fn dialog(pending: &Pending, running: bool) -> HostedParamDialog {
+fn dialog(ctx: &egui::Context, pending: &Pending, running: bool) -> HostedParamDialog {
     let svg = pending.target.extension == "svg";
     let fields = DialogFields::from_pairs([("editor", editor_id(pending.editor).to_owned()), ("program", pending.program.clone().unwrap_or_default())]);
-    HostedParamDialog::new(KEY, fields, move |fields| {
+    HostedParamDialog::new(ctx, KEY, fields, move |fields| {
         let title = tr(if svg { "Edit SVG Smart Object" } else { "Edit Vector Smart Object" });
         let dialog = ParamDialog::new(KEY, Label::from(title), params(svg)).values(Bind::bound(fields));
         if running {
@@ -306,7 +306,7 @@ pub(crate) fn host(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let open = app.smart_svg.dialog.filter(|id| app.framework.dialogs.stack().ids().any(|shown| shown == *id));
     match (app.smart_svg.pending.as_ref(), open) {
         (Some(pending), None) => {
-            let dialog = dialog(pending, session_running(app, pending));
+            let dialog = dialog(ctx, pending, session_running(app, pending));
             app.smart_svg.dialog = app.framework.dialogs.open_unless_open(dialog).ok();
         }
         (None, Some(id)) => {

@@ -75,7 +75,7 @@ pub(crate) fn open_io(app: &mut PhotocraftApp) -> DialogId {
         ("customShapes", FieldValue::Bool(true)),
         ("tools", FieldValue::Bool(true)),
     ]);
-    let dialog = HostedParamDialog::command(IO, fields, |fields| {
+    let dialog = HostedParamDialog::command(app.ctx(), IO, fields, |fields| {
         ParamDialog::command(IO, tl!("Export/Import Presets"), io_params()).values(Bind::bound(fields))
     });
     app.framework.dialogs.open(dialog)

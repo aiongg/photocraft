@@ -204,8 +204,7 @@ fn lock_params() -> Vec<Param> {
 
 /// Opens the Lock Layers dialog (Layer › Lock Layers…, ⌘/ and the panel menu all open it).
 pub(crate) fn open_lock_layers(app: &mut PhotocraftApp) -> DialogId {
-    // PLAN: assumed an empty `DialogFields` opens each parameter with its default.
-    let dialog = HostedParamDialog::new(LOCK_LAYERS, DialogFields::new(), |fields| {
+    let dialog = HostedParamDialog::new(app.ctx(), LOCK_LAYERS, DialogFields::new(), |fields| {
         ParamDialog::new(LOCK_LAYERS, tl!("Lock Layers"), lock_params()).values(Bind::bound(fields))
     });
     app.framework.dialogs.open(dialog)

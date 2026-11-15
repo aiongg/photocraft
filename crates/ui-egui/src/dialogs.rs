@@ -134,7 +134,7 @@ pub(crate) mod params {
         build: impl for<'b> Fn(&'b mut DialogFields) -> ParamDialog<'b> + Send + 'static,
     ) -> DialogId {
         let canvas = app.session.active_index().map(|idx| CanvasHost::main(idx).canvas_id());
-        let dialog = HostedParamDialog::new(key, fields, move |fields| {
+        let dialog = HostedParamDialog::new(app.ctx(), key, fields, move |fields| {
             let mut dialog = build(fields).history(true);
             if let Some(save) = &save {
                 dialog = dialog.remember(save.clone());

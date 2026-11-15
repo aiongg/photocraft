@@ -361,7 +361,8 @@ fn color_lookup(app: &PhotocraftApp, params: &mut Vec<Param>) {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
         out.edit.response
-    });
+    })
+    .companions(["file", "data", "fileName"]);
     params.insert(at.min(params.len()), row);
 }
 
@@ -414,10 +415,7 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
 
 /// The source layer a form holds: the row's own choice, or the id a caller set through the row's key.
 fn layer_ref(fields: &DialogFields) -> Option<i64> {
-    fields.int("sourceLayer").or_else(|| match fields.get("sourceLayer")? {
-        FieldValue::Json(value) => value.as_i64(),
-        _ => None,
-    })
+    fields.int("sourceLayer")
 }
 
 // --- Replace Color ---------------------------------------------------------------------------------------------

@@ -394,9 +394,6 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) ->
 }
 
 fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) -> Reply {
-    if host(app).open_dialogs().iter().any(|d| d.parent == Some(id)) {
-        return err("confirm or cancel the color picker first");
-    }
     let choice = p.get("choice").and_then(Value::as_str);
     if let Some(choice) = choice {
         for (field, value) in map_request(app, id, "choice", json!(choice)) {

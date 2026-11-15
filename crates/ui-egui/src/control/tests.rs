@@ -505,7 +505,7 @@ fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
     let top = |app: &mut PhotocraftApp| call(app, &ctx, "ui.inspect", json!({}))["result"]["dialogs"].as_array().and_then(|d| d.last().cloned());
     let ok = |app: &mut PhotocraftApp, method: &str, params: Value| call(app, &ctx, method, params)["ok"].clone();
 
-    app.framework.dialogs.open(HostedParamDialog::new("gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
+    app.framework.dialogs.open(HostedParamDialog::new(&ctx, "gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
         ParamDialog::new("gaussianBlur", "Gaussian Blur", Param::parse_list(r#"{"radius":0.1..1000=1}"#)).values(Bind::bound(fields))
     }));
     let blur = top(&mut app).expect("the blur dialog is listed")["id"].clone();
@@ -581,7 +581,7 @@ fn inspect_lists_hosted_dialogs_in_stack_order() {
     // Each dialog takes its place when it opens, with no pass between the opens. The host keeps one dialog
     // per type, so the two are of different types.
     let lower = app.framework.dialogs.open(StandardPrompt::new(PromptKind::TrashMask));
-    let upper = app.framework.dialogs.open(HostedParamDialog::new("gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
+    let upper = app.framework.dialogs.open(HostedParamDialog::new(&ctx, "gaussianBlur", DialogFields::from_pairs([("radius", 1.0)]), |fields| {
         ParamDialog::new("gaussianBlur", "Gaussian Blur", Param::parse_list(r#"{"radius":0.1..1000=1}"#)).values(Bind::bound(fields))
     }));
     let (lower_id, upper_id) = (json!(lower.value().to_string()), json!(upper.value().to_string()));

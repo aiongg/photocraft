@@ -172,8 +172,9 @@ fn another_dialog_cannot_consume_the_selected_step() {
     let key = h.state().framework.dialogs.open_dialogs().into_iter().find(|open| open.id == real).and_then(|open| open.key).expect("the editor has a key");
     // A second hosted dialog with the same key and values, as another opener could make it.
     let impostor_key = key.clone();
+    let ctx = h.ctx.clone();
     let fake = h.state_mut().framework.dialogs.open(
-        HostedParamDialog::new(key, DialogFields::new(), move |fields: &mut DialogFields| {
+        HostedParamDialog::new(&ctx, key, DialogFields::new(), move |fields: &mut DialogFields| {
             let rows = vec![
                 Param::new("width", "Width", ParamKind::number(None, None, 4.0, 1.0, 0)),
                 Param::new("height", "Height", ParamKind::number(None, None, 3.0, 1.0, 0)),
