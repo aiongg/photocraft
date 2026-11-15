@@ -99,10 +99,10 @@ fn adjustment_editor_reopens_stored_parameters_and_updates_instead_of_appending(
     let steps = app.session.active().unwrap().history.past_len();
     confirm(&mut app);
     assert_eq!(smart(&app, layer).smart_filters.len(), 3);
-    assert_eq!(smart(&app, layer).smart_filters[2].params["hue"], json!(75));
+    assert_eq!(smart(&app, layer).smart_filters[2].params["hue"].as_f64(), Some(75.0));
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
     app.run("edit.undo", json!({})).unwrap();
-    assert_eq!(smart(&app, layer).smart_filters[2].params["hue"], json!(35));
+    assert_eq!(smart(&app, layer).smart_filters[2].params["hue"].as_f64(), Some(35.0));
     app.run("image.adjustments.invert", json!({})).unwrap();
     let sm = smart(&app, layer).clone();
     super::open_editor(&mut app, &ctx, layer.0, &sm, 3);
@@ -246,6 +246,8 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
     app.session.prefs.edit(|p| {
         p.dialogs.insert(command.into(), json!({"reduceNoise": 60, "radius": 9}));
     });
+    // The dialogs' last-used values live in the framework's remembered section: move the seeded ones there, as startup does.
+    app.framework.move_memories(&mut app.session);
     let mut sm = smart(&app, layer).clone();
     let index = sm.smart_filters.iter().position(|f| f.command == command).unwrap();
     sm.smart_filters[index].params = json!({"amount": 125, "radius": 2});
