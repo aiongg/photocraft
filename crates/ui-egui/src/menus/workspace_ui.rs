@@ -445,6 +445,24 @@ pub fn menu(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Result<
     })
 }
 
+/// The saved ratio a `{name, ratio}` request names, or why it names none.
+fn parse_custom_par(p: &Value) -> Result<CustomPar, String> {
+    let name = p.get("name").and_then(Value::as_str).map(str::trim).filter(|n| !n.is_empty()).ok_or("pass `name`")?.to_string();
+    let ratio = p.get("ratio").and_then(Value::as_f64).ok_or("pass `ratio`")? as f32;
+    if !(0.1..=10.0).contains(&ratio) {
+        return Err("the ratio must be between 0.100 and 10.000".into());
+    }
+    Ok(CustomPar { name, ratio })
+}
+
+/// Judges a shell parameter dialog's OK before it closes: the Custom Pixel Aspect Ratio needs a name and a ratio in range.
+pub(crate) fn check_param(_app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), craft::ui::runtime::env::Label> {
+    if result.key == CUSTOM_PAR {
+        parse_custom_par(&serde_json::to_value(&result.fields).unwrap_or_default()).map_err(craft::ui::runtime::env::Label::from)?;
+    }
+    Ok(())
+}
+
 /// Custom Pixel Aspect Ratio: `{name, ratio}` adds (or updates) and selects; `{delete: name}`
 /// removes; `{select: name}` selects a saved one.
 fn custom_par(app: &mut PhotocraftApp, p: &Value) -> Result<Value, String> {
@@ -463,12 +481,7 @@ fn custom_par(app: &mut PhotocraftApp, p: &Value) -> Result<Value, String> {
     let c = if let Some(n) = p.get("select").and_then(Value::as_str) {
         s.custom_pars.iter().find(|c| c.name == n).cloned().ok_or_else(|| format!("no custom pixel aspect ratio \"{n}\""))?
     } else {
-        let name = p.get("name").and_then(Value::as_str).map(str::trim).filter(|n| !n.is_empty()).ok_or("pass `name`")?.to_string();
-        let ratio = p.get("ratio").and_then(Value::as_f64).ok_or("pass `ratio`")? as f32;
-        if !(0.1..=10.0).contains(&ratio) {
-            return Err("the ratio must be between 0.100 and 10.000".into());
-        }
-        let c = CustomPar { name, ratio };
+        let c = parse_custom_par(p)?;
         match s.custom_pars.iter_mut().find(|x| x.name == c.name) {
             Some(x) => *x = c.clone(),
             None => s.custom_pars.push(c.clone()),

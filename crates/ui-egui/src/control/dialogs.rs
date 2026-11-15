@@ -159,6 +159,11 @@ fn is_unsaved(app: &PhotocraftApp, id: DialogId) -> bool {
     host(app).get_by_id::<craft::ui::dialog::UnsavedChangesDialog>(id).is_some()
 }
 
+/// Whether confirming dialog `id` answers the unsaved-changes prompt with Save.
+pub(crate) fn is_save_answer(app: &PhotocraftApp, id: DialogId) -> bool {
+    is_unsaved(app, id) && fields_of(app, id)["choice"] == "save"
+}
+
 fn is_profile(app: &PhotocraftApp, id: DialogId) -> bool {
 
     host(app).get_by_id::<craft::color::ui::ProfileMismatchDialog>(id).is_some()
@@ -404,13 +409,28 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value
     }
     // The unsaved-changes prompt answers Save when no choice is named.
     let judged = choice.unwrap_or("save");
+    // A Save writes the document back, so it is judged as `file.save` before the question closes.
+    if is_save_answer(app, id) {
+        if let Err(error) = crate::discard_ui::authorize_save(app, true) {
+            return err(error);
+        }
+    }
     if let Some((command, params)) = command_of(app, id, judged)
         && let Some(authorize) = app.services.automation_command.as_ref()
         && let Err(error) = authorize(&command, &params)
     {
         return err(error);
     }
-    super::run_waiting(app, wait_param(p), |app| crate::dialogs::confirm(app, ctx, id).map(|()| Value::Null))
+    // The unsaved-changes prompt answers with what is left to answer: whether another prompt or a file dialog is open.
+    let unsaved = is_unsaved(app, id);
+    super::run_waiting(app, wait_param(p), |app| {
+        crate::dialogs::confirm(app, ctx, id)?;
+        Ok(if unsaved {
+            json!({"open": app.discard.is_some(), "fileDialog": app.file_dialog_open()})
+        } else {
+            Value::Null
+        })
+    })
 }
 
 fn apply(app: &mut PhotocraftApp, id: DialogId) -> Reply {

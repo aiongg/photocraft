@@ -301,7 +301,7 @@ fn menu_and_dialog_requests_wait_for_jobs_unless_asked_not_to() {
         let outcome = control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.blurMore", "wait": wait}));
         land(&mut h, "Blur More", outcome, wait);
         let crate::control::Reply::Done(v) = control(&mut h, "ui.menu.invoke", json!({"id": "filter.blur.gaussianBlur"})) else { panic!("dialog") };
-        let dialog = v["result"]["dialog"].as_u64().expect("Gaussian Blur opens its dialog");
+        let dialog = v["result"]["dialog"].as_str().expect("Gaussian Blur opens its dialog (its id is the string ui.inspect lists)");
         control(&mut h, "ui.dialog.set", json!({"dialog": dialog, "field": "radius", "value": 3}));
         let outcome = control(&mut h, "ui.dialog.confirm", json!({"dialog": dialog, "wait": wait}));
         land(&mut h, "Gaussian Blur", outcome, wait);

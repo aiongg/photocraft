@@ -1381,6 +1381,26 @@ impl LayerMaskOverlay {
     }
 }
 
+/// The remembered swatches (`ToolState::saved_colors`); its default is the default swatches, so a file without them
+/// and a reset key both mean black over white.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ToolColors(pub Value);
+
+impl Default for ToolColors {
+    fn default() -> Self {
+        let pixels = crate::ToolState::PIXEL_COLORS;
+        Self(crate::ToolState::saved_colors([pixels, crate::ToolState::MASK_COLORS], &[]))
+    }
+}
+
+impl std::ops::Deref for ToolColors {
+    type Target = Value;
+    fn deref(&self) -> &Value {
+        &self.0
+    }
+}
+
 /// All preferences. JSON keys are the `edit.preferences.<section>` ids.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -1473,7 +1493,7 @@ pub struct Preferences {
     pub selected_tool: Value,
     /// Foreground/background swatches for pixels and masks and exact CMYK picks, restored by the shell at launch.
     /// Null in older files, which retain the default black/white pixel colours.
-    pub tool_colors: Value,
+    pub tool_colors: ToolColors,
     /// The tools used last, most recent first, restored at launch so each toolbar slot shows the
     /// tool it was left on and each tool key brings it back, as in Photoshop (#3569). Tool-name
     /// strings owned and validated by the shell; null in older files.

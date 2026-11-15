@@ -55,6 +55,9 @@ fn settle(app: &mut PhotocraftApp) {
     frame(app);
     for _ in 0..2000 {
         frame(app);
+        // The develop waits on the framework's queue until a request finishes it, as `waitPreview` does.
+        craft::ui::runtime::pending::finish_jobs(app.ctx(), std::time::Duration::from_secs(30));
+        frame(app);
         // The workspace's window draws a pass or two after it opens, and its first develop starts then: the frame
         // holds no histogram until that develop has landed.
         let state = describe(app);
@@ -63,7 +66,9 @@ fn settle(app: &mut PhotocraftApp) {
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    panic!("the RAW Develop preview never finished");
+    let d = describe(app);
+    let open: Vec<_> = app.framework.dialogs.open_dialogs().into_iter().map(|d| d.key).collect();
+    panic!("the RAW Develop preview never finished: pending={} histogram={} revision={} detail={} dialogs={open:?} raw_none={}", d["previewPending"], d["histogram"].is_null(), d["previewRevision"], d["detailPending"], app.raw.is_none());
 }
 
 /// Done on the open raw: the request queues it and the workspace's next pass answers it, so the reply is the one the
