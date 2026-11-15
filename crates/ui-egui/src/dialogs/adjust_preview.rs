@@ -231,7 +231,7 @@ struct GpuProxy {
 fn dialog(app: &PhotocraftApp) -> Option<(String, Value, bool)> {
     let open = crate::adjust_dialog::open_value(app).filter(|open| open.smart_filter.is_none())?;
     let hosted = crate::adjust_dialog::hosted(app, open.id)?;
-    let params = crate::adjust_editors::values::to_params(hosted.value(), &open.cx);
+    let params = crate::adjust_editors::values::to_params(hosted.value(), &open.cx, hosted.edited());
     crate::actions::authorize_panel_preview(app, open.id, &open.command, &params).ok()?;
     Some((open.kind.clone(), params, hosted.is_previewing() && !hosted.is_comparing()))
 }

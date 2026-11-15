@@ -117,7 +117,7 @@ pub fn layer_reset(app: &mut PhotocraftApp, id: LayerId, adj: &Adjustment) -> Va
                     }
                     None => zeroed(found),
                 };
-                values::to_params(&value, &vcx)
+                values::to_params(&value, &vcx, true)
             }
             Err(_) => committed,
         }
@@ -216,7 +216,7 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
 
     for event in out.edit {
         match &event {
-            EditEvent::Update { value: proposed, .. } => app.live_adjust = Some((id, values::to_params(proposed, &vcx))),
+            EditEvent::Update { value: proposed, .. } => app.live_adjust = Some((id, values::to_params(proposed, &vcx, true))),
             EditEvent::Commit { after, .. } | EditEvent::Set { after, .. } => {
                 let key = if session { Some(layer_key(id)) } else { crate::history_keys::coalesce(GESTURE_KEY, &event) };
                 commit(app, id, &mut record, &committed, after, &vcx, key);
@@ -228,7 +228,7 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
     match out.ask {
         Some(AdjustAsk::Auto) => match black_white_auto(app, Some(id), None) {
             Ok(Value::Object(weights)) => {
-                let mut params = values::to_params(&value, &vcx);
+                let mut params = values::to_params(&value, &vcx, true);
                 if let Some(target) = params.as_object_mut() {
                     target.extend(weights);
                 }
@@ -267,7 +267,7 @@ fn commit(
 ) {
     if value != committed {
         let rev = app.session.active().map(|s| s.revision);
-        let mut params = values::to_params(value, vcx);
+        let mut params = values::to_params(value, vcx, true);
         params["layer"] = json!(id.0);
         if let Some(key) = coalesce {
             params["coalesce"] = json!(key);
@@ -290,7 +290,7 @@ fn follow_color_pick(app: &mut PhotocraftApp, id: LayerId, record: &mut Properti
             if let Some(picked) = current {
                 let mut preview = pick.before.clone();
                 if answer_color(&mut preview, &pick.key, picked.color) {
-                    app.live_adjust = Some((id, values::to_params(&preview, vcx)));
+                    app.live_adjust = Some((id, values::to_params(&preview, vcx, true)));
                 }
             }
             record.pick = Some(pick);

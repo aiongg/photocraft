@@ -412,14 +412,10 @@ fn kind_name(value: &AdjustValue) -> &'static str {
 
 /// The complete params of `value`: its fields written over [`ValueCx::base`], so what no editor shows is kept.
 ///
-/// A base the engine cannot read opens the editor on the neutral value; while the user has not edited it, the base
+/// A base the engine cannot read opens the editor on the neutral value; while the value is not `edited`, the base
 /// itself is the params, so the engine refuses it at OK instead of the dialog turning it into a neutral setting.
-pub fn to_params(value: &AdjustValue, cx: &ValueCx) -> Value {
-    let kind = kind_name(value);
-    if from_params(kind, &cx.base, cx).is_err()
-        && let Ok(defaults) = adjust_params::default_for(kind, cx.tone_mode())
-        && from_params(kind, &adjust_params::to_params(&defaults), cx).is_ok_and(|neutral| neutral == *value)
-    {
+pub fn to_params(value: &AdjustValue, cx: &ValueCx, edited: bool) -> Value {
+    if !edited && from_params(kind_name(value), &cx.base, cx).is_err() {
         return cx.base.clone();
     }
     write_params(value, cx)
@@ -665,7 +661,7 @@ mod tests {
                     set_curves_mode(&mut curves, CurvesMode::Pencil);
                 }
                 let value = AdjustValue::Curves { curves: curves.clone() };
-                let before = to_params(&value, &cx);
+                let before = to_params(&value, &cx, true);
                 assert!(before.get("points").is_some() && before.get("b").is_some(), "combined and component records both written");
                 match &mut curves.curves[channel] {
                     Curve::Points { points, corners, .. } => {
@@ -675,7 +671,7 @@ mod tests {
                     Curve::Map(map) => map[100] = 240.0,
                     _ => {}
                 }
-                let after = to_params(&AdjustValue::Curves { curves: curves.clone() }, &cx);
+                let after = to_params(&AdjustValue::Curves { curves: curves.clone() }, &cx, true);
                 assert_eq!(after["pencil"], json!(pencil));
                 if channel == 0 {
                     assert_ne!(after["points"], before["points"]);
@@ -686,7 +682,7 @@ mod tests {
                 }
                 let mut back = curves;
                 set_curves_mode(&mut back, if pencil { CurvesMode::Points } else { CurvesMode::Pencil });
-                let flipped = to_params(&AdjustValue::Curves { curves: back }, &cx);
+                let flipped = to_params(&AdjustValue::Curves { curves: back }, &cx, true);
                 assert!(flipped.get("points").is_some() && flipped.get("b").is_some());
             }
         }

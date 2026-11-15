@@ -98,7 +98,8 @@ pub(crate) fn hosted_mut(app: &mut PhotocraftApp, id: DialogId) -> &mut HostedAd
 /// The open dialog's engine parameters: its value over the parameters it opened with.
 pub(crate) fn open_params(app: &PhotocraftApp) -> Option<Value> {
     let open = open_value(app)?;
-    Some(values::to_params(hosted(app, open.id)?.value(), &open.cx))
+    let dialog = hosted(app, open.id)?;
+    Some(values::to_params(dialog.value(), &open.cx, dialog.edited()))
 }
 
 /// Whether `command` opens an adjustment dialog (when run without params).
@@ -148,10 +149,27 @@ fn eyedropper_of(picker: TonePicker) -> Option<(photocraft_engine::adjust_params
     }
 }
 
-/// Sets the open dialog from engine parameters: the addressing keys (`target`, `layer`, `document`) retarget it, the rest
-/// become its value. An unresolved dialog that is retargeted seeds again from the new address when it resolves. Refused
-/// parameters leave the value as it is.
+/// Edits the open dialog from engine parameters (automation's sets, a picker's sample, Auto): the addressing keys
+/// (`target`, `layer`, `document`) retarget it, the rest become its value. An unresolved dialog that is retargeted seeds
+/// again from the new address when it resolves. Refused parameters leave the value as it is.
 pub fn apply_params(app: &mut PhotocraftApp, id: DialogId, params: &Value) -> bool {
+    set_params(app, id, params, Change::Edit)
+}
+
+/// Seeds the open dialog from engine parameters as [`apply_params`] sets them, without counting as an edit: the
+/// settings an opening restores.
+fn seed_params(app: &mut PhotocraftApp, id: DialogId, params: &Value) -> bool {
+    set_params(app, id, params, Change::Seed)
+}
+
+/// Whether a change of the dialog's value is the user's edit or the value the dialog opens at.
+#[derive(Clone, Copy, PartialEq)]
+enum Change {
+    Edit,
+    Seed,
+}
+
+fn set_params(app: &mut PhotocraftApp, id: DialogId, params: &Value, change: Change) -> bool {
     let Some(open) = app.adjust_open.as_mut().filter(|open| open.id == id) else { return false };
     let mut retargeted = false;
     for (key, address) in addressing(params) {
@@ -169,7 +187,10 @@ pub fn apply_params(app: &mut PhotocraftApp, id: DialogId, params: &Value) -> bo
     }
     let Ok(value) = values::from_params(&open.kind, params, &open.cx) else { return false };
     let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) else { return false };
-    *dialog.value_mut() = value;
+    match change {
+        Change::Edit => *dialog.value_mut() = value,
+        Change::Seed => dialog.seed(value),
+    }
     true
 }
 
@@ -327,7 +348,7 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, String> 
         && let Some(Value::Object(mut params)) = open_params(app)
     {
         params.extend(kept);
-        apply_params(app, id, &Value::Object(params));
+        seed_params(app, id, &Value::Object(params));
     }
     Ok(id)
 }
@@ -516,7 +537,7 @@ fn reset_target(kind: String, mode: ColorMode, isolated: Option<photocraft_engin
         let mut params = photocraft_engine::adjust_params::to_params(&defaults);
         let cx = value_cx(mode, isolated.clone(), params.clone());
         if kind == "colorBalance"
-            && let Some(preserve) = values::to_params(current, &cx).get("preserveLuminosity").cloned()
+            && let Some(preserve) = values::to_params(current, &cx, true).get("preserveLuminosity").cloned()
             && let Some(object) = params.as_object_mut()
         {
             object.insert("preserveLuminosity".into(), preserve);
@@ -614,7 +635,7 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, Str
     if let Value::Object(object) = &mut restored {
         object.extend(addressing(&open.cx.base));
     }
-    apply_params(app, id, &restored);
+    seed_params(app, id, &restored);
     Ok(id)
 }
 
@@ -659,9 +680,9 @@ fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, params:
 }
 
 /// Validate tone edits before the Smart Filter renderer uses them for preview or commit: the parameters the edit
-/// sends, or the engine's refusal of them.
-pub(crate) fn smart_filter_params(app: &PhotocraftApp, open: &OpenAdjust, value: &AdjustValue) -> Result<Value, String> {
-    let params = values::to_params(value, &open.cx);
+/// sends, or the engine's refusal of them. `edited` is the dialog's [`edited`](FrameworkDialog::edited).
+pub(crate) fn smart_filter_params(app: &PhotocraftApp, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<Value, String> {
+    let params = values::to_params(value, &open.cx, edited);
     if matches!(open.kind.as_str(), "levels" | "curves") {
         photocraft_engine::adjust_params::from_params(&open.kind, &params, None, curve_mode(app, &open.kind, &open.target)).map_err(|error| error.to_string())?;
     }
@@ -729,7 +750,7 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
         }
         (open.mode, open.target, open.cx, open.unresolved, open.picker_base, open.picked) = (seeded.mode, seeded.target, seeded.cx, false, None, None);
         if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) {
-            *dialog.value_mut() = seeded.value;
+            dialog.seed(seeded.value);
         }
         return;
     }
@@ -748,10 +769,10 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
 }
 
 /// Authorizes and runs the confirmed command (one history step), then remembers the settings.
-fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue) -> Result<(), String> {
+fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<(), String> {
     let params = match open.smart_filter {
-        Some(_) => smart_filter_params(app, open, value)?,
-        None => values::to_params(value, &open.cx),
+        Some(_) => smart_filter_params(app, open, value, edited)?,
+        None => values::to_params(value, &open.cx, edited),
     };
     crate::actions::authorize_panel_preview(app, open.id, &open.command, &params)?;
     let captured = open.smart_filter.as_ref().map_or(Value::Null, |(_, target)| target.clone());
@@ -763,10 +784,10 @@ fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust
 
 /// The hooks of a playing Action around a confirmed step dialog: the action continues after the command. A refused
 /// command keeps the dialog open and the step paused: the user can change the values and press OK again, or cancel.
-fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue) -> Result<(), String> {
+fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, value: &AdjustValue, edited: bool) -> Result<(), String> {
     // Taken before the command runs: the step dialog's playback is looked up by the dialog's id.
     let token = crate::actions::token_of(app, open.id);
-    run_confirmed(app, ctx, open, value)?;
+    run_confirmed(app, ctx, open, value, edited)?;
     match token {
         Some(token) => crate::actions::resume(app, token),
         None => Ok(()),
@@ -776,9 +797,11 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, valu
 /// The held OK of the dialog `id`: runs its command and answers the dialog. A refusal keeps the dialog open, showing
 /// why, with the adjustment still open; an accepted OK ends it, and the dialog closes at its next pass.
 fn answer_held(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) {
-    let Some(value) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id).and_then(FrameworkDialog::take_ok) else { return };
+    let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) else { return };
+    let edited = dialog.edited();
+    let Some(value) = dialog.take_ok() else { return };
     let Some(open) = app.adjust_open.take() else { return };
-    let answer = confirm(app, ctx, &open, &value);
+    let answer = confirm(app, ctx, &open, &value, edited);
     if answer.is_err() {
         app.adjust_open = Some(open);
     }
