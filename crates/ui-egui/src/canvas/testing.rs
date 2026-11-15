@@ -164,6 +164,14 @@ pub(crate) fn click(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
     settle(app);
 }
 
+/// A secondary-button press and release at `at`.
+pub(crate) fn secondary_click(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
+    shown(app);
+    let pos = to_screen(app, at);
+    WindowHost::of(&ctx(app)).inject_click(egui::ViewportId::ROOT, pos, PointerButton::Secondary, 1, held(mods), false);
+    settle(app);
+}
+
 /// A double click at `at`: one click with a count of 2, so egui counts the presses.
 pub(crate) fn double_click(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
     shown(app);

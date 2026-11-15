@@ -125,14 +125,13 @@ fn info_panel_shows_guide_drag_position_outside_canvas() {
 #[test]
 fn rulers_open_as_last_set_after_a_restart() {
     use std::sync::Arc;
-    // PLAN: ui-egui's dev-dependencies need craft-settings with its `testing` feature (top-w19 owns Cargo.toml).
-    let files = Arc::new(craft_settings::testing::MemoryFiles::new());
+    let files = Arc::new(craft::settings::testing::MemoryFiles::new());
     let scratch = std::env::temp_dir().join("photocraft-rulers-restart");
-    let launch = |files: &Arc<craft_settings::testing::MemoryFiles>| {
-        let options = craft_settings::OpenOptions::new(craft_settings::Location::Dir(scratch.clone())).files(files.clone());
+    let launch = |files: &Arc<craft::settings::testing::MemoryFiles>| {
+        let options = craft::settings::OpenOptions::new(craft::settings::Location::Dir(scratch.clone())).files(files.clone());
         PhotocraftApp::new(
             photocraft_engine::Session::new(),
-            crate::Services { settings: Some(craft_settings::SettingsStore::open_with(options)), ..Default::default() },
+            crate::Services { settings: Some(craft::settings::SettingsStore::open_with(options)), ..Default::default() },
         )
     };
     for on in [true, false] {

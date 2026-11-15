@@ -103,7 +103,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
     assert!(app.filter_preview.as_ref().unwrap().result.is_some());
 
     // A preview for old values occupies the worker until it is cancelled.
-    let dialog = top_dialog(&app).value();
+    let dialog = top_dialog(&app);
     let st = app.session.active().unwrap();
     let stale = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
@@ -151,7 +151,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
 // test that relies on a real blur beating a 150 ms timer is a test that fails on a loaded box.
 #[cfg(not(target_arch = "wasm32"))]
 fn gated_blur_preview(app: &mut PhotocraftApp, ctx: &egui::Context) -> (std::sync::mpsc::Sender<()>, f64) {
-    let dialog = top_dialog(app).value();
+    let dialog = top_dialog(app);
     let st = app.session.active().expect("a document is active");
     let command = "filter.blur.gaussianBlur";
     let params = app.with_mask_target(command, crate::filter_dialog::params_of(&fields(app)));
@@ -559,7 +559,7 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
     // before that job lands: its result is stale by the time it arrives.
     let moved = first + 4.0;
     set_field(&mut app, &ctx, "radius", json!(moved));
-    let dialog = top_dialog(&app).value();
+    let dialog = top_dialog(&app);
     let st = app.session.active().expect("a document is active");
     let key = crate::filter_dialog::FilterPreviewKey {
         doc: st.doc.id,
@@ -621,7 +621,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     // frame can still be replaced by the reopened dialog's own preview before we stop.
     drive_until(&mut app, &ctx, "the first dialog's frame to arrive", |a| {
         if let Some(preview) = &a.filter_preview {
-            assert_ne!(preview.key.dialog, first_dialog.value(), "a reopened dialog painted the previous dialog's preview");
+            assert_ne!(preview.key.dialog, first_dialog, "a reopened dialog painted the previous dialog's preview");
         }
         !a.filter_preview_worker.busy()
     });

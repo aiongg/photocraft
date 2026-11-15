@@ -32,7 +32,7 @@ fn off(p: [f64; 2], d: [f64; 2]) -> [f64; 2] {
 }
 
 /// A document with a Pattern Fill dialog open: editing an existing linked fill, or creating one.
-fn pattern_drag_app(depth: u64, create: bool) -> (PhotocraftApp, craft::ui::panels::dialog::DialogId, Option<u64>) {
+fn pattern_drag_app(depth: u64, create: bool) -> (PhotocraftApp, craft::ui::dialog::DialogId, Option<u64>) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 40, "height": 30, "depth": depth})).unwrap();
     let layer = if create {
@@ -51,13 +51,13 @@ fn pattern_drag_app(depth: u64, create: bool) -> (PhotocraftApp, craft::ui::pane
 }
 
 /// Ends the dialog with OK on the context the canvas frames run on.
-fn confirm(app: &mut PhotocraftApp, dialog: craft::ui::panels::dialog::DialogId) {
+fn confirm(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId) {
     let ctx = ctx(app);
     crate::dialogs::confirm(app, &ctx, dialog).unwrap();
 }
 
 /// Ends the dialog with Cancel on the context the canvas frames run on.
-fn cancel(app: &mut PhotocraftApp, dialog: craft::ui::panels::dialog::DialogId) {
+fn cancel(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId) {
     let ctx = ctx(app);
     crate::dialogs::cancel(app, &ctx, dialog).unwrap();
 }
@@ -83,9 +83,10 @@ fn a_linked_pattern_fill_drag_moves_in_document_space_at_any_view() {
         for depth in [8, 16, 32] {
             for (zoom, rotation, flip) in cases {
                 let (mut app, dialog, layer) = pattern_drag_app(depth, create);
-                // PLAN: assumed cw.P2b gains `set_view(app, zoom, rotation, flip)` (canvas-widgets-w14); the
-                // pattern drag must be independent of all three.
-                super::testing::set_view(&mut app, zoom, rotation, flip);
+                // The pattern drag must be independent of all three.
+                app.ui.views[0].zoom = zoom;
+                app.ui.views[0].rotation = rotation;
+                app.ui.view.flip_horizontal = flip;
                 let before = app.session.active().unwrap().doc.clone();
                 let count = app.session.active().unwrap().history.entries().len();
                 let start = [20.0, 15.0];

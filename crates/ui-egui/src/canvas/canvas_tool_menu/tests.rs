@@ -71,7 +71,7 @@ pub(super) fn confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) {
 pub(super) fn pen_clicks(app: &mut PhotocraftApp, at: &[(f64, f64)]) {
     app.ui.tool = Tool::Pen;
     for &(x, y) in at {
-        crate::vector_ui::test_input::click(app, x, y); // PLAN: assumed click(app: &mut PhotocraftApp, x: f64, y: f64)
+        crate::canvas::testing::click(app, [x, y], Modifiers::NONE);
     }
 }
 
@@ -142,7 +142,7 @@ fn document_state(app: &PhotocraftApp) -> impl PartialEq + use<> {
     (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), app.session.journal.len())
 }
 
-fn view_of(app: &PhotocraftApp) -> Option<(kurbo::Point, f64)> {
+fn view_of(app: &PhotocraftApp) -> Option<(craft::behavior::kurbo::Point, f64)> {
     crate::canvas::document_display::active_view(app).map(|v| (v.center, v.zoom))
 }
 
@@ -175,9 +175,8 @@ fn committed_type(app: &mut PhotocraftApp) -> u64 {
 fn crop_app() -> PhotocraftApp {
     let mut app = app();
     app.ui.tool = Tool::Crop;
-    app.ui.tool_options.crop_shield.classic_mode = true;
+    app.ui.tool_options.crop.shield.classic_mode = true;
     app.ui.extras.snap = false;
-    crate::crop_ui::ensure_frame(&mut app);
     app
 }
 
@@ -467,7 +466,7 @@ fn every_canvas_menu_row_runs_a_known_command() {
     for (name, table) in tables {
         for (label, id) in table.iter().flatten() {
             assert!(
-                menu_local(id) || items.iter().any(|i| i.id == *id) || photocraft_engine::commands::find(id).is_some(),
+                menu_local(id) || items.iter().any(|i| i.command.id == *id) || photocraft_engine::commands::find(id).is_some(),
                 "{name}: {label}: unknown command {id}"
             );
         }
@@ -778,7 +777,7 @@ fn pen_shape_menu_enables_shape_ops_and_style_copy_only_when_applicable() {
 #[test]
 fn unfinished_shape_path_disables_actions_that_would_target_the_previous_layer() {
     let mut app = app();
-    app.ui.tool_options.vector_mode = "shape".into();
+    app.ui.tool_options.vector_mode = craft::draw::ui::VectorMode::Shape;
     pen_clicks(&mut app, &[(2.0, 2.0), (20.0, 2.0), (20.0, 20.0)]);
     assert!(open_here(&mut app, Tool::Pen, [10.0, 10.0]));
     let menu = app.ui.canvas_tool_menu.as_ref().unwrap();
@@ -793,7 +792,7 @@ fn unfinished_shape_path_disables_actions_that_would_target_the_previous_layer()
 #[test]
 fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
     let mut app = crop_app();
-    app.ui.tool_options.crop_shield.classic_mode = false;
+    app.ui.tool_options.crop.shield.classic_mode = false;
     let mut h = harness(app);
     // Tall enough for the whole menu, down to its last row.
     h.set_size(vec2(1000.0, 1400.0));
@@ -885,7 +884,6 @@ fn crop_menu_rows_act_like_the_options_bar() {
     choose(&mut app, &ctx, CROP_CANCEL);
     assert!(!crate::crop_ui::pending(&app));
     // ...and, as Esc does, hides the frame without cropping (#10370).
-    crate::crop_ui::ensure_frame(&mut app);
     assert_eq!(frame_of(&app), None);
     assert_eq!(app.session.active().unwrap().doc.size, size);
 }

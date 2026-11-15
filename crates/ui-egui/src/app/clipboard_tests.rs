@@ -260,9 +260,8 @@ fn internal_only_clipboard_remains_usable_when_native_access_fails() {
             app.run("file.new", serde_json::json!({"width": 80, "height": 60})).unwrap();
             assert!(app.os_clip_sig.is_none() && !app.clip_external);
             let bounds = app.session.clipboard.as_ref().unwrap().bounds;
-            // PLAN: reads the hosted New dialog (decisions.md): `HostedNewDocument::options().size` against the clipboard bounds; the dialog's owner set provides the type and `new_doc_ui::open`.
             let dialog = crate::new_doc_ui::open(&mut app);
-            let hosted = app.framework.dialogs.get_by_id::<HostedNewDocument>(dialog).unwrap();
+            let hosted = app.framework.dialogs.get_by_id::<craft::ui::patterns::form_dialogs::HostedNewDocument>(dialog).unwrap();
             assert_eq!((hosted.options().size.width, hosted.options().size.height), (bounds.width(), bounds.height()), "the dialog offers the clipboard size");
             let app_ctx = app.ctx().clone();
             crate::menus::invoke(&mut app, &app_ctx, id, serde_json::json!({})).unwrap();
@@ -443,10 +442,9 @@ fn os_clipboard_image_becomes_a_new_document() {
     let mut app = PhotocraftApp::new(Session::new(), Services { clipboard_get_image: Some(Box::new(get)), ..Default::default() });
     let ctx = app.ctx().clone();
     // Listed right after File › New…, enabled without reading the clipboard.
-    // PLAN: the sheet reads this menu through `menu_rows` (top-w11); that set replaces `menu_items` here.
-    let items = crate::menus::menu_items(&app);
-    let at = items.iter().position(|i| i.id == "file.new").unwrap();
-    assert_eq!(items[at + 1].id, "file.newFromClipboard");
+    let items = crate::menus::menu_rows(&app);
+    let at = items.iter().position(|i| i.command.id == "file.new").unwrap();
+    assert_eq!(items[at + 1].command.id, "file.newFromClipboard");
     assert!(items[at + 1].enabled && crate::menus::is_enabled(&app, "edit.paste"));
     assert!(!crate::menus::is_enabled(&app, "edit.pasteSpecial.pasteInPlace"), "Paste in Place needs a document");
     assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 0);

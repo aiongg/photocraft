@@ -34,7 +34,7 @@ fn transform_row(mut app: PhotocraftApp, tool: Tool) -> (&'static str, bool) {
 fn while_drawing_the_pen_row_reads_free_transform_points() {
     let mut app = app();
     pen_clicks(&mut app, &[(2.0, 2.0), (20.0, 2.0), (20.0, 20.0)]);
-    assert!(app.ui.pen.as_ref().is_some_and(|p| p.knots.len() >= 2), "the path is still being drawn");
+    assert!(app.ui.pen.as_ref().is_some_and(|p| p.draft.knots.len() >= 2), "the path is still being drawn");
     assert_eq!(transform_row(app, Tool::Pen), ("Free Transform Points", true));
 }
 

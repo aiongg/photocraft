@@ -35,8 +35,6 @@ fn right_click(mode: &str, shift: bool, erase_preference: bool) -> Outcome {
     let mut app = app(mode, erase_preference);
     let journal = app.session.journal.len();
     let mods = if shift { Modifiers::SHIFT } else { Modifiers::NONE };
-    // PLAN: assumed `canvas::testing::secondary_click(app, at: [f64; 2], mods: Modifiers)` (canvas-widgets-w14, cw.P2b): a
-    // secondary press and release through the window host, as `click` does for the primary button.
     testing::secondary_click(&mut app, [32.0, 32.0], mods);
     if app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::BrushMode)) {
         Outcome::Menu

@@ -179,7 +179,7 @@ fn the_web_opens_every_selected_file() {
     // Each good file is its own tab; the broken one is reported without stopping the rest.
     let names: Vec<_> = app.session.documents().iter().map(|st| st.doc.name.as_str()).collect();
     assert_eq!(names, ["one.png", "two.jpg"]);
-    assert!(app.ui.notices.iter().any(|n| n.error && n.title.contains("broken.png")), "{:?}", app.ui.notices);
+    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.contains("broken.png")), "{:?}", app.ui.notices);
 }
 
 /// #5749: the web shell reads dropped files itself, so it asks where they landed: image files
@@ -208,7 +208,7 @@ fn web_drops_onto_the_canvas_are_placed_from_their_bytes() {
     // The undecodable one is reported, not placed.
     app.place_next_dropped(&ctx);
     assert_eq!(layer_count(&app), layers + 1);
-    assert!(app.ui.notices.iter().any(|n| n.error && n.title.contains("bad.png")), "{:?}", app.ui.notices);
+    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.contains("bad.png")), "{:?}", app.ui.notices);
     assert!(app.drop_places.is_empty());
 }
 
@@ -377,7 +377,7 @@ fn import_warnings_reach_status_notice_and_control_response() {
     assert!(app.ui.status.contains("was flattened"), "{}", app.ui.status);
     assert!(app.ui.status_error);
     assert_eq!(app.ui.notices.len(), 1);
-    assert!(!app.ui.notices[0].error);
+    assert_ne!(app.ui.notices[0].tone, craft::theme::variant::Tone::Bad);
     assert_eq!(app.ui.notices[0].lines.len(), 1);
     // The document still opened, with its path.
     assert_eq!(app.session.active().and_then(|s| s.path.clone()), Some(p));
@@ -411,7 +411,7 @@ fn open_failures_are_errors_and_leave_no_document() {
     assert!(app.ui.recent_files.is_empty());
     assert!(app.ui.status_error);
     assert!(app.ui.status.starts_with("Couldn't open broken.psd"), "{}", app.ui.status);
-    assert!(app.ui.notices.last().is_some_and(|n| n.error));
+    assert!(app.ui.notices.last().is_some_and(|n| n.tone == craft::theme::variant::Tone::Bad));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -425,7 +425,7 @@ fn a_picked_file_that_cannot_be_read_is_reported_like_any_open_failure() {
     assert!(app.session.documents().is_empty());
     assert!(app.ui.status_error);
     let notice = app.ui.notices.last().unwrap();
-    assert!(notice.error && notice.title.starts_with("Couldn't open big.psb: "), "{}", notice.title);
+    assert!(notice.tone == craft::theme::variant::Tone::Bad && notice.title.starts_with("Couldn't open big.psb: "), "{}", notice.title);
     // Commands that read a picked file (scripts, notes, Place) fail with the file's name.
     app.ui.status_error = false;
     app.pick_file_bytes(|_, _, _| Err("read".into())).unwrap();
@@ -570,7 +570,7 @@ fn dropped_files_open_with_path_and_recent() {
     assert_eq!(app.session.documents()[1].path, None);
     assert_eq!(app.ui.recent_files, vec![abs_s]);
     assert!(app.ui.status_error);
-    assert_eq!(app.ui.notices.iter().filter(|n| n.error).count(), 2);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).count(), 2);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -636,7 +636,7 @@ fn files_dropped_onto_the_canvas_are_placed_in_free_transform_one_by_one() {
     assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Place Embedded"));
     // Next frame: the undecodable file is reported, the next one placed and transformed.
     app.place_next_dropped(&ctx);
-    assert_eq!(app.ui.notices.iter().filter(|n| n.error).count(), 1);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).count(), 1);
     assert_eq!(layer_count(&app), layers + 2);
     let st = app.session.active().unwrap();
     let top = st.doc.layer(st.active_layer.unwrap()).unwrap();
@@ -808,7 +808,7 @@ fn stepped_places_from_a_path_fail_and_cancel_like_background_ones() {
     assert!(!app.ui.status_error);
     // The queue went on to the damaged file, which fails by name.
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("bad.png"));
-    tick_until(&mut app, &ctx, |app| app.ui.notices.iter().any(|n| n.error && n.title.contains("bad.png")));
+    tick_until(&mut app, &ctx, |app| app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.contains("bad.png")));
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("last.png"));
     tick_until(&mut app, &ctx, |app| app.jobs.place.is_none());
     assert_eq!(layer_count(&app), layers + 1);
@@ -848,13 +848,13 @@ fn a_background_place_that_fails_reports_it_and_the_queue_continues() {
     app.open_dropped(&ctx, vec![dropped("bad.png", Ok(b"bad".to_vec())), dropped("good.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("bad.png"));
-    tick_until(&mut app, &ctx, |app| app.ui.notices.iter().any(|n| n.error && n.title.contains("bad.png")));
+    tick_until(&mut app, &ctx, |app| app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.contains("bad.png")));
     assert_eq!(layer_count(&app), layers, "nothing was placed");
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("good.png"), "the next file started at once");
     tick_until(&mut app, &ctx, |app| app.jobs.place.is_none());
     assert_eq!(layer_count(&app), layers + 1);
     assert_eq!(app.ui.transform.as_ref().and_then(|t| t.made), Some(crate::state::MadeLayer::Place));
-    assert_eq!(app.ui.notices.iter().filter(|n| n.error).count(), 1);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).count(), 1);
 }
 
 /// Cancelling the place says so, places nothing and goes on with the queue.
@@ -923,7 +923,7 @@ fn skip_transform_when_placing_places_inline_drops_without_free_transform() {
     app.place_next_dropped(&ctx);
     assert!(app.ui.transform.is_none() && app.drop_places.is_empty());
     assert_eq!((layer_count(&app), history_steps(&app)), (layers + 2, steps + 2));
-    assert_eq!(app.ui.notices.iter().filter(|n| n.error && n.title.contains("bad.png")).count(), 1);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.contains("bad.png")).count(), 1);
 }
 
 /// #8492: Skip Transform when Placing only concerns the interactive place. `file.placeEmbedded`
@@ -1787,7 +1787,7 @@ fn scratch(tag: &str) -> std::path::PathBuf {
 }
 
 fn error_titles(app: &PhotocraftApp) -> Vec<String> {
-    app.ui.notices.iter().filter(|n| n.error).map(|n| n.title.clone()).collect()
+    app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).map(|n| n.title.clone()).collect()
 }
 
 /// The Home screen (no document open) is where a first drop lands: every file opens as its own
@@ -1932,7 +1932,7 @@ fn open_as_smart_object_dialog_opens_one_document_per_selected_file() {
 
     assert_eq!(app.session.documents().iter().map(|d| d.doc.name.as_str()).collect::<Vec<_>>(), ["one-1", "two-1"]);
     assert!(app.session.documents().iter().all(|d| d.path.is_none() && d.doc.layers.len() == 1));
-    assert!(app.ui.notices.iter().any(|n| n.error && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
+    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -1954,6 +1954,6 @@ fn open_as_smart_object_opens_in_the_background_in_name_order() {
     tick_until(&mut app, &ctx, |app| app.jobs.opens.is_empty());
     assert_eq!(app.session.documents().iter().map(|d| d.doc.name.as_str()).collect::<Vec<_>>(), ["one-1", "two-1"]);
     assert!(app.session.documents().iter().all(|d| d.path.is_none() && d.doc.layers.len() == 1));
-    assert!(app.ui.notices.iter().any(|n| n.error && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
+    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
     let _ = std::fs::remove_dir_all(&dir);
 }

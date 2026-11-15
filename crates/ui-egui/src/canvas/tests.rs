@@ -601,9 +601,10 @@ fn layer_style_dialog_previews_live_and_cancel_restores() {
     let (shown, key) = display_doc(&mut app, 0);
     assert_eq!((fx(&shown), fx(&app.session.documents()[0].doc)), (1, 0), "previewed, not committed");
     // Adding a stroke through the dialog's instance list re-renders the canvas.
-    // PLAN: dialogs-w35 has not named the `LayerStyleDraft` method that adds an instance by kind; `add_instance(kind, params)` is assumed.
-    if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<crate::layer_style::HostedLayerStyle>(id) {
-        dialog.draft.add_instance("stroke", json!({"size": 3}));
+    if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<craft::imaging::ui::layer_style::HostedLayerStyle>(id) {
+        let mut params = craft::imaging::layer_style::StyleParams::default();
+        params.set("size", craft::imaging::layer_style::StyleValue::Number(3.0));
+        dialog.draft_mut().add_instance(craft::imaging::layer_style::EffectKind::Stroke, &params);
     }
     let (shown, key2) = display_doc(&mut app, 0);
     assert_eq!(fx(&shown), 2);
@@ -691,8 +692,8 @@ fn arrange_layout_only_includes_docked_documents() {
     for name in ["first", "floating", "last"] {
         app.run("file.new", json!({"width": 80, "height": 60, "name": name})).unwrap();
     }
-    app.ui.view.arrange = "threeUpStacked".into();
     let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.threeUpStacked", json!({})).unwrap();
     crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
     let rect = Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
     let shown: Vec<_> = arranged_cells(&app, rect).unwrap().into_iter().map(|(doc, _)| doc).collect();

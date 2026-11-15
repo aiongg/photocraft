@@ -3,7 +3,7 @@ use super::*;
 use serde_json::json;
 
 /// The corners of a rectangle as `[x0, y0, x1, y1]`.
-fn corners(r: kurbo::Rect) -> [f64; 4] {
+fn corners(r: craft::behavior::kurbo::Rect) -> [f64; 4] {
     [r.x0, r.y0, r.x1, r.y1]
 }
 

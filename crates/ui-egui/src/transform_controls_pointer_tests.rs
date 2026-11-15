@@ -550,7 +550,7 @@ fn other_samplers_releases_end_an_existing_transform_handle_drag() {
             "curves" => {
                 let id = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").expect("the Curves dialog opens");
                 app.framework.dialogs.set_json_field(&ctx, id, "__curvePicker", json!("black")).unwrap();
-                assert!(crate::canvas_input::armed(&app).is_some(), "{sampler}");
+                assert!(crate::dialogs::canvas_input::armed(&app).is_some(), "{sampler}");
                 id
             }
             _ => {

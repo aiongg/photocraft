@@ -57,7 +57,7 @@ fn a_click_paints_the_pixel_drawn_under_the_pointer() {
     let mut h = harness();
     menu(&mut h, "view.pixelAspectRatio.anamorphic2To1", json!({}));
     let view = active_view(h.state()).expect("the canvas showed a view");
-    let at = view.to_screen(kurbo::Point::new(120.5, 30.5));
+    let at = view.to_screen(craft::behavior::kurbo::Point::new(120.5, 30.5));
     click(&mut h, at);
     assert_eq!(alpha(&h, 120, 30), 1.0, "painted under the pointer");
     // A square mapping of the same screen point is a different pixel, left blank.

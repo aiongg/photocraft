@@ -5,7 +5,7 @@ use craft::behavior::CanvasView;
 /// Document points on the shown view land on device pixels.
 fn assert_pixel_edges(view: &CanvasView, ppp: f32) {
     for [x, y] in [[0.0, 0.0], [1.0, 1.0], [17.0, 29.0], [1500.0, 1000.0]] {
-        let p = view.to_screen(kurbo::Point::new(x, y)) * ppp;
+        let p = view.to_screen(craft::behavior::kurbo::Point::new(x, y)) * ppp;
         assert!((p.x - p.x.round()).abs() < 0.001, "x edge: {p:?}, ppp {ppp}");
         assert!((p.y - p.y.round()).abs() < 0.001, "y edge: {p:?}, ppp {ppp}");
     }

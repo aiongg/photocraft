@@ -11,7 +11,7 @@ use craft::behavior::{EditEvent, Mixed};
 use craft::draw::ui::transform::TransformEdit;
 use egui::vec2;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use photocraft_engine::jobs::{JobId, Started};
 use serde_json::{Value, json};
 
@@ -1010,8 +1010,9 @@ fn warp_and_commit(h: &mut Harness<'static, PhotocraftApp>) {
     let app = h.state_mut();
     crate::transform_tool::begin(app, &ctx).unwrap();
     let session = &mut app.ui.transform.as_mut().unwrap().session;
-    let warp = photocraft_geom::warp::Warp::preset(photocraft_geom::warp::WarpStyle::Arc, 40.0, session.rect());
-    session.apply(TransformEdit::Warp(crate::transform_tool::SessionWarp::new(warp, false)), 0.0);
+    let rect = session.rect();
+    let warp = photocraft_geom::warp::Warp::preset(photocraft_geom::warp::WarpStyle::Arc, 40.0, [rect.x0, rect.y0, rect.x1, rect.y1]);
+    session.apply(TransformEdit::Warp(crate::state::SessionWarp::new(warp, false)), 0.0);
     crate::transform_tool::commit(app);
 }
 

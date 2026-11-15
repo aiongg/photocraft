@@ -38,7 +38,7 @@ const DIAGONAL: &[[f64; 2]] = &[[20.0, 20.0], [50.0, 35.0], [80.0, 50.0], [110.0
 const AREA: &[[f64; 2]] = &[[20.0, 20.0], [80.0, 20.0], [80.0, 80.0], [20.0, 80.0]];
 
 /// The ids of the open "No pixels are selected." alerts. The message is the only way to tell this alert from others.
-fn alerts(app: &PhotocraftApp) -> Vec<crate::dialogs::DialogId> {
+fn alerts(app: &PhotocraftApp) -> Vec<craft::ui::dialog::DialogId> {
     app.framework
         .dialogs
         .open_dialogs()

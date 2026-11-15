@@ -918,7 +918,7 @@ mod tests {
 
         assert_eq!(app.session.active().unwrap().path.as_deref(), Some(path.as_str()), "the document save itself succeeded");
         assert!(assets.join("good.png").is_file(), "the good asset was exported");
-        let notice = app.ui.notices.iter().find(|notice| notice.error).expect("the failed asset is reported as an error notice");
+        let notice = app.ui.notices.iter().find(|notice| notice.tone == craft::theme::variant::Tone::Bad).expect("the failed asset is reported as an error notice");
         assert_eq!(notice.title, format!("Saved {path}: 1 Image Assets output failed"), "the failure names the saved document by its full path");
         assert_eq!(notice.lines.len(), 1, "{:?}", notice.lines);
         assert!(notice.lines[0].starts_with("blocked/fail.png: asset path"), "{:?}", notice.lines[0]);
@@ -935,7 +935,7 @@ mod tests {
         std::fs::remove_file(assets.join("blocked")).unwrap();
         let revision = app.session.active().unwrap().revision;
         app.saved(doc, revision, &path, &[], false);
-        assert!(app.ui.notices.iter().all(|notice| !notice.error), "no notice when every asset went out");
+        assert!(app.ui.notices.iter().all(|notice| notice.tone != craft::theme::variant::Tone::Bad), "no notice when every asset went out");
         assert!(!app.ui.status_error);
         assert!(app.ui.status.contains("image assets: 2 in"), "{}", app.ui.status);
         let _ = std::fs::remove_dir_all(&root);

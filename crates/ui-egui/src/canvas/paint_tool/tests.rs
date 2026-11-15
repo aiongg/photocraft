@@ -30,14 +30,13 @@ fn redrawn_since(app: &mut PhotocraftApp, ctx: &egui::Context, seen: Revision) -
 
 /// The messages of the open alerts.
 fn errors(app: &PhotocraftApp) -> Vec<String> {
-    // PLAN: assumed `crate::dialogs::alerts(&PhotocraftApp) -> Vec<String>` (dialogs-w19), read from `app.framework.dialogs`.
-    crate::dialogs::alerts(app)
+    app.framework.dialogs.open_dialogs().iter().filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string)).collect()
 }
 
 /// The stroke the live paint gesture holds, as the points the engine's commit gets.
 fn stroke_points(app: &PhotocraftApp) -> Vec<photocraft_paint::StrokePoint> {
 
-    paint_tool::stroking(app).expect("a live gesture").points.iter().map(|p| photocraft_paint::StrokePoint::new(p[0], p[1], p[2] as f32)).collect()
+    super::stroking(app).expect("a live gesture").points.iter().map(|p| photocraft_paint::StrokePoint::new(p[0], p[1], p[2] as f32)).collect()
 }
 
 /// The live trail's coverage reader.
