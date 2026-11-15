@@ -7,9 +7,10 @@ use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::{Point, Rect as Rect64, Size};
 use craft::behavior::{CanvasView, PixelSize};
 use craft::ui::canvas::{
-    Canvas, CanvasOutput, CanvasScrollbars, CanvasSpace, Extent, GuidesOutput, NavigationOptions, PageBorder, PageFrame, Pasteboard, PasteboardColor, PixelRect, RasterDisplay,
-    RasterSource, RotateView, SelectionOutline, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view,
+    Canvas, CanvasOutput, CanvasScrollbars, CanvasSpace, Extent, NavigationOptions, PageBorder, PageFrame, Pasteboard, PasteboardColor, PixelRect, RasterDisplay, RasterSource,
+    RotateView, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view,
 };
+use craft::ui::canvas_controls::{GuidesOutput, SelectionOutline};
 use craft::imaging::ui::SelectionOverlay;
 use craft::ui::contract::{Bind, Props, Show, ShowContainer};
 use craft::ui::primitives::Checker;
