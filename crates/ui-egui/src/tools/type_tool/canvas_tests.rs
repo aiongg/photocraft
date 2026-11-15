@@ -408,8 +408,6 @@ fn make_harness_with(builder: egui_kittest::HarnessBuilder<PhotocraftApp>, ppp: 
     let builder = builder.allow_missing_glyphs().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_pixels_per_point(ppp);
     let mut h = builder.build_app(
         |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            crate::shortcuts::handle(app, &ctx);
             egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,

@@ -69,6 +69,9 @@ pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<De
 /// What PhotoCraft keeps for the framework: the `Host` its components read services from, and
 /// the host of the framework dialogs it opens.
 pub struct Framework {
+    /// A test harness's own pass body, run in place of the app's frame (see [`BuildApp`]).
+    #[cfg(test)]
+    pub(crate) test_body: Option<Box<dyn FnMut(&mut egui::Ui, &mut PhotocraftApp)>>,
     sections: Arc<PrefSections>,
     host: Arc<Host>,
     /// The UI language `host` speaks.
@@ -242,6 +245,8 @@ impl Framework {
         let sections = Arc::new(PrefSections::default());
         let lang = "en";
         Framework {
+            #[cfg(test)]
+            test_body: None,
             host: Arc::new(build_host(&sections, lang, files.as_ref())),
             sections,
             lang,
@@ -617,26 +622,20 @@ pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -
     ctx.run_ui(input, |ui| embed::logic(ui.ctx(), || crate::discard_ui::close_decision(app)))
 }
 
-/// Builds a kittest harness whose every pass starts as the app's frame does (`raw_input_hook`, then `logic`): the
-/// runtime takes the app's command states, catalog and overrides, and the commands the last pass fired run. Harness
-/// stepping runs one pass per queued event, so the work belongs to the pass, not to the code that steps the harness.
+/// Builds a kittest harness over the app whose every pass runs the app's frame hooks (`raw_input_hook` before it,
+/// `logic` ahead of the UI) around `body`, the pass's UI, as eframe does. The harness steps one pass per queued
+/// event, so the hooks belong to the harness's passes, not to the code that steps it.
 #[cfg(test)]
 pub(crate) trait BuildApp {
-    fn build_app<'a>(self, body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'a, app: PhotocraftApp) -> egui_kittest::Harness<'a, PhotocraftApp>;
+    fn build_app(self, body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'static, app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp>;
 }
 
 #[cfg(test)]
 impl BuildApp for egui_kittest::HarnessBuilder<PhotocraftApp> {
-    fn build_app<'a>(self, mut body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'a, app: PhotocraftApp) -> egui_kittest::Harness<'a, PhotocraftApp> {
-        self.build_ui_state(
-            move |ui, app: &mut PhotocraftApp| {
-                let ctx = ui.ctx().clone();
-                app.framework_before_input(&ctx);
-                crate::shortcuts::handle(app, &ctx);
-                body(ui, app);
-            },
-            app,
-        )
+    fn build_app(self, body: impl FnMut(&mut egui::Ui, &mut PhotocraftApp) + 'static, mut app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
+        app.framework.test_body = Some(Box::new(body));
+        let ctx = app.ctx().clone();
+        self.with_context(ctx).build_eframe(move |_| app)
     }
 }
 

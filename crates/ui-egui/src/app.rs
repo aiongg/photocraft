@@ -293,6 +293,12 @@ impl eframe::App for PhotocraftApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        #[cfg(test)]
+        if let Some(mut body) = self.framework.test_body.take() {
+            body(ui, self);
+            self.framework.test_body = Some(body);
+            return;
+        }
         photocraft_compose::discard_unreadable_pixel_caches();
         if let Err(error) = photocraft_raster::spill::check_integrity() {
             self.ui.status = error;
