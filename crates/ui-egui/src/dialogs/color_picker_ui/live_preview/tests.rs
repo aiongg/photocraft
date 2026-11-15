@@ -49,9 +49,10 @@ struct FillPicker {
 /// Opens Edit › Fill, chooses Contents › Color, takes the colour row's request and opens its picker child.
 fn fill_with_picker(app: &mut PhotocraftApp) -> FillPicker {
     let ctx = app.ctx().clone();
-    let fill = crate::dialogs::open_command_dialog(app, "edit.fill", "Fill").expect("Fill opens");
-    app.framework.dialogs.set_json_field(&ctx, fill, "color", json!("#20a040")).unwrap();
+    let fill = crate::fill_ui::open(app);
+    // The Color row shows once Contents is Color.
     app.framework.dialogs.set_json_field(&ctx, fill, "contents", json!("color")).unwrap();
+    app.framework.dialogs.set_json_field(&ctx, fill, "color", json!({"r": 32.0 / 255.0, "g": 160.0 / 255.0, "b": 64.0 / 255.0, "a": 1.0})).unwrap();
     host_pass(app);
     let request = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(fill).and_then(|d| d.pick_color()).expect("Color… files a colour request");
     let key = request.key.clone();
@@ -217,8 +218,7 @@ fn shield_picker(app: &mut PhotocraftApp) -> DialogId {
 /// A shield colour set elsewhere (`ui.set cropShield`) while its picker is open is what Cancel restores.
 #[test]
 fn the_crop_shield_keeps_a_colour_set_while_its_picker_is_open() {
-    // PLAN: dialogs-w37's `live_preview::show` puts back the colour the picker opened on, so a colour set while the
-    // picker is open is lost on Cancel; the base kept it (live_preview.rs:99-109). The asserts below are the base's.
+    // Cancel puts the shield back to what it held before the preview took it, unless something else set it since.
     let mut app = app();
     let picker = shield_picker(&mut app);
     pick(&mut app, picker, "#336699");

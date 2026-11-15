@@ -18,7 +18,7 @@ use crate::PhotocraftApp;
 enum Before {
     /// Colour row `key` of dialog `parent`.
     Row { parent: DialogId, key: String },
-    /// The Crop shield's colour choice and custom colour.
+    /// The Crop shield's colour choice and custom colour as they were just before the preview took it.
     CropShield { color: ShieldColor, custom: [u8; 3] },
 }
 
@@ -35,7 +35,6 @@ pub(super) fn begin(app: &mut PhotocraftApp, picker: DialogId, target: &PickTarg
     let before = match target {
         PickTarget::Request { parent, key } => Before::Row { parent: *parent, key: key.clone() },
         PickTarget::CropShield => {
-            // PLAN: assumed `tool_options.crop.shield` with `color` and `custom_color` (tools-w45).
             let s = &app.ui.tool_options.crop.shield;
             Before::CropShield { color: s.color, custom: s.custom_color }
         }
@@ -73,18 +72,28 @@ fn same(a: Option<Srgba>, b: Option<Srgba>) -> bool {
     }
 }
 
-/// Shows `color` in the target, or what it was (`None`).
-fn show(app: &mut PhotocraftApp, before: &Before, color: Option<Srgba>) -> Result<(), String> {
+/// Shows `color` in the target, or what it was (`None`). `shown` is what the target showed until now. A shield that
+/// no longer holds the shown colour was set elsewhere while the picker was open, and keeps that choice.
+fn show(app: &mut PhotocraftApp, before: &mut Before, shown: Option<Srgba>, color: Option<Srgba>) -> Result<(), String> {
     match before {
         Before::Row { parent, key } => {
             app.framework.dialogs.preview_color(*parent, key, color);
             Ok(())
         }
         Before::CropShield { color: was, custom } => match color {
-            Some(c) => crate::crop_ui::set_shield_color(app, &rgb_hex(c)),
+            Some(c) => {
+                if shown.is_none() {
+                    let s = &app.ui.tool_options.crop.shield;
+                    (*was, *custom) = (s.color, s.custom_color);
+                }
+                crate::crop_ui::set_shield_color(app, &rgb_hex(c))
+            }
             None => {
                 let s = &mut app.ui.tool_options.crop.shield;
-                (s.color, s.custom_color) = (*was, *custom);
+                let rgb8 = |c: Srgba| [c.r, c.g, c.b].map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
+                if shown.is_some_and(|c| s.color == ShieldColor::Custom && s.custom_color == rgb8(c)) {
+                    (s.color, s.custom_color) = (*was, *custom);
+                }
                 Ok(())
             }
         },
@@ -102,7 +111,7 @@ pub(crate) fn sync(app: &mut PhotocraftApp) -> bool {
     live.retain_mut(|l| {
         let Some(color) = picked(app, l.picker) else {
             if l.shown.is_some() {
-                changed |= show(app, &l.before, None).is_ok();
+                changed |= show(app, &mut l.before, l.shown, None).is_ok();
             }
             return false;
         };
@@ -110,7 +119,7 @@ pub(crate) fn sync(app: &mut PhotocraftApp) -> bool {
             return true;
         }
         // A target that refuses (the shield with no Crop options) stops the preview.
-        if show(app, &l.before, color).is_err() {
+        if show(app, &mut l.before, l.shown, color).is_err() {
             return false;
         }
         l.shown = color;
@@ -126,8 +135,8 @@ pub(crate) fn sync(app: &mut PhotocraftApp) -> bool {
 /// previewing. OK then sets the target.
 pub(crate) fn end(app: &mut PhotocraftApp, picker: DialogId) {
     let Some(i) = app.color_picker_live.iter().position(|l| l.picker == picker) else { return };
-    let l = app.color_picker_live.remove(i);
-    let _ = show(app, &l.before, None);
+    let mut l = app.color_picker_live.remove(i);
+    let _ = show(app, &mut l.before, l.shown, None);
 }
 
 #[cfg(test)]
