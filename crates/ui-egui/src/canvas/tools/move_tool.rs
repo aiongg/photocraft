@@ -47,7 +47,7 @@ struct Run {
     delta: [f64; 2],
     /// The same offset as the release commits it.
     offset: (i32, i32),
-    /// The pointer travelled past the arena's slop: a press that never does is a click and moves nothing.
+    /// The pointer left its press ([`MoveGesture::left_press`]): a press that never does is a click and moves nothing.
     moved: bool,
     /// The refusal message was shown.
     prompted: bool,
@@ -259,6 +259,10 @@ fn follow(run: &mut Run, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mu
     let Some(gesture) = run.gesture.as_mut() else { return };
     let zoom = space.view.zoom;
     gesture.follow(space.view.to_doc(pointer.pos), pointer.mods, zoom);
+    // Inside its press the move is still a click: nothing snaps or moves.
+    if !gesture.left_press() {
+        return;
+    }
     let mut delta = gesture.value().delta;
     if let Some(b) = run.box_rect {
         delta += cx.snap_rect(kurbo::Rect::new(b[0] + delta.x, b[1] + delta.y, b[2] + delta.x, b[3] + delta.y));
@@ -314,10 +318,8 @@ impl CanvasTool for MoveRun<'_> {
             }
             Kind::Refused => {}
             Kind::Layers | Kind::Pixels => {
-                // A click (released with no travel) never moves: the snap would nudge the layer.
-                if run.moved {
-                    follow(&mut run, app, pointer, cx, false);
-                }
+                // A click (released without leaving its press) never moves: `follow` snaps nothing inside the press.
+                follow(&mut run, app, pointer, cx, false);
                 let (dx, dy) = run.offset;
                 if run.kind == Kind::Layers {
                     if run.moved {
@@ -376,6 +378,12 @@ impl CanvasTool for MoveRun<'_> {
         } else {
             Cursor::System(CursorIcon::Default)
         }
+    }
+
+    /// A layer or pixel move takes every move from the press, so a move of a few pixels moves; its click is decided by
+    /// [`MoveGesture::left_press`] alone.
+    fn takes_every_move(&self) -> bool {
+        self.state.run.as_ref().is_some_and(|run| matches!(run.kind, Kind::Layers | Kind::Pixels))
     }
 
     fn command_form(&self) -> ToolPath {
