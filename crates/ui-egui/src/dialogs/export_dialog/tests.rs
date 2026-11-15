@@ -22,7 +22,13 @@ type AppHarness = Harness<'static, PhotocraftApp>;
 
 /// An app with a `width` × `height` document whose exporter and writer accept everything.
 fn export_app(width: u32, height: u32) -> PhotocraftApp {
+    export_app_over(width, height, None)
+}
+
+/// [`export_app`] over the file service `files` (the framework takes it when the app is built).
+fn export_app_over(width: u32, height: u32, files: Option<std::sync::Arc<dyn craft::host::Files>>) -> PhotocraftApp {
     let services = crate::Services {
+        files,
         export: Some(Box::new(|_, _, _| Ok((Vec::new(), Vec::new())))),
         write: Some(Box::new(|_, _| Ok(()))),
         ..Default::default()
@@ -246,6 +252,8 @@ fn a_remembered_pixel_size_keeps_this_images_proportions() {
     let mut step = landscape;
     step["path"] = json!("/x.png");
     step["format"] = json!("png");
+    // The open dialog encoded the image for its size estimate; the replay's export is the one under test.
+    sizes.borrow_mut().clear();
     replay(h.state_mut(), &step).unwrap();
     assert_eq!(*sizes.borrow(), [(20, 15)]);
 }
@@ -923,8 +931,7 @@ fn preview_cache_tracks_working_profiles_but_prefers_embedded_profiles() {
 fn a_second_take_in_a_frame_answers_nothing_twice() {
     use craft::host::ScriptedFiles;
     let files = std::sync::Arc::new(ScriptedFiles::held());
-    let mut app = export_app(20, 10);
-    app.services.files = Some(files.clone());
+    let app = export_app_over(20, 10, Some(files.clone()));
     let mut h = harness(app);
     open(h.state_mut()).unwrap();
     settle_preview(&mut h);

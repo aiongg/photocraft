@@ -419,6 +419,9 @@ fn snapshot_thumbnails_follow_their_document() {
     let revision = |app: &PhotocraftApp| SnapshotThumbs::new(app, doc_id).revision(&0, &request);
     let first = revision(&app);
     assert_eq!(first, revision(&app), "the same picture keeps its revision");
+    // The revision follows the snapshot document's `Arc` address, so each closed document stays alive for the
+    // test: a freed address handed to the next document would read as the same picture.
+    let mut closed = vec![app.session.active().unwrap().snapshots[0].doc.clone()];
     // Closed and reopened with the same id.
     app.session.close(0);
     app.sync_views();
@@ -427,6 +430,7 @@ fn snapshot_thumbnails_follow_their_document() {
     let reopened = revision(&app);
     assert_ne!(reopened, first);
     // Closed and reopened with no sync in between: still a fresh one.
+    closed.push(app.session.active().unwrap().snapshots[0].doc.clone());
     app.session.close(0);
     app.session.add_document(doc, None);
     assert_ne!(revision(&app), reopened);

@@ -531,7 +531,7 @@ fn framework_dialogs_are_set_confirmed_and_cancelled_by_id() {
         ("ui.dialog.confirm", json!({"choice": "delete"}), true, false),
     ];
     for (method, extra, accepted, kept) in routes {
-        let (command, mark) = crate::mask_trash_prompt::drop_action(layer.0, crate::mask_thumbs_ui::MaskKind::Layer);
+        let (command, mark) = crate::mask_trash_prompt::drop_action(layer.0, crate::mask_thumbs_ui::MaskKind::Pixel);
         crate::mask_trash_prompt::intercept(&mut app, &command, &mark).expect("the drop opens the prompt").unwrap();
         let prompt = top(&mut app).expect("the prompt is listed")["id"].clone();
         let mut params = extra.clone();
