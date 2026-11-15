@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 
 use super::strokes::{feed_live_stroke_waiting, live_stroke_busy, stroke_command};
-use super::{PhotocraftApp, Tool, ToolEvent, cancel_mixer_on_context_change, tool_event};
+use super::{PhotocraftApp, Tool, ToolEvent, testing, tool_event};
 
 const M: egui::Modifiers = egui::Modifiers::NONE;
 
@@ -22,13 +22,23 @@ fn app_for(tool: Tool) -> PhotocraftApp {
     app
 }
 
-/// The pen moves along the stroke; the points reach the drag but the stroke isn't fed yet.
+/// The pen moves along the stroke, one frame per move; the paint tool feeds the live stroke once per
+/// frame, and the held thread keeps it busy.
 fn move_without_feeding(app: &mut PhotocraftApp) {
-    app.defer_live_stroke = true;
+    // With `LIVE_STROKE_WAIT` at `Duration::MAX` in tests, a feed into a held thread must not block; the paint tool feeds so.
     for x in (30..=130).step_by(10) {
         tool_event(app, ToolEvent::Move { x: f64::from(x), y: 30.0, pressure: 1.0 }, M);
     }
-    app.defer_live_stroke = false;
+}
+
+/// Hands the stroke's pending points to the thread without waiting for its steps, as `tools::run`
+/// does with the paint state taken out of the app.
+fn feed_without_waiting(app: &mut PhotocraftApp) {
+    let state = std::mem::take(&mut app.canvas_tools.paint);
+    if let Some(stroke) = state.stroke.as_ref() {
+        feed_live_stroke_waiting(app, stroke, Duration::ZERO);
+    }
+    app.canvas_tools.paint = state;
 }
 
 /// The command the release ran, undone and run again from its params: the pixels must match.
@@ -52,7 +62,7 @@ fn wait_until(what: &str, done: impl Fn() -> bool) {
 
 /// Pen-up while the thread is still painting: the release waits for the steps it was given, and
 /// the commit takes the live stroke's pixels (the Brush) or its prepared commit (the Mixer Brush,
-/// which `finish_gesture` handles on its own), with every point.
+/// which `PaintTool::release` and `strokes::finish` handle on their own), with every point.
 #[test]
 fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
     for tool in [Tool::Brush, Tool::MixerBrush] {
@@ -62,7 +72,7 @@ fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
         tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 30.0, pressure: 1.0 }, M);
         let release = app.live_stroke.as_ref().unwrap().paint.hold();
         move_without_feeding(&mut app);
-        feed_live_stroke_waiting(&mut app, Duration::ZERO);
+        feed_without_waiting(&mut app);
         assert!(live_stroke_busy(&app), "{what}: the thread is still painting");
         // The slow step finishes while the release waits for it.
         let slow = std::thread::spawn(move || {
@@ -93,19 +103,14 @@ fn cancel_while_the_thread_is_busy_changes_nothing_and_the_thread_ends() {
     let paint = &app.live_stroke.as_ref().unwrap().paint;
     let (release, alive) = (paint.hold(), paint.thread_alive());
     move_without_feeding(&mut app);
-    feed_live_stroke_waiting(&mut app, Duration::ZERO);
+    feed_without_waiting(&mut app);
     assert!(live_stroke_busy(&app), "the thread is still painting");
 
-    let ctx = egui::Context::default();
-    let mut raw = egui::RawInput { focused: true, ..Default::default() };
-    raw.events.push(egui::Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: M });
-    ctx.begin_pass(raw);
-    assert!(cancel_mixer_on_context_change(&mut app, &ctx));
-    let mut output = ctx.end_pass();
-    output.textures_delta.clear();
+    // The host cancels the gesture on Escape.
+    testing::key(&mut app, egui::Key::Escape, M);
     tool_event(&mut app, ToolEvent::Up { x: 130.0, y: 30.0 }, M);
 
-    assert!(app.drag.is_none() && app.live_stroke.is_none());
+    assert!(app.live_stroke.is_none());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "the document is untouched");
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
     assert!(!app.session.journal.iter().any(|(id, _)| id == "paint.mixerBrush"));

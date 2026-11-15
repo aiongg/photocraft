@@ -6,7 +6,6 @@ use egui_kittest::Harness;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::canvas::ViewXform;
 use crate::state::Tool;
 
 fn harness() -> Harness<'static, PhotocraftApp> {
@@ -35,17 +34,8 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 }
 
 fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-    let app = h.state();
-    let v = &app.ui.views[0];
-    let xf = ViewXform {
-        rect: crate::rulers::content_rect(app, app.last_canvas_rect),
-        zoom: v.zoom,
-        center: v.center,
-        flip: app.ui.view.flip_horizontal,
-        rotation: v.rotation,
-        aspect: app.ui.view.display_aspect(),
-    };
-    xf.to_screen(x, y)
+
+    crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
 }
 
 fn button(h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32, down: bool) {
@@ -104,14 +94,20 @@ fn stroke_points_carry_increasing_times_from_zero() {
     assert!(times.last().copied().unwrap_or(0.0) > 0.0, "time advances over the frames: {times:?}");
 }
 
-/// Points of the drag in progress after holding the pointer still for a while.
+/// Points of the live stroke in progress.
+fn live_points(h: &Harness<'static, PhotocraftApp>) -> usize {
+
+    crate::canvas::paint_tool::stroking(h.state()).map_or(0, |s| s.points.len())
+}
+
+/// Points of the live stroke after holding the pointer still for a while.
 fn held_points(h: &mut Harness<'static, PhotocraftApp>) -> (usize, usize) {
     move_to(h, 20.0, 50.0);
     button(h, 20.0, 50.0, true);
     move_to(h, 30.0, 50.0);
-    let before = h.state().drag.as_ref().map_or(0, |d| d.points.len());
+    let before = live_points(h);
     h.run_steps(12);
-    let after = h.state().drag.as_ref().map_or(0, |d| d.points.len());
+    let after = live_points(h);
     button(h, 30.0, 50.0, false);
     (before, after)
 }
@@ -132,14 +128,6 @@ fn a_held_plain_brush_adds_nothing() {
     assert_eq!(after, before, "nothing changes with time, so nothing is repeated");
 }
 
-#[test]
-fn spread_ms_spaces_a_frames_samples_after_the_last_point() {
-    use crate::canvas::spread_ms;
-    assert_eq!((0..4).map(|k| spread_ms(100.0, 116.0, k, 4)).collect::<Vec<_>>(), vec![104.0, 108.0, 112.0, 116.0]);
-    assert_eq!(spread_ms(116.0, 116.0, 0, 3), 116.0, "a press frame's moves share its time");
-    assert_eq!(spread_ms(120.0, 116.0, 0, 1), 116.0, "a clock that went back never goes below now");
-    assert_eq!(spread_ms(f64::NAN, 116.0, 0, 1), 116.0);
-}
 
 #[test]
 fn moves_in_one_frame_take_the_pressures_the_pen_reported_between_them() {
