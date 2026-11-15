@@ -7,7 +7,7 @@ use craft::draw::ui::shape::VectorMode;
 use craft::keymap::Mods;
 use craft::theme::Srgba;
 use egui::{Event, Key, Modifiers};
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::{Harness, kittest::{NodeT, Queryable}};
 use photocraft_doc::ShapeLayer;
 
 fn app(mode: &str, depth: u32) -> PhotocraftApp {

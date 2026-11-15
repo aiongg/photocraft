@@ -128,16 +128,16 @@ fn drag_with(h: &mut Harness<'_, PhotocraftApp>, label: &str, fractions: &[f32],
     let pos = |f: f32| pos2(r.left() + 7.0 + (r.width() - 14.0) * f, r.center().y);
     let start = pos(fractions[0]);
     h.hover_at(start);
-    frames(&mut h, 1);
+    frames(h, 1);
     h.event(egui::Event::PointerButton { pos: start, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
-    frames(&mut h, 1);
+    frames(h, 1);
     for &f in &fractions[1..] {
         h.hover_at(pos(f));
-        frames(&mut h, 1);
+        frames(h, 1);
     }
     if escape {
         h.key_press(egui::Key::Escape);
-        frames(&mut h, 1);
+        frames(h, 1);
     }
     h.event(egui::Event::PointerButton {
         pos: pos(*fractions.last().unwrap()),
@@ -145,7 +145,7 @@ fn drag_with(h: &mut Harness<'_, PhotocraftApp>, label: &str, fractions: &[f32],
         pressed: false,
         modifiers: egui::Modifiers::NONE,
     });
-    frames(&mut h, 3);
+    frames(h, 3);
 }
 
 #[test]
