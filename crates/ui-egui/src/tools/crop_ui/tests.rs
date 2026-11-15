@@ -344,7 +344,8 @@ fn another_tool_commits_a_drawn_frame_at_8_and_16_bit() {
         assert_eq!(crop_ui::frame(&app), None);
     }
     let mut app = app(SampleType::U8);
-    crop_ui::each_pass(&mut app);
+    // The host's pass makes the default frame.
+    crate::canvas::testing::frame(&mut app);
     assert!(crop_ui::frame(&app).is_some() && !crop_ui::pending(&app));
     let steps = app.session.active().unwrap().history.past_len();
     app.ui.tool = Tool::Move;

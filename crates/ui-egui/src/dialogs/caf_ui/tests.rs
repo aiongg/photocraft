@@ -252,7 +252,8 @@ fn apply_fills_and_stays_open_ok_closes_cancel_keeps_what_was_applied() {
     assert!(px(&app, top, 100, 80)[3] > 0.99, "the new layer holds the fill");
 }
 
-/// The settings are remembered on Apply, OK and Cancel, and the menu opens the hosted workspace.
+/// The settings are remembered at every close (here a Cancel through the control route), and the menu opens the hosted
+/// workspace.
 #[test]
 fn settings_are_remembered_and_the_menu_opens_the_workspace() {
     let mut app = app_with_selection();

@@ -18,7 +18,7 @@ use std::cell::RefCell;
 
 use craft::behavior::kurbo::Size;
 use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
-use craft::draw::ui::CropToolPass;
+use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
     Autoscroll, CanvasOutput, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims, ToolContext,
@@ -444,6 +444,7 @@ fn with_rig<R>(
     host: CanvasHost,
     tools: &mut CanvasTools,
     stand_ins: bool,
+    crop_shown: Option<CropShown>,
     f: impl FnOnce(&mut dyn CanvasTool, ToolHost<'_>) -> R,
 ) -> R {
     let tool = app.ui.tool;
@@ -458,7 +459,7 @@ fn with_rig<R>(
     let symmetry_transform = if fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
     let mut symmetry = symmetry_transform.as_ref().and_then(|t| crate::symmetry_ui::session_tool(app, t));
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
-        (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx)),
+        (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx, crop_shown)),
         _ => None,
     };
     let command_wanted = stand_ins && transform.is_none() && takes_command_stand_in(tool);
@@ -577,7 +578,7 @@ fn with_rig<R>(
 /// Runs the tool host for the canvas `host` on the canvas's output `out`, and applies what it reports: the view a
 /// tool or the autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain.
 /// Tools are active in the main window only.
-pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput) -> ToolHostResponse {
+pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput, crop_shown: Option<CropShown>) -> ToolHostResponse {
     let ctx = ui.ctx().clone();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
     let mut tools = std::mem::take(&mut app.canvas_tools);
@@ -592,7 +593,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
     let precise = app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise;
     let smart = super::snap_ui::smart_guide_color(app);
-    let mut response = with_rig(app, &ctx, host, &mut tools, primary, |selected, tool_host| {
+    let mut response = with_rig(app, &ctx, host, &mut tools, primary, crop_shown, |selected, tool_host| {
         tool_host.enabled(primary).smart_guide_color(smart).precise_cursors(precise).run(ui, out, selected)
     });
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
@@ -665,7 +666,7 @@ pub(crate) fn tool_changed(app: &mut PhotocraftApp, ctx: &egui::Context, host: C
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let id = host.canvas_id();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
-    with_rig(app, ctx, host, &mut tools, primary, |selected, tool_host| {
+    with_rig(app, ctx, host, &mut tools, primary, None, |selected, tool_host| {
         tool_host.cancel(ctx, id, selected, CancelReason::HostChanged);
     });
     app.canvas_tools = tools;

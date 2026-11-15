@@ -256,7 +256,7 @@ pub fn park_dialog(app: &mut PhotocraftApp, path: String, copy: bool, record: &'
     let Start { quality, own_quality, format } = Start::for_active(app);
     let mut options = JpegOptions::new(quality.min(MAX_QUALITY));
     options.format = ui_format(format);
-    let dialog = HostedFormatOptions::new(ExportOptionsKind::Jpeg).initial(FormatOptions::Jpeg(options));
+    let dialog = HostedFormatOptions::new(app.ctx(), ExportOptionsKind::Jpeg).initial(FormatOptions::Jpeg(options));
     format_prompts::park(app, ParkedSave { doc, path, copy, record, format: ParkedFormat::Jpeg(Parked::new(own_quality)) }, dialog)
 }
 

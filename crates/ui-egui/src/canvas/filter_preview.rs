@@ -43,7 +43,7 @@ fn smart_adjust_preview(app: &PhotocraftApp) -> Option<(craft::ui::dialog::Dialo
     if !hosted.is_previewing() {
         return None;
     }
-    let params = crate::adjust_dialog::smart_filter_params(app, open, hosted.value()).ok()?;
+    let params = crate::adjust_dialog::smart_filter_params(app, open, hosted.value(), hosted.edited()).ok()?;
     Some((open.id, open.command.clone(), captured.clone(), params))
 }
 
