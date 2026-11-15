@@ -10,8 +10,7 @@ workspace = true
 [dependencies]
 chrono = { workspace = true }
 craft-print = { workspace = true }
-craft-ui = { workspace = true }
-craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap", "automation", "theme-store"] }
+craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imaging", "window", "keymap", "automation", "theme-store", "print", "menu", "timeline", "text", "text-font-picker", "font-manager"] }
 # Interface translations over the embedded craft-i18n catalogs (`build.rs`, `src/i18n.rs`).
 craft-i18n = { workspace = true }
 photocraft-geom = { workspace = true }
@@ -43,18 +42,13 @@ serde_json = { workspace = true }
 # The tables of craft-host's `SectionStore` (`app/framework.rs`); already linked through craft-host.
 toml = { version = "1.1", default-features = false, features = ["std", "serde"] }
 log = { workspace = true }
-# Display order of right-to-left labels (`bidi_text.rs`); already linked through usvg.
-unicode-bidi = "0.3"
-# Context-sensitive dotted/dotless I mapping for Azerbaijani and Turkish UI text.
-icu_casemap = "2.3"
-icu_locale_core = "2.3"
 base64 = "0.23"
-# Inflating egui's default fonts, stored deflated (build.rs, `text/egui_fonts.rs`); already linked through photocraft-io.
-flate2 = { workspace = true }
 web-time = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 craft-update = { workspace = true }
+# `FilePanels::pump_with`: rfd's folder picker and file paths exist on native only.
+craft = { workspace = true, features = ["dialogs"] }
 rayon = { workspace = true }
 # Safe native UI-language APIs (Windows/macOS); no subprocess or web dependency.
 sys-locale = "=0.3.2"
@@ -67,8 +61,8 @@ winsafe = { version = "=0.0.29", default-features = false, features = ["kernel",
 
 [dev-dependencies]
 photocraft-io = { workspace = true, features = ["testgen"] }
-# egui's own default fonts in tests: the oracle for egui_fonts.rs, and contexts made with
-# `Context::default()` (no install_fonts) can lay out text.
+# egui's own default fonts in tests, so contexts made with `Context::default()` (no
+# install_fonts) can lay out text.
 egui = { workspace = true, features = ["default_fonts", "monochrome_emoji_fonts"] }
 # Synthetic raw files for the open-time Camera Raw dialog tests.
 photocraft-raw = { workspace = true, features = ["testgen"] }
@@ -85,10 +79,6 @@ tempfile = "3"
 craft = { workspace = true, features = ["screen-testing"] }
 
 [build-dependencies]
-# Deflates egui's default fonts (build.rs); already linked at run time to inflate them.
-flate2 = { workspace = true }
-# egui's default fonts, deflated by build.rs for egui_fonts.rs (the same version egui uses).
-epaint_default_fonts = { version = "0.37", features = ["monochrome_emoji_fonts"] }
 serde_json = { workspace = true }
 toml = "1"
 

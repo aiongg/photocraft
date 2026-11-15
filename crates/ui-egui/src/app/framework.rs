@@ -6,38 +6,56 @@
 //! that feature turns on egui's `default_fonts`, which PhotoCraft leaves out (it ships them
 //! deflated). Its two jobs are PhotoCraft's own here: `work_area::fit_window` fits the window to
 //! its monitor, and the Windows window comes from PhotoCraft's title bar code.
+//!
+//! The `craft` facade features PhotoCraft enables for this: `text`, `text-font-picker`,
+//! `font-manager`, `menu`, `timeline` and `print`, plus `dialogs` on native targets.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
 use craft::host::target::{Backend, ShellInfo};
-use craft::host::{AppInfo, Host, SectionStore};
+use craft::host::{AppInfo, Files, Host, SectionStore};
 use craft::i18n::Direction;
 use craft::keymap::Overrides;
 use craft::theme::{AppDefaults, AppSizes, ModeChoice, Size, SuiteChoice, ThemeId, ThemePair, resolve_sized};
 use craft::theme_store::{SelectionChange, SuiteClient};
-use craft::ui::dialog::{DialogHost, DialogId, dialog_id};
+use craft::ui::dialog::DialogHost;
 use craft::ui::fonts::UiFonts;
-use craft::ui::runtime::commands::{CommandInput, CommandRef, CommandSet as _, CommandState, Fired, NavCommand};
-use craft::ui::runtime::env::{RootEnv, Scale};
-use craft::ui::runtime::frame::{ChromeToggle, FrameInput, FrameOutput};
+use craft::ui::runtime::commands::{AppCatalog, CommandInput, CommandRef, CommandSet as _, CommandState, Fired, NavCommand};
+use craft::ui::runtime::env::{PointSize, RootEnv, Scale, SystemReader};
+use craft::ui::runtime::focus::TabReach;
+use craft::ui::runtime::frame::{FrameInput, FrameOutput};
+use craft::ui::runtime::install::WheelModifiers;
 use craft::ui::runtime::{InstallError, InstallSpec};
 use craft::ui::shell::embed;
+use craft::window::policy::Decision;
 use craft::window::system::SystemWindows;
 use photocraft_engine::Session;
 use photocraft_engine::prefs::{AppearanceMode, Preferences};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use super::PhotocraftApp;
 use crate::i18n;
-use crate::state::{Dialog, DialogKind, UiState};
+use crate::state::Tool;
 use crate::theme::AppTheme;
 
-/// Installs the runtime on `ctx` with `fonts`, unless it is there already (a language change, or
-/// `setup_context` again for the same context).
-pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>) {
-    let spec = InstallSpec::new(ShellInfo::default().backend(Backend::from_env()), Arc::new(SystemWindows));
+/// Installs the runtime on `ctx` with `fonts` and the root window's decided `frame` (`None` where
+/// the platform decides none), unless it is there already (`setup_window` again for the same
+/// context). Only `theme::install_runtime` calls it.
+pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<Decision>) {
+    // The wheel zooms with the canvas's own keys and scrolls sideways with Shift or Command, as
+    // PhotoCraft's input always has.
+    let wheel = WheelModifiers { zoom: egui::Modifiers::NONE, sideways: egui::Modifiers::SHIFT | egui::Modifiers::COMMAND };
+    let wake = ctx.clone();
+    let mut spec = InstallSpec::new(ShellInfo::default().backend(Backend::from_env()), Arc::new(SystemWindows))
+        .wheel(wheel)
+        .app_id(crate::os_window::APP_ID)
+        .system(SystemReader::start(move || wake.request_repaint()));
+    if let Some(decision) = frame {
+        spec = spec.frame(decision);
+    }
+    // The icons the interface draws are registered before the runtime reads its first frame.
+    crate::icons::register();
     match embed::install(ctx, spec, fonts) {
         Ok(_) | Err(InstallError::AlreadyInstalled) => {}
         Err(error) => log::error!("the craft runtime could not be installed: {error}"),
@@ -55,10 +73,18 @@ pub struct Framework {
     /// The runtime's keymap overrides. The runtime rebuilds its keymap when the `Arc` changes, so
     /// it is replaced only when the bindings it carries change.
     overrides: Arc<Overrides>,
-    /// The preferences revision `overrides` was last checked against.
+    /// The preferences revision `overrides` and `catalog` were last built at.
     overrides_rev: Option<u64>,
-    /// The chrome toggles the runtime took from the keys since the last frame, for `logic`.
-    pub(crate) chrome_toggles: Vec<ChromeToggle>,
+    /// The app's command catalog as of `overrides_rev`.
+    catalog: Option<AppCatalog>,
+    /// The file services the host gives components (pickers, reads and writes); `None` keeps the
+    /// host's own default.
+    files: Option<Arc<dyn Files>>,
+    /// The commands the runtime's keys and surfaces fired since `shortcuts::handle` last ran.
+    pub(crate) fired: Vec<Fired>,
+    /// Whether a component refused its input in the frames since the last alert: the frame plays
+    /// its alert once.
+    pub(crate) refused: bool,
     /// The commands the runtime's components ran since the last frame, for the action recorder in `logic`.
     pub(crate) delivered: Vec<Fired>,
     /// The suite's theme selection, shared with the other Craft apps.
@@ -168,21 +194,48 @@ fn base_root() -> RootEnv {
     let mut root = RootEnv::new();
     // Photoshop's Tab hides the panels, Shift+Tab all but the tools, over the canvas.
     root.tab_toggles_chrome = true;
+    // Tab in a dialog moves between its fields, as in Photoshop.
+    root.dialog_tab = TabReach::Fields;
     root
 }
 
 impl Default for Framework {
     fn default() -> Self {
+        Framework::new(None)
+    }
+}
+
+fn build_host(sections: &Arc<PrefSections>, lang: &str, files: Option<&Arc<dyn Files>>) -> Host {
+    let i18n = i18n::framework_i18n();
+    let mut builder = Host::builder(AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
+        .i18n(Arc::clone(i18n))
+        .settings(Arc::clone(sections) as Arc<dyn SectionStore>)
+        .jobs(craft::host::default_jobs());
+    if let Some(files) = files {
+        builder = builder.files(Arc::clone(files));
+    }
+    if let Some(lang) = i18n.from_code(lang) {
+        builder = builder.lang(lang);
+    }
+    builder.build()
+}
+
+impl Framework {
+    /// The framework state of a new app, its host serving `files` where the app has file services.
+    pub(crate) fn new(files: Option<Arc<dyn Files>>) -> Self {
         let sections = Arc::new(PrefSections::default());
         let lang = "en";
         Framework {
-            host: Arc::new(build_host(&sections, lang)),
+            host: Arc::new(build_host(&sections, lang, files.as_ref())),
             sections,
             lang,
             dialogs: DialogHost::new(),
             overrides: Arc::new(Overrides::new()),
             overrides_rev: None,
-            chrome_toggles: Vec::new(),
+            catalog: None,
+            files,
+            fired: Vec::new(),
+            refused: false,
             delivered: Vec::new(),
             suite: SuiteClient::memory(),
             synced: None,
@@ -192,40 +245,56 @@ impl Default for Framework {
             theme_resolves: Default::default(),
         }
     }
-}
 
-fn build_host(sections: &Arc<PrefSections>, lang: &str) -> Host {
-    let i18n = i18n::framework_i18n();
-    let mut builder = Host::builder(AppInfo { id: "photocraft", name: "PhotoCraft", version: env!("CARGO_PKG_VERSION") })
-        .i18n(Arc::clone(i18n))
-        .settings(Arc::clone(sections) as Arc<dyn SectionStore>)
-        .jobs(craft::host::default_jobs());
-    if let Some(lang) = i18n.from_code(lang) {
-        builder = builder.lang(lang);
+    /// Moves the dialogs' last-used values the preferences still hold into the framework's saved
+    /// memory, once, before the first frame. Nothing is left to move after the first run.
+    pub(crate) fn move_memories(&mut self, session: &mut Session) {
+        self.sections.sync(session);
+        session.edit_prefs(|prefs| crate::dialogs::move_memories(prefs, &self.host));
+        self.sections.sync(session);
     }
-    builder.build()
-}
 
-impl Framework {
-    /// The input for the coming frame, from PhotoCraft's preferences.
-    fn frame_input(&mut self, session: &mut Session, ctx: &egui::Context, theme: &AppTheme, states: Vec<(CommandRef, CommandState)>) -> FrameInput {
+    /// The input for the coming frame, from PhotoCraft's preferences: `states` of every command
+    /// source, the held catalog and overrides, and `gate` over the commands.
+    fn frame_input(
+        &mut self,
+        session: &mut Session,
+        ctx: &egui::Context,
+        theme: &AppTheme,
+        states: Vec<(CommandRef, CommandState)>,
+        gate: craft::ui::runtime::commands::CommandGate,
+        latched: craft::keymap::Mods,
+    ) -> FrameInput {
         self.sections.sync(session);
         let lang = i18n::current().code();
         if lang != self.lang {
             self.lang = lang;
-            self.host = Arc::new(build_host(&self.sections, lang));
+            self.host = Arc::new(build_host(&self.sections, lang, self.files.as_ref()));
         }
         let rtl = i18n::framework_i18n().from_code(lang).is_some_and(|l| i18n::framework_i18n().rtl(l));
         let root = match theme.library() {
             Some(def) => base_root().library_theme(Arc::clone(def)),
             None => base_root().theme(theme.id().clone()),
         };
-        let root = root
+        let mut root = root
             .mode(if theme.is_dark() { ModeChoice::Dark } else { ModeChoice::Light })
             .scale(Scale::new(crate::prefs_ui::interface_zoom(session.prefs().interface.ui_scale, ctx)))
             .direction(if rtl { Direction::Rtl } else { Direction::Ltr });
-        let commands = states.into_iter().fold(CommandInput::new(), |input, (command, state)| input.state(command, state));
-        FrameInput::new(root).host(Arc::clone(&self.host)).commands(commands.overrides(Arc::clone(&self.overrides)))
+        // Read each frame, so a preference change shows at once.
+        root.canvas_pattern = session.prefs().interface.show_canvas_dots;
+        root.values.set(craft::ui::canvas::ShowReadouts(session.prefs().tools.show_transformation_values));
+        // Length fields read the Point/Pica size from the root; each passes its document's pixels
+        // per inch in its own `LengthUnits`.
+        root.values.set(match session.prefs().units_and_rulers.point_size {
+            photocraft_engine::prefs::PointSize::PostScript => PointSize::PostScript,
+            photocraft_engine::prefs::PointSize::Traditional => PointSize::Traditional,
+        });
+        let mut commands = states.into_iter().fold(CommandInput::new(), |input, (command, state)| input.state(command, state));
+        if let Some(catalog) = &self.catalog {
+            commands = commands.catalog(catalog.clone());
+        }
+        let commands = commands.overrides(Arc::clone(&self.overrides)).gate(gate);
+        FrameInput::new(root).host(Arc::clone(&self.host)).commands(commands).latched(latched)
     }
 
     /// Opens the suite folder this machine shares with the other Craft apps, in place of the
@@ -360,21 +429,16 @@ impl Framework {
             .unwrap_or_else(|| id.as_str().to_owned())
     }
 
-    /// The runtime's keymap overrides from PhotoCraft's own bindings: the chrome commands it
-    /// dispatches for PhotoCraft (`shortcut_dispatch::FRAMEWORK_OWNED`) and the document canvas's
-    /// view commands (`shortcut_dispatch::VIEW_OWNED`) get PhotoCraft's keys for them, and the pane moves are unbound, because PhotoCraft's own table binds F6 and Shift+F6
-    /// (Window › Color, Select › Modify › Feather) until those are a framework `CommandSet`.
-    fn set_overrides(&mut self, rev: u64, chrome: [Vec<String>; 2], view: [Vec<String>; 4]) {
+    /// Rebuilds the catalog and the runtime's keymap overrides at preferences revision `rev`. The
+    /// pane moves are unbound in the overrides, because PhotoCraft's own table binds F6 and
+    /// Shift+F6 (Window › Color, Select › Modify › Feather) until those are a framework
+    /// `CommandSet`. The held `Arc` is replaced only when the bindings differ, so the runtime
+    /// rebuilds its keymap only on a change.
+    fn set_overrides(&mut self, rev: u64, catalog: AppCatalog, mut overrides: Overrides) {
         self.overrides_rev = Some(rev);
-        let mut overrides = Overrides::new();
+        self.catalog = Some(catalog);
         for command in [NavCommand::NextPane, NavCommand::PreviousPane] {
             overrides.insert(CommandRef::from(command).key(), Vec::new());
-        }
-        for ((_, command), texts) in crate::shortcut_dispatch::FRAMEWORK_OWNED.iter().zip(chrome) {
-            overrides.insert(CommandRef::from(*command).key(), texts);
-        }
-        for ((_, command), texts) in crate::shortcut_dispatch::VIEW_OWNED.iter().zip(view) {
-            overrides.insert(CommandRef::from(*command).key(), texts);
         }
         if *self.overrides != overrides {
             self.overrides = Arc::new(overrides);
@@ -382,66 +446,72 @@ impl Framework {
     }
 }
 
+/// One user of the framework's command sets: the states its commands show and the runner of the
+/// ones it fires.
+pub(crate) struct CommandSource {
+    /// The states of the source's commands for the coming frame.
+    states: fn(&PhotocraftApp) -> Vec<(CommandRef, CommandState)>,
+    /// Runs `command` when it is this source's; whether it was.
+    run: fn(&mut PhotocraftApp, &egui::Context, &CommandRef) -> bool,
+}
+
+/// Every command source, in the order [`run_command`] tries them. The theme has no entry: it has
+/// no command state, and its picks run through `menus::invoke`.
+pub(crate) const COMMAND_SOURCES: &[CommandSource] = &[
+    CommandSource { states: crate::panels::registry::states, run: crate::panels::registry::run_fired },
+    CommandSource { states: crate::panels::rail_commands::states, run: crate::panels::rail_commands::run_fired },
+    CommandSource { states: tool_states, run: run_tool },
+    CommandSource { states: crate::workspace_ui::states, run: crate::workspace_ui::run_fired },
+    CommandSource { states: crate::slice_ui::command_states, run: crate::slice_ui::run_fired },
+    CommandSource { states: crate::align_bar::command_states, run: crate::align_bar::run_fired },
+    CommandSource { states: crate::artboard_tool::command_states, run: crate::artboard_tool::run_fired },
+];
+
+/// The tool commands: the current tool's row is checked.
+fn tool_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
+    Tool::ALL.iter().map(|&tool| (CommandRef::from(crate::panels::tool_commands::command_of(tool)), CommandState::new().checked(app.ui.tool == tool))).collect()
+}
+
+/// Selects the tool a tool command names.
+fn run_tool(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &CommandRef) -> bool {
+    let Some(command) = crate::panels::tool_commands::ToolCommand::from_ref(command) else {
+        return false;
+    };
+    crate::tool_memory::select(app, crate::panels::tool_commands::tool_of(command));
+    true
+}
+
+/// Runs `command` through the first source that owns it; whether one did.
+pub(crate) fn run_command(app: &mut PhotocraftApp, ctx: &egui::Context, command: &CommandRef) -> bool {
+    COMMAND_SOURCES.iter().any(|source| (source.run)(app, ctx, command))
+}
+
 impl PhotocraftApp {
     /// Before each frame (`raw_input_hook`): the runtime's output of the last frame, and its
-    /// input for this one. Of the output, PhotoCraft runs the chrome toggles and records the view
-    /// commands the canvas ran (in `logic`).
+    /// input for this one. Of the output, PhotoCraft keeps the fired commands (`shortcuts::handle`
+    /// runs them), the commands the canvas ran (`record_view_commands`, in `logic`) and whether a
+    /// component refused its input.
     pub(crate) fn framework_before_input(&mut self, ctx: &egui::Context) {
-        // The bindings come from walking the whole command table: only after a preferences change.
+        // The catalog and the bindings come from walking the whole command table: only after a
+        // preferences change.
         let rev = self.session.prefs.rev();
         if self.framework.overrides_rev != Some(rev) {
-            let chrome = crate::shortcut_dispatch::owned_texts(self, &crate::shortcut_dispatch::FRAMEWORK_OWNED);
-            let view = crate::shortcut_dispatch::owned_texts(self, &crate::shortcut_dispatch::VIEW_OWNED);
-            self.framework.set_overrides(rev, chrome, view);
+            let catalog = crate::shortcut_dispatch::catalog(self);
+            let overrides = crate::shortcut_dispatch::overrides(self);
+            self.framework.set_overrides(rev, catalog, overrides);
         }
         if self.framework.sync_theme(&mut self.session) {
             crate::prefs_ui::show_selected_theme(self, ctx);
         }
-        // The Color panel menu's commands (its ramp's context menu fires them): the checks go in, the fired ones run
-        // after the frame.
-        let states = ColorPanelMenu::states(&self.ui.color_panel.panel).into_iter().map(|(command, state)| (CommandRef::from(command), state)).collect();
-        let mut color_commands = Vec::new();
+        let states: Vec<(CommandRef, CommandState)> = COMMAND_SOURCES.iter().flat_map(|source| (source.states)(self)).collect();
+        let gate = crate::menus::command_gate(self);
+        let latched = self.ui.shell.latched;
         embed::before_input(ctx, |output: FrameOutput| {
-            self.framework.chrome_toggles.extend(output.chrome_toggles.into_iter().map(|(_, toggle)| toggle));
+            self.framework.fired.extend(output.fired);
             self.framework.delivered.extend(output.delivered);
-            color_commands.extend(output.fired.iter().filter_map(|fired| ColorPanelCommand::from_ref(&fired.command)));
-            self.framework.frame_input(&mut self.session, ctx, &self.ui.theme, states)
+            self.framework.refused |= output.refused;
+            self.framework.frame_input(&mut self.session, ctx, &self.ui.theme, states, gate, latched)
         });
-        for command in color_commands {
-            if let Some(text) = crate::panels::color::run_menu_command(self, command) {
-                ctx.copy_text(text);
-            }
-        }
-    }
-
-    /// After PhotoCraft's own dialogs (`ui_body`): the framework dialogs it keeps open.
-    pub(crate) fn framework_dialogs(&mut self, ui: &mut egui::Ui) {
-        self.framework.dialogs.run(ui);
-    }
-
-    /// Opens PhotoCraft's own dialog `kind` on top of the one dialog stack, over the dialog its fields name as its
-    /// parent. Returns its id.
-    pub fn open_dialog(&mut self, kind: DialogKind, fields: Map<String, Value>) -> u64 {
-        open_dialog(&mut self.ui, &mut self.framework.dialogs, kind, fields)
-    }
-
-    /// Closes PhotoCraft's own dialog `id`: it leaves the stack with the framework dialogs opened over it.
-    pub fn close_dialog(&mut self, id: u64) -> Option<Dialog> {
-        let at = self.ui.dialogs.iter().position(|d| d.id == id)?;
-        self.framework.dialogs.close_beside(stack_id(id));
-        let closed = self.ui.dialogs.remove(at);
-        // Closing a dialog also closes the ones opened over it: the two lists never part.
-        let host = &self.framework.dialogs;
-        self.ui.dialogs.retain(|d| host.stack().ids().any(|s| s == stack_id(d.id)));
-        Some(closed)
-    }
-
-    /// Closes PhotoCraft's own dialogs for which `keep` is false, each as [`close_dialog`](Self::close_dialog) does.
-    pub fn retain_dialogs(&mut self, mut keep: impl FnMut(&Dialog) -> bool) {
-        let closed: Vec<u64> = self.ui.dialogs.iter().filter(|d| !keep(d)).map(|d| d.id).collect();
-        for id in closed {
-            self.close_dialog(id);
-        }
     }
 
     /// Whether a dialog is open, PhotoCraft's own or a framework one: the canvas, shortcuts, menus and tools under it
@@ -454,21 +524,6 @@ impl PhotocraftApp {
     pub fn dialog_count(&self) -> usize {
         self.framework.dialogs.stack().ids().count()
     }
-}
-
-/// [`PhotocraftApp::open_dialog`] for code that holds other parts of the app at the same time.
-pub(crate) fn open_dialog(ui: &mut UiState, host: &mut DialogHost, kind: DialogKind, fields: Map<String, Value>) -> u64 {
-    let parent = crate::dialogs::parent_of(&fields).map(stack_id);
-    let id = ui.alloc_id();
-    ui.dialogs.push(Dialog { id, kind, fields });
-    host.open_beside(stack_id(id), parent);
-    id
-}
-
-/// The framework stack's id of PhotoCraft's own dialog `id`: control requests address both kinds
-/// by one `dialog` id, PhotoCraft's `u64` for its own dialogs and the stack id for hosted ones.
-pub(crate) fn stack_id(id: u64) -> DialogId {
-    dialog_id(("photocraft.dialog", id))
 }
 
 /// The framework's settings sections, kept in PhotoCraft's preferences (`Preferences::sections`).
@@ -522,8 +577,21 @@ impl SectionStore for PrefSections {
 #[cfg(test)]
 pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -> egui::FullOutput {
     let ctx = egui::Context::default();
-    install(&ctx, &UiFonts::new(&craft::ui::fonts::I18nScripts));
+    install(&ctx, &UiFonts::new(&craft::ui::fonts::I18nScripts), None);
     ctx.run_ui(input, |ui| embed::logic(ui.ctx(), || crate::discard_ui::close_decision(app)))
+}
+
+/// Runs one frame of `input` on `ctx` as the app's runtime key pass: the runtime takes the input
+/// with the app's command states, catalog and overrides, `body` runs in the pass, and the commands
+/// the pass's keys fired go to `shortcuts::handle` in the same frame, as `raw_input_hook` and
+/// `logic` hand them over in the next one.
+#[cfg(test)]
+pub(crate) fn keys_pass(app: &mut PhotocraftApp, ctx: &egui::Context, input: egui::RawInput, body: impl FnMut(&mut egui::Ui)) {
+    app.framework_before_input(ctx);
+    ctx.run_ui(input, body);
+    // Collects what this pass fired.
+    app.framework_before_input(ctx);
+    crate::shortcuts::handle(app, ctx);
 }
 
 #[cfg(test)]

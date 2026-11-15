@@ -248,10 +248,10 @@ impl AppTheme {
         self.tokens.pro
     }
 
-    /// The Window › Theme command that shows this theme: `window.theme.dark.<id>` or `window.theme.light.<id>`.
+    /// The Appearance command that shows this theme in its current mode.
     #[cfg(test)]
-    pub(crate) fn command(&self) -> String {
-        format!("window.theme.{}.{}", if self.is_dark() { "dark" } else { "light" }, self.id.as_str())
+    pub(crate) fn command(&self) -> craft::ui::runtime::commands::CommandRef {
+        craft::menu::ThemeChoice::Theme { id: self.id.clone(), dark: self.is_dark() }.command()
     }
 }
 
@@ -264,8 +264,6 @@ pub struct Tokens {
     pub chrome: Color32,
     /// Canvas surround.
     pub canvas: Color32,
-    /// Dot colour of the canvas grid pattern.
-    pub canvas_dot: Color32,
     /// Dock background (behind cards).
     pub dock: Color32,
     /// Cards / panels.
@@ -330,7 +328,6 @@ impl Tokens {
             dark,
             chrome: c(ColorToken::SurfaceChrome),
             canvas: c(ColorToken::SurfaceCanvas),
-            canvas_dot: c(ColorToken::SurfaceCanvasPattern),
             dock: c(ColorToken::SurfaceBackground),
             card: c(ColorToken::SurfacePanel),
             card_border: c(ColorToken::LineBorder),
@@ -395,7 +392,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(184, 184, 184),
                 canvas: Color32::from_rgb(160, 160, 160),
-                canvas_dot: Color32::from_rgb(160, 160, 160),
                 dock: Color32::from_rgb(168, 168, 168),
                 card: Color32::from_rgb(184, 184, 184),
                 card_border: Color32::from_rgb(160, 160, 160),
@@ -420,7 +416,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(240, 240, 240),
                 canvas: Color32::from_rgb(214, 214, 214),
-                canvas_dot: Color32::from_rgb(214, 214, 214),
                 dock: Color32::from_rgb(226, 226, 226),
                 card: Color32::from_rgb(240, 240, 240),
                 card_border: Color32::from_rgb(214, 214, 214),
@@ -444,7 +439,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(50, 50, 50),
                 canvas: Color32::from_rgb(40, 40, 40),
-                canvas_dot: Color32::from_rgb(40, 40, 40),
                 dock: Color32::from_rgb(30, 30, 30),
                 card: Color32::from_rgb(50, 50, 50),
                 card_border: Color32::from_rgb(30, 30, 30),
@@ -483,7 +477,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(20, 20, 21),
                 canvas: Color32::from_rgb(14, 14, 15),
-                canvas_dot: Color32::from_rgb(46, 46, 50),
                 dock: Color32::from_rgb(17, 17, 18),
                 card: Color32::from_rgb(26, 26, 28),
                 card_border: Color32::from_rgb(40, 40, 44),
@@ -524,7 +517,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(246, 246, 248),
                 canvas: Color32::from_rgb(226, 226, 230),
-                canvas_dot: Color32::from_rgb(200, 200, 206),
                 dock: Color32::from_rgb(240, 240, 243),
                 card: Color32::from_rgb(252, 252, 253),
                 card_border: Color32::from_rgb(222, 222, 228),
@@ -563,7 +555,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(212, 208, 200),
                 canvas: Color32::from_rgb(128, 128, 128),
-                canvas_dot: Color32::from_rgb(128, 128, 128),
                 dock: Color32::from_rgb(212, 208, 200),
                 card: Color32::from_rgb(212, 208, 200),
                 card_border: Color32::from_rgb(128, 128, 128),
@@ -605,7 +596,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::WHITE,
                 canvas: Color32::from_rgb(222, 222, 223),
-                canvas_dot: Color32::from_rgb(222, 222, 223),
                 dock: Color32::from_rgb(235, 235, 237),
                 card: Color32::WHITE,
                 card_border: Color32::from_rgb(218, 218, 221),
@@ -644,7 +634,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(46, 46, 50),
                 canvas: Color32::from_rgb(29, 29, 32),
-                canvas_dot: Color32::from_rgb(29, 29, 32),
                 dock: Color32::from_rgb(34, 34, 38),
                 card: Color32::from_rgb(54, 54, 58),
                 card_border: Color32::from_rgb(64, 64, 68),
@@ -689,7 +678,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(219, 222, 226),
                 canvas: Color32::from_rgb(219, 222, 226),
-                canvas_dot: Color32::from_rgb(219, 222, 226),
                 dock: Color32::from_rgb(224, 227, 231),
                 card: Color32::from_rgb(236, 238, 241),
                 card_border: Color32::from_rgb(203, 208, 213),
@@ -738,7 +726,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(38, 42, 48),
                 canvas: Color32::from_rgb(17, 20, 24),
-                canvas_dot: Color32::from_rgb(17, 20, 24),
                 dock: Color32::from_rgb(26, 29, 34),
                 card: Color32::from_rgb(29, 33, 38),
                 card_border: Color32::from_rgb(52, 56, 61),
@@ -780,7 +767,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(58, 58, 68),
                 canvas: Color32::from_rgb(40, 40, 48),
-                canvas_dot: Color32::from_rgb(40, 40, 48),
                 dock: Color32::from_rgb(47, 47, 56),
                 card: Color32::from_rgb(54, 54, 64),
                 card_border: Color32::from_rgb(70, 70, 82),
@@ -821,7 +807,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(232, 230, 236),
                 canvas: Color32::from_rgb(218, 216, 224),
-                canvas_dot: Color32::from_rgb(218, 216, 224),
                 dock: Color32::from_rgb(226, 224, 231),
                 card: Color32::from_rgb(240, 238, 243),
                 card_border: Color32::from_rgb(208, 205, 215),
@@ -863,7 +848,6 @@ impl Tokens {
                 dark: kind.is_dark(),
                 chrome: Color32::from_rgb(7, 54, 66),
                 canvas: Color32::from_rgb(0, 43, 54),
-                canvas_dot: Color32::from_rgb(10, 61, 74),
                 dock: Color32::from_rgb(0, 37, 47),
                 card: Color32::from_rgb(7, 54, 66),
                 card_border: Color32::from_rgb(0, 37, 47),
@@ -955,15 +939,6 @@ impl Tokens {
         self.histogram_bg
     }
 
-    /// The background behind selected text in a text field (#3789): a subtle shade rather than
-    /// egui's default blue. The monochrome Pro themes use a grey so a selection doesn't read as a
-    /// second accent; coloured themes keep their own accent. Scoped to text fields by
-    /// [`crate::widgets::text_field`], because `Visuals::selection` also fills selected list rows
-    /// and slider trails, which must keep the theme's.
-    pub fn field_selection(&self) -> Color32 {
-        if self.pro { Color32::from_gray(if self.dark() { 96 } else { 201 }) } else { self.accent_soft }
-    }
-
     /// The 1 px ring round a slider knob, if the theme draws one: the Pro layouts' dark ring, and
     /// in the light themes the dim text colour, so their white knob stands out from a pale panel
     /// (#7927). The dark Studio-layout themes need none; Classic draws a bevelled knob instead.
@@ -980,6 +955,16 @@ impl Tokens {
     pub fn dark(&self) -> bool {
         self.dark
     }
+}
+
+/// Installs the font stack and the size stack on `ctx`, not the runtime: Inter (UI) and JetBrains
+/// Mono (numbers) with the named weights, the craft-fonts faces and the loader of system fonts,
+/// each face at Interface › UI Font Size. A language change and a served face call it again to
+/// rebuild the stack. The runtime is installed once, when the window or context is created
+/// ([`install_runtime`]).
+pub fn install_fonts(ctx: &egui::Context) {
+    let fonts = ui_fonts(ctx, crate::i18n::current().code());
+    install_font_stack(ctx, &fonts);
 }
 
 /// PhotoCraft's faces as the craft framework's font stack: Inter for the interface with its
@@ -1015,28 +1000,28 @@ fn ui_fonts(ctx: &egui::Context, ui_language: &str) -> UiFonts<'static> {
     if let Some(locale) = crate::cjk_fonts::os_locale() {
         fonts = fonts.os_locale(locale);
     }
-    // Shared Han and kana keep the craft manifest's first Japanese face while no Han script is preferred.
-    if let Some(family) = crate::cjk_fonts::han_baseline(ui_language) {
-        fonts = fonts.prefer("Jpan", family);
-    }
     if let Some(served) = crate::served_fonts::served(ctx) {
         fonts = fonts.served_faces(&served.faces).fetcher(served.fetcher);
     }
     faces.into_iter().fold(fonts, |fonts, (name, data, families)| fonts.app_face(&name, data, &families))
 }
 
-/// Register Inter (UI) and JetBrains Mono (numbers) plus named weights, the craft-fonts faces and the loader of
-/// system fonts for scripts nothing else covers. The first install on a context installs the craft runtime too
-/// (`app/framework.rs`); a language change installs again.
-// PLAN: hub-w1's `install_runtime(ctx, frame: Option<Decision>)` wraps this body; `Decision` and
-// `framework::install`'s `frame` argument do not exist at the base, so the body stays here.
-pub fn install_fonts(ctx: &egui::Context) {
+/// Installs the craft runtime on `ctx` with the font stack (see [`install_fonts`]) and the root
+/// window's `frame` decision (`None` where the platform has none, as on the web; the frame is part
+/// of this install, never set afterwards). It runs once, from `PhotocraftApp::setup_window` or
+/// `setup_context`, when the window or headless context is created.
+pub fn install_runtime(ctx: &egui::Context, frame: Option<craft::window::policy::Decision>) {
+    let fonts = ui_fonts(ctx, crate::i18n::current().code());
+    crate::app::framework::install(ctx, &fonts, frame);
+    install_font_stack(ctx, &fonts);
+}
+
+/// Every face of `fonts` at Interface › UI Font Size, egui's default faces the framework adds
+/// included, with the plugin that follows size changes and the loader of system fonts for scripts
+/// nothing else covers. The runtime's install takes no edited stack, so after it this replaces the
+/// stack it just installed.
+fn install_font_stack(ctx: &egui::Context, fonts: &UiFonts<'_>) {
     let language = crate::i18n::current().code();
-    let fonts = ui_fonts(ctx, language);
-    crate::app::framework::install(ctx, &fonts);
-    // Every face of the stack at Interface › UI Font Size, egui's default faces the framework
-    // adds included. The runtime's install takes no edited stack, so on the first install this
-    // replaces the stack it just installed.
     let mut stack = fonts.stack();
     for (name, data) in stack.flat_definitions().font_data {
         let mut data = (*data).clone();
@@ -1144,9 +1129,8 @@ impl egui::Plugin for UiFontSizePlugin {
             ctx.data_mut(|d| d.insert_temp(id, original));
             Arc::make_mut(data).tweak.scale = original * font_scale(size);
         }
+        // The on-demand loader registers its faces into these definitions, so they take the size too.
         ctx.set_fonts(fonts);
-        // PLAN: faces the installed system font provider finds are not part of the definitions, so this scale
-        // does not reach them; the framework's provider takes no scale (framework-01-w5, `fonts/stack.rs`).
         self.applied = size;
         ctx.request_repaint();
     }
@@ -1389,11 +1373,6 @@ pub mod live {
                     t.canvas = c;
                 }
             }
-            "canvas_dot" => {
-                if let Some(c) = color(value) {
-                    t.canvas_dot = c;
-                }
-            }
             "dock" => {
                 if let Some(c) = color(value) {
                     t.dock = c;
@@ -1531,19 +1510,5 @@ pub mod live {
             _ => return false,
         }
         true
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn overrides_apply_and_report_unknown() {
-            let mut t = super::super::AppTheme::pro().tokens();
-            let unknown = apply_overrides(&mut t, &serde_json::json!({"card": "#102030", "radius": 9, "nope": 1}));
-            assert_eq!(t.card, Color32::from_rgb(16, 32, 48));
-            assert_eq!(t.radius, 9.0);
-            assert_eq!(unknown, vec!["nope".to_string()]);
-        }
     }
 }
