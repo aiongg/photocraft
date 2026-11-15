@@ -11,8 +11,7 @@ use crate::PhotocraftApp;
 /// above the Background.
 fn app() -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300, "background": "white"})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
@@ -30,10 +29,7 @@ fn transform_and_move(h: &mut Harness<'static, PhotocraftApp>) {
     crate::menus::invoke(h.state_mut(), &ctx, "edit.freeTransform", json!({})).unwrap();
     h.run_steps(2);
     let t = h.state_mut().ui.transform.as_mut().expect("Free Transform is open");
-    for p in &mut t.quad {
-        p[0] += 50.0;
-        p[1] += 40.0;
-    }
+    t.edit_box(|b| *b = b.moved((50.0, 40.0).into()));
     h.run_steps(2);
 }
 
@@ -64,8 +60,7 @@ fn picking_another_tool_in_the_toolbar_applies_the_transform() {
 /// place takes that step back.
 fn placed_app() -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300, "background": "white"})).unwrap();
         app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
         app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
@@ -87,10 +82,7 @@ fn placed_and_moved(h: &mut Harness<'static, PhotocraftApp>) {
     crate::transform_tool::begin_placed(h.state_mut(), &ctx).unwrap();
     h.run_steps(2);
     let t = h.state_mut().ui.transform.as_mut().expect("Free Transform is open");
-    for p in &mut t.quad {
-        p[0] += 50.0;
-        p[1] += 40.0;
-    }
+    t.edit_box(|b| *b = b.moved((50.0, 40.0).into()));
     h.run_steps(2);
 }
 
@@ -201,7 +193,7 @@ fn a_refused_transform_keeps_the_placed_layer_and_refuses_the_new_layer() {
     let mut h = placed_app();
     placed_and_moved(&mut h);
     let t = h.state_mut().ui.transform.as_mut().unwrap();
-    t.quad = [[0.0, 0.0], [4.0e6, 0.0], [4.0e6, 4.0e6], [0.0, 4.0e6]];
+    t.edit_box(|b| b.quad = [[0.0, 0.0], [4.0e6, 0.0], [4.0e6, 4.0e6], [0.0, 4.0e6]].map(|[x, y]: [f64; 2]| (x, y).into()));
     h.run_steps(2);
     let before = history(&h);
     let r = h.state_mut().run("layer.new.layer", json!({}));
