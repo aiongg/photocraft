@@ -506,7 +506,7 @@ fn write_levels(out: &mut Map<String, Value>, entries: &[(ToneChannel, usize)], 
 fn write_curves(out: &mut Map<String, Value>, entries: &[(ToneChannel, usize)], curves: &ToneCurves, space: ToneSpace, cx: &ValueCx) {
     let pencil = curves.mode == CurvesMode::Pencil;
     let record = |c: &Curve| match c {
-        Curve::Points { points, .. } => Some(json!(points.iter().map(|q| [q[0].round(), q[1].round()]).collect::<Vec<_>>())),
+        Curve::Points { points, .. } => Some(json!(points.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>())),
         Curve::Map(map) => Some(json!(map.iter().map(|o| (o * 100.0).round() / 100.0).collect::<Vec<_>>())),
         // A curve kind the engine has no record for is left as `base` has it.
         _ => None,

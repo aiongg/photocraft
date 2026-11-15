@@ -190,11 +190,13 @@ pub struct EditorSetup {
     pub swatches: [[f32; 3]; 2],
     /// The tone Color Balance shows first; `None` keeps the editor's default (Midtones).
     pub tone: Option<ColorBalanceTone>,
+    /// The Smart Filter the dialog edits is not reachable from the active document: the editor shows no controls.
+    pub stale: bool,
 }
 
 impl Default for EditorSetup {
     fn default() -> Self {
-        Self { channels: ToneChannels::of(ToneSpace::Rgb, false), histograms: Vec::new(), pickers_unavailable: false, gradients: Vec::new(), swatches: [[0.0; 3], [1.0; 3]], tone: None }
+        Self { channels: ToneChannels::of(ToneSpace::Rgb, false), histograms: Vec::new(), pickers_unavailable: false, gradients: Vec::new(), swatches: [[0.0; 3], [1.0; 3]], tone: None, stale: false }
     }
 }
 

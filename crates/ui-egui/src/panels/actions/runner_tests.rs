@@ -115,10 +115,22 @@ fn token(app: &PhotocraftApp, value: u64) -> u64 {
     token_of(app, open_id(app, value).expect("the dialog is open")).expect("a playback is paused at the dialog")
 }
 
-/// The fields of the open dialog `value`, as automation lists them.
+/// The fields of the open dialog `value`, as automation lists them. The framework keeps every number
+/// as a float; a whole one reads as the integer a parameter is written with.
 fn dialog_fields(app: &PhotocraftApp, value: u64) -> Value {
+    fn whole(v: Value) -> Value {
+        match v {
+            Value::Number(n) => match n.as_f64() {
+                Some(f) if n.is_f64() && f.fract() == 0.0 && f.abs() < 9.0e15 => json!(f as i64),
+                _ => Value::Number(n),
+            },
+            Value::Array(items) => Value::Array(items.into_iter().map(whole).collect()),
+            Value::Object(map) => Value::Object(map.into_iter().map(|(k, v)| (k, whole(v))).collect()),
+            other => other,
+        }
+    }
     let id = open_id(app, value).expect("the dialog is open");
-    app.framework.dialogs.open_dialogs().into_iter().find(|dialog| dialog.id == id).and_then(|dialog| dialog.fields).unwrap_or(Value::Null)
+    whole(app.framework.dialogs.open_dialogs().into_iter().find(|dialog| dialog.id == id).and_then(|dialog| dialog.fields).unwrap_or(Value::Null))
 }
 
 /// Set `field` of the open dialog `value`, as `ui.dialog.set` does.
@@ -1142,11 +1154,11 @@ fn equalize_step_with_a_selection_opens_its_choices() {
 
     let result = play(&mut app, &json!({"action": "Equalize"})).unwrap();
     let id = result["paused"]["dialog"].as_u64().unwrap();
-    assert_eq!(dialog_fields(&app, id)["selectedAreaOnly"], true);
+    assert_eq!(dialog_fields(&app, id)["area"], "selected");
     assert!((gray(&app, 12, 1) - 0.4).abs() < 0.01, "nothing changes before OK");
 
     // OK with the entire image chosen maps the pixels outside the selection too.
-    set_field(&mut app, id, "selectedAreaOnly", json!(false)).unwrap();
+    set_field(&mut app, id, "area", json!("entire")).unwrap();
     answer_ok(&mut app, id).unwrap();
     assert!(gray(&app, 12, 1) < 0.05 && gray(&app, 12, 12) > 0.95, "outside the selection too");
 }
@@ -1228,7 +1240,8 @@ fn a_failing_step_dialog_command_ends_the_recorded_call_once() {
     let mut app = recording_with_dialog_child();
     let id = pause_child(&mut app);
     assert!(app.session.actions.recording.is_none(), "recording stays suspended while the step dialog is open");
-    set_field(&mut app, id, "radius", json!("not a radius")).unwrap();
+    // The dialog takes only values its row accepts, so the command fails on the document: the layer it filters is locked.
+    app.run("layer.lockLayers", json!({"all": true})).unwrap();
     assert!(answer_ok(&mut app, id).is_err(), "the dialog command fails");
     assert!(app.session.actions.recording.is_some(), "recording comes back when the dialog command fails");
     assert_eq!(suffixes(&app), 0, "the action stops at the failed step");
@@ -1240,7 +1253,8 @@ fn a_failing_step_dialog_command_ends_the_recorded_call_once() {
 fn an_abandoned_step_dialog_leaves_no_paused_playback() {
     let mut app = recording_with_dialog_child();
     let id = pause_child(&mut app);
-    set_field(&mut app, id, "radius", json!("not a radius")).unwrap();
+    // The dialog takes only values its row accepts, so the command fails on the document: the layer it filters is locked.
+    app.run("layer.lockLayers", json!({"all": true})).unwrap();
     assert!(answer_ok(&mut app, id).is_err(), "the dialog command fails");
     assert!(app.paused_playbacks.paused.is_empty(), "the failed dialog ends its pause");
     app.run("actions.stop", json!({})).unwrap();
@@ -1298,7 +1312,8 @@ fn a_step_dialog_keeps_its_continuation_token() {
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     for (name, steps) in [
         ("First", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]),
-        ("Second", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1})), ("select.all".into(), json!({}))]),
+        // Another command, so the two step dialogs are two dialogs: a dialog of a command is the one open.
+        ("Second", vec![("filter.blur.boxBlur".into(), json!({"radius": 1})), ("select.all".into(), json!({}))]),
     ] {
         let mut action = new_action(name, steps);
         action.dialogs.insert(0);

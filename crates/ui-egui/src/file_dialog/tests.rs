@@ -1097,7 +1097,7 @@ fn export_as_with_several_artboards_selected_writes_one_file_each() {
     let id: DialogId = serde_json::from_value(r["dialog"].clone()).expect("the command opened a dialog");
     // The dialog's settings apply to every file: JPG at 50 %.
     app.framework.dialogs.set_json_field(&ctx, id, "format", json!("jpg")).unwrap();
-    app.framework.dialogs.set_json_field(&ctx, id, "scale", json!(50)).unwrap();
+    app.framework.dialogs.set_json_field(&ctx, id, "size", json!({"Scale": 50.0})).unwrap();
     crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
     assert_eq!(files.requests().len(), 1, "one destination for every board");
     answer(&files, chose("/out/boards.jpg"));
@@ -1718,7 +1718,8 @@ fn every_save_dialog_leads_with_its_own_extension() {
         app.run("prefs.set", json!({"path": "export.quickExportFormat", "value": format})).unwrap();
         let _ = invoke(&mut app, "file.export.quickExportAsPng");
     }
-    for format in ["gif", "png8", "png24", "jpeg", "webp", "wbmp"] {
+    // The dialog's format field takes the framework's variant names.
+    for format in ["Gif", "Png8", "Png24", "Jpeg", "WebP", "Wbmp"] {
         dialog(&mut app, "file.export.saveForWebLegacy", json!({"format": format}));
     }
     app.run("slice.new", json!({"x": 0, "y": 0, "width": 2, "height": 2})).unwrap();

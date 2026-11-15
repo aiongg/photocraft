@@ -27,19 +27,15 @@ pub(crate) fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, p
     }
 }
 
-/// A secondary click at document point (x, y): `ui.pointer` queues it for the canvas pass, so the testing
-/// frames run until the window host has taken it.
+/// A secondary click at document point (x, y) over the control channel, delivered to the canvas
+/// (`testing::control`).
 pub(crate) fn right_click(app: &mut PhotocraftApp, x: f64, y: f64) {
-    let ctx = crate::canvas::testing::ctx(app);
-    let r = call(app, &ctx, "ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
+    let r = crate::canvas::testing::control(
+        app,
+        "ui.pointer",
+        json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}),
+    );
     assert_eq!(r["ok"], true, "{r}");
-    let host = craft::ui::runtime::windows::WindowHost::of(&ctx);
-    for _ in 0..8 {
-        crate::canvas::testing::frame(app);
-        if host.injected_idle() {
-            break;
-        }
-    }
 }
 
 /// The open menu's rows as `ui.inspect` lists them: ids, with "―" for separators.

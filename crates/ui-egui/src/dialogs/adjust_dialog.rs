@@ -494,7 +494,7 @@ fn shared_editor(kind: String, setup: Arc<Mutex<EditorSetup>>) -> impl for<'b> F
     move |ui, value, cx| {
         let setup = setup.lock().ok()?.clone();
         if setup.stale {
-            ui.label(tl!("The adjustment target is missing or unavailable."));
+            ui.label(tl!("The adjustment target is missing or unavailable.").to_string());
             return None;
         }
         adjust_editors::dialog_editor(&kind, setup)(ui, value, cx)
