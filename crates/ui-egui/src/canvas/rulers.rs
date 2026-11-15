@@ -18,6 +18,7 @@ use crate::PhotocraftApp;
 use crate::canvas::document_display::CanvasHost;
 use crate::canvas::tools::Family;
 use crate::guide_select;
+use crate::prefs::unit_kind;
 use crate::state::Tool;
 
 /// English display name for a length unit, as shown in Preferences › Units & Rulers.
@@ -39,19 +40,6 @@ const UNITS: [Unit; 7] = [Unit::Pixels, Unit::Inches, Unit::Centimeters, Unit::M
 /// The units Photoshop's Create Rectangle (and the other shape dialogs) offer on a right-click of
 /// Width or Height: the lengths, without Percent.
 pub(crate) const LENGTH_UNITS: [Unit; 6] = [Unit::Pixels, Unit::Inches, Unit::Centimeters, Unit::Millimeters, Unit::Points, Unit::Picas];
-
-/// The framework's unit for a ruler unit: the one mapping between the two, both ways.
-fn unit_kind(u: Unit) -> UnitKind {
-    match u {
-        Unit::Pixels => UnitKind::Pixels,
-        Unit::Inches => UnitKind::Inches,
-        Unit::Centimeters => UnitKind::Centimetres,
-        Unit::Millimeters => UnitKind::Millimetres,
-        Unit::Points => UnitKind::Points,
-        Unit::Picas => UnitKind::Picas,
-        Unit::Percent => UnitKind::Percent,
-    }
-}
 
 /// [`UNITS`] as the rulers' own units menu lists them.
 static UNIT_KINDS: [UnitKind; 7] =

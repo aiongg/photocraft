@@ -80,6 +80,8 @@ pub(crate) struct CanvasTools {
     pub(crate) retouch: retouch::RetouchTools,
     /// The Perspective Crop tool.
     pub(crate) perspective: crate::perspective_crop_ui::PerspectiveCrop,
+    /// The Crop tool.
+    pub(crate) crop: crate::crop_ui::CropHost,
     /// The document and canvas a running gesture began on: the canvas pass ends it with `tool_changed` once another
     /// document is the one shown.
     gesture_on: Option<(u64, CanvasHost)>,
@@ -113,6 +115,7 @@ impl Default for CanvasTools {
             slice: Default::default(),
             retouch: Default::default(),
             perspective: Default::default(),
+            crop: Default::default(),
             gesture_on: None,
             #[cfg(test)]
             frames: None,
@@ -441,7 +444,7 @@ fn with_rig<R>(
     let fam = family(tool);
     // Tools that own state the app lends nobody are built before the scope takes the app.
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
-    let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut app.crop.tool));
+    let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
     let mut transform = app.ui.transform.is_some().then(|| crate::transform_tool::canvas_tool(app));
     let mut symmetry = if fam == Family::Paint { crate::symmetry_ui::session_tool(app) } else { None };
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
@@ -546,7 +549,7 @@ fn with_rig<R>(
     if let Some(pass) = crop_pass {
         let output = CropToolPass::finish(pass);
         if let Some(tool) = crop_tool {
-            app.crop.tool = tool;
+            tools.crop.tool = tool;
         }
         crop::finish(app, output);
     }

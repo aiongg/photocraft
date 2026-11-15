@@ -12,13 +12,13 @@ use craft::ui::canvas::RulerText;
 use craft::ui::contract::{Bind, Props as _, Show as _, ShowContainer as _, Sizing};
 use craft::ui::layout_components::Grid;
 use craft::ui::runtime::commands::CommandRef;
-use craft::ui::runtime::env::UnitKind;
 use craft::ui::sections::Section;
 use photocraft_doc::{Layer, LayerContent, LayerId};
 use photocraft_engine::prefs::Unit;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
+use crate::prefs::unit_kind;
 
 /// The panel width, in points, from which Quick Actions take two columns.
 const TWO_COLUMNS_FROM: f32 = 360.0;
@@ -87,16 +87,7 @@ fn ruler_unit(app: &PhotocraftApp) -> (Unit, f64, f64) {
 
 /// The framework's text for lengths in `unit` along an axis `extent` px long (the 100% of percent).
 fn ruler_text(unit: Unit, dpi: f64, ppi: f64, extent: f64) -> RulerText {
-    let kind = match unit {
-        Unit::Pixels => UnitKind::Pixels,
-        Unit::Inches => UnitKind::Inches,
-        Unit::Centimeters => UnitKind::Centimetres,
-        Unit::Millimeters => UnitKind::Millimetres,
-        Unit::Points => UnitKind::Points,
-        Unit::Picas => UnitKind::Picas,
-        Unit::Percent => UnitKind::Percent,
-    };
-    RulerText::new(RulerUnits::new(unit.from_px(1.0, dpi, extent, ppi), Ticks::decimal(unit == Unit::Pixels)), kind)
+    RulerText::new(RulerUnits::new(unit.from_px(1.0, dpi, extent, ppi), Ticks::decimal(unit == Unit::Pixels)), unit_kind(unit))
 }
 
 /// The width and height of a row's box.

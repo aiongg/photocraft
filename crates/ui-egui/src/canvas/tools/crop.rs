@@ -1,5 +1,5 @@
 //! The Crop family's adapter: the framework's `CropToolPass` is the host's tool, and `finish`
-//! hands its output to the one `image.crop` mapping. The tool itself lives at `app.crop.tool`
+//! hands its output to the one `image.crop` mapping. The tool itself lives at `app.canvas_tools.crop.tool`
 //! (`CropHost`); this module keeps no state.
 
 use craft::draw::ui::crop::{CropOutput, CropTool, CropToolPass};
