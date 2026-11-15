@@ -12,16 +12,9 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
+    // The whole app: its frame hook hands the keys, the wheel and the pointer to the framework's runtime.
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).with_context(ctx).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            crate::shortcuts::handle(app, &ctx);
-            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
-            crate::dialogs::run(app, ui);
-        },
-        app,
-    );
+    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_context(ctx).with_max_steps(64).build_eframe(move |_cc| app);
     h.run_steps(4);
     h
 }

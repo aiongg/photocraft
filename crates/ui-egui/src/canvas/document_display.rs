@@ -117,6 +117,7 @@ pub(crate) fn navigation(app: &PhotocraftApp) -> NavigationOptions {
     let mut options = NavigationOptions::default();
     options.zoom_with_wheel = p.general.zoom_with_scroll_wheel;
     options.animated_zoom = p.general.animated_zoom;
+    options.zoom_clicked_point_to_center = p.tools.zoom_clicked_point_to_center;
     options.flick_panning = p.tools.enable_flick_panning;
     options.overscroll = p.tools.overscroll;
     options.pinch_zooms = p.enhanced_controls.zoom_with_trackpad_pinch;

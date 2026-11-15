@@ -13,7 +13,7 @@ use crate::PhotocraftApp;
 use crate::state::Tool;
 
 pub(super) const HORIZONTAL: [&str; 3] = ["Left align text", "Center text", "Right align text"];
-pub(super) const VERTICAL: [&str; 3] = ["Top align text", "Center text", "Bottom align text"];
+pub(super) const VERTICAL: [&str; 3] = ["Align text to the top", "Center text vertically", "Align text to the bottom"];
 
 pub(super) fn new_app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -44,7 +44,7 @@ pub(super) fn bar(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 /// Which of the two button sets the bar shows; panics on a mix or neither.
 pub(super) fn shown(h: &Harness<'static, PhotocraftApp>) -> [&'static str; 3] {
     let has = |label: &str| h.query_by_label(label).is_some();
-    match (has("Top align text") && has("Bottom align text"), has("Left align text") && has("Right align text")) {
+    match (has(VERTICAL[0]) && has(VERTICAL[2]), has(HORIZONTAL[0]) && has(HORIZONTAL[2])) {
         (true, false) => VERTICAL,
         (false, true) => HORIZONTAL,
         (true, true) => panic!("both the vertical and the horizontal buttons"),

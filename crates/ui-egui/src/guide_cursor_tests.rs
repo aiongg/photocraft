@@ -16,18 +16,9 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     app.ui.extras.rulers = false;
     app.ui.tool = tool;
     app.run("view.newGuide", json!({"orientation": "vertical", "position": 200})).unwrap();
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                return;
-            }
-            crate::shortcuts::handle(app, &ctx);
-            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
+    // The whole app: its frame hook hands the keys and the pointer to the framework's runtime.
+    let ctx = app.ctx().clone();
+    let mut h = Harness::builder().with_context(ctx).with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |_cc| app);
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
     v.zoom = 1.0;
