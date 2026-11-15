@@ -384,6 +384,10 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) ->
         return err("confirm or cancel the color picker first");
     }
     let value = p.get("value").cloned().unwrap_or(Value::Null);
+    // An adjustment dialog's address (`target`, `layer`, `document`) is not one of its fields: it retargets the dialog.
+    if matches!(field, "target" | "layer" | "document") && app.adjust_open.as_ref().is_some_and(|open| open.id == id) {
+        return if crate::adjust_dialog::apply_params(app, id, &json!({ field: value })) { ok(Value::Null) } else { err(format!("the dialog refused `{field}`")) };
+    }
     for (field, value) in map_request(app, id, field, value) {
         if let Err(e) = app.framework.dialogs.set_json_field(ctx, id, &field, value) {
             return err(e);

@@ -266,7 +266,7 @@ fn footer_buttons_run_photocraft_commands() {
             after: |h| {
                 assert!(layer(h, "Masked").is_some());
                 assert!(crate::dialogs::alerts::prompt_tagged::<crate::delete_layer_prompt::PendingDelete>(h.state()).is_some());
-                h.get_by_label("Delete").click();
+                h.get_by_role_and_label(egui::accesskit::Role::Button, "Delete").click();
                 h.run_steps(3);
                 assert!(layer(h, "Masked").is_none());
             },
