@@ -14,8 +14,9 @@ use std::collections::HashSet;
 
 use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
+use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::rails::{LastUsed, RailTool};
-use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, FirePhase, FireSource, Fired};
+use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -61,6 +62,11 @@ pub(crate) enum Bridged {
     Chrome(ChromeCommand),
     /// A tool in effect while its key is held.
     Momentary(MomentaryCommands),
+    /// A framework edit command that owns the chord of a PhotoCraft action; PhotoCraft runs the action when it fires.
+    Edit(EditCommands),
+    /// A Layers panel stacking command that owns the chord of a `layer.arrange.*` action; PhotoCraft runs the
+    /// action when it fires.
+    Stack(LayersPanelCommands),
 }
 
 impl Bridged {
@@ -70,6 +76,8 @@ impl Bridged {
             Bridged::View(command) => CommandRef::from(command),
             Bridged::Chrome(command) => CommandRef::from(command),
             Bridged::Momentary(command) => CommandRef::from(command),
+            Bridged::Edit(command) => CommandRef::from(command),
+            Bridged::Stack(command) => CommandRef::from(command),
         }
     }
 }
@@ -95,6 +103,11 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("tools.temporary.hand", Bridged::Momentary(MomentaryCommands::Hand)),
     ("tools.temporary.zoomIn", Bridged::Momentary(MomentaryCommands::ZoomIn)),
     ("tools.temporary.zoomOut", Bridged::Momentary(MomentaryCommands::ZoomOut)),
+    ("select.all", Bridged::Edit(EditCommands::SelectAll)),
+    ("layer.arrange.bringForward", Bridged::Stack(LayersPanelCommands::MoveUp)),
+    ("layer.arrange.sendBackward", Bridged::Stack(LayersPanelCommands::MoveDown)),
+    ("layer.arrange.bringToFront", Bridged::Stack(LayersPanelCommands::MoveToTop)),
+    ("layer.arrange.sendToBack", Bridged::Stack(LayersPanelCommands::MoveToBottom)),
 ];
 
 /// The PhotoCraft id and bridge row of a framework command, if a row bridges it.
@@ -400,7 +413,7 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
         }
         // The chrome toggles come back as the framework's command; the canvas runs its view commands itself.
         if let Some((id, bridged)) = bridge_of(&f.command) {
-            if matches!(bridged, Bridged::Chrome(_)) && f.phase == FirePhase::Press {
+            if matches!(bridged, Bridged::Chrome(_) | Bridged::Edit(_) | Bridged::Stack(_)) && f.phase == FirePhase::Press {
                 dispatch(app, ctx, id);
             }
             continue;
@@ -500,7 +513,7 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
             return;
         }
     }
-    if id == "edit.clear" {
+    if id == EditCommands::Delete.id() {
         // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in Photoshop (#5702), never
         // Edit › Clear on the pixels under it.
         if crate::vector_ui::delete_key_deletes_work_path(app) {
@@ -520,6 +533,8 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
     if crate::app::framework::run_command(app, ctx, &f.command) {
         return;
     }
+    // The Delete key is Edit › Clear, or deletes the layers when nothing is selected (`delete_key_command`).
+    let id = if id == EditCommands::Delete.id() { "edit.clear" } else { id };
     let id = clip_key_command(app, delete_key_command(app, id.to_string()));
     dispatch_as(app, ctx, &id, f.alt_variant);
 }

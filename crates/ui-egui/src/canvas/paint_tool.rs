@@ -447,7 +447,7 @@ impl CanvasTool for PaintTool<'_> {
             let tool = app.ui.tool;
             match button {
                 PointerButton::Primary => {
-                    if crate::brush_resize::PaintResize::takes(tool, button, mods) || (alt_loads_mixer(tool, mods) && !mods.cmd) {
+                    if crate::brush_resize::PaintResize::chord(tool, button, mods) || (alt_loads_mixer(tool, mods) && !mods.cmd) {
                         return true;
                     }
                     // Clone Stamp and Healing take ⌥ as the source stand-in (`retouch::source_tool`).

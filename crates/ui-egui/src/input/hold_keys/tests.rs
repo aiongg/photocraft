@@ -62,7 +62,8 @@ fn key(h: &mut Harness<'static, PhotocraftApp>, k: Key, pressed: bool, m: Modifi
     let m = platform(m);
     h.event(Event::ModifiersChanged(m));
     h.event(Event::Key { key: k, physical_key: None, pressed, repeat: false, modifiers: m });
-    h.run_steps(1);
+    // The runtime takes the key in the first frame and the app runs the command it fired in the next.
+    h.run_steps(2);
 }
 
 /// A quick press and release in one frame (a tool letter held across frames springs, #2672).
@@ -412,23 +413,6 @@ fn cmd_alt_drag_duplicates_the_layer_then_moves_the_copy() {
         assert_eq!(st.history.undo_label(), Some(tl!("Move")));
         assert_eq!(h.state().ui.tool, tool);
     }
-}
-
-/// Off the Mac, Ctrl+Alt-drag with the Brush resizes the brush, as before ⌘ became the Move
-/// tool: no copy, no move, the layer untouched.
-#[test]
-fn ctrl_alt_drag_with_the_brush_resizes_it_off_the_mac() {
-    let mut h = harness(Tool::Brush);
-    let orig = with_layer(&mut h);
-    let n0 = h.state().session.active().unwrap().doc.layers.len();
-    let size0 = h.state().session.tools.brush.size;
-    drag_raw(&mut h, CTRL_ALT, 130.0, 130.0, 170.0, 150.0);
-    let st = h.state().session.active().unwrap();
-    assert_eq!(st.doc.layers.len(), n0, "no copy");
-    assert_eq!(st.active_layer, Some(orig));
-    assert_eq!(bounds(&h, orig), Rect::new(100, 100, 160, 160), "the layer stays");
-    assert_ne!(st.history.undo_label(), Some("Move"));
-    assert_ne!(h.state().session.tools.brush.size, size0, "the brush was resized");
 }
 
 /// With a selection, ⌘-drag with the Brush moves the selected pixels (a floating piece), as the

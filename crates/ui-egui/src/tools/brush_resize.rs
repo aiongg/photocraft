@@ -68,6 +68,12 @@ impl PaintResize {
         applies(tool) && BrushResize::takes(button, mods)
     }
 
+    /// Whether a press of `button` with `mods` on the painting `tool` is the resize gesture's chord (Ctrl+Alt with the
+    /// primary button): the tool takes that press even where it would hand the press to the ⌘ stand-in.
+    pub(crate) fn chord(tool: Tool, button: PointerButton, mods: Mods) -> bool {
+        applies(tool) && BrushResize::chord(button, mods)
+    }
+
     /// Whether a resize runs.
     pub(crate) fn active(&self) -> bool {
         self.resize.active()
