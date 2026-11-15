@@ -145,6 +145,9 @@ fn move_controls_press_zones_start_the_matching_gesture() {
             }
             Opens::Scale | Opens::Rotate => {}
         }
+        // The framework's transform box begins its edit when the drag starts, not at the press.
+        let halfway = [(down[0] + to[0]) / 2.0, (down[1] + to[1]) / 2.0];
+        pointer(&mut app, &ctx, "move", halfway);
         let transform = app.ui.transform.as_ref().unwrap_or_else(|| panic!("{what}: Move controls open Free Transform"));
         let r = transform.session.rect();
         assert_eq!([r.x0, r.y0, r.x1, r.y1], [100.0, 100.0, 800.0, 500.0], "{what}");
@@ -360,7 +363,8 @@ fn transform_handle_gesture_can_finish_after_a_dialog_opens() {
     let old = layers.map(|id| bounds(&app, id));
     let steps = app.session.active().unwrap().history.past_len();
     pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    assert!(app.ui.transform.is_some(), "the handle starts Free Transform");
+    pointer(&mut app, &ctx, "move", [750.0, 470.0]);
+    assert!(app.ui.transform.is_some(), "the handle drag starts Free Transform");
     let initial = quad(&app);
     accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
     let dialog = top_dialog(&app);
@@ -460,6 +464,7 @@ fn color_picker_release_ends_an_existing_transform_handle_drag() {
     let old = layers.map(|id| bounds(&app, id));
     let steps = app.session.active().unwrap().history.past_len();
     pointer(&mut app, &ctx, "down", [800.0, 500.0]);
+    pointer(&mut app, &ctx, "move", [750.0, 470.0]);
     let initial = quad(&app);
     pointer(&mut app, &ctx, "move", [700.0, 440.0]);
     let preview = quad(&app);
@@ -516,9 +521,9 @@ fn color_picker_release_clears_the_handle_drags_snap_lines() {
     app.ui.extras.snap = true;
     app.ui.view.show.smart_guides = true;
     pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    assert!(app.ui.transform.is_some());
     // 2 px from the document's centre (500, 350): the corner snaps there and the guides show.
     pointer(&mut app, &ctx, "move", [502.0, 352.0]);
+    assert!(app.ui.transform.is_some(), "the drag began the transform");
     assert!(guide_lines(&app) > 0, "a snapped handle drag reports guide lines");
     accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     pointer(&mut app, &ctx, "up", [999.0, 690.0]);
