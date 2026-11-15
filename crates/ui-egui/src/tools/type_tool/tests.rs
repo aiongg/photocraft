@@ -26,6 +26,12 @@ fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
     tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, Modifiers::NONE);
 }
 
+fn bar_pass(app: &mut PhotocraftApp) {
+    let ctx = app.ctx().clone();
+    let input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 800.0))), ..Default::default() };
+    let _ = ctx.run_ui(input, |ui| crate::type_tool::options_bar(app, ui));
+}
+
 /// A lower Recent Fonts cap trims the existing list in the next pass, without waiting for a
 /// pick; 0 clears it.
 #[test]
@@ -33,11 +39,11 @@ fn lowering_the_recent_fonts_cap_applies_at_once() {
     let mut app = app();
     app.ui.recent_fonts = ["C", "B", "A"].map(String::from).to_vec();
     app.run("prefs.set", json!({"path": "type.recentFonts", "value": 2})).unwrap();
-    // A pointer move with no button runs one app frame.
-    tool_event(&mut app, ToolEvent::Move { x: 5.0, y: 5.0, pressure: 1.0 }, Modifiers::NONE);
+    // One pass of the options bar, whose pickers hold the list.
+    bar_pass(&mut app);
     assert_eq!(app.ui.recent_fonts, ["C", "B"], "the smaller cap trims the tail without a pick");
     app.run("prefs.set", json!({"path": "type.recentFonts", "value": 0})).unwrap();
-    tool_event(&mut app, ToolEvent::Move { x: 6.0, y: 6.0, pressure: 1.0 }, Modifiers::NONE);
+    bar_pass(&mut app);
     assert!(app.ui.recent_fonts.is_empty(), "0 clears the list");
 }
 
@@ -48,11 +54,14 @@ fn layer_text(app: &PhotocraftApp) -> String {
 
 /// A committed type layer reading `s` at the same spot as the others (stacked variants, #4320).
 fn stacked_variant(app: &mut PhotocraftApp, s: &str) -> LayerId {
+    // A click on the stack's spot would edit the text under it, so the layer is made where the click would.
     app.ui.text_edit = None;
-    click(app, 50.0, 100.0, Modifiers::NONE);
-    insert(app, s);
-    commit(app);
-    app.session.active().unwrap().active_layer.unwrap()
+    let mut p = default_style_params(app);
+    p["text"] = json!(s);
+    p["orientation"] = json!("horizontal");
+    p["x"] = json!(50.0);
+    p["y"] = json!(100.0);
+    LayerId(app.run("type.create", p).unwrap()["layer"].as_u64().unwrap())
 }
 
 fn hide(app: &mut PhotocraftApp, id: LayerId) {
@@ -118,7 +127,8 @@ fn shift_click_on_existing_type_starts_new_text() {
     let ed = app.ui.text_edit.clone().expect("⇧-click starts a session");
     assert_ne!(ed.layer, existing.0, "⇧: a new type layer, not the existing one");
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1);
-    commit(&mut app);
+    // Cancel takes the new layer back; committed, its placeholder would sit over the existing text.
+    cancel(&mut app);
     click(&mut app, x, y, Modifiers::NONE);
     assert_eq!(app.ui.text_edit.as_ref().map(|e| e.layer), Some(existing.0), "a plain click edits the existing text");
 }

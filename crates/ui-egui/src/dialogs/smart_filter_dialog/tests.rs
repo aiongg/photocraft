@@ -19,7 +19,9 @@ pub(crate) fn open_count(app: &PhotocraftApp) -> usize {
 /// Sets `field` of dialog `id` as `ui.dialog.set` does.
 pub(crate) fn set(app: &mut PhotocraftApp, id: DialogId, field: &str, value: Value) {
     let ctx = app.ctx().clone();
-    app.framework.dialogs.set_json_field(&ctx, id, field, value).unwrap();
+    for (field, value) in crate::control::dialogs::map_request(app, id, field, value) {
+        app.framework.dialogs.set_json_field(&ctx, id, &field, value).unwrap();
+    }
 }
 
 /// OK on dialog `id` through the dispatcher; a refused OK leaves the dialog open.

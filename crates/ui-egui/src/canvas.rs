@@ -263,7 +263,29 @@ mod rotation_preview_isolation_tests {
 
     /// Opens the filter dialog of `command` and returns its id.
     fn open(app: &mut PhotocraftApp, command: &str) -> DialogId {
-        crate::filter_dialog::open(app, command).expect("the dialog opens")
+        let id = crate::filter_dialog::open(app, command).expect("the dialog opens");
+        // The Preview box is on from the dialog's first drawn pass.
+        for _ in 0..2 {
+            crate::smart_filter_dialog::tests::pass(app);
+        }
+        id
+    }
+
+    /// A harness running the app's dialogs, for the Preview box's clicks.
+    fn dialogs_harness(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
+        let mut h = egui_kittest::Harness::builder()
+            .with_size(egui::vec2(1200.0, 900.0))
+            .with_context(app.ctx().clone())
+            .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
+        h.run_steps(2);
+        h
+    }
+
+    /// Clicks the open dialog's Preview box.
+    fn toggle_preview(h: &mut egui_kittest::Harness<'static, PhotocraftApp>) {
+        use egui_kittest::kittest::Queryable;
+        h.get_by_label("Preview").click();
+        h.run_steps(2);
     }
 
     /// Writes a field of the hosted dialog `id`, as the form's control would.
@@ -297,11 +319,13 @@ mod rotation_preview_isolation_tests {
             crate::channel_view::render(&before, &st.channel_view, before.bounds(), 1, crate::channel_view::Look::default(), st.active_layer).unwrap();
         assert_ne!(overlay_pixels(&mut app, &ctx), original, "a nontrivial filter must be visible before OK");
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
-        set(&mut app, &ctx, dialog, "__preview", json!(false));
-        assert_eq!(overlay_pixels(&mut app, &ctx), original, "Preview off restores the channel");
-        set(&mut app, &ctx, dialog, "__preview", json!(true));
-        crate::dialogs::cancel(&mut app, &ctx, dialog).unwrap();
-        assert_eq!(overlay_pixels(&mut app, &ctx), original, "Cancel restores the channel");
+        let mut h = dialogs_harness(app);
+        toggle_preview(&mut h);
+        assert_eq!(overlay_pixels(h.state_mut(), &ctx), original, "Preview off restores the channel");
+        toggle_preview(&mut h);
+        let app = h.state_mut();
+        crate::dialogs::cancel(app, &ctx, dialog).unwrap();
+        assert_eq!(overlay_pixels(app, &ctx), original, "Cancel restores the channel");
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
     }
 
@@ -480,8 +504,6 @@ mod rotation_preview_isolation_tests {
         let preview = |app: &mut PhotocraftApp, command: &str, profile: &str| {
             let ctx = app.ctx().clone();
             let dialog = open(app, command);
-            // The dialog has a Preview checkbox, on: writing the field fails when it has none.
-            set(app, &ctx, dialog, "__preview", json!(true));
             set(app, &ctx, dialog, "profile", json!(profile));
             ensure_filter_preview(app, 0, &ctx).expect("a preview");
             let result = app.filter_preview.as_ref().unwrap().result.clone().unwrap();
@@ -526,8 +548,10 @@ mod rotation_preview_isolation_tests {
         let original = &app.session.active().unwrap().doc;
         assert_eq!([original.size.width, original.size.height], [96, 48]);
 
-        set(&mut app, &ctx, dialog, "__preview", json!(false));
-        assert!(ensure_filter_preview(&mut app, 0, &ctx).is_none(), "disabling Preview must hide the preview");
+        let mut h = dialogs_harness(app);
+        toggle_preview(&mut h);
+        let app = h.state_mut();
+        assert!(ensure_filter_preview(app, 0, &ctx).is_none(), "disabling Preview must hide the preview");
         assert_eq!([app.session.active().unwrap().doc.size.width, app.session.active().unwrap().doc.size.height], [96, 48]);
     }
 

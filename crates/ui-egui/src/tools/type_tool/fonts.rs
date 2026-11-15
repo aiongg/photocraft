@@ -154,10 +154,11 @@ pub(crate) fn finish_font_state(app: &mut PhotocraftApp, state: FontSourceState)
             app.ui.status_error = true;
         }
     }
-    if settings.recent != before.recent {
-        let cap = (app.session.prefs().type_.recent_fonts as usize).min(MAX_RECENT_FONTS);
-        let mut recent = settings.recent;
-        recent.truncate(cap);
+    // The cap applies on every pass, so lowering the preference trims the list without a pick.
+    let cap = (app.session.prefs().type_.recent_fonts as usize).min(MAX_RECENT_FONTS);
+    let mut recent = settings.recent;
+    recent.truncate(cap);
+    if recent != app.ui.recent_fonts {
         app.ui.recent_fonts = recent;
     }
     app.ui.font_filters = filters;

@@ -87,7 +87,9 @@ fn open_swatch_picker(app: &mut PhotocraftApp, request: Option<ColorRequest>) {
 
 fn dialog_set(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId, field: &str, value: serde_json::Value) {
     let ctx = app.ctx().clone();
-    app.framework.dialogs.set_json_field(&ctx, dialog, field, value).unwrap();
+    for (field, value) in crate::control::dialogs::map_request(app, dialog, field, value) {
+        app.framework.dialogs.set_json_field(&ctx, dialog, &field, value).unwrap();
+    }
 }
 
 fn dialog_confirm(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId) {

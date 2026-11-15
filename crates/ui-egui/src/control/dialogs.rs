@@ -261,6 +261,7 @@ pub(crate) const FIELD_KEYS: &[FieldKey] = &[
     prompt!(crate::dialogs::disk_change_prompt::HeldSave, &[CANCEL]),
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[], with: None },
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[("saveAll", "save")], with: Some(save_all) },
+    FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[("dontSaveAll", "dontSave")], with: Some(dont_save_all) },
     FieldKey { which: Which::Is(is_profile), from: "action", to: "action", values: &[("preserve", "useEmbedded"), ("convert", "convertToWorking"), ("discard", "discard")], with: None },
     FieldKey { which: Which::Is(is_color_picker), from: "webOnly", to: "webColors", values: &[], with: None },
     FieldKey { which: Which::Key("edit.fill"), from: "mode", to: "mode", values: &[], with: Some(mode_row) },
@@ -302,7 +303,16 @@ pub(crate) fn map_request(app: &PhotocraftApp, id: DialogId, field: &str, value:
         let mapped = value.as_str().and_then(|v| row.values.iter().find(|(from, _)| *from == v)).map_or(value, |(_, to)| json!(to));
         return vec![(row.to.to_string(), mapped)];
     }
-    vec![(field.to_string(), value)]
+    vec![(field.to_string(), hex_as_color(&current, field, value))]
+}
+
+/// A `#rrggbb` string sent to a colour row, as the three 0..=1 components the row keeps.
+fn hex_as_color(current: &Value, field: &str, value: Value) -> Value {
+    let is_color_row = current.get(field).and_then(Value::as_array).is_some_and(|c| c.len() == 3 && c.iter().all(Value::is_number));
+    match value.as_str().filter(|_| is_color_row).and_then(craft::theme::Srgba::from_hex) {
+        Some(c) => json!([c.r, c.g, c.b]),
+        None => value,
+    }
 }
 
 /// The command a hosted dialog's confirm is judged as, with its params; `None` when it runs no command.
@@ -315,11 +325,15 @@ fn command_of(app: &PhotocraftApp, id: DialogId, choice: &str) -> Option<(String
     match key.as_str() {
         "workspace.new" => Some(("window.workspace.newWorkspace".into(), fields)),
         "workspace.delete" => Some(("window.workspace.deleteWorkspace".into(), json!({"name": fields.get("name")}))),
-        _ if host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedParamDialog>(id).is_some() && photocraft_engine::commands::find(&key).is_some() => {
-            Some((key, fields))
-        }
-        _ => None,
+        _ => hosted_command(app, id),
     }
+}
+
+/// The command a hosted parameter dialog stands for, with its values: the dialog's key, when the key is a command (an
+/// engine command or a shell one such as `file.save`). Automation is judged for it when the dialog is confirmed.
+pub(crate) fn hosted_command(app: &PhotocraftApp, id: DialogId) -> Option<(String, Value)> {
+    let key = key_of(app, id)?;
+    (host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedParamDialog>(id).is_some() && crate::menus::is_live(&key)).then(|| (key, fields_of(app, id)))
 }
 
 // ---- ui.dialog.* ----
