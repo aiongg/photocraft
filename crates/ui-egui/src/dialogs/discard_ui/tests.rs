@@ -196,7 +196,7 @@ type Prompted = egui_kittest::Harness<'static, PhotocraftApp>;
 
 /// The unsaved-changes prompt for `command` over `app`'s dirty documents, as `os` draws it (with
 /// the file dialogs answered at the end of each frame, as the app does).
-fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) -> Prompted {
+fn prompt_for(app: PhotocraftApp, command: &str, os: craft::host::target::Os) -> Prompted {
     let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             // As `ui_frame` starts: a pass carrying injected input acts for the automation client.
@@ -207,7 +207,7 @@ fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) 
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.ctx.set_os(os);
+    craft::ui::testing::windows::set_os(&h.ctx, os);
     assert!(intercept(h.state_mut(), command, &Value::Null));
     // The first pass opens the question, the second draws it, the third shows it to the access tree.
     h.run_steps(3);
@@ -215,7 +215,7 @@ fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) 
 }
 
 /// The unsaved-changes prompt for Close All over two dirty documents, as `os` draws it.
-fn prompt_on(os: egui::os::OperatingSystem) -> Prompted {
+fn prompt_on(os: craft::host::target::Os) -> Prompted {
     let mut app = app_with_docs(2);
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
@@ -273,7 +273,7 @@ fn listed_id(h: &mut Prompted) -> Value {
 /// "Apply to All" (a checkbox, as in Photoshop) gives the answer to every document still to ask about.
 #[test]
 fn apply_to_all_discards_the_rest_without_asking_again() {
-    let mut h = prompt_on(egui::os::OperatingSystem::Windows);
+    let mut h = prompt_on(craft::host::target::Os::Windows);
     answer(&mut h, "dontSave", true);
     h.run_steps(8);
     assert!(h.state().discard.is_none());
@@ -284,21 +284,21 @@ fn apply_to_all_discards_the_rest_without_asking_again() {
 fn apply_to_all_is_only_offered_while_several_documents_are_left() {
     let mut one_dirty = app_with_docs(2);
     make_dirty(&mut one_dirty, 0);
-    let h = prompt_for(one_dirty, "file.closeAll", egui::os::OperatingSystem::Windows);
+    let h = prompt_for(one_dirty, "file.closeAll", craft::host::target::Os::Windows);
     assert!(question_fields(&h).get("applyToAll").is_none(), "only one document is unsaved");
-    let h = prompt_on(egui::os::OperatingSystem::Windows);
+    let h = prompt_on(craft::host::target::Os::Windows);
     assert!(question_fields(&h).get("applyToAll").is_some());
     let mut app = app_with_docs(2);
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
-    let h = prompt_for(app, "file.revert", egui::os::OperatingSystem::Windows);
+    let h = prompt_for(app, "file.revert", craft::host::target::Os::Windows);
     assert!(question_fields(&h).get("applyToAll").is_none(), "a revert never offers it");
 }
 
 /// A save that was cancelled or failed brings its document back: asking again beats retrying forever.
 #[test]
 fn a_document_that_comes_back_after_apply_to_all_is_asked_about_again() {
-    let mut h = prompt_on(egui::os::OperatingSystem::Windows);
+    let mut h = prompt_on(craft::host::target::Os::Windows);
     let first = doc_id(h.state(), 0);
     if let Some(p) = h.state_mut().discard.as_mut() {
         (p.auto, p.auto_answered) = (Some(Answer::Save), Some(first));
@@ -316,7 +316,7 @@ fn a_document_dirtied_after_apply_to_all_is_asked_about() {
     let mut app = app_with_docs(3);
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
-    let mut h = prompt_for(app, "file.closeAll", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.closeAll", craft::host::target::Os::Windows);
     let late = doc_id(h.state(), 2);
     make_dirty(h.state_mut(), 2);
     if let Some(p) = h.state_mut().discard.as_mut() {
@@ -358,7 +358,7 @@ fn control_clients_can_answer_for_all() {
     for i in 0..3 {
         make_dirty(&mut app, i);
     }
-    let mut h = prompt_for(app, "file.closeAll", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.closeAll", craft::host::target::Os::Windows);
     let id = listed_id(&mut h);
     let reply = control(&mut h, "ui.dialog.confirm", json!({"dialog": id, "choice": "dontSaveAll"}));
     assert_eq!(reply["ok"], true, "{reply}");
@@ -374,7 +374,7 @@ fn a_control_answer_clears_a_stale_apply_to_all() {
     for i in 0..3 {
         make_dirty(&mut app, i);
     }
-    let mut h = prompt_for(app, "file.closeAll", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.closeAll", craft::host::target::Os::Windows);
     let (first, last) = (doc_id(h.state(), 0), doc_id(h.state(), 2));
     if let Some(p) = h.state_mut().discard.as_mut() {
         (p.auto, p.auto_answered) = (Some(Answer::Discard), Some(first));
@@ -392,7 +392,7 @@ fn a_control_answer_clears_a_stale_apply_to_all() {
 fn the_all_answers_need_more_than_one_document_left() {
     let mut app = app_with_docs(1);
     make_dirty(&mut app, 0);
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.close", craft::host::target::Os::Windows);
     let id = listed_id(&mut h);
     let reply = control(&mut h, "ui.dialog.confirm", json!({"dialog": id, "choice": "saveAll"}));
     assert_eq!(reply["ok"], false, "{reply}");
@@ -417,7 +417,7 @@ fn answering_no_closes_that_document_and_asks_about_the_next() {
         let second = doc_id(&app, 1);
         let first = doc_id(&app, 0);
         assert_eq!(app.session.active_index(), Some(1), "the last new document is active");
-        let mut h = prompt_for(app, command, egui::os::OperatingSystem::Windows);
+        let mut h = prompt_for(app, command, craft::host::target::Os::Windows);
         assert!(asks_about(&h, &names[0]), "{command}");
         assert_eq!(h.state().session.active().map(|d| d.doc.id), Some(first), "{command}: the first tab asked about is shown");
         answer(&mut h, "dontSave", false);
@@ -442,7 +442,7 @@ fn cancel_after_no_keeps_the_unanswered_documents_and_the_app_open() {
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
     let second = doc_id(&app, 1);
-    let mut h = prompt_for(app, EXIT, egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, EXIT, craft::host::target::Os::Windows);
     answer(&mut h, "dontSave", false);
     answer(&mut h, "cancel", false);
     assert!(h.state().discard.is_none());
@@ -460,7 +460,7 @@ fn quitting_over_a_pending_close_replaces_the_open_question() {
     let mut app = app_with_docs(2);
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.close", craft::host::target::Os::Windows);
     assert!(question_open(&h));
     assert!(intercept(h.state_mut(), EXIT, &Value::Null));
     h.run_steps(3);
@@ -488,7 +488,7 @@ fn command_d_answers_the_prompt_rather_than_deselecting() {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.ctx.set_os(egui::os::OperatingSystem::Mac);
+    craft::ui::testing::windows::set_os(&h.ctx, craft::host::target::Os::Mac);
     assert!(intercept(h.state_mut(), "file.close", &json!({"document": 0})));
     h.run_steps(3);
     h.key_press_modifiers(egui::Modifiers::COMMAND, Key::D);
@@ -513,7 +513,7 @@ fn saving_from_the_prompt_waits_for_the_save_dialog_then_closes() {
         w.borrow_mut().push(p.to_string());
         Ok(())
     }));
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.close", craft::host::target::Os::Windows);
     // Cancelling the save dialog brings the question back.
     answer(&mut h, "save", false);
     h.run_steps(3);
@@ -560,7 +560,7 @@ fn saving_from_the_prompt_waits_for_a_background_save_then_closes() {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.ctx.set_os(egui::os::OperatingSystem::Windows);
+    craft::ui::testing::windows::set_os(&h.ctx, craft::host::target::Os::Windows);
     assert!(intercept(h.state_mut(), "file.close", &Value::Null));
     h.run_steps(2);
     answer(&mut h, "save", false);
@@ -595,7 +595,7 @@ fn saving_from_the_prompt_closes_after_an_unconfirmed_write() {
         w.borrow_mut().push(p.to_string());
         Ok(())
     }));
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.close", craft::host::target::Os::Windows);
     answer(&mut h, "save", false);
     h.run_steps(3);
     assert_eq!(*written.borrow(), ["/pics/kept.psd"]);
@@ -621,7 +621,7 @@ fn a_synthetic_save_press_on_the_hosted_prompt_is_refused_and_reported() {
     }));
     app.services.automation_command =
         Some(Box::new(|id: &str, _: &Value| if id == "file.save" { Err(format!("automation command `{id}` is disabled")) } else { Ok(()) }));
-    let mut h = prompt_for(app, "file.close", egui::os::OperatingSystem::Windows);
+    let mut h = prompt_for(app, "file.close", craft::host::target::Os::Windows);
     // Y as synthetic input: the window host injects it, and the passes carrying it act for the
     // automation client.
     let ctx = h.ctx.clone();

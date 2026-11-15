@@ -489,7 +489,7 @@ fn a_wrongly_typed_value_resets_only_itself_and_is_repaired_on_disk() {
         "shortcuts": {"edit.fill": "Cmd+Shift+F", "file.open": 7},
         "futureSection": {"kept": true},
     });
-    let (mut app, store) = app_with_legacy_json(&saved, Some(2));
+    let (mut app, store) = app_with_json(&saved);
     let ctx = egui::Context::default();
     tick(&mut app, &ctx);
     let p = app.session.prefs();
@@ -1576,7 +1576,7 @@ fn edit_dialogs_open() {
 
 #[test]
 fn tool_colors_first_saves_keep_other_instances_separate_edits() {
-    for initial in [None, Some(json!({})), Some(json!({"toolColors": crate::tool_memory::default_colors()}))] {
+    for initial in [None, Some(json!({})), Some(json!({"toolColors": photocraft_engine::prefs::ToolColors::default().0}))] {
         for background_first in [false, true] {
             let files = Arc::new(MemoryFiles::new());
             if let Some(initial) = &initial {

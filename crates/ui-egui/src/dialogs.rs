@@ -85,6 +85,7 @@ pub(crate) mod params {
         crate::actions::playback::FAMILY,
         crate::actions::menu_item::FAMILY,
         crate::smart_svg_ui::family(),
+        ParamFamily::new(crate::workspace_ui::owns_param, crate::workspace_ui::run_param),
         ParamFamily { check: Some(filter_dialog::check), cancel: Some(filter_dialog::cancel), ..ParamFamily::new(filter_dialog::owns, filter_dialog::run) },
     ];
 
@@ -462,6 +463,10 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
         && let Some((command, params)) = crate::control::dialogs::hosted_command(app, id)
     {
         authorize(&command, &params)?;
+    }
+    // Synthetic input answering Save on the unsaved-changes prompt is judged as `file.save`, as a control answer is.
+    if app.automation_input && crate::control::dialogs::is_save_answer(app, id) {
+        crate::discard_ui::authorize_save(app, false)?;
     }
     if !app.framework.dialogs.confirm_by_id(ctx, id) {
         if app.framework.dialogs.held_state(id) != Some(HeldOk::Waiting) {
