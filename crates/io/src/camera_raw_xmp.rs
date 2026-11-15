@@ -20,6 +20,7 @@
 //! Filter has none). Without `HasCrop`, or with `HasCrop="False"`, the crop keys are stale and
 //! mean nothing. A straightened crop (`CropAngle` other than 0) isn't applied.
 
+use craft::imaging::raw::VignetteStyle;
 use photocraft_algo::camera_raw::{CameraRaw, validate_curve};
 
 /// The Camera Raw settings namespace.
@@ -126,7 +127,8 @@ const CURVES: &[(&str, Curve)] = &[
     ("ToneCurvePV2012Blue", |p| &mut p.point_curve_blue),
 ];
 
-const STYLES: &[(&str, &str)] = &[("1", "highlightPriority"), ("2", "colorPriority"), ("3", "paintOverlay")];
+const STYLES: &[(&str, VignetteStyle)] =
+    &[("1", VignetteStyle::HighlightPriority), ("2", VignetteStyle::ColorPriority), ("3", VignetteStyle::PaintOverlay)];
 
 /// Bookkeeping fields Camera Raw writes that carry no setting.
 const METADATA: &[&str] = &[
@@ -319,7 +321,7 @@ fn apply(params: &mut CameraRaw, report: &mut LoadReport, crop: &mut CropFields,
     } else if name == "PostCropVignetteStyle" {
         match STYLES.iter().find(|(n, _)| *n == value.trim()) {
             Some((_, style)) => {
-                params.vignette_style = (*style).into();
+                params.vignette_style = *style;
                 report.applied += 1;
             }
             None => report.ignored.push(name.to_string()),
