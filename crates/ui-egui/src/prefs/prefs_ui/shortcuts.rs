@@ -244,16 +244,20 @@ pub(crate) fn save_keys(app: &mut PhotocraftApp, keymap: &Keymap, profiles: &Pro
     alternates.retain(|id, _| !is_action(id));
     set.extend(prefs.shortcuts.iter().filter(|(id, _)| is_action(id)).map(|(id, key)| (id.clone(), key.clone())));
     alternates.extend(prefs.alternate_shortcuts.iter().filter(|(id, _)| is_action(id)).map(|(id, keys)| (id.clone(), keys.clone())));
+    let builtins = builtins();
+    let active = profiles.active_name(&builtins);
+    // OK saves the dialog's bindings into the set in use.
     let sets: Map<String, Value> = profiles
         .sets()
         .iter()
         .map(|(name, overrides)| {
-            let (shortcuts, alternate_shortcuts) = keymap_defs::overrides_to_prefs(overrides);
+            let overrides = if name.as_str() == active { keymap.overrides() } else { overrides };
+            let (mut shortcuts, mut alternate_shortcuts) = keymap_defs::overrides_to_prefs(overrides);
+            shortcuts.retain(|id, _| !is_action(id));
+            alternate_shortcuts.retain(|id, _| !is_action(id));
             (name.clone(), json!({"shortcuts": shortcuts, "alternateShortcuts": alternate_shortcuts}))
         })
         .collect();
-    let builtins = builtins();
-    let active = profiles.active_name(&builtins);
     let active = if active == DEFAULTS_NAME { "" } else { active };
     let call = json!({"reset": true, "set": set, "alternates": alternates, "sets": sets, "activeSet": active, "allowUnknown": true, "removeConflicts": false});
     app.run("edit.keyboardShortcuts", call).map_err(|e| e.to_string())

@@ -379,7 +379,10 @@ fn unit(fields: &Map<String, Value>, panel: String) -> DragUnit<String> {
 /// Where a `zone` param puts a unit beside `anchor`: `tab` (the default) joins its tabs before `before`; `center`
 /// joins them at the end; `left`, `right`, `top`/`above` and `bottom`/`below` go beside its group.
 fn destination(fields: &Map<String, Value>, anchor: String) -> Result<DockTo<String>, String> {
-    let zone = fields.get("zone").and_then(Value::as_str).unwrap_or("tab");
+    let zone = match fields.get("zone") {
+        None | Some(Value::Null) => "tab",
+        Some(zone) => zone.as_str().ok_or("zone must be tab, center, left, right, top, bottom, above or below")?,
+    };
     let rtl = crate::direction::is_rtl();
     let side = match zone {
         "tab" => return Ok(DockTo::tabs(anchor, named(fields, "before"))),
@@ -695,7 +698,13 @@ fn migrated(saved: &Value, default: &Workspace) -> Workspace {
         dock.remove("order");
         dock.remove("heights");
     }
-    let Ok(mut actions) = legacy_on(&default.layout, saved.get("panels"), saved.get("dockTabs"), dock.as_ref()) else { return default.clone() };
+    // An old save lists a tab pick for every group, hidden ones too: a hidden group's pick has nothing to select.
+    let panels = saved.get("panels");
+    let mut tabs = saved.get("dockTabs").cloned();
+    if let Some(picks) = tabs.as_mut().and_then(Value::as_object_mut) {
+        picks.retain(|key, _| panels.and_then(|panels| panels.get(key)).and_then(Value::as_bool) != Some(false));
+    }
+    let Ok(mut actions) = legacy_on(&default.layout, panels, tabs.as_ref(), dock.as_ref()) else { return default.clone() };
     if saved.get("timelineOpen").and_then(Value::as_bool) == Some(true) {
         actions.push(Action::open("timeline".to_owned(), None));
     }
