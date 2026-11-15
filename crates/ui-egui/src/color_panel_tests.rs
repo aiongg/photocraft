@@ -11,7 +11,6 @@ use serde_json::json;
 use craft::color::ui::{ColorPanelCommand, ColorPanelMode, ColorPanelRamp};
 
 use crate::PhotocraftApp;
-use crate::dock::Group;
 use crate::theme::AppTheme;
 
 fn new_app() -> PhotocraftApp {
@@ -20,11 +19,10 @@ fn new_app() -> PhotocraftApp {
 
 /// The Color tab of `kind` for `app`, alone in a 300 x 400 pt group that it fills.
 fn color_tab_of(kind: AppTheme, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let tab = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
     let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                crate::panels::dock_body(app, ui, Group::Color, tab);
+                crate::panels::panel_docking::probe::body(app, ui, "color");
             }
         },
         app,
@@ -61,15 +59,13 @@ fn control_sets_the_mode_ramp_and_web_safe_ramp() {
     }
 }
 
-/// The saved state keeps its shape: the panel's fields flat beside Only Web Colors (`webOnly`),
-/// and state saved under the old snake_case key still loads.
+/// The saved state keeps its shape: the panel's fields flat at the top level.
 #[test]
 fn saved_state_keeps_its_keys() {
-    let old: crate::state::ColorPanelState = serde_json::from_value(json!({"background": true, "web_only": true, "mode": "rgbSliders"})).unwrap();
-    assert!(old.panel.background && old.web_only);
+    let old: crate::state::ColorPanelState = serde_json::from_value(json!({"background": true, "mode": "rgbSliders"})).unwrap();
+    assert!(old.panel.background);
     assert_eq!(old.panel.mode, ColorPanelMode::RgbSliders);
     let new = serde_json::to_value(old).unwrap();
-    assert_eq!((new.get("webOnly"), new.get("web_only")), (Some(&json!(true)), None));
     assert_eq!((new.get("mode"), new.get("background")), (Some(&json!("rgbSliders")), Some(&json!(true))));
 }
 

@@ -6,18 +6,16 @@ use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
 
 use crate::PhotocraftApp;
-use crate::dock::Group;
 use crate::theme::AppTheme;
 
 /// The height of the Hue Cube's field in the Color tab of `kind`, alone in a 300 pt wide group
 /// `height` tall; panics where the tab shows channel rows.
 fn field_height(kind: AppTheme, height: f32) -> f32 {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let tab = Group::Color.tabs(kind.tokens().pro).iter().position(|name| *name == "Color").unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(300.0, height)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                crate::panels::dock_body(app, ui, Group::Color, tab);
+                crate::panels::panel_docking::probe::body(app, ui, "color");
             }
         },
         app,

@@ -5,8 +5,6 @@ use craft::behavior::EditEvent;
 use craft::color::ui::{ColorPanel, ColorPanelCommand, ColorPanelMenu, PanelTarget, PickedColor};
 use craft::theme::Srgba;
 use craft::ui::contract::Bind;
-use craft::ui::menu::PanelRow;
-use craft::ui::runtime::commands::CommandSet as _;
 use serde_json::json;
 
 use super::PhotocraftApp;
@@ -44,11 +42,11 @@ fn set_color(app: &mut PhotocraftApp, target: PanelTarget, event: &EditEvent<Pic
     if [c.r, c.g, c.b, c.a] == now {
         return;
     }
-    let key = match event.id() {
-        Some(id) => format!("color-panel-{}", id.0),
-        None => format!("color-panel-set-{}", app.ui.alloc_id()),
-    };
-    let mut params = json!({"coalesce": key});
+    let key = crate::history_keys::coalesce("color-panel", event);
+    let mut params = json!({});
+    if let Some(key) = &key {
+        params["coalesce"] = json!(key);
+    }
     params[target_name(target)] = json!([c.r, c.g, c.b, c.a]);
     if let Err(e) = app.run("tools.setColors", params) {
         app.ui.status = e;
@@ -56,7 +54,7 @@ fn set_color(app: &mut PhotocraftApp, target: PanelTarget, event: &EditEvent<Pic
         return;
     }
     if target == PanelTarget::Foreground {
-        crate::apply_color::foreground_changed(app, Some(key));
+        crate::apply_color::foreground_changed(app, key);
     }
 }
 
@@ -70,32 +68,6 @@ fn target_name(target: PanelTarget) -> &'static str {
 /// A tool colour (sRGB-encoded RGBA) as the framework's colour.
 pub(crate) fn srgba(c: [f32; 4]) -> Srgba {
     Srgba::new(c[0], c[1], c[2], c[3])
-}
-
-/// The Color panel's panel menu (the dock's menus are still drawn by PhotoCraft): the rows,
-/// checks and commands of `ColorPanelMenu`. The ramp's context menu fires the same commands
-/// through the framework (`framework_before_input`).
-pub(crate) fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let defs = ColorPanelCommand::defs().unwrap_or_default();
-    for row in ColorPanelMenu::rows() {
-        let PanelRow::Command(command) = row else {
-            ui.separator();
-            continue;
-        };
-        let Some(id) = ColorPanelCommand::from_ref(&command) else { continue };
-        let label = defs.iter().find(|d| d.command == command).map_or("", |d| d.label.as_str());
-        let checked = ColorPanelMenu::checked(&app.ui.color_panel.panel, id);
-        let text = match checked {
-            Some(on) => format!("{}{}", if on { "✔ " } else { "   " }, tl!(label)),
-            None => tl!(label).to_string(),
-        };
-        if ui.button(text).clicked() {
-            if let Some(text) = run_menu_command(app, id) {
-                ui.ctx().copy_text(text);
-            }
-            ui.close();
-        }
-    }
 }
 
 /// Runs a Color panel menu command on the panel state; Copy Color as HTML and Copy Color's Hex

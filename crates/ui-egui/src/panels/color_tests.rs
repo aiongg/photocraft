@@ -201,9 +201,6 @@ fn swap_and_default_colors_recolour_selected_type() {
             session: "s".into(),
             created: false,
             mask: false,
-            dragging: false,
-            resize: None,
-            preedit: None,
         });
         let mut h = egui_kittest::Harness::builder().with_size(vec2(80.0, 120.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
@@ -236,14 +233,20 @@ fn swap_and_default_colors_recolour_selected_type() {
 fn a_click_on_the_edited_well_opens_its_color_picker() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = color_tab(app);
-    for (i, well_name, target) in [(1, "Background color", "background"), (0, "Foreground color", "foreground")] {
-        h.state_mut().ui.dialogs.clear();
+    use crate::color_picker_ui::PickTarget;
+    for (i, well_name, foreground) in [(1, "Background color", false), (0, "Foreground color", true)] {
         well(&h, i).click();
         h.run_steps(2);
-        assert!(h.state().ui.dialogs.is_empty(), "{well_name}: the first click only makes it the edited well");
+        assert!(!h.state().dialog_open(), "{well_name}: the first click only makes it the edited well");
         well(&h, i).click();
         h.run_steps(2);
-        let [d] = h.state().ui.dialogs.as_slice() else { panic!("{well_name}: one Color Picker") };
-        assert_eq!(d.fields.get("__colorPicker").and_then(Value::as_str), Some(target));
+        assert_eq!(h.state().color_targets.len(), 1, "{well_name}: one Color Picker");
+        let (&id, target) = h.state().color_targets.iter().next().unwrap();
+        let expected = if foreground { matches!(target, PickTarget::Foreground) } else { matches!(target, PickTarget::Background) };
+        assert!(expected, "{well_name}: the picker edits the clicked well");
+        let ctx = h.ctx.clone();
+        crate::dialogs::testing::cancel(h.state_mut(), &ctx, id).unwrap();
+        h.run_steps(2);
+        assert!(!h.state().dialog_open(), "{well_name}: cancel closes the picker");
     }
 }

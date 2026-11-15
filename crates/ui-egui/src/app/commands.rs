@@ -1,5 +1,5 @@
 use super::{
-    DocId, PhotocraftApp, Tool, Value, actions, canvas, delete_layer_prompt, dock, gpu_canvas, jobs_ui, json, mask_trash_prompt, notices, panel_docking,
+    DocId, PhotocraftApp, Value, actions, canvas, delete_layer_prompt, gpu_canvas, jobs_ui, json, mask_trash_prompt, notices, panel_docking,
     smart_svg_ui, state, transform_tool, type_transform, vector_ui,
 };
 
@@ -223,12 +223,6 @@ impl PhotocraftApp {
 
     /// Keep one view per document, in tab order: a view and its windows stay with their document
     /// when tabs move (`document.move`) or close.
-    /// The tool pointer events go to: a held temporary tool when there is one (⌘ is the Move
-    /// tool, `hold_keys::cmd_moves`), else the selected tool.
-    pub fn active_tool(&self) -> state::Tool {
-        self.tool_override.unwrap_or(self.ui.tool)
-    }
-
     /// Selects the newly attached type path on composite channel target so the path becomes immediately editable.
     fn select_attached_type_path(&mut self, command: &str, result: &Result<Value, String>) {
         if command != "type.attachToPath" {
@@ -277,12 +271,7 @@ impl PhotocraftApp {
         if result.is_ok() && creates_adjustment_or_fill {
             // Properties comes to the front, shown and expanded, so the new layer's settings can
             // be edited at once, as in Photoshop (#4028). The layer is made whatever happens here.
-            if self.ui.docking.is_some() {
-                let _ = panel_docking::command(self, "window.panel.activate", &json!({"panel": "properties"}));
-            } else {
-                self.ui.dock_tabs.properties = 0;
-                dock::reveal(self, dock::Group::Properties);
-            }
+            let _ = panel_docking::show_panel(self, "properties", Some(true));
         }
         // Making a new selection reveals its outline after View > Extras was hidden (#5597).
         // These interactive selection commands complete inline; a failed command, deselection,
@@ -340,7 +329,6 @@ impl PhotocraftApp {
 
     /// Reconciles canvas view state with open documents in the session.
     pub fn sync_views(&mut self) {
-        crate::type_path_placement::cancel_stale(self);
         // The Paths panel selection belongs to the active document. Ordinary edits replace the
         // snapshot and advance its revision; a replaced snapshot without a newer revision is a
         // reopened document, even with the same ID.
@@ -353,7 +341,7 @@ impl PhotocraftApp {
             && id != old_id
             && self.view_docs.contains(id)
         {
-            self.ui.tool_options.crop_content_aware = false;
+            self.ui.tool_options.crop.fill = crate::state::CropFill::Background;
         }
         let same_document = match (&self.path_document, &document) {
             (Some((old_id, old_revision, old_source)), Some((id, revision, source))) => old_id == id && (revision > old_revision || old_source.ptr_eq(source)),
@@ -364,23 +352,10 @@ impl PhotocraftApp {
             self.ui.selected_path = None;
         }
         self.path_document = document;
-        // A shape box handle drag belongs to its document, revision and tool.
-        crate::shape_bounds_box::cancel_stale(self);
         vector_ui::cancel_stale_pen(self);
         crate::direct_select::cancel_stale(self);
-        canvas::cancel_stale_vector_drag(self);
         type_transform::cancel_stale(self);
         crate::cam_transform::cancel_stale(self);
-        crate::lasso_ui::cancel_stale(self);
-        crate::retouch_ui::cancel_stale(self);
-        // A polygon under construction belongs to the Polygonal Lasso tool, not the next tool.
-        if self.ui.tool != Tool::PolygonLasso {
-            self.ui.polygon.clear();
-            self.ui.polygon_mode.clear();
-        }
-        // ... and to the document it was started on.
-        crate::canvas::polygon_cancel_stale(self);
-        crate::crop_ui::cancel_stale(self);
         crate::distort_ui::cancel_stale(self);
         crate::perspective_crop_ui::cancel_stale(self);
         // A pen path under construction belongs to the document it was started on too.
@@ -410,11 +385,9 @@ impl PhotocraftApp {
         self.canvases.retain(|(doc, _), _| ids.contains(doc));
         self.raster_logs.retain(|(doc, _), _| ids.contains(doc));
         self.navigator_textures.retain(|doc, _| ids.contains(doc));
-        self.snapshot_thumbs.retain(|(doc, _), _| ids.contains(doc));
         // Closing a document cancels its page work; its GPU pages go with `retain_gpu_documents`.
         self.streams.retain(|doc, _| ids.contains(doc));
         self.view_docs = ids;
-        self.prune_thumbs();
         self.sync_mask_targets();
         // With no document left, no canvas paints the Levels clipping display to drop its cache.
         if self.session.documents().is_empty() {
