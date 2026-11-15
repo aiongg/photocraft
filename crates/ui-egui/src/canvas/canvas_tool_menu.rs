@@ -380,9 +380,9 @@ pub fn crop_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row<String>>
     rows.push(Some((words.new_preset.as_str().to_owned(), CROP_NEW.into())));
     rows.push(Some((words.delete_preset.as_str().to_owned(), CROP_DELETE.into())));
     rows.push(None);
-    rows.extend(CropGuide::ALL.iter().map(|k| Some((tl!(k.label()).to_string(), format!("{CROP_OVERLAY}{}", k.id())))));
+    rows.extend(CropGuide::ALL.iter().map(|k| Some((words.guide_name(*k).to_owned(), format!("{CROP_OVERLAY}{}", serde_id(k))))));
     rows.push(None);
-    rows.extend(GuideShow::ALL.iter().map(|k| Some((tl!(k.label()).to_string(), format!("{CROP_SHOW}{}", k.id())))));
+    rows.extend(GuideShow::ALL.iter().map(|k| Some((words.show_name(*k).to_owned(), format!("{CROP_SHOW}{}", serde_id(k))))));
     rows.push(None);
     rows.push(Some((tl!("Cancel").to_string(), CROP_CANCEL.into())));
     rows.push(Some((tl!("Crop").to_string(), CROP_COMMIT.into())));
@@ -402,9 +402,22 @@ fn crop_checked(app: &PhotocraftApp, command: &str) -> bool {
         return command == crop_id(crop.choice(&crate::crop_presets::user_presets(app)));
     }
     if let Some(k) = command.strip_prefix(CROP_OVERLAY) {
-        return k == crop.guide.id();
+        return k == serde_id(&crop.guide);
     }
-    command.strip_prefix(CROP_SHOW).is_some_and(|k| k == crop.guide_show.id())
+    command.strip_prefix(CROP_SHOW).is_some_and(|k| k == serde_id(&crop.guide_show))
+}
+
+/// The id of a crop overlay or show rule: its serde name, the one the settings store.
+fn serde_id<T: Serialize>(value: &T) -> String {
+    match serde_json::to_value(value) {
+        Ok(Value::String(id)) => id,
+        _ => String::new(),
+    }
+}
+
+/// The value a [`serde_id`] names, if any.
+fn from_serde_id<T: serde::de::DeserializeOwned>(id: &str) -> Option<T> {
+    serde_json::from_value(Value::String(id.to_owned())).ok()
 }
 
 fn crop_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bool {
@@ -438,9 +451,9 @@ fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) ->
                 app.ui.tool_options.crop.choose(choice, &document, &saved);
             } else if command == CROP_CLEAR {
                 app.ui.tool_options.crop.clear();
-            } else if let Some(k) = command.strip_prefix(CROP_OVERLAY).and_then(CropGuide::from_id) {
+            } else if let Some(k) = command.strip_prefix(CROP_OVERLAY).and_then(from_serde_id::<CropGuide>) {
                 app.ui.tool_options.crop.set_guide(k);
-            } else if let Some(k) = command.strip_prefix(CROP_SHOW).and_then(GuideShow::from_id) {
+            } else if let Some(k) = command.strip_prefix(CROP_SHOW).and_then(from_serde_id::<GuideShow>) {
                 app.ui.tool_options.crop.guide_show = k;
             }
             // As the options bar does: a ratio or W x H change refits the frame.
@@ -1483,8 +1496,8 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         };
         let mut entry = Entry::new(command.clone(), label).enabled(entry_enabled(app, menu, &command)).checked(mode_checked(app, menu, &command));
         // The overlay rows carry their own glyph (#10889); the rest stay text-only.
-        if let Some(kind) = command.strip_prefix(CROP_OVERLAY).and_then(crate::crop_overlay::CropGuide::from_id) {
-            entry = entry.icon(kind.icon());
+        if let Some(kind) = command.strip_prefix(CROP_OVERLAY).and_then(from_serde_id::<craft::behavior::geometry::CropGuide>) {
+            entry = entry.icon(craft::draw::ui::crop::guide_icon(kind));
         }
         out.push(entry);
     }
