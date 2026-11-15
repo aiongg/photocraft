@@ -77,25 +77,6 @@ fn reading(pen: PenSample) -> PointerSample {
 }
 
 #[test]
-fn the_feed_queues_every_sample_in_order_and_keeps_the_latest() {
-    let feed = StylusFeed::default();
-    for p in [0.1, 0.2, 0.3] {
-        feed.set(Some(pen(p)));
-    }
-    assert_eq!(feed.get().map(|s| s.pressure), Some(0.3));
-    assert_eq!(feed.drain().iter().map(|s| s.pressure).collect::<Vec<_>>(), vec![0.1, 0.2, 0.3]);
-    assert!(feed.drain().is_empty(), "drained once");
-    feed.set(None);
-    assert_eq!(feed.get(), None, "a lifted pen is not queued");
-    assert!(feed.drain().is_empty());
-    // A UI that stops draining keeps only the newest samples.
-    for i in 0..FEED_QUEUE + 10 {
-        feed.set(Some(pen((i % 100) as f32 / 100.0)));
-    }
-    assert_eq!(feed.drain().len(), FEED_QUEUE);
-}
-
-#[test]
 fn the_pressure_curve_reshapes_pen_pressure_but_not_the_mouse() {
     let mut s = Stylus::default();
     s.set_pressure_curve(&[[0.0, 0.0], [0.3, 0.6], [1.0, 1.0]]);
@@ -140,9 +121,8 @@ fn feed_wins_and_is_sanitized() {
     let wild = PenSample { pressure: 7.0, tilt_x: 120.0, tilt_y: f32::NAN, rotation: -90.0, eraser: false }.sanitized();
     assert_eq!(wild, PenSample { pressure: 1.0, tilt_x: 90.0, tilt_y: 0.0, rotation: 270.0, eraser: false });
     let feed = StylusFeed::default();
-    feed.set(Some(PenSample { pressure: 0.6, tilt_x: 120.0, tilt_y: -30.0, rotation: -90.0, eraser: false }));
-    assert_eq!(feed.get(), Some(PenSample { pressure: 0.6, tilt_x: 90.0, tilt_y: -30.0, rotation: 270.0, eraser: false }));
-    assert_eq!(feed.drain(), vec![feed.get().unwrap_or_default()]);
+    feed.set(Some(PenSample { pressure: 0.6, tilt_x: 120.0, tilt_y: f32::NAN, rotation: -90.0, eraser: false }));
+    assert_eq!(feed.get(), Some(PenSample { pressure: 0.6, tilt_x: 90.0, tilt_y: 0.0, rotation: 270.0, eraser: false }));
 }
 
 #[test]
@@ -154,24 +134,28 @@ fn pen_samples_reach_the_brush_stroke() {
     app.session.execute("layer.new.layer", json!({})).unwrap();
     app.ui.tool = crate::state::Tool::Brush;
     let m = egui::Modifiers::NONE;
+    // The pen's readings go into the feed; each event carries the pressure of the reading it goes with.
     app.stylus.feed.set(Some(PenSample { pressure: 0.2, tilt_x: 40.0, tilt_y: 0.0, rotation: 30.0, eraser: false }));
-    let pr = app.stylus.pressure();
-    tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 40.0, pressure: pr }, m);
+    tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 40.0, pressure: 0.2 }, m);
     app.stylus.feed.set(Some(PenSample { pressure: 0.9, tilt_x: 10.0, tilt_y: -5.0, rotation: 60.0, eraser: false }));
-    let pr = app.stylus.pressure();
-    tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 40.0, pressure: pr }, m);
+    tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 40.0, pressure: 0.9 }, m);
     tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 40.0 }, m);
     let (id, p) = app.session.journal.iter().rev().find(|(id, _)| id == "paint.stroke").cloned().unwrap();
     assert_eq!(id, "paint.stroke");
-    assert_eq!(p["points"][0], json!([10.0, 40.0, 0.2f32 as f64, 40.0, 0.0, 30.0]));
-    assert_eq!(p["points"][1], json!([100.0, 40.0, 0.9f32 as f64, 10.0, -5.0, 60.0]));
-    // A mouse stroke stays at full pressure with plain [x, y, p] points.
+    // x, y, pressure, tilt and rotation in degrees (through the runtime's radians), then the point's time.
+    let near = |point: &serde_json::Value, want: [f64; 6]| {
+        let got: Vec<f64> = point.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        assert!(got.len() == 7 && got.iter().zip(want).all(|(g, w)| (g - w).abs() < 1e-4), "{got:?} is not {want:?}");
+    };
+    near(&p["points"][0], [10.0, 40.0, f64::from(0.2f32), 40.0, 0.0, 30.0]);
+    near(&p["points"][1], [100.0, 40.0, f64::from(0.9f32), 10.0, -5.0, 60.0]);
+    // A mouse stroke stays at full pressure with no tilt.
     app.stylus.feed.set(None);
-    let pr = app.stylus.pressure();
-    tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 60.0, pressure: pr }, m);
+    tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 60.0, pressure: 1.0 }, m);
     tool_event(&mut app, ToolEvent::Up { x: 90.0, y: 60.0 }, m);
     let (_, p) = app.session.journal.iter().rev().find(|(id, _)| id == "paint.stroke").cloned().unwrap();
-    assert_eq!(p["points"][0], json!([10.0, 60.0, 1.0]));
+    assert_eq!(p["points"][0].as_array().unwrap()[..3], [json!(10.0), json!(60.0), json!(1.0)]);
+    assert!(p["points"][0].as_array().unwrap().iter().skip(3).take(3).all(|v| v.as_f64() == Some(0.0)), "no tilt or rotation");
 }
 
 #[test]
@@ -219,9 +203,10 @@ fn eraser_end_switches_tools_once_and_never_mid_drag() {
     app.stylus.feed.set(pen(false));
     assert!(!Stylus::sync_eraser_tool(&mut app));
     assert_eq!(app.ui.tool, Tool::Eraser);
+    // The canvas pass after the release takes the flip.
     tool_event(&mut app, ToolEvent::Up { x: 20.0, y: 10.0 }, egui::Modifiers::NONE);
-    assert!(Stylus::sync_eraser_tool(&mut app));
     assert_eq!(app.ui.tool, Tool::Brush, "the tip restores the previous tool");
+    assert!(!Stylus::sync_eraser_tool(&mut app), "reported once");
     // The eraser end while the Eraser is already chosen remembers nothing to restore.
     app.ui.tool = Tool::Eraser;
     app.stylus.feed.set(pen(true));

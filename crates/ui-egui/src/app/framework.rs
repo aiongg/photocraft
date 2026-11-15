@@ -54,10 +54,14 @@ pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<De
     if let Some(decision) = frame {
         spec = spec.frame(decision);
     }
+    // The platform's pen readings: the app writes them into this feed, the runtime pairs them with the pointer moves.
+    let pen = crate::stylus::StylusFeed::default();
+    spec = spec.pen(pen.source());
     // The icons the interface draws are registered before the runtime reads its first frame.
     crate::icons::register();
     match embed::install(ctx, spec, fonts) {
-        Ok(_) | Err(InstallError::AlreadyInstalled) => {}
+        Ok(_) => pen.keep_on(ctx),
+        Err(InstallError::AlreadyInstalled) => {}
         Err(error) => log::error!("the craft runtime could not be installed: {error}"),
     }
 }
