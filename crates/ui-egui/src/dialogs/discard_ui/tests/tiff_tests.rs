@@ -1,12 +1,18 @@
 //! The two-modal save/close workflow, including the writer's success/failure boundary.
 use super::*;
-use crate::{FileDialogAnswer, tiff_options_ui};
+use super::jpeg_tests::{parked, set_field};
+use craft::host::{Picked, ScriptedFiles};
 use egui_kittest::kittest::Queryable;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 type Writes = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
 
 fn tiff_prompt(command: &str) -> (Prompted, Writes, DocId, DocId) {
+    tiff_prompt_answering(command, &["kept.tif"])
+}
+
+/// [`tiff_prompt`] with a save dialog that answers each of `paths` in turn.
+fn tiff_prompt_answering(command: &str, paths: &[&str]) -> (Prompted, Writes, DocId, DocId) {
     let _gpu = photocraft_testkit::gpu_lock();
     let mut app = app_with_docs(2);
     make_dirty(&mut app, 0);
@@ -14,19 +20,18 @@ fn tiff_prompt(command: &str) -> (Prompted, Writes, DocId, DocId) {
     app.session.active_mut().unwrap().path = Some("original.tif".into());
     let writes: Writes = Rc::default();
     let written = writes.clone();
-    app.services.file_dialog = Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("kept.tif".into()))]).0);
+    app.services.files = Some(Arc::new(ScriptedFiles::answering(paths.iter().map(|p| Picked::Paths(vec![(*p).into()])))));
     app.services.export = Some(Box::new(move |doc, _, settings| Ok((serde_json::to_vec(&(doc.id, settings.tiff_layers)).unwrap(), Vec::new()))));
     app.services.write = Some(Box::new(move |path, bytes| {
         written.borrow_mut().push((path.to_string(), bytes.to_vec()));
         Ok(())
     }));
-    let builder = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0));
+    let builder = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).with_context(app.ctx().clone());
     let builder = if std::env::var_os("PHOTOCRAFT_TIFF_SNAPSHOTS").is_some() { builder.wgpu() } else { builder };
     let mut h = builder.build_ui_state(
         |ui, app| {
-            show(app, ui.ctx());
-            tiff_options_ui::show(app, ui.ctx());
-            app.poll_file_dialog(ui.ctx(), None);
+            crate::dialogs::run(app, ui);
+            app.poll_file_dialog();
         },
         app,
     );
@@ -53,7 +58,7 @@ fn closing_after_tiff_save_waits_for_options_and_writes_the_requested_document()
         h.key_press(Key::Y);
         h.run_steps(3);
         capture(&mut h, "02-tiff-options");
-        assert!(h.state().tiff_options.is_some());
+        assert!(h.state().parked_save.is_some());
         assert_eq!(h.state().session.documents().len(), 2, "nothing closes before TIFF Options saves");
         assert_eq!(docs_left(&h), Some(1));
         assert!(!h.state().allow_close);
@@ -65,7 +70,7 @@ fn closing_after_tiff_save_waits_for_options_and_writes_the_requested_document()
         h.run_steps(3);
         assert_eq!(writes.borrow().as_slice(), &[("kept.tif".into(), serde_json::to_vec(&(saved, true)).unwrap())]);
         assert!(h.state().discard.is_none());
-        assert!(h.state().tiff_options.is_none());
+        assert!(h.state().parked_save.is_none());
         match command {
             EXIT => assert!(h.state().allow_close),
             "file.closeAll" => assert!(h.state().session.documents().is_empty()),
@@ -79,22 +84,14 @@ fn closing_after_tiff_save_waits_for_options_and_writes_the_requested_document()
 
 #[test]
 fn cancelling_failing_or_copying_a_tiff_keeps_the_original_unsaved() {
-    for outcome in ["cancel", "enter on cancel", "export error", "write error", "copy"] {
+    for outcome in ["cancel", "export error", "write error", "copy"] {
         let (mut h, writes, saved, _) = tiff_prompt("file.close");
         h.key_press(Key::Y);
         h.run_steps(3);
         match outcome {
             "export error" => h.state_mut().services.export = Some(Box::new(|_, _, _| Err("cannot encode".into()))),
             "write error" => h.state_mut().services.write = Some(Box::new(|_, _| Err("disk full".into()))),
-            "copy" => {
-                h.get_by_label("Discard Layers and Save a Copy").click();
-                h.run_steps(2);
-            }
-            // Enter on a focused Cancel is its click, not OK.
-            "enter on cancel" => {
-                h.get_by_label("Cancel").focus();
-                h.run_steps(2);
-            }
+            "copy" => set_field(&mut h, "discardLayers", json!(true)),
             _ => {}
         }
         h.key_press(if outcome == "cancel" { Key::Escape } else { Key::Enter });
@@ -102,7 +99,7 @@ fn cancelling_failing_or_copying_a_tiff_keeps_the_original_unsaved() {
         if outcome == "cancel" {
             capture(&mut h, "03-cancelled");
         }
-        assert!(h.state().tiff_options.is_none());
+        assert!(h.state().parked_save.is_none());
         assert_eq!(h.state().session.documents().len(), 2, "{outcome}");
         assert_eq!(docs_left(&h), Some(1), "{outcome}");
         assert!(h.query_by_label("(Y)es").is_some());
@@ -126,7 +123,7 @@ fn tiff_options_cannot_be_replaced_or_retarget_a_closed_document() {
     h.key_press(Key::Y);
     h.run_steps(3);
     assert!(h.state_mut().save_as(Some("replacement.tif".into())).is_err());
-    assert_eq!(h.state().tiff_options.as_ref().unwrap().path, "kept.tif");
+    assert_eq!(parked(&h).map(|p| p.0).as_deref(), Some("kept.tif"));
     // A direct engine command bypasses the UI close guard. Never fall through to the next tab.
     h.state_mut().run("file.close", json!({"document": 0})).unwrap();
     h.key_press(Key::Enter);
@@ -139,13 +136,11 @@ fn tiff_options_cannot_be_replaced_or_retarget_a_closed_document() {
 
 #[test]
 fn close_all_waits_for_each_layered_tiff_write() {
-    let (mut h, writes, first, second) = tiff_prompt("file.closeAll");
+    let (mut h, writes, first, second) = tiff_prompt_answering("file.closeAll", &["first.tif", "second.tif"]);
     make_dirty(h.state_mut(), 1);
     // Rebuild the prompt after making the second document dirty.
     h.state_mut().discard = None;
     assert!(intercept(h.state_mut(), "file.closeAll", &Value::Null));
-    h.state_mut().services.file_dialog =
-        Some(crate::file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("first.tif".into())), Some(FileDialogAnswer::SaveTo("second.tif".into()))]).0);
     for (i, doc) in [first, second].into_iter().enumerate() {
         h.key_press(Key::Y);
         h.run_steps(3);

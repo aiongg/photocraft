@@ -92,7 +92,6 @@ pub fn start() {
                 canvas,
                 options,
                 Box::new(move |cc| {
-                    PhotocraftApp::install_type_reset_hooks(&cc.egui_ctx);
                     PhotocraftApp::setup_context(&cc.egui_ctx, AppTheme::pro());
                     let inbox: Inbox = Arc::default();
                     let place_inbox: PlaceInbox = Arc::default();
@@ -101,7 +100,7 @@ pub fn start() {
                     let (session, warnings) = crate::preset_bridge::session(presets.clone());
                     preset_warnings.extend(warnings);
                     let drag = listen_drag(&pen_target);
-                    let mut app = PhotocraftApp::new(session, services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)));
+                    let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)));
                     if !preset_warnings.is_empty() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
@@ -464,7 +463,6 @@ impl eframe::App for WebShell {
         self.serve_fonts(ctx);
         self.app.logic_frame(ctx, frame);
         self.save_presets(ctx);
-        self.app.finish_type_reset_logic(ctx);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
@@ -493,13 +491,11 @@ impl eframe::App for WebShell {
         }
         self.app.ui_frame(ui, frame);
         self.save_presets(ui.ctx());
-        self.app.finish_type_reset_pass(ui.ctx());
     }
 }
 
 fn services(inbox: Inbox, place_inbox: PlaceInbox, cursor_pos: photocraft_ui_egui::CursorPosFn) -> Services {
     Services {
-        screen_pick: screen_color_service(),
         import: Some(Box::new(|name: &str, bytes: &[u8], opts: &photocraft_io::ImportOptions| {
             photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
         })),
@@ -605,71 +601,4 @@ fn mime_for(name: &str) -> &'static str {
     }
 }
 
-/// Rust bindings to the browser's user-activated EyeDropper API; unsupported browsers keep
-/// the document picker and its normal canvas zoom. The browser owns its screen magnifier.
-fn screen_color_service() -> Option<photocraft_ui_egui::screen_picker::Service> {
-    use js_sys::{Function, Reflect};
-    use photocraft_ui_egui::screen_picker::{Capture, Pending};
-    use wasm_bindgen::{JsValue, closure::Closure};
-    let window = web_sys::window()?;
-    let constructor = Reflect::get(&window, &JsValue::from_str("EyeDropper")).ok()?.dyn_into::<Function>().ok()?;
-    Some(Box::new(move |ctx| {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let started = (|| -> Result<_, String> {
-            let eye = Reflect::construct(&constructor, &js_sys::Array::new()).map_err(|e| format!("Could not start browser eyedropper: {e:?}"))?;
-            let controller = web_sys::AbortController::new().map_err(|e| format!("Could not create eyedropper cancellation: {e:?}"))?;
-            let options = js_sys::Object::new();
-            Reflect::set(&options, &JsValue::from_str("signal"), &controller.signal()).map_err(|e| format!("Could not set eyedropper options: {e:?}"))?;
-            let open = Reflect::get(&eye, &JsValue::from_str("open"))
-                .map_err(|e| format!("Browser eyedropper has no open method: {e:?}"))?
-                .dyn_into::<Function>()
-                .map_err(|_| "Invalid browser eyedropper method")?;
-            let promise = open
-                .call1(&eye, &options)
-                .map_err(|e| format!("Could not open browser eyedropper: {e:?}"))?
-                .dyn_into::<js_sys::Promise>()
-                .map_err(|_| "Browser eyedropper returned no promise")?;
-            let stop = cancelled.clone();
-            let abort = controller.clone();
-            let timer = Closure::<dyn FnMut()>::new(move || {
-                if stop.load(std::sync::atomic::Ordering::Relaxed) {
-                    abort.abort();
-                }
-            });
-            let interval = window.set_interval_with_callback_and_timeout_and_arguments_0(timer.as_ref().unchecked_ref(), 50).map_err(|e| {
-                controller.abort();
-                format!("Could not watch eyedropper cancellation: {e:?}")
-            })?;
-            Ok((promise, timer, interval))
-        })();
-        match started {
-            Err(e) => {
-                let _ = tx.send(Err(e));
-            }
-            Ok((promise, timer, interval)) => {
-                let wake = ctx.clone();
-                let window = window.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    let result = match wasm_bindgen_futures::JsFuture::from(promise).await {
-                        Ok(value) => Reflect::get(&value, &JsValue::from_str("sRGBHex"))
-                            .ok()
-                            .and_then(|v| v.as_string())
-                            .and_then(|h| photocraft_ui_egui::color_picker_ui::parse_hex(&h))
-                            .map(|rgb| Capture::Color(Some(rgb)))
-                            .ok_or_else(|| "Browser eyedropper returned an invalid color".into()),
-                        Err(e) if Reflect::get(&e, &JsValue::from_str("name")).ok().and_then(|v| v.as_string()).as_deref() == Some("AbortError") => {
-                            Ok(Capture::Color(None))
-                        }
-                        Err(e) => Err(format!("Browser screen color selection failed: {e:?}")),
-                    };
-                    window.clear_interval_with_handle(interval);
-                    drop(timer);
-                    let _ = tx.send(result);
-                    wake.request_repaint();
-                });
-            }
-        }
-        Pending { receiver: rx, cancelled }
-    }))
-}
+

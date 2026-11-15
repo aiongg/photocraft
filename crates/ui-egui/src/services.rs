@@ -1,7 +1,6 @@
-use super::{
-    CaptionStyle, Document, FileDialogFn, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, native_menu, screen_picker,
-    targa_options_ui, tiff_options_ui,
-};
+#[cfg(target_arch = "wasm32")]
+use super::FileDialogFn;
+use super::{Document, OsEvent, Value, dds_options_ui, jobs_ui, jpeg_options_ui, monitor_status, targa_options_ui, tiff_options_ui};
 
 /// The error a save gets while another save waits on its format prompt.
 pub(crate) const SAVE_OPTIONS_OPEN: &str = "Answer the TIFF, Targa, DDS or JPEG Options before starting another save";
@@ -466,14 +465,8 @@ pub type CapsLockFn = Box<dyn FnMut() -> bool>;
 /// Called once per frame; `None` when the window is decorated or the platform needs no fixing.
 pub type WindowFrameFn = Box<dyn FnMut()>;
 
-/// The caption buttons' current style ([`Services::caption_style`]).
-pub type CaptionStyleFn = Box<dyn Fn(&egui::Context) -> CaptionStyle>;
-
 /// Physical right mouse button or stylus barrel button down (Windows; read for brush resize).
 pub type RightButtonDownFn = Box<dyn Fn() -> bool + Send + Sync>;
-
-/// Where the pen in range is on the screen, in physical pixels ([`Services::pen_screen_px`]).
-pub type PenScreenFn = Box<dyn Fn() -> Option<[i32; 2]> + Send + Sync>;
 
 /// Which end of the pen is in use, `Some(true)` = eraser, `None` = no pen ([`Services::pen_end`]).
 pub type PenEndFn = Box<dyn Fn() -> Option<bool> + Send + Sync>;
@@ -482,18 +475,20 @@ pub type PenEndFn = Box<dyn Fn() -> Option<bool> + Send + Sync>;
 /// whether the app window is focused (to re-assert WinTab overlap priority on activation).
 pub type TabletPollFn = Box<dyn FnMut(bool)>;
 
-/// What the last self-update came to: `Ok` with the version it installed, `Err` with the reason it
-/// could not be installed, `None` when there is nothing to report ([`Services::last_update`]).
-pub type LastUpdateFn = fn() -> Option<Result<String, String>>;
-
 /// Platform services injected by the app binary (file dialogs, codecs), keeping this crate free of
 /// I/O dependencies.
 #[derive(Default)]
 pub struct Services {
     /// Explicit interactive SVG smart-object editing; unavailable in browser and automation.
     pub open_external_svg: Option<OpenExternalSvgFn>,
-    /// User-initiated desktop/browser pixel sampling.
-    pub screen_pick: Option<screen_picker::Service>,
+    /// A capture source for the screen picker; `None` uses the platform capture (`ScreenPick::tick`).
+    pub screen_capture: Option<std::sync::Arc<dyn Fn() -> Box<dyn craft::color::ui::CaptureSource> + Send + Sync>>,
+    /// The file service the app's host answers file picks with (`HostBuilder::files`); `None` in tests that install none.
+    pub files: Option<std::sync::Arc<dyn craft::host::Files>>,
+    /// The main-thread side of the native file panels, pumped by the app.
+    pub file_panels: Option<craft::dialogs::service::FilePanels>,
+    /// The opened settings store and what opening it reported; `None` in the web build.
+    pub settings: Option<(craft::settings::SettingsStore<photocraft_engine::prefs::SavedPrefs>, craft::settings::LoadReport)>,
     /// Decode a file's bytes into a document (PSD, PNG, JPEG, …).
     pub import: Option<ImportFn>,
     /// Encode a document for a file name (format chosen by extension).
@@ -501,7 +496,9 @@ pub struct Services {
     /// Background save over the automation write authority (`app.save`, #2017): same worker
     /// contract as `save_file`, but the bytes go through the capability-scoped workspace.
     pub automation_save: Option<SaveFileFn>,
-    /// Show an Open or Save dialog without waiting for it (see `file_dialog`).
+    /// Show an Open or Save dialog without waiting for it (see `file_dialog`). The web build's file path until
+    /// the framework's web `Files` exists (FW-264).
+    #[cfg(target_arch = "wasm32")]
     pub file_dialog: Option<FileDialogFn>,
     /// Write bytes to a path (native) or trigger a download (web).
     pub write: Option<WriteFn>,
@@ -511,7 +508,7 @@ pub struct Services {
     /// Whether two paths name one entry in one folder (native): a save dialog's answer and the
     /// path the save writes to after Lowercase Extension, on a file system that ignores letter
     /// case. A hard link is another entry. A save asks before replacing an entry it finds
-    /// different (`replace_prompt`).
+    /// different (the save dialog's own replace question).
     pub same_file: Option<SameFileFn>,
     /// `write` only asks for the bytes to be kept (a browser download, which the user can
     /// cancel and which reports nothing back), so a save through it names the document but
@@ -539,11 +536,6 @@ pub struct Services {
     /// (Tab, Alt; see `zoom_field`). No platform sets it yet, so the alert falls back to
     /// [`Self::beep`].
     pub alert: Option<fn()>,
-    /// Starts a background check for published releases (desktop, outside Flatpak).
-    pub check_updates: Option<photocraft_engine::updates_cmds::CheckFn>,
-    /// What the last self-update came to, read once at the first frame: `Ok` with the version it
-    /// installed, `Err` with the reason it could not be installed (desktop).
-    pub last_update: Option<LastUpdateFn>,
     /// Files delivered asynchronously (web drag-and-drop): drained every frame and opened as
     /// documents.
     pub inbox: Option<Inbox>,
@@ -562,7 +554,9 @@ pub struct Services {
     pub clipboard_unreadable: Option<ClipboardUnreadableFn>,
     /// Preferences persistence: the platform config directory on native, browser storage on
     /// the web (see `prefs_ui`).
+    #[cfg(target_arch = "wasm32")]
     pub load_prefs: Option<LoadTextFn>,
+    #[cfg(target_arch = "wasm32")]
     pub save_prefs: Option<SaveTextFn>,
     /// Load/save the bounded deterministic GPU compositor failure memo (native only).
     pub load_gpu_memo: Option<LoadTextFn>,
@@ -571,7 +565,6 @@ pub struct Services {
     pub shader_compiler: Option<String>,
     /// Photoshop's live keyboard shortcut set, imported once at first launch (`kys_import`).
     pub photoshop_shortcuts: Option<PhotoshopShortcutsFn>,
-    pub system_theme: Option<SystemThemeFn>,
     /// The native window is connected directly to a Wayland compositor.
     pub is_wayland: bool,
     /// On Wayland, the shell command that starts this install under XWayland, where native file
@@ -603,18 +596,11 @@ pub struct Services {
     /// (Windows custom title bar, #2246). Called once per frame; `None` when the window is
     /// decorated or the platform needs no fixing.
     pub window_frame: Option<WindowFrameFn>,
-    /// How the custom title bar's caption buttons look and where they sit (Linux: the desktop's
-    /// style and button layout). Read every frame, with the context to wake when it changes;
-    /// `None` keeps Windows' buttons at the right end.
-    pub caption_style: Option<CaptionStyleFn>,
     /// Physical right mouse button or pen barrel button currently down.
     pub right_button_down: Option<RightButtonDownFn>,
     /// Which end of the pen is in use, where the platform reports it outside the stylus feed
     /// (Windows: the feed carries no pen samples there). Read for the eraser-end tool switch.
     pub pen_end: Option<PenEndFn>,
-    /// Where the pen is on the screen, independent of where the window is (Windows: the pen's
-    /// pointer messages). A pen moving the window by its title bar follows it (`titlebar`).
-    pub pen_screen_px: Option<PenScreenFn>,
     /// WinTab packet poll (Windows with Windows Ink disabled; see `photocraft_tablet::wintab`).
     pub tablet_poll: Option<TabletPollFn>,
     /// The persistent brush preset store, loading in the background (desktop; see
@@ -625,5 +611,5 @@ pub struct Services {
     /// `monitor_status`). Without one, the canvas uses the profile chosen in Color Settings, or sRGB.
     pub read_displays: Option<monitor_status::ReadDisplaysFn>,
     /// The macOS menu bar, when the desktop app installed one; the in-window menus are hidden then.
-    pub native_menu: Option<native_menu::NativeMenu>,
+    pub native_menu: Option<craft::menu::NativeMenu>,
 }
