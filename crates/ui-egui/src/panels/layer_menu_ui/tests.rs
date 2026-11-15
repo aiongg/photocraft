@@ -146,8 +146,7 @@ fn row_menu_entries_follow_the_target() {
     let app = crate::PhotocraftApp::new(s, Default::default());
     let st = app.session.active().unwrap();
     let tree = crate::panels::layers_tree::PhotoLayers::new(&app, st, &Default::default(), false, None);
-    // PLAN: `MenuTarget` is `#[non_exhaustive]` and has no constructor; assumed `MenuTarget::<LayerId>::empty_space()` (framework, craft-layers panel/events.rs) for the menu of no row.
-    let target = MenuTarget::<LayerId>::empty_space();
+    let target = MenuTarget::<LayerId>::new(None);
     let menu = crate::panels::layers_tree::row_menu(&tree, &target);
     let size = |size: ThumbSize, label: &str| {
         let value = format!("{}{}", crate::panels::layers_tree::THUMB_SIZE, crate::layers_panel_ui::size_key(size));

@@ -1,4 +1,7 @@
-use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, empty, icons, vec2};
+use craft::theme::variant::Tone;
+use craft::ui::notices::{Notice, NoticeLayout};
+
+use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, icons, vec2};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -28,11 +31,11 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Thumbnail Contents is the clip preference alone, so the panel reads it each pass.
     app.ui.layers_settings.options.thumbnail_contents = crate::layers_panel_ui::thumbnail_contents(app);
     let Some(st) = app.session.active() else {
-        empty(ui, tl!("No document"));
+        let _ = Notice::new(Tone::Neutral, tl!("No document")).layout(NoticeLayout::Centred).show(ui);
         return;
     };
     // While the drag shows another document, its rows take no drop.
-    let foreign = crate::layer_transfer::source(&ctx).is_some_and(|source| source != st.doc.id);
+    let foreign = crate::layer_transfer::source(app, &ctx).is_some_and(|source| source != st.doc.id);
     let settings = &app.ui.layers_settings;
     // The tree borrows the app for the pass, so the filter is bound through a copy and stored back after it.
     let mut filter = app.ui.layer_filter.clone();
