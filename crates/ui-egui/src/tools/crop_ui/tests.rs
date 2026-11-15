@@ -38,6 +38,8 @@ fn drag(app: &mut PhotocraftApp, pts: &[[f64; 2]], mods: Modifiers) {
     let (first, last) = (pts[0], pts[pts.len() - 1]);
     // The frame's handles take presses from the pass that drew them: a frame set since the last pass is shown first.
     crate::canvas::testing::frame(app);
+    // The pointer is over a handle before it presses it.
+    tool_event(app, ToolEvent::Move { x: first[0], y: first[1], pressure: 1.0 }, mods);
     tool_event(app, ToolEvent::Down { x: first[0], y: first[1], pressure: 1.0 }, mods);
     for p in &pts[1..] {
         tool_event(app, ToolEvent::Move { x: p[0], y: p[1], pressure: 1.0 }, mods);

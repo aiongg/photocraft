@@ -91,7 +91,8 @@ fn from_center_and_the_other_tools() {
     confirm_by_id(&mut app, id);
     assert_eq!(live(&app), LiveShape::Polygon { rect: [10.0, 10.0, 50.0, 60.0], sides: 7, star_ratio: 0.5, corner_radius: 0.0 });
 
-    click(&mut app, Tool::Triangle, [5.0, 6.0]);
+    // Away from the polygon just drawn: its scale box, still selected, takes a press at its handles.
+    click(&mut app, Tool::Triangle, [305.0, 206.0]);
     let id = only_dialog(&app);
     confirm_by_id(&mut app, id);
     let LiveShape::Polygon { sides: 3, .. } = live(&app) else { panic!("a triangle") };
