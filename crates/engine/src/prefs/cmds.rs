@@ -123,8 +123,9 @@ fn toolbar(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some(h) = ids("hidden") {
             pr.toolbar.hidden = h;
         }
-        if let Some(o) = ids("order") {
-            pr.toolbar.order = o;
+        // A slot that doesn't read as one (a hand-written script) is skipped, like an unknown tool name.
+        if let Some(slots) = p.get("slots").and_then(Value::as_array) {
+            pr.toolbar.slots = slots.iter().filter_map(|slot| serde_json::from_value(slot.clone()).ok()).collect();
         }
     });
     Ok(serde_json::to_value(&s.prefs().toolbar).unwrap_or_default())
@@ -208,6 +209,6 @@ pub fn specs() -> Vec<CommandSpec> {
             menus,
             true
         ),
-        spec!("edit.toolbar", "Toolbar…", ["Edit"], None, r##"{"hidden":["<tool>",…]?,"order":["<tool>",…]?,"reset":bool=false}"##, toolbar, true),
+        spec!("edit.toolbar", "Toolbar…", ["Edit"], None, r##"{"hidden":["<tool>",…]?,"slots":[{"id":u32,"tools":["<tool>",…],"groupEnd":bool},…]?,"reset":bool=false}"##, toolbar, true),
     ]
 }

@@ -601,7 +601,10 @@ pub struct FileHandling {
     pub save_in_background: bool,
     /// Save recovery information (crash recovery autosave).
     pub autosave: bool,
-    /// Minutes between autosaves of documents with unsaved changes.
+    /// Minutes between autosaves of documents with unsaved changes: one of
+    /// [`INTERVAL_CHOICES_MINUTES`](craft::platform::autosave::INTERVAL_CHOICES_MINUTES). An older
+    /// file's free value reads as the nearest choice ([`nearest_autosave_minutes`]).
+    #[serde(deserialize_with = "autosave_minutes")]
     pub autosave_minutes: u32,
     /// Offer to reopen recovered documents at launch.
     pub recover_on_launch: bool,
@@ -629,6 +632,20 @@ pub struct FileHandling {
     /// A folder whose `.cube`, `.3dl` and `.look` files Color Lookup lists under its built-in
     /// looks (native only, #6558). Empty lists none.
     pub lut_folder: String,
+}
+
+/// The autosave choice nearest to `minutes`, the larger one on a tie: 1-4 read as 5, 45 as 60 and
+/// 240 as 60.
+pub fn nearest_autosave_minutes(minutes: u32) -> u32 {
+    craft::platform::autosave::INTERVAL_CHOICES_MINUTES
+        .into_iter()
+        .min_by_key(|choice| (choice.abs_diff(minutes), std::cmp::Reverse(*choice)))
+        .unwrap_or(minutes)
+}
+
+/// `fileHandling.autosaveMinutes` as stored (a count, or an older file's text), snapped to a choice.
+fn autosave_minutes<'de, D: serde::Deserializer<'de>>(d: D) -> std::result::Result<u32, D::Error> {
+    craft::platform::autosave::deserialize_minutes(d).map(nearest_autosave_minutes)
 }
 
 impl FileHandling {
@@ -1292,10 +1309,8 @@ impl Default for HistoryOptions {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MenuCustomization {
-    #[serde(deserialize_with = "theme_ids::commands")]
     pub hidden: Vec<String>,
     /// Command id → colour name (red, orange, yellow, green, blue, violet, gray).
-    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub colors: BTreeMap<String, String>,
 }
 
@@ -1313,12 +1328,26 @@ impl MenuCustomization {
     }
 }
 
-/// Edit › Toolbar: hidden tools and a custom order (tool names as in `ui.set {tool}`).
+/// Edit › Toolbar: hidden tools and the Edit Toolbar drawer's arrangement (tool names as in
+/// `ui.set {tool}`).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ToolbarCustomization {
     pub hidden: Vec<String>,
-    pub order: Vec<String>,
+    /// The toolbar's slots in order; empty means the default arrangement.
+    pub slots: Vec<SavedSlot>,
+}
+
+/// One toolbar slot as the Edit Toolbar drawer saves it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SavedSlot {
+    /// The slot's id, kept across restarts so the slot's last-used tool comes back with it.
+    pub id: u32,
+    /// The slot's tools, first shown first.
+    pub tools: Vec<String>,
+    /// The slot is the last of its group (a divider follows it).
+    pub group_end: bool,
 }
 
 /// Layer Mask Display Options (double-click the layer mask's row in the Channels panel, or Mask
@@ -1380,13 +1409,11 @@ pub struct Preferences {
     pub history_options: HistoryOptions,
     /// Edit › Keyboard Shortcuts: command id → shortcut (`Cmd+Shift+N` notation); an empty
     /// string removes the default shortcut.
-    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub shortcuts: BTreeMap<String, String>,
     /// Edit › Keyboard Shortcuts: a command's further keys besides its main one (#3665),
     /// command id → keys. A list replaces the command's default alternates
     /// ([`ALTERNATE_SHORTCUTS`]); an empty list removes them. Settings files from before this
     /// map load with nothing stored, so every command keeps its defaults.
-    #[serde(deserialize_with = "theme_ids::command_keys")]
     pub alternate_shortcuts: BTreeMap<String, Vec<String>>,
     /// Edit › Keyboard Shortcuts › Set: saved shortcut sets by name (`crate::shortcut_sets`).
     pub shortcut_sets: BTreeMap<String, crate::shortcut_sets::ShortcutSet>,
@@ -1396,10 +1423,20 @@ pub struct Preferences {
     pub toolbar: ToolbarCustomization,
     /// Edit › Check Spelling: words added to the dictionary ("Add").
     pub user_dictionary: Vec<String>,
-    /// Window › Workspace › New Workspace…: saved layouts by name (JSON owned by the shell).
+    /// Saved layouts by name from before the framework's workspace set: read once, when the
+    /// shell moves them into [`workspace_set`](Self::workspace_set), and never written.
+    #[serde(default, skip_serializing)]
     pub workspaces: BTreeMap<String, Value>,
-    /// Window › Workspace › Lock Workspace: panels can't be moved.
+    /// Lock Workspace from before the framework's workspace set: read once for the same move, never
+    /// written.
+    #[serde(default, skip_serializing)]
     pub workspace_locked: bool,
+    /// The framework's workspace set (the saved workspaces, the one in use, the lock). JSON owned
+    /// by the shell.
+    pub workspace_set: Value,
+    /// PhotoCraft's own state kept with each saved workspace, by workspace name. JSON owned by the
+    /// shell.
+    pub workspace_extras: BTreeMap<String, Value>,
     /// The live panel layout (dock group heights, order, collapsed groups, open panels), saved
     /// as the user changes it and restored at launch when Workspace › Remember Workspace
     /// Changes is on. JSON owned by the shell.
@@ -1591,6 +1628,143 @@ impl Preferences {
     }
 }
 
+/// Everything PhotoCraft keeps in its settings file: the preferences at the top level (their
+/// sections as `[general]`, `[interface]`, ...), Edit › Color Settings as `colorSettings` and the
+/// preset libraries as `presets`. The type the settings store holds
+/// (`craft::settings::SettingsStore<SavedPrefs>`); [`Session::saved_prefs`] and
+/// [`Session::set_saved_prefs`] move it in and out of the session.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SavedPrefs {
+    /// The preferences.
+    #[serde(flatten)]
+    pub prefs: Preferences,
+    /// Edit › Color Settings.
+    pub color_settings: crate::color_cmds::ColorSettings,
+    /// The preset libraries, as [`PresetState::to_json`](crate::presets::PresetState::to_json) writes them.
+    pub presets: Value,
+}
+
+/// Written through [`strip_nulls`]: TOML has no null, and the store refuses a document holding one
+/// at any depth. A null in these files always means "not set", which a missing key reads as too.
+impl Serialize for SavedPrefs {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        let mut v = self.prefs.to_json();
+        if let Value::Object(m) = &mut v {
+            m.insert("colorSettings".into(), serde_json::to_value(&self.color_settings).map_err(serde::ser::Error::custom)?);
+            m.insert("presets".into(), self.presets.clone());
+        }
+        strip_nulls(&mut v);
+        v.serialize(serializer)
+    }
+}
+
+impl craft::settings::Settings for SavedPrefs {
+    const APP_ID: &'static str = "photocraft";
+    const SCHEMA_VERSION: u32 = 1;
+}
+
+/// Removes every null from `v`: object entries holding null and null list items, at any depth.
+pub fn strip_nulls(v: &mut Value) {
+    match v {
+        Value::Object(m) => {
+            m.retain(|_, item| !item.is_null());
+            m.values_mut().for_each(strip_nulls);
+        }
+        Value::Array(items) => {
+            items.retain(|item| !item.is_null());
+            items.iter_mut().for_each(strip_nulls);
+        }
+        _ => {}
+    }
+}
+
+/// Reads a `preferences.json` written by [`Session::prefs_to_json`] (the file before
+/// `config.toml`), with its migrations: the old shift-key default, the single-theme preference,
+/// the `sr` catalog and the renamed command ids. Missing keys keep their defaults and unknown keys
+/// are ignored, so files from older and newer versions load. A value of the wrong type (a
+/// hand-edited `"recentFileCount": "ten"`) keeps its default and everything else still loads
+/// (#6611); the returned list names those values. Only text that isn't a JSON object fails as a
+/// whole.
+pub fn parse_prefs_json(s: &str) -> std::result::Result<(SavedPrefs, Vec<InvalidPref>), String> {
+    let mut v: Value = serde_json::from_str(s).map_err(|e| format!("preferences: {e}"))?;
+    if !v.is_object() {
+        return Err("preferences: expected a JSON object".into());
+    }
+    // Files before version 2 hold Use Shift Key for Tool Switch off because that was the default
+    // when they were written: every key is saved, chosen or not. Like Photoshop it is on by
+    // default now (#3528), so those files take the new default (#5647: a tool letter pressed again
+    // kept cycling its group).
+    if v.get("version").and_then(Value::as_u64).unwrap_or(0) < 2
+        && let Some(tools) = v.get_mut("tools").and_then(Value::as_object_mut)
+        && tools.get("useShiftKeyForToolSwitch") == Some(&json!(false))
+    {
+        tools.remove("useShiftKeyForToolSwitch");
+    }
+    // Saved preferences before appearance modes had one concrete theme. Preserve its appearance
+    // instead of silently switching established users to Auto.
+    if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
+        && !interface.contains_key("appearanceMode")
+        && let Some((id, dark)) = interface.get("theme").and_then(Value::as_str).and_then(theme_ids::alias)
+    {
+        let (mode, slot) = if dark { ("dark", "darkTheme") } else { ("light", "lightTheme") };
+        interface.insert("appearanceMode".into(), json!(mode));
+        // A partially migrated file may already contain a newer theme selection (#5139).
+        interface.entry(slot).or_insert_with(|| json!(id));
+    }
+    // The Serbian interface catalog was `sr`; since the catalogs moved to craft-i18n it is
+    // `sr-latn`, the same Latin text.
+    if let Some(language) = v.get_mut("interface").and_then(|interface| interface.get_mut("language"))
+        && language.as_str().is_some_and(|code| code.eq_ignore_ascii_case("sr"))
+    {
+        *language = json!("sr-latn");
+    }
+    remap_command_ids(&mut v);
+    let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
+    let presets = v.as_object_mut().and_then(|m| m.remove("presets")).unwrap_or(Value::Null);
+    let mut invalid = Vec::new();
+    let prefs: Preferences = read_lenient(v, &[], &mut invalid);
+    let color_settings = color.map(|c| read_lenient(c, &["colorSettings"], &mut invalid)).unwrap_or_default();
+    Ok((SavedPrefs { prefs, color_settings, presets }, invalid))
+}
+
+/// [`parse_prefs_json`] as the settings store's legacy import calls it
+/// (`craft::settings::LegacyFile::parse`): the file's bytes in, the values reset as the store's
+/// section errors out.
+pub fn parse_legacy_prefs(bytes: &[u8]) -> std::result::Result<(SavedPrefs, Vec<craft::settings::SectionError>), String> {
+    let text = std::str::from_utf8(bytes).map_err(|e| format!("preferences: {e}"))?;
+    let (saved, invalid) = parse_prefs_json(text)?;
+    Ok((saved, invalid.iter().map(reset_value).collect()))
+}
+
+/// A value the load reset, in the form the settings store reports it: the dotted key path as the
+/// section, the value the file held as the message.
+pub fn reset_value(bad: &InvalidPref) -> craft::settings::SectionError {
+    craft::settings::SectionError { section: bad.path(), message: format!("unreadable value {}", bad.value) }
+}
+
+/// Applies [`theme_ids::command_id`] once to the saved command ids: the keys of `shortcuts`,
+/// `alternateShortcuts` and `menus.colors`, and the items of `menus.hidden`.
+fn remap_command_ids(v: &mut Value) {
+    fn remap_keys(map: Option<&mut Value>) {
+        if let Some(Value::Object(m)) = map {
+            *m = std::mem::take(m).into_iter().map(|(id, item)| (theme_ids::command_id(&id), item)).collect();
+        }
+    }
+    remap_keys(v.get_mut("shortcuts"));
+    remap_keys(v.get_mut("alternateShortcuts"));
+    if let Some(menus) = v.get_mut("menus") {
+        remap_keys(menus.get_mut("colors"));
+        if let Some(Value::Array(hidden)) = menus.get_mut("hidden") {
+            for id in hidden {
+                if let Value::String(s) = id {
+                    *s = theme_ids::command_id(s);
+                }
+            }
+        }
+    }
+}
+
 impl Session {
     /// The current preferences.
     pub fn prefs(&self) -> &Preferences {
@@ -1663,70 +1837,45 @@ impl Session {
         v
     }
 
-    /// Restore preferences saved by [`Session::prefs_to_json`]. Missing keys keep their
-    /// defaults and unknown keys are ignored, so files from older and newer versions load.
-    /// A value of the wrong type (a hand-edited `"recentFileCount": "ten"`) keeps its default
-    /// and everything else still loads (#6611); the returned list names those values. Only
-    /// text that isn't a JSON object fails as a whole.
+    /// Restore preferences saved by [`Session::prefs_to_json`]: [`parse_prefs_json`], then
+    /// [`Session::set_saved_prefs`]. The returned list names the values both left at their
+    /// defaults. Only text that isn't a JSON object fails as a whole.
     pub fn load_prefs_json(&mut self, s: &str) -> std::result::Result<Vec<InvalidPref>, String> {
-        let mut v: Value = serde_json::from_str(s).map_err(|e| format!("preferences: {e}"))?;
-        if !v.is_object() {
-            return Err("preferences: expected a JSON object".into());
-        }
-        // Files before version 2 hold Use Shift Key for Tool Switch off because that was the
-        // default when they were written: every key is saved, chosen or not. Like Photoshop it is
-        // on by default now (#3528), so those files take the new default (#5647: a tool letter
-        // pressed again kept cycling its group). A choice made since is saved as version 2.
-        if v.get("version").and_then(Value::as_u64).unwrap_or(0) < 2
-            && let Some(tools) = v.get_mut("tools").and_then(Value::as_object_mut)
-            && tools.get("useShiftKeyForToolSwitch") == Some(&json!(false))
-        {
-            tools.remove("useShiftKeyForToolSwitch");
-        }
-        // Saved preferences before appearance modes had one concrete theme. Preserve its
-        // appearance instead of silently switching established users to Auto.
-        if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
-            && !interface.contains_key("appearanceMode")
-            && let Some((id, dark)) = interface.get("theme").and_then(Value::as_str).and_then(theme_ids::alias)
-        {
-            let (mode, slot) = if dark { ("dark", "darkTheme") } else { ("light", "lightTheme") };
-            interface.insert("appearanceMode".into(), json!(mode));
-            // A partially migrated file may already contain a newer theme selection (#5139).
-            interface.entry(slot).or_insert_with(|| json!(id));
-        }
-        // The Serbian interface catalog was `sr`; since the catalogs moved to craft-i18n it is
-        // `sr-latn`, the same Latin text. A saved `sr` loads as `sr-latn` and is saved that way next.
-        if let Some(language) = v.get_mut("interface").and_then(|interface| interface.get_mut("language"))
-            && language.as_str().is_some_and(|code| code.eq_ignore_ascii_case("sr"))
-        {
-            *language = json!("sr-latn");
-        }
-        let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
-        let presets = v.as_object_mut().and_then(|m| m.remove("presets"));
+        let (saved, mut invalid) = parse_prefs_json(s)?;
+        invalid.extend(self.set_saved_prefs(saved));
+        Ok(invalid)
+    }
+
+    /// Everything the settings file holds, as the session has it now.
+    pub fn saved_prefs(&self) -> SavedPrefs {
+        SavedPrefs { prefs: self.prefs().clone(), color_settings: self.color.settings.clone(), presets: self.presets.to_json(self) }
+    }
+
+    /// Takes `saved` as the session's preferences, colour settings and presets, from either source
+    /// (the settings file, or an older `preferences.json` through [`parse_prefs_json`]), and
+    /// applies the engine-side ones. Values that read but that this build no longer accepts are
+    /// put back to their defaults (or the nearest accepted value) and returned.
+    pub fn set_saved_prefs(&mut self, saved: SavedPrefs) -> Vec<InvalidPref> {
+        let SavedPrefs { mut prefs, color_settings, presets } = saved;
         let mut invalid = Vec::new();
-        let mut prefs: Preferences = read_lenient(v, &[], &mut invalid);
         // An Effect Cache the field no longer accepts (above the 32-bit cap, saved before the cap
         // or by a 64-bit build; a hand-edited 0) loads as the nearest value it does. Otherwise
         // Apply from another Preferences tab, which validates every value, would reject it.
         prefs.performance.effect_cache_mb = accepted_effect_cache_mb(prefs.performance.effect_cache_mb, SMALL_ADDRESS_SPACE);
-        if let Some(c) = color {
-            self.color.settings = read_lenient(c, &["colorSettings"], &mut invalid);
-            // A number outside 0..MAX reads, but `validate_settings` would then refuse every
-            // later Color Settings edit: reset it like an unreadable value.
-            let gain = self.color.settings.spot_dot_gain;
-            if !(gain.is_finite() && (0.0..=photocraft_compose::multichannel::MAX_SPOT_DOT_GAIN).contains(&gain)) {
-                invalid.push(InvalidPref { keys: vec!["colorSettings".into(), "spotDotGain".into()], value: json!(gain) });
-                self.color.settings.spot_dot_gain = photocraft_compose::multichannel::SPOT_DOT_GAIN;
-            }
-            photocraft_compose::psblend::set_text_gamma(self.color.settings.blend_text_gamma);
-            photocraft_compose::multichannel::set_spot_dot_gain(self.color.settings.spot_dot_gain);
+        self.color.settings = color_settings;
+        // A number outside 0..MAX reads, but `validate_settings` would then refuse every later
+        // Color Settings edit: reset it like an unreadable value.
+        let gain = self.color.settings.spot_dot_gain;
+        if !(gain.is_finite() && (0.0..=photocraft_compose::multichannel::MAX_SPOT_DOT_GAIN).contains(&gain)) {
+            invalid.push(InvalidPref { keys: vec!["colorSettings".into(), "spotDotGain".into()], value: json!(gain) });
+            self.color.settings.spot_dot_gain = photocraft_compose::multichannel::SPOT_DOT_GAIN;
         }
+        photocraft_compose::psblend::set_text_gamma(self.color.settings.blend_text_gamma);
+        photocraft_compose::multichannel::set_spot_dot_gain(self.color.settings.spot_dot_gain);
         self.prefs.edit(|p| *p = prefs);
-        if let Some(v) = presets {
-            self.load_presets_json(v);
-        }
+        self.load_presets_json(presets);
         self.apply_prefs();
-        Ok(invalid)
+        invalid
     }
 
     /// Full JSON view used by `prefs.get`: preferences plus `colorSettings`.

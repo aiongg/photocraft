@@ -182,28 +182,41 @@ fn appearance_choices_validate_and_legacy_theme_still_selects() {
 }
 
 /// Names PhotoCraft saved before theme ids, in any spelling `ui.set` took, read as ids: in the
-/// slots, the favorites and the theme command ids of saved shortcuts and menu customizations.
-/// Old clients still read the single theme: the id the appearance mode shows.
+/// slots and the favorites. Old clients still read the single theme: the id the appearance mode
+/// shows.
 #[test]
 fn pre_id_theme_names_read_as_ids_where_they_were_saved() {
     let mut s = Session::new();
     let saved = json!({
         "interface": {"appearanceMode": "dark", "darkTheme": "Pro (Medium Gray)", "lightTheme": "gnome", "favoriteThemes": ["breezeDark"]},
-        "shortcuts": {"window.theme.proMedium": "F9"},
-        "alternateShortcuts": {"window.theme.studioLight": ["F10"]},
-        "menus": {"colors": {"window.theme.classic": "red"}, "hidden": ["window.theme.pro"]}
     });
     s.load_prefs_json(&saved.to_string()).unwrap();
     let p = s.prefs();
     assert_eq!((p.interface.dark_theme.as_str(), p.interface.light_theme.as_str()), ("craft.artcraft", "craft.adwaita"));
     assert_eq!(p.interface.favorite_themes, ["craft.breeze"]);
-    assert!(p.shortcuts.contains_key("window.theme.dark.craft.artcraft"), "{:?}", p.shortcuts);
-    assert!(p.alternate_shortcuts.contains_key("window.theme.light.craft.studio"), "{:?}", p.alternate_shortcuts);
-    assert!(p.menus.colors.contains_key("window.theme.light.craft.classic"), "{:?}", p.menus.colors);
-    assert_eq!(p.menus.hidden, ["window.theme.dark.craft.pro"]);
     assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.artcraft"));
     s.execute("prefs.set", json!({"path": "interface.appearanceMode", "value": "light"})).unwrap();
     assert_eq!(s.execute("prefs.get", json!({"path": "interface.theme"})).unwrap(), json!("craft.adwaita"));
+}
+
+/// The four Window › Workspace commands that moved to the workspace set keep a binding saved
+/// under their old ids; other `window.workspace.*` ids read as saved.
+#[test]
+fn old_workspace_command_ids_read_as_the_workspace_set_ids() {
+    let mut s = Session::new();
+    let saved = json!({
+        "shortcuts": {"window.workspace.lockWorkspace": "F9", "window.workspace.motion": "F12"},
+        "alternateShortcuts": {"window.workspace.resetWorkspace": ["F10"]},
+        "menus": {"colors": {"window.workspace.newWorkspace": "red"}, "hidden": ["window.workspace.deleteWorkspace", "window.workspace.motion"]}
+    });
+    s.load_prefs_json(&saved.to_string()).unwrap();
+    let p = s.prefs();
+    assert_eq!(p.shortcuts.get("workspace.lock").map(String::as_str), Some("F9"), "{:?}", p.shortcuts);
+    assert_eq!(p.shortcuts.get("window.workspace.motion").map(String::as_str), Some("F12"));
+    assert!(!p.shortcuts.contains_key("window.workspace.lockWorkspace"));
+    assert_eq!(p.alternate_shortcuts.get("workspace.reset"), Some(&vec!["F10".to_string()]), "{:?}", p.alternate_shortcuts);
+    assert_eq!(p.menus.colors.get("workspace.new").map(String::as_str), Some("red"), "{:?}", p.menus.colors);
+    assert_eq!(p.menus.hidden, ["workspace.delete", "window.workspace.motion"]);
 }
 
 #[test]
@@ -507,6 +520,34 @@ fn menus_and_toolbar_customisation_persist() {
     s.execute("edit.toolbar", json!({"hidden": ["Sponge"]})).unwrap();
     let back: Preferences = serde_json::from_str(&s.prefs_to_json()).unwrap();
     assert_eq!(back.toolbar.hidden, vec!["Sponge".to_string()]);
+}
+
+// PLAN: the sheet has an old `order` key read into `slots` by alias; the set's decision (pn.PC4)
+// drops the flat field, so an old key reads as the default (empty) slots and the test asserts that.
+/// The Edit Toolbar drawer's arrangement saved as `toolbar.slots` reads back as saved; a file with
+/// the old flat `toolbar.order` loads cleanly with the default arrangement and keeps its hidden tools.
+#[test]
+fn toolbar_slots_round_trip_and_an_old_order_key_reads_as_slots() {
+    let mut s = session();
+    let slots = json!([
+        {"id": 3, "tools": ["Brush", "Pencil"], "groupEnd": false},
+        {"id": 0, "tools": ["Move"], "groupEnd": true},
+    ]);
+    s.execute("edit.toolbar", json!({"slots": slots})).unwrap();
+    let mut back = Session::new();
+    assert!(back.load_prefs_json(&s.prefs_to_json()).unwrap().is_empty());
+    let expected = vec![
+        SavedSlot { id: 3, tools: vec!["Brush".into(), "Pencil".into()], group_end: false },
+        SavedSlot { id: 0, tools: vec!["Move".into()], group_end: true },
+    ];
+    assert_eq!(back.prefs().toolbar.slots, expected);
+
+    let mut old = Session::new();
+    let invalid = old.load_prefs_json(&json!({"toolbar": {"hidden": ["Sponge"], "order": ["Move", "Brush"]}}).to_string()).unwrap();
+    assert!(invalid.is_empty(), "{invalid:?}");
+    assert!(old.prefs().toolbar.slots.is_empty());
+    assert_eq!(old.prefs().toolbar.hidden, ["Sponge"]);
+    assert!(old.prefs().get("toolbar.order").is_none());
 }
 
 /// #5096: Edit › Menus can't hide the way back into itself, Preferences, Save or Exit.

@@ -1,9 +1,7 @@
 //! Theme ids in the preferences: the dark and light slots and the favorites hold the ids of the
 //! Craft suite's themes. The theme names PhotoCraft took before ids (`proMedium`, `studioLight`,
-//! `Pro (Medium Gray)`, `gnome`, ...) read as their ids, in the slots, the favorites, `ui.set
-//! {theme}` and the command ids saved with shortcuts and menu colours.
-
-use std::collections::BTreeMap;
+//! `Pro (Medium Gray)`, `gnome`, ...) read as their ids, in the slots, the favorites and `ui.set
+//! {theme}`. Saved command ids go through [`command_id`].
 
 use craft::theme::ThemeId;
 use serde::{Deserialize, Deserializer};
@@ -47,15 +45,19 @@ pub fn parse(value: &str) -> Option<(ThemeId, Option<bool>)> {
     }
 }
 
-/// The command id a saved one names: the pre-id theme commands (`window.theme.proMedium`) read as
-/// `window.theme.dark.<id>` or `window.theme.light.<id>`; every other id reads as saved.
+/// The command id a saved one names: the four Window › Workspace commands that moved to the
+/// framework's workspace set read as their new ids, so a binding saved for one still matches a
+/// command. The match is on the whole id: other `window.workspace.*` ids (`window.workspace.motion`,
+/// a saved workspace's entry) read as saved. The old ids are never written.
 pub fn command_id(id: &str) -> String {
-    let theme = id.strip_prefix("window.theme.").filter(|name| !name.contains('.')).and_then(alias);
-    match theme {
-        Some((theme, true)) => format!("window.theme.dark.{theme}"),
-        Some((theme, false)) => format!("window.theme.light.{theme}"),
-        None => id.to_owned(),
+    match id {
+        "window.workspace.resetWorkspace" => "workspace.reset",
+        "window.workspace.newWorkspace" => "workspace.new",
+        "window.workspace.deleteWorkspace" => "workspace.delete",
+        "window.workspace.lockWorkspace" => "workspace.lock",
+        other => other,
     }
+    .to_owned()
 }
 
 pub(super) fn theme<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -66,12 +68,9 @@ pub(super) fn themes<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::
     Vec::<String>::deserialize(d).map(|v| v.iter().map(|s| id_of(s)).collect())
 }
 
+// PLAN: the sheet removes this adapter (L-27b), but `shortcut_sets.rs:32,35` (no set owns it) still
+// reads it for a saved set's keys; it stays until that file remaps its keys in `parse_prefs_json`.
 /// A map keyed by command id, with [`command_id`] applied to each key.
-pub(crate) fn command_keys<'de, D: Deserializer<'de>, V: Deserialize<'de>>(d: D) -> Result<BTreeMap<String, V>, D::Error> {
-    BTreeMap::<String, V>::deserialize(d).map(|map| map.into_iter().map(|(id, v)| (command_id(&id), v)).collect())
-}
-
-/// A list of command ids, with [`command_id`] applied to each.
-pub(crate) fn commands<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
-    Vec::<String>::deserialize(d).map(|v| v.iter().map(|id| command_id(id)).collect())
+pub(crate) fn command_keys<'de, D: Deserializer<'de>, V: Deserialize<'de>>(d: D) -> Result<std::collections::BTreeMap<String, V>, D::Error> {
+    std::collections::BTreeMap::<String, V>::deserialize(d).map(|map| map.into_iter().map(|(id, v)| (command_id(&id), v)).collect())
 }

@@ -107,7 +107,6 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
 /// Valid range of a numeric preference.
 pub fn range(path: &str) -> Option<(f64, f64)> {
     Some(match path {
-        "fileHandling.autosaveMinutes" => (1.0, 240.0),
         "actions.pauseSeconds" => (1.0, 60.0),
         "fileHandling.recentFileCount" => (0.0, 100.0),
         "tools.nudgeBundlePauseMs" => (100.0, 10_000.0),
@@ -245,6 +244,13 @@ pub(super) fn check_value(path: &str, v: &Value) -> std::result::Result<(), Stri
         let ok = v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 16 && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
         if !ok {
             return Err("`interface.language` must be `auto` or a language code such as `en` or `ja`".into());
+        }
+    }
+    if path == "fileHandling.autosaveMinutes" {
+        let choices = craft::platform::autosave::INTERVAL_CHOICES_MINUTES;
+        if !v.as_u64().is_some_and(|m| choices.iter().any(|c| u64::from(*c) == m)) {
+            let list = choices.map(|c| c.to_string()).join("|");
+            return Err(format!("`{path}` must be one of {list} (got {v})"));
         }
     }
     if let Some((lo, hi)) = range(path) {
