@@ -36,6 +36,8 @@ fn boxed(x0: f64, y0: f64, x1: f64, y1: f64, angle: f64) -> CropBox {
 
 fn drag(app: &mut PhotocraftApp, pts: &[[f64; 2]], mods: Modifiers) {
     let (first, last) = (pts[0], pts[pts.len() - 1]);
+    // The frame's handles take presses from the pass that drew them: a frame set since the last pass is shown first.
+    crate::canvas::testing::frame(app);
     tool_event(app, ToolEvent::Down { x: first[0], y: first[1], pressure: 1.0 }, mods);
     for p in &pts[1..] {
         tool_event(app, ToolEvent::Move { x: p[0], y: p[1], pressure: 1.0 }, mods);
@@ -114,6 +116,10 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
             tool(&mut app).crop_to(frame);
         }
         let before = (crop_ui::frame(&app), doc_size(&app));
+        // The engine names a crop that filled new area after the fill.
+        let canvas = Rect::new(0.0, 0.0, f64::from(before.1.width), f64::from(before.1.height));
+        let fills = app.ui.tool_options.crop.fill == CropFill::ContentAware && row.frame.is_some_and(|f| f.rect != f.rect.intersect(canvas));
+        let label = if fills { "Content-aware Crop" } else { "Crop" };
         let applied = crop_ui::apply(&mut app);
         let st = app.session.active().unwrap();
         match row.expect {
@@ -121,7 +127,7 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
                 assert!(applied, "{}", row.name);
                 assert_eq!((st.doc.size, st.doc.resolution_dpi), (size, dpi), "{}", row.name);
                 assert_eq!(st.doc.pixel_format().sample, row.depth, "{}", row.name);
-                assert_eq!(st.history.undo_label(), Some("Crop"), "{}", row.name);
+                assert_eq!(st.history.undo_label(), Some(label), "{}", row.name);
             }
             None => {
                 assert!(!applied, "{}", row.name);
@@ -171,6 +177,8 @@ fn history_jumps_wait_for_a_pending_crop() {
     app.run("image.canvasSize", json!({"width": 300, "height": 200})).unwrap();
     let snapshot = app.session.active().unwrap().snapshots[0].id;
     let frame = boxed(220.0, 120.0, 290.0, 190.0, 0.0);
+    // A pass first: the tool holds a frame for the document it was made for, which Discard drops.
+    crate::canvas::testing::frame(&mut app);
     tool(&mut app).crop_to(frame);
     for (cmd, p) in [
         ("history.selectState", json!({"state": 0})),
@@ -187,6 +195,7 @@ fn history_jumps_wait_for_a_pending_crop() {
     app.run("history.selectState", json!({"state": 0})).unwrap();
     assert_eq!(size(&app), Some((200, 100)));
     // Step Forward has a state to redo now; a pending frame holds it back too.
+    crate::canvas::testing::frame(&mut app);
     tool(&mut app).crop_to(boxed(10.0, 10.0, 50.0, 50.0, 0.0));
     assert!(app.run("history.stepForward", json!({})).is_err(), "history.stepForward waits for the crop");
     assert_eq!(size(&app), Some((200, 100)));
@@ -386,6 +395,7 @@ fn drawing_a_new_crop_snaps_its_corner_not_the_default_frame() {
         let mut app = board();
         app.ui.tool_options.crop.shield.classic_mode = classic;
         crop_ui::each_pass(&mut app);
+        crate::canvas::testing::frame(&mut app);
         let default = crop_ui::frame(&app);
         // A click without a drag changes nothing.
         drag(&mut app, &[[297.0, 150.0], [297.0, 150.0]], NONE);

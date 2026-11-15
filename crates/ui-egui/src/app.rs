@@ -230,6 +230,8 @@ impl PhotocraftApp {
         };
         // Saved preferences are in place before the first frame; recovery starts in upkeep.
         prefs_ui::load(&mut app);
+        // The workspace set reads the loaded preferences (and moves the earlier saves into it).
+        crate::workspace_ui::load(&mut app);
         layers_panel_ui::restore_options(&mut app);
         histogram_panel::restore_options(&mut app);
         // The dialogs' last-used values the preferences still hold move to the framework's saved

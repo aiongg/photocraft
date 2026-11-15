@@ -150,12 +150,10 @@ mod tests {
         app.ui.tool = crate::state::Tool::Crop;
         app.session.execute("history.stepBackward", json!({})).unwrap();
         assert!(on(&app, "history.stepBackward"), "no frame is drawn");
-        // PLAN: the sheet sets the frame with `CropTool::crop_to`, whose `CropBox` argument this set cannot build
-        // without tools-w45's helpers; the frame is drawn through the canvas drag instead. Also needs
-        // `crate::canvas::testing` visible to this module (cw.P2 declares it a private `mod testing`).
-        crate::canvas::testing::press(&mut app, [4.0, 4.0], egui::Modifiers::NONE);
-        crate::canvas::testing::move_to(&mut app, [40.0, 30.0], egui::Modifiers::NONE);
-        crate::canvas::testing::release(&mut app, [40.0, 30.0], egui::Modifiers::NONE);
+        // A pass first: the tool makes its default frame for the document, then the frame is set.
+        crate::canvas::testing::frame(&mut app);
+        let frame = craft::behavior::geometry::CropBox::new(craft::behavior::kurbo::Rect::new(4.0, 4.0, 40.0, 30.0), 0.0);
+        app.canvas_tools.crop.tool.crop_to(frame);
         assert!(crate::crop_ui::pending(&app), "the Crop tool holds a drawn frame");
         for id in ["history.stepBackward", "history.stepForward", "history.deleteState"] {
             assert!(!on(&app, id), "{id}");
