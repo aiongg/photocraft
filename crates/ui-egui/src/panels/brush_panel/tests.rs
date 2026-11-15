@@ -329,13 +329,6 @@ fn brush_and_eraser_size_fields_keep_sizes_above_2500_px() {
 }
 
 /// Runs the menu row `label` from the keyboard: focus it, then Enter.
-fn click_menu_item(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
-    h.get_by_label(label).focus();
-    h.run_steps(2);
-    h.key_press(egui::Key::Enter);
-    h.run_steps(2);
-}
-
 #[test]
 fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     let mut h = options_bar_harness(crate::state::Tool::MixerBrush);
@@ -364,7 +357,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     // Current Brush Load › Clean Brush empties the brush.
     h.get_by_label("Current brush load").click();
     h.run_steps(3);
-    click_menu_item(&mut h, "Clean Brush");
+    h.get_by_label("Clean Brush").click();
     h.run_steps(3);
     assert_eq!(last_journal(h.state()).map(|(id, _)| id), Some("brush.mixer.clean".to_string()));
     assert_eq!(h.state().session.tools.mixer.reservoir, None);
@@ -380,7 +373,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
     // Load Brush fills it with the foreground again.
     h.get_by_label("Current brush load").click();
     h.run_steps(3);
-    click_menu_item(&mut h, "Load Brush");
+    h.get_by_label("Load Brush").click();
     h.run_steps(3);
     assert_eq!(h.state().session.tools.mixer.reservoir, Some([0.0, 0.0, 1.0, 1.0]));
 }
@@ -774,7 +767,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     // A right-click on Width lists the units; Millimeters shows both sides in mm.
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(100.0)).unwrap().click_secondary();
     h.run_steps(3);
-    click_menu_item(&mut h, "Millimeters");
+    h.get_by_label("Millimeters").click();
     h.run_steps(4);
     let o = &h.state().ui.tool_options;
     assert_eq!(o.marquee_unit, "mm");
@@ -797,7 +790,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     // them (50 px at 254 ppi is 0.197 in, which reads back as 50.038 px).
     h.query_all_by_role(Role::SpinButton).find(|n| n.accesskit_node().numeric_value() == Some(5.0)).unwrap().click_secondary();
     h.run_steps(3);
-    click_menu_item(&mut h, "Inches");
+    h.get_by_label("Inches").click();
     h.run_steps(4);
     let field = h.query_all_by_role(Role::SpinButton).position(|n| n.accesskit_node().numeric_value().is_some_and(|v| (v - 0.19685).abs() < 1e-4)).unwrap();
     h.query_all_by_role(Role::SpinButton).nth(field).unwrap().click();
