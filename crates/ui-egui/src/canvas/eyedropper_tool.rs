@@ -147,8 +147,9 @@ impl CanvasTool for PcEyedropper<'_> {
         self.inner.cursor(cx)
     }
 
-    fn takes(&self, button: PointerButton, _mods: Mods) -> bool {
-        button == PointerButton::Primary
+    fn takes(&self, button: PointerButton, mods: Mods) -> bool {
+        // ⌘ is the Move stand-in's, here as with the painting tools.
+        button == PointerButton::Primary && (self.stand_in || !mods.cmd)
     }
 
     fn autoscrolls(&self) -> bool {
