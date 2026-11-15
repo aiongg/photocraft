@@ -252,11 +252,7 @@ pub(crate) fn drop_draft(app: &mut PhotocraftApp) {
 /// ended draft. Inside a pass the app holds stand-in tools and this does nothing; there the Pen reported the end
 /// itself.
 pub(crate) fn release_draft(app: &mut PhotocraftApp) {
-    let pen = &mut app.canvas_tools.vector.pen;
-    if pen.discard() {
-        // The app has no draft left for the Pen's cancel and discard to end.
-        let _ = pen.take_events();
-    }
+    app.canvas_tools.vector.pen.draft(None);
 }
 
 /// Keeps the draft the Pen reports. Drawing on deselects an anchor Auto Add put on the draft, and a shorter draft loses

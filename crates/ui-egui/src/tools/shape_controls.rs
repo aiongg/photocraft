@@ -343,9 +343,7 @@ fn commit_corners(app: &mut PhotocraftApp, targets: &[CornerTarget], change: Opt
     let Some(change) = change else { return };
     for edit in &change.targets {
         let Some(target) = targets.iter().find(|t| t.key == edit.key) else { continue };
-        // The widgets work in trigonometry, so a capped radius arrives a few ulps off (19.999999999999996): the
-        // document stores the radius to a millionth of a pixel.
-        let radii: Vec<f64> = edit.radii.iter().map(|r| (r * 1e6).round() / 1e6).collect();
+        let radii = &edit.radii;
         let params = if target.individual {
             json!({"layer": edit.key, "radii": radii, "coalesce": key})
         } else {

@@ -212,13 +212,13 @@ pub(crate) fn show_note_options(app: &mut PhotocraftApp, i: usize) {
 }
 
 /// The Color Sampler point under document point `at` on the active document, by the hit test a click uses (the
-/// tool's reach of 7 screen points), so the right-click menu acts on the sampler a click would grab.
+/// tool's reach), so the right-click menu acts on the sampler a click would grab.
 pub(crate) fn sampler_at(app: &PhotocraftApp, at: [f64; 2]) -> Option<usize> {
     if !at.iter().all(|v| v.is_finite()) {
         return None;
     }
     let (samplers, _) = canvas::samplers_of(app)?;
-    samplers.hit(at, 7.0 / f64::from(app.point_zoom().max(0.01)))
+    samplers.hit(at, app.tool_reach())
 }
 
 /// Show a command error in the status bar without treating the sample-limit message as a fault.

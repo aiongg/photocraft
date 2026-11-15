@@ -18,10 +18,6 @@ use super::sampling;
 use super::tools::{FamilyTool, ToolScope};
 use crate::PhotocraftApp;
 
-/// The distance in screen points within which a Shift+Alt press is on an existing colour sampler:
-/// the Color Sampler tool's reach.
-const SAMPLER_REACH: f64 = 7.0;
-
 /// The gesture's flags, kept in `CanvasTools::eyedropper`.
 #[derive(Debug, Default)]
 pub(crate) struct EyedropperState {
@@ -107,7 +103,7 @@ impl<'a> PcEyedropper<'a> {
 
 /// Whether document point (x, y) is on a colour sampler, within the Color Sampler tool's reach of one.
 fn on_sampler(app: &PhotocraftApp, x: f64, y: f64) -> bool {
-    let tol = SAMPLER_REACH / f64::from(app.point_zoom().max(0.01));
+    let tol = app.tool_reach();
     app.session.active().is_some_and(|d| d.color_samplers.iter().any(|q| (q[0] - x).hypot(q[1] - y) <= tol))
 }
 
