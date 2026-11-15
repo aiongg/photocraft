@@ -1,11 +1,8 @@
 pub(super) mod alt_grab;
 pub(super) mod blend_keys;
-pub(super) mod control_click;
 pub mod hold_keys;
-pub(super) mod layout_keys;
 pub mod nudge_bundle;
 pub(super) mod opacity_keys;
-pub(super) mod page_keys;
 pub(super) mod scrub_wrap;
 pub mod shortcut_dispatch;
 pub mod shortcuts;

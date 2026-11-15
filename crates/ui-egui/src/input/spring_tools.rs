@@ -1,6 +1,6 @@
 //! Spring-loaded tool keys (#2672): hold a tool's letter for a temporary tool.
 //!
-//! A tool letter switches tools when it is pressed, as before (`shortcuts::handle`). If the key is
+//! A tool letter switches tools when its command fires (`shortcut_dispatch::run_fired`). If the key is
 //! then held for [`SPRING_HOLD_SECS`] or longer, or the canvas is used while it is down, the switch
 //! was only temporary: releasing the key gives back the tool in effect before the press, with its
 //! options. A quick tap with no canvas use stays a permanent switch.
@@ -12,14 +12,14 @@
 //!   previous tool returns once the button is up (as `hold_keys` latches Space).
 //! - Another letter pressed while one is held wins (newest first); releasing every held letter
 //!   returns the original tool. Holding two letters at once counts as a hold.
-//! - Key repeats are not presses: `shortcuts::handle` drops them for tool letters.
+//! - Key repeats are not presses: the runtime fires them as `FirePhase::Repeat`, which no tool letter acts on.
+//! - The key-up is the command's `FirePhase::Release` ([`released`]); nothing polls key state.
 //!
 //! Z is one case: hold Z to zoom, add ⌥ to zoom out, as with the Zoom tool itself (and as
 //! `hold_keys` does for ⌥ with a held Zoom In).
 //!
 //! The state is [`crate::state::UiState::spring`], readable over the control channel.
 
-use egui::Key;
 use serde::{Deserialize, Serialize};
 
 use crate::PhotocraftApp;
@@ -47,17 +47,20 @@ pub struct Spring {
     pub released: bool,
 }
 
-/// The egui key of a tool letter (`None` for the tools without one).
-pub fn key_of(letter: char) -> Option<Key> {
+/// The egui key of a tool letter (`None` for the tools without one), for the tests that press it.
+#[cfg(test)]
+pub fn key_of(letter: char) -> Option<egui::Key> {
     if letter == '\0' {
         return None;
     }
-    Key::from_name(&letter.to_string())
+    egui::Key::from_name(&letter.to_string())
 }
 
-/// Is `k` some tool's single-key shortcut?
-pub fn is_tool_key(k: Key) -> bool {
-    Tool::ALL.iter().any(|t| key_of(t.key()) == Some(k))
+/// The key `letter` came up (its tool command's `FirePhase::Release`): it no longer counts as held.
+pub fn released(app: &mut PhotocraftApp, letter: char) {
+    if let Some(s) = app.ui.spring.as_mut() {
+        s.keys.retain(|k| *k != letter);
+    }
 }
 
 /// A tool letter switched the tool from `before` (the switch is already made). `plain` is false
@@ -95,8 +98,8 @@ pub fn note_canvas_press(app: &mut PhotocraftApp) {
     }
 }
 
-/// Once a frame, before the key handling: notice released letters and give the previous tool
-/// back when the switch was temporary and no drag is in progress.
+/// Once a pass, after the fired commands ran ([`released`] has taken the letters that came up): give the previous
+/// tool back when the switch was temporary and no drag is in progress.
 pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(mut s) = app.ui.spring.take() else { return };
     // Type editing begun with the temporary Type tool keeps it: the edit owns the tool now. So
@@ -105,12 +108,12 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     let (now, button) = ctx.input(|i| (i.time, i.pointer.any_down()));
-    let dragging = app.drag.is_some() || button;
+    let in_gesture = crate::canvas::tools::in_gesture(app);
+    let dragging = in_gesture || button;
     if !s.released {
-        if app.drag.is_some() {
+        if in_gesture {
             s.used = true;
         }
-        s.keys.retain(|k| key_of(*k).is_some_and(|k| ctx.input(|i| i.key_down(k))));
         if !s.keys.is_empty() {
             app.ui.spring = Some(s);
             return;
