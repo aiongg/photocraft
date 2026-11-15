@@ -77,7 +77,7 @@ fn a_logic_tick_requests_a_hidden_paint_for_waiting_captures_and_queued_input() 
     let document = app.document_identity();
     let (_transport, requests) = std::sync::mpsc::channel();
     let mut channel = craft::automation::ControlChannel::new(requests);
-    channel.captures.admit(90, None, tx, document, 0.0, craft::ui::runtime::motion::now()).expect("parked before the first pass");
+    channel.captures.admit(90, None, egui::ViewportId::ROOT, tx, document, 0.0, craft::ui::runtime::motion::now()).expect("parked before the first pass");
     app.control = Some(channel);
     let out = ctx.run_logic(&host_input(egui::ViewportId::ROOT), |ctx| app.logic(ctx, &mut frame));
     assert!(paints(&out), "a capture waiting for geometry keeps the hidden window painting");

@@ -79,10 +79,10 @@ fn actual_callback_fixture() -> ActualCallbackFixture {
     for _ in 0..4 {
         actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
     }
-    let old_geometry = captures(&app).last_geometry().expect("the old real UI geometry");
+    let old_geometry = captures(&app).last_geometry(ViewportId::ROOT).expect("the old real UI geometry");
     let document = app.document_identity();
     let (tx, reply) = std::sync::mpsc::channel();
-    captures_mut(&mut app).admit(91, Some("fixture/current.png".into()), tx, document, 0.0, motion::now()).unwrap();
+    captures_mut(&mut app).admit(91, Some("fixture/current.png".into()), ViewportId::ROOT, tx, document, 0.0, motion::now()).unwrap();
     let mut callback = None;
     for _ in 0..8 {
         let output = actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
@@ -121,7 +121,7 @@ fn verify_changed_capture(fixture: &mut ActualCallbackFixture, size: egui::Vec2,
     let output = actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, minimized);
     assert!(fixture.writes.borrow().is_empty(), "no stale write on the first changed input");
     assert!(fixture.old_pixels.upgrade().is_none(), "old pixels are released on geometry rejection");
-    let current = captures(&fixture.app).last_geometry().unwrap();
+    let current = captures(&fixture.app).last_geometry(ViewportId::ROOT).unwrap();
     assert!(
         current.size_points != fixture.old_geometry.size_points
             || current.pixels_per_point != fixture.old_geometry.pixels_per_point
@@ -155,11 +155,11 @@ fn verify_minimized_capture(fixture: &mut ActualCallbackFixture, size: egui::Vec
     assert!(actual_callback(output).is_none());
     actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, false);
     let (tx, restored_rx) = std::sync::mpsc::channel();
-    captures_mut(&mut fixture.app).admit(92, Some("fixture/restored.png".into()), tx, fixture.document, 0.0, motion::now()).unwrap();
+    captures_mut(&mut fixture.app).admit(92, Some("fixture/restored.png".into()), ViewportId::ROOT, tx, fixture.document, 0.0, motion::now()).unwrap();
     for _ in 0..8 {
         let output = actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, false);
         if let Some(callback) = actual_callback(&output) {
-            callback.complete(Arc::new(ColorImage::filled(captures(&fixture.app).last_geometry().unwrap().expected_pixels().unwrap(), Color32::BLUE)));
+            callback.complete(Arc::new(ColorImage::filled(captures(&fixture.app).last_geometry(ViewportId::ROOT).unwrap().expected_pixels().unwrap(), Color32::BLUE)));
             break;
         }
     }
@@ -206,7 +206,7 @@ fn a_launch_and_capture_request_waits_for_the_first_ui_pass() {
         assert!(Instant::now() < give_up, "the request was never issued");
         std::thread::sleep(Duration::from_millis(20));
     };
-    let geometry = captures(&app).last_geometry().expect("the first pass recorded the geometry");
+    let geometry = captures(&app).last_geometry(ViewportId::ROOT).expect("the first pass recorded the geometry");
     callback.complete(Arc::new(ColorImage::filled(geometry.expected_pixels().unwrap(), Color32::RED)));
     actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
     let reply = reply.try_recv().expect("one answer after the image");
@@ -236,9 +236,9 @@ fn a_capture_in_flight_follows_the_app_document_identity() {
         };
         let admitted = app.document_identity();
         let mut queue = Captures::default();
-        queue.note_geometry(geometry(admitted));
+        queue.note_geometry(ViewportId::ROOT, geometry(admitted));
         let (tx, _reply) = std::sync::mpsc::channel();
-        queue.admit(1, None, tx, admitted, 0.0, now).unwrap();
+        queue.admit(1, None, ViewportId::ROOT, tx, admitted, 0.0, now).unwrap();
         for _ in 0..SETTLE_PASSES {
             queue.note_pass();
         }
@@ -253,8 +253,8 @@ fn a_capture_in_flight_follows_the_app_document_identity() {
         }
         let current = app.document_identity();
         assert_ne!(current, admitted, "{name}: the identity moved");
-        queue.note_geometry(geometry(current));
-        let finished = queue.drain(now, Some(geometry(current)), current);
+        queue.note_geometry(ViewportId::ROOT, geometry(current));
+        let finished = queue.drain(now, current);
         assert_eq!(finished.len(), 1, "{name}");
         assert_eq!(finished[0].result.is_ok(), captured, "{name}: {:?}", finished[0].result.as_ref().err());
     }
