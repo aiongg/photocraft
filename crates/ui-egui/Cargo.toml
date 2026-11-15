@@ -76,8 +76,6 @@ tempfile = "3"
 # The framework's test helpers, e.g. the thumbnail and fx badge rects of a Layers panel row
 # (`craft::layers::testing`).
 craft = { workspace = true, features = ["screen-testing"] }
-# `craft::settings::testing` (the in-memory `MemoryFiles`) is behind craft-settings' own `testing` feature, which the facade does not forward.
-craft-settings = { workspace = true, features = ["testing"] }
 
 [build-dependencies]
 serde_json = { workspace = true }
