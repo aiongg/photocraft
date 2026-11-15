@@ -11,7 +11,7 @@ use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _
 use craft::ui::display::Divider;
 use craft::ui::form::Field;
 use craft::ui::menu::Menu;
-use craft::ui::runtime::env::Label;
+use craft::ui::runtime::env::{Label, WheelScope, with_env};
 use craft::ui::text::NumberField;
 use photocraft_paint::BrushSettings;
 
@@ -98,7 +98,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(ending) = &ending {
         bar = bar.commit_cancel(ending.commit.clone(), ending.cancel.clone());
     }
-    let shown = bar.show(ui, |ui, _| body(app, ui));
+    // A value control of the bar takes the wheel without a click, as the Mode dropdown and the fields did.
+    let shown = bar.show(ui, |ui, _| with_env(ui, |set| set.wheel = Some(WheelScope::Free), |ui| body(app, ui)));
     if let Some(ending) = ending {
         answer(app, ui, tool, ending.end, &shown.output);
     }
