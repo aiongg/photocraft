@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 
-use super::{CameraRaw, PhotocraftApp, RawOpen, commit_open_raw, finish_redevelop, queue_open_dialog, replace_raw_document};
+use craft::imaging::raw::RawDevelopSettings as CameraRaw;
+
+use super::open::{RawOpen, commit_open_raw, finish_redevelop, queue_open_dialog, replace_raw_document};
+use crate::PhotocraftApp;
 
 fn synthetic_raw() -> Vec<u8> {
     use photocraft_raw::testgen::{DngSpec, mosaic, scene};
