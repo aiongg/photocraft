@@ -105,7 +105,7 @@ pub(super) fn document_window_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui,
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(crate::theme::Tokens::get(ui.ctx()).canvas)).show(ui, |ui| {
         let rect = ui.available_rect_before_wrap();
         let host = CanvasHost { idx: doc, viewport: ui.ctx().viewport_id(), window: Some(window) };
-        out = (canvas_view(app, ui, host, rect, view, focused), rect);
+        out = (canvas_view(app, ui, host, rect, view, focused).0, rect);
     });
     out
 }

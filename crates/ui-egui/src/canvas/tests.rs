@@ -428,7 +428,7 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
         let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
         let mut seen = view0.clone();
         let mut out = ctx.run_ui(input, |ui| {
-            seen = canvas_view(app, ui, CanvasHost::main(0), rect, view0.clone(), false);
+            (seen, _) = canvas_view(app, ui, CanvasHost::main(0), rect, view0.clone(), false);
         });
         out.textures_delta.clear();
         seen
