@@ -203,7 +203,6 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let surf = preview.run(&work).map_err(|e| e.to_string())?;
             let [w, h] = preview.size();
-            // PLAN: `read_surface` lives in `transform_tool/preview.rs` (tools-w28); it needs a `pub(crate) use preview::read_surface` in `transform_tool.rs` (tools-w27's re-export list) for this path.
             Ok(crate::transform_tool::read_surface(&surf, photocraft_geom::Rect::from_xywh(0, 0, w, h), usize::MAX).0)
         }))
         .unwrap_or_else(|_| Err("Content-Aware Scale preview failed".into()));
@@ -243,7 +242,7 @@ pub fn fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &FreeTransform) {
     Field::new(tl!("Protect")).layout(caption).sizing(Sizing::Content).show(ui, |ui, _| {
         let channels: Vec<String> = app.session.active().map(|st| st.doc.channels.iter().map(|c| c.name.clone()).collect()).unwrap_or_default();
         let mut entries: Vec<Entry<Option<String>>> = vec![Entry::new(None, tl!("None"))];
-        entries.extend(channels.iter().map(|name| Entry::new(Some(name.clone()), name.as_str())));
+        entries.extend(channels.iter().map(|name| Entry::new(Some(name.clone()), name.clone())));
         let pick = Select::new(tl!("Protect"), Bind::given(o.protect.clone()), &entries).sizing(Sizing::Content).show(ui);
         if let Some(protect) = pick.value() {
             next.protect = protect.clone();

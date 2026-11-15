@@ -254,7 +254,7 @@ pub fn apply(app: &mut PhotocraftApp, r: Detection) {
     let advice = crate::i18n::fmt(tl!(template), &[("display", &names.join(", "))]);
     let mut lines: Vec<String> = fresh.into_iter().map(|(_, _, reason)| reason).collect();
     lines.push(advice);
-    crate::notices::post(app, FALLBACK_TITLE, lines, true, None);
+    crate::notices::post(app, FALLBACK_TITLE, lines, craft::theme::variant::Tone::Bad, None);
 }
 
 /// The frame of the window `ctx` draws, in OS points (as `Display::frame`). egui reports it in

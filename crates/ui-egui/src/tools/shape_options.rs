@@ -4,7 +4,7 @@ use craft::behavior::{EditEvent, Mixed};
 use craft::draw::stroke::StrokeStyle;
 use craft::draw::ui::shape::{ShapeAppearance, ShapeBar, ShapeChange, ShapePaint, ShapeToolSettings};
 use craft::draw::ui::shape_drag::ShapeKind;
-use craft::ui::contract::Bind;
+use craft::ui::contract::{Bind, Show as _};
 use craft::ui::dialog::{Alert, HostedAlert};
 use craft::ui::runtime::env::Env;
 use photocraft_doc::{Fill, LayerContent};

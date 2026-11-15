@@ -217,7 +217,7 @@ fn pending_row(ui: &mut egui::Ui, label: &str, checked: Option<bool>) {
             Checkbox::new(Bind::given(on)).label(tl!(label).to_owned()).enabled(false).tooltip(reason).show(ui);
         }
         None => {
-            Button::new(tl!(label)).enabled(false).tooltip(reason).show(ui);
+            Button::new(tl!(label).to_owned()).enabled(false).tooltip(reason).show(ui);
         }
     }
 }

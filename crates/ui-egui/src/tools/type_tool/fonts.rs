@@ -175,15 +175,18 @@ pub(crate) struct FontFieldOutput {
 /// The family field of the Styles panels: a `FontPicker` over the catalog and [`font_state`].
 pub(crate) fn font_field(app: &mut PhotocraftApp, ui: &mut egui::Ui, label: impl Into<Label>, family: &mut String) -> FontFieldOutput {
     let mut state = font_state(app);
-    let source = state.source();
-    let mut picker = FontPicker::new(label, Bind::given(family.clone()), source.catalog)
-        .settings(source.settings.reborrowed())
-        .filters(source.filters.reborrowed())
-        .served(source.served);
-    if let Some(text) = source.preview_text {
-        picker = picker.preview_text(text);
-    }
-    let out = picker.show(ui);
+    // The source borrows `state`; it ends with the pass's picker, before `finish_font_state` takes the state.
+    let out = {
+        let mut source = state.source();
+        let mut picker = FontPicker::new(label, Bind::given(family.clone()), source.catalog)
+            .settings(source.settings.reborrowed())
+            .filters(source.filters.reborrowed())
+            .served(source.served);
+        if let Some(text) = source.preview_text {
+            picker = picker.preview_text(text);
+        }
+        picker.show(ui)
+    };
     // A served family is fetched once the pointer or keyboard rests on it, and at the latest when it is picked.
     if let Some(rested) = &out.rested {
         photocraft_text::served::request(rested);

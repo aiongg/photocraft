@@ -436,7 +436,7 @@ fn release_content(app: &mut PhotocraftApp, c: &ContentPress, to: KPoint, mods: 
         let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
         edits.push(TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after)));
     }
-    crate::transform_tool::commit::auto_commit(app, &edits);
+    crate::transform_tool::auto_commit(app, &edits);
 }
 
 fn cancel_content(app: &mut PhotocraftApp, c: &ContentPress, reason: CancelReason, time: f64) {

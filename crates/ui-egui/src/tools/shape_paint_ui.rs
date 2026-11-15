@@ -1,8 +1,15 @@
 //! Shape fill and stroke paints shared by the options bar and the Properties panel.
 
-use craft::color::ui::{GradientPreview, Paint};
+use craft::color::palette::SwatchGroup;
+use craft::color::ui::{GradientPreview, Paint, PaintChip, PaintChipOutput, SwatchKey};
+use craft::draw::stroke::StrokeStyle;
+use craft::draw::ui::shape::{ShapeAppearance, ShapePaint};
 use craft::theme::Srgba;
+use craft::ui::contract::{Bind, Show as _};
+use craft::ui::patterns::presets::PresetState;
 use serde_json::{Value, json};
+
+use crate::shape_stroke_ui::StrokeOptions;
 
 pub(crate) fn color_of(f: &photocraft_doc::Fill) -> Option<[f32; 4]> {
     match f {
@@ -65,4 +72,45 @@ pub(crate) fn paint_of(fill: Option<&photocraft_doc::Fill>) -> Paint {
         Some(f @ photocraft_doc::Fill::Gradient { .. }) => Paint::Gradient(gradient_preview(f)),
         _ => Paint::None,
     }
+}
+
+/// The `shape.edit` parameter of a chip's `paint`: a colour as float RGBA, a gradient as its stops, `null` for No
+/// Color or a paint the shape tools do not offer (a pattern or picture).
+pub(crate) fn fill_param(paint: &Paint) -> Value {
+    match paint {
+        Paint::Solid(c) => json!(rgba(*c)),
+        Paint::Gradient(preview) => {
+            let stops: Vec<Value> = preview.stops.iter().map(|(t, c)| json!([t, photocraft_doc::Color::rgba(c.r, c.g, c.b, c.a)])).collect();
+            json!({"gradient": {"stops": stops}})
+        }
+        _ => Value::Null,
+    }
+}
+
+/// The colour of a solid `paint`, for the Recently Used Colors.
+pub(crate) fn solid_rgb(paint: &Paint) -> Option<[f32; 3]> {
+    match paint {
+        Paint::Solid(c) => Some([c.r, c.g, c.b]),
+        _ => None,
+    }
+}
+
+/// What the Shape Properties panel and the shape options bar show for shape layer `sh`; `locked` disables every field.
+pub(crate) fn appearance_of(sh: &photocraft_doc::ShapeLayer, locked: bool) -> ShapeAppearance {
+    let width = sh.stroke.as_ref().map_or(0.0, |s| s.width);
+    let style = sh.stroke.as_ref().map(|s| StrokeStyle::from(&StrokeOptions::from(s))).unwrap_or_default();
+    ShapeAppearance::new(paint_of(sh.fill.as_ref()), paint_of(sh.stroke.as_ref().map(|s| &s.paint)), f64::from(width)).stroke_style(style).locked(locked)
+}
+
+/// The Fill or Stroke chip of the Shape Properties panel: the Recently Used Colors, the swatch library and the full
+/// Color Picker. `which` is the chip's own paint; the chip has no Gradient tab here.
+pub(crate) fn decorate_chip<'a>(
+    chip: PaintChip<'a>,
+    _which: ShapePaint,
+    recent: &'a [Srgba],
+    swatches: &'a [SwatchGroup],
+    folders: &'a mut PresetState<SwatchKey>,
+    ui: &mut egui::Ui,
+) -> PaintChipOutput {
+    chip.recent(recent).swatches(swatches, Bind::bound(folders)).full_picker(true).show(ui)
 }

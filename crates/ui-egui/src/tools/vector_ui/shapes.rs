@@ -396,7 +396,7 @@ pub fn show_preview(app: &PhotocraftApp, ui: &egui::Ui, at: egui::Rect, view: &C
 }
 
 /// A click of a Shape tool: the Create Shape dialog for the clicked kind, none in Path mode.
-pub fn click(app: &mut PhotocraftApp, kind: ShapeKind, at: [f64; 2]) -> Option<craft::ui::panels::dialog::DialogId> {
+pub fn click(app: &mut PhotocraftApp, kind: ShapeKind, at: [f64; 2]) -> Option<craft::ui::dialog::DialogId> {
     if draws_path(&app.ui.tool_options) {
         return None;
     }

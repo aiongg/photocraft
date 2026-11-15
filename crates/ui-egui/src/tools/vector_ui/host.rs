@@ -149,7 +149,9 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut VectorTools, _response:
         match event {
             PathSelectionEvent::Press { at, shift } => {
                 crate::path_components::press(app, at, shift);
-                state.path_selection.owned_by(VectorOwner::capture(app));
+                if let Some(owner) = VectorOwner::capture(app) {
+                    state.path_selection.owned_by(owner);
+                }
             }
             PathSelectionEvent::Release { start, end, owner } => {
                 if owner.is_none_or(|o| o.valid(app)) {

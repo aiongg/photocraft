@@ -20,10 +20,14 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         (tool.straighten_armed(), tool.frame().map(|f| f.angle), tool.modified(), tool.shows_selection_entry(&settings))
     };
     let words = words(app);
-    let out = CropBar::new(&mut settings, &document)
+    let mut crop_bar = CropBar::new(&mut settings, &document);
+    // Without a frame the Angle field stays disabled.
+    if let Some(angle) = angle {
+        crop_bar = crop_bar.angle(angle);
+    }
+    let out = crop_bar
         .user_presets(&users)
         .straighten(armed)
-        .angle(angle)
         .selection_entry(entry)
         .selection_chosen(entry)
         .can_reset(modified)

@@ -94,7 +94,7 @@ impl PhotocraftApp {
         type_tool::end_if_left(self);
         transform_tool::end_if_left(self);
         prefs_ui::tick(self, ctx, std::time::Instant::now());
-        updates_ui::tick(self, ctx);
+        updates_ui::tick(self);
         monitor_status::poll_frame(self, ctx, frame);
         // Control requests and persisted preferences can change the language in this frame.
         i18n::sync_context(ctx, &self.session.prefs().interface.language);
@@ -220,8 +220,7 @@ impl PhotocraftApp {
         // Step by Step and Pause For: play an action's next step once its wait is over (Esc ends it).
         crate::actions::playback::tick(self, &ctx);
         // View › Screen Mode › Full Screen Mode: only the image, on black (F or Esc returns).
-        screen_picker::show(&ctx);
-        if screen_picker::busy(&ctx) {
+        if screen_picker::busy(self) {
             ui.disable();
             ui.set_opacity(1.0);
         }
@@ -262,6 +261,7 @@ impl PhotocraftApp {
         updates_ui::show(self, &ctx);
         crate::dialogs::run(self, ui);
         canvas::extra_windows(self, ui);
+        screen_picker::show(self, ui);
         smart_svg_ui::poll(self, &ctx);
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);

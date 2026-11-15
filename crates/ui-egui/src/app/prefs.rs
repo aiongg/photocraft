@@ -75,12 +75,12 @@ impl PhotocraftApp {
 
     /// [`setup_context`](Self::setup_context) for a window whose frame the platform decided
     /// (`decision`): the runtime installs the frame's look with the fonts.
-    pub fn setup_window(ctx: &egui::Context, theme: theme::AppTheme, decision: craft_window::policy::Decision) {
+    pub fn setup_window(ctx: &egui::Context, theme: theme::AppTheme, decision: craft::window::policy::Decision) {
         Self::setup(ctx, theme, Some(decision));
     }
 
     /// The one setup both entry points run.
-    fn setup(ctx: &egui::Context, theme: theme::AppTheme, frame: Option<craft_window::policy::Decision>) {
+    fn setup(ctx: &egui::Context, theme: theme::AppTheme, frame: Option<craft::window::policy::Decision>) {
         crate::icons::register();
         theme::install_runtime(ctx, frame);
         egui_extras::install_image_loaders(ctx);

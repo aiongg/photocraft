@@ -20,9 +20,9 @@ const COLOR_TIP: &str = "Adjust how much the source color can be modified";
 
 /// A check box over `value`, with an optional tooltip.
 pub(super) fn check(ui: &mut egui::Ui, label: &str, value: &mut bool, enabled: bool, tip: Option<&str>) {
-    let mut cell = Checkbox::new(Bind::given(*value)).label(label).enabled(enabled);
+    let mut cell = Checkbox::new(Bind::given(*value)).label(label.to_owned()).enabled(enabled);
     if let Some(tip) = tip {
-        cell = cell.tooltip(tip);
+        cell = cell.tooltip(tip.to_owned());
     }
     if let Some(on) = cell.show(ui).value().copied() {
         *value = on;
@@ -40,9 +40,9 @@ pub(super) fn choose<T: Value + Clone + 'static>(
 ) {
     let picked = Field::new(caption)
         .show(ui, |ui, _| {
-            let mut cell = Select::new(caption, Bind::given(value.clone()), entries).enabled(enabled);
+            let mut cell = Select::new(caption.to_owned(), Bind::given(value.clone()), entries).enabled(enabled);
             if let Some(tip) = tip {
-                cell = cell.tooltip(tip);
+                cell = cell.tooltip(tip.to_owned());
             }
             cell.show(ui).value().cloned()
         })
@@ -55,15 +55,15 @@ pub(super) fn choose<T: Value + Clone + 'static>(
 
 /// The entries of a string option from `(engine value, label)` pairs.
 pub(super) fn string_entries(items: &[(&str, &str)]) -> Vec<Entry<String>> {
-    items.iter().map(|(value, label)| Entry::new((*value).to_owned(), *label)).collect()
+    items.iter().map(|(value, label)| Entry::new((*value).to_owned(), (*label).to_owned())).collect()
 }
 
 /// A radio group over a string option.
 fn radios(ui: &mut egui::Ui, label: &str, value: &mut String, items: &[(&str, &str)]) {
-    let picked = RadioGroup::new(label, Bind::given(value.clone()))
+    let picked = RadioGroup::new(label.to_owned(), Bind::given(value.clone()))
         .show(ui, |ui, _| {
             for (v, l) in items {
-                Radio::new((*v).to_owned()).label(*l).show(ui);
+                Radio::new((*v).to_owned()).label((*l).to_owned()).show(ui);
             }
         })
         .output

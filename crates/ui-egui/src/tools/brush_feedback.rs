@@ -7,7 +7,8 @@
 use craft::behavior::geometry::Homography;
 use craft::behavior::kurbo::Point;
 use craft::ui::canvas::RasterDisplay;
-use craft::ui::canvas_controls::{SourceMarker, StraightLinePreview};
+use craft::ui::canvas_controls::StraightLinePreview;
+use craft::ui::canvas_controls::brush::SourceMarker;
 use craft::ui::contract::Show as _;
 
 use crate::PhotocraftApp;
@@ -24,7 +25,7 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp, rect: egui::Rect,
     show_smoothing_string(ui, app);
     crate::object_finder::show(ui, app, at);
     if let Some(at) = at {
-        let shift = crate::modifier_keys::held_mods(ui.ctx()).shift;
+        let shift = craft::ui::runtime::pointer::frame(ui.ctx()).mods.shift;
         let tool = app.ui.tool;
         crate::stroke_constraint::show_line_preview(ui, app, at, tool, shift);
     }
@@ -46,7 +47,7 @@ fn show_clone_overlay(ui: &mut egui::Ui, app: &mut PhotocraftApp, at: Option<Poi
     if !matches!(app.ui.tool, Tool::CloneStamp | Tool::Healing) {
         return;
     }
-    if app.brush_resize.active() || crate::modifier_keys::held_mods(ui.ctx()).alt {
+    if app.brush_resize.active() || craft::ui::runtime::pointer::frame(ui.ctx()).mods.alt {
         return;
     }
     let Some(source) = crate::canvas::strokes::clone_source(app, [at.x, at.y]) else { return };

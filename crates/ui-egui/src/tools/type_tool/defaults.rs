@@ -208,7 +208,7 @@ pub(super) fn apply(app: &mut PhotocraftApp, props: serde_json::Value, coalesce:
 
 /// Open the shared Color Picker with a snapshot of the text target. Sampling or cancelling
 /// the dialog never changes the text selection, tool colours, or document history.
-pub fn open_color_picker(app: &mut PhotocraftApp, rgb: [f32; 3]) -> crate::dialogs::DialogId {
+pub fn open_color_picker(app: &mut PhotocraftApp, rgb: [f32; 3]) -> craft::ui::dialog::DialogId {
     if let Some(params) = formatting_params(app) {
         crate::color_picker_ui::open_for_command(app, "Color Picker (Text Color)", rgb, "type.setStyle", params)
     } else {

@@ -161,7 +161,13 @@ fn show_warp(t: &FreeTransform, pv: &OpenPreview, w: &SessionWarp, ui: &mut egui
     let preset = one_patch && !matches!(w.warp.style, WarpStyle::None | WarpStyle::Custom);
     // No splits on type (#3004).
     let split = pv.split.filter(|_| !w.on_type);
-    let mut grid = WarpGrid::new("Warp grid", Bind::given(w.mesh.clone()), t.session.rect()).preset(preset).lines_only(w.on_type);
+    let mut grid = WarpGrid::new("Warp grid", Bind::given(w.mesh.clone()), t.session.rect());
+    if preset {
+        grid = grid.preset();
+    }
+    if w.on_type {
+        grid = grid.lines_only();
+    }
     if let Some(split) = split {
         grid = grid.split(split);
     }

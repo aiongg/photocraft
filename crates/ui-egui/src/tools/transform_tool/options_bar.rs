@@ -45,7 +45,10 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if let Some(w) = t.session.warp() {
             let (values, on_type) = (warp_values(w), w.on_type);
             bar = bar.warp_fields(BarSlot::new(|ui| {
-                let mut fields = WarpFields::new(&styles, values.clone()).on_type(on_type);
+                let mut fields = WarpFields::new(&styles, values.clone());
+                if on_type {
+                    fields = fields.on_type();
+                }
                 if let Some(armed) = split {
                     fields = fields.split(armed);
                 }

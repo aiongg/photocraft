@@ -119,7 +119,7 @@ fn clear_confirmed(app: &mut PhotocraftApp, document: u64) -> Result<(), String>
         return Err(tl!("The document changed. Please choose Clear All again.").into());
     }
     app.run("notes.delete", json!({"all": true}))?;
-    let defaults = crate::analysis_ui::AnalysisUi::default();
+    let defaults = super::AnalysisUi::default();
     let a = &mut app.ui.analysis;
     (a.note_selected, a.note_author, a.note_color) = (None, defaults.note_author, defaults.note_color);
     Ok(())

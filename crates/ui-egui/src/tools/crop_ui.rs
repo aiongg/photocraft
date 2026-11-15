@@ -62,7 +62,7 @@ pub(crate) fn document(app: &PhotocraftApp) -> Option<CropDocument> {
     let selection = st.doc.selection.as_ref().map(|s| s.content_bounds().intersect(&canvas)).filter(|b| !b.is_empty());
     let bounds = selection.map(|b| Rect::new(f64::from(b.x0), f64::from(b.y0), f64::from(b.x1), f64::from(b.y1)));
     let size = Size::new(f64::from(st.doc.size.width), f64::from(st.doc.size.height));
-    Some(CropDocument::new(CropDocKey(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)).selection(bounds))
+    Some(CropDocument::new(CropDocKey::new(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)).selection(bounds))
 }
 
 /// Whether the New Crop Preset… row can save the current options.

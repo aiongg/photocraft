@@ -6,7 +6,7 @@ use craft::behavior::EditEvent;
 use craft::behavior::kurbo::Point;
 use craft::color::gradient::{StopRows, StopRules};
 use craft::draw::ui::gradient::{GradientLine, GradientOverlay, GradientStyle as OverlayStyle, LineGradient};
-use craft::ui::contract::Bind;
+use craft::ui::contract::{Bind, Show as _};
 use egui::{Rect, Ui};
 use photocraft_doc::{Fill, GradientStyle, Layer, LayerContent, LayerId};
 use photocraft_engine::gradient_fill_cmds as cmds;
@@ -58,8 +58,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut Ui, at: Rect) -> Option<(La
         return None;
     }
     // ⌘ is the Move tool (`hold_keys::cmd_moves`): the overlay steps aside while it is held.
-    let mods = ui.input(|i| i.modifiers);
-    if crate::canvas::event_tool(app, mods) != Tool::Gradient {
+    if craft::ui::runtime::pointer::frame(ui.ctx()).mods.cmd && crate::canvas::tools::takes_command_stand_in(Tool::Gradient) {
         return None;
     }
     let (layer, frame, canvas) = active_gradient(app)?;

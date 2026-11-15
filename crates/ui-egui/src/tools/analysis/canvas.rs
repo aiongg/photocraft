@@ -9,7 +9,7 @@ use craft::behavior::{CancelReason, Cursor, CursorBadge, CursorIcon, CountMark, 
 use craft::color::ui::{ColorSamplerMarks, ColorSamplers, ColorSamplerTool, SamplerEvent};
 use craft::draw::ui::{RulerLine, RulerTool};
 use craft::ui::canvas::{CanvasTool, NoTool, ToolAction, ToolClaims, ToolContext, ToolHostResponse, ToolKey, ToolPath, ToolPointer, canvas_space};
-use craft::ui::contract::{Access, Common, Component, Cx, MeasureCx, PaintUi, Props as _, Role};
+use craft::ui::contract::{Access, Common, Component, Cx, MeasureCx, PaintUi, Props as _, Role, Show as _};
 use craft::ui::primitives::{Draw, PaintShape, StrokeWidth, TextRun};
 use craft::ui::runtime::env::Label;
 use craft::ui::style::{ComponentStyle, DataColor, StyleColor, StyleCx};
@@ -114,8 +114,7 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut AnalysisTools, _respons
         status_on_err(app, result);
     }
     if let Some(toast) = state.sampler.take_error() {
-        // PLAN: assumed `notices::post(app: &mut PhotocraftApp, tone: Tone, text: impl Into<String>)` and `Toast::{tone, text}`.
-        crate::notices::post(app, toast.tone, toast.text);
+        crate::notices::post(app, toast.message.as_str().to_owned(), Vec::new(), toast.tone, None);
     }
     for event in std::mem::take(&mut state.count.events) {
         match event {
@@ -484,7 +483,7 @@ impl Component for CountMarks {
     type Style = OverlayStyle;
     type Output = Response;
 
-    fn style(cx: &StyleCx<'_>, _: OverlayStyleKey) -> OverlayStyle {
+    fn style(cx: &StyleCx<'_>, _: CountMarksStyleKey) -> OverlayStyle {
         overlay_style(cx)
     }
 
@@ -554,7 +553,7 @@ impl Component for NoteCards {
     type Style = OverlayStyle;
     type Output = Response;
 
-    fn style(cx: &StyleCx<'_>, _: OverlayStyleKey) -> OverlayStyle {
+    fn style(cx: &StyleCx<'_>, _: NoteCardsStyleKey) -> OverlayStyle {
         overlay_style(cx)
     }
 

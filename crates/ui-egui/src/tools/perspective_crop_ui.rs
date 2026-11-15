@@ -52,14 +52,14 @@ pub fn cancel(app: &mut PhotocraftApp) {
 /// The Perspective Crop tool for one pass: the framework's pass over the family's state, with the options bar's Show
 /// Grid and the Perspective Crop shield. Its idle cursor, box and corner rules, clicks and preview are the pass's.
 pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut PerspectiveCrop, _host: CanvasHost) -> FamilyTool<'a> {
-    Box::new(state.tool.pass(scope.with_app(input)))
+    Box::new(state.tool.pass(scope.with_app(|app| input(app))))
 }
 
 /// What the pass is given each frame: the active document, whose pending quad the pass keeps and drops when another
 /// document becomes active, and the options bar's Show Grid.
 fn input<'a>(app: &PhotocraftApp) -> PerspectiveInput<'a> {
     let mut input = PerspectiveInput::default();
-    input.document = app.session.active().map(|st| CropDocKey(st.doc.id.0));
+    input.document = app.session.active().map(|st| CropDocKey::new(st.doc.id.0));
     input.show_grid = app.ui.tool_options.perspective_crop_grid;
     input.shield = Some(&CropShield::PERSPECTIVE);
     input
@@ -108,7 +108,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
 fn document(app: &PhotocraftApp) -> Option<CropDocument> {
     let st = app.session.active()?;
     let size = Size::new(f64::from(st.doc.size.width), f64::from(st.doc.size.height));
-    Some(CropDocument::new(CropDocKey(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)))
+    Some(CropDocument::new(CropDocKey::new(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)))
 }
 
 /// ↵: crops to the pending quad. W and H come from the options fields (inches at the typed resolution; an empty side
@@ -155,7 +155,7 @@ pub fn committed(app: &mut PhotocraftApp, out: &BarOutput) {
 /// Options bar: W, ⇄, H, the resolution, Front Image, Clear and Show Grid. A value typed out of range raises the
 /// range alert once.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let document = document(app).unwrap_or_else(|| CropDocument::new(CropDocKey(0), Size::ZERO, 72.0));
+    let document = document(app).unwrap_or_else(|| CropDocument::new(CropDocKey::new(0), Size::ZERO, 72.0));
     let options = &mut app.ui.tool_options;
     let shown = PerspectiveCropBar::new(&mut options.perspective_crop, &document, Bind::bound(&mut options.perspective_crop_grid)).show(ui);
     if let Some(alert) = shown.out_of_range {

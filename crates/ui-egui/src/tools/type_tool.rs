@@ -54,9 +54,9 @@ pub(crate) use options_bar::styles_at;
 pub(crate) use panel::{OPENTYPE_BUTTONS, toggle_opentype};
 pub use panel::{character_panel, type_properties};
 pub(crate) use controls::canvas_controls;
-pub(crate) use pointer::{PathClick, TypeState, TypeTool, hover_path_target};
+pub(crate) use pointer::{PathClick, TypeState, TypeTool, box_shape, drain, hover_path_target, inside_box, tool};
 #[cfg(test)]
-pub(crate) use pointer::{box_shape, path_target};
+pub(crate) use pointer::path_target;
 pub(crate) use values::doc_unit;
 
 pub const PLACEHOLDER: &str = "Lorem Ipsum";

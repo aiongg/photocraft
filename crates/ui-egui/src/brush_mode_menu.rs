@@ -81,8 +81,7 @@ pub(crate) fn pattern_stamp_choices() -> Vec<((Option<BlendMode>, bool), &'stati
 fn blend_items(behind: bool, clear: bool) -> Vec<Item> {
     let mut out = Vec::new();
     for m in BlendMode::LAYER_MODES {
-        // PLAN: assumed path of the framework `BlendShortcut`
-        if crate::panels::blend_shortcut(m).is_some_and(craft::ui::patterns::BlendShortcut::starts_group) {
+        if crate::panels::blend_shortcut(m).is_some_and(craft::ui::patterns::blend_keys::BlendShortcut::starts_group) {
             out.push(Item::Separator);
         }
         out.push(Item::Blend(m));

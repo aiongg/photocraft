@@ -382,13 +382,11 @@ pub fn patch_drags_selection(app: &PhotocraftApp, at: [f64; 2], mods: Mods) -> b
 /// until the release (#11024). Adding, subtracting and intersecting keep it visible. The host ends
 /// a press whose canvas is no longer the one in use, so the press carries no document of its own.
 pub(crate) fn patch_replaces_selection(app: &PhotocraftApp, press: Option<&PatchPress>) -> bool {
-    // PLAN: assumed `tool_feedback::selection_op(tool: Tool, bar: SelectionOperation-or-mode, mods: Mods, has_selection: bool) -> SelectionOperation`
-    // and the module path `crate::canvas::tool_feedback` (cw.P10, canvas-widgets-w27).
     use crate::canvas::tool_feedback::{has_selection, selection_op};
     press.is_some_and(|p| {
         matches!(p.tool, Tool::Patch | Tool::ContentAwareMove)
             && !patch_drags_selection(app, p.start, p.modifiers)
-            && selection_op(p.tool, app.ui.selection_mode, p.modifiers, has_selection(app)) == craft::behavior::SelectionOperation::New
+            && selection_op(p.tool, app.ui.selection_mode, p.modifiers, has_selection(app)) == craft::behavior::geometry::SelectionOperation::New
     })
 }
 

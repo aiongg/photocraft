@@ -38,6 +38,7 @@ mod session;
 pub mod values;
 
 pub use session::{layer_editor, layer_reset};
+pub(crate) use session::PropertiesAdjust;
 
 /// Kinds edited here (Color Lookup has its own editor in `adjust_ui`; Invert has none).
 pub const KINDS: [&str; 14] = [

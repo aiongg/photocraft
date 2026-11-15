@@ -50,7 +50,7 @@ pub mod mask_thumbs_ui;
 mod navigator;
 pub(crate) mod options_bar;
 pub(super) mod panel_docking;
-mod rail_commands;
+pub(crate) mod rail_commands;
 pub(crate) mod preset_browser;
 pub mod preset_panels;
 mod properties;

@@ -77,9 +77,7 @@ fn character_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, unit: DocUnit)
     let face = values::face_axes(app);
     let mut font_state = fonts::font_state(app);
     let mut controls = CharacterControls::new(tl!("Character"), &shown, &families, &styles).unit(unit);
-    if let Some(source) = font_state.source() {
-        controls = controls.font_picker(source);
-    }
+    controls = controls.font_picker(font_state.source());
     if let Some(face) = &face {
         controls = controls.axes(face.view());
     }

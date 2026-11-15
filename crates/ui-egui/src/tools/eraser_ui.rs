@@ -162,7 +162,7 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
         // Shown as the stroke reads it; written back only when the user edits it.
         let shown = stored_tolerance(o.bg_tolerance);
         let mut tolerance = shown;
-        let (_, alert) = option_cells::number(tl!("Tolerance:"), &mut tolerance, 1.0..=100.0)
+        let alert = option_cells::number(tl!("Tolerance:"), &mut tolerance, 1.0..=100.0)
             .whole()
             .unit("%")
             .tooltip(tl!("Erase range of similar colors"))
@@ -177,14 +177,13 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
     let before = app.session.tools.brush.clone();
     let mut brush = before.clone();
     let mut angle = brush.angle;
-    // PLAN: assumed `NumberCell::show(self, ui) -> (EditEvents<f64>, Option<RangeAlert>)`; its events key the Angle's history step.
-    let (angle_events, alert) = option_cells::number(tl!("Angle"), &mut angle, -180.0..=180.0)
+    let alert = option_cells::number(tl!("Angle"), &mut angle, -180.0..=180.0)
         .whole()
         .unit("°")
         .icon(IconSpec::svg(IconId::new("rotate_cw")))
         .tooltip(tl!("Set the brush angle"))
         .show(ui);
-    let mut key = angle_events.iter().find_map(|e| crate::history_keys::coalesce("brush", e));
+    let mut key = None;
     brush.angle = angle;
     alerts.extend(alert);
 
@@ -199,10 +198,7 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
         brush.pressure_size = on;
         key = pressure.events.iter().find_map(|e| crate::history_keys::coalesce("brush", e)).or(key);
     }
-    match key {
-        Some(key) => crate::brush_panel::commit_keyed(app, &before, &brush, key),
-        None => crate::brush_panel::commit(app, &before, &brush),
-    }
+    crate::brush_panel::commit_keyed(app, &before, &brush, key);
 
     for alert in &alerts {
         option_cells::range_alert(app, ui, alert);

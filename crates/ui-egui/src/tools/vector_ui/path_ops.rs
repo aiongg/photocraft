@@ -474,7 +474,7 @@ impl craft::ui::canvas::CanvasTool for PathSelectionTool {
     }
 
     // The moved path shows through the overlay (`show_paths`), so the tool paints nothing.
-    fn paint(&self, _draw: &craft::ui::canvas::Draw<'_>, _cx: &craft::ui::canvas::ToolContext<'_>) {}
+    fn paint(&self, _draw: &craft::ui::primitives::Draw<'_>, _cx: &craft::ui::canvas::ToolContext<'_>) {}
 }
 
 /// The path a Path Selection drag in progress shows moved.

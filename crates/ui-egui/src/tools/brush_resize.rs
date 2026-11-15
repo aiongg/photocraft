@@ -158,7 +158,7 @@ impl PaintResize {
         } else {
             after.opacity = level;
         }
-        crate::panels::brush_panel::commit_keyed(app, &before, &after, format!("brush-resize:{}", self.key));
+        crate::panels::brush_panel::commit_keyed(app, &before, &after, Some(format!("brush-resize:{}", self.key)));
     }
 }
 

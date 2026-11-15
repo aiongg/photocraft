@@ -80,21 +80,15 @@ pub(crate) fn delete_anchors(app: &mut PhotocraftApp, path: PathRef, anchors: &[
         app.ui.direct_selection = DirectSelection { target: Some(path), ..Default::default() };
         return;
     }
-    let params = |&[s, k]: &[usize; 2]| {
-        let mut params = json!({"subpath": s, "knot": k});
-        if segments {
-            params["segments"] = json!(true);
-        }
-        with_target(app, path, params)
-    };
     // PLAN: the prompt's confirm runs one `path.deleteAnchor`, so a live shape with several anchors selected loses only the first one asked about (dialogs-w21)
-    if crate::dialogs::live_shape_prompt::ask(app, path, &params(&order[0])) {
+    let first = anchor_params(app, path, segments, &order[0]);
+    if crate::dialogs::live_shape_prompt::ask(app, path, &first) {
         return;
     }
     let key = (order.len() > 1).then(|| format!("delete-anchor-{}", app.ui.alloc_id()));
     let mut deleted = false;
     for anchor in &order {
-        let mut params = params(anchor);
+        let mut params = anchor_params(app, path, segments, anchor);
         if let Some(key) = &key {
             params["coalesce"] = json!(key);
         }
@@ -235,6 +229,15 @@ fn context(app: &mut PhotocraftApp, hit: &BezierHit, at: Pos2, tool: Tool, mods:
     let Some(r) = PathRef::from_key(hit.path()) else { return };
     let Some(doc) = crate::canvas::document_display::doc_point_at(app, at) else { return };
     crate::canvas_tool_menu::open_at(app, tool, mods, at, [doc.x, doc.y], Some((r, hit.clone())));
+}
+
+/// The `path.deleteAnchor` parameters for one anchor of `path`.
+fn anchor_params(app: &PhotocraftApp, path: PathRef, segments: bool, &[s, k]: &[usize; 2]) -> Value {
+    let mut params = json!({"subpath": s, "knot": k});
+    if segments {
+        params["segments"] = json!(true);
+    }
+    with_target(app, path, params)
 }
 
 fn with_target(app: &PhotocraftApp, r: PathRef, mut params: Value) -> Value {

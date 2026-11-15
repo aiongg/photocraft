@@ -634,7 +634,7 @@ impl PhotocraftApp {
                 crate::i18n::fmt(tl!(template), &[("doc", doc.as_str())])
             })
             .collect();
-        notices::post(self, title, lines, false, None);
+        notices::post(self, title, lines, craft::theme::variant::Tone::Neutral, None);
     }
 
     /// Record a written save of document `doc` as it was at `revision`: its name, path and saved
@@ -729,7 +729,7 @@ impl PhotocraftApp {
             let written = crate::i18n::fmt(tl!("{ok} written to {dir}"), &[("ok", &asset_ok.to_string()), ("dir", &asset_dir)]);
             self.ui.status = format!("{title} ({written}): {}", asset_errors[0]);
             self.ui.status_error = true;
-            notices::post(self, title, asset_errors, true, None);
+            notices::post(self, title, asset_errors, craft::theme::variant::Tone::Bad, None);
         }
         self.sync_views();
     }

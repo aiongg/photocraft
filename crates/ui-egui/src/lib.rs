@@ -236,7 +236,7 @@ pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
     ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn, ExportSettings,
     ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox,
-    LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PenScreenFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn,
+    LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn,
     SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
@@ -328,7 +328,7 @@ pub struct PhotocraftApp {
     /// (`canvas::tools`).
     pub(crate) canvas_tools: canvas::tools::CanvasTools,
     /// The Info, Notes, Log and ruler-tool state of the analysis tools (`tools::analysis`).
-    pub(crate) analysis_tools: tools::analysis::AnalysisTools,
+    pub(crate) analysis_tools: tools::analysis::canvas::AnalysisTools,
     /// The Slice and Slice Select tools' session (`slice_ui`).
     pub(crate) slice_tool: craft::draw::ui::slice::SliceTool,
     /// Brush/Eraser stroke being drawn, rendered by the engine (see `canvas::LiveStroke`).
@@ -449,7 +449,7 @@ pub struct PhotocraftApp {
     /// What each open Color Picker edits (`color_picker_ui`).
     pub(crate) color_targets: HashMap<craft::ui::dialog::DialogId, color_picker_ui::PickTarget>,
     /// Colours a Color Picker answered with OK, waiting for their owner: (dialog, field, colour).
-    pub(crate) color_answers: Vec<(craft::ui::dialog::DialogId, String, craft::color::Srgba)>,
+    pub(crate) color_answers: Vec<(craft::ui::dialog::DialogId, String, craft::theme::Srgba)>,
     /// The screen-colour pick in progress (`screen_picker`).
     pub(crate) screen_pick: craft::color::ui::ScreenPick,
     /// Select and Mask / Content-Aware Fill / Liquify / Gallery / Vanishing Point sessions.
@@ -961,7 +961,6 @@ mod view_guides_submenu_tests;
 #[cfg(test)]
 mod reset_tip_tests;
 #[cfg(test)]
-#[path = "tools/zoom_tool/zoom_mode_tests.rs"]
 mod zoom_mode_tests;
 
 #[cfg(test)]

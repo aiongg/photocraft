@@ -42,7 +42,9 @@ impl Kind {
 }
 
 /// The data-point sources of the Select Data Points dialog, in column order.
-const SOURCES: [(&str, &str); 3] = [("selection", tl!("Selections")), ("ruler", tl!("Ruler Tool")), ("count", tl!("Count Tool"))];
+fn sources() -> [(&'static str, &'static str); 3] {
+    [("selection", tl!("Selections")), ("ruler", tl!("Ruler Tool")), ("count", tl!("Count Tool"))]
+}
 
 /// The field key of the check box of column `column` in `source`.
 fn point_key(source: &str, column: &str) -> String {
@@ -72,7 +74,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, kind: Kind) -> Result<DialogId, Stri
         }
         Kind::DataPoints => {
             let points = serde_json::to_value(&app.session.analysis.data_points).unwrap_or_default();
-            for (source, _) in SOURCES {
+            for (source, _) in sources() {
                 let chosen: Vec<&str> = points.get(source).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
                 for column in analysis_cmds::available(source) {
                     fields.set(point_key(source, column), chosen.contains(&column));
@@ -159,7 +161,7 @@ fn form(kind: Kind, fields: &mut DialogFields) -> ParamDialog<'_> {
             let row = Param::custom("columns", tl!("Data Points"), |ui, fields, _| {
                 Row::new()
                     .show(ui, |ui, _| {
-                        for (source, title) in SOURCES {
+                        for (source, title) in sources() {
                             Stack::new().show(ui, |ui, _| {
                                 Text::new(Label::from(title)).show(ui);
                                 for column in analysis_cmds::available(source) {
@@ -174,7 +176,7 @@ fn form(kind: Kind, fields: &mut DialogFields) -> ParamDialog<'_> {
                             });
                         }
                     })
-                    .response
+                    .output
             });
             ParamDialog::command(key, tl!("Select Data Points"), vec![row])
         }

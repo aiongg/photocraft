@@ -79,6 +79,10 @@ pub struct Framework {
     overrides_rev: Option<u64>,
     /// The app's command catalog as of `overrides_rev`.
     catalog: Option<AppCatalog>,
+    /// The rows `catalog` was built from, and its generation: the runtime rebuilds its keymap when the generation
+    /// changes, so it advances only when the rows differ.
+    catalog_rows: Vec<craft::keymap::CommandDef>,
+    catalog_generation: u64,
     /// The file services the host gives components (pickers, reads and writes); `None` keeps the
     /// host's own default.
     files: Option<Arc<dyn Files>>,
@@ -242,6 +246,8 @@ impl Framework {
             overrides: Arc::new(Overrides::new()),
             overrides_rev: None,
             catalog: None,
+            catalog_rows: Vec::new(),
+            catalog_generation: 0,
             files,
             fired: Vec::new(),
             refused: false,
@@ -510,7 +516,12 @@ impl PhotocraftApp {
         // preferences change.
         let rev = self.session.prefs.rev();
         if self.framework.overrides_rev != Some(rev) {
-            let catalog = crate::shortcut_dispatch::catalog(self);
+            let rows = crate::shortcut_dispatch::command_rows(self);
+            if !crate::shortcut_dispatch::same_rows(&self.framework.catalog_rows, &rows) {
+                self.framework.catalog_generation += 1;
+                self.framework.catalog_rows = rows.clone();
+            }
+            let catalog = crate::shortcut_dispatch::catalog(rows, self.framework.catalog_generation);
             let overrides = crate::shortcut_dispatch::overrides(self);
             self.framework.set_overrides(rev, catalog, overrides);
         }

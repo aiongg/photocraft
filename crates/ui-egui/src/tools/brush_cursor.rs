@@ -6,7 +6,7 @@
 //! [`cursor`] builds it per call.
 
 use craft::behavior::kurbo::Rect;
-use craft::behavior::{Cursor, CursorIcon, IconId, PointerSample};
+use craft::behavior::{Cursor, CursorIcon, PointerSample};
 use craft::ui::canvas::ToolContext;
 use craft::ui::canvas_controls::brush::{BrushCursor, BrushCursorOptions, BrushTip, BrushTipOutline, PaintingCursor, TipPose, TipRings};
 use photocraft_engine::prefs::PaintingCursor as PaintingPref;
@@ -140,7 +140,7 @@ pub(crate) fn cursor(app: &PhotocraftApp, cx: &ToolContext<'_>) -> Cursor {
     let centre = crate::canvas::cursor_policy::brush_tip_centre(tool, cx.mods.alt || app.ui.shell.latched.alt, prefs.show_crosshair_in_brush_tip);
     let painting = crate::canvas::paint_tool::stroking(app).is_some();
     // The framework's Standard cursor is the tool's icon.
-    let icon = IconId::new(crate::icons::tool_icon(tool));
+    let icon = crate::icons::tool_icon(tool);
     let brush = &app.session.tools.brush;
     if let Some((size, block)) = aliased(app, tool) {
         // The whole-pixel cell the dab fills at the pointer; without a pointer there is nothing to outline.

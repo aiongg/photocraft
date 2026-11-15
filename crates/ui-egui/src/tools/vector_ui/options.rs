@@ -395,11 +395,12 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     let was_linked = app.ui.arrow_default == Some(target);
     let mut linked = was_linked;
     let swatches = &app.session.presets.swatches;
-    let (folders, gradient_state) = (&mut app.ui.paint_folders, &mut app.ui.shape_gradient_state);
+    let folders = &mut app.ui.paint_folders;
+    let recent_colors: Vec<Srgba> = crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| Srgba::new(c[0], c[1], c[2], 1.0)).collect();
     let output = ShapePanel::new(label(tl!("Shape properties")), &shown, &appearance, ppi)
         .sections(true, sh.live.is_some())
         .stroke_open(Bind::bound(&mut app.ui.shape_stroke_open))
-        .chips(|which, chip| crate::shape_paint_ui::decorate_chip(chip, which, swatches, folders, gradient_state))
+        .chips(|which, chip, chip_ui| crate::shape_paint_ui::decorate_chip(chip, which, &recent_colors, swatches, folders, chip_ui))
         .fallbacks(Srgba::new(fg[0], fg[1], fg[2], fg[3]), Srgba::new(bg[0], bg[1], bg[2], bg[3]))
         .arrow_default(Bind::bound(&mut linked))
         .show(ui);

@@ -91,13 +91,13 @@ impl<'a> NumberCell<'a> {
                 let codec = NumberCodec::new(Env::of(ui).units().reader(None), 0);
                 field = field.step(1.0).commit_decimals(0).codec(codec);
             }
-            if let Some(unit) = unit {
+            if let Some(unit) = unit.clone() {
                 field = field.unit(unit);
             }
             if popup_slider {
                 field = field.popup_slider(range.clone());
             }
-            if let Some(tooltip) = tooltip {
+            if let Some(tooltip) = tooltip.clone() {
                 field = field.tooltip(tooltip);
             }
             alert = field.show(ui).out_of_range;

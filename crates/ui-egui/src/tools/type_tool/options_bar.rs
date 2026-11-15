@@ -16,9 +16,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .orientation(values::orientation(app))
         .anti_alias_methods(&methods)
         .can_warp(crate::menus::is_enabled(app, "type.warpText"));
-    if let Some(source) = font_state.source() {
-        bar = bar.font_picker(source);
-    }
+    bar = bar.font_picker(font_state.source());
     // A mixed selection leaves the anti-aliasing menu without a shown method.
     if let Some(method) = values::anti_alias(app) {
         bar = bar.anti_alias(method);
