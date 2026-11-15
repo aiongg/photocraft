@@ -52,7 +52,7 @@ fn fill_with_picker(app: &mut PhotocraftApp) -> FillPicker {
     let fill = crate::fill_ui::open(app);
     // The Color row shows once Contents is Color.
     app.framework.dialogs.set_json_field(&ctx, fill, "contents", json!("color")).unwrap();
-    app.framework.dialogs.set_json_field(&ctx, fill, "color", json!({"r": 32.0 / 255.0, "g": 160.0 / 255.0, "b": 64.0 / 255.0, "a": 1.0})).unwrap();
+    app.framework.dialogs.set_json_field(&ctx, fill, "color", json!([32.0 / 255.0, 160.0 / 255.0, 64.0 / 255.0])).unwrap();
     host_pass(app);
     let request = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(fill).and_then(|d| d.pick_color()).expect("Color… files a colour request");
     let key = request.key.clone();

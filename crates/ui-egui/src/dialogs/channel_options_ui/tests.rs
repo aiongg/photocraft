@@ -37,11 +37,12 @@ fn saved_selection_becomes_a_spot_channel_with_its_ink_and_solidity() {
     let ctx = app.ctx().clone();
     assert!(channel(&app).spot.is_none());
     let id = open(&mut app, &json!(0)).unwrap();
+    crate::dialogs::testing::show(&mut app);
     let f = values(&app, id);
     assert_eq!((f.text("indicates"), f.text("name")), (Some("masked"), Some(channel(&app).name.as_str())));
     set(&mut app, id, "name", json!("PMS 185"));
     set(&mut app, id, "indicates", json!("spot"));
-    set(&mut app, id, "color", json!("#ff0000"));
+    set(&mut app, id, "color", json!([1.0, 0.0, 0.0]));
     set(&mut app, id, "opacity", json!(40.0));
     crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
     assert!(app.framework.dialogs.is_empty());
@@ -53,6 +54,7 @@ fn saved_selection_becomes_a_spot_channel_with_its_ink_and_solidity() {
 
     // Reopened, the dialog shows the spot settings; switching back makes it an alpha channel.
     let id = open(&mut app, &json!(0)).unwrap();
+    crate::dialogs::testing::show(&mut app);
     let f = values(&app, id);
     assert_eq!((f.text("indicates"), f.color("color"), f.number("opacity")), (Some("spot"), Some([1.0, 0.0, 0.0]), Some(40.0)));
     set(&mut app, id, "indicates", json!("selected"));
@@ -75,7 +77,7 @@ fn menu_opens_the_dialog_on_the_targeted_channel_and_refuses_otherwise() {
     assert!(app.framework.dialogs.is_empty());
     app.run("channel.target", json!({"channel": 0})).unwrap();
     let r = crate::menus::invoke(&mut app, &ctx, COMMAND, json!({})).unwrap();
-    assert!(r["dialog"].is_u64());
+    assert!(r["dialog"].is_string());
     assert_eq!(params::captured(&app, COMMAND)["channel"], json!(0));
     // Explicit params run the engine directly, no dialog.
     close_all(&mut app);
@@ -108,7 +110,8 @@ fn layer_mask_display_options_set_the_rubylith() {
     assert_eq!((f.color("color"), f.number("opacity")), (Some([1.0, 0.0, 0.0]), Some(50.0)));
     assert_eq!(params(&f, &json!("mask")), json!({"channel": "mask", "color": "#ff0000", "opacity": 50.0}));
     let id = open(&mut app, &json!("mask")).unwrap();
-    set(&mut app, id, "color", json!("#00ff00"));
+    crate::dialogs::testing::show(&mut app);
+    set(&mut app, id, "color", json!([0.0, 1.0, 0.0]));
     crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
     assert_eq!(app.session.prefs().layer_mask_overlay.color, "#00ff00");
     // Channels › Channel Options… with the layer mask targeted.
@@ -131,10 +134,11 @@ fn new_spot_channel_dialog_creates_the_ink_from_the_selection_and_remembers_it()
     let ctx = app.ctx().clone();
     app.run("select.rect", json!({"x": 2, "y": 2, "width": 8, "height": 8})).unwrap();
     let id = open_new_spot(&mut app).unwrap();
+    crate::dialogs::testing::show(&mut app);
     let f = values(&app, id);
     assert_eq!((f.text("name"), f.color("color"), f.number("solidity")), (Some("Spot Color 1"), Some([1.0, 0.0, 0.0]), Some(0.0)));
     set(&mut app, id, "name", json!("PMS 300"));
-    set(&mut app, id, "color", json!("#0050ff"));
+    set(&mut app, id, "color", json!([0.0, 80.0 / 255.0, 1.0]));
     set(&mut app, id, "solidity", json!(60.0));
     crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
     let doc = &app.session.active().unwrap().doc;
@@ -149,6 +153,7 @@ fn new_spot_channel_dialog_creates_the_ink_from_the_selection_and_remembers_it()
 
     // The next one gets a fresh name and the last ink.
     let id = open_new_spot(&mut app).unwrap();
+    crate::dialogs::testing::show(&mut app);
     let f = values(&app, id);
     assert_eq!(f.text("name"), Some("Spot Color 1"));
     assert_eq!(hex(f.color("color").unwrap()), "#0050ff");

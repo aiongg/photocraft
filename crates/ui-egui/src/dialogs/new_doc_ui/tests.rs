@@ -117,9 +117,8 @@ fn a_custom_background_color_is_picked_and_used() {
     let opened = h.state().framework.dialogs.open_dialogs();
     let picker = opened.iter().find(|d| d.id != id).map(|d| d.id).expect("the Color Picker opens over the dialog");
     assert_eq!(opened.len(), 2);
-    // PLAN: the colour picker's own field is assumed to be `color`, an `Srgba` object, as New Guide's (dialogs-w37 owns the hosted picker).
     let ctx = h.ctx.clone();
-    h.state_mut().framework.dialogs.set_json_field(&ctx, picker, "color", json!({"r": 0.2, "g": 0.4, "b": 0.6, "a": 1.0})).unwrap();
+    h.state_mut().framework.dialogs.set_json_field(&ctx, picker, "color", json!("#336699")).unwrap();
     assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker), "OK is enabled");
     h.run_steps(3);
     assert!(matches!(crate::new_doc_remember_tests::options(h.state(), id).background, BackgroundContents::Custom(_)), "{}", fields(h.state(), id));
