@@ -304,7 +304,8 @@ mod tests {
         open_editor(&mut app, &app_ctx, id, &sm, 0);
         crate::dialogs::testing::show(&mut app);
         let d = app.framework.dialogs.open_dialogs().pop().expect("the adjustment editor opened");
-        let fields = d.fields.expect("the editor's fields");
+        // An adjustment dialog shows its engine parameters, the form its command takes.
+        let fields = crate::adjust_dialog::command_params(&app, d.id);
         assert_eq!(fields["brightness"].as_f64(), Some(40.0), "the recorded settings");
         assert_eq!(fields["contrast"].as_f64(), Some(-10.0));
         let dialog = d.id;
@@ -341,7 +342,10 @@ mod tests {
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         // The open dialog's fields, whatever its type.
-        let fields_of = |app: &PhotocraftApp, dialog| app.framework.dialogs.open_dialogs().into_iter().find(|d| d.id == dialog).and_then(|d| d.fields).unwrap();
+        let fields_of = |app: &PhotocraftApp, dialog| match crate::adjust_dialog::hosted(app, dialog) {
+            Some(_) => crate::adjust_dialog::command_params(app, dialog),
+            None => app.framework.dialogs.open_dialogs().into_iter().find(|d| d.id == dialog).and_then(|d| d.fields).unwrap(),
+        };
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
         h.run_steps(2);
         let dialog = h.state().framework.dialogs.open_dialogs().pop().unwrap().id;
@@ -352,8 +356,10 @@ mod tests {
         assert_eq!(fields["blues"][0].as_f64(), Some(30.0));
         assert_eq!(fields["method"], json!("absolute"));
         // Edit the row and the Method, then OK.
-        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "blues", json!([10.0, 0.0, 0.0, 0.0])).unwrap();
-        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "method", json!("relative")).unwrap();
+        let mut edited = crate::adjust_dialog::command_params(h.state(), dialog);
+        edited["blues"] = json!([10.0, 0.0, 0.0, 0.0]);
+        edited["method"] = json!("relative");
+        assert!(crate::adjust_dialog::apply_params(h.state_mut(), dialog, &edited), "the dialog takes the edit");
         h.run_steps(2);
         crate::dialogs::testing::confirm(h.state_mut(), dialog);
         let sm = recorded(h.state());

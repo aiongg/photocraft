@@ -33,6 +33,20 @@ pub(crate) fn filter_preview_factor(app: &PhotocraftApp, doc: &Document, cmd: &s
     if cfg!(target_arch = "wasm32") { k } else { crate::proxy::view_factor(k, app.current_zoom(), doc.size.area()) }
 }
 
+/// The open Smart Filter adjustment editor with its Preview box on: its dialog id, the adjustment command, the
+/// captured Smart Filter target and the settings it would send. A plain adjustment dialog previews through
+/// `adjust_preview` instead.
+fn smart_adjust_preview(app: &PhotocraftApp) -> Option<(craft::ui::dialog::DialogId, String, serde_json::Value, serde_json::Value)> {
+    let open = crate::adjust_dialog::open_value(app)?;
+    let (_, captured) = open.smart_filter.as_ref()?;
+    let hosted = crate::adjust_dialog::hosted(app, open.id)?;
+    if !hosted.is_previewing() {
+        return None;
+    }
+    let params = crate::adjust_dialog::smart_filter_params(app, open, hosted.value()).ok()?;
+    Some((open.id, open.command.clone(), captured.clone(), params))
+}
+
 /// Live preview for an open filter dialog: run the filter on the proxy and upload it. With
 /// background jobs (the desktop app) it computes on one background worker
 /// (`filter_preview_worker`); otherwise (web, tests, `PHOTOCRAFT_INLINE_JOBS`) it keeps the
@@ -49,25 +63,31 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
     if crate::adjust_preview::on_layer(app, idx) {
         return None;
     }
-    // The open parameter dialog with its Preview box on; its key is the command.
-    let (id, key, dialog_fields, mut fields) = {
-        let d = app.framework.dialogs.get::<HostedParamDialog>()?;
-        if !d.is_previewing() {
-            return None;
-        }
-        let serde_json::Value::Object(fields) = serde_json::to_value(d.fields()).ok()? else { return None };
-        (d.id(), d.key()?.to_owned(), d.fields().clone(), fields)
-    };
-    crate::filter_dialog::refresh_match_color_sources(&app.session, &mut fields);
-    // Previews edit what the command will: a targeted layer mask included (#780).
-    let target = crate::dialogs::params::captured(app, &key);
-    crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
-    let (cmd, params) = if crate::smart_filter_dialog::owns(&key) {
-        crate::smart_filter_dialog::blend_command(app, &target, &dialog_fields).ok()?
-    } else if !target.is_null() {
-        crate::smart_filter_dialog::params_command(app, &target, &key, crate::filter_dialog::params_of(&fields)).ok()?
+    // The open dialog with its Preview box on, whichever family hosts it; its key is the command.
+    let (id, cmd, params) = if let Some((id, key, captured, params)) = smart_adjust_preview(app) {
+        let (cmd, params) = crate::smart_filter_dialog::params_command(app, &captured, &key, params).ok()?;
+        (id, cmd, params)
     } else {
-        (key.clone(), app.with_mask_target(&key, crate::filter_dialog::params_of(&fields)))
+        let (id, key, dialog_fields, mut fields) = {
+            let d = app.framework.dialogs.get::<HostedParamDialog>()?;
+            if !d.is_previewing() {
+                return None;
+            }
+            let serde_json::Value::Object(fields) = serde_json::to_value(d.fields()).ok()? else { return None };
+            (d.id(), d.key()?.to_owned(), d.fields().clone(), fields)
+        };
+        crate::filter_dialog::refresh_match_color_sources(&app.session, &mut fields);
+        // Previews edit what the command will: a targeted layer mask included (#780).
+        let target = crate::dialogs::params::captured(app, &key);
+        crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
+        let (cmd, params) = if crate::smart_filter_dialog::owns(&key) {
+            crate::smart_filter_dialog::blend_command(app, &target, &dialog_fields).ok()?
+        } else if !target.is_null() {
+            crate::smart_filter_dialog::params_command(app, &target, &key, crate::filter_dialog::params_of(&fields)).ok()?
+        } else {
+            (key.clone(), app.with_mask_target(&key, crate::filter_dialog::params_of(&fields)))
+        };
+        (id, cmd, params)
     };
     crate::actions::authorize_panel_preview(app, id, &cmd, &params).ok()?;
     let st = app.session.documents().get(idx)?;

@@ -48,9 +48,7 @@ fn ctx(app: &PhotocraftApp) -> egui::Context {
 /// One pass of the host with the app's taker, as a frame runs them.
 fn pass(app: &mut PhotocraftApp) {
     let ctx = ctx(app);
-    crate::testing::run_ui(&ctx, egui::RawInput::default(), |ui| {
-        app.framework.dialogs.run(ui);
-    });
+    crate::canvas::testing::frame(app);
     take(app, &ctx);
 }
 
@@ -146,7 +144,7 @@ fn the_lasso_edits_the_fill_area_and_the_window_follows() {
     let d = facts(&app);
     assert_eq!((d["fillArea"].as_u64(), d["lassoMode"].as_str()), (Some(800), Some("subtract")));
     // Subtracting everything is refused: the fill area can't be empty.
-    ui(&mut app, json!({"lasso": {"points": [[0.0, 0.0], [200.0, 0.0], [200.0, 160.0], [0.0, 160.0]]}})).unwrap();
+    ui(&mut app, json!({"lasso": {"op": "subtract", "points": [[0.0, 0.0], [200.0, 0.0], [200.0, 160.0], [0.0, 160.0]]}})).unwrap();
     let d = facts(&app);
     assert_eq!(d["fillArea"], json!(800));
     assert!(d["error"].as_str().is_some_and(|e| e.contains("empty")), "{d}");
@@ -440,7 +438,7 @@ fn keys_wait_while_the_overlay_colour_picker_is_open() {
     );
     h.run_steps(4);
     // The Sampling Area Overlay section starts closed; its swatch is named "Color".
-    h.get_by_label("Sampling Area Overlay").click();
+    h.query_all_by_label("Sampling Area Overlay").next().expect("the section header").click();
     h.run_steps(4);
     h.get_by_label("Color").click();
     h.run_steps(4);

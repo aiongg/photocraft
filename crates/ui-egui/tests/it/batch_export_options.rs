@@ -74,8 +74,8 @@ fn edit_path(h: &mut Harness, name: &str, value: &Path) {
     h.get_by_role_and_label(egui::accesskit::Role::TextInput, name).click();
     h.run_steps(2);
     replace_text(h, &value.to_string_lossy());
-    // Clicking the caption commits the field without Enter confirming the dialog.
-    h.get_by_role_and_label(egui::accesskit::Role::Label, name).click();
+    // Moving focus on commits the field without Enter confirming the dialog.
+    h.key_press(egui::Key::Tab);
     h.run_steps(2);
 }
 
@@ -83,8 +83,8 @@ fn edit_quality(h: &mut Harness, value: &str) {
     h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").click();
     h.run_steps(2);
     replace_text(h, value);
-    // Clicking the caption commits the field without Enter confirming the dialog.
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Quality").click();
+    // Moving focus on commits the field without Enter confirming the dialog.
+    h.key_press(egui::Key::Tab);
     h.run_steps(3);
 }
 
@@ -310,7 +310,7 @@ fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     h.run_steps(2);
     h.event(egui::Event::Text("7".into()));
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "Starting Serial Number").click();
+    h.key_press(egui::Key::Tab);
     h.run_steps(3);
     assert_eq!(form_fields(&mut h)["startingSerial"], 7, "typing changes the starting serial");
     evidence(&mut h, "batch-naming");
