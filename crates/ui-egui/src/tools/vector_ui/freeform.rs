@@ -35,6 +35,8 @@ pub(crate) struct FreeformPenTool {
     pub(crate) draft: OutlineDraft,
     /// The destination captured when the trace began.
     pub(crate) owner: Option<PenOwner>,
+    /// The document, selected path and mode the trace began on: a release on another target commits nothing.
+    pub(crate) target: Option<super::VectorOwner>,
     /// The finished trace (its points and the indices of those reached by a straight segment) until `drain` commits it.
     pub(crate) closed: Option<(Vec<Point>, Vec<usize>)>,
     /// The modifiers of the last pass, to report changes to the draft.
@@ -49,6 +51,7 @@ impl Default for FreeformPenTool {
             refused: false,
             draft: OutlineDraft::new(DraftKind::Mixed, DraftReach::new(0.0, 0.0)),
             owner: None,
+            target: None,
             closed: None,
             mods: Mods::NONE,
         }
@@ -86,10 +89,10 @@ impl FreeformPenTool {
     }
 
     /// The finished trace as the points `freeform_finish_owned` takes, with its straight-segment indices and owner.
-    pub(super) fn take_finished(&mut self) -> Option<(Vec<[f64; 3]>, Vec<usize>, PenOwner)> {
+    pub(super) fn take_finished(&mut self) -> Option<(Vec<[f64; 3]>, Vec<usize>, PenOwner, Option<super::VectorOwner>)> {
         let (points, straight) = self.closed.take()?;
         let owner = self.owner.take()?;
-        Some((points.iter().map(|p| [p.x, p.y, 1.0]).collect(), straight, owner))
+        Some((points.iter().map(|p| [p.x, p.y, 1.0]).collect(), straight, owner, self.target.take()))
     }
 }
 
@@ -169,6 +172,7 @@ impl CanvasTool for FreeformPenTool {
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {
         self.draft.cancel();
         self.owner = None;
+        self.target = None;
     }
 
     /// Between clicks: Enter closes, Escape cancels, Backspace and Delete retract.
@@ -184,6 +188,7 @@ impl CanvasTool for FreeformPenTool {
             ToolKey::Cancel => {
                 self.draft.cancel();
                 self.owner = None;
+                self.target = None;
             }
             ToolKey::Delete { .. } => {
                 self.draft.retract();
