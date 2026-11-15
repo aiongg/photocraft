@@ -1,10 +1,10 @@
-use super::invoke::{panel_alias, proof_preset, workspace_name};
-use super::items::MenuItem;
+use super::invoke::{panel_alias, proof_preset, workspace_id};
 use super::{DOCUMENT_ITEM, PhotocraftApp, Value};
 
 pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
+    // Shortcut-only: the tool host owns presses during a gesture.
     if id == "layer.selectUnderCursor" {
-        return app.session.active().is_some() && app.drag.is_none() && app.brush_resize.is_none();
+        return app.session.active().is_some() && !app.brush_resize.active();
     }
     if crate::tool_shortcuts::tool(id).is_some() {
         return true;
@@ -21,10 +21,6 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if crate::enable_rules::disabled(app, id) {
         return false;
     }
-    // A pending crop greys what Photoshop greys during one (#1918).
-    if crate::crop_ui::blocks(app, id) {
-        return false;
-    }
     // Filters stay live on a type layer: choosing one asks to rasterize it (#4303).
     if crate::rasterize_prompt::filter_needs(app, id).is_some() {
         return true;
@@ -32,10 +28,7 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if let Some(e) = crate::workspace_ui::is_enabled(app, id) {
         return e;
     }
-    if crate::analysis_ui::handles(id) {
-        return true;
-    }
-    if crate::preset_panels::handles(id) || crate::type_panels_ui::handles(id) || crate::timeline_ui::handles(id) {
+    if crate::analysis::handles(id) {
         return true;
     }
     if let Some(e) = crate::view_cmds::is_enabled(app, id) {
@@ -61,12 +54,11 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
         | "window.panel.closeGroup"
         | "window.panel.closeOthers"
         | "window.panel.minimize"
-        | "window.panel.iconic" => !app.session.prefs().workspace_locked,
+        | "window.panel.iconic" => !app.workspaces.set.locked,
         "file.open" | "file.exit" | "file.clearRecent" | "file.removeRecent" | "help.about" | "help.systemInfo" | "edit.search" => true,
         i if i.starts_with("file.openRecent.") => true,
         i if i.starts_with(DOCUMENT_ITEM) => true,
         i if crate::links::url_for(i).is_some() => true,
-        i if i.starts_with("window.theme.") => true,
         // Interface brightness works with or without a document, as in Photoshop.
         "view.darkenInterface" | "view.lightenInterface" => true,
         "file.save" | "file.saveAs" | "file.export.exportAs" | "file.export.quickExportAsPng" => {
@@ -76,7 +68,7 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
         "window.togglePanels" => true,
         // With one document open the key stays quiet, as in Photoshop, rather than reporting why.
         "window.nextDocument" | "window.previousDocument" => app.session.active().is_some(),
-        i if panel_alias(i).is_some() || workspace_name(i).is_some() => true,
+        i if panel_alias(i).is_some() || workspace_id(i).is_some() => true,
         i if proof_preset(i).is_some() => app.session.active().is_some(),
         // "Custom…" is the full Proof Setup dialog.
         "view.proofSetup.custom" => app.session.active().is_some(),
@@ -108,7 +100,7 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
         | "edit.transform.skew"
         | "edit.transform.distort"
         | "edit.transform.perspective" => match &app.ui.transform {
-            Some(t) => t.warp.is_none(),
+            Some(t) => t.session.warp().is_none(),
             None => app.session.active().and_then(|s| s.active_layer).is_some(),
         },
         // A targeted layer mask enables what edits it (Invert on an adjustment layer's mask).
@@ -119,35 +111,31 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
 /// Image › Mode items that carry a checkmark.
 const MODE_CHECKS: [&str; 11] = ["rgb", "grayscale", "cmyk", "lab", "multichannel", "indexedColor", "bitmap", "duotone", "bits8", "bits16", "bits32"];
 
-/// Is a UI-level panel toggle currently on (for checkmarks)?
+/// `window.panel.*` ids that are commands on a panel, not panels.
+const PANEL_VERBS: [&str; 13] =
+    ["activate", "layout", "group", "move", "float", "window", "dock", "close", "closeGroup", "closeOthers", "minimize", "iconic", "modifierKeys"];
+
+/// The dock panel a Window menu id shows or hides.
+fn panel_of(id: &str) -> Option<&str> {
+    if let Some(toggle) = id.strip_prefix("window.toggle.") {
+        // PLAN: assumed dock panel ids `tools` (the toolbar) and the toggle names for the others.
+        return match toggle {
+            "dock" => None,
+            "toolbar" => Some("tools"),
+            other => Some(other),
+        };
+    }
+    let panel = id.strip_prefix("window.panel.")?;
+    (!PANEL_VERBS.contains(&panel)).then_some(panel)
+}
+
+/// Is a UI-level toggle currently on (for checkmarks)?
 pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
-    if let Some(checked) = crate::panel_docking::checked(app, id) {
-        return Some(checked);
-    }
     use photocraft_doc::{ColorMode, SampleType};
-    if let Some(name) = id.strip_prefix("window.theme.").filter(|n| *n != "toggle") {
-        let auto = app.session.prefs().interface.appearance_mode == photocraft_engine::prefs::AppearanceMode::Auto;
-        let shown = |dark: bool, id: &str| app.ui.theme.is_dark() == dark && app.ui.theme.id().as_str() == id;
-        return Some(match (name.strip_prefix("dark."), name.strip_prefix("light.")) {
-            _ if name == "system" => auto,
-            (Some(id), _) => !auto && shown(true, id),
-            (_, Some(id)) => !auto && shown(false, id),
-            _ => false,
-        });
-    }
     if let Some(c) = crate::view_cmds::checked(app, id) {
         return Some(c);
     }
-    if let Some(c) = crate::analysis_ui::checked(app, id).or_else(|| crate::workspace_ui::checked(app, id)).or_else(|| crate::file_ui::checked(app, id)) {
-        return Some(c);
-    }
-    if let Some(c) = crate::preset_panels::checked(app, id) {
-        return Some(c);
-    }
-    if let Some(c) = crate::timeline_ui::checked(app, id) {
-        return Some(c);
-    }
-    if let Some(c) = crate::type_panels_ui::checked(app, id) {
+    if let Some(c) = crate::analysis::checked(app, id).or_else(|| crate::workspace_ui::checked(app, id)).or_else(|| crate::file_ui::checked(app, id)) {
         return Some(c);
     }
     if let Some(alias) = panel_alias(id) {
@@ -169,9 +157,10 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         let pv = app.session.color.proof(d.doc.id);
         return Some(if id == "view.proofColors" { pv.enabled } else { pv.gamut_warning });
     }
-    if id.starts_with("window.workspace.") && id != "window.workspace.resetWorkspace" {
-        let want = workspace_name(id)?;
-        return Some(app.ui.workspace == if want.is_empty() { "Essentials" } else { want });
+    if let Some(rest) = id.strip_prefix("window.workspace.") {
+        let set = &app.workspaces.set;
+        let want = workspace_id(id).or_else(|| set.saved.iter().find(|w| w.id == rest).map(|w| w.id.as_str()))?;
+        return Some(set.current == want);
     }
     if let Some(m) = id.strip_prefix("image.mode.") {
         let Some(d) = app.session.active().map(|s| &s.doc) else {
@@ -201,21 +190,11 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         "view.lockGuides" => return Some(e.lock_guides),
         _ => {}
     }
-    let p = &app.ui.panels;
+    let shown = |panel: &str| crate::panel_docking::is_shown(app, panel);
     Some(match id {
-        "window.toggle.layers" => p.layers,
-        "window.toggle.history" => p.history,
-        "window.toggle.properties" => p.properties,
-        "window.toggle.color" => p.color,
-        "window.toggle.navigator" => p.navigator,
-        "window.toggle.toolbar" => p.toolbar,
-        "window.toggle.dock" => p.dock,
-        "window.togglePanels" => p.toolbar || p.options_bar || p.dock,
-        "window.toggle.options" => p.options_bar,
-        "window.toggle.contextualTaskBar" => p.context_task_bar,
-        "window.toggle.brushSettings" => p.brush_settings,
-        "window.toggle.brushes" => p.brushes,
-        _ => return None,
+        "window.toggle.dock" => shown("dock"),
+        "window.togglePanels" => ["tools", "options", "dock"].into_iter().any(shown),
+        _ => return panel_of(id).map(shown),
     })
 }
 
@@ -234,15 +213,15 @@ pub(crate) fn reveal_label() -> &'static str {
 
 /// Translate the fixed command label and substitute the currently configured export format.
 /// Reuse the existing translated PNG sentence, so dynamic formats work in every UI language.
-pub(super) fn translated_menu_label(lang: crate::i18n::Lang, item: &MenuItem) -> String {
+pub(super) fn translated_menu_label(lang: crate::i18n::Lang, id: &str, label: &str) -> String {
     // A document's name is shown as it is.
-    if item.id.starts_with(DOCUMENT_ITEM) {
-        return item.label.clone();
+    if id.starts_with(DOCUMENT_ITEM) {
+        return label.to_string();
     }
-    if item.id == "file.export.quickExportAsPng"
-        && let Some(fmt) = item.label.strip_prefix("Quick Export as ")
+    if id == "file.export.quickExportAsPng"
+        && let Some(fmt) = label.strip_prefix("Quick Export as ")
     {
-        return crate::i18n::tr_id(lang, &item.id, "Quick Export as PNG").replace("PNG", fmt);
+        return crate::i18n::tr_id(lang, id, "Quick Export as PNG").replace("PNG", fmt);
     }
-    crate::i18n::tr_id(lang, &item.id, &item.label).to_string()
+    crate::i18n::tr_id(lang, id, label).to_string()
 }

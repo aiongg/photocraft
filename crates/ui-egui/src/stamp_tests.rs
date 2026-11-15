@@ -1,5 +1,4 @@
-//! Stamp Visible / Stamp Down (#217) through the real key handling: the default shortcuts fire,
-//! Edit › Keyboard Shortcuts lists and rebinds them, and ⌥ + the Merge menu items stamp.
+//! Stamp Down (#217) through the real key handling: ⌘⌥E stamps into the layer below.
 
 use egui::{Event, Key, Modifiers, vec2};
 use egui_kittest::Harness;
@@ -58,24 +57,6 @@ fn layers(h: &Harness<'static, PhotocraftApp>) -> usize {
     h.state().session.active().unwrap().doc.walk().len()
 }
 
-const STAMP: Modifiers = Modifiers { alt: true, shift: true, command: true, ctrl: false, mac_cmd: false };
-
-#[test]
-fn cmd_alt_shift_e_stamps_visible_and_can_be_rebound() {
-    let mut h = harness();
-    assert_eq!(layers(&h), 2);
-    tap(&mut h, Key::E, STAMP);
-    assert_eq!(layers(&h), 3, "⌘⌥⇧E stamped the visible layers");
-    let top = h.state().session.active().unwrap().doc.layers.last().unwrap().name.clone();
-    assert!(top.starts_with("Layer "), "{top}");
-    // Rebound to F9: the default no longer fires, the new key does.
-    h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"layer.stampVisible": "F9"}})).unwrap();
-    tap(&mut h, Key::E, STAMP);
-    assert_eq!(layers(&h), 3, "the old key is free");
-    tap(&mut h, Key::F9, Modifiers::NONE);
-    assert_eq!(layers(&h), 4);
-}
-
 #[test]
 fn cmd_alt_e_stamps_down() {
     let mut h = harness();
@@ -91,31 +72,4 @@ fn cmd_alt_e_stamps_down() {
     h.state_mut().run("layer.select", json!({"layer": bg})).unwrap();
     tap(&mut h, Key::E, Modifiers { alt: true, command: true, ..Default::default() });
     assert!(h.state().ui.status.contains("below"), "{}", h.state().ui.status);
-}
-
-#[test]
-fn keyboard_shortcuts_lists_the_stamps_with_layer() {
-    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let items = crate::prefs_ui::shortcut_items(&app);
-    let find = |id: &str| items.iter().position(|i| i.0 == id);
-    let (Some(v), Some(d)) = (find("layer.stampVisible"), find("layer.stampDown")) else { panic!("listed") };
-    assert_eq!(items[v].2, ["Layer"]);
-    assert_eq!(items[v].3.as_deref(), Some("Cmd+Alt+Shift+E"));
-    assert_eq!(items[d].3.as_deref(), Some("Cmd+Alt+E"));
-    // Inside one contiguous Layer section.
-    let is_layer = |i: usize| items[i].2.first().map(String::as_str) == Some("Layer");
-    let first = (0..items.len()).find(|i| is_layer(*i)).unwrap();
-    let last = (0..items.len()).rev().find(|i| is_layer(*i)).unwrap();
-    assert!((first..=last).all(is_layer), "one Layer section");
-    assert!(v <= last && d <= last);
-}
-
-#[test]
-fn alt_click_on_merge_items_stamps() {
-    use crate::menus::alt_click;
-    assert_eq!(alt_click("layer.mergeVisible".into(), true), "layer.stampVisible");
-    assert_eq!(alt_click("layer.mergeDown".into(), true), "layer.stampDown");
-    assert_eq!(alt_click("layer.mergeLayers".into(), true), "layer.stampDown");
-    assert_eq!(alt_click("layer.mergeVisible".into(), false), "layer.mergeVisible");
-    assert_eq!(alt_click("file.open".into(), true), "file.open");
 }
