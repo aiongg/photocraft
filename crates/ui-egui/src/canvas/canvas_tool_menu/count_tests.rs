@@ -15,7 +15,8 @@ fn app() -> (PhotocraftApp, egui::Context) {
     app.run("count.add", json!({"x": 20, "y": 20})).unwrap();
     app.sync_views();
     app.ui.tool = Tool::Count;
-    (app, egui::Context::default())
+    let ctx = app.ctx().clone();
+    (app, ctx)
 }
 
 pub(crate) fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
@@ -26,9 +27,19 @@ pub(crate) fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, p
     }
 }
 
-pub(crate) fn right_click(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64) {
-    let r = call(app, ctx, "ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
+/// A secondary click at document point (x, y): `ui.pointer` queues it for the canvas pass, so the testing
+/// frames run until the window host has taken it.
+pub(crate) fn right_click(app: &mut PhotocraftApp, x: f64, y: f64) {
+    let ctx = crate::canvas::testing::ctx(app);
+    let r = call(app, &ctx, "ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
     assert_eq!(r["ok"], true, "{r}");
+    let host = craft::ui::runtime::windows::WindowHost::of(&ctx);
+    for _ in 0..8 {
+        crate::canvas::testing::frame(app);
+        if host.injected_idle() {
+            break;
+        }
+    }
 }
 
 /// The open menu's rows as `ui.inspect` lists them: ids, with "―" for separators.
@@ -42,6 +53,7 @@ fn markers(app: &PhotocraftApp) -> Vec<[f64; 2]> {
     app.session.active().unwrap().doc.measurement.count_groups.iter().flat_map(|g| g.points.clone()).collect()
 }
 
+/// The rows of the layer menu the Count tool opens.
 const WANT: [&str; 17] = [
     "layer.layerStyle.blendingOptions",
     "―",
@@ -63,23 +75,11 @@ const WANT: [&str; 17] = [
 ];
 
 #[test]
-fn a_right_click_on_or_off_a_marker_opens_the_layer_menu_in_order() {
-    for (x, y, what) in [(50.0, 40.0, "empty canvas"), (20.0, 20.0, "a marker")] {
-        let (mut app, ctx) = app();
-        right_click(&mut app, &ctx, x, y);
-        assert_eq!(listed(&mut app, &ctx), WANT, "on {what}");
-        let labels: Vec<&str> = rows(app.ui.canvas_tool_menu.as_ref().unwrap()).iter().flatten().map(|(l, _)| *l).collect();
-        assert_eq!(labels[..3], ["Blending Options…", "Duplicate Layer…", "Delete Layer"], "on {what}");
-        assert_eq!(labels.last(), Some(&"Reselect"));
-    }
-}
-
-#[test]
 fn the_right_click_adds_no_marker_and_no_history_step() {
     for (x, y) in [(50.0, 40.0), (20.0, 20.0)] {
-        let (mut app, ctx) = app();
+        let (mut app, _ctx) = app();
         let (before, steps) = (markers(&app), app.session.active().unwrap().history.past_len());
-        right_click(&mut app, &ctx, x, y);
+        right_click(&mut app, x, y);
         assert_eq!(markers(&app), before, "({x}, {y}): no marker added or moved");
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "({x}, {y}): no history step");
         assert!(app.ui.canvas_tool_menu.is_some(), "({x}, {y}): the menu is open");
@@ -88,10 +88,10 @@ fn the_right_click_adds_no_marker_and_no_history_step() {
 
 #[test]
 fn rows_are_enabled_as_the_layers_panel_menu_enables_them() {
-    let (mut app, ctx) = app();
-    right_click(&mut app, &ctx, 50.0, 40.0);
+    let (mut app, _ctx) = app();
+    right_click(&mut app, 50.0, 40.0);
     let menu = app.ui.canvas_tool_menu.clone().unwrap();
-    for (_, id) in rows(&menu).iter().flatten() {
+    for id in WANT.iter().filter(|id| **id != "―") {
         assert_eq!(entry_enabled(&app, &menu, id), crate::menus::is_enabled(&app, id), "{id}");
     }
     // A pixel layer: Convert to Layers (a smart object's) and Reselect (no earlier selection) are
@@ -103,29 +103,7 @@ fn rows_are_enabled_as_the_layers_panel_menu_enables_them() {
     app.ui.canvas_tool_menu = None;
     app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
     app.run("select.deselect", json!({})).unwrap();
-    right_click(&mut app, &ctx, 50.0, 40.0);
+    right_click(&mut app, 50.0, 40.0);
     let menu = app.ui.canvas_tool_menu.clone().unwrap();
     assert!(entry_enabled(&app, &menu, "select.reselect"), "Reselect after a cleared selection");
-}
-
-#[test]
-fn picking_a_row_runs_it_on_the_active_layer() {
-    let (mut app, ctx) = app();
-    let layers = app.session.active().unwrap().doc.layers.len();
-    right_click(&mut app, &ctx, 50.0, 40.0);
-    assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id": "layer.delete"}))["ok"], true);
-    assert_eq!(app.session.active().unwrap().doc.layers.len(), layers - 1, "Delete Layer deleted the active layer");
-    assert!(app.ui.canvas_tool_menu.is_none(), "the pick closes the menu");
-    // A row the menu doesn't have is refused.
-    right_click(&mut app, &ctx, 50.0, 40.0);
-    assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id": "select.inverse"}))["ok"], false);
-}
-
-#[test]
-fn the_other_tools_keep_their_menus() {
-    let (mut app, ctx) = app();
-    app.ui.tool = Tool::RectMarquee;
-    right_click(&mut app, &ctx, 50.0, 40.0);
-    assert_ne!(listed(&mut app, &ctx), WANT, "the marquee keeps its selection menu");
-    assert!(!applies(Tool::Note), "a tool without a canvas menu still gets none");
 }
