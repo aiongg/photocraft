@@ -200,7 +200,7 @@ fn dialogs_open_on_the_host_and_ok_runs_their_commands() {
         for (field, value) in &row.edits {
             app.framework.dialogs.set_json_field(&ctx, id, field, value.clone()).unwrap_or_else(|e| panic!("{}: {field}: {e}", row.menu));
         }
-        assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "{}: OK is enabled", row.menu);
+        crate::dialogs::confirm(&mut app, &ctx, id).unwrap_or_else(|e| panic!("{}: OK is enabled: {e}", row.menu));
 
         crate::canvas::testing::frame(&mut app);
         assert!(app.framework.dialogs.open_dialogs().is_empty(), "{}: OK closes the dialog", row.menu);

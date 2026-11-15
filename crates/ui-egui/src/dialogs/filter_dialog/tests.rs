@@ -1645,7 +1645,7 @@ fn replace_color_result_swatch_sets_the_sliders() {
     // PLAN: assumed the Color Picker child keeps its colour under `color` as a hex string.
     set(h.state_mut(), picker, "color", json!("#3355cc"));
     let ctx = h.ctx.clone();
-    h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker);
+    crate::dialogs::confirm(h.state_mut(), &ctx, picker).expect("OK is enabled");
     h.run_steps(3);
     let f = fields_of(h.state(), id);
     let n = |k: &str| f.number(k).unwrap() as f32;

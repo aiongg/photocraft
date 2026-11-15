@@ -194,8 +194,7 @@ fn set_field(h: &mut AppHarness, id: DialogId, field: &str, value: Value) -> Res
 
 /// Presses OK on dialog `id`; the next frames' dialog run applies the answer.
 fn confirm(h: &mut AppHarness, id: DialogId) {
-    let ctx = h.ctx.clone();
-    assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, id), "OK is enabled");
+    crate::dialogs::testing::confirm(h.state_mut(), id).expect("OK is enabled");
     h.run_steps(2);
 }
 

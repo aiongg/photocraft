@@ -81,7 +81,7 @@ fn export_with(h: &mut AppHarness, id: DialogId, options: &ExportOptions) {
         h.state_mut().framework.dialogs.set_json_field(&ctx, id, &field, value).unwrap();
     }
     h.state_mut().framework.dialogs.set_json_field(&ctx, id, "path", json!("/out/x")).unwrap();
-    assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, id));
+    crate::dialogs::confirm(h.state_mut(), &ctx, id).expect("OK is enabled");
     h.run_steps(3);
 }
 

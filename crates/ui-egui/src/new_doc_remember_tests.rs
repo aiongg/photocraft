@@ -60,8 +60,7 @@ pub(crate) fn set_options(h: &mut AppHarness, id: DialogId, options: &DocumentOp
 
 /// Presses Create on dialog `id`; the frames after it run the pump.
 pub(crate) fn press_create(h: &mut AppHarness, id: DialogId) -> bool {
-    let ctx = h.ctx.clone();
-    let enabled = h.state_mut().framework.dialogs.confirm_by_id(&ctx, id);
+    let enabled = crate::dialogs::testing::confirm(h.state_mut(), id).is_ok();
     h.run_steps(3);
     enabled
 }

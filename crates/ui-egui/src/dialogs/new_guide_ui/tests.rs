@@ -49,8 +49,7 @@ fn set_guide(h: &mut H, id: DialogId, orientation: &str, position: f64) {
 }
 
 fn confirm(h: &mut H, id: DialogId) -> bool {
-    let ctx = h.ctx.clone();
-    let accepted = h.state_mut().framework.dialogs.confirm_by_id(&ctx, id);
+    let accepted = crate::dialogs::testing::confirm(h.state_mut(), id).is_ok();
     h.run_steps(3);
     accepted
 }

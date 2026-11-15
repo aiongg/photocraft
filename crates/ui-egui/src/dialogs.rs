@@ -727,8 +727,6 @@ pub(crate) mod testing {
     /// defaults when it first shows, so its fields read empty until a pass has run.
     pub(crate) fn show(app: &mut PhotocraftApp) {
         let ctx = app.ctx().clone();
-        let mut output = ctx.run_ui(Default::default(), |ui| super::run(app, ui));
-        // No renderer takes the pass's texture uploads.
-        output.textures_delta.clear();
+        crate::testing::run_ui(&ctx, Default::default(), |ui| super::run(app, ui));
     }
 }

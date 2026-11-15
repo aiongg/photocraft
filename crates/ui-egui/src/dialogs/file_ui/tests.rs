@@ -40,7 +40,7 @@ fn answer_path(app: &mut PhotocraftApp, id: DialogId, path: &str) {
 fn confirm(app: &mut PhotocraftApp, id: DialogId) {
     let ctx = app.ctx().clone();
     if app.framework.dialogs.get_by_id::<HostedSaveForWeb>(id).is_some() {
-        assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "OK needs the path answered");
+        crate::dialogs::confirm(app, &ctx, id).expect("OK needs the path answered");
     }
     take(app, &ctx);
 }

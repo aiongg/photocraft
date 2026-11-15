@@ -24,8 +24,7 @@ fn set(app: &mut PhotocraftApp, id: DialogId, field: &str, value: Value) {
 
 /// Answers OK, which runs the command through `take`.
 fn confirm_by_id(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = app.ctx().clone();
-    crate::dialogs::confirm(app, &ctx, id).unwrap();
+    crate::dialogs::testing::confirm(app, id).unwrap();
 }
 
 fn doc_size(app: &PhotocraftApp) -> photocraft_doc::Size {

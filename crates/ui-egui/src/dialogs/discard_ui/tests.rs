@@ -250,7 +250,7 @@ fn answer(h: &mut Prompted, choice: &str, all: bool) {
     if all {
         host.set_json_field(&ctx, id, "applyToAll", json!(true)).unwrap();
     }
-    assert!(host.confirm_by_id(&ctx, id), "the question takes the answer");
+    crate::dialogs::confirm(h.state_mut(), &ctx, id).expect("the question takes the answer");
     h.run_steps(2);
 }
 

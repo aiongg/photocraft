@@ -11,13 +11,13 @@ use crate::canvas::testing::{key, move_to, press, release};
 use crate::state::Tool;
 
 /// Sends a control request and returns its reply, through the canvas driver's control channel (`testing::control`).
-pub(crate) fn call(app: &mut PhotocraftApp, _ctx: &egui::Context, method: &str, params: Value) -> Value {
+pub(crate) fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     crate::canvas::testing::control(app, method, params)
 }
 
 /// `call` that asserts the reply is ok.
-pub(crate) fn accepted(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) {
-    let reply = call(app, ctx, method, params);
+pub(crate) fn accepted(app: &mut PhotocraftApp, _ctx: &egui::Context, method: &str, params: Value) {
+    let reply = call(app, method, params);
     assert_eq!(reply["ok"], true, "{method}: {reply}");
 }
 
@@ -245,7 +245,7 @@ fn invalid_move_show_transform_is_atomic_with_other_ui_fields() {
         let before = serde_json::to_value(&app.ui).unwrap();
         let doc = app.session.active().unwrap().doc.clone();
         let steps = app.session.active().unwrap().history.past_len();
-        let reply = call(&mut app, &ctx, "ui.set", json!({"tool": "Brush", "zoom": 2.0, "moveShowTransform": invalid}));
+        let reply = call(&mut app, "ui.set", json!({"tool": "Brush", "zoom": 2.0, "moveShowTransform": invalid}));
         assert_eq!(reply["ok"], false, "{reply}");
         assert!(reply["error"].as_str().unwrap().contains("moveShowTransform"), "{reply}");
         assert_eq!(serde_json::to_value(&app.ui).unwrap(), before, "no UI field changed");
@@ -259,7 +259,7 @@ fn invalid_move_show_transform_is_atomic_with_other_ui_fields() {
 fn move_show_transform_is_retained_when_omitted_and_waits_for_all_validation() {
     let (mut app, ctx, _) = fixture();
     accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": false}));
-    let reply = call(&mut app, &ctx, "ui.set", json!({"moveShowTransform": true, "zoom": "bad"}));
+    let reply = call(&mut app, "ui.set", json!({"moveShowTransform": true, "zoom": "bad"}));
     assert_eq!(reply["ok"], false);
     assert!(!app.ui.tool_options.move_show_transform);
     accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": true}));
@@ -276,7 +276,6 @@ fn invalid_later_pointer_event_does_not_begin_a_transform() {
     let steps = app.session.active().unwrap().history.past_len();
     let reply = call(
         &mut app,
-        &ctx,
         "ui.pointer",
         json!({"events": [
             {"kind": "down", "x": 800, "y": 500},

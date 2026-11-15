@@ -25,8 +25,7 @@ fn set(app: &mut PhotocraftApp, id: DialogId, color: &str) {
 }
 
 fn confirm_picker(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = app.ctx().clone();
-    assert!(app.framework.dialogs.confirm_by_id(&ctx, id));
+    crate::dialogs::testing::confirm(app, id).expect("OK is enabled");
     let result = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id).unwrap();
     answered(app, result);
 }

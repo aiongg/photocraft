@@ -83,9 +83,9 @@ fn open(app: &mut PhotocraftApp) -> (DialogId, DialogFields) {
 fn confirm(app: &mut PhotocraftApp, id: DialogId) {
     let ctx = app.ctx().clone();
     PhotocraftApp::setup_context(&ctx, Default::default());
-    app.framework.dialogs.confirm_by_id(&ctx, id);
+    crate::dialogs::testing::confirm(app, id).expect("OK is accepted");
     for _ in 0..3 {
-        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(app, ui)).textures_delta.clear();
+        crate::testing::run_ui(&ctx, Default::default(), |ui| crate::dialogs::run(app, ui));
     }
 }
 

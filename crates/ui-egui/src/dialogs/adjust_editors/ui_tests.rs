@@ -421,7 +421,7 @@ fn photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step()
     show_in_picker(&mut h, picker, "#00ff80");
     show_in_picker(&mut h, picker, "#00ff00");
     assert_eq!(history_len(&h), before);
-    assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker));
+    crate::dialogs::confirm(h.state_mut(), &ctx, picker).expect("OK is enabled");
     h.run_steps(4);
     assert!(h.state().live_adjust.is_none());
     assert_eq!(photo_filter_color(&layer(&h).1), [0.0, 1.0, 0.0]);
@@ -444,7 +444,7 @@ fn gradient_map_stop_picker_closed_without_a_colour_changes_nothing() {
     for button in ["Cancel", "OK"] {
         let picker = open_picker(&mut h, "Color");
         if button == "OK" {
-            assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker));
+            crate::dialogs::confirm(h.state_mut(), &ctx, picker).expect("OK is enabled");
         } else {
             h.state_mut().framework.dialogs.cancel_by_id(&ctx, picker);
         }

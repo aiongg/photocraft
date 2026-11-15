@@ -50,8 +50,7 @@ fn set(app: &mut PhotocraftApp, id: DialogId, fields: Value) {
 }
 
 fn confirm_by_id(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = app.ctx().clone();
-    crate::dialogs::confirm(app, &ctx, id).unwrap();
+    crate::dialogs::testing::confirm(app, id).unwrap();
 }
 
 fn only_dialog(app: &PhotocraftApp) -> DialogId {

@@ -52,10 +52,9 @@ mod tests {
             v.outer_rect = outer;
             v.maximized = maximized;
         }
-        let mut out = ctx.run_ui(input, |ui| {
+        let out = crate::testing::run_ui(&ctx, input, |ui| {
             fit_window(ui.ctx());
         });
-        out.textures_delta.clear();
         out.viewport_output.get(&egui::ViewportId::ROOT).map(|v| v.commands.clone()).unwrap_or_default()
     }
 
@@ -84,10 +83,9 @@ mod tests {
             v.monitor_size = Some(MONITOR);
             v.maximized = Some(false);
         }
-        let mut out = ctx.run_ui(input, |ui| {
+        let out = crate::testing::run_ui(&ctx, input, |ui| {
             fit_window(ui.ctx());
         });
-        out.textures_delta.clear();
         let cmds = out.viewport_output.get(&egui::ViewportId::ROOT).map(|v| v.commands.clone()).unwrap_or_default();
         assert_eq!(cmds.contains(&egui::ViewportCommand::Maximized(true)), !cfg!(target_os = "macos"));
     }

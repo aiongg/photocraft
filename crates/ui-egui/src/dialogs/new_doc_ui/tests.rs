@@ -119,7 +119,7 @@ fn a_custom_background_color_is_picked_and_used() {
     assert_eq!(opened.len(), 2);
     let ctx = h.ctx.clone();
     h.state_mut().framework.dialogs.set_json_field(&ctx, picker, "color", json!("#336699")).unwrap();
-    assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker), "OK is enabled");
+    crate::dialogs::confirm(h.state_mut(), &ctx, picker).expect("OK is enabled");
     h.run_steps(3);
     assert!(matches!(crate::new_doc_remember_tests::options(h.state(), id).background, BackgroundContents::Custom(_)), "{}", fields(h.state(), id));
     assert!(press_create(&mut h, id));

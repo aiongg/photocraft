@@ -38,8 +38,7 @@ fn set_group(h: &mut Harness<'static, PhotocraftApp>, id: DialogId, field: &str,
 }
 
 fn confirm(h: &mut Harness<'static, PhotocraftApp>, id: DialogId) -> bool {
-    let ctx = h.ctx.clone();
-    let accepted = h.state_mut().framework.dialogs.confirm_by_id(&ctx, id);
+    let accepted = crate::dialogs::testing::confirm(h.state_mut(), id).is_ok();
     h.run_steps(3);
     accepted
 }

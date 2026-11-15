@@ -90,7 +90,7 @@ fn answer_with(h: &mut Harness<'static, PhotocraftApp>, action: &str, remember: 
     if remember {
         host.set_json_field(&ctx, id, "remember", json!(true)).unwrap();
     }
-    assert!(host.confirm_by_id(&ctx, id), "OK answers the prompt");
+    crate::dialogs::confirm(h.state_mut(), &ctx, id).expect("OK answers the prompt");
     settle(h);
 }
 
