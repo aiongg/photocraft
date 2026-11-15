@@ -18,7 +18,6 @@ use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolPath, ToolPointer};
 use craft::ui::primitives::{Draw, PaintShape, StrokeColor, StrokeWidth};
 use craft::ui::runtime::env::Label;
-use craft::ui::style::DataColor;
 use photocraft_engine::float_cmds::Floating;
 use serde_json::json;
 
@@ -356,7 +355,7 @@ impl CanvasTool for MoveRun<'_> {
         }
         let dir = travel.normalized();
         let side = egui::vec2(-dir.y, dir.x);
-        let accent = StrokeColor::Data(DataColor::new(style.color(style.tokens.color.overlay.line)));
+        let accent = StrokeColor::Theme(style.color(style.tokens.color.overlay.line));
         draw.stroke(&PaintShape::Path(vec![from, to]), StrokeWidth::Medium, accent);
         draw.stroke(&PaintShape::Path(vec![to - dir * 10.0 + side * 5.0, to, to - dir * 10.0 - side * 5.0]), StrokeWidth::Medium, accent);
     }
