@@ -621,12 +621,11 @@ fn shell_dialogs_are_listed_and_driven_through_ui_dialog() {
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
     assert!(!app.ui.view.show.notes && dialogs(&mut app, &ctx).is_empty());
     // An OK that fails keeps the dialog open and says why.
-    crate::menus::invoke(&mut app, &ctx, "view.show.showExtrasOptions", json!({})).unwrap();
+    crate::menus::invoke(&mut app, &ctx, "view.pixelAspectRatio.custom", json!({})).unwrap();
     let id = top_dialog(&mut app, &ctx)["id"].clone();
-    call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": "bogus", "value": true}));
     let r = call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": id}));
     assert_eq!(r["ok"], false);
-    assert!(r["error"].as_str().unwrap_or("").contains("bogus"), "{r}");
+    assert!(r["error"].as_str().unwrap_or("").contains("name"), "{r}");
     assert_eq!(dialogs(&mut app, &ctx).len(), 1);
     // Apply is Preferences-only; an id no dialog has is refused.
     assert_eq!(call(&mut app, &ctx, "ui.dialog.apply", json!({"dialog": id}))["ok"], false);

@@ -302,6 +302,7 @@ mod tests {
         assert_eq!(sm.smart_filters.len(), 1);
         let app_ctx = app.ctx().clone();
         open_editor(&mut app, &app_ctx, id, &sm, 0);
+        crate::dialogs::testing::show(&mut app);
         let d = app.framework.dialogs.open_dialogs().pop().expect("the adjustment editor opened");
         let fields = d.fields.expect("the editor's fields");
         assert_eq!(fields["brightness"].as_f64(), Some(40.0), "the recorded settings");
@@ -342,6 +343,7 @@ mod tests {
         // The open dialog's fields, whatever its type.
         let fields_of = |app: &PhotocraftApp, dialog| app.framework.dialogs.open_dialogs().into_iter().find(|d| d.id == dialog).and_then(|d| d.fields).unwrap();
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
+        h.run_steps(2);
         let dialog = h.state().framework.dialogs.open_dialogs().pop().unwrap().id;
         h.run_steps(3);
         let fields = fields_of(h.state(), dialog);
@@ -365,6 +367,7 @@ mod tests {
         assert_eq!(adjustments[4], [10.0, 0.0, 0.0, 0.0], "the edited row renders");
         // And reopens as edited.
         open_editor(h.state_mut(), &ctx, id, &sm, 0);
+        h.run_steps(2);
         let dialog = h.state().framework.dialogs.open_dialogs().pop().unwrap().id;
         h.run_steps(3);
         let fields = fields_of(h.state(), dialog);
@@ -394,6 +397,7 @@ mod tests {
         let sm = smart(&app, &app.session.active().unwrap().doc);
         let ctx = app.ctx().clone();
         open_editor(&mut app, &ctx, id, &sm, 0);
+        crate::dialogs::testing::show(&mut app);
         let open = app.framework.dialogs.open_dialogs().pop().expect("the filter's dialog opened");
         let (dialog, key) = (open.id, open.key.unwrap_or_default());
         app.framework.dialogs.set_json_field(&ctx, dialog, "radius", json!(6.0)).unwrap();

@@ -90,6 +90,7 @@ fn adjustment_editor_reopens_stored_parameters_and_updates_instead_of_appending(
     let ctx = egui::Context::default();
     let sm = smart(&app, layer).clone();
     super::open_editor(&mut app, &ctx, layer.0, &sm, 2);
+    crate::dialogs::testing::show(&mut app);
     assert_eq!(fields(&app)["hue"].as_f64(), Some(35.0));
     set(&mut app, &ctx, "hue", json!(75));
     let idx = app.session.active_index().unwrap();
@@ -105,6 +106,7 @@ fn adjustment_editor_reopens_stored_parameters_and_updates_instead_of_appending(
     app.run("image.adjustments.invert", json!({})).unwrap();
     let sm = smart(&app, layer).clone();
     super::open_editor(&mut app, &ctx, layer.0, &sm, 3);
+    crate::dialogs::testing::show(&mut app);
     assert!(app.framework.dialogs.open_dialogs().is_empty(), "Invert has no parameter editor");
 }
 
@@ -120,6 +122,7 @@ fn stored_after_confirming_unedited(mode: &str, command: &str, recorded: &serde_
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
+    h.run_steps(2);
     h.run_steps(3);
     confirm(h.state_mut());
     let after = smart(h.state(), layer);
@@ -186,12 +189,14 @@ fn a_lab_tone_smart_filter_opens_with_its_settings_on_the_lightness_channel() {
     let ctx = egui::Context::default();
 
     super::open_editor(&mut app, &ctx, layer.0, &sm, 2);
+    crate::dialogs::testing::show(&mut app);
     let shown = fields(&app);
     assert_eq!(shown["lightness"], dim);
     assert_eq!(shown["points"], dim, "both keys say the same");
     cancel(&mut app);
 
     super::open_editor(&mut app, &ctx, layer.0, &sm, 3);
+    crate::dialogs::testing::show(&mut app);
     let shown = fields(&app);
     assert_eq!(shown["lightness"]["inBlack"].as_f64(), Some(30.0));
     assert_eq!(shown["inBlack"].as_f64(), Some(30.0), "both keys say the same");
@@ -206,6 +211,7 @@ fn an_unreadable_adjustment_smart_filter_opens_with_its_recorded_values() {
     let mut sm = smart(&app, layer).clone();
     sm.smart_filters[2].params = json!({"points": "not a curve"});
     super::open_editor(&mut app, &egui::Context::default(), layer.0, &sm, 2);
+    crate::dialogs::testing::show(&mut app);
     assert_eq!(fields(&app)["points"], json!("not a curve"));
 }
 
@@ -249,6 +255,7 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
+    h.run_steps(2);
     h.run_steps(3);
     let shown = fields(h.state());
     assert_eq!(shown["reduceNoise"].as_f64(), Some(10.0), "the spec default, not the remembered 60");
@@ -331,6 +338,7 @@ fn tone_filter_editor_ignores_current_channel_target() {
                 PhotocraftApp::setup_context(&h.ctx, Default::default());
                 let ctx = h.ctx.clone();
                 super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
+                h.run_steps(2);
                 let values = fields(h.state());
                 assert_eq!(values.get("target"), None, "{mode} {kind} view={view}: no channel target is added to a Smart Filter");
                 let read = |p: &serde_json::Value| adjust_params::from_params(kind, p, None, color_mode).unwrap();
@@ -387,6 +395,7 @@ fn rabbit_whole_image_curves_alias_survives_reopening() {
                 let filters = smart(&app, layer).clone();
                 let ctx = egui::Context::default();
                 super::open_editor(&mut app, &ctx, layer.0, &filters, 2);
+                crate::dialogs::testing::show(&mut app);
                 assert!(fields(&app).get("gray").is_none(), "the alias must be consumed before defaults");
                 let idx = app.session.active_index().unwrap();
                 crate::canvas::ensure_filter_preview(&mut app, idx, &ctx).unwrap();
@@ -417,6 +426,7 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         PhotocraftApp::setup_context(&h.ctx, Default::default());
         let ctx = h.ctx.clone();
         super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
+        h.run_steps(2);
         h.run_steps(3);
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).any(|n| n.value().as_deref() == Some("RGB")));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":1}));
@@ -476,6 +486,7 @@ fn rabbit_whole_image_levels_alias_is_visible_and_editable() {
             let filters = smart(&app, layer).clone();
             let ctx = egui::Context::default();
             super::open_editor(&mut app, &ctx, layer.0, &filters, 2);
+            crate::dialogs::testing::show(&mut app);
             let shown = fields(&app);
             assert_eq!(shown["gamma"], json!(2.0));
             assert!(shown.get("gray").is_none());
@@ -519,6 +530,7 @@ fn edit_first_filter(app: PhotocraftApp, id: u64) -> Harness<'static, Photocraft
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, id, &sm, 0);
+    h.run_steps(2);
     h.run_steps(3);
     h
 }
