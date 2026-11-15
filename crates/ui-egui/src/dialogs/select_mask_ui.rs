@@ -208,11 +208,6 @@ impl PcSelectMaskSource {
         }
     }
 
-    /// The source as `Any`, so the app reads its own facts back from the host's trait object.
-    fn pc(source: &dyn SelectMaskSource) -> Option<&PcSelectMaskSource> {
-        source.as_any().downcast_ref() // PLAN: assumed `SelectMaskSource::as_any(&self) -> &dyn std::any::Any` (dialogs-w10)
-    }
-
     #[cfg(test)]
     pub(crate) fn cached_edits(&self) -> Option<usize> {
         lock(&self.shared.cache).as_ref().map(|c| c.base.edits.len())
@@ -241,10 +236,6 @@ impl SelectMaskSource for PcSelectMaskSource {
 
     fn image(&self) -> &dyn RasterSource {
         &*self.image
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 
     fn ants(&self) -> Option<(&dyn MaskSource, u32)> {
@@ -318,10 +309,9 @@ fn command_params(cmd: &SelectMaskCommand, target_mask: bool) -> Value {
 
 /// The params OK runs `select.refineEdge` with, over the open workspace.
 pub(crate) fn commit_params(app: &PhotocraftApp) -> Option<Value> {
-    let (id, ..) = app.select_mask_target.as_ref()?;
+    let (id, _, _, source) = app.select_mask_target.as_ref()?;
     let hosted = app.framework.dialogs.get_by_id::<Hosted>(*id)?;
-    let target_mask = PcSelectMaskSource::pc(&**hosted.source())?.target_mask;
-    Some(command_params(&hosted.workspace().command(), target_mask))
+    Some(command_params(&hosted.workspace().command(), source.target_mask))
 }
 
 /// The facts of the open workspace for the control surface (merged with the workspace's own fields; a refused OK's
@@ -336,10 +326,9 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
     }))
 }
 
-/// The source of the open workspace, read back from the dialog host.
+/// The source of the open workspace: the app keeps its own handle beside the dialog's.
 pub(crate) fn source(app: &PhotocraftApp) -> Option<&PcSelectMaskSource> {
-    let (id, ..) = app.select_mask_target.as_ref()?;
-    PcSelectMaskSource::pc(&**app.framework.dialogs.get_by_id::<Hosted>(*id)?.source())
+    app.select_mask_target.as_ref().map(|(.., source)| &**source)
 }
 
 /// Opens the workspace on the selection (or the active layer's mask).
@@ -369,9 +358,9 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     // PLAN: the navigation, transparency-grid and cursor preferences have no app accessor in this tree; the workspace
     // opens with the framework's defaults for them.
     let open = SelectMaskOpen::new(size, subject, limits).settings(settings).target_mask(target_mask).remember(REMEMBERED);
-    let hosted = HostedWorkspace::new(SelectMaskWorkspace::new(open), source as Arc<dyn SelectMaskSource>).held_ok();
+    let hosted = HostedWorkspace::new(SelectMaskWorkspace::new(open), Arc::clone(&source) as Arc<dyn SelectMaskSource>).held_ok();
     let dialog = app.framework.dialogs.open(hosted);
-    app.select_mask_target = Some((dialog, document, layer));
+    app.select_mask_target = Some((dialog, document, layer, source));
     Ok(dialog)
 }
 
@@ -379,7 +368,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
 /// selected by a shortcut or the control channel). `select.refineEdge` works on the active layer, so its edits must
 /// not run there. A document switch is `distort_ui::drop_foreign`'s.
 pub(crate) fn stale(app: &PhotocraftApp) -> Option<&'static str> {
-    let (_, document, opened_on) = app.select_mask_target.as_ref()?;
+    let (_, document, opened_on, _) = app.select_mask_target.as_ref()?;
     let st = app.session.active().filter(|st| st.doc.id == *document)?;
     let layer = st.active_layer.filter(|id| st.doc.layer(*id).is_some());
     (layer != Some(*opened_on)).then_some(tl!("Select and Mask was closed: another layer was selected"))
@@ -428,7 +417,10 @@ fn follow_revision(app: &mut PhotocraftApp, id: DialogId) {
     }
     let Some(source) = PcSelectMaskSource::of_active(app, layer, target_mask).map(Arc::new) else { return };
     if let Some(hosted) = app.framework.dialogs.get_mut_by_id::<Hosted>(id) {
-        hosted.set_source(source as Arc<dyn SelectMaskSource>);
+        hosted.set_source(Arc::clone(&source) as Arc<dyn SelectMaskSource>);
+    }
+    if let Some(target) = app.select_mask_target.as_mut() {
+        target.3 = source;
     }
 }
 

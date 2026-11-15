@@ -123,7 +123,7 @@ mod tests {
             doc: photocraft_doc::DocId(1),
             revision,
             sources: Vec::new(),
-            dialog,
+            dialog: craft::ui::dialog::DialogId::new(dialog),
             active: None,
             target: Default::default(),
             command: "image.mode.indexedColor".into(),

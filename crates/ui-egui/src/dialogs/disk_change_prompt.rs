@@ -16,7 +16,7 @@ use crate::PhotocraftApp;
 /// a flat file confirmed in the Save dialog.
 pub(crate) struct HeldSave {
     doc: DocId,
-    path: String,
+    pub(crate) path: String,
     flat: bool,
     choices: crate::FormatChoices,
 }

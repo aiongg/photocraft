@@ -13,9 +13,6 @@ const COMMAND: &str = "file.print";
 /// Keys of `file.print` that the print panel's `Settings` carries instead of a section row.
 const SETTINGS_KEYS: [&str; 4] = ["printer", "copies", "duplex", "grayscale"];
 
-/// Keys of `file.print` that are not dialog fields: the driver's own state, which the print panel keeps.
-const DRIVER_KEYS: [&str; 3] = ["printerSettings", "printable", "units"];
-
 /// Number fields: a remembered whole number (`100`) is still a number field's value.
 const NUMERIC_KEYS: [&str; 4] = ["top", "left", "scale", "bleed"];
 
@@ -91,26 +88,6 @@ fn write_settings(fields: &mut DialogFields, settings: &Settings) {
     fields.set("grayscale", FieldValue::Bool(settings.grayscale));
 }
 
-/// Writes the driver's own state from the panel's Print Settings… (the `printerSettings` hex and the
-/// printable area) into the fields `file.print` reads. Absent state removes the keys, so a printer
-/// without a driver answer keeps neither.
-fn write_driver(fields: &mut DialogFields, settings: &Settings) {
-    // PLAN: assumed `Settings::driver: Option<String>` (the DEVMODE hex) and
-    // `Settings::printable: Option<[f64; 4]>` (left, top, right, bottom in points); dialogs-w16 names them.
-    match &settings.driver {
-        Some(hex) => fields.set("printerSettings", FieldValue::Text(hex.clone())),
-        None => {
-            fields.remove("printerSettings");
-        }
-    }
-    match settings.printable {
-        Some(area) => fields.set("printable", FieldValue::List(area.iter().map(|v| FieldValue::Number(*v)).collect())),
-        None => {
-            fields.remove("printable");
-        }
-    }
-}
-
 /// Opens the Print dialog seeded from the last print (also from an earlier session), filling
 /// missing fields with defaults. The printer list is asked for by the dialog's first pass
 /// (`take`). Returns the dialog's id without submitting a print job.
@@ -125,7 +102,7 @@ pub fn open_print(app: &mut PhotocraftApp) -> DialogId {
             paper = p.clone();
         }
         for (k, v) in m {
-            if k == "paper" || SETTINGS_KEYS.contains(&k.as_str()) || DRIVER_KEYS.contains(&k.as_str()) {
+            if k == "paper" || SETTINGS_KEYS.contains(&k.as_str()) {
                 continue;
             }
             if let Some(value) = field_value(k, v) {
@@ -499,7 +476,6 @@ pub(super) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn finish(app: &mut PhotocraftApp, answer: PrintAnswer) {
     let mut fields = answer.fields;
     write_settings(&mut fields, &answer.settings);
-    write_driver(&mut fields, &answer.settings);
     match answer.finish {
         PrintFinish::Print => {
             if let Err(e) = print_confirm(app, &fields) {

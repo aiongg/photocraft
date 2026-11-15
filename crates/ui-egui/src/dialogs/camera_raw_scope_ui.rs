@@ -142,6 +142,13 @@ impl ScopeData {
     }
 }
 
+/// The vectorscope of the picture before or after the settings, over the whole frame or the selected region, as the control
+/// channel's reply.
+pub(crate) fn vectorscope_reply(data: &ScopeData, before: bool, region: bool) -> serde_json::Value {
+    let vectorscope = data.vectorscope(before, region);
+    serde_json::json!({"before": before, "selectedRegion": region, "hues": HUES, "saturations": SATURATIONS, "samples": vectorscope.samples, "counts": vectorscope.counts})
+}
+
 /// The proxy pixel under `at` (0..=1 each way over the picture), straight RGBA. `refined` is the
 /// full-resolution develop's pixel there, which wins when it has one. `None` outside the picture,
 /// over a transparent pixel or one that is not finite.

@@ -446,6 +446,8 @@ pub struct PhotocraftApp {
     pub(crate) adjust_session: Option<adjust_editors::PropertiesAdjust>,
     /// The Color Picker dialog asking for a screen sample: the dialog and the field that took it.
     pub(crate) dialog_dropper: Option<(craft::ui::dialog::DialogId, String)>,
+    /// The child dialog (colour picker or contour editor) the open Layer Style dialog has, with that dialog's id.
+    pub(crate) layer_style_child: Option<(craft::ui::dialog::DialogId, dialogs::layer_style::Child)>,
     /// What each open Color Picker edits (`color_picker_ui`).
     pub(crate) color_targets: HashMap<craft::ui::dialog::DialogId, color_picker_ui::PickTarget>,
     /// Colours a Color Picker answered with OK, waiting for their owner: (dialog, field, colour).
@@ -460,7 +462,7 @@ pub struct PhotocraftApp {
     /// The Layer Style, Select and Mask and parameter dialogs' open targets, one field per family,
     /// keyed by the dialog.
     pub(crate) layer_style_target: Option<(craft::ui::dialog::DialogId, DocId, photocraft_doc::LayerId)>,
-    pub(crate) select_mask_target: Option<(craft::ui::dialog::DialogId, DocId, photocraft_doc::LayerId)>,
+    pub(crate) select_mask_target: Option<(craft::ui::dialog::DialogId, DocId, photocraft_doc::LayerId, std::sync::Arc<select_mask_ui::PcSelectMaskSource>)>,
     /// The Guide Layout dialog's document.
     pub(crate) guide_layout_doc: Option<(craft::ui::dialog::DialogId, DocId)>,
     /// The Export As dialog that is open.

@@ -3,6 +3,7 @@ use craft::imaging::ui::color_range::SampleTool;
 use craft::keymap::Mods;
 use egui::Modifiers;
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use photocraft_doc::{Color, ColorMode, SampleType, Size};
 use photocraft_geom::Rect as GRect;
 

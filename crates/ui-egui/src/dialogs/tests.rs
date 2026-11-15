@@ -144,7 +144,7 @@ fn the_one_time_move_stores_owned_dialog_values_once_and_leaves_engine_read_keys
     assert!(table("photocraft.shape.create.ellipse").is_none());
     assert_eq!(
         table("photocraft.edit.fill").unwrap().get("mode"),
-        Some(&toml::Value::String(crate::layers_tree::blend_key(photocraft_color::BlendMode::ColorBurn)))
+        Some(&toml::Value::String(crate::panels::layers_tree::blend_key(photocraft_color::BlendMode::ColorBurn)))
     );
     let mut left: Vec<&str> = prefs.dialogs.keys().map(String::as_str).collect();
     left.sort_unstable();

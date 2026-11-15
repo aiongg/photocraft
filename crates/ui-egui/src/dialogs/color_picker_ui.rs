@@ -439,8 +439,7 @@ mod screen_integration_tests {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
             let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, Default::default());
             app.ui.tool = crate::state::Tool::Type;
-            // PLAN: assumed dialogs-w39's capture source is set with `screen_picker::set_capture(app, Box<dyn ..>)`.
-            crate::screen_picker::set_capture(&mut app, Box::new(StillCapture::color(Srgba::rgb(1.0, 136.0 / 255.0, 0.0))));
+            app.services.screen_capture = Some(std::sync::Arc::new(|| Box::new(StillCapture::color(Srgba::rgb(1.0, 136.0 / 255.0, 0.0)))));
             app
         });
         h.run_steps(8);

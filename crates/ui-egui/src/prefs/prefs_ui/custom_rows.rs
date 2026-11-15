@@ -8,7 +8,7 @@ use craft::theme_store::ui::AppearancePage;
 use craft::theme_store::{SelectionChange, SuiteClient};
 use craft::ui::buttons::Button;
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
+use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Text;
 use craft::ui::form::Field;
 use craft::ui::pickers::Select;
@@ -237,10 +237,14 @@ impl PrefsCustom<'_> {
                 };
                 draft.set(APPEARANCE_MODE, &name);
             }
-            if let Some(id) = change.theme_light.filter(|_| change.theme_light != shown.theme_light) {
+            if change.theme_light != shown.theme_light
+                && let Some(id) = &change.theme_light
+            {
                 draft.set(LIGHT_THEME, &id.as_str());
             }
-            if let Some(id) = change.theme_dark.filter(|_| change.theme_dark != shown.theme_dark) {
+            if change.theme_dark != shown.theme_dark
+                && let Some(id) = &change.theme_dark
+            {
                 draft.set(DARK_THEME, &id.as_str());
             }
         }

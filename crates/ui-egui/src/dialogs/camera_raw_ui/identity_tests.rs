@@ -68,7 +68,7 @@ fn identity_app() -> (PhotocraftApp, RawOpen, Control) {
 /// another event changes the tab list. No sleeps, timing races or fake decoder are needed.
 fn completed_redevelop(app: &mut PhotocraftApp, raw: &RawOpen) -> (CameraRaw, Value, photocraft_doc::DocId) {
     app.background_jobs = true;
-    let params = CameraRaw { exposure: 1.0, contrast: 20.0, ..Default::default() };
+    let params = cr!(exposure: 1.0, contrast: 20.0);
     let started = commit_open_raw(app, &params, raw, None).unwrap();
     let job = photocraft_engine::jobs::JobId(started["job"].as_u64().expect("the sensor re-develop runs as a real job"));
     let mut result = app.session.wait_job(job).unwrap();

@@ -94,7 +94,7 @@ fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
     // #6323: a press condition installed in the system can be the CMYK working space, as in
     // Photoshop's Color Settings; each working-space menu lists only profiles of its space.
     use photocraft_cms::{ColorSpace, ProfileClass};
-    let p = |path: &str, class, color_space| InstalledProfile { path: path.into(), description: path.to_uppercase(), class, color_space };
+    let p = |path: &str, class, color_space| photocraft_engine::installed_profiles::InstalledProfile { path: path.into(), description: path.to_uppercase(), class, color_space };
     let installed = [
         p("gracol.icc", ProfileClass::Output, ColorSpace::Cmyk),
         p("monitor.icc", ProfileClass::Display, ColorSpace::Rgb),
@@ -127,7 +127,7 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
     let colors = rows::indexed_matte_defaults(&app);
 
     let doc = app.session.active().unwrap().doc.clone();
-    let source = app.session.color.working(ColorMode::Rgb);
+    let source = app.session.color.working(photocraft_doc::ColorMode::Rgb);
     let destination = photocraft_engine::color_cmds::document_profile(&doc);
     let transform = Transform::new(&source, &destination, app.session.color.settings.intent(), app.session.color.settings.bpc).unwrap();
     for (value, input) in [("foreground", [0.2, 0.4, 0.8]), ("background", [0.8, 0.4, 0.2])] {
@@ -143,10 +143,10 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
 #[test]
 fn only_direction_angles_get_the_dial() {
     // Every listed command still has a degree `angle` row, so the list cannot go stale.
-    let app = new_app();
-    let has_dial = |cmd: &str| {
+    let mut app = new_app();
+    let mut has_dial = |cmd: &str| {
         let spec = photocraft_engine::commands::find(cmd).unwrap_or_else(|| panic!("{cmd} is not a command")).params;
-        params(&app, cmd, spec).iter().any(|p| p.key == "angle" && matches!(p.kind, ParamKind::Angle { .. }))
+        params(&mut app, cmd, spec).iter().any(|p| p.key == "angle" && matches!(p.kind, ParamKind::Angle { .. }))
     };
     for cmd in ANGLE_DIAL {
         assert!(has_dial(cmd), "{cmd} has no angle dial");
@@ -232,7 +232,7 @@ fn layer_id_params_stay_out_of_the_dialog() {
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     let spec = photocraft_engine::commands::find("edit.autoAlignLayers").unwrap().params;
-    assert!(!params(&app, "edit.autoAlignLayers", spec).iter().any(|p| p.key == "reference"), "no reference row");
+    assert!(!params(&mut app, "edit.autoAlignLayers", spec).iter().any(|p| p.key == "reference"), "no reference row");
     let id = open(&mut app, "edit.autoAlignLayers").expect("Auto-Align opens");
     assert!(!fields_of(&app, id).contains("reference"), "no reference field");
 }
@@ -777,7 +777,7 @@ fn match_color_after_source_change(change: &str) {
         match_color_control(&mut app, &ctx, "ui.window.open", json!({"document": 1}));
         assert_eq!(app.session.active_index(), Some(1), "{change}");
     }
-    let child = open(&mut app, command).unwrap_or_else(|| panic!("{change}: {command} opens over Match Color"));
+    let child = open(&mut app, command).unwrap_or_else(|e| panic!("{change}: {command} opens over Match Color: {e}"));
     set(&mut app, child, field, value.clone());
     assert!(ok(&mut app, child), "{change}: the nested command is confirmed");
     let target_index = app.session.documents().iter().position(|st| st.doc.id == target_id).unwrap();
@@ -1536,7 +1536,7 @@ fn assign_profile_offers(mode: Option<&str>) -> (Vec<String>, Vec<String>) {
         let ParamKind::Choice { options, .. } = row.kind else { panic!("profile is a menu") };
         options.into_iter().map(|(id, _)| id).collect::<Vec<String>>()
     };
-    let offered = ids(params(&app, "edit.assignProfile", spec.params));
+    let offered = ids(params(&mut app, "edit.assignProfile", spec.params));
     let accepted = ids(Param::parse_list(spec.params)).into_iter().filter(|name| app.session.execute("edit.assignProfile", json!({"profile": name})).is_ok()).collect();
     (offered, accepted)
 }
@@ -1593,9 +1593,7 @@ fn replace_color_eyedropper_samples_the_image() {
     let id = open(&mut app, REPLACE_COLOR).unwrap();
     assert_eq!(fields_of(&app, id).color("color"), Some([1.0, 0.0, 0.0]), "the dialog starts from the foreground colour");
     // #6279: armed as it opens, so the first click on the image samples.
-    assert!(crate::canvas_input::armed(&app));
-    // PLAN: assumed `color_eyedropper_sample(&mut PhotocraftApp, x, y, Modifiers) -> bool` drives
-    // dialogs-w32's `take_eyedropper` → canvas pick → `answer_eyedropper`.
+    assert!(crate::dialogs::canvas_input::armed(&app).is_some());
     assert!(color_eyedropper_sample(&mut app, 4.0, 4.0, egui::Modifiers::NONE));
     assert_eq!(fields_of(&app, id).color("color"), Some([0.0, 1.0, 0.0]));
     // #4457: where it was picked, for Localized Color Clusters.
@@ -1603,7 +1601,12 @@ fn replace_color_eyedropper_samples_the_image() {
     // Off-image: the click is consumed, nothing changes and the eyedropper stays armed.
     assert!(color_eyedropper_sample(&mut app, -1.0, 4.0, egui::Modifiers::NONE));
     assert_eq!(fields_of(&app, id).color("color"), Some([0.0, 1.0, 0.0]));
-    assert!(crate::canvas_input::armed(&app));
+    assert!(crate::dialogs::canvas_input::armed(&app).is_some());
+}
+
+/// A press at the document point `(x, y)` with the dialog's eyedropper armed, as the canvas's pick takes it.
+fn color_eyedropper_sample(app: &mut PhotocraftApp, x: f64, y: f64, mods: egui::Modifiers) -> bool {
+    crate::dialogs::canvas_input::pick_dropper(app, [x, y], craft::keymap::Mods::from_egui(&mods, craft::keymap::Platform::current()))
 }
 
 /// The app's samples follow the framework's Alt reset: after it, the next samples carry an
@@ -1787,7 +1790,6 @@ fn match_color_preview_refreshes_when_a_source_job_lands() {
         let shown = preview(&mut app, false);
         let after_key = app.filter_preview.as_ref().unwrap().key.clone();
         assert_ne!(before_key, after_key);
-        // PLAN: assumed `canvas::filter_preview::session_of(&FilterPreviewKey) -> PreviewSession` is `pub(crate)`.
         assert_ne!(
             app.filter_live.session(),
             Some(crate::canvas::filter_preview::session_of(&before_key)),

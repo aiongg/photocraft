@@ -921,7 +921,7 @@ fn preview_cache_tracks_working_profiles_but_prefers_embedded_profiles() {
 /// passes) starts no second preview and files no second save request.
 #[test]
 fn a_second_take_in_a_frame_answers_nothing_twice() {
-    use craft::host::files::ScriptedFiles;
+    use craft::host::ScriptedFiles;
     let files = std::sync::Arc::new(ScriptedFiles::held());
     let mut app = export_app(20, 10);
     app.services.files = Some(files.clone());

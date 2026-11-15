@@ -39,6 +39,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::dialogs::camera_raw_detail_ui::DetailPreview;
+use crate::dialogs::camera_raw_scope_ui as scope_ui;
 use crate::camera_raw_gpu::CameraRawGpu;
 use crate::dialogs::shared_picture::SharedPicture;
 
@@ -204,6 +205,12 @@ pub(crate) struct PcRawSource {
 }
 
 impl PcRawSource {
+    /// Whether the open-time dialog knows how the raw was developed (its camera tone curve).
+    #[cfg(test)]
+    pub(crate) fn has_raw_curve(&self) -> bool {
+        self.raw_curve.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some()
+    }
+
     /// A source over `init`; its pictures are empty until the first develop lands.
     pub(crate) fn new(init: SourceInit) -> Self {
         let SourceInit { proxy, selection, proxy_size, full_size, block, float, display, gpu, encoding_gamma, lab_transform, scope_transform, detail, ctx } = init;
@@ -363,16 +370,26 @@ impl RawDevelopSource for PcRawSource {
     }
 
     fn scope(&self, before: bool, region: bool, at: Option<[f64; 2]>, show: &mut dyn FnMut(Option<ScopeFrame<'_>>)) {
-        // PLAN: assumed (dialogs-w51 names): the scope data functions of `camera_raw_scope_ui` take `&PcRawSource`.
-        crate::dialogs::camera_raw_scope_ui::scope(self, before, region, at, show);
+        let Some(developed) = self.developed() else {
+            show(None);
+            return;
+        };
+        let pixels: &[[f32; 4]] = if before { &self.proxy } else { &developed.processed };
+        let hover = at
+            .and_then(|at| scope_ui::pixel_at(at, [self.pw, self.ph], pixels, |_| None))
+            .and_then(|pixel| scope_ui::hover_target(pixel, &self.scope_transform));
+        developed.scope.show(before, region, hover, show);
     }
 
     fn clipping(&self) -> Option<(Arc<ClippingMask>, Revision)> {
-        crate::dialogs::camera_raw_scope_ui::clipping(self)
+        self.developed().map(|developed| developed.scope.clipping())
     }
 
     fn sample(&self, at: [f64; 2], before: bool, lab: bool) -> Option<ScopeReadout> {
-        crate::dialogs::camera_raw_scope_ui::sample(self, at, before, lab)
+        let developed = self.developed()?;
+        let pixels: &[[f32; 4]] = if before { &self.proxy } else { &developed.processed };
+        let pixel = scope_ui::pixel_at(at, [self.pw, self.ph], pixels, |_| None)?;
+        Some(scope_ui::readout(pixel, lab, &self.lab_transform))
     }
 
     fn has_selection(&self) -> bool {
@@ -498,7 +515,7 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
     // PLAN: assumed (dialogs-w51 names): `vectorscope_reply` is the vectorscope's counts for the Before/region pair, `readout` is
     // today's `CameraRawDialog::readout` over `PcRawSource`. The workspace exposes neither the samplers' points nor the pointer, so
     // the two readout keys stay empty until the framework's `json_fields` carries them (owner: dialogs-w17).
-    result["vectorscope"] = developed.as_ref().map_or(Value::Null, |d| crate::dialogs::camera_raw_scope_ui::vectorscope_reply(&d.scope, before, region));
+    result["vectorscope"] = developed.as_ref().map_or(Value::Null, |d| scope_ui::vectorscope_reply(&d.scope, before, region));
     result["pointerReadout"] = Value::Null;
     result["samplerReadouts"] = json!([]);
     if let (Value::Object(out), Value::Object(own)) = (&mut result, fields) {
@@ -602,6 +619,21 @@ fn finish(app: &mut PhotocraftApp, result: &RawDevelopResult) -> Result<Value, S
     };
     app.raw = None;
     Ok(reply)
+}
+
+/// `CameraRaw` with the named fields set (the type is `#[non_exhaustive]`, so no struct expression), or a copy of a base with them set.
+#[cfg(test)]
+macro_rules! cr {
+    ($($f:ident : $v:expr),* $(,)?) => {{
+        let mut s = CameraRaw::default();
+        $(s.$f = $v;)*
+        s
+    }};
+    ($base:expr => $($f:ident : $v:expr),* $(,)?) => {{
+        let mut s: CameraRaw = $base;
+        $(s.$f = $v;)*
+        s
+    }};
 }
 
 #[cfg(test)]

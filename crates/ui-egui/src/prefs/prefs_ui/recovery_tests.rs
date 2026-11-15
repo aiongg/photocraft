@@ -172,7 +172,7 @@ fn failed_recovery_reports_the_error_and_continues_to_the_next_entry() {
     settle(&mut app, &ctx);
     assert_eq!(app.session.documents().len(), 1);
     assert!(app.ui.chrome.home.is_none(), "the first recovered document should be visible");
-    assert!(app.ui.notices.iter().any(|n| n.error && (n.title.contains("corrupt tile") || n.lines.iter().any(|l| l.contains("corrupt tile")))));
+    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && (n.title.contains("corrupt tile") || n.lines.iter().any(|l| l.contains("corrupt tile")))));
     assert_eq!(*log.lock().unwrap(), [format!("adopt {} good", app.session.active().unwrap().doc.id.0)]);
 }
 

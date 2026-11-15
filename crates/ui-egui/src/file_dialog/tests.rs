@@ -110,7 +110,7 @@ fn parked(app: &PhotocraftApp) -> Option<(String, bool, &'static str)> {
 /// The id of the open JPEG Options dialog.
 fn options_dialog(app: &PhotocraftApp) -> Option<DialogId> {
     let host = &app.framework.dialogs;
-    host.stack().ids().find(|id| host.get_by_id::<crate::format_prompts::HostedFormatOptions>(*id).is_some())
+    host.stack().ids().find(|id| host.get_by_id::<craft::ui::patterns::form_dialogs::HostedFormatOptions>(*id).is_some())
 }
 
 /// The value of a field of the open JPEG Options dialog.
@@ -1229,8 +1229,7 @@ fn changed_by_another_app(disk: &Disk, path: &str) {
 
 /// The changed-on-disk question of a Save, when one is open.
 fn disk_prompt(app: &PhotocraftApp) -> Option<DialogId> {
-    // PLAN: assumed dialogs-w21: the question is a standard prompt tagged `disk_change_prompt::HeldSave`; `alerts::prompt_tagged::<T>(app)` answers its id and message.
-    crate::alerts::prompt_tagged::<crate::disk_change_prompt::HeldSave>(app).map(|(id, _)| id)
+    crate::dialogs::alerts::prompt_tagged::<crate::disk_change_prompt::HeldSave>(app)
 }
 
 #[test]
@@ -1252,8 +1251,9 @@ fn save_asks_before_replacing_a_file_another_app_changed() {
     let r = menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     assert_eq!(r["confirmationPending"], true);
     assert_eq!(written.borrow().len(), 1, "nothing is written before the answer");
-    let (id, message) = crate::alerts::prompt_tagged::<crate::disk_change_prompt::HeldSave>(&app).expect("Save asks first");
-    assert!(message.contains("a.psd"), "{message}");
+    let id = disk_prompt(&app).expect("Save asks first");
+    let held = crate::dialogs::alerts::prompt_tag::<crate::disk_change_prompt::HeldSave>(&app).expect("the prompt holds the save");
+    assert!(held.path.contains("a.psd"), "{}", held.path);
 
     // Cancel leaves the file and the unsaved document alone.
     crate::dialogs::cancel(&mut app, &ctx, id).unwrap();

@@ -95,8 +95,7 @@ fn frames(app: &mut PhotocraftApp) {
 
 /// A press on the canvas at document point `(x, y)`.
 fn sample_at(app: &mut PhotocraftApp, x: f64, y: f64) {
-    let ctx = app.ctx().clone();
-    crate::canvas_input::press(app, &ctx, [x, y], egui::Modifiers::NONE);
+    crate::canvas::testing::click(app, [x, y], egui::Modifiers::NONE);
 }
 
 /// The top picker takes the colour under a canvas press, and nothing off the image, over transparency or at a point

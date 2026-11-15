@@ -218,7 +218,7 @@ fn auto_uses_native_system_theme_when_egui_does_not_report_one() {
     app.run("prefs.set", json!({"path": "interface.appearanceMode", "value": "auto"})).unwrap();
     let ctx = egui::Context::default();
     // The reader reports light; no `Event::SystemTheme` reaches egui (X11, and Wayland without the settings portal).
-    craft::ui::testing::report_os_theme(&ctx, false);
+    craft::ui::testing::style::report_os_theme(&ctx, false);
     tick(&mut app, &ctx);
     assert_eq!(app.ui.theme, AppTheme::pro_light());
 }

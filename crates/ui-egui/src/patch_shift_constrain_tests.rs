@@ -25,7 +25,7 @@ fn mv(app: &mut PhotocraftApp, x: f64, y: f64, m: Modifiers) {
 /// Press at 140,140 without ⇧, move past the first 60 px, then to `to` with `m` held. Returns the press as
 /// captured at the Down, the last point and whether ⇧ is held there.
 fn drag_to(app: &mut PhotocraftApp, to: [f64; 2], m: Modifiers) -> (crate::retouch_ui::PatchPress, [f64; 2], bool) {
-    let press = crate::retouch_ui::PatchPress::capture(app, Tool::Patch, [140.0, 140.0], craft::keymap::Mods::default()).expect("a press on the active document");
+    let press = crate::retouch_ui::PatchPress::new(Tool::Patch, [140.0, 140.0], craft::keymap::Mods::default());
     tool_event(app, ToolEvent::Down { x: 140.0, y: 140.0, pressure: 1.0 }, Modifiers::NONE);
     mv(app, 200.0, 145.0, Modifiers::NONE);
     mv(app, to[0], to[1], m);

@@ -196,7 +196,8 @@ fn texture(ctx: &egui::Context, key: egui::Id, image: egui::ColorImage, shown: e
 fn original_texture(ctx: &egui::Context, doc: &photocraft_doc::Document) -> SizedTexture {
     let (w, h) = (f64::from(doc.size.width).max(1.0), f64::from(doc.size.height).max(1.0));
     let k = (2048.0 / w.max(h)).min(1.0);
-    let resample = web_preview::proxy_resample(&json!({}), k);
+    let params = json!({});
+    let resample = web_preview::proxy_resample(&params, k);
     let size = json!({"width": (w * k).round().max(1.0), "height": (h * k).round().max(1.0), "resample": resample});
     let settings = WebSettings::default();
     let image = web_cmds::web_document(doc, &size, &settings)

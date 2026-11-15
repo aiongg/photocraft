@@ -207,7 +207,7 @@ const FADE: &str = "edit.fade";
 /// The preview session of `key`: everything that makes two requests the same target at any scale (document,
 /// revision, active layer, dialog, and the target, sources, command, tool colours and Match Color's source layer),
 /// not the other parameters and not `k`. A frame of another session is foreign to the dialog's preview.
-fn session_of(key: &crate::filter_dialog::FilterPreviewKey) -> PreviewSession {
+pub(crate) fn session_of(key: &crate::filter_dialog::FilterPreviewKey) -> PreviewSession {
     let layer = key.active.map_or(0, |l| u64::from(l.0) + 1);
     let source_layer = key.params.get("sourceLayer");
     let target = format!("{:?}|{:?}|{}|{:?}|{:?}", key.target, key.sources, key.command, key.tool_colors, source_layer);

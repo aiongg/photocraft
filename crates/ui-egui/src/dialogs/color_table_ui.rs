@@ -191,9 +191,8 @@ mod tests {
     fn loaded_act_bytes_fill_the_dialog_fields() {
         let table: Vec<[u8; 3]> = (0..256).map(|i| [i as u8, 0, 255]).collect();
         let bytes = photocraft_engine::swatch_cmds::act_bytes(&table, Some(3)).unwrap();
-        let answers = vec![Some(crate::file_dialog::FileDialogAnswer::Contents("Table.act".into(), bytes))];
-        // PLAN: assumed `Services::files` takes the file-dialog fake (top-w28)
-        let services = crate::Services { files: crate::file_dialog::fake(answers).0, ..Default::default() };
+        let files = std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Contents(vec![("Table.act".into(), bytes)])]));
+        let services = crate::Services { files: Some(files), ..Default::default() };
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
         let ctx = app.ctx().clone();
         app.run("file.new", json!({"width": 8, "height": 8, "mode": "rgb"})).unwrap();

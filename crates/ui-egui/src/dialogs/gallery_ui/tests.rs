@@ -396,7 +396,7 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     h.get_by_label("Glow Color").click();
     h.run_steps(3);
     let id = picker(h.state());
-    crate::color_picker_ui::testing::set_color(h.state_mut(), id, craft::theme::Srgba::from_hex("#8040ff").unwrap());
+    crate::color_picker_ui::testing::set_color(h.state_mut(), id, "#8040ff");
     crate::dialogs::testing::confirm(h.state_mut(), id);
     h.run_steps(3);
     assert!(near(&glow(h.state())[..3], &[0.21586, 0.05127, 1.0], 1e-3), "{:?}", glow(h.state()));

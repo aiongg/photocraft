@@ -35,7 +35,7 @@ pub(crate) mod document_area;
 pub(crate) mod document_display;
 pub(crate) mod document_windows;
 mod eyedropper_tool;
-mod filter_preview;
+pub(crate) mod filter_preview;
 pub mod gpu_canvas;
 mod gpu_picture;
 pub mod guide_select;

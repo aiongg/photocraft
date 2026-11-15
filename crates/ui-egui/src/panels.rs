@@ -42,7 +42,7 @@ pub(super) mod layer_reveal;
 pub mod layer_row_ui;
 pub(super) mod layer_transfer;
 mod layers;
-mod layers_events;
+pub(crate) mod layers_events;
 pub mod layers_panel_ui;
 pub(crate) mod layers_tree;
 pub(super) mod mask_props_ui;

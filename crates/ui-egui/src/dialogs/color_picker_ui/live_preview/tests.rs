@@ -75,7 +75,7 @@ fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
 /// The colour the dialog `id` previews on its row `key`, as `"#rrggbb"`.
 fn previewed(app: &PhotocraftApp, id: DialogId, key: &str) -> Option<String> {
     let dialog = app.framework.dialogs.get_by_id::<HostedParamDialog>(id)?;
-    dialog.previewed_colors().iter().find(|(row, _)| row == key).map(|(_, color)| hex(*color))
+    dialog.previewed_colors().iter().find(|(row, _)| row == key).map(|(_, color)| hex([color.r, color.g, color.b]))
 }
 
 /// #9886: the Fill dialog's colour row follows the picker before OK, Cancel puts back what it showed, and nothing

@@ -38,13 +38,11 @@ fn session(app: &PhotocraftApp) -> &RawSession {
 
 /// The proxy pixels of the last develop that landed.
 fn processed(app: &PhotocraftApp) -> Vec<[f32; 4]> {
-    // PLAN: assumed `RawSession::source: Arc<PcRawSource>` and `Developed::pixels: Arc<Vec<[f32; 4]>>` (dialogs-w50: `PcRawSource::developed()` holds the last developed frame).
-    session(app).source.developed().expect("a develop has landed").pixels.to_vec()
+    session(app).source.developed().expect("a develop has landed").processed.clone()
 }
 
 /// Whether the open-time dialog knows how the raw was developed (its camera tone curve).
 fn knows_raw_curve(app: &PhotocraftApp) -> bool {
-    // PLAN: assumed a `pub(crate) fn has_raw_curve(&self) -> bool` on `PcRawSource` (dialogs-w50 keeps `raw_curve` private).
     session(app).source.has_raw_curve()
 }
 
@@ -512,7 +510,7 @@ fn a_raw_that_fails_to_open_stays_in_the_filmstrip_with_its_settings() {
     app.open_bytes("three.dng", &dng).unwrap();
     let ids: Vec<_> = app.raw_shelf.iter().map(|h| h.raw.document).collect();
     // Two's file can no longer be developed, and it was left with its own settings.
-    let mut kept = CameraRaw { exposure: 0.5, ..Default::default() };
+    let mut kept = cr!(exposure: 0.5);
     kept.contrast = 20.0;
     app.raw_shelf[1].raw.bytes = Some(std::sync::Arc::new(b"not a raw file".to_vec()));
     app.raw_shelf[1].kept = Some((kept.clone(), CameraRaw::default()));
@@ -549,7 +547,7 @@ fn a_raw_that_cannot_be_shown_keeps_the_dialog_and_the_filmstrip() {
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     let ids: Vec<_> = app.raw_shelf.iter().map(|h| h.raw.document).collect();
-    let kept = CameraRaw { exposure: 0.5, ..Default::default() };
+    let kept = cr!(exposure: 0.5);
     app.raw_shelf[1].kept = Some((kept.clone(), CameraRaw::default()));
     filmstrip::open_held(&mut app, &ctx, 0).unwrap();
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"exposure": 1.0}}})).unwrap().unwrap();
@@ -590,7 +588,7 @@ fn a_raw_whose_background_develop_fails_comes_back_to_the_filmstrip() {
     app.open_bytes("one.dng", &dng).unwrap();
     app.open_bytes("two.dng", &dng).unwrap();
     let ids: Vec<_> = app.raw_shelf.iter().map(|h| h.raw.document).collect();
-    let (kept, from) = (CameraRaw { exposure: 0.5, contrast: 20.0, ..Default::default() }, CameraRaw { contrast: 5.0, ..Default::default() });
+    let (kept, from) = (cr!(exposure: 0.5, contrast: 20.0), cr!(contrast: 5.0));
     app.raw_shelf[1].raw.bytes = Some(std::sync::Arc::new(b"not a raw file".to_vec()));
     app.raw_shelf[1].kept = Some((kept.clone(), from.clone()));
     filmstrip::open_held(&mut app, &ctx, 0).unwrap();
@@ -1035,7 +1033,7 @@ fn a_sidecar_write_error_stays_reported() {
     let ctx = egui::Context::default();
     open_dialog_at(&mut app, &ctx, &dng, &raw_path);
     menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": {"set": {"exposure": 0.5, "contrast": 15}, "commit": true}})).unwrap().unwrap();
-    let errors: Vec<_> = app.ui.notices.iter().filter(|n| n.error).map(|n| n.title.clone()).collect();
+    let errors: Vec<_> = app.ui.notices.iter().filter(|n| n.tone == craft::theme::variant::Tone::Bad).map(|n| n.title.clone()).collect();
     assert!(errors.iter().any(|t| t.contains("IMG_0100.xmp") && t.contains("read-only volume")), "{errors:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }

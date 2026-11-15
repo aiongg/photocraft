@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
-mod print;
+pub(crate) mod print;
 mod web;
 #[path = "file_ui/web_preview.rs"]
 mod web_preview;

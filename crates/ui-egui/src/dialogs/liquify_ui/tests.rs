@@ -1,6 +1,7 @@
 use super::*;
 use crate::control::dialogs::workspace_ui;
 use craft::imaging::ui::liquify::{BackdropMode, BackdropUse, LiquifySettings};
+use craft::ui::runtime::memory::{saved_value, set_saved_value};
 
 const KEY: &str = "filter.liquify";
 

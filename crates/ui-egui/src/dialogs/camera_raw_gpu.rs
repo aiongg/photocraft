@@ -183,6 +183,20 @@ mod tests {
     use photocraft_algo::camera_raw::develop;
     use serde_json::json;
 
+    /// `CameraRaw` with the named fields set (the type is `#[non_exhaustive]`, so no struct expression), or a copy of a base with them set.
+    macro_rules! cr {
+        ($($f:ident : $v:expr),* $(,)?) => {{
+            let mut s = CameraRaw::default();
+            $(s.$f = $v;)*
+            s
+        }};
+        ($base:expr => $($f:ident : $v:expr),* $(,)?) => {{
+            let mut s: CameraRaw = $base;
+            $(s.$f = $v;)*
+            s
+        }};
+    }
+
     /// The pass evaluates develop's expressions in f32 (see `photocraft-gpu`'s Camera Raw tests).
     const TOL: f32 = 1.0 / 4096.0;
 
@@ -258,7 +272,7 @@ mod tests {
                 eprintln!("skipping: the device can't run the RAW Develop pass");
                 return;
             }
-            let per_pixel = CameraRaw {
+            let per_pixel = cr! {
                 temperature: 20.0,
                 exposure: 0.4,
                 contrast: 30.0,
@@ -269,7 +283,6 @@ mod tests {
                 grade_shadows: photocraft_algo::camera_raw::Wheel { hue: 220.0, sat: 40.0, lum: 0.0 },
                 vignette_amount: -40.0,
                 grain_amount: 30.0,
-                ..Default::default()
             };
             let (backend, gpu, cpu) = developed(&app, per_pixel.clone());
             assert_eq!(backend, "gpu", "{depth}-bit");
@@ -277,16 +290,16 @@ mod tests {
             assert!(worst <= TOL, "{depth}-bit: off by {worst}");
             // PLAN: the old `describe["developBackend"] == "gpu"` check read the dialog's own render; a `Job` can only be run by the host (no public runner), so the helper runs the job's body and the session's reported backend is not asserted here.
             // Shadows and Highlights develop on the GPU too, Whites and Blacks measured after them.
-            let toned = CameraRaw { shadows: 40.0, highlights: -35.0, ..per_pixel.clone() };
+            let toned = cr!(per_pixel.clone() => shadows: 40.0, highlights: -35.0);
             let (backend, gpu, cpu) = developed(&app, toned.clone());
             assert_eq!(backend, "gpu", "{depth}-bit, Shadows and Highlights");
             let worst = gpu.iter().zip(&cpu).flat_map(|(a, b)| (0..4).map(move |c| (a[c] - b[c]).abs())).fold(0.0f32, f32::max);
             assert!(worst <= TOL, "{depth}-bit, Shadows and Highlights: off by {worst}");
             // So do Dehaze, Clarity and Texture, with Whites and Blacks measured after them.
             for spatial in [
-                CameraRaw { clarity: 30.0, texture: 25.0, dehaze: 20.0, ..toned.clone() },
-                CameraRaw { dehaze: -25.0, ..per_pixel.clone() },
-                CameraRaw { clarity: -40.0, texture: 35.0, ..per_pixel.clone() },
+                cr!(toned.clone() => clarity: 30.0, texture: 25.0, dehaze: 20.0),
+                cr!(per_pixel.clone() => dehaze: -25.0),
+                cr!(per_pixel.clone() => clarity: -40.0, texture: 35.0),
             ] {
                 let (backend, gpu, cpu) = developed(&app, spatial.clone());
                 assert_eq!(backend, "gpu", "{depth}-bit, {spatial:?}");
@@ -294,7 +307,7 @@ mod tests {
                 assert!(worst <= TOL, "{depth}-bit, {spatial:?}: off by {worst}");
             }
             // Detail develops the whole frame on the CPU.
-            for detail in [CameraRaw { sharpen_amount: 40.0, ..toned.clone() }, CameraRaw { noise_luminance: 30.0, dehaze: 20.0, ..per_pixel.clone() }] {
+            for detail in [cr!(toned.clone() => sharpen_amount: 40.0), cr!(per_pixel.clone() => noise_luminance: 30.0, dehaze: 20.0)] {
                 let (backend, shown, cpu) = developed(&app, detail);
                 assert_eq!((backend, shown == cpu), ("cpu", true), "{depth}-bit");
             }
@@ -315,7 +328,7 @@ mod tests {
             eprintln!("skipping: the device can't run the RAW Develop pass");
             return;
         }
-        let (backend, _, _) = developed(&app, CameraRaw { exposure: 0.5, ..Default::default() });
+        let (backend, _, _) = developed(&app, cr!(exposure: 0.5));
         assert_eq!(backend, "gpu", "a per-pixel setting develops on the GPU");
         let (backend, shown, cpu) = developed(&app, CameraRaw::default());
         assert_eq!((backend, shown == cpu), ("cpu", true), "default settings: the CPU returns them unchanged");
@@ -335,9 +348,9 @@ mod tests {
         // A layer about 450 times wider than tall has a 2 px tall proxy: its pyramid has one level.
         let thin = vec![[0.4, 0.3, 0.2, 1.0]; 40 * 2];
         let inputs = DevelopInputs::default();
-        assert!(gpu.develop(&thin, None, 40, 2, &CameraRaw { shadows: 50.0, ..Default::default() }, &inputs, false).is_none());
+        assert!(gpu.develop(&thin, None, 40, 2, &cr!(shadows: 50.0), &inputs, false).is_none());
         let px = vec![[0.4, 0.3, 0.2, 1.0]; 64 * 48];
-        assert!(gpu.develop(&px, None, 64, 48, &CameraRaw { exposure: 0.5, ..Default::default() }, &inputs, false).is_some(), "the GPU develop stays on");
+        assert!(gpu.develop(&px, None, 64, 48, &cr!(exposure: 0.5), &inputs, false).is_some(), "the GPU develop stays on");
     }
 
     #[test]
@@ -347,7 +360,7 @@ mod tests {
         force_pass(&app);
         app.run("prefs.set", json!({"path": "performance.renderingMode", "value": "cpu"})).unwrap();
         open_raw(&mut app);
-        let (backend, shown, cpu) = developed(&app, CameraRaw { exposure: 0.5, ..Default::default() });
+        let (backend, shown, cpu) = developed(&app, cr!(exposure: 0.5));
         assert_eq!((backend, shown == cpu), ("cpu", true));
     }
 }

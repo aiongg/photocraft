@@ -158,9 +158,8 @@ fn dialog_open(h: &H) -> bool {
 
 /// What the colour picker on top of the dialog stack edits.
 fn picker_target(h: &H) -> Option<crate::color_picker_ui::PickTarget> {
-    // PLAN: assumed `color_picker_ui::target(app, id) -> Option<PickTarget>`.
     let id = h.state().framework.dialogs.stack().top()?;
-    crate::color_picker_ui::target(h.state(), id)
+    crate::color_picker_ui::target(h.state(), id).cloned()
 }
 
 fn properties_shown(h: &H) {
@@ -254,8 +253,7 @@ fn double_clicks_open_what_the_part_shows() {
             At::Thumb(LayerPart::Pixels),
             |h| {
                 assert!(h.state().framework.dialogs.is_open::<craft::draw::ui::pattern::PatternFillDialog>(), "the Pattern Fill dialog opened");
-                // PLAN: assumed `pattern_fill.session` names the layer it edits in `layer`.
-                assert_eq!(h.state().pattern_fill.session.as_ref().map(|s| s.layer), Some(layer_id(h.state(), "T").0));
+                assert_eq!(h.state().pattern_fill.session.as_ref().and_then(|s| s.layer()).map(|l| l.0), Some(layer_id(h.state(), "T").0));
             },
         ),
         (

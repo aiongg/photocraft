@@ -162,6 +162,7 @@ fn save_as_flat_keeps_the_layered_original() {
         w.borrow_mut().push(path.to_string());
         Ok(())
     }));
+    let ctx = app.ctx().clone();
     let before = identity(&app);
     menus::invoke(&mut app, &ctx, "file.saveAs", json!({"path": "flat.jpg", "jpegFormat": "baseline"})).unwrap();
     assert_eq!(*written.borrow(), ["flat.jpg"]);

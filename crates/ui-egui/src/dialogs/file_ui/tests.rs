@@ -470,10 +470,9 @@ fn print_dialog_opens_with_the_settings_remembered_from_an_earlier_session() {
 
 /// #5328: Save as PDF has Browse…, which fills the field from a Save dialog (suggesting the
 /// document's name as a PDF) rather than needing a typed path.
-// PLAN: assumed `Services::files: Option<Arc<ScriptedFiles>>` for the app's file dialogs (top-w28); the print `take` answers the dialog's path request.
 #[test]
 fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
-    use craft::host::files::ScriptedFiles;
+    use craft::host::ScriptedFiles;
     use egui_kittest::kittest::Queryable;
     let files = Arc::new(ScriptedFiles::new().saving_suggested());
     let mut app = app();
