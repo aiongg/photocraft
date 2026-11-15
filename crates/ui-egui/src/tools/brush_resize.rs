@@ -76,7 +76,6 @@ impl PaintResize {
     /// A press: begins a resize when it is the gesture's chord on a tool it resizes, and says whether it did, so the
     /// tool paints nothing.
     pub(crate) fn press(&mut self, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> bool {
-
         if !applies(app.ui.tool) || !BrushResize::chord(pointer.button, pointer.mods) {
             return false;
         }

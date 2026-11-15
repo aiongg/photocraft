@@ -24,7 +24,8 @@ fn masked_app() -> PhotocraftApp {
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.run("layer.new.layer", json!({"name": "Masked"})).unwrap();
     app.run("layer.layerMask.revealAll", json!({})).unwrap();
-    app.run("channel.new", json!({})).unwrap();
+    // White, so loading it as a selection selects something.
+    app.run("channel.new", json!({"fill": "white"})).unwrap();
     app
 }
 
@@ -89,8 +90,8 @@ fn cmyk_channel_thumbs_upload_the_document_inks() {
 fn channel_events_run_their_commands() {
     let mut app = masked_app();
     let ctx = app.ctx().clone();
-    app.run("channel.new", json!({"name": "Alpha 2"})).unwrap();
-    app.run("channel.new", json!({"name": "Alpha 3"})).unwrap();
+    app.run("channel.new", json!({"name": "Alpha 2", "fill": "white"})).unwrap();
+    app.run("channel.new", json!({"name": "Alpha 3", "fill": "white"})).unwrap();
 
     // Target: an alpha, the layer mask, then the composite.
     target(&mut app, Row::Alpha(0), false);

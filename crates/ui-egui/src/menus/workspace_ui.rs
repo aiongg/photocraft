@@ -67,7 +67,7 @@ const IDS: [&str; 5] = ["window.panel.modifierKeys", "window.workspace.select", 
 
 /// Menu ids handled here (live menu items).
 pub fn handles(id: &str) -> bool {
-    IDS.contains(&id)
+    IDS.contains(&id) || WorkspaceCommands::from_ref(&CommandRef::new(id)).is_some()
 }
 
 /// The check mark of a menu id of this module.

@@ -608,13 +608,15 @@ fn shape_preview_is_the_committed_path() {
     let none = Modifiers::NONE;
     // The geometry the tool reports while the drag runs, as the canvas previews it.
     let running = |app: &PhotocraftApp| host::shape_preview(app).map(|(kind, geometry)| (kind, geometry.clone()));
-    for tool in [Tool::Rectangle, Tool::EllipseShape, Tool::Triangle, Tool::Polygon, Tool::Line] {
+    for (row, tool) in [Tool::Rectangle, Tool::EllipseShape, Tool::Triangle, Tool::Polygon, Tool::Line].into_iter().enumerate() {
         app.ui.tool = tool;
-        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, none);
-        tool_event(&mut app, ToolEvent::Move { x: 60.0, y: 30.0, pressure: 1.0 }, none);
+        // Each shape is drawn on its own row: the scale box of the shape before it, still selected, takes a press on its handles.
+        let y = 10.0 + 38.0 * row as f64;
+        tool_event(&mut app, ToolEvent::Down { x: 10.0, y, pressure: 1.0 }, none);
+        tool_event(&mut app, ToolEvent::Move { x: 60.0, y: y + 20.0, pressure: 1.0 }, none);
         let (kind, geometry) = running(&app).unwrap_or_else(|| panic!("{tool:?}: the drag reports a shape"));
         let shown = shape_preview(&app, kind, &geometry).unwrap_or_else(|| panic!("{tool:?}: a preview")).path;
-        tool_event(&mut app, ToolEvent::Up { x: 60.0, y: 30.0 }, none);
+        tool_event(&mut app, ToolEvent::Up { x: 60.0, y: y + 20.0 }, none);
         let st = app.session.active().unwrap();
         let LayerContent::Shape(sh) = &st.doc.layer(st.active_layer.unwrap()).unwrap().content else { panic!("{tool:?}: no shape layer") };
         assert_eq!(sh.path, shown, "{tool:?}");

@@ -47,6 +47,9 @@ pub(super) fn current_doc(app: &PhotocraftApp) -> Weak<Document> {
 /// The path being finished as it was being drawn: open, whatever closed it, and not marked failed.
 pub(super) fn draft_before_finish(pen: &PenPath) -> PenPath {
     let mut draft = pen.clone();
+    if let Some(open) = draft.before_close.take() {
+        draft.draft = open;
+    }
     draft.draft.closed = false;
     draft.commit_failed = false;
     draft
