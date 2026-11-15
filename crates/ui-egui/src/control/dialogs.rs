@@ -457,16 +457,17 @@ fn apply_field(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, field
     Ok(())
 }
 
-/// A `{ui:{…}}` request on the open hosted workspace `key`: the keys apply in order, a refused key stops the
-/// request (its error names the key; earlier keys stay applied), and the reply is the workspace's fields with its
-/// `describe` facts.
+/// A `{ui:{…}}` request on the open hosted workspace `key`: the keys apply in order with `commit` and `cancel` last (a
+/// JSON object keeps no order of its own), a refused key stops the request (its error names the key; earlier keys stay
+/// applied), and the reply is the workspace's fields with its `describe` facts.
 pub(crate) fn workspace_ui(app: &mut PhotocraftApp, ctx: &egui::Context, key: &str, ui: &Value) -> Result<Value, String> {
     let Some(id) = host(app).open_dialogs().into_iter().find(|d| d.key.as_deref() == Some(key)).map(|d| d.id) else {
         return Err(format!("`{key}` is not open"));
     };
     let Some(request) = ui.as_object() else { return Err("`ui` must be an object".into()) };
     let mut committed = None;
-    for (name, value) in request {
+    let (ends, edits): (Vec<_>, Vec<_>) = request.iter().partition(|(name, _)| matches!(name.as_str(), "commit" | "cancel"));
+    for (name, value) in edits.into_iter().chain(ends) {
         let step = match name.as_str() {
             "commit" if value.as_bool() != Some(false) => {
                 committed = Some(workspace_reply(app, key, id));
