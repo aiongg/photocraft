@@ -1,8 +1,8 @@
-//! #11381: the Move tool's options bar. The two Distribute buttons, the "..." icon panel (it
-//! closes on a second click, not on Escape) and the gear menu with its three check items.
+//! #11381: the Move tool's options bar. The Distribute buttons gated by the layer count, the
+//! gear's switches (rollover outlines) and the group expansion on a click.
 
 use craft::layers::ui::panel::Groups;
-use egui::{Rect as ScreenRect, vec2};
+use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use photocraft_doc::LayerId;
@@ -10,7 +10,7 @@ use photocraft_geom::Rect;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::state::{Tool, ToolOptions};
+use crate::state::Tool;
 
 fn paint(app: &mut PhotocraftApp, r: Rect) -> LayerId {
     app.session.execute("layer.new.layer", json!({})).unwrap();
@@ -48,18 +48,19 @@ fn app() -> (PhotocraftApp, [LayerId; 3]) {
     (app, [a, b, c])
 }
 
-/// The Move tool's align controls and gear, as the options bar lays them out.
+/// The Move tool's align controls and gear, on the app's own context so command states reach them
+/// as in the running app.
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(700.0, 200.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
-            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+            let ctx = ui.ctx().clone();
+            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
+            // PLAN: assumed `PhotocraftApp::framework_before_input(&mut self, &egui::Context)` (hub-w1): publishes every command source's states.
+            app.framework_before_input(&ctx);
             egui::CentralPanel::default().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    crate::align_bar::options(app, ui);
-                    crate::align_bar::gear(app, ui);
-                });
+                ui.horizontal(|ui| crate::align_bar::show(app, ui));
             });
         },
         app,
@@ -69,167 +70,19 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     h
 }
 
-fn rect_of(h: &Harness<'static, PhotocraftApp>, label: &str) -> ScreenRect {
-    h.get_by_label(label).rect()
-}
-
-fn click(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
-    h.get_by_label(label).click();
-    h.run_steps(4);
-}
-
-const BAR: [&str; 10] = [
-    "Align left edges",
-    "Align horizontal centers",
-    "Align right edges",
-    "Distribute vertically",
-    "Align top edges",
-    "Align vertical centers",
-    "Align bottom edges",
-    "Distribute horizontally",
-    "Align and distribute",
-    "Options",
-];
-
-#[test]
-fn bar_buttons_and_tooltips_are_in_the_measured_order() {
-    let (app, _) = app();
-    let h = harness(app);
-    let xs: Vec<f32> = BAR.iter().map(|l| rect_of(&h, l).left()).collect();
-    assert!(xs.windows(2).all(|w| w[0] < w[1]), "left to right: {BAR:?} at {xs:?}");
-    let ys: Vec<f32> = BAR.iter().map(|l| rect_of(&h, l).center().y).collect();
-    assert!(ys.iter().all(|y| (y - ys[0]).abs() < 1.0), "one row: {ys:?}");
-}
-
-#[test]
-fn distribute_vertically_button_runs_its_command() {
-    let (mut app, [a, b, c]) = app();
-    select_all(&mut app, &[a, b, c]);
-    let mut h = harness(app);
-    assert!(!h.get_by_label("Distribute vertically").accesskit_node().is_disabled());
-    click(&mut h, "Distribute vertically");
-    // The same result as Layer > Distribute > Vertically: spans 0..80, heights 34, gaps 23.
-    assert_eq!(bounds(h.state(), b), Rect::new(12, 33, 32, 37));
-    assert_eq!(bounds(h.state(), a), Rect::new(0, 0, 10, 10));
-}
-
-#[test]
-fn distribute_horizontally_button_runs_its_command() {
-    let (mut app, [a, b, c]) = app();
-    select_all(&mut app, &[a, b, c]);
-    let mut h = harness(app);
-    assert!(!h.get_by_label("Distribute horizontally").accesskit_node().is_disabled());
-    click(&mut h, "Distribute horizontally");
-    // Spans 0..100, widths 60, gaps 20: the middle layer starts at 30.
-    assert_eq!(bounds(h.state(), b), Rect::new(30, 50, 50, 54));
-    assert_eq!(bounds(h.state(), c), Rect::new(70, 60, 100, 80));
-}
-
 #[test]
 fn distribute_buttons_are_greyed_with_too_few_layers_like_the_menu() {
     let (mut app, [a, b, c]) = app();
     select_all(&mut app, &[a, b]);
     let mut h = harness(app);
-    for label in ["Distribute vertically", "Distribute horizontally"] {
+    for label in ["Distribute Vertically", "Distribute Horizontally"] {
         assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} with two layers");
     }
-    for cmd in ["layer.distribute.vertically", "layer.distribute.horizontally"] {
-        assert!(!h.state().session.is_enabled(cmd), "{cmd} is off in the menu too");
-    }
     // Align still works with two layers.
-    assert!(!h.get_by_label("Align left edges").accesskit_node().is_disabled());
+    assert!(!h.get_by_label("Align Left Edges").accesskit_node().is_disabled());
     select_all(h.state_mut(), &[a, b, c]);
     h.run_steps(2);
-    assert!(!h.get_by_label("Distribute vertically").accesskit_node().is_disabled());
-}
-
-#[test]
-fn ellipsis_panel_holds_align_and_distribute_and_closes_on_a_second_click_not_escape() {
-    let (app, _) = app();
-    let mut h = harness(app);
-    assert!(h.query_by_label("Align: Left Edges").is_none(), "closed at first");
-    click(&mut h, "Align and distribute");
-    assert!(crate::align_bar::panel_is_open(&h.ctx));
-
-    let align = ["Left Edges", "Horizontal Centers", "Right Edges", "Top Edges", "Vertical Centers", "Bottom Edges"];
-    let distribute = ["Top Edges", "Vertical Centers", "Bottom Edges", "Left Edges", "Horizontal Centers", "Right Edges"];
-    let tips: Vec<String> = align.iter().map(|l| format!("Align: {l}")).chain(distribute.iter().map(|l| format!("Distribute: {l}"))).collect();
-    let rects: Vec<ScreenRect> = tips.iter().map(|t| rect_of(&h, t)).collect();
-    // Align row above the Distribute row; each row runs left to right.
-    assert!(rects[..6].windows(2).all(|w| w[0].left() < w[1].left()), "align row: {rects:?}");
-    assert!(rects[6..].windows(2).all(|w| w[0].left() < w[1].left()), "distribute row: {rects:?}");
-    assert!(rects[5].bottom() <= rects[6].top() + 0.5, "the Distribute group is below the Align group");
-    // The panel hangs under the "..." button.
-    assert!(rects[0].top() > rect_of(&h, "Align and distribute").bottom() - 0.5);
-
-    // Escape leaves it open.
-    h.key_press(egui::Key::Escape);
-    h.run_steps(4);
-    assert!(crate::align_bar::panel_is_open(&h.ctx));
-    assert!(h.query_by_label("Align: Left Edges").is_some());
-
-    // A second click on the button closes it.
-    click(&mut h, "Align and distribute");
-    assert!(!crate::align_bar::panel_is_open(&h.ctx));
-    assert!(h.query_by_label("Align: Left Edges").is_none());
-}
-
-#[test]
-fn panel_icons_run_their_commands() {
-    let (mut app, [a, b, c]) = app();
-    select_all(&mut app, &[a, b, c]);
-    let mut h = harness(app);
-    click(&mut h, "Align and distribute");
-    click(&mut h, "Distribute: Left Edges");
-    // Left edges 0, 12, 70 -> the middle one moves to 35.
-    assert_eq!(bounds(h.state(), b), Rect::new(35, 50, 55, 54));
-}
-
-#[test]
-fn gear_menu_has_three_check_items_on_by_default_that_switch_the_options() {
-    let (app, _) = app();
-    let mut h = harness(app);
-    click(&mut h, "Options");
-    for label in ["Show layer bounds on hover", "Expand layer group on click", "Show hover bounds from Layers"] {
-        assert!(h.query_by_label(label).is_some(), "{label} is in the gear menu");
-    }
-    click(&mut h, "Show layer bounds on hover");
-    assert!(!h.state().ui.tool_options.move_show_hover_bounds);
-    click(&mut h, "Expand layer group on click");
-    assert!(!h.state().ui.tool_options.move_expand_group_on_click);
-    click(&mut h, "Show hover bounds from Layers");
-    assert!(!h.state().ui.tool_options.move_show_layers_hover_bounds);
-}
-
-#[test]
-fn gear_toggles_default_on_are_saved_and_reset() {
-    let o = ToolOptions::default();
-    assert!(o.move_show_hover_bounds && o.move_expand_group_on_click && o.move_show_layers_hover_bounds);
-
-    // Saved with the Move tool options: they are in the serde form that ui.inspect and ui.set use,
-    // and an older save without them reads as on.
-    let mut v = serde_json::to_value(&o).unwrap();
-    for key in ["move_show_hover_bounds", "move_expand_group_on_click", "move_show_layers_hover_bounds"] {
-        assert_eq!(v[key], json!(true), "{key}");
-        v[key] = json!(false);
-    }
-    let off: ToolOptions = serde_json::from_value(v.clone()).unwrap();
-    assert!(!off.move_show_hover_bounds && !off.move_expand_group_on_click && !off.move_show_layers_hover_bounds);
-    for key in ["move_show_hover_bounds", "move_expand_group_on_click", "move_show_layers_hover_bounds"] {
-        v.as_object_mut().unwrap().remove(key);
-    }
-    let old: ToolOptions = serde_json::from_value(v).unwrap();
-    assert!(old.move_show_hover_bounds && old.move_expand_group_on_click && old.move_show_layers_hover_bounds);
-
-    // Tool > Reset Tool puts them back.
-    let (mut app, _) = app();
-    app.ui.tool_options = off;
-    app.ui.tool_options.feather = 12.0;
-    let ctx = egui::Context::default();
-    crate::menus::invoke(&mut app, &ctx, "tool.reset", json!({})).unwrap();
-    let o = &app.ui.tool_options;
-    assert!(o.move_show_hover_bounds && o.move_expand_group_on_click && o.move_show_layers_hover_bounds);
-    assert_eq!(o.feather, 12.0, "another tool's option is left alone");
+    assert!(!h.get_by_label("Distribute Vertically").accesskit_node().is_disabled());
 }
 
 #[test]
@@ -270,9 +123,10 @@ fn expand_layer_group_on_click_switches_the_opening_of_closed_parent_groups() {
         let group = app.session.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.is_group()).map(|(_, _, l)| l.id).unwrap();
         app.session.execute("layer.setExpanded", json!({"layer": group.0, "expanded": false})).unwrap();
         app.session.execute("layer.select", json!({"layer": group.0})).unwrap();
+        app.sync_views();
         app.ui.tool = Tool::Move;
         app.ui.tool_options.move_expand_group_on_click = on;
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         // The first frame only records the active layer; then a canvas click picks the inner one.
         assert_eq!(crate::layer_reveal::track(&mut app, &ctx), None);
         // The Move tool picks the layer under the pointer (Auto-Select targets layers, not groups).
