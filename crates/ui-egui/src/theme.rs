@@ -982,16 +982,13 @@ impl Tokens {
     }
 }
 
-/// Register Inter (UI) and JetBrains Mono (numbers) plus named weights.
-pub fn install_fonts(ctx: &egui::Context) {
-    install_fonts_with(ctx, crate::cjk_fonts::Sources::system());
-}
-
 /// PhotoCraft's faces as the craft framework's font stack: Inter for the interface with its
 /// `medium` and `semibold` families, JetBrains Mono for numbers. The framework puts egui's default
-/// faces after them, for symbols Inter lacks.
-fn ui_fonts() -> UiFonts<'static> {
-    use craft::ui::fonts::{Family, FontRef, I18nScripts, SEMIBOLD};
+/// faces after them, for symbols Inter lacks, and orders the craft-fonts faces this build embeds
+/// (`cjk_fonts::craft_faces`) by `ui_language`. A web build's served faces and their fetcher come
+/// from `served_fonts::serve`.
+fn ui_fonts(ctx: &egui::Context, ui_language: &str) -> UiFonts<'static> {
+    use craft::ui::fonts::{Emoji, Family, FontRef, I18nScripts, SEMIBOLD};
     let (proportional, monospace, medium, semibold) = (FontRef::proportional(), FontRef::monospace(), FontRef::named("medium"), FontRef::named(SEMIBOLD));
     let mut faces: Vec<(String, FontData, Vec<FontRef>)> = Vec::new();
     // The bundled fonts are inflated on first use (photocraft_text::fonts). Should one ever fail
@@ -1006,30 +1003,36 @@ fn ui_fonts() -> UiFonts<'static> {
     add("Inter-SemiBold", bundled(photocraft_text::fonts::INTER_SEMIBOLD.as_slice()), std::slice::from_ref(&semibold));
     add("JetBrainsMono", bundled(photocraft_text::fonts::JETBRAINS_MONO_REGULAR.as_slice()), std::slice::from_ref(&monospace));
     add("Inter", bundled(photocraft_text::fonts::INTER_REGULAR.as_slice()), &[proportional.clone(), medium.clone(), semibold.clone()]);
-    let every = [proportional, monospace, medium, semibold];
-    // egui's monochrome emoji faces, which the framework's default faces leave out.
-    let egui_faces = crate::egui_fonts::definitions();
-    for name in ["NotoEmoji-Regular", "emoji-icon-font"] {
-        add(name, egui_faces.font_data.get(name).map(|data| (**data).clone()), &every);
+    // The monochrome emoji face egui's `default_fonts` would add; the last resort after the system fonts.
+    let mut emoji = Emoji::default();
+    emoji.monochrome = craft::ui::fonts::noto_emoji();
+    let mut fonts = UiFonts::new(&I18nScripts)
+        .family(Family::named("medium").weight(500))
+        .family(Family::named(SEMIBOLD).weight(600))
+        .craft_faces(&crate::cjk_fonts::craft_faces())
+        .ui_language(ui_language)
+        .emoji(emoji);
+    if let Some(locale) = crate::cjk_fonts::os_locale() {
+        fonts = fonts.os_locale(locale);
     }
-    // The optional craft-fonts input carries Japanese, Simplified Chinese, Korean, Arabic, Thai and
-    // other faces. They are not registered into this static stack: `cjk_fonts` installs a
-    // per-character font provider for them, so a broad Simplified Chinese face is not put in the
-    // family stack ahead of the Japanese or Korean face, and a locale without a Traditional Chinese
-    // craft face leaves Han to the system font. (A single linear per-family chain still decides a
-    // glyph once a broad face is discovered; see `cjk_fonts`.)
-    // Served script fallbacks the web build has received (Arabic, Japanese…), after everything else.
-    for (name, data) in crate::served_fonts::ui_faces() {
-        add(&name, Some((*data).clone()), &every);
+    // Shared Han and kana keep the craft manifest's first Japanese face while no Han script is preferred.
+    if let Some(family) = crate::cjk_fonts::han_baseline(ui_language) {
+        fonts = fonts.prefer("Jpan", family);
     }
-    let fonts = UiFonts::new(&I18nScripts).family(Family::named("medium").weight(500)).family(Family::named(SEMIBOLD).weight(600));
+    if let Some(served) = crate::served_fonts::served(ctx) {
+        fonts = fonts.served_faces(&served.faces).fetcher(served.fetcher);
+    }
     faces.into_iter().fold(fonts, |fonts, (name, data, families)| fonts.app_face(&name, data, &families))
 }
 
-/// [`install_fonts`] with the CJK and other-script fallback fonts taken from `cjk` (tests swap the sources).
-/// The first install on a context installs the craft runtime too (`app/framework.rs`).
-pub fn install_fonts_with(ctx: &egui::Context, cjk: crate::cjk_fonts::Sources) {
-    let fonts = ui_fonts();
+/// Register Inter (UI) and JetBrains Mono (numbers) plus named weights, the craft-fonts faces and the loader of
+/// system fonts for scripts nothing else covers. The first install on a context installs the craft runtime too
+/// (`app/framework.rs`); a language change installs again.
+// PLAN: hub-w1's `install_runtime(ctx, frame: Option<Decision>)` wraps this body; `Decision` and
+// `framework::install`'s `frame` argument do not exist at the base, so the body stays here.
+pub fn install_fonts(ctx: &egui::Context) {
+    let language = crate::i18n::current().code();
+    let fonts = ui_fonts(ctx, language);
     crate::app::framework::install(ctx, &fonts);
     // Every face of the stack at Interface › UI Font Size, egui's default faces the framework
     // adds included. The runtime's install takes no edited stack, so on the first install this
@@ -1053,9 +1056,12 @@ pub fn install_fonts_with(ctx: &egui::Context, cjk: crate::cjk_fonts::Sources) {
     {
         ctx.add_plugin(UiFontSizePlugin { applied: size, defer_after_install: true });
     }
-    // CJK, Thai, Arabic, Indic and other script fallback fonts (craft-fonts' Japanese ones if built in, then
-    // the system's) are registered on demand (cjk_fonts.rs).
-    crate::cjk_fonts::install_with(ctx, cjk);
+    // Installed system fonts for scripts the stack lacks are registered on demand. The loader's faces are
+    // dropped with the stack and take names again, so the sizes recorded for them are forgotten.
+    for (name, ..) in craft::ui::fonts::on_demand_registered(ctx) {
+        ctx.data_mut(|d| d.remove_temp::<f32>(ui_fonts_id().with(name)));
+    }
+    crate::cjk_fonts::on_demand_fonts(language).install(ctx);
 }
 
 /// Has [`install_fonts`]'s stack reached the active fonts? Before that (the first pass, when
@@ -1073,11 +1079,6 @@ fn ui_font_size(ctx: &egui::Context) -> UiFontSize {
     ctx.data(|d| d.get_temp::<UiFontSize>(ui_fonts_id())).unwrap_or_default()
 }
 
-/// The Interface > UI Font Size multiplier for the current context (including the default Small).
-pub(crate) fn ui_font_scale(ctx: &egui::Context) -> f32 {
-    font_scale(ui_font_size(ctx))
-}
-
 fn font_scale(size: UiFontSize) -> f32 {
     match size {
         UiFontSize::Tiny => 10.0 / 12.0,
@@ -1087,8 +1088,8 @@ fn font_scale(size: UiFontSize) -> f32 {
     }
 }
 
-/// Register the original multiplier before sizing a face, including lazy CJK fallbacks.
-pub(crate) fn size_ui_font(ctx: &egui::Context, name: &str, data: &mut FontData) {
+/// Register the original multiplier before sizing a face of the installed stack.
+fn size_ui_font(ctx: &egui::Context, name: &str, data: &mut FontData) {
     ctx.data_mut(|d| d.insert_temp(ui_fonts_id().with(name), data.tweak.scale));
     data.tweak.scale *= font_scale(ui_font_size(ctx));
 }
@@ -1121,7 +1122,11 @@ impl egui::Plugin for UiFontSizePlugin {
     fn output_hook(&mut self, ctx: &egui::Context, _output: &mut egui::FullOutput) {
         let size = ui_font_size(ctx);
         let deferred = std::mem::take(&mut self.defer_after_install);
-        if size == self.applied {
+        // A face registered after the install (a served or on-demand fallback) starts at its own scale and has no
+        // recorded original; the faces of the installed stack all have one. Such a face is sized on the pass that
+        // finds it, and the pass after finds none.
+        let unsized_face = size == self.applied && font_scale(size) != 1.0 && !deferred && ui_fonts_active(ctx) && has_unsized_face(ctx);
+        if size == self.applied && !unsized_face {
             return;
         }
         if deferred || !ui_fonts_active(ctx) {
@@ -1134,18 +1139,23 @@ impl egui::Plugin for UiFontSizePlugin {
         let mut fonts = ctx.fonts(|f| f.definitions().clone());
         for (name, data) in &mut fonts.font_data {
             let id = ui_fonts_id().with(name);
-            let original = ctx.data(|d| d.get_temp::<f32>(id)).unwrap_or(data.tweak.scale / font_scale(self.applied));
+            // No record: the face came after the install, at the scale it was made with.
+            let original = ctx.data(|d| d.get_temp::<f32>(id)).unwrap_or(data.tweak.scale);
             ctx.data_mut(|d| d.insert_temp(id, original));
             Arc::make_mut(data).tweak.scale = original * font_scale(size);
         }
         ctx.set_fonts(fonts);
-        // The provider must use the scale of the definitions that were active while this pass
-        // laid out text. A face it discovers during the pass is inserted at that old scale; after
-        // `set_fonts` the rescaled definitions take effect and the provider follows them.
-        crate::cjk_fonts::set_craft_font_scale(ctx, font_scale(size));
+        // PLAN: faces the installed system font provider finds are not part of the definitions, so this scale
+        // does not reach them; the framework's provider takes no scale (framework-01-w5, `fonts/stack.rs`).
         self.applied = size;
         ctx.request_repaint();
     }
+}
+
+/// Whether the active definitions hold a face whose original scale was never recorded.
+fn has_unsized_face(ctx: &egui::Context) -> bool {
+    let names: Vec<String> = ctx.fonts(|f| f.definitions().font_data.keys().cloned().collect());
+    names.iter().any(|name| ctx.data(|d| d.get_temp::<f32>(ui_fonts_id().with(name))).is_none())
 }
 
 pub fn medium(size: f32) -> FontId {

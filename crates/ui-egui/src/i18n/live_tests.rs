@@ -288,11 +288,11 @@ fn cjk_font_order_follows_the_selected_language() {
     if !needs_catalogs() {
         return;
     }
-    use photocraft_text::cjk::CjkScript;
-    for (code, script) in [("zh-hans", CjkScript::SimplifiedChinese), ("ja", CjkScript::Japanese), ("ko", CjkScript::Korean)] {
+    for (code, han) in [("zh-hans", "Simplified"), ("ja", "Japanese"), ("ko", "Korean")] {
         with_language(lang(code), || {
-            let mut fallback = crate::cjk_fonts::CjkFallback::new(crate::cjk_fonts::Sources::system());
-            assert_eq!(fallback.order().first(), Some(&script), "{code}");
+            // The font stack takes the Han preference from the UI language, whatever the OS locale.
+            let preferred = craft::ui::fonts::han_for_locale(crate::i18n::current().code(), crate::cjk_fonts::os_locale());
+            assert_eq!(format!("{preferred:?}"), format!("Some({han})"), "{code}");
         });
     }
 }
