@@ -25,7 +25,14 @@ pub(crate) struct Preview {
     key: u64,
 }
 
+thread_local! {
+    /// How many Solid Color pickers this thread has opened. A picker's dialog id is the same at every open, so the
+    /// preview key takes this count to tell one open from the next.
+    static OPENS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
 pub(crate) fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
+    OPENS.with(|opens| opens.set(opens.get() + 1));
     let st = app.session.active()?;
     let layer = st.active_layer?;
     let LayerContent::Fill(Fill::Solid(color)) = st.doc.layer(layer)?.content else { return None };
@@ -39,6 +46,7 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
 /// Creating a Solid Color fill is transactional: the document is unchanged until OK.
 /// The picker is seeded with the foreground colour, matching the engine's default.
 pub(crate) fn open_new(app: &mut PhotocraftApp) -> Option<DialogId> {
+    OPENS.with(|opens| opens.set(opens.get() + 1));
     let document = app.session.active()?.doc.id;
     let foreground = app.session.tools.foreground;
     let rgb = [foreground[0], foreground[1], foreground[2]];
@@ -133,10 +141,10 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     }
     let mut doc = (*st.doc).clone();
     doc.layer_mut(layer)?.content = LayerContent::Fill(Fill::Solid(color));
-    // Include the dialog identity: cancelling and reopening at the same document revision
+    // Include the dialog identity and the open it belongs to: cancelling and reopening at the same document revision
     // must not reuse an old preview's pixels in the canvas caches.
     let mut hash = std::collections::hash_map::DefaultHasher::new();
-    (st.doc.id.0, st.revision, dialog, layer.0).hash(&mut hash);
+    (st.doc.id.0, st.revision, dialog, OPENS.with(std::cell::Cell::get), layer.0).hash(&mut hash);
     color.mode.hash(&mut hash);
     for component in color.c.into_iter().chain([color.alpha]) {
         component.to_bits().hash(&mut hash);

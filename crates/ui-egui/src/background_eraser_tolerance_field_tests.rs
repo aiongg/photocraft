@@ -21,6 +21,8 @@ fn bar(tool: Tool) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1800.0, 300.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             crate::panels::options_bar(app, ui);
+            // The alert a field raises is a hosted dialog, drawn by the dialog host.
+            crate::dialogs::run(app, ui);
         },
         app,
     );

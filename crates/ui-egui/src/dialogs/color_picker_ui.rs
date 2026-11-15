@@ -458,7 +458,7 @@ mod screen_integration_tests {
         h.run_steps(6);
         let picker = top(h.state()).expect("the text swatch opens the Color Picker");
         assert!(matches!(target(h.state(), picker), Some(PickTarget::Command { command, .. }) if command == "type.setStyle"));
-        h.get_by_label("Pick screen color").click();
+        h.get_by_label("Sample color from the screen").click();
         h.run_steps(6);
         assert_eq!(rgb_hex(testing::current(h.state(), picker).unwrap().color), "#ff8800");
         assert_eq!(h.state().session.active().unwrap().history.entries().len(), before, "sampling only changes the picker's colour");
