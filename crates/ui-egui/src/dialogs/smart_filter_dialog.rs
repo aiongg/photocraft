@@ -78,7 +78,7 @@ pub fn open(app: &mut PhotocraftApp, layer: LayerId, index: usize) -> Result<Dia
     fields.set("blend", blend_key(filter.blend));
     fields.set("opacity", f64::from(filter.opacity) * 100.0);
     app.filter_preview = None;
-    Ok(open_param(app, COMMAND, fields, target, move |f| ParamDialog::new(COMMAND, title.clone(), params.clone()).values(Bind::bound(f))))
+    Ok(open_param(app, COMMAND, fields, target, move |f| ParamDialog::new(COMMAND, title.clone(), params.clone()).values(Bind::bound(f)).previews(true)))
 }
 
 /// Whether the dialog `key` is the Blending Options dialog rather than another Smart Filter editor.

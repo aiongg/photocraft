@@ -490,7 +490,10 @@ fn builder(
 ) -> impl for<'b> Fn(&'b mut DialogFields) -> ParamDialog<'b> + Send + 'static {
     let key = command.to_owned();
     move |fields: &mut DialogFields| {
-        let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone()).values(Bind::bound(fields)).reset_to(reset.clone());
+        let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
+            .values(Bind::bound(fields))
+            .reset_to(reset.clone())
+            .previews(previews(&key));
         if key == "image.mode.colorTable" {
             dialog = dialog.extra_buttons(vec![("load".to_owned(), Label::from(tl!("Load…").to_string())), ("save".to_owned(), Label::from(tl!("Save…").to_string()))]);
         }
@@ -507,8 +510,6 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, String> 
     let captured = if command == MATCH_COLOR { json!(app.session.active().map(|st| (st.doc.id, st.active_layer))) } else { Value::Null };
     let reset = reset_values(&params, &fields);
     let build = builder(command, title_of(spec.label), params, reset);
-    // PLAN: assumed `open_param(app, key: &str, fields: DialogFields, captured: Value, build) -> DialogId` (dialogs-w19), which sets the
-    // remember key `photocraft.<key>`, the Preview picture for `previews(key)` commands and the held OK of a family with a `check`.
     Ok(crate::dialogs::params::open_param(app, command, fields, captured, build))
 }
 
