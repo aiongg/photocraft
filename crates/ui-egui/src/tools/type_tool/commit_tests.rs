@@ -102,7 +102,12 @@ pub(super) fn type_new(app: &mut PhotocraftApp, s: &str) -> LayerId {
     click(app, 50.0, 100.0, egui::Modifiers::NONE);
     // The editor shows and takes the keyboard in the next pass.
     testing::frame(app);
-    type_keys(app, s);
+    if s.is_empty() {
+        // The placeholder is selected: deleting it leaves the text empty.
+        testing::key(app, egui::Key::Backspace, egui::Modifiers::NONE);
+    } else {
+        type_keys(app, s);
+    }
     LayerId(app.ui.text_edit.as_ref().unwrap().layer)
 }
 

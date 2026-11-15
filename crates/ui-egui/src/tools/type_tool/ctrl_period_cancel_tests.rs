@@ -89,7 +89,7 @@ fn command_period_restores_edited_text() {
         let id = LayerId(made["layer"].as_u64().unwrap());
         let before = snapshot(&app);
         edit_active(&mut app);
-        super::host::type_text(&mut app, "CD");
+        super::commit_tests::type_keys(&mut app, "CD");
         assert_ne!(text_of(&app, id), "Hello", "{tool:?}: typed");
         let app = command_period(app);
         assert!(app.ui.text_edit.is_none(), "{tool:?}: the session ends");
