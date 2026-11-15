@@ -75,6 +75,9 @@ fn sampled(app: &PhotocraftApp) -> u64 {
 fn settle(app: &mut PhotocraftApp, done: impl Fn(&Value) -> bool) -> Value {
     for _ in 0..600 {
         pass(app);
+        // The preview job waits on the framework's queue until a request finishes it, as `waitPreview` does.
+        craft::ui::runtime::pending::finish_jobs(&ctx(app), std::time::Duration::from_secs(30));
+        pass(app);
         let d = facts(app);
         if done(&d) {
             return d;

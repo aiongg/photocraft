@@ -3,7 +3,8 @@
 //! `tests/it/actions_panel_menu.rs`.
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use craft::automation::ui::actions::ActionSelection;
+use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
+use craft::ui::runtime::commands::CommandRef;
 use craft::ui::dialog::DialogId;
 use egui_kittest::Harness;
 use photocraft_engine::actions_cmds::{Action, ActionStep};
@@ -39,10 +40,10 @@ fn control(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: V
     }
 }
 
-/// Fire the panel menu row of `command` (`duplicate`, `insertMenuItem`, …) as a click on it would.
-fn fire(h: &mut Harness<'static, PhotocraftApp>, command: &str) -> Value {
+/// Fire the panel menu row of `command` as a click on it would.
+fn fire(h: &mut Harness<'static, PhotocraftApp>, command: ActionsPanelCommands) -> Value {
     let ctx = h.ctx.clone();
-    let reply = control(h.state_mut(), &ctx, "ui.menu.invoke", json!({"id": format!("actionsPanel.{command}")}));
+    let reply = control(h.state_mut(), &ctx, "ui.menu.invoke", json!({"id": CommandRef::from(command).id}));
     h.run_steps(3);
     reply
 }
@@ -53,7 +54,7 @@ fn top_dialog(app: &PhotocraftApp) -> DialogId {
 }
 
 /// Fire the row of `command` and return the dialog it opened.
-fn open(h: &mut Harness<'static, PhotocraftApp>, command: &str) -> DialogId {
+fn open(h: &mut Harness<'static, PhotocraftApp>, command: ActionsPanelCommands) -> DialogId {
     fire(h, command);
     top_dialog(h.state())
 }
@@ -99,10 +100,10 @@ fn steps(app: &PhotocraftApp) -> Vec<ActionStep> {
 fn insert_menu_item_chooser_cancels_or_records_descriptor_free_filter_event() {
     let mut h = harness();
     let revision = h.state().session.active().unwrap().revision;
-    let dialog = open(&mut h, "insertMenuItem");
+    let dialog = open(&mut h, ActionsPanelCommands::InsertMenuItem);
     cancel(&mut h, dialog);
     assert!(steps(h.state()).is_empty());
-    let dialog = open(&mut h, "insertMenuItem");
+    let dialog = open(&mut h, ActionsPanelCommands::InsertMenuItem);
     assert_eq!(set_field(&mut h, dialog, "id", json!("filter.blur.gaussianBlur"))["ok"], true);
     confirm(&mut h, dialog).unwrap();
     assert_eq!(steps(h.state())[0], ActionStep::new(atn_cmds::MENU_ITEM, json!({"id":"filter.blur.gaussianBlur","eventKind":"name"})));
@@ -233,7 +234,7 @@ fn deny_image_size_choice(id: &str, params: &Value) -> photocraft_engine::Result
 fn menu_chooser_authorizes_the_selected_command_without_default_probe() {
     let mut h = harness();
     h.state_mut().session.authorize = Some(deny_image_size_choice);
-    let dialog = open(&mut h, "insertMenuItem");
+    let dialog = open(&mut h, ActionsPanelCommands::InsertMenuItem);
     set_field(&mut h, dialog, "id", json!("filter.blur.gaussianBlur"));
     h.state_mut().session.authorize = None;
     confirm(&mut h, dialog).unwrap();
@@ -241,7 +242,7 @@ fn menu_chooser_authorizes_the_selected_command_without_default_probe() {
     assert_eq!(inserted, [ActionStep::new(atn_cmds::MENU_ITEM, json!({"id":"filter.blur.gaussianBlur","eventKind":"name"}))]);
 
     h.state_mut().session.authorize = Some(deny_image_size_choice);
-    let dialog = open(&mut h, "insertMenuItem");
+    let dialog = open(&mut h, ActionsPanelCommands::InsertMenuItem);
     h.state_mut().session.authorize = None;
     let error = confirm(&mut h, dialog).unwrap_err();
     assert!(error.contains("choice denied"), "{error}");

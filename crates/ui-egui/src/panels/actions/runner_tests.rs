@@ -135,7 +135,11 @@ fn dialog_fields(app: &PhotocraftApp, value: u64) -> Value {
 fn set_field(app: &mut PhotocraftApp, value: u64, field: &str, to: Value) -> Result<(), String> {
     let id = open_id(app, value).ok_or_else(|| format!("no dialog {value}"))?;
     let ctx = app.ctx().clone();
-    app.framework.dialogs.set_json_field(&ctx, id, field, to)
+    let (request, _reply) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": id, "field": field, "value": to}));
+    match crate::control::handle(app, &ctx, &request) {
+        crate::control::Reply::Done(reply) => if reply["ok"] == true { Ok(()) } else { Err(reply["error"].as_str().unwrap_or("refused").to_string()) },
+        _ => Err("ui.dialog.set answers at once".into()),
+    }
 }
 
 /// Dialog confirmation, worker completion and cancellation retain the original action boundary.

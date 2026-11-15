@@ -70,9 +70,15 @@ pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers
     app.canvas_tools.last_response.take().unwrap_or_default()
 }
 
-/// Feeds the pen's pressure for the next frame; a mouse (pressure 1) feeds no pen.
+/// Feeds the pen's pressure for the next frame: a reading of `pressure`, unless the feed already holds one of that
+/// pressure (a test's own reading, with its tilt and pen end); a mouse (pressure 1) feeds no pen.
 fn pen(app: &PhotocraftApp, pressure: f32) {
-    app.stylus.feed.set((pressure != 1.0).then(|| PenSample { pressure, ..PenSample::default() }));
+    let feed = &app.stylus.feed;
+    if pressure == 1.0 {
+        feed.set(None);
+    } else if feed.get().map(|s| s.pressure) != Some(pressure) {
+        feed.set(Some(PenSample { pressure, ..PenSample::default() }));
+    }
 }
 
 /// The context the canvas pass runs in: the app's own, which its code outside the pass reads too.
@@ -86,21 +92,23 @@ fn held(mods: Modifiers) -> Mods {
     Mods { cmd: mods.mac_cmd || mods.command, ctrl: mods.ctrl && (mods.mac_cmd || !mods.command), alt: mods.alt, shift: mods.shift }
 }
 
-/// One frame of the app on its own context: the key route, then the document area and the hosted dialogs, as the
-/// app's frame orders them.
+/// One frame of the app on its own context, as its eframe hooks run it: the runtime's input hook gives the frame the
+/// app's command catalog, states and gate; the pass draws the document area and the hosted dialogs; then the input
+/// hook takes what the pass fired and the key route runs it, so a key a step delivers runs in the frame that took it.
 fn run_frame(app: &mut PhotocraftApp) {
     // The app's frame reconciles the views with the open documents before anything draws.
     app.sync_views();
     let ctx = ctx(app);
-    let mut frames = app.canvas_tools.frames.take().unwrap_or_else(|| Frames::over(ctx));
+    let mut frames = app.canvas_tools.frames.take().unwrap_or_else(|| Frames::over(ctx.clone()));
     app.canvas_tools.last_response = None;
-    frames.frame(Vec::new(), |ui| {
-        let ctx = ui.ctx().clone();
-        crate::shortcuts::handle(app, &ctx);
+    app.framework_before_input(&ctx);
+    frames.frame_without_input(Vec::new(), |ui| {
         egui::CentralPanel::default().show(ui, |ui| super::document_area(app, ui));
         crate::dialogs::run(app, ui);
     });
     app.canvas_tools.frames = Some(frames);
+    app.framework_before_input(&ctx);
+    crate::shortcuts::handle(app, &ctx);
 }
 
 /// Runs frames until the window host has delivered everything queued.

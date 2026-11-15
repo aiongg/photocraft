@@ -112,11 +112,11 @@ pub(crate) fn next_in_group_id(letter: char) -> String {
     format!("tools.nextInGroup.{}", letter.to_ascii_lowercase())
 }
 
-/// The tool key a [`next_in_group_id`] names.
+/// The tool key a [`next_in_group_id`] names, as `Tool::key` gives it (upper case).
 fn next_in_group_letter(id: &str) -> Option<char> {
     let mut chars = id.strip_prefix("tools.nextInGroup.")?.chars();
     let letter = chars.next()?;
-    chars.next().is_none().then_some(letter)
+    chars.next().is_none().then_some(letter.to_ascii_uppercase())
 }
 
 /// A default binding from the text the tables write it in.

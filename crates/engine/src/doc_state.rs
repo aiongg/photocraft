@@ -239,6 +239,19 @@ impl ToolState {
     /// background (reveal-paint first).
     pub const MASK_COLORS: [[f32; 4]; 2] = [[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 1.0]];
 
+    /// The pixel colour pair a fresh session starts with: black foreground, white background.
+    pub const PIXEL_COLORS: [[f32; 4]; 2] = [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]];
+
+    /// The swatches as `Preferences::tool_colors` keeps them: the pixel pair, the mask pair and the CMYK picks.
+    pub fn saved_colors(pairs: [[[f32; 4]; 2]; 2], cmyk_picks: &[([f32; 3], [f32; 4])]) -> serde_json::Value {
+        let [[foreground, background], [mask_foreground, mask_background]] = pairs;
+        serde_json::json!({
+            "foreground": foreground, "background": background,
+            "maskForeground": mask_foreground, "maskBackground": mask_background,
+            "cmykPicks": cmyk_picks,
+        })
+    }
+
     /// Note that `brush` or `current_preset` changed. Every setter of either (commands and the
     /// shell's tool-switch paths) calls this; the last-brush persistence only serialises when the
     /// revision has moved since the stored value ([`Self::brush_saved_rev`]).
@@ -266,8 +279,8 @@ impl ToolState {
 impl Default for ToolState {
     fn default() -> Self {
         Self {
-            foreground: [0.0, 0.0, 0.0, 1.0],
-            background: [1.0, 1.0, 1.0, 1.0],
+            foreground: Self::PIXEL_COLORS[0],
+            background: Self::PIXEL_COLORS[1],
             // Photoshop's Brush tool starts at 10 % Smoothing.
             brush: photocraft_paint::BrushSettings {
                 smoothing: photocraft_paint::brush::Smoothing { amount: 0.1, ..Default::default() },

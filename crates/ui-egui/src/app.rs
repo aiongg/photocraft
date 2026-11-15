@@ -46,6 +46,7 @@ impl PhotocraftApp {
         session.automation_gate = session.automation_gate.or(services.automation_authorize);
         // PLAN: dialogs-w59 adds `Services::files` (assumed `Option<Arc<dyn craft::host::Files>>`).
         let framework = framework::Framework::new(services.files.clone());
+        let pen_feed = stylus::StylusFeed::of(&ctx);
         let mut app = Self {
             session,
             ui: UiState::default(),
@@ -221,7 +222,8 @@ impl PhotocraftApp {
             workspaces: Default::default(),
             // Off until `prefs_ui::load` sets the saved interval.
             autosave: craft::platform::autosave::Autosave::new(None),
-            stylus: Default::default(),
+            // The feed the runtime was installed with: each pointer the canvas takes carries the pen's reading.
+            stylus: stylus::Stylus::over(pen_feed),
             background_jobs: false,
             min_frame_ms: None,
             last_frame_start_ms: 0.0,

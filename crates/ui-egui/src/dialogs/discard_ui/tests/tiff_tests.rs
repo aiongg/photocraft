@@ -35,7 +35,7 @@ fn tiff_prompt_answering(command: &str, paths: &[&str]) -> (Prompted, Writes, Do
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.ctx.set_os(egui::os::OperatingSystem::Windows);
+    craft::ui::testing::windows::set_os(&h.ctx, craft::host::target::Os::Windows);
     assert!(intercept(h.state_mut(), command, &Value::Null));
     h.run_steps(3);
     (h, writes, saved, other)

@@ -39,7 +39,7 @@ fn targa_app(alpha_channel: bool, to: &str) -> (Prompted, Writes) {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.ctx.set_os(egui::os::OperatingSystem::Windows);
+    craft::ui::testing::windows::set_os(&h.ctx, craft::host::target::Os::Windows);
     (h, writes)
 }
 

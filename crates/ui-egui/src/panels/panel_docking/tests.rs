@@ -171,7 +171,7 @@ fn window_panel_ids_drive_the_workspace() {
         assert_eq!(saved(&app), before, "{id} {params}");
     }
 
-    invoke(&mut app, "window.workspace.lock", json!({"locked": true})).unwrap();
+    invoke(&mut app, "workspace.lock", json!({})).unwrap();
     let before = saved(&app);
     assert!(invoke(&mut app, "window.panel.float", json!({"panel": "layers"})).is_err());
     assert_eq!(saved(&app), before, "a locked workspace refuses the move");

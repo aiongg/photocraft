@@ -56,7 +56,8 @@ fn fill_with_picker(app: &mut PhotocraftApp) -> FillPicker {
     app.framework.dialogs.set_json_field(&ctx, fill, "contents", json!("color")).unwrap();
     app.framework.dialogs.set_json_field(&ctx, fill, "color", json!([32.0 / 255.0, 160.0 / 255.0, 64.0 / 255.0])).unwrap();
     host_pass(app);
-    let request = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(fill).and_then(|d| d.pick_color()).expect("Color… files a colour request");
+    // The request the Color row's press files: its key and the colour the row holds.
+    let request = ColorRequest::new("color", craft::theme::Srgba::from_rgb_array([32.0 / 255.0, 160.0 / 255.0, 64.0 / 255.0]));
     let key = request.key.clone();
     let picker = open_for_request(app, fill, request);
     assert_eq!(top_of(app), Some(picker), "the picker opens over the Fill dialog");
