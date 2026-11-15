@@ -168,10 +168,16 @@ fn invalid_mask_samples_leave_both_swatches_unchanged() {
     app.run("tools.setColors", json!({"foreground": [0.2, 0.2, 0.2, 1.0], "background": [0.8, 0.8, 0.8, 1.0]})).unwrap();
     let before = (app.session.tools.foreground, app.session.tools.background);
     let assert_unchanged = |app: &PhotocraftApp| assert_eq!((app.session.tools.foreground, app.session.tools.background), before);
-    for (x, y) in [(-0.1, 1.0), (1.0, 8.0), (f64::NAN, 1.0), (1.0, f64::INFINITY)] {
+    for (x, y) in [(-0.1, 1.0), (1.0, 8.0)] {
         for mods in [Modifiers::NONE, Modifiers::ALT] {
             click(&mut app, x, y, mods);
             assert_unchanged(&app);
         }
     }
+    // A point with no screen position (the pointer cannot be put there): the pick itself refuses it.
+    let options = app.ui.tool_options.eyedropper;
+    for at in [[f64::NAN, 1.0], [1.0, f64::INFINITY]] {
+        assert_eq!(super::pick(&mut app, at, options.size, options.source), None, "{at:?}");
+    }
+    assert_unchanged(&app);
 }

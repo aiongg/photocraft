@@ -169,10 +169,6 @@ fn is_color_picker(app: &PhotocraftApp, id: DialogId) -> bool {
     host(app).get_by_id::<craft::color::ui::ColorPickerDialog>(id).is_some()
 }
 
-fn is_export_as(app: &PhotocraftApp, id: DialogId) -> bool {
-    host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedExportAs>(id).is_some()
-}
-
 /// Export As's `scale` (percent) is the dialog's `size`, as the scale variant of its serde form.
 fn export_scale(_: &Value, v: &Value) -> Vec<(String, Value)> {
     vec![pair("size", json!({"Scale": v}))]
@@ -287,7 +283,7 @@ pub(crate) const FIELD_KEYS: &[FieldKey] = &[
     FieldKey { which: Which::Key("slice.divide"), from: "horizontal", to: "rows", values: &[], with: None },
     FieldKey { which: Which::Key("slice.divide"), from: "vertical", to: "columns", values: &[], with: None },
     FieldKey { which: Which::Key("slice.divide"), from: "number", to: "", values: &[], with: Some(dropped) },
-    FieldKey { which: Which::Is(is_export_as), from: "scale", to: "", values: &[], with: Some(export_scale) },
+    FieldKey { which: Which::Key("file.exportAs"), from: "scale", to: "", values: &[], with: Some(export_scale) },
     FieldKey { which: Which::Key("filter.liquify"), from: "backdropUse", to: "backdrop", values: &[], with: Some(liquify_backdrop) },
 ];
 

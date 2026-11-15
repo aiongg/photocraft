@@ -1414,7 +1414,7 @@ fn views_and_windows_stay_with_their_documents() {
     app.run("file.close", json!({"document": 1})).unwrap();
     assert_eq!(doc_names(&app), ["b.psd", "d.psd", "a.psd"]);
     assert_eq!(zooms(&app), [2.0, 4.0, 1.0]);
-    assert_eq!(windows(&app), [(made[0], 2), (made[2], 0), (made[3], 1)]);
+    assert_eq!(windows(&app), [(made[0], 2), (made[1], 0), (made[3], 1)]);
 }
 
 

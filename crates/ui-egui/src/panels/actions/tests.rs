@@ -57,10 +57,10 @@ fn selected_layer_name_is_visible_during_recording_and_after_stop() {
     }
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(400.0, 260.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(4);
-    h.get_by_label("Select Layer (Background)");
+    h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Select Layer (Background)");
     h.state_mut().run("actions.stop", json!({})).unwrap();
     h.run_steps(4);
-    h.get_by_label("Select Layer (Background)");
+    h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Select Layer (Background)");
 }
 
 /// #7646: an action's function key can take Shift and Command, as in Photoshop's Action

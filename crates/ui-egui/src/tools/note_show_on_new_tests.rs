@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;
-use crate::control::{ControlRequest, handle};
 use crate::state::Tool;
 use serde_json::json;
 
@@ -65,7 +64,7 @@ fn a_new_note_turns_show_notes_and_the_panel_on() {
 
 /// A denied canvas creation preserves the selected note and visibility settings.
 fn refused_creation_changes_nothing() {
-    let (mut app, ctx) = note_tool();
+    let (mut app, _) = note_tool();
     app.run("notes.add", json!({"x": 20, "y": 20})).unwrap();
     app.run("notes.add", json!({"x": 70, "y": 20})).unwrap();
     gesture(&mut app, [72.0, 22.0], [72.0, 22.0]);
@@ -84,18 +83,7 @@ fn refused_creation_changes_nothing() {
         Ok(())
     }));
     app.automation_input = true;
-    let (request, reply) = ControlRequest::new("ui.pointer", json!({"events": [{"kind": "down", "x": 130, "y": 70}, {"kind": "up", "x": 130, "y": 70}]}));
-    let _ = handle(&mut app, &ctx, &request);
-
-    let mut answer = None;
-    for _ in 0..30 {
-        crate::canvas::testing::frame(&mut app);
-        if let Ok(v) = reply.try_recv() {
-            answer = Some(v);
-            break;
-        }
-    }
-    let answer = answer.expect("ui.pointer answers after the queued input ran");
+    let answer = crate::canvas::testing::control(&mut app, "ui.pointer", json!({"events": [{"kind": "down", "x": 130, "y": 70}, {"kind": "up", "x": 130, "y": 70}]}));
 
     assert_eq!(answer["ok"], true);
     assert_eq!(denials.get(), 1);

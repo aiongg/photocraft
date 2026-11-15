@@ -278,7 +278,7 @@ fn hidden_frame_ancestors_hide_placeholders_and_handles() {
     drag(&mut app, [20., 30.], [120., 110.]);
     let id = selected(&app).unwrap().id;
     let mut h = harness(app);
-    assert!(h.query_by_label("Frame").is_some(), "a visible selected frame shows its box");
+    assert!(h.query_all_by_label("Frame").next().is_some(), "a visible selected frame shows its box");
     h.state_mut()
         .session
         .edit("Hide group", |doc, _| {
@@ -291,7 +291,7 @@ fn hidden_frame_ancestors_hide_placeholders_and_handles() {
         .unwrap();
     h.run_steps(3);
     assert_eq!(frame_at(h.state(), [50., 50.]), None);
-    assert!(h.query_by_label("Frame").is_none(), "no box for a hidden frame");
+    assert!(h.query_all_by_label("Frame").next().is_none(), "no box for a hidden frame");
 }
 
 #[test]
