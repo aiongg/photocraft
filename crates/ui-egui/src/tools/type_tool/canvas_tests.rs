@@ -203,14 +203,14 @@ mod panel_defaults {
         let app = new_app();
         let steps = app.session.active().unwrap().history.entries().len();
         let mut h = panel_harness(app);
-        open_presets(&h, "Font size presets").click();
+        open_presets(&h, "Font size presets");
         h.run();
         h.get_by_label("72 pt").scroll_to_me();
         h.run();
         h.get_by_label("72 pt").click();
         h.run();
         assert_eq!(h.state().ui.tool_options.type_size, 72.0);
-        open_presets(&h, "Leading presets").click();
+        open_presets(&h, "Leading presets");
         h.run();
         h.get_by_label("Auto").click();
         h.run();

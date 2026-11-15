@@ -218,7 +218,7 @@ pub(crate) fn channel_index(v: &Value, names: &[String]) -> Option<usize> {
 fn lens_blur(app: &PhotocraftApp, params: &mut [Param]) {
     let names = channel_names(app);
     if let Some(depth_map) = row(params, "depthMap") {
-        if let ParamKind::Choice { options, default } = &mut depth_map.kind {
+        if let ParamKind::Choice { options, default, .. } = &mut depth_map.kind {
             options.retain(|(id, _)| id != "channel");
             options.extend(names.iter().enumerate().map(|(i, name)| (channel_choice(i), Label::from(name.clone()))));
             // A source that names a channel of one document is never carried to another, so the menu opens as None.
