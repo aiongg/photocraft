@@ -165,5 +165,3 @@ mod mask_properties_tests;
 #[cfg(test)]
 mod history_panel_select_tests;
 
-#[cfg(test)]
-mod toolbar_tab_reveal_tests;

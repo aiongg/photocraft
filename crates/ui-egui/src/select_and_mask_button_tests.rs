@@ -10,28 +10,28 @@ use egui_kittest::{
 use serde_json::json;
 
 fn harness() -> Harness<'static, PhotocraftApp> {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
-    app.sync_views();
-    app.ui.tool = Tool::RectMarquee;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 60.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                crate::panels::options_bar(app, ui);
-            }
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(4);
+    // The whole app: the button's label and enabled state come from the command state its frame publishes.
+    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        app.sync_views();
+        app.ui.tool = Tool::RectMarquee;
+        app
+    });
+    h.run_steps(8);
     h
+}
+
+fn button<'a>(h: &'a Harness<'static, PhotocraftApp>) -> egui_kittest::Node<'a> {
+    h.get_by_role_and_label(egui::accesskit::Role::Button, "Select and Mask…")
 }
 
 #[test]
 fn select_and_mask_follows_the_selection() {
     let mut h = harness();
-    assert!(h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "the button is greyed out with no selection");
+    assert!(button(&h).accesskit_node().is_disabled(), "the button is greyed out with no selection");
     h.state_mut().run("select.all", json!({})).unwrap();
     h.run_steps(4);
-    assert!(!h.get_by_label("Select and Mask…").accesskit_node().is_disabled(), "the button is live with a selection");
+    assert!(!button(&h).accesskit_node().is_disabled(), "the button is live with a selection");
 }

@@ -3,6 +3,17 @@ use egui_kittest::kittest::Queryable;
 
 const HEIGHT: f32 = 360.0;
 
+/// Whether the rail's button for `tool` has the focus. A tool's button is a node inside a node of the same name (the
+/// slot and the button in it), so the name matches two.
+fn focused(harness: &egui_kittest::Harness<'_, PhotocraftApp>, tool: &str) -> bool {
+    harness.query_all_by_label_contains(tool).any(|node| node.is_focused())
+}
+
+/// The rect of the rail's button for `tool`: the innermost of the nodes carrying its name.
+fn button_rect(harness: &egui_kittest::Harness<'_, PhotocraftApp>, tool: &str) -> egui::Rect {
+    harness.query_all_by_label_contains(tool).last().unwrap_or_else(|| panic!("no {tool} button")).rect()
+}
+
 /// A harness that draws the toolbar in a window much shorter than its tools, so the rail scrolls.
 fn short_toolbar_harness() -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut ready = false;
@@ -37,27 +48,27 @@ fn tab_reveals_and_activates_the_last_tool() {
     for _ in 0..40 {
         harness.key_press(egui::Key::Tab);
         harness.run_steps(3);
-        entered = harness.get_by_label_contains("Move Tool").is_focused();
+        entered = focused(&harness, "Move Tool");
         if entered {
             break;
         }
     }
     assert!(entered, "Tab must reach the rail's buttons");
     // The node's rect is its visible part, so a button the rail clipped is shorter than a whole one.
-    let full_height = harness.get_by_label_contains("Move Tool").rect().height();
+    let full_height = button_rect(&harness, "Move Tool").height();
     // The grid wraps, so Up from the first slot goes backwards from the end of the rail.
     let mut reached = false;
     for _ in 0..10 {
         harness.key_press(egui::Key::ArrowUp);
         harness.run_steps(3);
-        reached = harness.get_by_label_contains("Zoom Tool").is_focused();
+        reached = focused(&harness, "Zoom Tool");
         if reached {
             break;
         }
     }
     assert!(reached, "the arrow keys must reach the last tool");
     harness.run_steps(20);
-    let rect = harness.get_by_label_contains("Zoom Tool").rect();
+    let rect = button_rect(&harness, "Zoom Tool");
     assert!(rect.height() >= full_height - 0.5, "the focused tool is clipped: {rect:?} against a full height of {full_height}");
     assert!(rect.top() >= 0.0 && rect.bottom() <= HEIGHT, "the focused tool is outside the window: {rect:?}");
     harness.key_press(egui::Key::Space);
