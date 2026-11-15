@@ -87,16 +87,14 @@ fn last_dialog(app: &PhotocraftApp) -> u64 {
     app.framework.dialogs.open_dialogs().last().map(|dialog| dialog.id.value()).expect("a dialog is open")
 }
 
-/// Press OK on the open dialog `value` through the dialog host. `Err` is the failure the dialog's
-/// finish left in the status bar, or a dialog that is not open or refused OK.
+/// Press OK on the open dialog `value` through the app's OK path, which answers a held OK at once. `Err` is the
+/// failure the dialog's finish left in the status bar, or a dialog that is not open or refused OK.
 fn answer_ok(app: &mut PhotocraftApp, value: u64) -> Result<(), String> {
     let id = open_id(app, value).ok_or_else(|| format!("no dialog {value}"))?;
     let ctx = app.ctx().clone();
     app.ui.status.clear();
     app.ui.status_error = false;
-    if !app.framework.dialogs.confirm_by_id(&ctx, id) {
-        return Err(format!("dialog {value} did not accept OK"));
-    }
+    crate::dialogs::confirm(app, &ctx, id)?;
     settle(app, &ctx);
     if app.ui.status_error { Err(app.ui.status.clone()) } else { Ok(()) }
 }
