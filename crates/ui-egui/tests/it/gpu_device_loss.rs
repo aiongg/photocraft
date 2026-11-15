@@ -411,7 +411,7 @@ fn tiled_canvas_keeps_tiles_in_place() {
                 view_key: 1,
                 display: 0,
                 output: 0,
-
+                hdr: None,
             },
         }
     });

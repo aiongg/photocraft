@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use craft::host::files::ScriptedFiles;
+use craft::host::ScriptedFiles;
 use egui_kittest::kittest::Queryable;
 use photocraft_ui_egui::control::{ControlRequest, Reply};
 use photocraft_ui_egui::{PhotocraftApp, Services, menus};

@@ -110,7 +110,7 @@ fn save_draft_and_open_apply_menu(h: &mut H, id: &str) -> String {
 /// CSV chosen through the import menu supplies the row that Apply renders and OK preserves.
 #[test]
 fn imported_csv_replaces_pixels_through_the_apply_dialog() {
-    use craft::host::files::{Picked, ScriptedFiles};
+    use craft::host::{Picked, ScriptedFiles};
 
     for contents in [false, true] {
         let (dir, mut h, id) = pixel_replacement_harness();

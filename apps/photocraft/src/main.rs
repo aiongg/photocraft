@@ -65,7 +65,8 @@ mod window_frame;
 
 use photocraft_engine::Session;
 use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::window_policy::{self, Backend, Frame, Prefix, TitleBarPref};
+use photocraft_ui_egui::Prefix;
+use photocraft_ui_egui::window_policy::{self, Backend, Frame, TitleBarPref};
 
 use photocraft_ui_egui::os_window::APP_ID;
 
@@ -661,11 +662,11 @@ fn main() -> eframe::Result {
                 use photocraft_ui_egui::i18n;
                 let line = i18n::t("{path}: the path is not valid Unicode; rename the file and open it again.");
                 let lines = unreadable_paths.iter().map(|p| i18n::fmt(line, &[("path", p.as_str())])).collect();
-                photocraft_ui_egui::notices::post(&mut app, i18n::t("Could not open"), lines, true, None);
+                photocraft_ui_egui::notices::post(&mut app, i18n::t("Could not open"), lines, craft::theme::variant::Tone::Bad, None);
             }
             // Portable marker found but its data folder isn't writable (#228): say where settings went.
             if let Some(w) = &app_dirs::current().warning {
-                photocraft_ui_egui::notices::post(&mut app, "Portable mode is off", vec![w.clone()], false, None);
+                photocraft_ui_egui::notices::post(&mut app, "Portable mode is off", vec![w.clone()], craft::theme::variant::Tone::Neutral, None);
             }
             Ok(Box::new(app))
         }),

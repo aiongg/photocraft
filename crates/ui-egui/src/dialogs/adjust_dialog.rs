@@ -286,7 +286,7 @@ pub(crate) fn add_point(app: &mut PhotocraftApp, at: [f64; 2], every_channel: bo
 const KEEPS_LAST: &[(&str, &str)] = &[("photoFilter", "preserveLuminosity")];
 
 /// The saved-tier key of the settings last confirmed in the dialog of `kind`.
-fn last_key(kind: &str) -> SaveKey {
+pub fn last_key(kind: &str) -> SaveKey {
     SaveKey::named(format!("photocraft.adjust.last.{kind}"))
 }
 

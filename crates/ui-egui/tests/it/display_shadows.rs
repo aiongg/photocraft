@@ -254,7 +254,7 @@ fn compare_display_paths_24mp() {
         hdr: None,
     };
     let mut harness =
-        egui_kittest::Harness::builder().with_context(params.ctx().clone()).with_size(egui::vec2(SIZE[0] as f32, SIZE[1] as f32)).with_pixels_per_point(1.0).renderer(renderer).build_ui_state(
+        egui_kittest::Harness::builder().with_size(egui::vec2(SIZE[0] as f32, SIZE[1] as f32)).with_pixels_per_point(1.0).renderer(renderer).build_ui_state(
             |ui, params| {
                 let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(SIZE[0] as f32, SIZE[1] as f32));
                 GpuCanvas::paint(&ui.painter().with_clip_rect(rect), rect, *params);

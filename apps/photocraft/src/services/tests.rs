@@ -1,4 +1,5 @@
 use super::*;
+use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_engine::Session;
 use photocraft_format::list_recovery;
 use photocraft_ui_egui::{PhotocraftApp, prefs_ui};
@@ -210,7 +211,7 @@ fn recovered_documents_survive_a_second_crash_until_saved_or_closed() {
     // Launch 1: two unsaved documents are autosaved, then the app crashes.
     {
         let mut app = launch(&dir);
-    let ctx = app.ctx().clone();
+        let ctx = app.ctx().clone();
         new_doc(&mut app, "#ff0000");
         new_doc(&mut app, "#0000ff");
         autosave(&mut app, &ctx);
@@ -219,6 +220,7 @@ fn recovered_documents_survive_a_second_crash_until_saved_or_closed() {
     // Launch 2 recovers both and crashes again before its first autosave (#444).
     {
         let mut app = launch(&dir);
+        let ctx = app.ctx().clone();
         let mut docs = open_docs(&app);
         docs.sort_by(|a, b| a.0[0].total_cmp(&b.0[0]));
         assert_eq!(docs, [(BLUE, true), (RED, true)], "recovered and still unsaved");
@@ -229,6 +231,7 @@ fn recovered_documents_survive_a_second_crash_until_saved_or_closed() {
     // (whose id may repeat one from an earlier launch) gets an entry of its own.
     {
         let mut app = launch(&dir);
+        let ctx = app.ctx().clone();
         assert_eq!(app.session.documents().len(), 2);
         autosave(&mut app, &ctx);
         new_doc(&mut app, "#00ff00");
@@ -237,6 +240,7 @@ fn recovered_documents_survive_a_second_crash_until_saved_or_closed() {
     assert_eq!(list_recovery(&dir).len(), 3);
     // Launch 4: closing and saving recovered documents removes their entries, no duplicates.
     let mut app = launch(&dir);
+    let ctx = app.ctx().clone();
     assert_eq!(app.session.documents().len(), 3);
     let red = index_of(&app, RED);
     app.run("file.close", json!({"document": red})).unwrap();

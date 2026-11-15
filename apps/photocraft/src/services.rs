@@ -416,7 +416,7 @@ fn shell_word(s: &str) -> String {
 
 /// Every native service. `wake` requests a repaint from any thread; the file panels answer through it.
 pub fn native(automation: Option<photocraft_automation::AuthorizedWorkspace>, wake: craft::dialogs::Wake) -> Services {
-    let (files, file_panels) = craft::dialogs::FileService::new(wake);
+    let (files, file_panels) = craft::dialogs::service::FileService::new(wake);
     let clip: Rc<RefCell<Option<arboard::Clipboard>>> = Rc::default();
     let clip_unreadable: Rc<Cell<bool>> = Rc::default();
     let automation_read = automation.clone().map(|workspace| {

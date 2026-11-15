@@ -122,7 +122,8 @@ fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value)
 // PLAN: the sheet reads the open value through `values::to_params`; the decision for this file reads the fields the host lists (`open_dialogs`),
 // which are assumed to carry the engine parameter keys beside `preview`, `picker`, `channel` and `clipping` (dl.K46).
 fn fields(h: &Harness<'static, PhotocraftApp>) -> Value {
-    h.state().framework.dialogs.open_dialogs().into_iter().last().and_then(|dialog| dialog.fields).unwrap_or(Value::Null)
+    let inspected = photocraft_ui_egui::control::inspect(h.state(), &h.ctx);
+    inspected["dialogs"].as_array().and_then(|dialogs| dialogs.last()).map(|dialog| dialog["fields"].clone()).unwrap_or(Value::Null)
 }
 
 /// Extract only the public command parameters from the top modal.
@@ -144,14 +145,14 @@ fn set(h: &mut Harness<'static, PhotocraftApp>, id: DialogId, field: &str, value
 
 /// OK on dialog `id` through the host.
 fn confirm(h: &mut Harness<'static, PhotocraftApp>, id: DialogId) -> Result<(), String> {
-    let ctx = h.ctx.clone();
-    dialogs::confirm(h.state_mut(), &ctx, id).map(|_| ())
+    let reply = control(h, "ui.dialog.confirm", json!({"dialog": id}));
+    if reply["ok"] == true { Ok(()) } else { Err(reply["error"].as_str().unwrap_or("not confirmed").to_string()) }
 }
 
 /// Cancel on dialog `id` through the host.
 fn cancel(h: &mut Harness<'static, PhotocraftApp>, id: DialogId) {
-    let ctx = h.ctx.clone();
-    dialogs::cancel(h.state_mut(), &ctx, id).expect("the dialog cancels");
+    let reply = control(h, "ui.dialog.cancel", json!({"dialog": id}));
+    assert_eq!(reply["ok"], true, "the dialog cancels: {reply}");
 }
 
 /// The rectangle of the window that draws the dialog's OK button.
@@ -231,15 +232,20 @@ fn play(h: &mut Harness<'static, PhotocraftApp>, action: &str) {
 }
 
 /// Seeds the settings the dialog recalls with ⌥, as an earlier OK leaves them.
-// PLAN: the last-used settings live in the SAVED tier (dialogs-w32); `adjust_dialog::last_key(command) -> SaveKey` and a `Value` as the saved
-// type are assumed, so a test can seed settings an OK would never write (malformed, address-bearing).
+/// The last-used settings live in the saved tier under the dialog kind; seeding them directly lets a test store settings an OK would
+/// never write (malformed, address-bearing).
 fn remember_last(h: &Harness<'static, PhotocraftApp>, command: &str, last: Value) {
-    set_saved_value(&h.ctx, &adjust_dialog::last_key(command), last);
+    set_saved_value(&h.ctx, &adjust_dialog::last_key(kind_of(command)), Some(last));
+}
+
+/// The dialog kind of an `image.adjustments.<kind>` command.
+fn kind_of(command: &str) -> &str {
+    command.strip_prefix("image.adjustments.").unwrap_or(command)
 }
 
 /// The last-used settings of `command`.
 fn remembered(h: &Harness<'static, PhotocraftApp>, command: &str) -> Value {
-    saved_value::<Value>(&h.ctx, &adjust_dialog::last_key(command))
+    saved_value::<Option<Value>>(&h.ctx, &adjust_dialog::last_key(kind_of(command))).unwrap_or(Value::Null)
 }
 
 /// Real Levels gamma edits affect the named scalar target and agree with preview, commit and undo.
