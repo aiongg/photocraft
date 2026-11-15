@@ -355,13 +355,14 @@ fn photo(width: u32, height: u32, depth: u32) -> PhotocraftApp {
     app
 }
 
-/// Mid-drag by (37, 11): is the layer shown at the pointer?
+/// Mid-drag by (1000, 500) document pixels, far enough on screen for these large documents (shown at a small zoom)
+/// to pass the press slop: is the layer shown at the pointer?
 fn follows_a_drag(app: &mut PhotocraftApp) -> bool {
     let m = egui::Modifiers::NONE;
     crate::canvas::tool_event(app, ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, m);
-    crate::canvas::tool_event(app, ToolEvent::Move { x: 137.0, y: 111.0, pressure: 1.0 }, m);
+    crate::canvas::tool_event(app, ToolEvent::Move { x: 1100.0, y: 600.0, pressure: 1.0 }, m);
     let shown = super::display_doc(app, 0).is_some();
-    crate::canvas::tool_event(app, ToolEvent::Up { x: 137.0, y: 111.0 }, m);
+    crate::canvas::tool_event(app, ToolEvent::Up { x: 1100.0, y: 600.0 }, m);
     shown
 }
 

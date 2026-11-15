@@ -94,9 +94,11 @@ fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
     output.textures_delta.clear();
 }
 
-/// Fires a view command on the canvas and runs the frame that drains it.
+/// Fires a view command on the canvas and runs the frame that drains it. The canvas takes the command once a frame
+/// has shown it, so one runs first.
 fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: craft::ui::canvas::ViewCommands) {
-    craft::ui::runtime::commands::fire(ctx, command, craft::ui::runtime::commands::FireSource::Menu);
+    frame(app, ctx);
+    assert!(craft::ui::runtime::commands::fire(ctx, command, craft::ui::runtime::commands::FireSource::Menu), "the canvas takes {command:?}");
     frame(app, ctx);
 }
 

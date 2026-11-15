@@ -284,7 +284,7 @@ mod rotation_preview_isolation_tests {
     /// Clicks the open dialog's Preview box.
     fn toggle_preview(h: &mut egui_kittest::Harness<'static, PhotocraftApp>) {
         use egui_kittest::kittest::Queryable;
-        h.get_by_label("Preview").click();
+        h.get_by_role_and_label(egui::accesskit::Role::CheckBox, "Preview").click();
         h.run_steps(2);
     }
 
