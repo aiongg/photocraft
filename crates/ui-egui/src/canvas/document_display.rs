@@ -1,21 +1,25 @@
-//! The document canvas on the framework's `Canvas`: the view binding, the navigation options from Preferences, and
-//! the document's picture in its body (a GPU picture or the CPU composite, and the Channels panel's view over it).
+//! The document canvas on the framework's `Canvas`: the view binding, the navigation options from Preferences, the
+//! pasteboard, the canvas controls of the body in their order, the document's picture (a GPU picture or the CPU
+//! composite, and the Channels panel's view over it), and the tool host that runs after the canvas.
 
+use craft::behavior::geometry::crop::normalized_angle;
 use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::{Point, Rect as Rect64, Size};
 use craft::behavior::{CanvasView, PixelSize};
-use craft::ui::canvas::{Canvas, Extent, NavigationOptions, RasterDisplay, RasterSource, easing_view};
+use craft::ui::canvas::{
+    Canvas, CanvasOutput, CanvasScrollbars, CanvasSpace, Extent, GuidesOutput, NavigationOptions, PageBorder, PageFrame, Pasteboard, PasteboardColor, PixelRect, RasterDisplay,
+    RasterSource, RotateView, SelectionOutline, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view,
+};
+use craft::imaging::ui::SelectionOverlay;
 use craft::ui::contract::{Bind, Props, Show, ShowContainer};
 use craft::ui::primitives::Checker;
 use craft::ui::runtime::env::Label;
-use craft::ui::runtime::focus::{KeyUse, host_canvas};
 use craft::ui::style::DataColor;
-use egui::{Color32, Pos2, Rect, Sense};
+use egui::{Color32, Pos2, Rect};
 
 use super::gpu_picture::{GpuPicture, GpuRequest, gpu_picture};
 use super::raster_source::{CompositePrep, OverlayPrep};
-use super::view_xform::ViewXform;
-use super::{DRect, Document, PhotocraftApp, View};
+use super::{DRect, Document, PhotocraftApp, View, tools};
 
 impl View {
     /// This view as the framework's canvas view of `rect` at `ppp` device pixels per point, mirrored by View › Flip
@@ -32,19 +36,7 @@ impl View {
     pub(crate) fn set_from(&mut self, view: &CanvasView, ppp: f32) {
         self.zoom = (view.zoom * f64::from(ppp)) as f32;
         self.center = [view.center.x as f32, view.center.y as f32];
-        self.rotation = crate::rotate_view::wrap_deg(view.rotation as f32);
-    }
-}
-
-/// The view a canvas shows as PhotoCraft's mapping, for the overlays and tools that still map through it.
-pub(crate) fn view_xform(view: &CanvasView) -> ViewXform {
-    ViewXform {
-        rect: view.rect,
-        zoom: view.zoom as f32,
-        center: [view.center.x as f32, view.center.y as f32],
-        flip: view.flip_x,
-        rotation: view.rotation as f32,
-        aspect: view.aspect as f32,
+        self.rotation = normalized_angle(view.rotation) as f32;
     }
 }
 
@@ -52,7 +44,7 @@ pub(crate) fn view_xform(view: &CanvasView) -> ViewXform {
 /// a floating document) or in the main document area (`None`). One document can show in both in one viewport, so the
 /// window is part of the canvas's identity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct CanvasHost {
+pub struct CanvasHost {
     pub idx: usize,
     pub viewport: egui::ViewportId,
     pub window: Option<u64>,
@@ -60,40 +52,61 @@ pub(crate) struct CanvasHost {
 
 impl CanvasHost {
     /// Document `idx`'s canvas in the main window's document area.
-    pub(crate) fn main(idx: usize) -> Self {
+    pub fn main(idx: usize) -> Self {
         Self { idx, viewport: egui::ViewportId::ROOT, window: None }
     }
 
-    /// Document `idx`'s canvas as it is drawn now: in `ctx`'s viewport, in the document window being drawn, if any.
-    pub(crate) fn drawn(app: &PhotocraftApp, ctx: &egui::Context, idx: usize) -> Self {
-        Self { idx, viewport: ctx.viewport_id(), window: app.drawing_window }
-    }
-
-    /// The canvas's id, under which it keeps its zoom ease.
+    /// The canvas's id, under which it keeps its zoom ease and its tool host's state.
     pub(crate) fn canvas_id(self) -> egui::Id {
         egui::Id::unique(("pc-canvas", self))
-    }
-
-    /// The id of PhotoCraft's tool widget over the canvas.
-    pub(crate) fn tool_widget(self) -> egui::Id {
-        egui::Id::unique(("pc-canvas-tools", self))
     }
 }
 
 /// The zoom (device pixels per document pixel at `ppp`) and centre the document view shows on `host`'s canvas: the
-/// view on screen of the canvas's zoom ease while one runs, else `view`'s own. For the mapping and the panels that
-/// read the view outside the canvas's pass.
-pub(crate) fn shown_camera(ctx: Option<&egui::Context>, host: CanvasHost, view: &View, ppp: f32) -> (f32, [f32; 2]) {
-    match ctx.and_then(|ctx| easing_view(ctx, host.canvas_id())) {
+/// view on screen of the canvas's zoom ease while one runs, else `view`'s own. For the panels that read the view
+/// outside the canvas's pass.
+pub(crate) fn shown_camera(ctx: &egui::Context, host: CanvasHost, view: &View, ppp: f32) -> (f32, [f32; 2]) {
+    match easing_view(ctx, host.canvas_id()) {
         Some(eased) => ((eased.zoom * f64::from(ppp)) as f32, [eased.center.x as f32, eased.center.y as f32]),
         None => (view.zoom, view.center),
     }
 }
 
+/// The active document's main canvas as its last pass showed it, rect included: the tool host keeps the space it ran
+/// in, so no view is stored beside it. `None` before the first pass and with no document.
+pub fn active_view(app: &PhotocraftApp) -> Option<CanvasView> {
+    let idx = app.session.active_index()?;
+    ToolHost::shown_space(app.ctx(), CanvasHost::main(idx).canvas_id()).map(|space| space.view)
+}
+
+/// The document point under the screen point `pos` of the active document's main canvas; `None` when `pos` is outside
+/// the canvas.
+pub(crate) fn doc_point_at(app: &PhotocraftApp, pos: Pos2) -> Option<Point> {
+    active_view(app).filter(|view| view.rect.contains(pos)).map(|view| view.to_doc(pos))
+}
+
+/// Whether the selection's marching ants show on document `idx`, and where: `Some(offset)` is the whole-pixel offset
+/// a floating piece or a selection drag shows them at, `(0, 0)` otherwise; `None` hides them. The one answer the body
+/// reads for `SelectionOverlay::visible` and its offset. Four conditions hide them: Selection Edges off, a Polygonal
+/// or Magnetic Lasso outline that is open (it replaces the selection when made), a Patch or Content-Aware Move drag
+/// (which replaces it on the active document, never a floating piece), and Content-Aware Move's Transform On Drop
+/// box, which draws them where it puts them.
+pub(crate) fn ants_shown(app: &PhotocraftApp, idx: usize) -> Option<(i32, i32)> {
+    if !app.ui.view.shows(app.ui.view.show.selection_edges) || app.canvas_tools.selection.replaces_selection() || crate::cam_transform::active(app) {
+        return None;
+    }
+    let active = app.session.active_index() == Some(idx);
+    let floating = super::tools::selection::floating_outline(app, idx).is_some();
+    if active && !floating && crate::retouch_ui::patch_replaces_selection(app, app.canvas_tools.retouch.press()) {
+        return None;
+    }
+    Some(if active { super::tools::selection::shown_offset(app).unwrap_or((0, 0)) } else { (0, 0) })
+}
+
 /// Whether PhotoCraft's tool moves the view with the pointer this pass: the Crop tool in its default mode slides the
-/// view under a fixed frame. The canvas then shows the view unaligned, and so does PhotoCraft's own mapping.
+/// view under a fixed frame. The canvas then shows the view unaligned.
 pub(crate) fn view_follows_pointer(app: &PhotocraftApp) -> bool {
-    crate::crop_mode::moves_image(app)
+    crate::crop_ui::moves_view(app)
 }
 
 /// The user's navigation choices from Preferences (General, Tools, Enhanced Controls).
@@ -110,6 +123,43 @@ pub(crate) fn navigation(app: &PhotocraftApp) -> NavigationOptions {
     options
 }
 
+/// The transparency checkerboard of Preferences › Transparency & Gamut, `None` when it is off.
+pub(crate) fn checkerboard(app: &PhotocraftApp) -> Option<Checker> {
+    let prefs = app.session.prefs();
+    prefs.transparency_and_gamut.square().map(|square| {
+        let [light, dark] = prefs.transparency_and_gamut.colors();
+        let color = |c: [u8; 3]| DataColor::new(Color32::from_rgb(c[0], c[1], c[2]));
+        Checker::new().size(square).colors(color(light), color(dark))
+    })
+}
+
+/// What the view commands fit and fill: the document, its artboard (the active board, else the last, production's
+/// Fit Artboard), the selected layers' content bounds (else the document's), and the resolutions Print Size and
+/// Actual Pixels read.
+pub(crate) fn view_target(app: &PhotocraftApp, idx: usize) -> ViewTarget {
+    let state = &app.session.documents()[idx];
+    let doc = &state.doc;
+    let rect64 = |r: DRect| Rect64::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1));
+    let mut layers = DRect::EMPTY;
+    for id in state.selected_layers() {
+        if let Some(bounds) = doc.layer(id).and_then(|l| l.surface()).map(|s| s.content_bounds()) {
+            layers = if layers.is_empty() { bounds } else { layers.union(&bounds) };
+        }
+    }
+    if layers.is_empty() {
+        layers = doc.bounds();
+    }
+    let pages = super::artboard_ui::pages(app, idx);
+    let mut target = ViewTarget::new(Size::new(f64::from(doc.size.width), f64::from(doc.size.height)))
+        .layers(rect64(layers))
+        .ppi(f64::from(doc.resolution_dpi))
+        .screen_ppi(app.session.prefs().units_and_rulers.screen_resolution);
+    if let Some(page) = pages.iter().find(|p| p.active == Some(true)).or_else(|| pages.last()) {
+        target = target.artboard(page.rect);
+    }
+    target
+}
+
 /// One document view's canvas this pass.
 pub(crate) struct CanvasPass<'a> {
     pub ctx: &'a egui::Context,
@@ -121,10 +171,18 @@ pub(crate) struct CanvasPass<'a> {
     pub ppp: f32,
     pub flip: bool,
     pub aspect: f32,
-    /// The keys PhotoCraft's tool widget takes while it is the key host; `None` while another control has them.
-    pub keys: Option<KeyUse>,
-    /// PhotoCraft pressed on the canvas itself this pass (its own pan, a tool drag): an ease stops.
-    pub jumped: bool,
+}
+
+/// What a canvas pass leaves for the caller.
+pub(crate) struct Shown {
+    /// The view on screen.
+    pub view: CanvasView,
+    /// The canvas's output, for the canvas menu.
+    pub output: CanvasOutput,
+    /// What the tool host did this pass.
+    pub response: ToolHostResponse,
+    /// The guides' output (their context request), when the body showed them.
+    pub guides: Option<GuidesOutput>,
 }
 
 /// The document's picture as prepared for this pass, before the app is borrowed shared.
@@ -133,14 +191,24 @@ enum Prepared {
     Cpu(CompositePrep),
 }
 
+/// The pasteboard colour: Preferences › Interface's, else black in Full Screen Mode (the backdrop there) and the
+/// theme's canvas otherwise.
+fn pasteboard_color(app: &PhotocraftApp) -> PasteboardColor {
+    match crate::prefs_ui::pasteboard_color(app) {
+        Some(color) => PasteboardColor::Custom(DataColor::new(color)),
+        None if app.ui.view.hides_chrome() => PasteboardColor::Black,
+        None => PasteboardColor::Default,
+    }
+}
+
 /// Shows document `pass.host.idx` in a framework `Canvas` over `pass.rect` through `view`: the canvas folds the wheel,
 /// pinch, page keys, view commands and the Overscroll clamp into the view, eases PhotoCraft's own eased zooms, and its
-/// body draws the document's picture. `view` is the view after the canvas's pass; the view the canvas shows is
-/// returned.
-pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, pass: &CanvasPass<'_>) -> CanvasView {
-    let (ctx, idx, doc, output, rect, ppp) = (pass.ctx, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
+/// body shows the pasteboard, the canvas controls and, last, the document's picture into the slot the canvas reserved
+/// under the controls. The tool host then runs on the canvas's output. `view` is the view after the canvas's pass.
+pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, pass: &CanvasPass<'_>) -> Shown {
+    let (ctx, host, idx, doc, output, rect, ppp) = (pass.ctx, pass.host, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
     let given = view.canvas_view(rect, ppp, pass.flip, pass.aspect);
-    let id = pass.host.canvas_id();
+    let id = host.canvas_id();
     // A discrete zoom eases from the view it was asked for in.
     let from = view.zoom_from.map_or(given, |(zoom, center)| View { zoom, center, ..view.clone() }.canvas_view(rect, ppp, pass.flip, pass.aspect));
     let ease = view.zoom_animating.then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
@@ -154,13 +222,11 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     });
 
     let size = PixelSize::new(doc.size.width, doc.size.height);
-    let prefs = app.session.prefs();
-    let checker = prefs.transparency_and_gamut.square().map(|square| {
-        let [light, dark] = prefs.transparency_and_gamut.colors();
-        let color = |c: [u8; 3]| DataColor::new(Color32::from_rgb(c[0], c[1], c[2]));
-        Checker::new().size(square).colors(color(light), color(dark))
-    });
-    let border = prefs.interface.canvas_border;
+    let border = match app.session.prefs().interface.canvas_border {
+        photocraft_engine::prefs::CanvasBorder::DropShadow => PageBorder::DropShadow,
+        photocraft_engine::prefs::CanvasBorder::Line => PageBorder::Line,
+        _ => PageBorder::None,
+    };
     let pattern = app.ui.view.pattern_preview;
     // A flipped or pixel-aspect-corrected view draws through the CPU path (the GPU canvas shader has no mirroring or
     // non-square pixels). Rotation stays on the GPU: it is a view uniform.
@@ -172,79 +238,88 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             crate::render_path::view_cpu(app, doc.id.0);
         }
     }
-    let xf = view_xform(&drawn);
-    let target = view_xform(&given);
-    let picture =
-        gpu_ok.then(|| gpu_picture(app, &GpuRequest { ctx, idx, doc, output, xf: &xf, target: &target, zoom: view.zoom, render_zoom: view.zoom })).flatten();
-    match &picture {
-        Some(picture) if picture.shows_document() && app.navigator_plain.contains(&doc.id) => {
-            app.navigator_gpu.insert(doc.id, picture.params(&given));
-        }
-        _ => {
-            app.navigator_gpu.remove(&doc.id);
-        }
-    }
-    let prepared = match picture {
-        Some(picture) => Some(Prepared::Gpu(picture)),
-        None => CompositePrep::new(app, ctx, idx, output).map(Prepared::Cpu),
+    let label = {
+        let (name, detail) = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
+        format!("{name} @ {detail}")
     };
-    let overlay = OverlayPrep::new(app, ctx, idx, output);
-    let beyond = super::paint::beyond_canvas(app, ctx, idx, output);
-    // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview), nor while the Crop tool
-    // hides everything outside its box (Show Cropped Area off).
-    let edge = border == photocraft_engine::prefs::CanvasBorder::Line && beyond.is_none() && !crate::crop_shield::hides_outside(app);
-    let label = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
-    let pasteboard = crate::prefs_ui::pasteboard_color(app);
-    let dots = app.session.prefs().interface.show_canvas_dots;
-    let theme = crate::theme::Tokens::get(ctx);
-    let shadow = border == photocraft_engine::prefs::CanvasBorder::DropShadow && !theme.bevel && !theme.pro && !pattern && beyond.is_none();
     let navigation = navigation(app);
     let follows_pointer = view_follows_pointer(app);
-
-    let app: &PhotocraftApp = app;
-    let (gpu, composite) = match prepared {
-        Some(Prepared::Gpu(picture)) => (Some(picture), None),
-        Some(Prepared::Cpu(prep)) => (None, Some(prep.source(app))),
-        None => (None, None),
-    };
-    let overlay = overlay.map(|prep| prep.source(app));
-    let bounds = gpu.as_ref().map(GpuPicture::bounds).or_else(|| composite.as_ref().map(|c| c.bounds())).unwrap_or_else(|| doc.bounds());
-    let mapping = (bounds != doc.bounds()).then(|| placement(bounds));
-    let widget = pass.host.tool_widget();
+    let checker = checkerboard(app);
+    let snap = super::snap_ui::snap(app, idx);
+    let target = view_target(app, idx);
+    let pasteboard = pasteboard_color(app);
+    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
 
     let mut bound = given;
     let mut canvas = Canvas::new(label.clone())
         .id(id)
         .view(Bind::bound(&mut bound))
-        .document(Size::new(f64::from(size.width), f64::from(size.height)))
+        .document(target)
+        .snap(snap)
+        .pasteboard(pasteboard)
         .navigation(navigation)
         .view_follows_pointer(follows_pointer);
-    canvas = match ease {
-        Some((from, anchor)) => canvas.ease_from(from, anchor),
-        None if pass.jumped => canvas.jumped(),
-        None => canvas,
-    };
+    if let Some((from, anchor)) = ease {
+        canvas = canvas.ease_from(from, anchor);
+    }
+    let mut guides = None;
+    let mut turned = None;
     let shown = canvas.show_at(ui, rect, |ui, body| {
-        // Pasteboard: the Interface colour or the theme's canvas with its dots, under the document's shadow.
-        match pasteboard {
-            Some(color) => {
-                ui.painter_at(body.rect).rect_filled(body.rect, 0.0, color);
-            }
-            None => super::tabs::paint_dots(ui, body.rect, dots),
+        let Some(space) = canvas_space(&body.env) else { return };
+        pasteboards(app, ui, body.rect, idx, border, label.clone());
+        guides = super::rulers::show(app, ui, host);
+        selection_controls(app, ui, body.rect, idx, &label);
+        // Under the controls, through the canvas's reserved paint slot.
+        let mut under = Vec::new();
+        if primary {
+            under.extend(crate::levels_clipping::shapes(app, &space, idx));
         }
-        if let Some(space) = craft::ui::canvas::canvas_space(&body.env) {
-            let painter = ui.painter_at(body.rect);
-            // egui's shadow is an upright rect: a turned page gets none rather than a dark box around it.
-            if shadow && space.view.rotation == 0.0 {
-                let area = Rect::from_points(&space.view.quad(rect64(bounds)));
-                painter.add(egui::Shadow { offset: [0, 8], blur: 28, spread: 0, color: Color32::from_black_alpha(150) }.as_shape(area, 0));
+        under.extend(crate::color_range_ui::selection_preview(app, ctx));
+        if !under.is_empty() {
+            space.paint_picture(ctx, under);
+        }
+        if app.ui.view.tile_grid {
+            super::tile_overlay::show(ui, app, idx);
+        }
+        let live = canvas_controls(app, ui, body.rect, host, &space, &mut turned);
+        // The picture is prepared after the controls, so a gradient's live proposal shows in the pass that made it.
+        let picture = gpu_ok
+            .then(|| {
+                let (xf, target) = (&drawn, &given);
+                // PLAN: `live` is the field canvas-widgets-w32 adds to `GpuRequest` (cw.P19); its name follows w32's decision.
+                gpu_picture(app, &GpuRequest { ctx, idx, doc, output, view: xf, target, zoom: view.zoom, render_zoom: view.zoom, live: live.as_ref() })
+            })
+            .flatten();
+        match &picture {
+            Some(picture) if picture.shows_document() && app.navigator_plain.contains(&doc.id) => {
+                app.navigator_gpu.insert(doc.id, picture.params(&given));
             }
-            // Crop: the layers' pixels past the canvas, under it (its edge blends into them).
-            if let Some(beyond) = &beyond {
-                beyond.paint(&painter, &view_xform(&space.view));
+            _ => {
+                app.navigator_gpu.remove(&doc.id);
             }
         }
-        let frame = Frame { checker: checker.as_ref(), edge, mapping, pattern };
+        let prepared = match picture {
+            Some(picture) => Some(Prepared::Gpu(picture)),
+            None => CompositePrep::new(app, ctx, idx, output, live.as_ref()).map(Prepared::Cpu),
+        };
+        let overlay = OverlayPrep::new(app, ctx, idx, output, live.as_ref());
+        // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview), nor while the Crop
+        // tool hides everything outside its box (Show Cropped Area off).
+        let edge = border == PageBorder::Line && !crate::crop_ui::shows_beyond_canvas(app) && !crate::crop_ui::hides_canvas_edge(app);
+        let region = crate::crop_ui::shows_beyond_canvas(app).then(|| crate::crop_ui::frame(app)).flatten().map(|frame| {
+            let r = frame.turned_bounds();
+            PixelRect::new(r.x0.floor() as i32, r.y0.floor() as i32, r.x1.ceil() as i32, r.y1.ceil() as i32)
+        });
+        let app: &PhotocraftApp = app;
+        let (gpu, composite) = match prepared {
+            Some(Prepared::Gpu(picture)) => (Some(picture), None),
+            Some(Prepared::Cpu(prep)) => (None, Some(prep.source(app))),
+            None => (None, None),
+        };
+        let overlay = overlay.map(|prep| prep.source(app));
+        let bounds = gpu.as_ref().map(GpuPicture::bounds).or_else(|| composite.as_ref().map(|c| c.bounds())).unwrap_or_else(|| doc.bounds());
+        let mapping = (bounds != doc.bounds()).then(|| placement(bounds));
+        let frame = Frame { checker: checker.as_ref(), edge, mapping, pattern, region };
         if let Some(picture) = &gpu {
             frame.apply(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).show_at(ui, body.rect);
         } else if let Some(composite) = &composite {
@@ -258,32 +333,129 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             };
             display.show_at(ui, body.rect);
         }
-        // P-15 replaces this widget with the framework's ToolHost. PhotoCraft's tools read its response before the
-        // canvas shows (`canvas_view`); here it takes its place over the displays and the key focus in the canvas. Not
-        // in the canvas's measuring run: egui keeps a widget where it first registered in a pass, under the canvas's
-        // own widget, which would then take the first press after the canvas first shows.
-        if !craft::ui::runtime::measure::active(ui.ctx()) {
-            let response = ui.interact(body.rect, widget, Sense::click_and_drag());
-            if let Some(keys) = pass.keys {
-                host_canvas(ui.ctx(), response.id, keys);
-            }
-        }
     });
-    drop((composite, overlay));
-    let output = shown.output;
-    if let Some(next) = output.view {
-        view.set_from(&next, ppp);
+    let canvas_output = shown.output;
+    if let Some(next) = canvas_output.view.as_ref() {
+        view.set_from(next, ppp);
     }
-    output.space.map_or(given, |space| space.view)
+    // The scroll bars' and the compass's change: the bars drag the view, the compass turns it.
+    if let Some(next) = turned.as_ref() {
+        view.set_from(next, ppp);
+    }
+    let response = tools::run(app, ui, host, &canvas_output);
+    // A view a tool set (the Crop tool's slide) is the one the app keeps; the canvas's own otherwise.
+    if let Some(next) = response.view.as_ref() {
+        view.set_from(next, ppp);
+    }
+    let view = canvas_output.space.map_or(given, |space| space.view);
+    Shown { view, output: canvas_output, response, guides }
+}
+
+/// The document's pasteboard, and for an artboard document a second one over the boards that leaves the shown layers
+/// uncovered (the layers' pixels past a board show through).
+fn pasteboards(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, border: PageBorder, label: String) {
+    let Some(doc) = app.session.documents().get(idx).map(|state| state.doc.clone()) else { return };
+    let page = [PageFrame::new(Rect64::new(0.0, 0.0, f64::from(doc.size.width), f64::from(doc.size.height)))];
+    let pages = super::artboard_ui::pages(app, idx);
+    if pages.is_empty() {
+        Pasteboard::new(label, &page).border(border).show_at(ui, rect);
+        return;
+    }
+    let shown = super::display_doc(app, idx).0;
+    let uncovered = super::artboard_ui::uncovered(&shown);
+    Pasteboard::new(label, &pages).border(border).uncovered(&uncovered).show_at(ui, rect);
+}
+
+/// The selection's marching ants, the Layer Edges outline and the pixel grid.
+fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, label: &str) {
+    let ants = ants_shown(app, idx);
+    if let Some(state) = app.session.documents().get(idx) {
+        let doc = state.doc.clone();
+        if let Some(selection) = doc.selection.as_ref() {
+            let mask = super::outline::SurfaceMask::new(selection, crate::app::surface_fingerprint(selection), [doc.size.width, doc.size.height]);
+            // The map is `transform_tool::selection_map` while a Free Transform carries the selection.
+            let overlay = SelectionOverlay::new(label.to_owned(), &mask)
+                .visible(ants.is_some())
+                .offset(ants.map_or([0, 0], |(x, y)| [x, y]))
+                .mapped(crate::transform_tool::selection_map(app, &doc));
+            overlay.show_at(ui, rect);
+        }
+    }
+    if let Some(edges) = super::transform_controls::layer_edges(app, idx) {
+        SelectionOutline::solid(label.to_owned(), &edges).show_at(ui, rect);
+    }
+    if app.ui.view.shows(app.ui.view.show.pixel_grid) {
+        let composite = super::display_doc(app, idx).0;
+        craft::ui::canvas::PixelGrid::new(label.to_owned(), &composite).show_at(ui, rect);
+    }
+}
+
+/// The controls the tools show over the document, in the order that decides who takes a press: a control shown later
+/// is above the earlier ones. Returns the gradient's live proposal, which the picture of the same pass shows.
+fn canvas_controls(
+    app: &mut PhotocraftApp,
+    ui: &mut egui::Ui,
+    rect: Rect,
+    host: CanvasHost,
+    space: &CanvasSpace,
+    turned: &mut Option<CanvasView>,
+) -> Option<(photocraft_doc::LayerId, photocraft_engine::Fill)> {
+    let pointer = ui.input(|i| i.pointer.hover_pos());
+    let now = ui.input(|i| i.time);
+    crate::distort_ui::show_in_canvas(app, ui, rect);
+    crate::blur_pins::overlay(app, ui, rect);
+    let paths = crate::vector_ui::overlay::show_paths(app, ui, rect);
+    crate::direct_select::edits::apply(app, paths);
+    crate::type_tool::canvas_controls(app, ui, rect);
+    crate::type_path_placement::show(app, ui, rect);
+    crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    crate::cam_transform::show(app, ui, rect);
+    // PLAN: the TransformBox (RotateZone::Band over `transform_controls::frame`) and the TransformOverlay are
+    // canvas-widgets-w21's; the contract names no show function, so this is its assumed entry.
+    super::transform_controls::show(app, ui, rect);
+    crate::move_box::show(app, ui, rect);
+    crate::move_hover::show(app, ui, rect, pointer);
+    crate::move_distance::show(app, ui, rect);
+    crate::artboard_tool::show_overlay(app, ui, rect);
+    crate::frame_tool::show(app, ui, rect);
+    crate::shape_controls::show(app, ui);
+    let live = crate::gradient_ui::live_overlay::show(app, ui);
+    crate::slice_ui::canvas_controls(app, ui, rect);
+    crate::symmetry_ui::canvas_controls(ui, app, rect);
+    crate::perspective_crop_ui::body(app, ui, rect);
+    crate::analysis::canvas::body(app, ui, rect);
+    crate::crop_task_bar::show(app, ui, rect);
+    crate::frame_tool::task_bar::show(ui, app, rect);
+    crate::crop_ui::each_pass(app);
+    crate::vector_ui::shapes::show_preview(app, ui, rect);
+    // PLAN: `brush_feedback` is tools-w61's file in `crate::tools` (re-exported at the crate root like `move_hover`), not a canvas::tools module.
+    crate::brush_feedback::show(ui, app, rect, pointer);
+    // The scroll bars (Standard Screen Mode only) and the rotation compass change the view they are bound to.
+    let mut shown = space.view;
+    if !app.ui.view.hides_chrome() {
+        let size = app.session.documents()[host.idx].doc.size;
+        let bounds = Rect64::from_origin_size(Point::ZERO, Size::new(f64::from(size.width), f64::from(size.height)));
+        CanvasScrollbars::new("Scroll bars", Bind::bound(&mut shown), bounds).show_at(ui, rect);
+    }
+    if RotateView::visible(shown.rotation) {
+        let mut rotation = shown.rotation;
+        RotateView::new("Rotate View", Bind::bound(&mut rotation), shown.flip_x).show_at(ui, RotateView::compass_rect(ui, rect));
+        shown.rotation = rotation;
+    }
+    if shown != space.view {
+        *turned = Some(shown);
+    }
+    live
 }
 
 /// How the document's picture sits on the canvas: the transparency checkerboard under it, its edge, where a reduced or
-/// size-changing picture lies, and View › Pattern Preview's copies around it.
+/// size-changing picture lies, the pixels past it Crop previews, and View › Pattern Preview's copies around it.
 struct Frame<'c> {
     checker: Option<&'c Checker>,
     edge: bool,
     mapping: Option<Homography>,
     pattern: bool,
+    region: Option<PixelRect>,
 }
 
 impl Frame<'_> {
@@ -297,6 +469,10 @@ impl Frame<'_> {
             Some(frame) => display.mapped(frame, 1),
             None => display,
         };
+        let display = match self.region {
+            Some(region) => display.extent(Extent::Region(region)),
+            None => display,
+        };
         if self.pattern { display.extent(Extent::Tiled) } else { display }
     }
 }
@@ -308,6 +484,71 @@ fn placement(bounds: DRect) -> Homography {
     Homography::from_rows([[w, 0.0, x0], [0.0, h, y0], [0.0, 0.0, 1.0]])
 }
 
-fn rect64(r: DRect) -> Rect64 {
-    Rect64::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1))
+#[cfg(test)]
+mod tests {
+    use egui::Modifiers;
+    use serde_json::json;
+
+    use super::*;
+    use crate::canvas::testing;
+    use crate::state::Tool;
+
+    /// A 64×64 document with a 16×16 selection, shown by a first pass.
+    fn app() -> PhotocraftApp {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
+        app.sync_views();
+        app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
+        testing::frame(&mut app);
+        app
+    }
+
+    /// Four conditions decide whether the selection's ants show; each hides them alone, and Escape on an open polygon
+    /// outline brings them back.
+    #[test]
+    fn selection_ants_visibility() {
+        let mut app = app();
+        let idx = app.session.active_index().unwrap();
+        assert_eq!(ants_shown(&app, idx), Some((0, 0)), "a selection shows its ants");
+
+        app.ui.view.show.selection_edges = false;
+        assert_eq!(ants_shown(&app, idx), None, "Selection Edges off hides them");
+        app.ui.view.show.selection_edges = true;
+
+        // A Polygonal or Magnetic Lasso outline left open replaces the selection when made: its ants are hidden until
+        // it ends.
+        for tool in [Tool::PolygonLasso, Tool::MagneticLasso] {
+            app.ui.tool = tool;
+            testing::click(&mut app, [30.0, 30.0], Modifiers::NONE);
+            testing::click(&mut app, [50.0, 30.0], Modifiers::NONE);
+            assert!(app.canvas_tools.selection.outline_open(), "{tool:?}");
+            assert_eq!(ants_shown(&app, idx), None, "an open {tool:?} outline hides them");
+            testing::key(&mut app, egui::Key::Escape, Modifiers::NONE);
+            assert!(!app.canvas_tools.selection.outline_open(), "{tool:?}");
+            assert_eq!(ants_shown(&app, idx), Some((0, 0)), "Escape ends the {tool:?} outline and shows them again");
+        }
+
+        // A Patch or Content-Aware Move drag that lassos a new selection replaces the old one while it runs.
+        app.ui.tool_options.cam_transform_on_drop = false;
+        for tool in [Tool::Patch, Tool::ContentAwareMove] {
+            app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
+            app.ui.tool = tool;
+            testing::press(&mut app, [30.0, 30.0], Modifiers::NONE);
+            testing::move_to(&mut app, [45.0, 40.0], Modifiers::NONE);
+            assert_eq!(ants_shown(&app, idx), None, "a {tool:?} drag hides them");
+            testing::release(&mut app, [45.0, 40.0], Modifiers::NONE);
+        }
+
+        // Content-Aware Move's Transform On Drop box draws the ants where it puts them.
+        app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
+        app.ui.tool_options.cam_transform_on_drop = true;
+        assert!(crate::cam_transform::begin(&mut app, [20, 8]), "the dropped patch gets a box");
+        assert_eq!(ants_shown(&app, idx), None, "the Transform On Drop box hides them");
+        crate::cam_transform::cancel(&mut app);
+        assert_eq!(ants_shown(&app, idx), Some((0, 0)), "cancelling the box shows them again");
+
+        // A floating piece shows them at its offset.
+        app.session.execute("select.float", json!({"dx": 4, "dy": 3})).unwrap();
+        assert_eq!(ants_shown(&app, idx), Some((4, 3)), "a floating piece's ants follow its offset");
+    }
 }

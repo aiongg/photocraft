@@ -466,7 +466,7 @@ fn painted_ants_of(app: &mut PhotocraftApp, idx: usize) -> Vec<egui::Rect> {
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0));
     let view = crate::state::View { zoom: 2.0, center: [50.0, 30.0], doc_size: [100, 60], fit_pending: false, ..Default::default() };
     let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
-        crate::canvas::canvas_view(app, ui, idx, rect, view.clone(), true);
+        let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(idx), rect, view.clone(), true);
     });
     output.textures_delta.clear();
     let black_and_white =

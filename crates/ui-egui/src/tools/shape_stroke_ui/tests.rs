@@ -536,7 +536,7 @@ fn canvas_harness(properties: bool) -> Harness<'static, CanvasScene> {
             let rect = Rect::from_min_max(pos2(350.0, 110.0), pos2(990.0, 740.0));
             app.last_canvas_rect = rect;
             let view = app.ui.views[0].clone();
-            crate::canvas::canvas_view(app, ui, 0, rect, view, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, view, true);
             finish_frame(app, ui.ctx());
         },
         CanvasScene { app, properties, show_controls: true },

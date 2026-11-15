@@ -166,7 +166,7 @@ fn hover_over_the_canvas_moves_the_preview() {
                 return;
             }
             let v = app.ui.views[0].clone();
-            crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
         },
         a,
     );

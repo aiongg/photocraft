@@ -144,7 +144,8 @@ fn canvas_paints_48_point_cells_at_zoom_two_and_hidpi() {
         let input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1000.0, 800.0))), ..Default::default() };
         let mut output = ctx.run_ui(input, |ui| {
             ui.set_clip_rect(clip);
-            let painted_view = photocraft_ui_egui::canvas::canvas_view(&mut app, ui, 0, rect, view.clone(), true);
+            let (painted_view, _) =
+                photocraft_ui_egui::canvas::canvas_view(&mut app, ui, photocraft_ui_egui::canvas::CanvasHost::main(0), rect, view.clone(), true);
             assert_eq!(painted_view.zoom, 2.0);
         });
         // Shape-only CPU inspection has no renderer to consume texture updates.

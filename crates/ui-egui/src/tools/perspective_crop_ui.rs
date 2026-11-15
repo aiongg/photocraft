@@ -614,7 +614,7 @@ mod tests {
                     return;
                 }
                 let v = app.ui.views[0].clone();
-                crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+                let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
             },
             a,
         );
@@ -672,7 +672,7 @@ mod tests {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let v = app.ui.views[0].clone();
-                crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+                let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
             },
             a,
         );
@@ -742,7 +742,7 @@ mod tests {
                 }
                 let v = app.ui.views[0].clone();
                 let rect = egui::Rect::from_min_size(egui::pos2(100.0, 0.0), egui::vec2(600.0, 400.0));
-                crate::canvas::canvas_view(app, ui, 0, rect, v, true);
+                let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, v, true);
             },
             a,
         );

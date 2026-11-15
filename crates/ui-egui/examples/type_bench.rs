@@ -22,7 +22,7 @@ fn refresh(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 1000.0));
     let view = app.ui.views.first().cloned().unwrap_or_default();
     let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
-        photocraft_ui_egui::canvas::canvas_view(app, ui, 0, rect, view, true);
+        let (_, _) = photocraft_ui_egui::canvas::canvas_view(app, ui, photocraft_ui_egui::canvas::CanvasHost::main(0), rect, view, true);
     });
 }
 

@@ -242,7 +242,7 @@ fn a_refused_handle_press_on_the_canvas_reaches_no_move_tool() {
         let mut frame = |app: &mut PhotocraftApp, events: Vec<Event>| {
             let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
             let mut out = ctx.run_ui(input, |ui| {
-                view = crate::canvas::canvas_view(app, ui, 0, rect, view.clone(), true);
+                (view, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, view.clone(), true);
             });
             out.textures_delta.clear();
         };

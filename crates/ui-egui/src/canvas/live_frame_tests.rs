@@ -1,8 +1,13 @@
 //! Live painting tools show this frame's pointer input in this frame (no extra frame of delay): the tools run before
 //! the canvas shows. The tools map through the canvas's zoom ease.
 
-use super::*;
+use egui::{PointerButton, Pos2, Rect, vec2};
 use serde_json::json;
+
+use super::document_display::{CanvasHost, shown_camera};
+use super::{canvas_display, canvas_view, document_area};
+use crate::PhotocraftApp;
+use crate::state::{Tool, View};
 
 #[test]
 fn live_brush_texture_includes_this_frames_press_and_moves() {
@@ -13,7 +18,7 @@ fn live_brush_texture_includes_this_frames_press_and_moves() {
         app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0, "smoothing": {"amount": 0.0}}})).unwrap();
         app.ui.tool = tool;
         app.sync_views();
-        let mut h = egui_kittest::Harness::builder().with_size(vec2(900.0, 640.0)).build_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 640.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if !ui.ctx().fonts(|fonts| fonts.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
@@ -71,13 +76,13 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         v.zoom = 1.0;
         v.center = [32.0, 32.0];
         v.doc_size = [64, 64];
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         PhotocraftApp::setup_context(&ctx, Default::default());
         let rect = Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0));
         let pass = |app: &mut PhotocraftApp, view: View, time: f64| {
             let mut shown = view.clone();
             let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), time: Some(time), ..Default::default() }, |ui| {
-                shown = canvas_view(app, ui, 0, rect, view.clone(), true);
+                (shown, _) = canvas_view(app, ui, CanvasHost::main(0), rect, view.clone(), true);
             });
             out.textures_delta.clear();
             shown
@@ -90,7 +95,7 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         let view = pass(&mut app, view, 0.1);
         let view = pass(&mut app, view, 0.15);
         let ppp = ctx.pixels_per_point();
-        let shown = super::document_display::shown_camera(Some(&ctx), super::document_display::CanvasHost::main(0), &view, ppp).0;
+        let shown = shown_camera(&ctx, CanvasHost::main(0), &view, ppp).0;
         assert!(shown > 1.0 && shown < 2.0, "{tool:?}: the canvas's ease is between the endpoints, {shown}");
         assert_eq!(view.zoom, 2.0, "{tool:?}: the requested zoom stays the target");
     }

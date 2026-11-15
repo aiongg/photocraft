@@ -690,7 +690,7 @@ fn space_on_the_canvas_moves_the_frame_not_the_view() {
                 return;
             }
             let v = app.ui.views[0].clone();
-            crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
         },
         a,
     );
@@ -755,7 +755,7 @@ fn a_handle_held_past_the_canvas_edge_scrolls_the_view() {
                 return;
             }
             let v = app.ui.views[0].clone();
-            crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
         },
         a,
     );
@@ -816,7 +816,7 @@ fn a_press_beside_the_canvas_does_not_scroll_it_for_a_crop_drag() {
             }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 400.0));
-            crate::canvas::canvas_view(app, ui, 0, rect, v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, v, true);
         },
         a,
     );
@@ -868,7 +868,7 @@ fn a_held_click_at_the_canvas_edge_draws_no_frame_and_does_not_scroll() {
             }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::pos2(100.0, 0.0), egui::vec2(600.0, 400.0));
-            crate::canvas::canvas_view(app, ui, 0, rect, v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, v, true);
         },
         a,
     );
@@ -940,7 +940,7 @@ fn a_scrollbar_drag_past_the_canvas_edge_does_not_scroll_for_a_crop_drag() {
             }
             let v = app.ui.views[0].clone();
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 400.0));
-            crate::canvas::canvas_view(app, ui, 0, rect, v, true);
+            let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), rect, v, true);
         },
         a,
     );
@@ -1348,7 +1348,7 @@ fn a_tool_switch_during_a_real_drag_commits_the_drawn_box() {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let v = app.ui.views[0].clone();
-                crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
+                let (_, _) = crate::canvas::canvas_view(app, ui, crate::canvas::CanvasHost::main(0), ui.max_rect(), v, true);
             },
             a,
         );

@@ -297,7 +297,14 @@ fn main_view(app: &mut PhotocraftApp) -> crate::state::View {
 /// The shapes of one 160×80 canvas frame of document 0 in `view`.
 fn canvas_frame(ctx: &egui::Context, app: &mut PhotocraftApp, view: &crate::state::View, primary: bool) -> Vec<egui::epaint::ClippedShape> {
     let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-        crate::canvas::canvas_view(app, ui, 0, egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 80.0)), view.clone(), primary);
+        let (_, _) = crate::canvas::canvas_view(
+            app,
+            ui,
+            crate::canvas::CanvasHost::main(0),
+            egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 80.0)),
+            view.clone(),
+            primary,
+        );
     });
     out.textures_delta.clear();
     out.shapes
