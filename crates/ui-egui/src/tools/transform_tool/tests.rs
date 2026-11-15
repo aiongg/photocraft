@@ -380,7 +380,9 @@ fn image_processor_document_sources_wait_for_the_transform() {
                 let history = app.session.active().unwrap().history.past_len();
                 let params = json!({"source": source, "output": output.path(), "format": "png"});
                 let result: Result<(), String> = if through_dialog {
-                    let id = crate::dialogs::open_command_dialog(&mut app, "file.scripts.imageProcessor", "Image Processor").unwrap();
+                    // The menu's own dialog holds the Source row; the bare command dialog has only the engine's fields.
+                    let reply = crate::menus::invoke(&mut app, &ctx, "file.scripts.imageProcessor", json!({})).unwrap();
+                    let id: craft::ui::dialog::DialogId = serde_json::from_value(reply["dialog"].clone()).expect("the menu opened the dialog");
                     app.framework.dialogs.set_json_field(&ctx, id, "source", json!(source)).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "output", json!(output.path())).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "format", json!("png")).unwrap();
