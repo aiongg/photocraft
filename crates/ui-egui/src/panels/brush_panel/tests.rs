@@ -463,7 +463,7 @@ fn kit(name: &str, group: &str, folder: &[&str]) -> paint::BrushPreset {
 
 /// The rows `preset_rows` gives for `app`, drawn in a frame (the rows read the frame's environment).
 fn rows_of(app: PhotocraftApp, view: PresetView) -> Vec<PresetRow<BrushKey>> {
-    let mut h = Harness::builder().with_size(vec2(200.0, 200.0)).build_ui_state(
+    let mut h = Harness::builder().with_size(vec2(200.0, 200.0)).with_context(app.ctx().clone()).build_ui_state(
         move |ui, st: &mut (PhotocraftApp, Vec<PresetRow<BrushKey>>)| {
             st.1 = preset_rows(&st.0, &Env::of(ui), parts_of(view));
         },

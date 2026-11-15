@@ -132,7 +132,8 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 100, "height": 50})).unwrap();
         app.sync_views();
-        (app, egui::Context::default())
+        let ctx = app.ctx().clone();
+        (app, ctx)
     }
 
     fn boards(app: &PhotocraftApp) -> Vec<photocraft_geom::Rect> {

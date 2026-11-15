@@ -31,7 +31,7 @@ fn home(path: &str) -> Harness<'static, (PhotocraftApp, bool)> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     app.background_jobs = false;
     app.push_recent(path);
-    let mut h = Harness::builder().with_size(egui::vec2(900.0, 760.0)).build_ui_state(
+    let mut h = Harness::builder().with_size(egui::vec2(900.0, 760.0)).with_context(app.ctx().clone()).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
                 egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| crate::canvas::document_area(app, ui));

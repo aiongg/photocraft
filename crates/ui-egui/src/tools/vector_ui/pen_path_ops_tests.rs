@@ -15,7 +15,15 @@ use crate::state::Tool;
 use craft::draw::ui::VectorMode;
 
 fn app() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    prepared(PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()))
+}
+
+/// The app on `ctx`, a harness's context that has the framework installed.
+fn app_on(ctx: egui::Context) -> PhotocraftApp {
+    prepared(PhotocraftApp::with_context(ctx, photocraft_engine::Session::new(), crate::Services::default()))
+}
+
+fn prepared(mut app: PhotocraftApp) -> PhotocraftApp {
     app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
     app.ui.tool = Tool::Pen;
     app
@@ -167,7 +175,7 @@ fn assert_kept_as_work_path(app: &PhotocraftApp, id: LayerId, body: &Path, steps
 fn switching_tools_ends_a_refused_draft_once() {
     let mut h = egui_kittest::Harness::builder().with_size(vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app()
+        app_on(cc.egui_ctx.clone())
     });
     h.run_steps(2);
     let (id, body, steps) = refused_hole(h.state_mut());

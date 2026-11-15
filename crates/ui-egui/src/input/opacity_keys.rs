@@ -133,7 +133,15 @@ mod tests {
     use OpacityDigit as D;
 
     fn app(tool: Tool) -> PhotocraftApp {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        prepared(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()), tool)
+    }
+
+    /// The app on `ctx`, a harness's context that has the framework installed.
+    fn app_on(ctx: egui::Context, tool: Tool) -> PhotocraftApp {
+        prepared(PhotocraftApp::with_context(ctx, photocraft_engine::Session::new(), Default::default()), tool)
+    }
+
+    fn prepared(mut app: PhotocraftApp, tool: Tool) -> PhotocraftApp {
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.ui.tool = tool;
@@ -297,7 +305,7 @@ mod tests {
         use egui_kittest::Harness;
         let mut h = Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            let mut a = app(Tool::Brush);
+            let mut a = app_on(cc.egui_ctx.clone(), Tool::Brush);
             a.run("tools.setBrush", json!({"brush": {"hardness": 0.5, "opacity": 1.0, "flow": 1.0}})).unwrap();
             a
         });

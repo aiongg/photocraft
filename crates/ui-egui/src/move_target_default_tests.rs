@@ -46,14 +46,15 @@ fn a_saved_choice_is_kept_and_only_a_missing_key_gets_layer() {
 
 #[test]
 fn the_target_dropdown_lists_group_then_layer() {
-    let mut h = Harness::builder().with_size(vec2(1600.0, 400.0)).build_ui_state(
+    let app = app();
+    let mut h = Harness::builder().with_size(vec2(1600.0, 400.0)).with_context(app.ctx().clone()).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
             crate::panels::options_bar(app, ui);
         },
-        app(),
+        app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::studio());
     h.run_steps(4);

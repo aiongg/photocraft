@@ -250,10 +250,10 @@ mod tests {
 
     #[test]
     fn full_resolution_preview_textures_respect_the_device_limit() {
-        let ctx = egui::Context::default();
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = app.ctx().clone();
         let limit = ctx.input(|i| i.max_texture_side) as u32;
         let width = limit + 2;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": width, "height": 2})).unwrap();
         for alpha in [false, true] {
             if alpha {

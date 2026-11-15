@@ -35,9 +35,8 @@ fn request(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Value
 fn histogram_matches_visible_preview_at_all_supported_depths_and_cancel_commit_are_reversible() {
     for mode in ["rgb", "grayscale"] {
         for depth in [8, 16, 32] {
-            let ctx = egui::Context::default();
-            photocraft_ui_egui::PhotocraftApp::setup_context(&ctx, photocraft_ui_egui::theme::AppTheme::pro());
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+            let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 16, "height": 8, "mode": mode, "depth": depth})).unwrap();
             app.run("layer.new.layer", json!({})).unwrap();
             app.run("edit.fill", json!({"color": "#808080"})).unwrap();

@@ -17,7 +17,15 @@ use crate::state::Tool;
 /// The issue's document: 800 x 600 with the saved path "Path 1", a corner square with an anchor
 /// at (300, 300), targeted in the Paths panel.
 fn app() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    prepared(PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()))
+}
+
+/// The app on `ctx`, a harness's context that has the framework installed.
+fn app_on(ctx: egui::Context) -> PhotocraftApp {
+    prepared(PhotocraftApp::with_context(ctx, photocraft_engine::Session::new(), crate::Services::default()))
+}
+
+fn prepared(mut app: PhotocraftApp) -> PhotocraftApp {
     app.run("file.new", json!({"width": 800, "height": 600, "background": "white"})).unwrap();
     let square = json!({"subpaths": [{"closed": true, "knots": [[100, 300], [300, 300], [300, 500], [100, 500]]}]});
     app.run("path.set", json!({"name": "Path 1", "path": square})).unwrap();
@@ -119,7 +127,7 @@ fn with_no_path_targeted_escape_still_leaves_full_screen_and_deselects_pixels() 
 fn escape_while_renaming_path_1_cancels_the_rename() {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = app();
+        let mut app = app_on(cc.egui_ctx.clone());
         // Layers | Channels | Paths: the Paths tab.
         crate::panel_docking::show_panel(&mut app, "paths", Some(true)).unwrap();
         app

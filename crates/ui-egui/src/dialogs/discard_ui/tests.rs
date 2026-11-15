@@ -688,7 +688,8 @@ fn window_close_goes_through_once_the_window_device_is_lost() {
 #[test]
 fn file_exit_quits_without_a_prompt_once_the_window_device_is_lost() {
     let exit = |app: &mut PhotocraftApp| {
-        let mut out = egui::Context::default().run_ui(egui::RawInput::default(), |ui| {
+        let ctx = app.ctx().clone();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
             let _ = crate::menus::invoke(app, ui.ctx(), EXIT, json!({}));
         });
         out.textures_delta.clear();

@@ -323,9 +323,8 @@ fn meshes_with(shapes: &[egui::epaint::ClippedShape], tex: egui::TextureId) -> u
 /// canvas (not primary) neither draws it nor replaces that cache with its own view.
 #[test]
 fn only_the_main_canvas_draws_the_display() {
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    let ctx = app.ctx().clone();
     open_levels(&mut app, json!({"inBlack": 100}), Some(LevelsClip::Shadows));
     let main = main_view(&mut app);
     let other = crate::state::View { zoom: 0.25, ..main.clone() };

@@ -1825,9 +1825,9 @@ fn a_dropped_folder_is_refused_with_a_clear_message() {
     std::fs::create_dir_all(&folder).unwrap();
     let file = dir.join("ok.psd");
     std::fs::write(&file, b"x").unwrap();
-    let ctx = egui::Context::default();
     // Opened (no document, or off the canvas).
     let (mut app, _) = app_with(Vec::new());
+    let ctx = app.ctx().clone();
     app.open_dropped(&ctx, vec![dropped(folder.clone(), Err("read from the path".into())), dropped(file, Err("read from the path".into()))], DropTo::Window);
     assert_eq!(doc_names(&app), ["ok.psd"]);
     let errors = error_titles(&app);
@@ -1835,6 +1835,7 @@ fn a_dropped_folder_is_refused_with_a_clear_message() {
     assert!(errors[0].starts_with("Couldn't open Holiday photos: ") && errors[0].contains("folder"), "{errors:?}");
     // On the canvas: not queued for placing, and the layers stay as they were.
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let layers = layer_count(&app);
     app.open_dropped(&ctx, vec![dropped(folder, Err("read from the path".into()))], DropTo::Canvas { at: None });
     assert!(app.drop_places.is_empty());
@@ -1853,13 +1854,14 @@ fn a_dropped_file_that_is_not_an_image_reports_why() {
     let dir = scratch("text");
     let file = dir.join("notes.txt");
     std::fs::write(&file, b"bad").unwrap();
-    let ctx = egui::Context::default();
     let (mut app, _) = app_with(Vec::new());
+    let ctx = app.ctx().clone();
     app.open_dropped(&ctx, vec![dropped(file.clone(), Err("read from the path".into()))], DropTo::Window);
     assert!(app.session.documents().is_empty());
     assert!(app.ui.status_error);
     assert!(error_titles(&app).iter().any(|t| t.starts_with("Couldn't open notes.txt: ")), "{:?}", app.ui.notices);
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let layers = layer_count(&app);
     app.open_dropped(&ctx, vec![dropped(file, Err("read from the path".into()))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);

@@ -47,7 +47,7 @@ fn harness(mut app: PhotocraftApp) -> Harness<'static, (PhotocraftApp, bool)> {
     let size = app.session.active().unwrap().doc.size;
     let view = View { zoom: 1.0, center: [size.width as f32 / 2.0, size.height as f32 / 2.0], fit_pending: false, fill_pending: false, ..app.ui.views[0].clone() };
     app.ui.window_views.insert(id, view);
-    let mut h = Harness::builder().with_size(vec2(900.0, 700.0)).build_ui_state(
+    let mut h = Harness::builder().with_size(vec2(900.0, 700.0)).with_context(app.ctx().clone()).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
                 crate::dialogs::run(app, ui);

@@ -373,9 +373,8 @@ fn auto_select_move_is_still_bounded() {
 fn a_secondary_canvas_does_not_overwrite_the_main_canvas_scale() {
     // #1943 review: a document window can sit on a display with another scale; only the
     // primary canvas records `app.ppp`, so the main mapping doesn't change under it.
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("view.actualPixels", json!({})).unwrap();
     app.sync_views();
@@ -402,9 +401,8 @@ fn a_secondary_canvas_does_not_overwrite_the_main_canvas_scale() {
 fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     // #2302 review: `app.ui.transform` is global, but only the primary canvas draws and drives
     // the box. A secondary window's Hand must still pan while the main window transforms.
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
@@ -454,9 +452,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // the document is; the box and handles still go over them, as in Photoshop. The document
     // picture and the controls are on different paint layers, so the order is read from the
     // pass's shapes, which egui hands over merged in paint order.
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
@@ -502,9 +499,8 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
     // planes, after the guides, hiding every guide across them; the guides now go over them,
     // the mesh lines, pins and planes over the guides, as in Photoshop.
     for command in ["edit.puppetWarp", "edit.perspectiveWarp", photocraft_engine::vp_cmds::VP] {
-        let ctx = egui::Context::default();
-        crate::PhotocraftApp::setup_context(&ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let ctx = app.ctx().clone();
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
@@ -722,7 +718,7 @@ fn torn_off_document_is_not_drawn_again_in_the_main_window() {
         assert!(app.ui.windows[0].floating);
         assert_eq!(app.session.active_index(), Some(0), "{kind:?}: the floated page remains active");
         assert_eq!(main_canvas_document(&app), Some(1), "{kind:?}: the main canvas picks a docked page instead");
-        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(680.0, 480.0)).build_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(680.0, 480.0)).with_context(app.ctx().clone()).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
                     egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| document_area(app, ui));
@@ -791,7 +787,7 @@ fn a_new_window_for_document_keeps_its_own_view() {
     app.sync_views();
     let app_ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &app_ctx, "window.arrange.newWindowForDocument", json!({})).unwrap();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).with_context(app.ctx().clone()).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
                 egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| document_area(app, ui));
@@ -800,7 +796,6 @@ fn a_new_window_for_document_keeps_its_own_view() {
         },
         (app, false),
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.state_mut().1 = true;
     h.run_steps(4);
     assert!(h.state().0.ui.windows.iter().any(|w| w.open && !w.floating), "the extra window is open");
@@ -829,7 +824,7 @@ fn a_tiled_document_follows_navigator_and_status_bar_zoom() {
         app.sync_views();
         let app_ctx = app.ctx().clone();
         crate::menus::invoke(&mut app, &app_ctx, &format!("window.arrange.{layout}"), json!({})).unwrap();
-        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).with_context(app.ctx().clone()).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
                     egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| document_area(app, ui));
@@ -837,7 +832,6 @@ fn a_tiled_document_follows_navigator_and_status_bar_zoom() {
             },
             (app, false),
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.state_mut().1 = true;
         h.run_steps(4);
         let active = h.state().0.session.active_index().unwrap();
@@ -934,9 +928,8 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
 /// Window view) is never left without a cursor for it.
 #[test]
 fn an_armed_eyedropper_hides_no_cursor_on_a_secondary_canvas() {
-    let ctx = egui::Context::default();
-    crate::PhotocraftApp::setup_context(&ctx, Default::default());
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
     app.ui.tool = crate::state::Tool::Move;

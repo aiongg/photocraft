@@ -6,10 +6,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let quick = args.iter().any(|a| a == "--quick");
     let (width, height, reps) = if quick { (6000, 4000, 12) } else { (7360, 4912, 40) };
-    let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, Default::default());
-    let _ = ctx.run_ui(Default::default(), |_| {});
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let ctx = app.ctx().clone();
+    let _ = ctx.run_ui(Default::default(), |_| {});
     // A full-resolution synthetic image with dense hue/saturation coverage and exact clipped
     // endpoints. Setup/import is outside the interactive measurements.
     let mut bytes = Vec::with_capacity(width * height * 3);

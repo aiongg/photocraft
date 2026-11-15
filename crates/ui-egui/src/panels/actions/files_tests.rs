@@ -25,8 +25,8 @@ fn action_set_bytes(set: &str, action: &str) -> Vec<u8> {
 
 /// Delivers the answer of the pick the last call asked for.
 fn settle(app: &mut PhotocraftApp) {
-    // PLAN: assumed top-w28 keeps `poll_file_dialog(&egui::Context, Option<_>)` as the frame's delivery of an answered pick.
-    app.poll_file_dialog(&egui::Context::default(), None);
+    let ctx = app.ctx().clone();
+    app.poll_file_dialog(&ctx, None);
 }
 
 fn names(app: &PhotocraftApp) -> Vec<&str> {

@@ -543,7 +543,8 @@ mod tests {
         // r1 finding 1 / r2 finding 2: a display connected while only a document window is on
         // it. The trigger must also wake the main window, whose frame starts the read.
         let mut app = app();
-        let (main, doc) = (egui::Context::default(), egui::Context::default());
+        // The main window is the app's own context; the document window is another window's.
+        let (main, doc) = (app.ctx().clone(), egui::Context::default());
         app.session.color.set_displays(Ok(displays(p3())));
         let reads = reader(&mut app, displays(p3()));
         frame(&mut app, &main, 100.0, [100.0, 100.0], [1728.0, 1117.0], true);
@@ -562,7 +563,8 @@ mod tests {
         // r2 finding 1: System Settings → back to a document window; the main window stays
         // unfocused (macOS reports focus per window).
         let mut app = app();
-        let (main, doc) = (egui::Context::default(), egui::Context::default());
+        // The main window is the app's own context; the document window is another window's.
+        let (main, doc) = (app.ctx().clone(), egui::Context::default());
         app.session.color.set_displays(Ok(displays(p3())));
         let reads = reader(&mut app, displays(p3()));
         let count = || reads.load(std::sync::atomic::Ordering::SeqCst);
