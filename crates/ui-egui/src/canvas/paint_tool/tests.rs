@@ -6,6 +6,7 @@ use craft::ui::canvas::RasterSource;
 use craft::ui::primitives::Revision;
 use egui::{Pos2, vec2};
 use egui_kittest::Harness;
+use crate::app::framework::BuildApp as _;
 use photocraft_doc::Document;
 use serde_json::json;
 
@@ -47,7 +48,7 @@ fn trail(app: &PhotocraftApp) -> Option<&crate::tools::stroke_trail::Trail> {
 /// A whole-document canvas at 100 % in a harness, for tests that feed several moves in one pass.
 fn harness(mut app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     app.sync_views();
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).with_step_dt(1.0 / 60.0).build_app(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

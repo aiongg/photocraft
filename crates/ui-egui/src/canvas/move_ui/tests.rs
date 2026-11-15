@@ -472,10 +472,7 @@ fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], m: egui::Modifier
 
 /// ↩ through the app's key handling.
 fn enter(app: &mut PhotocraftApp) {
-    let ctx = app.ctx().clone();
-    let key = egui::Event::Key { key: egui::Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE };
-    let input = egui::RawInput { events: vec![key], ..Default::default() };
-    ctx.run_ui(input, |ui| crate::shortcuts::handle(app, ui.ctx())).textures_delta.clear();
+    crate::canvas::testing::key(app, egui::Key::Enter, egui::Modifiers::NONE);
 }
 
 /// #578: with a selection the Move tool drags the selected pixels (from anywhere, without an

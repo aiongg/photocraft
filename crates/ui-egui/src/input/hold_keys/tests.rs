@@ -3,6 +3,7 @@
 //! pending crop, and Space right-click opens the Hand's view menu. Keys and buttons go in as
 //! window events, so they reach the runtime and come back as fired commands.
 
+use craft::behavior::cursor::{Cursor, PaintedCursor};
 use craft::behavior::kurbo::Point;
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
@@ -242,8 +243,9 @@ fn the_pen_path_being_drawn_stays_visible_while_space_pans() {
         painted_paths(&h).iter().any(|pts| pts.first().is_some_and(|p| near(p, a)) && pts.last().is_some_and(|p| near(p, b))),
         "the Pen path from {a:?} to {b:?} is drawn while panning"
     );
-    // The fist (#2196) is the cursor the host picks.
-    assert_eq!(h.output().platform_output.cursor_icon, egui::CursorIcon::Grabbing, "the fist while panning (#2196)");
+    // The host paints the Hand's cursor, closed while the button is down (#2196).
+    let cursor = h.state().canvas_tools.last_response.as_ref().and_then(|r| r.cursor.clone());
+    assert_eq!(cursor, Some(Cursor::Painted(PaintedCursor::Hand)), "the Hand's cursor while panning (#2196)");
     release(&mut h, 190.0, 230.0, Modifiers::NONE);
     key(&mut h, Key::Space, false, Modifiers::NONE);
     h.run_steps(2);

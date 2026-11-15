@@ -1,5 +1,6 @@
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
+use crate::app::framework::BuildApp as _;
 use serde_json::json;
 
 use super::*;
@@ -18,7 +19,7 @@ fn harness(prefs: Option<&str>) -> Harness<'static, PhotocraftApp> {
     }
     app.ui.tool = Tool::Brush;
     app.sync_views();
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_app(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

@@ -154,9 +154,9 @@ impl CanvasTool for GradientTool<'_> {
         Cursor::System(CursorIcon::Crosshair)
     }
 
-    /// ⌘ is the Move tool's stand-in: with it held the press belongs to Move.
+    /// ⌘ is the Move tool's stand-in and ⌥ the Eyedropper's: with either held the press belongs to the stand-in.
     fn takes(&self, button: PointerButton, mods: Mods) -> bool {
-        button == PointerButton::Primary && !mods.cmd
+        button == PointerButton::Primary && !mods.cmd && !crate::canvas::alt_samples(crate::state::Tool::Gradient, mods)
     }
 
     fn access(&self, _cx: &ToolContext<'_>) -> Option<ToolAccess> {
