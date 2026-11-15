@@ -61,7 +61,7 @@ fn font_cycle_in_options_bar_edits_the_layer_and_can_be_undone() {
     let steps = h.state().session.active().unwrap().history.entries().len();
     h.state_mut().run("edit.undo", json!({})).unwrap();
     assert_eq!(layer_font(h.state()), "Inter");
-    assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps, "one pick is one undoable step");
+    assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps - 1, "one pick is one undoable step");
     h.state_mut().run("edit.redo", json!({})).unwrap();
     assert_eq!(layer_font(h.state()), "JetBrains Mono");
 }

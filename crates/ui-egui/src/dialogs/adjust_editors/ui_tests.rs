@@ -279,8 +279,7 @@ fn map_stops(a: &Adjustment) -> Vec<(f32, [u8; 3])> {
 
 /// Opens the Gradient Map's preset picker and chooses its Import entry.
 fn import_gradients_from_picker(h: &mut Harness<'_, PhotocraftApp>) {
-    // PLAN: the picker's button and the Import entry keep the old labels; `GradientMapEditor`'s own may differ.
-    let preset = label_rect(h, "Preset:").expect("the preset picker");
+    let preset = label_rect(h, "Preset").expect("the preset picker");
     click(h, Pos2::new(preset.right() + 60.0, preset.center().y));
     h.get_by_label_contains("Import").click();
     h.run_steps(4);
@@ -379,7 +378,7 @@ fn photo_filter_color(a: &Adjustment) -> [f32; 3] {
 
 /// Clicks the colour well labelled `label` and returns the Color Picker it opened.
 fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::dialog::DialogId {
-    h.get_by_label(label).click();
+    h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
     crate::color_picker_ui::top(h.state()).expect("the colour well opens the Color Picker")
 }
@@ -396,14 +395,13 @@ fn photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step()
     let (id, _) = layer(&h);
     h.state_mut().run("layer.setAdjustment", json!({"layer": id.0, "color": "#336699"})).unwrap();
     h.run_steps(4);
-    // PLAN: the Color radio and the well keep their old labels ("Color:", "Color Picker (Photo Filter)").
-    h.get_by_label("Color:").click();
+    h.get_by_role_and_label(Role::RadioButton, "Color").click();
     h.run_steps(3);
     let start = photo_filter_color(&layer(&h).1);
     let before = history_len(&h);
 
     // While the picker is open, the canvas previews its colour; nothing is committed yet.
-    let picker = open_picker(&mut h, "Color Picker (Photo Filter)");
+    let picker = open_picker(&mut h, "Filter Color");
     show_in_picker(&mut h, picker, "#ff0000");
     let live = h.state().live_adjust.clone();
     assert!(matches!(&live, Some((l, v)) if *l == id && v["color"] == "#ff0000"), "live preview while the picker is open: {live:?}");
@@ -419,7 +417,7 @@ fn photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step()
     assert_eq!(history_len(&h), before);
 
     // OK: the colour, as one history step however long it previewed.
-    let picker = open_picker(&mut h, "Color Picker (Photo Filter)");
+    let picker = open_picker(&mut h, "Filter Color");
     show_in_picker(&mut h, picker, "#00ff80");
     show_in_picker(&mut h, picker, "#00ff00");
     assert_eq!(history_len(&h), before);
@@ -444,8 +442,7 @@ fn gradient_map_stop_picker_closed_without_a_colour_changes_nothing() {
     let history = history_len(&h);
     let ctx = h.ctx.clone();
     for button in ["Cancel", "OK"] {
-        // PLAN: the stop's well keeps its old label "Color Picker (Stop Color)".
-        let picker = open_picker(&mut h, "Color Picker (Stop Color)");
+        let picker = open_picker(&mut h, "Color");
         if button == "OK" {
             assert!(h.state_mut().framework.dialogs.confirm_by_id(&ctx, picker));
         } else {
