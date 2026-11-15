@@ -45,7 +45,7 @@ fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value)
 
 /// Open by firing the panel menu's Record Again row, preserving its selected-step and enablement checks.
 fn open(h: &mut Harness<'static, PhotocraftApp>) -> DialogId {
-    let reply = control(h, "ui.menu.invoke", json!({"id": "actionsPanel.recordAgain"}));
+    let reply = control(h, "ui.menu.invoke", json!({"id": "actions.recordAgain"}));
     assert_eq!(reply["ok"], true, "{reply}");
     h.state().framework.dialogs.stack().top().expect("the editor opened")
 }

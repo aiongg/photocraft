@@ -18,6 +18,12 @@ type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
 /// and the writer records what it wrote. Its file picks answer with `answers`, in order; a pick past the
 /// last answer is cancelled.
 fn app_with(answers: Vec<Picked>) -> (PhotocraftApp, Written) {
+    app_over(Arc::new(ScriptedFiles::answering(answers)))
+}
+
+/// [`app_with`] over a file service the test keeps, to read the requests it was asked. The framework takes the
+/// service when the app is built.
+fn app_over(files: Arc<ScriptedFiles>) -> (PhotocraftApp, Written) {
     let written: Written = Rc::default();
     let w = written.clone();
     let services = Services {
@@ -32,7 +38,7 @@ fn app_with(answers: Vec<Picked>) -> (PhotocraftApp, Written) {
             let warnings = if path.ends_with(".png") { vec!["Layers were flattened".to_string()] } else { Vec::new() };
             Ok((b"out".to_vec(), warnings))
         })),
-        files: Some(Arc::new(ScriptedFiles::answering(answers))),
+        files: Some(files),
         write: Some(Box::new(move |p: &str, b: &[u8]| {
             w.borrow_mut().push((p.to_string(), b.to_vec()));
             Ok(())
@@ -348,7 +354,8 @@ fn export_as(bytes: &[u8], name: &str) -> Vec<u8> {
 
 #[test]
 fn templates_open_as_new_untitled_documents() {
-    let (mut app, written) = app_with(Vec::new());
+    let files = Arc::new(ScriptedFiles::answering([Picked::Cancelled]));
+    let (mut app, written) = app_over(files.clone());
     let ctx = egui::Context::default();
     app.open_file("/pics/card.PSDT", b"x").unwrap();
     app.open_file("/pics/card.psdt", b"x").unwrap();
@@ -357,8 +364,6 @@ fn templates_open_as_new_untitled_documents() {
     assert!(app.session.documents().iter().all(|d| d.path.is_none()));
     assert_eq!(app.ui.recent_files.first().map(String::as_str), Some("/pics/card.psdt"));
     // File › Save asks for a new name (cancelled here) rather than suggesting the template.
-    let files = Arc::new(ScriptedFiles::answering([Picked::Cancelled]));
-    app.services.files = Some(files.clone());
     menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     answer(&mut app);
     let asked: Vec<_> = files.requests().into_iter().map(|r| r.file_name).collect();
@@ -1333,10 +1338,10 @@ fn drag_and_drop_in_the_running_app() {
     });
     h.run_steps(4);
     // The first tab's rect, read from the shown strip: the topmost node labelled with the first document's name.
-    // PLAN: assumed the document tabs' accessible labels are the document names
+    // A tab's accessible label is the document's name, then its zoom and mode ("Untitled-1, 100% (…)").
     use egui_kittest::kittest::Queryable;
     let first_tab = h
-        .query_all_by_label("Untitled-1")
+        .query_all_by(|n| n.label().is_some_and(|label| label.starts_with("Untitled-1,")))
         .map(|n| n.rect())
         .min_by(|a, b| a.top().total_cmp(&b.top()))
         .expect("the tab strip is drawn");
@@ -1389,23 +1394,19 @@ fn views_and_windows_stay_with_their_documents() {
     for (i, v) in app.ui.views.iter_mut().enumerate() {
         v.zoom = i as f32 + 1.0;
     }
-    app.ui.windows = (0..4)
-        .map(|document| crate::state::DocWindow {
-            id: document as u64,
-            document,
-            view: Default::default(),
-            open: true,
-            floating: false,
-            focused: false,
-            position: None,
-        })
-        .collect();
+    // Each document also has a floating window; a window follows its document through moves and closes.
+    let ids: Vec<photocraft_doc::DocId> = app.session.documents().iter().map(|d| d.doc.id).collect();
+    let made: Vec<u64> = ids.iter().map(|id| app.ui.document_windows.new_window_for(id, egui::Rect::NOTHING)).collect();
     let zooms = |app: &PhotocraftApp| app.ui.views.iter().map(|v| v.zoom).collect::<Vec<_>>();
-    let windows = |app: &PhotocraftApp| app.ui.windows.iter().map(|w| (w.id, w.document)).collect::<Vec<_>>();
+    // Each floating window with the index of the document it shows.
+    let windows = |app: &PhotocraftApp| {
+        let docs = app.session.documents();
+        app.ui.document_windows.floating.iter().map(|(group, _)| (group.id, docs.iter().position(|d| d.doc.id == group.documents[0]).unwrap())).collect::<Vec<_>>()
+    };
     assert_eq!(app.run("document.move", json!({"document": 0, "to": 3})).unwrap(), json!({"document": 3}));
     assert_eq!(doc_names(&app), ["b.psd", "c.psd", "d.psd", "a.psd"]);
     assert_eq!(zooms(&app), [2.0, 3.0, 4.0, 1.0]);
-    assert_eq!(windows(&app), [(0, 3), (1, 0), (2, 1), (3, 2)]);
+    assert_eq!(windows(&app), [(made[0], 3), (made[1], 0), (made[2], 1), (made[3], 2)]);
     // Out of range: an error, nothing moves.
     assert!(app.run("document.move", json!({"document": 7, "to": 0})).is_err());
     assert_eq!(zooms(&app), [2.0, 3.0, 4.0, 1.0]);
@@ -1413,7 +1414,7 @@ fn views_and_windows_stay_with_their_documents() {
     app.run("file.close", json!({"document": 1})).unwrap();
     assert_eq!(doc_names(&app), ["b.psd", "d.psd", "a.psd"]);
     assert_eq!(zooms(&app), [2.0, 4.0, 1.0]);
-    assert_eq!(windows(&app), [(0, 2), (1, 0), (3, 1)]);
+    assert_eq!(windows(&app), [(made[0], 2), (made[2], 0), (made[3], 1)]);
 }
 
 
@@ -1422,17 +1423,17 @@ fn open_documents_as_tabs_preference_controls_floating_windows() {
     let (mut app, _) = app_with(Vec::new());
     app.session.edit_prefs(|p| p.workspace.open_documents_as_tabs = false);
     app.open_bytes("a.psd", b"x").unwrap();
-    assert_eq!(app.ui.windows.len(), 1);
-    assert_eq!(app.ui.windows[0].document, 0);
+    let floating = |app: &PhotocraftApp| app.ui.document_windows.floating.iter().map(|(group, _)| group.documents.clone()).collect::<Vec<_>>();
+    let id = |app: &PhotocraftApp, at: usize| app.session.documents()[at].doc.id;
+    assert_eq!(floating(&app), [vec![id(&app, 0)]]);
 
     app.run("file.new", json!({"width": 100, "height": 100})).unwrap();
-    assert_eq!(app.ui.windows.len(), 2);
-    assert_eq!(app.ui.windows[1].document, 1);
+    assert_eq!(floating(&app), [vec![id(&app, 0)], vec![id(&app, 1)]]);
 
     // Opening with preference true docks into tabs, creating no new floating window
     app.session.edit_prefs(|p| p.workspace.open_documents_as_tabs = true);
     app.open_bytes("b.psd", b"x").unwrap();
-    assert_eq!(app.ui.windows.len(), 2);
+    assert_eq!(floating(&app).len(), 2);
 }
 
 #[test]
@@ -1584,11 +1585,17 @@ fn export_as_is_recorded_and_replayed() {
     app.run("file.new", json!({"width": 40, "height": 20})).unwrap();
     app.run("actions.record", json!({})).unwrap();
     let id = menus::invoke(&mut app, &ctx, "file.export.exportAs", json!({})).unwrap()["dialog"].clone();
-    // PLAN: assumed `ui.dialog.set` takes `{dialog, field, value}`
+    let control = |app: &mut PhotocraftApp, method: &str, params: serde_json::Value| {
+        let (request, _reply) = crate::control::ControlRequest::new(method, params);
+        match crate::control::handle(app, &ctx, &request) {
+            crate::control::Reply::Done(reply) => assert_eq!(reply["ok"], true, "{method}: {reply}"),
+            _ => panic!("{method} answers at once"),
+        }
+    };
     for (field, value) in [("format", json!("jpg")), ("quality", json!(70)), ("scale", json!(50))] {
-        app.run("ui.dialog.set", json!({"dialog": id, "field": field, "value": value})).unwrap();
+        control(&mut app, "ui.dialog.set", json!({"dialog": id, "field": field, "value": value}));
     }
-    app.run("ui.dialog.confirm", json!({"dialog": id})).unwrap();
+    control(&mut app, "ui.dialog.confirm", json!({"dialog": id}));
     answer(&mut app);
     app.run("actions.stop", json!({})).unwrap();
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 20, 10, Some(70))]);
