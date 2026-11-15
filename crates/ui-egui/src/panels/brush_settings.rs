@@ -7,7 +7,8 @@ use craft::ui::primitives::Revision;
 use egui::vec2;
 use photocraft_engine::BrushSettings;
 
-use super::brush_panel::{CHECKBOX_ONLY_START, SECTIONS, commit_gesture, section_flag, section_lock};
+use super::brush_panel::{CHECKBOX_ONLY_START, SECTIONS, section_flag, section_lock};
+use super::brush_sections::SectionOut;
 use super::brush_settings_events::{apply_action, apply_section_events};
 use super::{brush_preview, brush_sections};
 use crate::PhotocraftApp;
@@ -47,24 +48,28 @@ pub(super) fn brush_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.ui.brush_section = 0;
     }
     let rows = sections(&mut brush);
-    let current = app.session.tools.current_preset.as_deref().filter(|name| app.session.tools.presets.iter().any(|p| p.name.eq_ignore_ascii_case(name)));
+    let can_update = app.session.tools.current_preset.as_deref().is_some_and(|name| app.session.tools.presets.iter().any(|p| p.name.eq_ignore_ascii_case(name)));
     let strip = BrushStrokeStrip::new(
         tl!("Stroke preview"),
         Revision::of(&(brush_preview::preview_sig(&before), text)),
         StripImage::new(|size| brush_preview::stroke_image(&before, size, text)),
     );
-    let (presets, tool) = (&app.session.tools.presets, app.ui.tool);
-    let panel = BrushSettingsPanel::new(tl!("Brush Settings"), &rows, Bind::bound(&mut app.ui.brush_section)).link_row().strip(strip);
-    let panel = if current.is_some() { panel.can_update() } else { panel };
+    let tool = app.ui.tool;
+    // The section is bound through a copy so the pane closure can borrow the whole app.
+    let mut section = app.ui.brush_section;
+    let panel = BrushSettingsPanel::new(tl!("Brush Settings"), &rows, Bind::bound(&mut section)).link_row().strip(strip);
+    let panel = if can_update { panel.can_update() } else { panel };
+    // A frame can run the pane twice and egui gives a frame's input events to the first pass only: the reports of
+    // every pass add up. The framework panel greys out the pane of a section that is off.
+    let mut reported = SectionOut::default();
     let out = ui.allocate_ui(vec2(ui.available_width(), HEIGHT), |ui| {
         panel.show(ui, |ui, _, section| {
-            // A section that is off shows its options greyed out (Photoshop).
-            let on = !rows[*section].is_off();
-            ui.add_enabled_ui(on, |ui| brush_sections::section_body(ui, &mut brush, *section, presets, current, tool)).inner
+            reported.merge(brush_sections::section_body(app, ui, &mut brush, *section, tool));
         })
     });
     let out = out.inner;
-    if let Some(name) = out.body.flatten() {
+    app.ui.brush_section = section;
+    if let Some(name) = reported.picked.take() {
         super::brush_panel::run_or_status(app, "brush.presets.setCurrent", serde_json::json!({ "name": name }));
     }
     if apply_section_events(&mut brush, &mut app.ui.brush_section, out.sections) {
@@ -73,5 +78,5 @@ pub(super) fn brush_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(action) = out.action {
         apply_action(app, &mut brush, action);
     }
-    commit_gesture(app, &ctx, &before, &brush);
+    super::brush_panel::commit_keyed(app, &before, &brush, reported.key);
 }
