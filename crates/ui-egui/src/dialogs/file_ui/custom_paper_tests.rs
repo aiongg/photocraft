@@ -57,6 +57,8 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 /// events remain in egui points while exercising both standard and Retina display scales.
 fn harness_at_scale(app: PhotocraftApp, pixels_per_point: f32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder()
+        // The paper menu lists the Japanese paper names; no installed face is guaranteed to draw them.
+        .allow_missing_glyphs()
         .with_size(vec2(1000.0, 900.0))
         .with_pixels_per_point(pixels_per_point)
         .with_max_steps(64)

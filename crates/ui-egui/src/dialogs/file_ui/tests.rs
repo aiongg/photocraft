@@ -480,6 +480,8 @@ fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
     app.run("file.new", json!({"width": 120, "height": 80, "name": "poster"})).unwrap();
     let id = open_print(&mut app);
     let mut h = egui_kittest::Harness::builder()
+        // The dialog lists the Japanese paper names; no installed face is guaranteed to draw them.
+        .allow_missing_glyphs()
         .with_size(egui::vec2(1440.0, 900.0))
         .with_max_steps(64)
         .with_context(app.ctx().clone())

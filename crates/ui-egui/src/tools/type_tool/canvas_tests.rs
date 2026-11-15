@@ -386,7 +386,9 @@ fn fast_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 }
 
 fn make_harness_with(builder: egui_kittest::HarnessBuilder<PhotocraftApp>, ppp: f32, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let builder = builder.with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_pixels_per_point(ppp);
+    // The tests type CJK text; the UI stack loads a system face only after a pass that missed the glyph,
+    // so the first pass draws tofu on any machine and the layout under test does not depend on a face.
+    let builder = builder.allow_missing_glyphs().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_pixels_per_point(ppp);
     let mut h = builder.build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
