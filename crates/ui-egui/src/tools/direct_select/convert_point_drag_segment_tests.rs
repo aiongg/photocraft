@@ -53,6 +53,22 @@ fn moved(p: &Path, which: Option<&[[usize; 2]]>, d: [f64; 2]) -> Path {
     p
 }
 
+/// `a` and `b` are the same path to within the view's `f32` mapping of a pointer to document pixels: a drag's
+/// delta carries rounding below a thousandth of a pixel.
+#[track_caller]
+fn assert_same_path(a: &Path, b: &Path, what: &str) {
+    assert_eq!(a.subpaths.len(), b.subpaths.len(), "{what}: subpaths");
+    for (sa, sb) in a.subpaths.iter().zip(&b.subpaths) {
+        assert_eq!((sa.closed, sa.knots.len()), (sb.closed, sb.knots.len()), "{what}: shape");
+        for (ka, kb) in sa.knots.iter().zip(&sb.knots) {
+            assert_eq!(ka.smooth, kb.smooth, "{what}: smooth");
+            for (pa, pb) in [(ka.anchor, kb.anchor), (ka.in_ctrl, kb.in_ctrl), (ka.out_ctrl, kb.out_ctrl)] {
+                assert!((pa.x - pb.x).abs() < 1e-3 && (pa.y - pb.y).abs() < 1e-3, "{what}: {pa:?} vs {pb:?}");
+            }
+        }
+    }
+}
+
 /// Every anchor of the path selected, by a ⌘-marquee (Direct Selection in this tool).
 fn select_all(app: &mut PhotocraftApp) {
     drag(app, [0.0, 0.0], [800.0, 600.0], Modifiers::COMMAND);
@@ -66,9 +82,7 @@ fn with_nothing_selected_a_segment_drag_moves_only_that_segment() {
     let steps = added(&mut app, |a| drag(a, BOTTOM_EDGE, [200.0, 540.0], Modifiers::NONE));
     assert_eq!(steps, ["Drag Segment"]);
     let after = path(&app);
-    assert_eq!(after.subpaths[0].knots[2].anchor, Point::new(300.0, 540.0));
-    assert_eq!(after.subpaths[0].knots[3].anchor, Point::new(100.0, 540.0));
-    assert_eq!(after, moved(&before, Some(&[[0, 2], [0, 3]]), [0.0, 40.0]), "the other anchors stay");
+    assert_same_path(&after, &moved(&before, Some(&[[0, 2], [0, 3]]), [0.0, 40.0]), "the other anchors stay");
     assert!(app.session.undo());
     assert_eq!(path(&app), before);
 }
@@ -78,7 +92,7 @@ fn the_closing_segment_of_a_closed_subpath_moves_too() {
     let mut app = app(Tool::ConvertPoint);
     let before = path(&app);
     assert_eq!(added(&mut app, |a| drag(a, [100.0, 400.0], [60.0, 400.0], Modifiers::NONE)), ["Drag Segment"]);
-    assert_eq!(path(&app), moved(&before, Some(&[[0, 3], [0, 0]]), [-40.0, 0.0]));
+    assert_same_path(&path(&app), &moved(&before, Some(&[[0, 3], [0, 0]]), [-40.0, 0.0]), "the closing segment");
 }
 
 #[test]
@@ -88,7 +102,7 @@ fn with_the_whole_path_selected_a_segment_drag_moves_the_whole_path() {
     let before = path(&app);
     let steps = added(&mut app, |a| drag(a, BOTTOM_EDGE, [200.0, 540.0], Modifiers::NONE));
     assert_eq!(steps, ["Drag Path"]);
-    assert_eq!(path(&app), moved(&before, None, [0.0, 40.0]), "all three subpaths moved");
+    assert_same_path(&path(&app), &moved(&before, None, [0.0, 40.0]), "all three subpaths moved");
     assert_eq!(app.ui.direct_selection.anchors.len(), 8, "the selection stays");
 }
 
@@ -101,7 +115,7 @@ fn direct_selection_segment_drags_keep_their_behaviour() {
         }
         let before = path(&app);
         assert_eq!(added(&mut app, |a| drag(a, BOTTOM_EDGE, [200.0, 540.0], Modifiers::NONE)), ["Drag Segment"]);
-        assert_eq!(path(&app), moved(&before, Some(&[[0, 2], [0, 3]]), [0.0, 40.0]), "all selected: {all}");
+        assert_same_path(&path(&app), &moved(&before, Some(&[[0, 2], [0, 3]]), [0.0, 40.0]), &format!("all selected: {all}"));
     }
 }
 
