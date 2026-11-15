@@ -449,9 +449,9 @@ fn canvas_controls(
     }
     crate::type_tool::canvas_controls(app, ui, rect);
     crate::type_path_placement::show(app, ui, rect);
-    crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    let session_box_shown = crate::transform_tool::show_in_canvas(app, ui, rect, now);
     crate::cam_transform::show(app, ui, rect);
-    super::transform_controls::show(app, ui, rect);
+    super::transform_controls::show(app, ui, rect, session_box_shown);
     crate::move_box::show(app, ui, rect);
     crate::move_hover::show(app, ui, rect, pointer);
     crate::move_distance::show(app, ui, rect, pointer);

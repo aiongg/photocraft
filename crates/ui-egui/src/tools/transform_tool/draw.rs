@@ -43,9 +43,12 @@ struct Shown {
 ///
 /// Every control reads the frame's input once for its own pass, so a second pass of a frame
 /// reports no edit again and this applies only what the pass it ran in reported.
-pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect, now: f64) {
+///
+/// Returns whether the session's box was shown in this pass, even if an edit then ended the session: the
+/// Move tool's transform controls share its id and must not open a second box in the same pass.
+pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect, now: f64) -> bool {
     let shown = {
-        let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return };
+        let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return false };
         show_session(app, t, pv, ui, rect)
     };
     let Shown { edits, apply, discard, mesh, cylinder, busy } = shown;
@@ -78,6 +81,7 @@ pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Re
     if let Some(t) = app.ui.transform.as_mut() {
         t.session.settle(now, busy);
     }
+    true
 }
 
 /// The pass's shows, in paint order.
