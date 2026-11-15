@@ -1,6 +1,6 @@
 use super::*;
 use craft::keymap::Mods;
-use craft::ui::dialog::{DialogHost, DialogResult};
+use craft::ui::dialog::DialogHost;
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui::{Modifiers, PointerButton, Pos2, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
@@ -59,12 +59,11 @@ pub(super) fn hosted(app: &mut PhotocraftApp) -> &mut HostedParamDialog {
     app.framework.dialogs.get_mut::<HostedParamDialog>().expect("a hosted parameter dialog is open")
 }
 
-/// Presses OK on the open hosted parameter dialog and hands its answer to the family that owns it, as the
-/// app's dialog pass does.
+/// Presses OK on the open hosted parameter dialog through the app's dialog path: a family that judges a held OK
+/// answers it, then its run takes the result.
 pub(super) fn confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) {
-    assert!(app.framework.dialogs.confirm::<HostedParamDialog>(ctx), "OK was accepted");
-    let Some(DialogResult::Ok(result)) = app.framework.dialogs.take::<HostedParamDialog>() else { panic!("the dialog answered OK") };
-    super::pen_dialogs::run(app, ctx, result);
+    let id = app.framework.dialogs.stack().ids().find(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some()).expect("a hosted parameter dialog is open");
+    crate::dialogs::confirm(app, ctx, id).expect("OK was accepted");
 }
 
 /// Pen clicks at document points `at`, as on the canvas.
@@ -440,7 +439,7 @@ fn menu_local(id: &str) -> bool {
 }
 
 /// A renamed command would leave a dead row unnoticed: every row runs a menu item, an engine command or
-/// a command of the menu itself.
+/// a command of the runtime or of the menu itself.
 #[test]
 fn every_canvas_menu_row_runs_a_known_command() {
     let app = app();
@@ -466,7 +465,10 @@ fn every_canvas_menu_row_runs_a_known_command() {
     for (name, table) in tables {
         for (label, id) in table.iter().flatten() {
             assert!(
-                menu_local(id) || items.iter().any(|i| i.command.id == *id) || photocraft_engine::commands::find(id).is_some(),
+                menu_local(id)
+                    || items.iter().any(|i| i.command.id == *id)
+                    || crate::shortcut_dispatch::RUNTIME_COMMANDS.iter().any(|(runtime, _)| runtime == id)
+                    || photocraft_engine::commands::find(id).is_some(),
                 "{name}: {label}: unknown command {id}"
             );
         }

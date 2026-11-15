@@ -48,14 +48,25 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2) {
     h.run_steps(2);
 }
 
-/// The fields of the newest open dialog, whatever its type.
+/// The fields of the newest open dialog, whatever its type. An adjustment dialog shows its engine parameters, the form
+/// its command takes (its framework fields are the editor's own value).
 fn fields(app: &PhotocraftApp) -> serde_json::Value {
-    app.framework.dialogs.open_dialogs().pop().and_then(|d| d.fields).expect("an open dialog with fields")
+    let open = app.framework.dialogs.open_dialogs().pop().expect("an open dialog");
+    if crate::adjust_dialog::hosted(app, open.id).is_some() {
+        return crate::adjust_dialog::command_params(app, open.id);
+    }
+    open.fields.expect("an open dialog with fields")
 }
 
-/// Sets `field` of the newest open dialog.
+/// Sets `field` of the newest open dialog; an adjustment dialog takes it as an engine parameter.
 fn set(app: &mut PhotocraftApp, ctx: &egui::Context, field: &str, value: serde_json::Value) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
+    if crate::adjust_dialog::hosted(app, id).is_some() {
+        let mut params = crate::adjust_dialog::command_params(app, id);
+        params[field] = value;
+        assert!(crate::adjust_dialog::apply_params(app, id, &params), "the dialog refused `{field}`");
+        return;
+    }
     app.framework.dialogs.set_json_field(ctx, id, field, value).unwrap();
 }
 
@@ -229,21 +240,27 @@ fn filter_editor_starts_missing_parameters_from_defaults_not_remembered_values()
     app.session.prefs.edit(|p| {
         p.dialogs.insert(command.into(), json!({"reduceNoise": 60, "radius": 9}));
     });
-    let ctx = egui::Context::default();
     let mut sm = smart(&app, layer).clone();
     let index = sm.smart_filters.iter().position(|f| f.command == command).unwrap();
     sm.smart_filters[index].params = json!({"amount": 125, "radius": 2});
 
-    super::open_editor(&mut app, &ctx, layer.0, &sm, index);
-    let shown = fields(&app);
+    // A dialog keeps only the values it was opened with until its first pass seeds the rest from the schema.
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
+    let ctx = h.ctx.clone();
+    super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
+    h.run_steps(3);
+    let shown = fields(h.state());
     assert_eq!(shown["reduceNoise"].as_f64(), Some(10.0), "the spec default, not the remembered 60");
     assert_eq!(shown["amount"].as_f64(), Some(125.0));
     assert_eq!(shown["radius"].as_f64(), Some(2.0), "recorded values beat the remembered 9");
-    cancel(&mut app);
+    cancel(h.state_mut());
+    h.run_steps(2);
 
     // A plain Filter menu dialog still starts from the remembered values.
-    crate::menus::invoke(&mut app, &ctx, command, serde_json::Value::Null).unwrap();
-    assert_eq!(fields(&app)["reduceNoise"].as_f64(), Some(60.0));
+    crate::menus::invoke(h.state_mut(), &ctx, command, serde_json::Value::Null).unwrap();
+    h.run_steps(3);
+    assert_eq!(fields(h.state())["reduceNoise"].as_f64(), Some(60.0));
 }
 
 /// A captured tone filter must visibly affect its CPU preview, not merely retain parameters.
@@ -530,7 +547,7 @@ fn a_channel_mixer_smart_filter_turned_off_monochrome_keeps_its_red_row() {
     assert!(matrix[0].iter().zip([0.7, 0.3, 0.0, 0.0]).all(|(a, b)| (a - b).abs() < 1e-5), "the edited Red row renders: {:?}", matrix[0]);
 }
 
-/// In Lab, top-level `points` aliases Lightness and the editor removes it on an edit. A stored
+/// In Lab, top-level `points` aliases Lightness and the editor writes both on an edit. A stored
 /// one must not override the edit: the Lightness the editor sends is what the filter renders.
 #[test]
 fn a_lab_curves_smart_filter_keeps_a_lightness_edit() {
@@ -541,7 +558,7 @@ fn a_lab_curves_smart_filter_keeps_a_lightness_edit() {
     let graph = curve_graph(&h, "Lightness");
     click(&mut h, egui::pos2(graph.left() + graph.width() * 0.75, graph.top() + graph.height() * 0.1));
     let shown = fields(h.state());
-    assert!(shown.get("points").is_none(), "the editor removed the alias: {shown:?}");
+    assert_eq!(shown["points"], shown["lightness"], "the alias follows the edit: {shown:?}");
     let edited = shown["lightness"].clone();
     assert_ne!(edited, old, "the click edited Lightness");
     confirm(h.state_mut());
@@ -552,7 +569,7 @@ fn a_lab_curves_smart_filter_keeps_a_lightness_edit() {
     let photocraft_doc::Adjustment::Curves { per_channel, .. } = read(&sm.smart_filters[0].params) else { panic!("Curves params") };
     let photocraft_doc::Adjustment::Curves { per_channel: wanted, .. } = read(&json!({"lightness": edited})) else { panic!("Curves params") };
     assert_eq!(per_channel[0], wanted[0], "the edited Lightness renders");
-    assert!(sm.smart_filters[0].params.get("points").is_none(), "the removed alias is not stored");
+    assert_eq!(sm.smart_filters[0].params["points"], edited, "the stored alias is the edit, never the old curve");
 }
 
 /// Emptying a text field removes its key from the Color Lookup dialog, which draws from the
