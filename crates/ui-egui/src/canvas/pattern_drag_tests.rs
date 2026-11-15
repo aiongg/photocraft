@@ -2,8 +2,8 @@
 //! position, previews and the commit they match. They drive the canvas through `canvas::testing`.
 
 use craft::draw::ui::pattern::PatternFillDialog;
-use craft::ui::panels::dialog::StackDialog;
-use egui::{Modifiers, Pos2, vec2};
+use craft::ui::dialog::StackDialog;
+use egui::{Modifiers, vec2};
 use photocraft_doc::{Document, Fill, LayerContent, LayerId, Pattern};
 use serde_json::json;
 
@@ -300,7 +300,7 @@ fn a_release_applies_its_last_motion_and_starts_no_held_drag() {
     // A release outside the canvas counts: the tool host delivers it to the gesture's owner.
     let rect = view(&app).unwrap().rect;
     let v = view(&app).unwrap();
-    let outside = v.to_doc(Pos2::new(rect.x1 as f32, rect.y1 as f32) + vec2(20.0, 20.0));
+    let outside = v.to_doc(rect.max + vec2(20.0, 20.0));
     let outside = [outside.x, outside.y];
     let base = phase(&mut app);
     press(&mut app, start, NONE);
@@ -325,7 +325,7 @@ fn the_dialog_tool_serves_only_the_active_documents_canvas() {
     assert!(app.session.set_active(0));
     frame(&mut app);
     let active = app.session.active_index().unwrap();
-    let scope = ToolScope::for_test(&app, CanvasHost::main(active));
+    let scope = ToolScope::for_test(&mut app, CanvasHost::main(active));
     let mut state = DialogTools::default();
     assert!(dialog_tool(&scope, &mut state, CanvasHost::main(active)).is_some(), "the active document's canvas runs the dialog tool");
     let mut state = DialogTools::default();
