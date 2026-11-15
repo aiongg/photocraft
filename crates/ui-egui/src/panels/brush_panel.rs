@@ -26,7 +26,7 @@ use crate::PhotocraftApp;
 pub(crate) mod brushes;
 
 pub use crate::brush_preview::{preview_pixels, preview_sig};
-pub use crate::brush_sections::section_body;
+pub(crate) use crate::brush_sections::section_body;
 pub use photocraft_engine::brush_cmds::brush_patch;
 
 /// Sections in Photoshop's order. The bool says whether the section has an enable box.

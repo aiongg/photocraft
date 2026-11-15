@@ -13,7 +13,8 @@ pub fn system_lang() -> Lang {
     }
     #[cfg(not(test))]
     {
-        Lang::from_code(super::framework_i18n().system_lang().code()).unwrap_or(Lang::EN)
+        let i18n = super::framework_i18n();
+        Lang::from_code(i18n.code(i18n.system_lang())).unwrap_or(Lang::EN)
     }
 }
 

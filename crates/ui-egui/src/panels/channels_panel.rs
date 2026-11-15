@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 
 // PLAN: assumed paths of the framework items (imaging channels, keymap, ui contract and runtime).
 use craft::imaging::ui::channels::{self as channels, ChannelKind, ChannelRow, ChannelsCommands, ChannelsEvent, ChannelsFooterButton, ChannelsPanel};
+use craft::behavior::geometry::SelectionOperation;
 use craft::keymap::Mods;
 use craft::ui::contract::{CommandSet, SweepStep};
 use craft::ui::menu::PanelRow;
@@ -216,11 +217,21 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
+/// The engine's name of a selection operation (`select.loadSelection`'s `operation`).
+pub(crate) fn operation_name(operation: SelectionOperation) -> &'static str {
+    match operation {
+        SelectionOperation::Add => "add",
+        SelectionOperation::Subtract => "subtract",
+        SelectionOperation::Intersect => "intersect",
+        _ => "new",
+    }
+}
+
 /// Runs the engine command of `event`. `ctx` serves the commands that ask first (`menus::invoke`).
 // PLAN: the sheet's `apply(app, event)` has no context; `menus::invoke` needs one, so it is a parameter.
 pub(crate) fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, event: ChannelsEvent<Row>) {
     match event {
-        ChannelsEvent::Target { key, extend } => target(app, key, extend),
+        ChannelsEvent::Target { key, extend, .. } => target(app, key, extend),
         ChannelsEvent::Visibility(step) => {
             let edit = match step {
                 SweepStep::Flip(e) | SweepStep::ShowOnly(e) | SweepStep::Restore(e) | SweepStep::UndoShowOnly(e) => e,
@@ -230,8 +241,8 @@ pub(crate) fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, event: Channel
         }
         ChannelsEvent::LoadSelection { key, operation, .. } => {
             let params = match key {
-                Row::LayerMask => json!({ "channel": "mask", "layer": masked_layer(app), "operation": operation.name() }),
-                _ => json!({ "channel": key.reference(), "operation": operation.name() }),
+                Row::LayerMask => json!({ "channel": "mask", "layer": masked_layer(app), "operation": operation_name(operation) }),
+                _ => json!({ "channel": key.reference(), "operation": operation_name(operation) }),
             };
             let _ = app.run("select.loadSelection", params);
         }
@@ -258,7 +269,10 @@ fn apply_visibility(app: &mut PhotocraftApp, key: Row, on: bool) {
 /// A footer click. `rows` is the targeted row's key (empty without rows); Alt on New asks for the channel's options first.
 fn apply_footer(app: &mut PhotocraftApp, ctx: &egui::Context, button: ChannelsFooterButton, rows: &[Row], mods: Mods) {
     match button {
-        ChannelsFooterButton::New if mods.alt => report(app, crate::menus::invoke(app, ctx, "channel.new", json!({}))),
+        ChannelsFooterButton::New if mods.alt => {
+            let asked = crate::menus::invoke(app, ctx, "channel.new", json!({}));
+            report(app, asked)
+        }
         ChannelsFooterButton::New => {
             let _ = app.run("channel.new", json!({}));
         }
@@ -350,8 +364,14 @@ fn run_drop(app: &mut PhotocraftApp, key: Row, button: ChannelsFooterButton) {
 fn run_command(app: &mut PhotocraftApp, ctx: &egui::Context, command: ChannelsCommands, key: Option<Row>) {
     // New Channel… and Merge Channels… ask first.
     match command {
-        ChannelsCommands::NewChannel => return report(app, crate::menus::invoke(app, ctx, "channel.new", json!({}))),
-        ChannelsCommands::MergeChannels => return report(app, crate::menus::invoke(app, ctx, "channel.merge", json!({}))),
+        ChannelsCommands::NewChannel => {
+            let asked = crate::menus::invoke(app, ctx, "channel.new", json!({}));
+            return report(app, asked);
+        }
+        ChannelsCommands::MergeChannels => {
+            let asked = crate::menus::invoke(app, ctx, "channel.merge", json!({}));
+            return report(app, asked);
+        }
         ChannelsCommands::NewSpotChannel => {
             let _ = crate::channel_options_ui::open_new_spot(app);
             return;

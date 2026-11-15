@@ -5,7 +5,7 @@
 use std::cell::Cell;
 
 use craft::behavior::{EditEvent, EditEvents, Mixed};
-use craft::imaging::ui::curve::{Curve, CurveEditor, CurveRows};
+use craft::imaging::ui::curve::{Curve, CurveEditor};
 use craft::ui::buttons::Button;
 use craft::ui::contract::{Bind, BodyCx, Show as _};
 use photocraft_engine::prefs::PressureCurve;
@@ -39,7 +39,7 @@ pub fn editor(ui: &mut egui::Ui, label: &str, points: &mut Vec<[f32; 2]>) -> Edi
         .levels(LEVELS as u32)
         .max_points(PressureCurve::MAX_POINTS)
         .fields(false)
-        .between(CurveRows::new(|ui: &mut egui::Ui, _: &mut BodyCx<'_>| {
+        .between(|ui: &mut egui::Ui, _: &mut BodyCx<'_>| {
             ui.horizontal(|ui| {
                 for (at, (name, _)) in PRESETS.iter().enumerate() {
                     if Button::new(tl!(name)).show(ui).clicked() {
@@ -47,7 +47,7 @@ pub fn editor(ui: &mut egui::Ui, label: &str, points: &mut Vec<[f32; 2]>) -> Edi
                     }
                 }
             });
-        }))
+        })
         .show(ui);
     let mut events = out.edit.events.map(|curve| unit_points(&curve));
     if let Some(at) = preset.get() {

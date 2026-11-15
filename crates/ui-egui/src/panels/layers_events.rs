@@ -190,7 +190,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                     LayerPart::LayerMask | LayerPart::VectorMask => mask_kind(part).map(|k| crate::mask_thumbs_ui::load_params(l, k, mods)),
                     LayerPart::FrameShape if l.frame.is_some() => Some(crate::mask_thumbs_ui::load_params(l, MaskKind::Vector, mods)),
                     LayerPart::Pixels | LayerPart::FrameShape if !doc.is_background(id) => {
-                        Some(json!({"channel": "transparency", "layer": id.0, "operation": craft::behavior::SelectionOperation::from_mods(mods).name()}))
+                        Some(json!({"channel": "transparency", "layer": id.0, "operation": super::channels_panel::operation_name(craft::behavior::geometry::SelectionOperation::from_mods(mods))}))
                     }
                     _ => None,
                 };

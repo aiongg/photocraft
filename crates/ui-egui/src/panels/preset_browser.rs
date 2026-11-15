@@ -146,7 +146,7 @@ fn show(
         browser = browser.view_lock(PresetView::List);
     }
     if let Some(text) = look.empty {
-        browser = browser.empty(text);
+        browser = browser.empty(text.to_owned());
     }
     if !look.flat {
         browser = browser.reorder(PresetReorder::items_and_groups());
@@ -569,8 +569,8 @@ pub fn tool_presets_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .iter()
         .filter(|preset| !only || Tool::from_name(&preset.tool) == Some(current))
         .map(|preset| {
-            let icon = Tool::from_name(&preset.tool).map_or("settings", crate::icons::tool_icon);
-            PresetRow::item(PresetKey::Item(preset.name.clone()), preset.name.clone(), 0).icon(craft::behavior::IconId::new(icon))
+            let icon = Tool::from_name(&preset.tool).map_or_else(|| craft::behavior::IconId::new("settings"), crate::icons::tool_icon);
+            PresetRow::item(PresetKey::Item(preset.name.clone()), preset.name.clone(), 0).icon(icon)
         })
         .collect();
     // The footer's closure is `Fn`, so the check box's value goes through a cell.

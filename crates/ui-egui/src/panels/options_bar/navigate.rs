@@ -1,7 +1,7 @@
 //! The options bar's members of the Move, Eyedropper, Zoom, Rotate View and Hand tools.
 
 use craft::ui::canvas::{NavigateBar, NavigationOptions};
-use craft::ui::contract::{Bind, BodyCx, Entry, Show as _};
+use craft::ui::contract::{Bind, Entry, Show as _};
 use craft::ui::display::Divider;
 use craft::ui::pickers::Select;
 
@@ -9,11 +9,10 @@ use super::check;
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
-/// The members of the active tool when it is one of the navigation tools; `cx` is the bar body's context, which the
-/// Move tool's align strip takes.
-pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>) {
+/// The members of the active tool when it is one of the navigation tools.
+pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     match app.ui.tool {
-        Tool::Move => move_members(app, ui, cx),
+        Tool::Move => move_members(app, ui),
         Tool::Eyedropper => crate::eyedropper_ui::options(app, ui),
         Tool::Zoom | Tool::RotateView | Tool::Hand => view_members(app, ui),
         _ => {}
@@ -21,7 +20,7 @@ pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyC
 }
 
 /// Auto-Select, its target, Show Transform Controls, then the align strip.
-fn move_members(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>) {
+fn move_members(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let o = &mut app.ui.tool_options;
     check(ui, tl!("Auto-Select:"), &mut o.move_auto_select);
     let targets = [Entry::new("group".to_owned(), tl!("Group").to_owned()), Entry::new("layer".to_owned(), tl!("Layer").to_owned())];
@@ -29,7 +28,7 @@ fn move_members(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>)
     Divider::vertical().show(ui);
     check(ui, tl!("Show Transform Controls"), &mut o.move_show_transform);
     Divider::vertical().show(ui);
-    crate::align_bar::show(app, ui, cx);
+    crate::align_bar::show(app, ui);
 }
 
 /// The navigation choices the bar edits: the preferences and the tools' own options, as the framework's

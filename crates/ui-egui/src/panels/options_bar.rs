@@ -7,7 +7,7 @@ use std::ops::RangeInclusive;
 use craft::behavior::{EditEvents, IconId};
 use craft::ui::bars::{Bar, BarHome, BarKind, BarOutput, BarTool};
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, BodyCx, Entry, Props as _, Show as _, ShowContainer as _};
+use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Divider;
 use craft::ui::form::Field;
 use craft::ui::menu::Menu;
@@ -79,7 +79,7 @@ fn ending(app: &PhotocraftApp, tool: Tool) -> Option<Ending> {
         return pair(End::Symmetry, tl!("Commit"), tl!("Cancel"));
     }
     match tool {
-        Tool::Crop if crate::crop_ui::commits_shown(app) => pair(End::Crop, tl!("Commit current crop operation"), tl!("Cancel current crop operation")),
+        Tool::Crop if crate::crop_ui::bar::commits_shown(app) => pair(End::Crop, tl!("Commit current crop operation"), tl!("Cancel current crop operation")),
         Tool::PerspectiveCrop if crate::perspective_crop_ui::commit_shown(app) => {
             pair(End::PerspectiveCrop, tl!("Commit"), tl!("Cancel"))
         }
@@ -98,7 +98,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(ending) = &ending {
         bar = bar.commit_cancel(ending.commit.clone(), ending.cancel.clone());
     }
-    let shown = bar.show(ui, |ui, cx| body(app, ui, cx));
+    let shown = bar.show(ui, |ui, _| body(app, ui));
     if let Some(ending) = ending {
         answer(app, ui, tool, ending.end, &shown.output);
     }
@@ -114,8 +114,11 @@ fn answer(app: &mut PhotocraftApp, ui: &egui::Ui, tool: Tool, end: End, out: &Ba
                 crate::symmetry_ui::cancel(app);
             }
         }
-        End::Crop => crate::crop_ui::committed(app, out),
-        // PLAN: tools-w50's `perspective_crop_ui::committed(app, &BarOutput)` is assumed, as for the crop.
+        End::Crop => {
+            if out.committed || out.cancelled {
+                crate::crop_ui::bar::committed(app, out.committed);
+            }
+        }
         End::PerspectiveCrop => crate::perspective_crop_ui::committed(app, out),
         End::Retouch => crate::retouch_ui::bar::answer(app, tool, out.committed, out.cancelled),
         End::Type => {
@@ -130,7 +133,7 @@ fn answer(app: &mut PhotocraftApp, ui: &egui::Ui, tool: Tool, end: End, out: &Ba
 }
 
 /// The bar's members in order: Home, the tool icon, then the active tool's options.
-fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>) {
+fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     lead(app, ui);
     if app.ui.transform.is_some() {
         crate::transform_tool::options_bar(app, ui);
@@ -149,27 +152,25 @@ fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>) {
     crate::paint_mouse::sync_tool_brush(app);
     if (tool.is_brushlike() && !matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser)) || tool == Tool::QuickSelection {
         crate::brush_picker::show_field(ui, app, true);
-        crate::brush_picker::settings_toggle(app, ui);
+        crate::brush_picker::settings_toggle(ui, app);
         Divider::vertical().show(ui);
     }
     if matches!(tool, Tool::CloneStamp | Tool::PatternStamp | Tool::HistoryBrush | Tool::Healing | Tool::ArtHistoryBrush) {
         stamp_members(app, ui, tool);
         Divider::vertical().show(ui);
     }
-    // PLAN: the return of `eraser_ui::options_bar`, `retouch_ui::bar::options_bar` and `artboard_tool::bar::options_bar` is
-    // assumed to be "the tool's bar was drawn", as the calls they replace.
-    if crate::eraser_ui::options_bar(app, ui, tool)
+    if crate::eraser_ui::options_bar(ui, app, tool)
         || crate::retouch_ui::bar::options_bar(ui, app, tool)
         || crate::vector_ui::options_bar(app, ui, tool)
         || crate::analysis::bars::options(app, ui, tool)
-        || crate::slice_ui::options_bar(app, ui, tool)
+        || crate::slice_ui::options_bar(ui, app, tool)
         || crate::frame_tool::options_bar(app, ui, tool)
-        || crate::artboard_tool::bar::options_bar(app, ui, cx)
+        || crate::artboard_tool::options_bar(app, ui, tool)
     {
         return;
     }
     match tool {
-        Tool::Crop => crate::crop_ui::bar(app, ui),
+        Tool::Crop => crate::crop_ui::bar::bar(app, ui),
         Tool::PerspectiveCrop => crate::perspective_crop_ui::options(app, ui),
         Tool::Gradient => crate::gradient_ui::bar(app, ui),
         tool if is_type_tool(tool) => crate::type_tool::options_bar(app, ui),
@@ -177,7 +178,7 @@ fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>) {
     }
     let _ = paint::members(app, ui, tool) || selection::members(app, ui, tool);
     fill::members(app, ui);
-    navigate::members(app, ui, cx);
+    navigate::members(app, ui);
 }
 
 /// The Home button and the tool's icon with its Reset Tool and Reset All Tools menu.
@@ -191,8 +192,8 @@ fn lead(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.ui.chrome.home = if on { None } else { Some(documents) };
     }
     // The tool picker is greyed while warping, as in the reference.
-    let warping = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_some());
-    let tool = BarTool::new(IconId::new(icons::tool_icon(app.ui.tool)), tl!(app.ui.tool.label()).to_owned()).enabled(!warping).show(ui);
+    let warping = app.ui.transform.as_ref().is_some_and(|t| t.session.warp().is_some());
+    let tool = BarTool::new(icons::tool_icon(app.ui.tool), tl!(app.ui.tool.label()).to_owned()).enabled(!warping).show(ui);
     // Photoshop: right-click the tool icon for Reset Tool / Reset All Tools.
     let rows = [Entry::new(Reset::Tool, tl!("Reset Tool").to_owned()), Entry::new(Reset::All, tl!("Reset All Tools").to_owned())];
     if let Some(reset) = Menu::context(tl!("Tool").to_owned(), &tool.response).pick(ui, &rows).picked
@@ -270,7 +271,7 @@ pub(super) fn number_field(ui: &mut egui::Ui, label: &str, value: f32, range: Ra
     let events = labelled(ui, label, |ui| {
         let field = NumberField::new(label.to_owned(), Bind::given(Some(f64::from(value)))).range(range.clone()).scrub_by_label();
         let field = if unit.is_empty() { field } else { field.unit(unit) };
-        field.show(ui).events
+        field.show(ui).events.clone()
     });
     events.unwrap_or_default().filter_map(|v| v.map(|v| v as f32))
 }

@@ -212,7 +212,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         run: super::brush_panel::run_fired,
         ..floating("brushSettings", || tl!("Brush Settings").to_string(), "brush-cleaning", [520.0, 460.0], super::brush_settings::brush_settings)
     },
-    floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], crate::menus::modifier_keys::panel),
+    floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], crate::modifier_keys::panel),
     floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], crate::gradient_ui::editor::show),
     floating("measurementLog", || tl!("Measurement Log").to_string(), "ruler", [620.0, 320.0], crate::tools::analysis::log_panel::body),
     floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], crate::tools::analysis::notes_panel::body),

@@ -216,7 +216,7 @@ fn label_override(key: &str) -> Option<&'static str> {
 }
 
 /// The English label of a stored choice value (`windowsInk` -> "Windows Ink (default)").
-fn choice_label(v: &str) -> String {
+pub(super) fn choice_label(v: &str) -> String {
     match v {
         "windowsInk" => "Windows Ink (default)".into(),
         "winTab" => "WinTab".into(),

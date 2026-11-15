@@ -174,7 +174,7 @@ pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm:
     }
     // The hosted filter dialog carries the target as its captured value; the recorded parameters
     // overlay the schema defaults, not the user's last-used values.
-    if let Err(e) = crate::filter_dialog::open_smart_edit(app, &f.command, &f.params, target) {
+    if let Err(e) = crate::filter_dialog::open_smart_edit(app, &f.command, &f.params.as_object().cloned().unwrap_or_default(), target) {
         crate::notices::error(app, e);
     }
 }
@@ -197,7 +197,7 @@ pub fn preview_command<'a>(key: &str, command: &'a str, captured: &Value) -> &'a
 pub fn confirm_command(app: &PhotocraftApp, captured: &Value, command: String, params: Value) -> Result<(String, Value), String> {
     // One builder for the preview and for OK, so the two cannot differ.
     if crate::smart_filter_dialog::is_target(captured) {
-        return crate::smart_filter_dialog::params_command(app, captured, command, params);
+        return crate::smart_filter_dialog::params_command(app, captured, &command, params);
     }
     Ok((command, params))
 }

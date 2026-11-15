@@ -31,6 +31,8 @@ pub struct Runtime {
     recovery_queue: VecDeque<crate::Recoverable>,
     recovery_pending: Option<(JobId, String)>,
     log_len: usize,
+    /// The preferences revision last handed to the settings writer.
+    saved_rev: u64,
     /// The open Preferences window. It lives here, not in `UiState`, because its document is not serialisable.
     pub(crate) window: Option<dialogs::PrefsSession>,
     /// The open Keyboard Shortcuts and Menus window.

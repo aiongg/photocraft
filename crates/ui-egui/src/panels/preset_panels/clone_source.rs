@@ -27,7 +27,7 @@ fn edit(app: &mut PhotocraftApp, command: &str, mut params: Value, gesture: Opti
 /// A number field of `value`: the value an edit landed on with its gesture, `None` when nothing changed.
 fn number(ui: &mut egui::Ui, label: &str, value: f64, range: std::ops::RangeInclusive<f64>, unit: UnitKind) -> Option<(f64, Option<GestureId>)> {
     let mut shown = Some(value);
-    let out = NumberField::new(label, Bind::bound(&mut shown)).range(range).unit_kind(unit).show(ui);
+    let out = NumberField::new(label.to_owned(), Bind::bound(&mut shown)).range(range).unit_kind(unit).show(ui);
     let landed = (*out.events.landed()?)?;
     ((landed - value).abs() > 1e-9).then(|| (landed, out.events.last().and_then(EditEvent::id)))
 }
@@ -35,7 +35,7 @@ fn number(ui: &mut egui::Ui, label: &str, value: f64, range: std::ops::RangeIncl
 /// A toggle button of `value`: the new state when a click changed it.
 fn toggle(ui: &mut egui::Ui, label: &str, value: bool) -> Option<bool> {
     let mut on = value;
-    let out = ToggleButton::new(label, Bind::bound(&mut on)).show(ui);
+    let out = ToggleButton::new(label.to_owned(), Bind::bound(&mut on)).show(ui);
     out.events.landed().copied().filter(|&now| now != value)
 }
 

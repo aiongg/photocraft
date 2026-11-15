@@ -114,7 +114,7 @@ fn save_failed(app: &mut PhotocraftApp, error: &str) {
     app.ui.status = crate::i18n::fmt(tl!(template), &[("error", error)]);
     app.ui.status_error = true;
     let lines = vec![error.to_string(), "PhotoCraft keeps retrying; until a save succeeds, preference changes are lost when it closes.".into()];
-    crate::notices::post(app, SAVE_FAILED_TITLE, lines, true, None);
+    crate::notices::post(app, SAVE_FAILED_TITLE, lines, craft::theme::variant::Tone::Bad, None);
 }
 
 /// A preferences write succeeded: after a failure, say so and take the notice down.

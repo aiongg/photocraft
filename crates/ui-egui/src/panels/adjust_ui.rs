@@ -11,7 +11,7 @@ use craft::behavior::EditEvent;
 use craft::cms::lutfile::{LutError, LutFile, write_cube};
 use craft::color::ui::{LutChoice, LutPicker};
 use craft::ui::choice::{Radio, RadioGroup, Switch};
-use craft::ui::contract::{Bind, Show, ShowContainer};
+use craft::ui::contract::{Bind, Props as _, Show, ShowContainer};
 use photocraft_doc::{Adjustment, LayerId};
 use serde_json::{Value, json};
 

@@ -1,4 +1,3 @@
-use super::fields::color_of;
 use super::{AppearanceMode, Color32, PhotocraftApp, json, prefs};
 use crate::theme::AppTheme;
 use craft::menu::{ThemeChoice, ThemeLabels, ThemeMenu, ThemeRow};
@@ -28,7 +27,7 @@ pub fn pasteboard_color(app: &PhotocraftApp) -> Option<Color32> {
         CanvasColor::DarkGray => Color32::from_gray(40),
         CanvasColor::MediumGray => Color32::from_gray(83),
         CanvasColor::LightGray => Color32::from_gray(184),
-        CanvasColor::Custom => color_of(&i.canvas_custom_color),
+        CanvasColor::Custom => prefs::parse_hex(&i.canvas_custom_color).map_or(Color32::GRAY, |c| Color32::from_rgb(c[0], c[1], c[2])),
     })
 }
 

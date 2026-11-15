@@ -1,8 +1,11 @@
+use craft::behavior::IconId;
 use craft::theme::variant::Tone;
 use craft::ui::contract::Show as _;
+use craft::ui::display::Icon;
 use craft::ui::notices::{Notice, NoticeLayout};
+use craft::ui::primitives::IconSpec;
 
-use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, icons, vec2};
+use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, vec2};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -14,7 +17,7 @@ pub(crate) fn blend_options(groups: bool, current: BlendMode) -> Vec<(BlendMode,
 }
 
 pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    use craft::layers::ui::panel::{LayersDrag, LayersPanel};
+    use craft::layers::ui::panel::LayersPanel;
     use craft::layers::ui::thumbs::LayerThumb;
     use craft::ui::contract::Bind;
     use craft::ui::primitives::textures::{ThumbnailOptions, Thumbnails};
@@ -22,13 +25,8 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     use super::layers_tree::{self, PhotoLayers, PhotoThumbs};
 
     // A Move-way pick of a layer opens its groups only when the Move option says so (#11381).
-    let reveal = crate::layer_reveal::track(app, ui.ctx());
+    let reveal = crate::layer_reveal::take(app);
     let ctx = ui.ctx().clone();
-    // A Layers panel row drag can be dropped on another document's tab (#589).
-    if let Some(drag) = craft::ui::runtime::drag::active::<LayersDrag<LayerId>>(&ctx) {
-        let layers: Vec<LayerId> = drag.layers().into_iter().copied().collect();
-        crate::layer_transfer::begin_from_panel(app, &ctx, &layers);
-    }
     // Thumbnail Contents is the clip preference alone, so the panel reads it each pass.
     app.ui.layers_settings.options.thumbnail_contents = crate::layers_panel_ui::thumbnail_contents(app);
     let Some(st) = app.session.active() else {
@@ -82,10 +80,11 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 /// The small down-arrow makes it clear that the footer icon expands into a menu.
-fn footer_menu_arrow(ui: &egui::Ui, rect: Rect) {
-    let t = Tokens::get(ui.ctx());
+fn footer_menu_arrow(ui: &mut egui::Ui, rect: Rect) {
     let arrow = Rect::from_min_size(rect.right_bottom() - vec2(11.0, 10.0), vec2(9.0, 9.0));
-    icons::paint(ui, arrow, "chevron-down", 8.0, t.text_dim);
+    ui.scope_builder(egui::UiBuilder::new().max_rect(arrow), |ui| {
+        Icon::new(IconSpec::svg(IconId::new("chevron-down"))).show(ui);
+    });
 }
 
 /// Photoshop's italic "fx" footer button (no icon-font equivalent).

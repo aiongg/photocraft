@@ -237,11 +237,11 @@ fn target_at(app: &PhotocraftApp, p: egui::Pos2) -> Option<(usize, Option<[f64; 
     // The document point under `p` in document `d`'s view of `rect`.
     let doc_point = |d: usize, rect: egui::Rect| -> Option<[f64; 2]> {
         let view = app.ui.views.get(d)?;
-        let canvas = view.canvas_view(crate::rulers::content_rect(app, rect), app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect());
+        let canvas = view.canvas_view(rect, app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect());
         let at = canvas.to_doc(p);
         Some([at.x, at.y])
     };
-    match crate::canvas::tabs::arranged_cells(app, app.last_canvas_rect) {
+    match crate::canvas::arranged_cells(app, app.last_canvas_rect) {
         Some(cells) => cells.into_iter().find(|(_, r)| r.contains(p)).map(|(d, r)| (d, doc_point(d, r.shrink(1.0)))),
         None => {
             let d = app.session.active_index()?;

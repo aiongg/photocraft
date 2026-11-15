@@ -108,7 +108,7 @@ fn answered(app: &mut PhotocraftApp, answer: OfferAnswer) {
         app,
         "Keyboard shortcuts imported",
         vec!["Your keyboard shortcut set {set} is in use here: {n} shortcuts differ from the defaults. Edit › Keyboard Shortcuts shows them; Reset All to Defaults undoes this.".to_owned()],
-        false,
+        craft::theme::variant::Tone::Neutral,
         None,
     );
     if let Some(n) = app.ui.notices.iter_mut().find(|n| n.id == id) {

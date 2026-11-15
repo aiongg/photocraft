@@ -117,12 +117,12 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
             LayerCompsEvent::Select(id) => app.ui.layer_comp_selected = Some(id as u32),
             LayerCompsEvent::Apply(comp) => run(app, "layerComp.apply", json!({ "comp": comp })),
-            LayerCompsEvent::Rename { comp, name } => run(app, "layerComp.rename", json!({ "comp": comp, "name": name })),
-            LayerCompsEvent::Reorder { comp, index } => {
+            LayerCompsEvent::Rename { comp, name, .. } => run(app, "layerComp.rename", json!({ "comp": comp, "name": name })),
+            LayerCompsEvent::Reorder { comp, index, .. } => {
                 app.ui.layer_comp_selected = Some(comp as u32);
                 run(app, "layerComp.reorder", json!({ "comp": comp, "index": index }));
             }
-            LayerCompsEvent::SetOption { comps, option, edit } => {
+            LayerCompsEvent::SetOption { comps, option, edit, .. } => {
                 for (id, p) in option_commands(&comps, option, &edit) {
                     run(app, id, p);
                 }

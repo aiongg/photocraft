@@ -560,8 +560,7 @@ pub(crate) fn row_menu(tree: &PhotoLayers<'_>, target: &MenuTarget<LayerId>) -> 
     let thumbnail_items = |out: &mut Vec<Entry<String>>| {
         let current = app.ui.layers_settings.options.thumbnail_size;
         for (size, label) in thumbnail_sizes() {
-            // PLAN: assumed `crate::layers_panel_ui::thumb_size_key(ThumbSize) -> &'static str` (panels-w23), the key `menu_pick` parses
-            let value = crate::layers_panel_ui::thumb_size_key(size);
+            let value = crate::layers_panel_ui::size_key(size);
             out.push(Entry::new(format!("{THUMB_SIZE}{value}"), label.to_string()).checked(current == size));
         }
         out.push(Entry::separator());

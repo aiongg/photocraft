@@ -136,7 +136,7 @@ impl Pane<'_> {
     /// A number row (caption, field, slider) showing `shown`; whether it was edited. Typed and dragged values
     /// land on whole units.
     fn number(&mut self, ui: &mut Ui, label: &str, shown: &mut f64, reset: f64, s: Shown, enabled: bool) -> bool {
-        let mut field = SliderField::new(label, Bind::bound(shown).reset(reset), s.min..=s.max).step(1.0).enabled(enabled);
+        let mut field = SliderField::new(label.to_owned(), Bind::bound(shown).reset(reset), s.min..=s.max).step(1.0).enabled(enabled);
         if let Some(unit) = s.unit {
             field = field.unit_kind(unit);
         }
@@ -168,15 +168,15 @@ impl Pane<'_> {
     }
 
     fn check(&mut self, ui: &mut Ui, label: &str, v: &mut bool) -> bool {
-        let edit = Checkbox::new(Bind::bound(v)).label(label).show(ui);
+        let edit = Checkbox::new(Bind::bound(v)).label(label.to_owned()).show(ui);
         self.out.note(&edit)
     }
 
     /// `label`'s select over the mask modes.
     fn mode(&mut self, ui: &mut Ui, label: &str, mode: &mut MaskMode) {
         let entries: Vec<Entry<MaskMode>> = MASK_MODES.iter().map(|(m, l)| Entry::new(m.clone(), tl!(*l).to_string())).collect();
-        Field::new(label).show(ui, |ui, _| {
-            let edit = Select::new(label, Bind::bound(&mut *mode), &entries).show(ui);
+        Field::new(label.to_owned()).show(ui, |ui, _| {
+            let edit = Select::new(label.to_owned(), Bind::bound(&mut *mode), &entries).show(ui);
             self.out.note(&edit);
         });
     }

@@ -4,10 +4,11 @@
 
 use craft::theme::variant::Tone;
 use craft::theme::{ModeChoice, ThemeId};
-use craft::theme_store::{AppearancePage, SelectionChange, SuiteClient};
+use craft::theme_store::ui::AppearancePage;
+use craft::theme_store::{SelectionChange, SuiteClient};
 use craft::ui::buttons::Button;
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Entry, Show as _};
+use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
 use craft::ui::display::Text;
 use craft::ui::form::Field;
 use craft::ui::pickers::Select;
@@ -128,7 +129,7 @@ fn memory_percent_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
     let mut percent = Some(f64::from(stored.unwrap_or(70)));
     let (was_on, was) = (on, percent);
     ui.horizontal(|ui| {
-        Checkbox::new(tl!("Memory Usage Percent"), Bind::bound(&mut on)).show(ui);
+        Checkbox::new(Bind::bound(&mut on)).label(tl!("Memory Usage Percent")).show(ui);
         NumberField::new(tl!("Memory Usage Percent"), Bind::bound(&mut percent)).range(1.0..=95.0).unit("%").enabled(on).show(ui);
     });
     if (on, percent) == (was_on, was) {
@@ -292,7 +293,7 @@ fn scratch_disks_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
         let mut on = disk.get("enabled").and_then(Value::as_bool).unwrap_or(false);
         let mut path = disk.get("path").and_then(Value::as_str).unwrap_or("").to_string();
         ui.horizontal(|ui| {
-            Checkbox::new(tl!("Enabled"), Bind::bound(&mut on)).id_salt(("disk-enabled", i)).show(ui);
+            Checkbox::new(Bind::bound(&mut on)).label(tl!("Enabled")).id_salt(("disk-enabled", i)).show(ui);
             TextField::new(tl!("Path"), Bind::bound(&mut path)).id_salt(("disk-path", i)).show(ui);
         });
         disk["enabled"] = json!(on);
@@ -308,7 +309,7 @@ fn scratch_disks_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
             tl!("The current scratch directory ({path}) doesn't report its free space, so PhotoCraft can't stop before it fills up, and large files get no extra room from it without a Scratch Size Limit. This warning applies to the current configuration; changes above take effect on Apply or OK. Set a limit or use a local disk."),
             &[("path", &dir)],
         );
-        Text::new(warning).tone(Tone::Warning).show(ui);
+        Text::new(warning).tone(Tone::Warn).show(ui);
     }
     if disks != before {
         draft.set(SCRATCH_DISKS, &disks);

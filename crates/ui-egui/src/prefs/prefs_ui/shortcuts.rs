@@ -15,7 +15,7 @@ use craft::keymap::{Builtins, CommandRef, ImportOptions, Keymap, NoneDefined, Ov
 use craft::menu::Row;
 use craft::menu::shortcuts::{Area, ConflictMode, DialogState, DialogTab, Format, Options, Outcome, ShortcutWords, ShortcutsDialog, kys_error_text};
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Entry, Show as _};
+use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
 use craft::ui::pickers::Select;
 use craft::ui::runtime::env::Env;
 use craft::ui::runtime::windows;
@@ -102,8 +102,7 @@ pub fn open(app: &mut PhotocraftApp, tab: u64) {
     }
     let prefs = app.session.prefs();
     let session = ShortcutsSession {
-        // `DialogState::with_tab` is the framework row of R105; the app tab is named by its `DialogTab` id.
-        state: DialogState::new().with_tab((tab == 1).then_some("menus")),
+        state: if tab == 1 { DialogState::new().with_tab("menus") } else { DialogState::new() },
         profiles: profiles_of(prefs),
         keymap: draft_keymap(app),
         menus: MenusDraft::of(&prefs.menus),

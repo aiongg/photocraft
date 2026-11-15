@@ -211,7 +211,7 @@ fn lasso(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
 /// The Magnetic Lasso's Width, Contrast, Frequency and pen-pressure toggle.
 fn magnetic_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let o = &app.ui.tool_options;
-    let (width, contrast, frequency, pressure) = (f64::from(o.magnetic_width), f64::from(o.magnetic_contrast), f64::from(o.magnetic_frequency), o.magnetic_pressure);
+    let (width, contrast, frequency, pressure) = (f64::from(o.magnetic.width), f64::from(o.magnetic.contrast), f64::from(o.magnetic.frequency), o.magnetic.pressure_width);
     let width = number(ui, "magnetic-width", label("Width"), width, 1.0..=256.0, Some(UnitKind::Pixels), Some(label("Follows only edges this close to the pointer ([ and ] change it)")));
     let contrast = number(
         ui,
@@ -231,16 +231,16 @@ fn magnetic_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .copied();
     let o = &mut app.ui.tool_options;
     if let Some(v) = width {
-        o.magnetic_width = v as f32;
+        o.magnetic.width = v as f32;
     }
     if let Some(v) = contrast {
-        o.magnetic_contrast = v as f32;
+        o.magnetic.contrast = v as f32;
     }
     if let Some(v) = frequency {
-        o.magnetic_frequency = v as f32;
+        o.magnetic.frequency = v as f32;
     }
     if let Some(on) = toggled {
-        o.magnetic_pressure = on;
+        o.magnetic.pressure_width = on;
     }
 }
 

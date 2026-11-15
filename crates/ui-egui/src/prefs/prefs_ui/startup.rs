@@ -89,7 +89,7 @@ fn repair_invalid(app: &mut PhotocraftApp, reset: &[craft::settings::SectionErro
         "The preferences file held values PhotoCraft can't read for {paths}. Those settings are back to their defaults; the rest of your preferences loaded.",
     );
     // Notices keep their English source and are translated when drawn.
-    let id = crate::notices::post(app, title, vec![line.into()], false, None);
+    let id = crate::notices::post(app, title, vec![line.into()], craft::theme::variant::Tone::Neutral, None);
     if let Some(notice) = app.ui.notices.iter_mut().find(|n| n.id == id) {
         notice.args.push(("paths".into(), paths));
     }

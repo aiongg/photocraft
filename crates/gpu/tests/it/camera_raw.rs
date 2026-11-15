@@ -16,6 +16,7 @@ struct Case {
 }
 
 /// A [`Case`] with the named fields set: `seed`, `pixel_scale` and `encoding_gamma` go to the inputs, the rest to the settings.
+/// A bare field name takes the local of that name.
 macro_rules! cr {
     (@set $s:ident;) => {};
     (@set $s:ident; seed: $v:expr $(, $($rest:tt)*)?) => {
@@ -32,6 +33,10 @@ macro_rules! cr {
     };
     (@set $s:ident; $f:ident : $v:expr $(, $($rest:tt)*)?) => {
         $s.p.$f = $v;
+        cr!(@set $s; $($($rest)*)?);
+    };
+    (@set $s:ident; $f:ident $(, $($rest:tt)*)?) => {
+        $s.p.$f = $f;
         cr!(@set $s; $($($rest)*)?);
     };
     ($($t:tt)*) => {{

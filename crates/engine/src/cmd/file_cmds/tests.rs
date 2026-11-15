@@ -711,7 +711,8 @@ fn batch_quiet_raw_applies_prior_settings_and_workflow_without_touching_inputs()
     let bytes = DngSpec::cfa(w, h, mosaic(&scene(w, h), w, [0, 1, 1, 2], 0, 65535)).build();
     std::fs::write(&path, &bytes).unwrap();
     let sidecar = join(&dir, "raw.xmp");
-    let settings = photocraft_algo::camera_raw::CameraRaw { exposure: 1.0, ..Default::default() };
+    let mut settings = photocraft_algo::camera_raw::CameraRaw::default();
+    settings.exposure = 1.0;
     let xmp = photocraft_io::camera_raw_xmp::save(&settings);
     std::fs::write(&sidecar, &xmp).unwrap();
     let mut s = Session::new();

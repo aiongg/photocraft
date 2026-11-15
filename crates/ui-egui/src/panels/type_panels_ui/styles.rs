@@ -52,17 +52,15 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool) {
         .text_selected(text_selected)
         .empty(tl!("No document"))
         .show(ui);
-    // PLAN: assumed `Selection<u64>::iter() -> impl Iterator<Item = &u64>` in list order
-    let highlighted: Vec<u64> = rows.iter().map(|r| r.id).filter(|id| selection.iter().any(|s| s == id)).collect();
+    let highlighted: Vec<u64> = rows.iter().map(|r| r.id).filter(|id| selection.contains(id)).collect();
     app.ui.type_panels.style_selection[kind_index] = selection;
 
     if let Some(message) = &output.status {
-        // PLAN: assumed `Label: Display` and `craft::ui::variant::Tone::Bad`
-        app.ui.status = message.text.to_string();
-        app.ui.status_error = matches!(message.tone, craft::ui::variant::Tone::Bad);
+        app.ui.status = message.text.as_str().to_owned();
+        app.ui.status_error = matches!(message.tone, craft::theme::variant::Tone::Bad);
     }
     match output.action {
-        Some(TextStyleAction::Apply { id, clear_overrides }) => {
+        Some(TextStyleAction::Apply { id, clear_overrides, .. }) => {
             let mut p = tgt.clone();
             p["id"] = json!(id);
             p["clearOverrides"] = json!(clear_overrides);
@@ -74,7 +72,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui, paragraph: bool) {
         Some(TextStyleAction::Redefine) => {
             super::run(app, &format!("{prefix}.redefine"), tgt.clone());
         }
-        Some(TextStyleAction::New { from_selection }) => {
+        Some(TextStyleAction::New { from_selection, .. }) => {
             let mut p = tgt.clone();
             p["fromSelection"] = json!(from_selection);
             if let Some(r) = super::run(app, &format!("{prefix}.new"), p)

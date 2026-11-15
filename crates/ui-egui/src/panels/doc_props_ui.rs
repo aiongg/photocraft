@@ -5,7 +5,7 @@
 use craft::behavior::Mixed;
 use craft::keymap::CommandRef;
 use craft::ui::buttons::{Button, ToggleButton};
-use craft::ui::contract::{Bind, Entry, Show, ShowContainer};
+use craft::ui::contract::{Bind, Entry, Props as _, Show, ShowContainer};
 use craft::ui::display::Text;
 use craft::ui::form::Field;
 use craft::ui::pickers::Select;

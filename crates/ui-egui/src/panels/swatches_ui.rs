@@ -12,18 +12,17 @@ use std::ffi::OsStr;
 
 use serde_json::{Value, json};
 
-// PLAN: assumed paths of the framework items (color swatches, presets files, cms, ui contract and widgets).
-use craft::cms::CmykConverter;
+use craft::cms::convert::CmykConverter;
 use craft::color::palette::SwatchColor;
 use craft::color::ui::PickedColor;
-use craft::color::ui::swatches::{SwatchAt, SwatchEdit, SwatchKey, SwatchesCommand, SwatchesMenu, SwatchesPanel, SwatchesWords};
+use craft::color::ui::{SwatchAt, SwatchEdit, SwatchKey, SwatchesCommand, SwatchesMenu, SwatchesPanel, SwatchesWords};
 use craft::theme::Srgba;
 use craft::theme::variant::Tone;
 use craft::ui::contract::{Bind, CommandSet};
 use craft::ui::menu::PanelRow;
 use craft::ui::patterns::presets::{PresetFileEvent, PresetFileRequest, PresetWords};
 use craft::ui::runtime::commands::{CommandRef, CommandState};
-use craft::ui::widgets::StatusMessage;
+use craft::ui::bars::StatusMessage;
 
 use crate::PhotocraftApp;
 
@@ -60,8 +59,7 @@ fn cmyk_converter(app: &PhotocraftApp) -> Option<CmykConverter> {
 /// The words of the panel and of its file entries, from the context's environment, so the names a menu command makes
 /// and the status lines follow the interface language.
 fn words(ctx: &egui::Context) -> (std::sync::Arc<SwatchesWords>, std::sync::Arc<PresetWords>) {
-    // PLAN: assumed `Env::of_context(&egui::Context) -> Env`; the panel reads the same words through `Env::of(ui)`.
-    let env = craft::ui::runtime::env::Env::of_context(ctx);
+    let env = craft::ui::runtime::env::Env::of_root(ctx);
     (env.words::<SwatchesWords>(), env.words::<PresetWords>())
 }
 
@@ -208,16 +206,30 @@ pub fn import_bytes(app: &mut PhotocraftApp, name: &str, bytes: &[u8], replace: 
 
 /// The status line shows a framework status message.
 fn show_status(app: &mut PhotocraftApp, status: &StatusMessage) {
-    // PLAN: assumed `Label: Display` for the message text.
-    app.ui.status = status.text.to_string();
+    app.ui.status = status.text.as_str().to_owned();
     app.ui.status_error = status.tone == Tone::Bad;
 }
 
-/// Answers a file dialog a menu command asked for through the host file service, then handles the result.
-fn answer_file(app: &mut PhotocraftApp, ctx: &egui::Context, request: PresetFileRequest) {
-    // PLAN: assumed top-w28 entry `preset_files_ui::answer(app, &request) -> Option<PresetFileEvent>` over the `Files` service.
-    if let Some(event) = crate::preset_files_ui::answer(app, &request) {
-        apply_file_event(app, ctx, &event);
+/// Answers a file dialog a menu command asked for through the app's pickers: a pick to read imports through the engine,
+/// a pick to write saves the export and says so in the status line.
+fn answer_file(app: &mut PhotocraftApp, request: PresetFileRequest) {
+    let started = match request {
+        PresetFileRequest::Open { extensions, replace, .. } => {
+            let extensions: Vec<&str> = extensions.iter().map(String::as_str).collect();
+            app.pick_file_bytes_filtered(&extensions, move |app, name, bytes| import_bytes(app, &name, &bytes, replace))
+        }
+        PresetFileRequest::Save { file_name, bytes, .. } => app.pick_save(&file_name, move |app, path| {
+            let write = app.services.write.as_mut().ok_or("no writer configured")?;
+            write(&path, &bytes)?;
+            app.ui.status_error = false;
+            app.ui.status = crate::i18n::fmt(tl!("Exported to {file}"), &[("file", &crate::file_open::display_name(&path))]);
+            Ok(json!({"path": path}))
+        }),
+        _ => Ok(Value::Null),
+    };
+    if let Err(e) = started {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
 }
 
@@ -231,7 +243,6 @@ pub(crate) fn apply_file_event(app: &mut PhotocraftApp, ctx: &egui::Context, eve
         return;
     }
     let (swatch_words, preset_words) = words(ctx);
-    // PLAN: assumed `Default` for the format of the notes.
     let out = SwatchesPanel::apply_file(&mut app.ui.swatches, event, &swatch_words, &preset_words, &Default::default());
     match &out.status {
         Some(status) => show_status(app, status),
@@ -262,7 +273,7 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, command: &
         apply_edit(app, edit);
     }
     if let Some(request) = out.file {
-        answer_file(app, ctx, request);
+        answer_file(app, request);
     }
     if let Some(status) = &out.status {
         show_status(app, status);
