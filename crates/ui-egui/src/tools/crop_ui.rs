@@ -199,6 +199,11 @@ pub fn pending(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && app.canvas_tools.crop.tool.session().pending()
 }
 
+/// The frame is the untouched default one, not a drawn, moved, resized or turned box.
+pub(crate) fn is_default_frame(app: &PhotocraftApp) -> bool {
+    app.canvas_tools.crop.tool.session().is_default()
+}
+
 /// A drag of the frame or a Straighten line runs.
 pub(crate) fn dragging(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && (app.canvas_tools.crop.tool.dragging() || app.canvas_tools.crop.tool.session().straighten().on())

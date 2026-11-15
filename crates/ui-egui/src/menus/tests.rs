@@ -78,7 +78,7 @@ fn proofed(app: &mut PhotocraftApp) {
     use craft::ui::patterns::form_dialogs::{Param, ParamKind};
     let spec = photocraft_engine::commands::find("edit.convertToProfile").unwrap();
     let params = Param::parse_list(spec.params);
-    assert!(matches!(&params[0].kind, ParamKind::Choice { options, .. } if options[0] == "srgb" && !options.iter().any(|v| v.contains('/'))));
+    assert!(matches!(&params[0].kind, ParamKind::Choice { options, .. } if options[0].0 == "srgb" && !options.iter().any(|(v, _)| v.contains('/'))));
 }
 
 fn painted_layer(app: &mut PhotocraftApp) {

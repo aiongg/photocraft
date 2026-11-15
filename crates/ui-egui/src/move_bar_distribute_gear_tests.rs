@@ -113,6 +113,18 @@ fn show_hover_bounds_from_layers_switches_the_layers_panel_outline() {
     assert_eq!(crate::move_hover::active_outline(&mut app, None, false, false), None);
 }
 
+/// The reveal the Layers panel's next draw takes.
+fn track(app: &mut PhotocraftApp) -> Option<(LayerId, Groups)> {
+    crate::layer_reveal::take(app)
+}
+
+/// Selects `layer` the way a command does: the reveal is filed around it.
+fn select(app: &mut PhotocraftApp, layer: LayerId) {
+    let before = crate::layer_reveal::mark(app);
+    app.run("layer.select", json!({"layer": layer.0})).unwrap();
+    crate::layer_reveal::file(app, before);
+}
+
 #[test]
 fn expand_layer_group_on_click_switches_the_opening_of_closed_parent_groups() {
     for on in [true, false] {
@@ -126,16 +138,15 @@ fn expand_layer_group_on_click_switches_the_opening_of_closed_parent_groups() {
         app.sync_views();
         app.ui.tool = Tool::Move;
         app.ui.tool_options.move_expand_group_on_click = on;
-        let ctx = app.ctx().clone();
-        // The first frame only records the active layer; then a canvas click picks the inner one.
-        assert_eq!(crate::layer_reveal::track(&mut app, &ctx), None);
+        // Nothing is filed yet; then a canvas click picks the inner one.
+        assert_eq!(track(&mut app), None);
         // The Move tool picks the layer under the pointer (Auto-Select targets layers, not groups).
         app.ui.tool_options.move_target = "layer".into();
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 12.0, y: 12.0, pressure: 1.0 }, egui::Modifiers::default());
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Up { x: 12.0, y: 12.0 }, egui::Modifiers::default());
         // The row is still revealed (scrolled to) either way.
         assert_eq!(
-            crate::layer_reveal::track(&mut app, &ctx),
+            track(&mut app),
             Some((inner, if on { Groups::Open } else { Groups::Keep })),
             "Expand layer group on click = {on}"
         );
@@ -144,7 +155,7 @@ fn expand_layer_group_on_click_switches_the_opening_of_closed_parent_groups() {
 
 /// A 64x64 document: `inner` painted at (8..24)^2 inside a closed group, the Background-less
 /// group selected, `tool` current and the gear option set to `on`. The reveal has seen the frame.
-fn closed_group_doc(tool: Tool, on: bool) -> (PhotocraftApp, LayerId, LayerId, egui::Context) {
+fn closed_group_doc(tool: Tool, on: bool) -> (PhotocraftApp, LayerId, LayerId) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
     let inner = paint(&mut app, Rect::new(8, 8, 24, 24));
@@ -156,9 +167,8 @@ fn closed_group_doc(tool: Tool, on: bool) -> (PhotocraftApp, LayerId, LayerId, e
     app.ui.tool = tool;
     app.ui.tool_options.move_expand_group_on_click = on;
     app.ui.tool_options.move_target = "layer".into();
-    let ctx = app.ctx().clone();
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), None);
-    (app, inner, group, ctx)
+    assert_eq!(track(&mut app), None);
+    (app, inner, group)
 }
 
 /// A press and release at (12, 12) with Ctrl/Cmd held (a temporary Move from another tool).
@@ -172,49 +182,49 @@ fn ctrl_click(app: &mut PhotocraftApp) {
 #[test]
 fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_ctrl_click_from_another_tool() {
     // Auto-Select off, so the Ctrl-click is the Move way of picking from the Brush.
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner), "the Ctrl-click picked the layer");
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Keep)), "the group stays closed");
+    assert_eq!(track(&mut app), Some((inner, Groups::Keep)), "the group stays closed");
 }
 
 #[test]
 fn expand_layer_group_on_click_on_opens_the_group_for_a_ctrl_click_from_another_tool() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, true);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, true);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner));
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "the group opens");
+    assert_eq!(track(&mut app), Some((inner, Groups::Open)), "the group opens");
 }
 
 #[test]
 fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_move_tool_click() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Move, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Move, false);
     use crate::canvas::{ToolEvent, tool_event};
     tool_event(&mut app, ToolEvent::Down { x: 12.0, y: 12.0, pressure: 1.0 }, egui::Modifiers::default());
     tool_event(&mut app, ToolEvent::Up { x: 12.0, y: 12.0 }, egui::Modifiers::default());
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner));
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Keep)));
+    assert_eq!(track(&mut app), Some((inner, Groups::Keep)));
 }
 
 #[test]
 fn expand_layer_group_on_click_off_still_opens_the_group_for_other_active_layer_changes() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
-    app.run("layer.select", json!({"layer": inner.0})).unwrap();
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "a command that changes the active layer reveals it");
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    select(&mut app, inner);
+    assert_eq!(track(&mut app), Some((inner, Groups::Open)), "a command that changes the active layer reveals it");
 }
 
 #[test]
 fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_layer() {
     for on in [false, true] {
-        let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, on);
+        let (mut app, inner, group) = closed_group_doc(Tool::Brush, on);
         app.ui.tool_options.move_auto_select = false;
         app.session.execute("layer.setProps", json!({"layer": inner.0, "locks": {"position": true}})).unwrap();
         ctrl_click(&mut app);
         assert_eq!(app.session.active().unwrap().active_layer, Some(inner), "the Ctrl-click picked the locked layer (on = {on})");
         assert_eq!(
-            crate::layer_reveal::track(&mut app, &ctx),
+            track(&mut app),
             Some((inner, if on { Groups::Open } else { Groups::Keep })),
             "Expand layer group on click = {on}"
         );
@@ -223,60 +233,50 @@ fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_la
 
 #[test]
 fn a_pick_marker_the_hidden_layers_panel_never_read_does_not_hide_a_later_command_change() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     // A Move-way pick of the inner layer while the Layers panel draws nothing (no `track`).
     ctrl_click(&mut app);
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner));
     // Frames pass without the panel, then commands change the layer twice and land on it again.
     app.frame += 5;
-    app.run("layer.select", json!({"layer": group.0})).unwrap();
-    app.run("layer.select", json!({"layer": inner.0})).unwrap();
+    select(&mut app, group);
+    select(&mut app, inner);
     // The panel is shown again: the change was a command's, so the group opens.
     app.frame += 1;
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "a command change after a stale pick expands the group");
+    assert_eq!(track(&mut app), Some((inner, Groups::Open)), "a command change after a stale pick expands the group");
 }
 
 #[test]
 fn a_pick_marker_survives_any_number_of_frames_while_the_layers_panel_is_hidden() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     app.frame += 5;
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Keep)), "the pick is still the latest change of the active layer");
+    assert_eq!(track(&mut app), Some((inner, Groups::Keep)), "the pick is still the latest change of the active layer");
 }
 
 #[test]
 fn commands_after_a_pick_in_the_same_frame_or_the_next_make_it_a_command_change() {
     for gap in [0, 1] {
-        let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
+        let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
         app.ui.tool_options.move_auto_select = false;
         ctrl_click(&mut app);
         app.frame += gap;
-        app.run("layer.select", json!({"layer": group.0})).unwrap();
-        app.run("layer.select", json!({"layer": inner.0})).unwrap();
-        assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "selects {gap} frame(s) after the pick reveal the layer");
+        select(&mut app, group);
+        select(&mut app, inner);
+        assert_eq!(track(&mut app), Some((inner, Groups::Open)), "selects {gap} frame(s) after the pick reveal the layer");
     }
 }
 
 #[test]
 fn a_pick_marker_is_read_once_and_governs_the_next_change_only() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Keep)));
-    app.run("layer.select", json!({"layer": group.0})).unwrap();
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((group, Groups::Open)));
-    app.run("layer.select", json!({"layer": inner.0})).unwrap();
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "a later command change opens the group");
-}
-
-#[test]
-fn direct_selection_calls_after_a_pick_make_it_a_command_change() {
-    let (mut app, inner, group, ctx) = closed_group_doc(Tool::Brush, false);
-    app.ui.tool_options.move_auto_select = false;
-    ctrl_click(&mut app);
-    app.session.select_layer(group).unwrap();
-    app.session.select_layer(inner).unwrap();
-    assert_eq!(crate::layer_reveal::track(&mut app, &ctx), Some((inner, Groups::Open)), "a direct selection away and back is not a pick");
+    assert_eq!(track(&mut app), Some((inner, Groups::Keep)));
+    select(&mut app, group);
+    assert_eq!(track(&mut app), Some((group, Groups::Open)));
+    select(&mut app, inner);
+    assert_eq!(track(&mut app), Some((inner, Groups::Open)), "a later command change opens the group");
 }

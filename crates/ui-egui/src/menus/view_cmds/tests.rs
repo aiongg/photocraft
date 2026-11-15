@@ -83,9 +83,12 @@ fn names_in(dir: &std::path::Path) -> Vec<String> {
 
 /// Fires a view command on the canvas and runs the frame that drains it.
 fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: craft::ui::canvas::ViewCommands) {
-    // PLAN: assumed `app::frame::run(app, ui)` (top-w29's drain)
     craft::ui::runtime::commands::fire(ctx, command, craft::ui::runtime::commands::FireSource::Menu);
-    ctx.run_ui(Default::default(), |ui| crate::app::frame::run(app, ui));
+    ctx.run_ui(Default::default(), |ui| {
+        let mut frame = eframe::Frame::_new_kittest();
+        app.logic_frame(ui.ctx(), &mut frame);
+        app.ui_frame(ui, &mut frame);
+    });
 }
 
 /// The form must list every source first and default to Current only when a document exists.
@@ -137,8 +140,7 @@ fn place_embedded_enablement_does_not_require_native_doc() {
         for has_picker in [true, false] {
             let (mut app, _) = app_with(usize::from(has_doc));
             if has_picker {
-                // PLAN: assumed top-w28's test fake: `Services::files: Option<Arc<dyn Files>>` over `ScriptedFiles`
-                app.services.files = Some(std::sync::Arc::new(craft::host::files::ScriptedFiles::new()));
+                app.services.files = Some(std::sync::Arc::new(craft::host::ScriptedFiles::new()));
             }
             for native_filesystem in [false, true] {
                 let native_doc = native_filesystem && has_doc;
@@ -306,8 +308,7 @@ fn arrange_layouts_floating_windows_and_matching() {
 /// below the zoom at which its shorter side is 2 px, even when the source view is lower.
 #[test]
 fn match_zoom_clamps_to_each_documents_zoom_range() {
-    // PLAN: assumed `ZoomLadder::min(Size)` takes the framework's `Size::new(width, height)`
-    let lowest = craft::behavior::canvas::ZoomLadder::min(craft::behavior::geometry::Size::new(10.0, 10.0)) as f32;
+    let lowest = craft::behavior::canvas::ZoomLadder::min(craft::behavior::kurbo::Size::new(10.0, 10.0)) as f32;
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 10, "height": 10})).unwrap();
     app.run("file.new", json!({"width": 2000, "height": 2000})).unwrap();
@@ -651,7 +652,7 @@ fn a_batch_that_fails_on_its_files_says_which_and_why() {
     let notice = app.ui.notices.get(notices).expect("a notice lists the files");
     assert_eq!(notice.lines.len(), 2);
     // CodeRabbit on #10730: a failure, not a warning, and each file by its whole path.
-    assert!(notice.error && notice.title.ends_with("2 files failed"), "{}", notice.title);
+    assert!(notice.tone == craft::theme::variant::Tone::Bad && notice.title.ends_with("2 files failed"), "{}", notice.title);
     let path = |name: &str| format!("{}: ", dir.join("in").join(name).to_string_lossy());
     assert!(notice.lines[0].starts_with(&path("a.png")) && notice.lines[1].starts_with(&path("b.png")), "{:?}", notice.lines);
     // CodeRabbit on #10730: each line is its file's path, then a reason.
@@ -767,7 +768,6 @@ fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
     let (mut app, ctx) = app_with(1);
     app.ui.tool = crate::Tool::Crop;
     crate::crop_ui::each_pass(&mut app);
-    // PLAN: assumed `crop_ui::is_default_frame(&PhotocraftApp) -> bool` (tools-w14): the pending frame is the untouched default
     let default_frame = |app: &PhotocraftApp| crate::crop_ui::frame(app).is_some() && crate::crop_ui::is_default_frame(app);
     assert!(default_frame(&app));
     for mode in ["fullScreen", "fullScreenWithMenuBar"] {
@@ -793,7 +793,7 @@ fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
 #[test]
 fn esc_in_full_screen_cancels_a_crop_drag_on_the_default_frame() {
     use crate::canvas::testing::{ToolEvent, tool_event};
-    let none = craft::keymap::Mods::NONE;
+    let none = egui::Modifiers::NONE;
     // Inside draws a new box, on the corner handle resizes, outside turns.
     for (what, from) in [("draw", [20.0, 20.0]), ("resize", [100.0, 80.0]), ("turn", [130.0, 110.0])] {
         let (mut app, ctx) = app_with(1);

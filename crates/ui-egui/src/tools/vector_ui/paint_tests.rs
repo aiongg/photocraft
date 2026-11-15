@@ -46,7 +46,7 @@ fn assert_saved_path(saved: &Path, original: &Path) {
 
 /// The drag box of `tool`'s kind from `from` to `to`, no modifiers.
 fn geometry(tool: Tool, from: [f64; 2], to: [f64; 2]) -> ShapeGeometry {
-    let rect = kurbo::Rect::new(from[0], from[1], to[0], to[1]);
+    let rect = craft::behavior::kurbo::Rect::new(from[0], from[1], to[0], to[1]);
     match tool {
         Tool::Rectangle => ShapeGeometry::Rect { rect, radii: [0.0; 4] },
         Tool::EllipseShape => ShapeGeometry::Ellipse { rect },
@@ -293,7 +293,7 @@ fn float_paints_match_preview_creation_native_roundtrip_and_document_depth() {
             app.ui.tool_options.shape_stroke.cap = photocraft_doc::LineCap::Round;
             app.ui.tool_options.shape_stroke.dashes = vec![0.0, 2.0];
             let drag = geometry(tool, [20.0, 20.0], [100.0, 80.0]);
-            let preview = shape_preview(&app, shapes::kind_of(tool), &drag).unwrap();
+            let preview = shapes::shape_preview(&app, shapes::kind_of(tool), &drag).unwrap();
             draw(&mut app, tool, [20.0, 20.0], [100.0, 80.0]);
             let committed = shape(&app).clone();
             assert_eq!(preview.fill, committed.fill);
@@ -324,7 +324,7 @@ fn transparent_and_absent_paints_remain_distinct_and_open_pen_keeps_foreground()
     set_tool_paint(&mut app, false, PaintChange::Color(transparent)).unwrap();
     set_tool_paint(&mut app, true, PaintChange::Color(transparent)).unwrap();
     let drag = geometry(Tool::Rectangle, [20.0, 20.0], [80.0, 70.0]);
-    let preview = shape_preview(&app, shapes::kind_of(Tool::Rectangle), &drag).unwrap();
+    let preview = shapes::shape_preview(&app, shapes::kind_of(Tool::Rectangle), &drag).unwrap();
     assert_eq!(preview.fill, Some(solid_paint(transparent)));
     assert_eq!(preview.stroke.as_ref().unwrap().paint, solid_paint(transparent));
     draw(&mut app, Tool::Rectangle, [20.0, 20.0], [80.0, 70.0]);
@@ -474,7 +474,7 @@ fn tool_gradient_paints_reach_the_preview_and_the_next_shape() {
         assert_eq!(app.ui.tool_options.stroke_width, 3.0, "a gradient enables the stroke");
         assert!(app.ui.tool_options.shape_fill);
         let drag = geometry(Tool::Rectangle, [20.0, 20.0], [100.0, 80.0]);
-        let preview = shape_preview(&app, shapes::kind_of(Tool::Rectangle), &drag).unwrap();
+        let preview = shapes::shape_preview(&app, shapes::kind_of(Tool::Rectangle), &drag).unwrap();
         draw(&mut app, Tool::Rectangle, [20.0, 20.0], [100.0, 80.0]);
         let committed = shape(&app).clone();
         assert_eq!(preview.fill, committed.fill);

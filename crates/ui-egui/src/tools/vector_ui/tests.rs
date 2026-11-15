@@ -1068,7 +1068,7 @@ fn shape_bar_harness(tool: Tool) -> egui_kittest::Harness<'static, PhotocraftApp
 }
 
 /// The fill and stroke of the active shape layer.
-fn active_shape_paint(app: &PhotocraftApp) -> (Option<photocraft_doc::Fill>, Option<photocraft_doc::Stroke>) {
+fn active_shape_paint(app: &PhotocraftApp) -> (Option<photocraft_doc::Fill>, Option<photocraft_doc::vector::ShapeStroke>) {
     let st = app.session.active().unwrap();
     match &st.doc.layer(st.active_layer.unwrap()).unwrap().content {
         LayerContent::Shape(sh) => (sh.fill.clone(), sh.stroke.clone()),

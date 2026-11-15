@@ -52,8 +52,6 @@ use pen::pen_path_op;
 pub use pen::{cancel_stale, pen_commit};
 pub use shapes::is_shape_tool;
 pub(crate) use shapes::{create_geometry, kind_of};
-#[cfg(test)]
-use shapes::shape_geometry;
 
 pub(crate) use host::{VectorTools, remove_last, replace_draft};
 

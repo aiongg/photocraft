@@ -1,7 +1,7 @@
 //! #7942 / #7531: path fields of command dialogs get a Browse… button (Artboards to Files'
 //! folder, Install Plug-in…'s .wasm file) that fills the field from the file service.
 use crate::PhotocraftApp;
-use craft::host::files::{PickKind, Picked, ScriptedFiles};
+use craft::host::{PickKind, Picked, ScriptedFiles};
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui_kittest::{Harness, kittest::Queryable};

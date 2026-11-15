@@ -32,7 +32,7 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         app.run("edit.fill", json!({"color": "#2060c0"})).unwrap();
         app
     });
-    let shown = |h: &Harness<'static, PhotocraftApp>| shown_camera(Some(&h.ctx), CanvasHost::main(0), &h.state().ui.views[0], 1.0).0;
+    let shown = |h: &Harness<'static, PhotocraftApp>| shown_camera(&h.ctx, CanvasHost::main(0), &h.state().ui.views[0], 1.0).0;
     h.run_steps(4);
     h.state_mut().run("view.actualPixels", json!({})).unwrap();
     h.step();

@@ -215,8 +215,10 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Mods, style: ConstrainSt
                     })
                 });
             let active_before = app.session.active().and_then(|st| st.active_layer);
+            let revealed = crate::layer_reveal::mark(app);
             let _ = app.run("layer.pickAt", json!({"x": p[0], "y": p[1], "target": target, "mode": mode, "moveAutoSelect": auto}));
             note_move_pick(app, active_before);
+            crate::layer_reveal::file(app, revealed);
             if locked_hit {
                 return marquee(app, mods.shift, false, false);
             }

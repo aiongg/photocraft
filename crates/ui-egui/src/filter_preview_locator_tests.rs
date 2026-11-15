@@ -116,7 +116,6 @@ fn pointer(h: &mut Harness<'static, PhotocraftApp>, events: Value) {
 #[test]
 fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     let mut h = harness(Some(SMART_SHARPEN), 0.0);
-    // PLAN: assumed `filter_preview_ui::shows(command: &str) -> bool` (dialogs-w25).
     assert!(crate::filter_preview_ui::shows(SMART_SHARPEN), "Smart Sharpen has a preview window");
     assert!(near(centre(&h), [200.0, 150.0]), "it opens centred: {:?}", centre(&h));
     let before = edits(&h);
@@ -175,7 +174,8 @@ fn a_rotated_view_centres_the_preview_on_the_point_under_the_pointer() {
 fn without_a_preview_dialog_the_click_still_reaches_the_tool() {
     let mut h = harness(None, 0.0);
     let before = edits(&h);
-    click(&mut h, screen(&h, [70.0, 230.0]));
+    let at = screen(&h, [70.0, 230.0]);
+    click(&mut h, at);
     let after = edits(&h);
     assert!(after.0 != before.0 && after.1 == before.1 + 1, "the Brush paints one stroke: {before:?} -> {after:?}");
 }

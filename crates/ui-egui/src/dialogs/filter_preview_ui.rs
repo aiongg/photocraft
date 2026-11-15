@@ -169,7 +169,7 @@ fn document_point(picture: Pos2, k: u32) -> [f64; 2] {
 
 /// Whether the dialog of `command` gets the preview pane: Filter menu dialogs, as in Photoshop. Image › Rotation ›
 /// Arbitrary and the adjustment dialogs keep only the on-canvas preview, and Select and Mask is a workspace.
-fn shows(command: &str) -> bool {
+pub(crate) fn shows(command: &str) -> bool {
     command.starts_with("filter.")
 }
 

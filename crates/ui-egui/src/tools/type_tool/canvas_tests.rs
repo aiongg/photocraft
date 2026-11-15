@@ -85,17 +85,17 @@ fn open_swatch_picker(app: &mut PhotocraftApp, request: Option<ColorRequest>) {
     }
 }
 
-fn dialog_set(app: &mut PhotocraftApp, dialog: crate::state::DialogId, field: &str, value: serde_json::Value) {
+fn dialog_set(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId, field: &str, value: serde_json::Value) {
     let ctx = app.ctx().clone();
     app.framework.dialogs.set_json_field(&ctx, dialog, field, value).unwrap();
 }
 
-fn dialog_confirm(app: &mut PhotocraftApp, dialog: crate::state::DialogId) {
+fn dialog_confirm(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId) {
     let ctx = app.ctx().clone();
     crate::dialogs::confirm(app, &ctx, dialog).unwrap();
 }
 
-fn dialog_cancel(app: &mut PhotocraftApp, dialog: crate::state::DialogId) {
+fn dialog_cancel(app: &mut PhotocraftApp, dialog: craft::ui::dialog::DialogId) {
     let ctx = app.ctx().clone();
     crate::dialogs::cancel(app, &ctx, dialog).unwrap();
 }
@@ -139,9 +139,7 @@ fn show_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .anti_alias(TextAntiAlias::Smooth)
         .anti_alias_methods(&ANTI_ALIAS_METHODS)
         .can_warp(true);
-    if let Some(source) = fonts.source() {
-        bar = bar.font_picker(source);
-    }
+    bar = bar.font_picker(fonts.source());
     let mut out = bar.show(ui);
     super::finish_font_state(app, fonts);
     open_swatch_picker(app, out.requests.take_color());
@@ -1403,7 +1401,7 @@ fn the_font_menu_lists_served_families() {
     photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
     let app = new_app();
     let mut state = super::font_state(&app);
-    let source = state.source().expect("the catalog is loaded");
+    let source = state.source();
     assert!(source.served.iter().any(|f| f == "Served Menu Test Serif"));
 }
 

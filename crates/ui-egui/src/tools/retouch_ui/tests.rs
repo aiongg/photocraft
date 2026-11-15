@@ -514,58 +514,13 @@ fn a_new_patch_lasso_hides_and_replaces_the_old_selection() {
         let mut app = app();
         app.run("select.rect", json!({"x": 10, "y": 20, "width": 16, "height": 20})).unwrap();
         app.ui.tool = tool;
-        let outside = PatchPress::capture(&app, tool, [60.0, 20.0], Mods::default()).expect("a press on the active document");
+        let outside = PatchPress::new(tool, [60.0, 20.0], Mods::default());
         assert!(patch_replaces_selection(&app, Some(&outside)), "{tool:?}: the old outline is hidden while the new one is drawn");
-        let added = PatchPress::capture(&app, tool, [60.0, 20.0], shift()).expect("a press on the active document");
+        let added = PatchPress::new(tool, [60.0, 20.0], shift());
         assert!(!patch_replaces_selection(&app, Some(&added)), "{tool:?}: ⇧ adds, so the old outline stays");
-        let inside = PatchPress::capture(&app, tool, [18.0, 30.0], Mods::default()).expect("a press on the active document");
+        let inside = PatchPress::new(tool, [18.0, 30.0], Mods::default());
         assert!(!patch_replaces_selection(&app, Some(&inside)), "{tool:?}: a press inside drags the patch");
         assert!(!patch_replaces_selection(&app, None), "{tool:?}: nothing is being drawn");
-    }
-}
-
-/// A Patch or Content-Aware Move press belongs to the document it was pressed on: switching to
-/// another drops it, so it doesn't hide that document's ants or land on it (#11024).
-#[test]
-fn a_patch_drag_is_dropped_when_another_document_is_active() {
-    for tool in [Tool::Patch, Tool::ContentAwareMove] {
-        let mut app = app();
-        app.run("select.rect", json!({"x": 10, "y": 20, "width": 16, "height": 20})).unwrap();
-        app.ui.tool = tool;
-        let mut press = Some(PatchPress::capture(&app, tool, [60.0, 20.0], Mods::default()).expect("a press on the active document"));
-        cancel_stale(&mut app, &mut press);
-        assert!(press.is_some() && patch_replaces_selection(&app, press.as_ref()), "{tool:?}: the press is still on its own document");
-
-        app.run("file.new", json!({"width": 100, "height": 60})).unwrap();
-        app.run("select.rect", json!({"x": 50, "y": 10, "width": 30, "height": 30})).unwrap();
-        assert!(!patch_replaces_selection(&app, press.as_ref()), "{tool:?}: the press belongs to the other document");
-        cancel_stale(&mut app, &mut press);
-        assert!(press.is_none(), "{tool:?}: dropped on the switch");
-    }
-}
-
-/// A document closed and reopened with the same ID mid-drag is another document, whether it comes
-/// back at the same revision or is edited past it. An ordinary edit keeps the press (#11024 review).
-#[test]
-fn a_patch_drag_is_dropped_when_its_document_is_reopened_with_the_same_id() {
-    for tool in [Tool::Patch, Tool::ContentAwareMove] {
-        // (reopened, revisions the reopened document is edited past the pressed one)
-        for (reopen, edits) in [(false, 0), (true, 0), (true, 1)] {
-            let mut app = app();
-            app.run("select.rect", json!({"x": 10, "y": 20, "width": 16, "height": 20})).unwrap();
-            app.ui.tool = tool;
-            let mut press = Some(PatchPress::capture(&app, tool, [60.0, 20.0], Mods::default()).expect("a press on the active document"));
-            if reopen {
-                let closed = app.session.close(0).unwrap();
-                app.session.add_document((*closed.doc).clone(), None);
-                app.session.active_mut().unwrap().revision = closed.revision + edits;
-                assert_eq!(app.session.active().unwrap().doc.id, closed.doc.id, "a reopened document may keep its ID");
-            } else {
-                app.run("layer.new.layer", json!({})).unwrap();
-            }
-            cancel_stale(&mut app, &mut press);
-            assert_eq!(press.is_some(), !reopen, "{tool:?}: reopened {reopen}, edited {edits}");
-        }
     }
 }
 

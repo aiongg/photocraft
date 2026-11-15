@@ -32,6 +32,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let styles = style_entries();
     let split = app.transform_preview.as_ref().and_then(|pv| pv.split);
     let mut warp_out = WarpFieldsOutput::default();
+    // Held outside the bar's block: the warp slot borrows them for as long as the bar lives.
+    let warp = t.session.warp().map(|w| (warp_values(w), w.on_type));
     let out = {
         let mut bar = TransformBar::new(Label::from(tl!("Free Transform").to_string()), &t.session, Bind::bound(&mut settings)).units(x_text, y_text).size_units(&units);
         if t.content_aware.is_some() {
@@ -42,11 +44,10 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             groups.size = true;
             bar = bar.groups(groups).extra(BarSlot::new(|ui| crate::cas_transform::fields(app, ui, &t)));
         }
-        if let Some(w) = t.session.warp() {
-            let (values, on_type) = (warp_values(w), w.on_type);
+        if let Some((values, on_type)) = &warp {
             bar = bar.warp_fields(BarSlot::new(|ui| {
                 let mut fields = WarpFields::new(&styles, values.clone());
-                if on_type {
+                if *on_type {
                     fields = fields.on_type();
                 }
                 if let Some(armed) = split {

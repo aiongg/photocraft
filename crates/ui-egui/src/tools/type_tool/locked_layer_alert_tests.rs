@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::canvas::testing;
-use crate::dialogs::alerts::alerts;
+use crate::tools::brush_refusal::brush_refusal_alert_tests::alerts;
 use crate::tools::type_tool::mask_replace_selection_tests::click as tool_click;
 
 const MESSAGE: &str = "Could not use the type tool because the layer is locked.";

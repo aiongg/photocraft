@@ -8,7 +8,7 @@
 use craft::behavior::geometry::quad::BoxAllow;
 use craft::behavior::kurbo::{Point, Rect};
 use craft::draw::ui::transform::{ApplyBy, TransformOverlay, TransformSession};
-use craft::imaging::ui::selection::SelectionOverlay;
+use craft::imaging::ui::selection::{PointMap, SelectionOverlay};
 
 use crate::PhotocraftApp;
 use crate::canvas::outline::SurfaceMask;
@@ -162,7 +162,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect)
             // A scale and rotate box has no horizon: the map always answers.
             SelectionOverlay::new(tl!("Content-Aware Move").to_owned(), &mask)
                 .offset(t.offset)
-                .mapped(move |p: Point| Some(h.apply(p)))
+                .mapped(Some(PointMap::new(move |p: Point| Some(h.apply(p)))))
                 .show_at(ui, rect);
         }
         TransformOverlay::new(tl!("Content-Aware Move").to_owned(), &t.session, &settings).show_at(ui, rect)

@@ -1,4 +1,5 @@
 use super::*;
+use crate::canvas::ToolEvent;
 
 fn app_with_gradient(style: &str) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

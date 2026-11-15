@@ -203,7 +203,7 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let surf = preview.run(&work).map_err(|e| e.to_string())?;
             let [w, h] = preview.size();
-            Ok(crate::transform_tool::read_surface(&surf, photocraft_geom::Rect::from_xywh(0, 0, w, h), usize::MAX).0)
+            Ok(crate::transform_tool::read_surface(&surf, photocraft_geom::Rect::from_xywh(0, 0, w, h), usize::MAX).image)
         }))
         .unwrap_or_else(|_| Err("Content-Aware Scale preview failed".into()));
         let _ = tx.send(result);

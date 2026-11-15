@@ -364,7 +364,7 @@ fn a_refused_pen_redo_keeps_the_path_claimed_by_its_document() {
 #[test]
 fn pen_undo_after_closing_a_shape_reopens_the_path() {
     let mut app = app();
-    app.ui.tool_options.vector_mode = crate::state::VectorMode::Shape;
+    app.ui.tool_options.vector_mode = craft::draw::ui::shape::VectorMode::Shape;
     let layers = app.session.active().unwrap().doc.layers.len();
     let knots = close_triangle(&mut app);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1);
@@ -536,7 +536,7 @@ fn redo_leaves_the_same_anchors_redrawn_in_shape_mode_alone() {
         menu(&mut app, "edit.undo");
     }
     assert!(app.ui.pen.is_none());
-    app.ui.tool_options.vector_mode = crate::state::VectorMode::Shape;
+    app.ui.tool_options.vector_mode = craft::draw::ui::shape::VectorMode::Shape;
     three_anchors(&mut app);
     assert_eq!(app.ui.pen.as_ref().unwrap().triples(), knots);
     assert!(!crate::menus::is_enabled(&app, "edit.redo"), "Redo greys out over the new draft");
@@ -550,7 +550,7 @@ fn redo_leaves_the_same_anchors_redrawn_in_shape_mode_alone() {
 #[test]
 fn undo_gives_back_a_refused_draft_esc_kept_as_the_work_path() {
     let mut app = app();
-    app.ui.tool_options.vector_mode = crate::state::VectorMode::Shape;
+    app.ui.tool_options.vector_mode = craft::draw::ui::shape::VectorMode::Shape;
     close_triangle(&mut app);
     app.run("layer.lockLayers", json!({"all": true})).unwrap();
     app.ui.tool_options.pen_path_op = "subtract".into();

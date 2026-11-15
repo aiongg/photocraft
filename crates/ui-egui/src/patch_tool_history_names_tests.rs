@@ -36,8 +36,8 @@ fn the_patch_tool_lasso_is_named_for_the_tool() {
 #[test]
 fn the_patch_tool_step_has_the_selection_icon() {
     let selection = craft::behavior::IconId::new("rect_dashed");
-    assert_eq!(crate::panels::history_step_icon("Patch Tool"), crate::panels::history_step_icon("Lasso"));
-    assert_eq!(crate::panels::history_step_icon("Patch Tool"), selection);
+    assert_eq!(crate::panels::history::step_icon("Patch Tool"), crate::panels::history::step_icon("Lasso"));
+    assert_eq!(crate::panels::history::step_icon("Patch Tool"), selection);
     // Applying the patch edits pixels, so it does not take the selection icon from "Selection".
-    assert_ne!(crate::panels::history_step_icon("Patch Selection"), selection);
+    assert_ne!(crate::panels::history::step_icon("Patch Selection"), selection);
 }

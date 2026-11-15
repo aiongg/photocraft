@@ -121,8 +121,8 @@ fn a_locked_shape_layer_keeps_the_drawn_path() {
         app.ui.tool_options.pen_path_op = "subtract".into();
         square(&mut app, 50.0, 50.0, 40.0);
         let pen = app.ui.pen.clone().unwrap_or_else(|| panic!("{lock}: the draft is kept"));
-        // The four corners and the close's stand-in on the first: still a closed path.
-        assert!(pen.draft.knots.len() == 5 && super::closing(&pen), "{lock}: {:?}", pen.draft.knots);
+        // The four corners, joined back to the first: still a closed path.
+        assert!(pen.draft.knots.len() == 4 && pen.draft.closed, "{lock}: {:?}", pen.draft.knots);
         assert!(app.ui.status_error, "{lock}: {}", app.ui.status);
         assert_eq!(shape_path(&app), (id, body.clone()), "{lock}: the shape is unchanged");
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "{lock}: no History step");
