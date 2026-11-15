@@ -143,7 +143,8 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
         (Some(DialogResult::Ok(guide)), None) => confirm_new(app, &guide),
         // Cancel and any other way of closing end the edit draft.
         (Some(_), draft) => {
-            if let Some(id) = draft {
+            // A dialog replaced by another under the same id closes with a Cancel that is not the new draft's.
+            if let Some(id) = draft.filter(|id| app.framework.dialogs.get_by_id::<HostedNewGuideDialog>(*id).is_none()) {
                 crate::guide_edit::cancel(app, id);
             }
             return;

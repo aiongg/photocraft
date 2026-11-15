@@ -95,7 +95,11 @@ fn over_a_marker_is_the_clicks_own_hit_test() {
         let pts = app.session.active().unwrap().doc.measurement.count_groups[0].points.clone();
         match hit {
             Some(_) => {
-                assert_eq!(pts, vec![[at[0], at[1] + 10.0]], "{dx} px: the press moved the marker the cursor marked");
+                // The pointer position passes through f32 on its way to the marker.
+                assert!(
+                    pts.len() == 1 && (pts[0][0] - at[0]).abs() < 1e-4 && (pts[0][1] - (at[1] + 10.0)).abs() < 1e-4,
+                    "{dx} px: the press moved the marker the cursor marked: {pts:?}"
+                );
             }
             None => assert_eq!(pts.len(), 2, "{dx} px: the press added a marker where the cursor marked none"),
         }

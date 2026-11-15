@@ -48,6 +48,7 @@ pub(crate) const MATTE_COLOR: &str = "matteColor";
 pub(crate) const SAMPLE_TOOL: &str = "sampleTool";
 /// The colour the Result swatch's Color Picker answers into, and the Result it opened on.
 const RESULT_PICKED: &str = "resultPicked";
+const RESULT_SHOWN: &str = "resultShown";
 /// The size and name of the LUT Load 3D LUT… embedded, and why one could not be read.
 const LUT_SIZE: &str = "lutSize";
 const LUT_ERROR: &str = "lutError";
@@ -216,9 +217,14 @@ pub(crate) fn channel_index(v: &Value, names: &[String]) -> Option<usize> {
 /// and Layer Mask, as in Photoshop (#7400).
 fn lens_blur(app: &PhotocraftApp, params: &mut [Param]) {
     let names = channel_names(app);
-    if let Some(Param { kind: ParamKind::Choice { options, .. }, .. }) = row(params, "depthMap") {
-        options.retain(|(id, _)| id != "channel");
-        options.extend(names.iter().enumerate().map(|(i, name)| (channel_choice(i), Label::from(name.clone()))));
+    if let Some(depth_map) = row(params, "depthMap") {
+        if let ParamKind::Choice { options, default } = &mut depth_map.kind {
+            options.retain(|(id, _)| id != "channel");
+            options.extend(names.iter().enumerate().map(|(i, name)| (channel_choice(i), Label::from(name.clone()))));
+            // A source that names a channel of one document is never carried to another, so the menu opens as None.
+            *default = Some("none".into());
+        }
+        *depth_map = depth_map.clone().not_remembered();
     }
 }
 
@@ -379,6 +385,7 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
     let label = Label::from(tl!("Source Layer"));
     let name = label.clone();
     params.retain(|p| p.key != "sourceLayer");
+    let count = documents.len();
     params.push(Param::custom("sourceLayer", label, move |ui, fields, _| {
         let source = fields.text("source").map(str::to_owned);
         // A layer belongs to the document that was chosen: another source drops it.
@@ -391,7 +398,7 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
             }
         }
         let listed = source.as_deref().and_then(|s| s.parse::<usize>().ok()).and_then(|i| layers.get(i));
-        let shown = fields.int("sourceLayer").filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
+        let shown = layer_ref(fields).filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
         let mut entries = vec![Entry::new(-1i64, Label::from(tl!("Merged")))];
         entries.extend(listed.into_iter().flatten().map(|(id, layer)| Entry::new(*id, Label::from(layer.clone()))));
         let out = Select::new(name.clone(), Bind::given(shown), &entries).enabled(listed.is_some()).show(ui);
@@ -401,7 +408,16 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
             None => {}
         }
         out.response().clone()
-    }));
+    })
+    .enabled_when_in("source", (0..count).map(|i| i.to_string())));
+}
+
+/// The source layer a form holds: the row's own choice, or the id a caller set through the row's key.
+fn layer_ref(fields: &DialogFields) -> Option<i64> {
+    fields.int("sourceLayer").or_else(|| match fields.get("sourceLayer")? {
+        FieldValue::Json(value) => value.as_i64(),
+        _ => None,
+    })
 }
 
 // --- Replace Color ---------------------------------------------------------------------------------------------
@@ -463,12 +479,12 @@ fn result_color(fields: &DialogFields) -> [f32; 3] {
 }
 
 /// Picking a Result in the Color Picker sets Hue, Saturation and Lightness so the sampled colour becomes it (#6278).
-/// The picker's answer is the only writer of `resultPicked` other than the row's own seed (the shown result), so an
-/// answer that differs from the shown result is a pick.
+/// `resultShown` is the result the row last drew and `resultPicked` is what the picker answers into, so a
+/// `resultPicked` that differs from `resultShown` is a pick; a slider edit made between passes changes neither.
 fn apply_picked_result(fields: &mut DialogFields) {
     use photocraft_algo::tone;
     let Some(to) = fields.color(RESULT_PICKED) else { return };
-    if to == result_color(fields) {
+    if fields.color(RESULT_SHOWN).is_none_or(|shown| shown == to) {
         return;
     }
     let from = fields.color("color").unwrap_or([0.0; 3]);
@@ -494,9 +510,8 @@ fn result_row() -> Param {
             .inner;
         // The picker opens on the colour the form held at the start of the pass: `resultPicked` holds the shown
         // Result and is what the picker answers into.
-        if fields.color(RESULT_PICKED) != Some(rgb) {
-            fields.set(RESULT_PICKED, FieldValue::Color(rgb));
-        }
+        fields.set(RESULT_PICKED, FieldValue::Color(rgb));
+        fields.set(RESULT_SHOWN, FieldValue::Color(rgb));
         if out.pick_color.is_some() {
             cx.pick_color(RESULT_PICKED);
         }

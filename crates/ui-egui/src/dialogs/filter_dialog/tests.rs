@@ -74,11 +74,7 @@ fn history(app: &PhotocraftApp) -> usize {
 /// The app drawn through `dialogs::run`, as the window shows its dialogs.
 fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftApp> {
     let h = Harness::builder().with_context(app.ctx().clone()).with_size(size).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
-            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                crate::dialogs::run(app, ui);
-            }
-        },
+        |ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui),
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
@@ -215,7 +211,7 @@ fn remembering_dialogs_never_persists_paths_or_document_indices() {
     let id = open(&mut app, "filter.distort.displace").unwrap();
     set(&mut app, id, "horizontal", json!(7));
     set(&mut app, id, "mapPath", json!(map.to_str().unwrap()));
-    set(&mut app, id, "mapDocument", json!(0));
+    set(&mut app, id, "mapDocument", json!("0"));
     assert!(ok(&mut app, id), "OK with a map given closes the dialog");
     let again = open(&mut app, "filter.distort.displace").unwrap();
     let f = fields_of(&app, again);
@@ -480,6 +476,8 @@ fn preview_runs_engine_command_on_proxy() {
     let revision = app.session.active().unwrap().revision;
     let id = open(&mut app, "filter.blur.gaussianBlur").unwrap();
     set(&mut app, id, "radius", json!(4.0));
+    // The Preview box is on from the dialog's first drawn pass.
+    passes(&mut app, 2);
     let ctx = dctx();
     crate::canvas::ensure_filter_preview(&mut app, 0, &ctx);
     let shown = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the live preview ran");
@@ -554,28 +552,28 @@ fn match_color_source_layer_picker_keeps_references_with_the_source() {
     session.execute("file.new", json!({"width": 16, "height": 16})).unwrap();
     let mut app = PhotocraftApp::new(session, Default::default());
     let id = open(&mut app, "image.adjustments.matchColor").unwrap();
-    assert_eq!(fields_of(&app, id).int("source"), Some(-1));
+    assert_eq!(fields_of(&app, id).text("source"), Some("-1"));
     assert!(field_json(&app, id, "sourceLayer").is_null(), "None starts with no layer reference");
     assert!(try_set(&mut app, id, "sourceLayer", json!(bottom)).is_err(), "Layer is disabled while Source is None");
-    set(&mut app, id, "source", json!(0));
+    set(&mut app, id, "source", json!("0"));
     set(&mut app, id, "sourceLayer", json!(bottom));
     assert_eq!(field_json(&app, id, "sourceLayer"), json!(bottom), "the bottom layer is identified by ID");
-    set(&mut app, id, "source", json!(1));
+    set(&mut app, id, "source", json!("1"));
     passes(&mut app, 2);
     assert!(field_json(&app, id, "sourceLayer").is_null(), "a new source returns to Merged even with copied IDs");
     set(&mut app, id, "sourceLayer", json!(top));
     assert_eq!(field_json(&app, id, "sourceLayer"), json!(top));
-    set(&mut app, id, "source", json!(-1));
+    set(&mut app, id, "source", json!("-1"));
     passes(&mut app, 2);
-    assert_eq!(fields_of(&app, id).int("source"), Some(-1));
+    assert_eq!(fields_of(&app, id).text("source"), Some("-1"));
     assert!(field_json(&app, id, "sourceLayer").is_null());
 
     // A confirmed source is never remembered.
-    set(&mut app, id, "source", json!(0));
+    set(&mut app, id, "source", json!("0"));
     set(&mut app, id, "sourceLayer", json!(bottom));
     ok(&mut app, id);
     let reopened = open(&mut app, "image.adjustments.matchColor").unwrap();
-    assert_eq!(fields_of(&app, reopened).int("source"), Some(-1));
+    assert_eq!(fields_of(&app, reopened).text("source"), Some("-1"));
     assert!(field_json(&app, reopened, "sourceLayer").is_null(), "source references are never remembered");
 }
 
@@ -609,7 +607,7 @@ fn match_color_source_layer_preview_and_ok_edit_only_the_target() {
         let original = target.layers[0].surface().unwrap().read_region(area);
         for (source_index, layer, blue) in [(0, Some(source_layer), true), (0, None, false), (1, Some(target.layers[0].id), false), (1, None, true)] {
             let choose = |app: &mut PhotocraftApp, id: DialogId| {
-                set(app, id, "source", json!(source_index));
+                set(app, id, "source", json!(source_index.to_string()));
                 if let Some(layer) = layer {
                     set(app, id, "sourceLayer", json!(layer));
                 }
@@ -696,9 +694,11 @@ fn match_color_refuses_a_changed_destination_without_closing() {
     refuse(&mut app, 1);
 
     app.session.select_layer(original).unwrap();
-    set(&mut app, id, "layer", json!(other));
-    refuse(&mut app, 1);
-    set(&mut app, id, "layer", json!(original));
+    // A `layer` parameter that names another layer than the active one is refused as a changed destination.
+    let destination = crate::dialogs::params::captured(&app, MATCH_COLOR);
+    let named = |layer| json!({ "layer": layer }).as_object().cloned().unwrap();
+    assert!(validate_match_color_destination(&app, MATCH_COLOR, &destination, &named(other.0)).is_err());
+    assert!(validate_match_color_destination(&app, MATCH_COLOR, &destination, &named(original.0)).is_ok());
     assert!(ok(&mut app, id), "the matching destination is accepted");
 }
 
@@ -713,7 +713,7 @@ fn match_color_explicit_unavailable_source_layer_is_refused_with_or_without_a_fr
         let id = open(&mut app, MATCH_COLOR).unwrap();
         let missing = u64::MAX;
         // PLAN: assumed the `sourceLayer` row accepts any layer id; the held OK checks it exists.
-        set(&mut app, id, "source", json!(0));
+        set(&mut app, id, "source", json!("0"));
         set(&mut app, id, "sourceLayer", json!(missing));
         if render {
             // Force a source-choice refresh as well as drawing the layer picker.
@@ -757,10 +757,10 @@ fn match_color_after_source_change(change: &str) {
     let ctx = dctx();
     let root = open(&mut app, "image.adjustments.matchColor").unwrap();
     if !change.starts_with("select-") {
-        set(&mut app, root, "source", json!(1));
+        set(&mut app, root, "source", json!("1"));
         set(&mut app, root, "sourceLayer", json!(reference_id));
     } else {
-        assert_eq!(fields_of(&app, root).int("source"), Some(-1), "{change}");
+        assert_eq!(fields_of(&app, root).text("source"), Some("-1"), "{change}");
     }
     let (command, field, value) = if change == "delete-layer" {
         ("layer.delete", "layer", json!(reference_id))
@@ -801,11 +801,11 @@ fn match_color_after_source_change(change: &str) {
         assert_eq!(app.session.documents()[0].doc.name, "reference", "{change}: the explicitly chosen current index is the blue source");
         if change == "select-invalid" {
             // A row that refuses the index is as good as a refused OK: it never becomes another document.
-            if try_set(&mut app, root, "source", json!(99)).is_err() {
+            if try_set(&mut app, root, "source", json!("99")).is_err() {
                 return;
             }
         } else {
-            set(&mut app, root, "source", json!(0));
+            set(&mut app, root, "source", json!("0"));
         }
     }
     let closed = ok(&mut app, root);
@@ -1591,6 +1591,7 @@ fn replace_color_eyedropper_samples_the_image() {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     app.run("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
     let id = open(&mut app, REPLACE_COLOR).unwrap();
+    passes(&mut app, 2);
     assert_eq!(fields_of(&app, id).color("color"), Some([1.0, 0.0, 0.0]), "the dialog starts from the foreground colour");
     // #6279: armed as it opens, so the first click on the image samples.
     assert!(crate::dialogs::canvas_input::armed(&app).is_some());
@@ -1673,6 +1674,7 @@ fn replace_color_localized_color_clusters() {
     s.execute("file.new", json!({"width": 40, "height": 10, "background": "#ff0000"})).unwrap();
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     let id = open(&mut app, REPLACE_COLOR).unwrap();
+    passes(&mut app, 2);
     assert!(color_eyedropper_sample(&mut app, 2.0, 5.0, egui::Modifiers::NONE));
     set(&mut app, id, "localized", json!(true));
     set(&mut app, id, "range", json!(10));
@@ -1710,11 +1712,11 @@ fn match_color_control_source_changes_reset_layer_even_with_copied_ids() {
         app.sync_views();
         for explicit_layer in [false, true] {
             let id = open(&mut app, "image.adjustments.matchColor").unwrap();
-            set(&mut app, id, "source", json!(0));
+            set(&mut app, id, "source", json!("0"));
             set(&mut app, id, "sourceLayer", json!(bottom));
-            set(&mut app, id, "source", json!(0));
+            set(&mut app, id, "source", json!("0"));
             assert_eq!(field_json(&app, id, "sourceLayer"), json!(bottom), "unchanged Source retains Layer");
-            set(&mut app, id, "source", json!(1));
+            set(&mut app, id, "source", json!("1"));
             if frame {
                 passes(&mut app, 1);
             }
@@ -1771,7 +1773,9 @@ fn match_color_preview_refreshes_when_a_source_job_lands() {
         let revision = app.session.active().unwrap().revision;
         let ctx = dctx();
         let id = open(&mut app, "image.adjustments.matchColor").unwrap();
-        set(&mut app, id, "source", json!(0));
+        set(&mut app, id, "source", json!("0"));
+        // The Preview box is on from the dialog's first drawn pass.
+        passes(&mut app, 2);
         let preview = |app: &mut PhotocraftApp, blue: bool| {
             crate::canvas::ensure_filter_preview(app, 1, &ctx).expect("inline preview");
             let pixel = app.filter_preview.as_ref().unwrap().result.as_ref().unwrap().layers[0].surface().unwrap().rgba(4, 4);
@@ -1849,12 +1853,8 @@ fn indexed_matte_dropdown_and_picker_change_the_applied_edge_color() {
         harness.get_by_label(choice).click();
         harness.run_steps(3);
         if choice == "Other…" {
-            let picker = top_dialog(harness.state());
-            assert_ne!(picker, id);
-            // PLAN: assumed the Color Picker child keeps its colour under `color` as a hex string.
-            set(harness.state_mut(), picker, "color", json!("#0000ff"));
-            let ctx = harness.ctx.clone();
-            harness.state_mut().framework.dialogs.confirm_by_id(&ctx, picker);
+            assert_eq!(top_dialog(harness.state()), id, "the matte colour is a row of the dialog, not a child picker");
+            set(harness.state_mut(), id, "matteColor", json!([0.0, 0.0, 1.0]));
             harness.run_steps(3);
         }
         harness.get_by_label("OK").click();
@@ -1869,9 +1869,9 @@ fn indexed_matte_dropdown_and_picker_change_the_applied_edge_color() {
     }
 }
 
-/// Selecting Other… must not replace None until the custom colour picker is confirmed.
+/// Other… shows the Matte Color row in the same dialog, None hides it again.
 #[test]
-fn indexed_matte_cancel_keeps_the_previous_choice() {
+fn indexed_matte_other_shows_the_color_row_and_none_hides_it() {
     use egui::accesskit::Role;
 
     let mut session = photocraft_engine::Session::new();
@@ -1880,18 +1880,19 @@ fn indexed_matte_cancel_keeps_the_previous_choice() {
     let mut harness = harness(app, egui::vec2(900.0, 1000.0));
     let id = open(harness.state_mut(), "image.mode.indexedColor").unwrap();
     harness.run_steps(3);
+    assert!(try_set(harness.state_mut(), id, "matteColor", json!([0.0, 0.0, 1.0])).is_err(), "no colour row while the matte is None");
     harness.query_all_by_role(Role::ComboBox).find(|node| node.value().as_deref() == Some("None")).expect("Matte dropdown").click();
     harness.run_steps(2);
     harness.get_by_label("Other…").click();
     harness.run_steps(3);
+    assert_eq!(top_dialog(harness.state()), id, "Other… opens no child dialog");
+    assert_eq!(fields_of(harness.state(), id).text("matte"), Some("custom"));
+    set(harness.state_mut(), id, "matteColor", json!([0.0, 0.0, 1.0]));
 
-    let picker = top_dialog(harness.state());
-    assert_ne!(picker, id);
-    assert_eq!(fields_of(harness.state(), id).text("matte"), None, "opening Other… does not commit a matte");
-
-    let ctx = harness.ctx.clone();
-    harness.state_mut().framework.dialogs.cancel_by_id(&ctx, picker);
+    harness.query_all_by_role(Role::ComboBox).find(|node| node.value().as_deref() == Some("Other…")).expect("Matte dropdown").click();
+    harness.run_steps(2);
+    harness.get_by_label("None").click();
     harness.run_steps(3);
-    assert!(is_open(harness.state(), id), "cancelling the child leaves Indexed Color open");
-    assert_eq!(fields_of(harness.state(), id).text("matte"), None, "cancel restores the previous None choice");
+    assert_eq!(fields_of(harness.state(), id).text("matte"), Some("none"));
+    assert!(try_set(harness.state_mut(), id, "matteColor", json!([0.0, 0.0, 1.0])).is_err(), "None hides the colour row");
 }

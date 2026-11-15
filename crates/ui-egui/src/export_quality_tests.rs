@@ -102,7 +102,7 @@ fn artboards_to_files_sends_a_custom_jpeg_quality() {
         let (a, b) = (tmp(), tmp());
         let dialog = open(&mut app, &ctx, ARTBOARDS, a.path(), "jpg");
         set(&mut app, &ctx, dialog, "quality", json!(quality));
-        assert_eq!(fields(&app, dialog)["quality"], json!(quality), "the typed quality is the field's value");
+        assert_eq!(fields(&app, dialog)["quality"].as_f64(), Some(quality as f64), "the typed quality is the field's value");
         let bytes = exported(&mut app, &ctx, dialog, a.path());
         assert!(bytes == direct(&mut app, b.path(), "jpg", Some(quality)), "quality {quality}: the file the command writes at that quality");
         sizes.push(bytes.len());

@@ -67,7 +67,7 @@ fn selected_layer_name_is_visible_during_recording_and_after_stop() {
 /// Options, and only that combination plays it.
 #[test]
 fn a_function_key_with_shift_and_command_plays_its_action() {
-    use egui::{Event, Key, Modifiers};
+    use egui::{Key, Modifiers};
     let mut app = new_app();
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.session
@@ -83,19 +83,7 @@ fn a_function_key_with_shift_and_command_plays_its_action() {
     let key = photocraft_engine::atn_cmds::function_key_name(2, true, true);
     assert_eq!(key, "Cmd+Shift+F2");
     assign_shortcut(&mut app, "Action 1", &key).unwrap();
-    let ctx = app.ctx().clone();
-    let press = |app: &mut PhotocraftApp, modifiers| {
-        ctx.begin_pass(egui::RawInput {
-            events: vec![
-                Event::ModifiersChanged(modifiers),
-                Event::Key { key: Key::F2, physical_key: None, pressed: true, repeat: false, modifiers },
-                Event::Key { key: Key::F2, physical_key: None, pressed: false, repeat: false, modifiers },
-            ],
-            ..Default::default()
-        });
-        crate::shortcuts::handle(app, &ctx);
-        ctx.end_pass().textures_delta.clear();
-    };
+    let press = |app: &mut PhotocraftApp, modifiers| crate::canvas::testing::key(app, Key::F2, modifiers);
     let layers = |app: &PhotocraftApp| app.session.active().unwrap().doc.layers.len();
     let before = layers(&app);
     press(&mut app, Modifiers::NONE);
@@ -185,11 +173,12 @@ fn set_folders_group_actions_and_collapse() {
     push(&mut app, "Also loose", None, vec![]);
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
-    let folder = h.get_by_label("Retouch").rect();
-    assert!(h.get_by_label("Loose").rect().top() < folder.top());
-    assert!(h.get_by_label("Sharpen").rect().top() > folder.top());
+    let first = |h: &Harness<'_, PhotocraftApp>, label: &str| h.get_all_by_label(label).next().expect(label).rect();
+    let folder = first(&h, "Retouch");
+    assert!(first(&h, "Loose").top() < folder.top());
+    assert!(first(&h, "Sharpen").top() > folder.top());
     // A click selects the set; Left closes it, as the framework list's keys do.
-    h.get_by_label("Retouch").click();
+    h.get_all_by_label("Retouch").next().expect("the set folder").click();
     h.run_steps(2);
     h.key_press(egui::Key::ArrowLeft);
     h.run_steps(3);
@@ -299,7 +288,7 @@ fn recording_into_a_collapsed_set_expands_it() {
     assert!(app.ui.actions.panel.expanded.contains("Sharpen"));
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
-    assert!(h.query_by_label("Sharpen").is_some(), "the set shows its action");
+    assert!(h.query_all_by_label("Sharpen").next().is_some(), "the set shows its action");
     h.state_mut().run("actions.stop", json!({})).unwrap();
 }
 

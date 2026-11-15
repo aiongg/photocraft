@@ -53,12 +53,6 @@ fn app() -> (PhotocraftApp, [LayerId; 3]) {
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(700.0, 200.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
-            let ctx = ui.ctx().clone();
-            if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                return;
-            }
-            // PLAN: assumed `PhotocraftApp::framework_before_input(&mut self, &egui::Context)` (hub-w1): publishes every command source's states.
-            app.framework_before_input(&ctx);
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.horizontal(|ui| crate::align_bar::show(app, ui));
             });
@@ -66,8 +60,17 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         app,
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    h.run_steps(4);
+    steps(&mut h, 4);
     h
+}
+
+/// `n` frames, each with the command states published before its input, as the app's frame does.
+fn steps(h: &mut Harness<'static, PhotocraftApp>, n: usize) {
+    for _ in 0..n {
+        let ctx = h.ctx.clone();
+        h.state_mut().framework_before_input(&ctx);
+        h.step();
+    }
 }
 
 #[test]
@@ -81,7 +84,7 @@ fn distribute_buttons_are_greyed_with_too_few_layers_like_the_menu() {
     // Align still works with two layers.
     assert!(!h.get_by_label("Align Left Edges").accesskit_node().is_disabled());
     select_all(h.state_mut(), &[a, b, c]);
-    h.run_steps(2);
+    steps(&mut h, 2);
     assert!(!h.get_by_label("Distribute Vertically").accesskit_node().is_disabled());
 }
 

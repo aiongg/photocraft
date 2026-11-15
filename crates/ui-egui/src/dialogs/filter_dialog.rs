@@ -564,6 +564,19 @@ pub(crate) fn command_params(command: &str, fields: &DialogFields) -> Value {
             }
         }
     }
+    // The exports to files take the JPEG quality only for a JPEG (a quality would make a WebP lossy).
+    if matches!(command, "file.export.artboardsToFiles" | "file.export.layersToFiles" | "file.export.layerCompsToFiles") && map.get("format").and_then(Value::as_str) != Some("jpg") {
+        map.remove("quality");
+    }
+    if command == "image.mode.indexedColor" {
+        // The matte colour row belongs to the "custom" choice, which the command takes as the colour itself.
+        let color = map.remove(rows::MATTE_COLOR);
+        if map.get("matte").and_then(Value::as_str) == Some("custom")
+            && let Some(color) = color
+        {
+            map.insert("matte".into(), color);
+        }
+    }
     if command == "filter.blur.radialBlur"
         && let Some([x, y]) = fields.point("center")
     {
@@ -609,9 +622,10 @@ pub(crate) fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(),
     validate_match_color_destination(app, &result.key, &destination, &fields_map(&result.fields)).map_err(Label::from)
 }
 
-/// A filter dialog was cancelled: its preview goes.
-pub(crate) fn cancelled(app: &mut PhotocraftApp) {
+/// A filter dialog was cancelled: its preview goes, and the playing action it paused ends.
+pub(crate) fn cancel(app: &mut PhotocraftApp, _ctx: &egui::Context, dialog: DialogId) {
     app.filter_preview = None;
+    abandon(app, crate::actions::token_of(app, dialog));
 }
 
 /// Keep Match Color's source choices live without reinterpreting a shifted document index.
@@ -1226,8 +1240,14 @@ mod multi_channel_dialog_tests {
                         "image.adjustments.curves" => ("points", json!([[0, 0], [100, 160], [255, 255]])),
                         _ => ("radius", json!(2)),
                     };
-                    app.framework.dialogs.set_json_field(&ctx, id, key, value).unwrap();
-                    // PLAN: assumed `adjust_dialog::command_params(app, id) -> Value` (dialogs-w32): the open adjustment dialog's command parameters.
+                    if adjust {
+                        // The adjustment dialog's fields are its typed value; an engine parameter is laid over its command parameters.
+                        let mut shown = crate::adjust_dialog::command_params(&app, id);
+                        shown[key] = value;
+                        assert!(crate::adjust_dialog::apply_params(&mut app, id, &shown), "the dialog takes {key}");
+                    } else {
+                        app.framework.dialogs.set_json_field(&ctx, id, key, value).unwrap();
+                    }
                     let params = if adjust { crate::adjust_dialog::command_params(&app, id) } else { dialog_params(&app, id, command) };
                     assert_eq!(params["target"], json!("mask"));
                     app.run("channel.target", json!({"channel":{"color":1}})).unwrap();

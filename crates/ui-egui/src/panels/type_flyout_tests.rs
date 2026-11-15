@@ -44,7 +44,8 @@ fn slots_come_back_on_their_last_tool_after_a_restart() {
         // Another slot's tool is current, so the slot shows its remembered tool rather than the current one.
         harness.state_mut().ui.tool = Tool::Move;
         harness.run_steps(2);
-        harness.get_by_label_contains(name).click();
+        // The slot button holds the flyout's own button of the same name: the outer one is first.
+        harness.get_all_by_label_contains(name).next().expect(name).click();
         harness.run_steps(3);
         assert_eq!(harness.state().ui.tool, tool, "the slot of {name}");
     }

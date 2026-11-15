@@ -37,10 +37,13 @@ fn app() -> PhotocraftApp {
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let (req, _rx) = control::ControlRequest::new(method, params);
     let app_ctx = app.ctx().clone();
-    match control::handle(app, &app_ctx, &req) {
+    let reply = match control::handle(app, &app_ctx, &req) {
         control::Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
-    }
+    };
+    // A dialog's answer is applied by the next pass of the dialogs, as the next frame does for an agent's next call.
+    app_ctx.run_ui(Default::default(), |ui| crate::dialogs::run(app, ui)).textures_delta.clear();
+    reply
 }
 
 /// The id `ui.inspect` lists for the one dialog that is open.

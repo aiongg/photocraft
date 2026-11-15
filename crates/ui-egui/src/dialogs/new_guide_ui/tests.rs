@@ -136,7 +136,7 @@ fn a_refused_position_reopens_the_dialog_without_a_guide() {
     assert_eq!(guides(h.state()), (vec![], vec![]));
     let again = h.state().framework.dialogs.get::<HostedNewGuideDialog>().expect("the dialog is open again").json_fields().unwrap();
     assert_eq!((again["orientation"].as_str(), again["position"].as_f64()), (Some("vertical"), Some(10.0)), "what was typed is kept");
-    h.get_by_label("guides are denied");
+    h.get_by_label_contains("guides are denied");
 }
 
 /// The guide stores the chosen colour; Cyan is the default and the last choice opens next time.
@@ -401,7 +401,7 @@ fn refused_edit_shows_the_error_and_typed_fields_in_the_dialog() {
     deny_edits(&mut h, "guide edits are denied");
     confirm(&mut h, id);
     h.run_steps(3);
-    h.get_by_label("guide edits are denied");
+    h.get_by_label_contains("guide edits are denied");
     assert_eq!(h.get_by_role_and_label(egui::accesskit::Role::TextInput, "Position").value().as_deref(), Some("30 px"));
     let id = draft_dialog(&h);
     set(&mut h, id, "position", json!(40.0));

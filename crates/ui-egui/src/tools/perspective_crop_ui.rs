@@ -257,12 +257,15 @@ mod tests {
         assert!(quad(&app).is_some(), "same document: the quad stays");
         app.session.set_active(1);
         app.sync_views();
+        // The tool host drops what belongs to the other document in its next pass.
+        crate::canvas::testing::frame(&mut app);
         assert_eq!(quad(&app), None);
         tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, Modifiers::NONE);
         tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 30.0 }, Modifiers::NONE);
         assert_eq!(app.canvas_tools.perspective.tool.placing(), 1, "a corner clicked on the second document");
         app.session.set_active(0);
         app.sync_views();
+        crate::canvas::testing::frame(&mut app);
         assert_eq!(app.canvas_tools.perspective.tool.placing(), 0, "the clicks are dropped too");
     }
 }

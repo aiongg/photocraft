@@ -499,6 +499,10 @@ pub(super) fn print_params(f: &DialogFields) -> Value {
             p.insert(k.to_string(), v);
         }
     }
+    // The driver's printable area belongs to a print to the printer, not to a file or a dry run.
+    if f.text("output").is_some_and(|output| !output.is_empty()) || f.bool("dryRun") == Some(true) {
+        p.remove("printable");
+    }
     if f.text("paper") == Some("custom") {
         let (default_w, default_h) = print_paper_size(None);
         p.insert("paper".into(), json!([f.number("paperWidth").unwrap_or(default_w), f.number("paperHeight").unwrap_or(default_h)]));

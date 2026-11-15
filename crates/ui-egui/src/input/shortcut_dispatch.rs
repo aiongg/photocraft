@@ -190,7 +190,8 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
 
     // Live menu items whose command has no row yet carry the catalogue's key.
     for &(_, label, shortcut, id) in crate::menu_catalog::CATALOG {
-        if label == "---" || !crate::menus::is_live(id) || seen.contains(id) {
+        // A Window panel item runs its shell command (`menus::panel_alias`), which has the row.
+        if label == "---" || !crate::menus::is_live(id) || seen.contains(id) || crate::menus::panel_alias(id).is_some_and(|alias| seen.contains(alias)) {
             continue;
         }
         let mut def = app_row(id, label.trim_end_matches('…'));
@@ -219,6 +220,10 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
         if crate::adjust_dialog::has_dialog(&def.command.id) || def.command.id == crate::new_layer_ui::COMMAND {
             def.has_alt_variant = true;
         }
+    }
+    // Smart Objects › Reveal in Finder names this platform's file manager, in the list as in the menu.
+    if let Some(def) = rows.iter_mut().find(|d| d.command.id == "layer.smartObjects.revealInFinder") {
+        def.label = crate::menus::reveal_label().into();
     }
     rows
 }

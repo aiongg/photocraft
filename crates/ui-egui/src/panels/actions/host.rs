@@ -20,7 +20,7 @@ pub(crate) struct PhotoActions<'a> {
 impl<'a> PhotoActions<'a> {
     /// The host for this pass; `paced` is whether a paced playback waits for its next step.
     pub(crate) fn new(session: &'a Session, paced: bool) -> Self {
-        let recording = session.actions.recording.map(|(index, _)| index);
+        let recording = session.actions.recording.map(|(_, action)| action);
         let pending = recording
             .map(|index| actions_cmds::pending_steps(session, index).map(|(id, params)| ActionStep::new(id.clone(), params.clone())).collect())
             .unwrap_or_default();

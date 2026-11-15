@@ -35,10 +35,13 @@ fn answer_path(app: &mut PhotocraftApp, id: DialogId, path: &str) {
     pass(app);
 }
 
-/// OK on Save for Web, then the app's takers run the export.
+/// OK on Save for Web, then the app's takers run the export. The answered Save… finishes the dialog in its pass;
+/// a dialog still open takes OK, which needs the path.
 fn confirm(app: &mut PhotocraftApp, id: DialogId) {
     let ctx = app.ctx().clone();
-    assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "OK needs the path answered");
+    if app.framework.dialogs.get_by_id::<HostedSaveForWeb>(id).is_some() {
+        assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "OK needs the path answered");
+    }
     take(app, &ctx);
 }
 
@@ -208,7 +211,7 @@ fn save_for_web_dialog_runs_the_command() {
     let mut app = app();
     let ctx = app.ctx().clone();
     let r = crate::menus::invoke(&mut app, &ctx, "file.export.saveForWebLegacy", json!({})).unwrap();
-    let id = DialogId::new(r["dialog"].as_u64().unwrap());
+    let id = serde_json::from_value::<DialogId>(r["dialog"].clone()).expect("the command opened a dialog");
     let dir = std::env::temp_dir().join(format!("pc-webui-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("web.gif").to_string_lossy().into_owned();
@@ -300,8 +303,8 @@ fn save_for_web_width_keeps_proportions_and_sizes_the_file() {
     let id = open_web(&mut app);
     let revision = app.session.active().unwrap().revision;
     set_option(&mut app, id, "format", json!(WebFormat::Png24));
-    // PLAN: assumed the hosted dialog takes the linked size as the JSON field `width` (dialogs-w15).
-    set_option(&mut app, id, "width", json!(60));
+    // The dialog keeps one size as a percent of the document, so the width follows the height.
+    set_option(&mut app, id, "percent", json!(50.0));
     let path = std::env::temp_dir().join(format!("pc-webui-wh-{}.png", std::process::id())).to_string_lossy().into_owned();
     answer_path(&mut app, id, &path);
     confirm(&mut app, id);
@@ -507,7 +510,7 @@ fn print_dialog_does_not_inherit_scripted_send_override() {
         app.session.execute("file.print", json!({"output": out, "send": send, "dryRun": true})).unwrap();
         assert!(app.session.file_menu.last_print.as_ref().unwrap().get("send").is_none());
         let r = crate::menus::invoke(&mut app, &ctx, "file.print", json!({})).unwrap();
-        let id = DialogId::new(r["dialog"].as_u64().unwrap());
+        let id = serde_json::from_value::<DialogId>(r["dialog"].clone()).expect("the command opened a dialog");
         assert!(!print_fields(&mut app, id).contains("send"));
         std::fs::remove_file(out).unwrap();
     }

@@ -136,9 +136,9 @@ fn canvas_right_click_while_drawing_opens_no_menu_and_enter_still_closes_the_bor
     let mut h = app();
     // The tool is the current one, as when the user picked it; the secondary press is the canvas's.
     call(&mut h, "ui.set", json!({"tool": "MagneticLasso"}));
-    click(&mut h, None, CORNERS[0], "primary", false);
-    click(&mut h, None, CORNERS[1], "primary", true);
-    click(&mut h, None, CORNERS[2], "primary", true);
+    click(&mut h, None, CORNERS[0], "left", false);
+    click(&mut h, None, CORNERS[1], "left", true);
+    click(&mut h, None, CORNERS[2], "left", true);
     let (before, _) = inspect(&mut h);
     assert!(border_live(&before), "a border is in progress: {before}");
 

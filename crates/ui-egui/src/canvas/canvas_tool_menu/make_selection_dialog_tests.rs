@@ -4,14 +4,11 @@
 //! Selection Change History step; each Operation runs `path.toSelection` with its mode. The
 //! combining operations keep the Make Selection step (not measured).
 
-use craft::ui::dialog::DialogResult;
-use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui::accesskit::Toggled;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::{Value, json};
 
-use super::pen_dialogs;
 use super::tests::{choose_open, dialog_open};
 use crate::PhotocraftApp;
 use crate::state::Tool;
@@ -33,14 +30,9 @@ fn app(selection: bool) -> PhotocraftApp {
     app
 }
 
-/// The dialog host's pass, then the answer of an OK to the family that owns the dialog.
+/// The app's dialog pass: the host draws the dialogs and the families take their answers.
 fn draw(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
-    if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-        app.framework.dialogs.run(ui);
-        if let Some(DialogResult::Ok(result)) = app.framework.dialogs.take::<HostedParamDialog>() {
-            pen_dialogs::run(app, ui.ctx(), result);
-        }
-    }
+    crate::dialogs::run(app, ui);
 }
 
 /// The Pen canvas menu's Make Selection… dialog, drawn as the window shows it.
