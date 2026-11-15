@@ -356,8 +356,10 @@ mod tests {
         assert_eq!(fields["blues"][0].as_f64(), Some(30.0));
         assert_eq!(fields["method"], json!("absolute"));
         // Edit the row and the Method, then OK.
-        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "blues", json!([10.0, 0.0, 0.0, 0.0])).unwrap();
-        h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "method", json!("relative")).unwrap();
+        let mut edited = crate::adjust_dialog::command_params(h.state(), dialog);
+        edited["blues"] = json!([10.0, 0.0, 0.0, 0.0]);
+        edited["method"] = json!("relative");
+        assert!(crate::adjust_dialog::apply_params(h.state_mut(), dialog, &edited), "the dialog takes the edit");
         h.run_steps(2);
         crate::dialogs::testing::confirm(h.state_mut(), dialog);
         let sm = recorded(h.state());
