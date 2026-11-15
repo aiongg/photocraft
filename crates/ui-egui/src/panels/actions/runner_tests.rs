@@ -1157,11 +1157,11 @@ fn equalize_step_with_a_selection_opens_its_choices() {
 
     let result = play(&mut app, &json!({"action": "Equalize"})).unwrap();
     let id = result["paused"]["dialog"].as_u64().unwrap();
-    assert_eq!(dialog_fields(&app, id)["area"], "selected");
+    assert_eq!(dialog_fields(&app, id)["selectedAreaOnly"], "selected");
     assert!((gray(&app, 12, 1) - 0.4).abs() < 0.01, "nothing changes before OK");
 
     // OK with the entire image chosen maps the pixels outside the selection too.
-    set_field(&mut app, id, "area", json!("entire")).unwrap();
+    set_field(&mut app, id, "selectedAreaOnly", json!("entire")).unwrap();
     answer_ok(&mut app, id).unwrap();
     assert!(gray(&app, 12, 1) < 0.05 && gray(&app, 12, 12) > 0.95, "outside the selection too");
 }
