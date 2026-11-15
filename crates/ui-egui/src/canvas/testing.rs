@@ -89,6 +89,8 @@ fn held(mods: Modifiers) -> Mods {
 /// One frame of the app on its own context: the key route, then the document area and the hosted dialogs, as the
 /// app's frame orders them.
 fn run_frame(app: &mut PhotocraftApp) {
+    // The app's frame reconciles the views with the open documents before anything draws.
+    app.sync_views();
     let ctx = ctx(app);
     let mut frames = app.canvas_tools.frames.take().unwrap_or_else(|| Frames::over(ctx));
     app.canvas_tools.last_response = None;
