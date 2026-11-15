@@ -103,7 +103,7 @@ mod open_recent_tests {
         assert!(rows.iter().any(|r| r.command.id == "file.clearRecent" && r.path == ["File", "Open Recent"]));
 
         // Clear Recent Files empties the list.
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         invoke(&mut app, &ctx, "file.clearRecent", json!({})).unwrap();
         assert!(app.ui.recent_files.is_empty());
         assert!(app.session.prefs().file_handling.recent_files.is_empty(), "cleared in the preferences too");
@@ -138,7 +138,7 @@ mod open_recent_tests {
         let path = std::env::temp_dir().join("photocraft_recent_test.pcraft");
         std::fs::write(&path, b"x").unwrap();
         let p = path.to_string_lossy().to_string();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         invoke(&mut app, &ctx, "file.open", json!({ "path": p })).unwrap();
         assert_eq!(app.ui.recent_files.first().map(String::as_str), Some(p.as_str()));
         // Re-open via the recent entry once closed (an open file shows its tab instead, #6598).

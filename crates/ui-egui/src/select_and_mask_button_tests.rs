@@ -14,7 +14,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.sync_views();
     app.ui.tool = Tool::RectMarquee;
-    let mut h = Harness::builder().with_size(vec2(1400.0, 60.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 60.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::panels::options_bar(app, ui);

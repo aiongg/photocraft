@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn a_late_reading_is_applied_and_windows_follow_their_display() {
         let mut app = app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let (tx, rx) = std::sync::mpsc::channel();
         pending(&mut app, rx);
         frame(&mut app, &ctx, 0.0, [100.0, 100.0], [1728.0, 1117.0], true);
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn displays_are_read_again_when_they_may_have_changed() {
         let mut app = app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.session.color.set_displays(Ok(displays(p3())));
         let reads = reader(&mut app, displays(p3()));
         let count = || reads.load(std::sync::atomic::Ordering::SeqCst);
@@ -513,7 +513,7 @@ mod tests {
         // r1 finding 2: a reading started when the interval runs out must schedule the frame
         // that applies its result; the reader doesn't wake the UI.
         let mut app = app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.session.color.set_displays(Ok(displays(None)));
         let (count, readers) = manual_reader(&mut app);
         frame(&mut app, &ctx, 0.0, [100.0, 100.0], [1728.0, 1117.0], false);
@@ -595,7 +595,7 @@ mod tests {
     fn color_settings_shows_the_profile_in_use_now() {
         // r1 finding 4: the dialog's line follows a reading that arrives while it is open.
         let mut app = app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.session.color.set_displays(Ok(displays(None)));
         app.session.color.main_display = Some(1);
         crate::prefs_ui::invoke(&mut app, &ctx, "edit.colorSettings", &serde_json::json!({})).unwrap();
@@ -621,7 +621,8 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel::<Detection>();
         pending(&mut app, rx);
         drop(tx);
-        poll(&mut app, &egui::Context::default());
+        let app_ctx = app.ctx().clone();
+        poll(&mut app, &app_ctx);
         assert!(app.monitors.pending.is_none());
         assert_eq!(app.ui.notices.len(), 1);
         assert!(app.ui.notices[0].lines[0].contains("stopped without an answer"));
@@ -650,7 +651,7 @@ mod tests {
             Display { id: 2, name: "HDMI-1".into(), frame: [1920.0, 0.0, 1920.0, 1080.0], profile_name: None, icc: None },
         ]));
         app.monitors.root_output_name = Some("HDMI-1".into());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
 
         assert_eq!(view_display(&app, &ctx), Some(2));
         app.monitors.root_output_name = Some("DP-3".into());

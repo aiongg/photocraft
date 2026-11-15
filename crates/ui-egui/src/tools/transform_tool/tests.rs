@@ -140,7 +140,8 @@ fn editing_the_contents_of_a_dropped_file_keeps_the_layer() {
     let parent_id = app.session.active().unwrap().doc.id;
     let placed_layer = app.session.active().unwrap().active_layer.unwrap();
 
-    begin_placed(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_placed(&mut app, &app_ctx).unwrap();
 
     app.session.execute("layer.smartObjects.editContents", json!({})).unwrap();
 
@@ -166,7 +167,8 @@ fn skip_transform_when_placing_leaves_the_place_without_a_box() {
         app.session.execute("layer.duplicate", json!({"inPlace": true})).unwrap();
         app.sync_views();
         let placed = app.session.active().unwrap().active_layer.unwrap();
-        begin_placed(&mut app, &egui::Context::default()).unwrap();
+        let app_ctx = app.ctx().clone();
+        begin_placed(&mut app, &app_ctx).unwrap();
         assert_eq!(app.ui.transform.is_some(), !skip, "skip {skip}: Free Transform opens only with the preference off");
         assert!(app.session.active().unwrap().doc.layer(placed).is_some(), "skip {skip}: the placed layer stays");
     }
@@ -174,7 +176,7 @@ fn skip_transform_when_placing_leaves_the_place_without_a_box() {
 
 /// Polls the app's background jobs until they have all landed.
 fn land_jobs(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for _ in 0..2000 {
         crate::jobs_ui::tick(app, &ctx);
         if !app.session.has_jobs() {
@@ -197,7 +199,8 @@ fn moved_place() -> (PhotocraftApp, LayerId, photocraft_geom::Rect, usize) {
     let st = app.session.active().unwrap();
     let placed = st.active_layer.unwrap();
     let frame = photocraft_engine::transform_cmds::transform_frame(&st.doc, st.doc.layer(placed).unwrap());
-    begin_placed(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_placed(&mut app, &app_ctx).unwrap();
     move_box(&mut app, 8.0, 0.0);
     app.background_jobs = true;
     (app, placed, frame, steps)
@@ -327,7 +330,7 @@ fn begin_and_commit_through_the_engine() {
             Ok(())
         })
         .unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     assert_eq!(rect_of(open(&app)), [8.0, 8.0, 24.0, 24.0]);
     scale_box(&mut app, 2.0, 2.0);
@@ -343,8 +346,8 @@ fn begin_and_commit_through_the_engine() {
 /// tool then ends it.
 #[test]
 fn a_refused_commit_keeps_the_box_open() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     let (revision, steps) = (app.session.active().unwrap().revision, app.session.active().unwrap().history.past_len());
     begin(&mut app, &ctx).unwrap();
     set_quad(&mut app, [[16.0, 16.0]; 4]);
@@ -366,8 +369,8 @@ fn image_processor_document_sources_wait_for_the_transform() {
     for source in ["current", "open"] {
         for through_dialog in [false, true] {
             for apply in [false, true] {
-                let ctx = egui::Context::default();
                 let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+                let ctx = app.ctx().clone();
                 let output = tempfile::tempdir().unwrap();
                 begin(&mut app, &ctx).unwrap();
                 move_box(&mut app, 6.0, 0.0);
@@ -409,8 +412,8 @@ fn image_processor_document_sources_wait_for_the_transform() {
 #[test]
 fn image_processor_folder_source_keeps_working_during_a_transform() {
     for source in [None, Some("folder")] {
-        let ctx = egui::Context::default();
         let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let ctx = app.ctx().clone();
         let input = tempfile::tempdir().unwrap();
         let output = tempfile::tempdir().unwrap();
         app.run("file.saveACopy", json!({"path": input.path().join("source.png")})).unwrap();
@@ -431,8 +434,8 @@ fn image_processor_folder_source_keeps_working_during_a_transform() {
 /// All open documents includes a transform in another tab; Current only reads its own tab.
 #[test]
 fn image_processor_checks_the_transform_document_for_each_source() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"name": "Other", "width": 16, "height": 16})).unwrap();
     assert!(app.session.set_active(0));
     begin(&mut app, &ctx).unwrap();
@@ -449,8 +452,8 @@ fn image_processor_checks_the_transform_document_for_each_source() {
 /// #6737: Save for Web exports the committed document, so it is off while a box is pending.
 #[test]
 fn save_for_web_is_off_under_a_pending_transform() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     assert!(crate::menus::is_enabled(&app, SAVE_FOR_WEB), "enabled with no box");
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
     assert!(!crate::menus::is_enabled(&app, SAVE_FOR_WEB), "off under the box");
@@ -469,8 +472,8 @@ fn save_for_web_is_off_under_a_pending_transform() {
 #[test]
 fn copy_css_is_off_under_a_pending_transform() {
     let id = photocraft_engine::layer_css_cmds::ID;
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     let copy_css = |app: &mut PhotocraftApp| {
         let mut result = None;
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| result = Some(crate::menus::invoke(app, ui.ctx(), id, json!({}))));
@@ -478,7 +481,8 @@ fn copy_css_is_off_under_a_pending_transform() {
         (result.unwrap(), out.platform_output.commands)
     };
     let moved = |app: &mut PhotocraftApp| {
-        crate::menus::invoke(app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
         move_box(app, 20.0, 0.0);
     };
     assert!(crate::menus::is_enabled(&app, id), "enabled with no box");
@@ -510,9 +514,9 @@ fn copy_css_is_off_under_a_pending_transform() {
 /// pixels only.
 #[test]
 fn free_transform_a_copy() {
-    let ctx = egui::Context::default();
     let bounds = |app: &PhotocraftApp, i: usize| app.session.active().unwrap().doc.layers[i].surface().unwrap().content_bounds();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     let (layers, steps) = (app.session.active().unwrap().doc.layers.len(), app.session.active().unwrap().history.past_len());
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransformCopy", json!({})).unwrap();
     assert_eq!(open(&app).made, Some(MadeLayer::Copy));
@@ -545,8 +549,8 @@ fn free_transform_a_copy() {
 /// back the copy and nothing before it.
 #[test]
 fn untouched_warp_of_a_cylinder_copy_keeps_its_own_step() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
     app.run("layer.smartObjects.warp", json!({"style": "cylinder", "values": [8, 24, 24, 8, 0.3, 0.3, 0.5], "rect": [8, 8, 24, 24]})).unwrap();
     let warp = |app: &PhotocraftApp, i: usize| match &app.session.active().unwrap().doc.layers[i].content {
@@ -578,7 +582,8 @@ fn cancelling_a_copy_after_switching_documents_preserves_the_active_document() {
             let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
             let original = app.session.active().unwrap().doc.clone();
             let steps = app.session.active().unwrap().history.past_len();
-            begin_copy(&mut app, &egui::Context::default()).unwrap();
+            let app_ctx = app.ctx().clone();
+            begin_copy(&mut app, &app_ctx).unwrap();
             set_quad(&mut app, corners([12.0, 8.0, 28.0, 24.0]));
             // Cloning a document deliberately shares layer IDs, but gets a fresh document ID.
             let other = app.session.active().unwrap().doc.as_ref().clone();
@@ -609,7 +614,8 @@ fn cancelling_a_copy_after_switching_documents_preserves_the_active_document() {
 #[test]
 fn cancelling_a_copy_after_its_document_closes_does_not_undo_another_document() {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
-    begin_copy(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_copy(&mut app, &app_ctx).unwrap();
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
@@ -625,7 +631,8 @@ fn cancelling_a_copy_after_its_document_closes_does_not_undo_another_document() 
 #[test]
 fn cancelling_an_already_undone_copy_preserves_history_and_redo() {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
-    begin_copy(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_copy(&mut app, &app_ctx).unwrap();
     assert!(app.session.undo());
     let st = app.session.active().unwrap();
     let (doc, history, redo) = (st.doc.clone(), st.history.entries(), st.history.redo_labels().map(str::to_owned).collect::<Vec<_>>());
@@ -640,7 +647,8 @@ fn cancelling_an_already_undone_copy_preserves_history_and_redo() {
 #[test]
 fn cancelling_a_copy_does_not_undo_a_later_edit() {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
-    begin_copy(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_copy(&mut app, &app_ctx).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     let st = app.session.active().unwrap();
     let (doc, history) = (st.doc.clone(), st.history.entries());
@@ -725,8 +733,8 @@ fn edits_during_a_selection_transform_keep_the_lifted_pixels_out() {
 /// and the next transform starts on the newly selected layer.
 #[test]
 fn selecting_another_layer_applies_the_transform_and_the_next_one_follows() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     let first = app.session.active().unwrap().active_layer.unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.session
@@ -824,8 +832,8 @@ fn the_box_is_the_selection_and_the_ants_follow_it() {
 /// Transform Selection moves the selection outline, not a layer: selecting a layer keeps it open.
 #[test]
 fn selecting_another_layer_keeps_a_transform_selection_open() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let ctx = app.ctx().clone();
     let first = app.session.active().unwrap().active_layer.unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("select.all", json!({})).unwrap();
@@ -873,7 +881,7 @@ fn a_pointer_request_with_another_tool_applies_the_transform_first() {
 #[test]
 fn distort_mode_edge_drag_commits_what_it_shows_in_one_step() {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     let steps = app.session.active().unwrap().history.past_len();
     let q0 = *open(&app).session.state();
@@ -910,8 +918,8 @@ fn right_click_menu_offers_warp_for_a_path() {
     let warp_row = |t: &FreeTransform| {
         t.session.menu(&words).iter().find(|e| matches!(e.value(), Some(TransformChoice::Warp))).map(|e| e.is_enabled()).expect("the menu has a Warp row")
     };
-    let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = app.ctx().clone();
     app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.sync_views();
     app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"closed": true, "knots": [[10, 10], [30, 10], [30, 20], [10, 20]]}]}})).unwrap();
@@ -1041,7 +1049,8 @@ fn free_transform_of_a_layer_linked_to_the_background_boxes_that_layer_alone() {
     app.session.execute("layer.select", json!({"layer": a.0, "mode": "add"})).unwrap();
     assert_eq!(app.session.execute("layer.linkLayers", json!({})).unwrap()["linked"], true);
     app.session.execute("layer.select", json!({"layer": a.0})).unwrap();
-    begin(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin(&mut app, &app_ctx).unwrap();
     let t = open(&app);
     assert_eq!((t.layer, rect_of(t)), (a.0, [8.0, 8.0, 24.0, 24.0]), "the box frames A, not the canvas-sized Background");
     assert!(t.layers.is_empty(), "a one-layer session");
@@ -1423,7 +1432,7 @@ fn transform_selection_moves_only_the_outline() {
     app.sync_views();
     app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
     let px0 = app.session.active().unwrap().doc.layers[0].surface().unwrap().read_region(photocraft_geom::Rect::new(0, 0, 64, 64));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &ctx, "select.transformSelection", json!({})).unwrap();
     let t = open(&app);
     assert!(t.selection && rect_of(t) == [8.0, 8.0, 24.0, 24.0]);
@@ -1441,15 +1450,16 @@ fn transform_selection_moves_only_the_outline() {
 /// A 64 px document with a red square over 8..32, in Warp mode on its default grid.
 fn warping_square() -> PhotocraftApp {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
-    begin_warp(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_warp(&mut app, &app_ctx).unwrap();
     app
 }
 
 /// A warp anchor dragged with its handles, a split cut through the grid, and the commit.
 #[test]
 fn warp_mode_drags_anchor_with_handles_splits_and_commits() {
-    let ctx = egui::Context::default();
     let mut app = warping_square();
+    let ctx = app.ctx().clone();
     assert!(session_warp(&app).warp.is_identity());
     // Drag the bottom-right anchor (point 15) by (+10, +6): its two handles follow.
     let before = warp_mesh(&app);
@@ -1483,7 +1493,7 @@ fn a_thin_layer_scaled_then_warped_commits_the_curve() {
     // #5793: a 3 px column stretched wide, switched to Warp and pulled down in the middle.
     // The commit came out straight: the warp's grid was one cell across the 3 source pixels.
     let mut app = app_with_square(128, photocraft_geom::Rect::new(40, 20, 43, 60));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     scale_box(&mut app, 30.0, 1.0);
     enter_warp(&mut app, &ctx);
@@ -1531,7 +1541,8 @@ fn warp_surface_drag_commits_as_previewed() {
             Ok(())
         })
         .unwrap();
-    begin_warp(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_warp(&mut app, &app_ctx).unwrap();
     // A pull of the surface inside the top-left cell: the grid's four inner points move.
     let (start, by) = ([30.0, 30.0], Vec2::new(9.0, -5.0));
     let mut pulled = warp_mesh(&app);
@@ -1574,7 +1585,8 @@ fn warp_surface_drag_commits_as_previewed() {
 #[test]
 fn an_armed_split_places_one_line_and_disarms() {
     let mut app = app_with_square(512, photocraft_geom::Rect::new(56, 56, 456, 356));
-    begin_warp(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_warp(&mut app, &app_ctx).unwrap();
     app.transform_preview.as_mut().unwrap().split = Some(WarpSplit::Vertical);
     let before = warp_mesh(&app);
     let cut = before.split(WarpSplit::Vertical, 0, 0, 0.5, 0.5);
@@ -1679,7 +1691,7 @@ fn preview_applies_the_linked_mask() {
     // With a selection the lifted pixels carry the mask too.
     let mut app = masked_app(true);
     app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 12, "height": 16})).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     let st = app.session.active().unwrap();
     let sel = st.doc.selection.clone().unwrap();
@@ -1796,7 +1808,7 @@ fn preview_of_a_clipped_smart_object_is_not_empty() {
 fn targeted_unlinked_mask_transforms_alone_through_the_box() {
     let mut app = masked_app(false);
     app.ui.mask_target = true;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     let t = open(&app);
     assert_eq!(t.target, Some(json!("mask")));
@@ -1816,7 +1828,8 @@ fn targeted_unlinked_mask_transforms_alone_through_the_box() {
     // Warp mode doesn't apply to a lone mask.
     app.ui.mask_target = true;
     begin(&mut app, &ctx).unwrap();
-    enter_warp(&mut app, &egui::Context::default());
+    let app_ctx = app.ctx().clone();
+    enter_warp(&mut app, &app_ctx);
     assert!(open(&app).session.warp().is_none());
 }
 
@@ -1830,7 +1843,8 @@ fn mask_view_keeps_move_and_transform_available_behind_a_colour_set() {
         let st = app.session.active().unwrap();
         let layer = st.active_layer.unwrap();
         let original = st.doc.layer(layer).unwrap().surface().unwrap().clone();
-        begin(&mut app, &egui::Context::default()).unwrap();
+        let app_ctx = app.ctx().clone();
+        begin(&mut app, &app_ctx).unwrap();
         assert_eq!(open(&app).target, Some(json!("mask")));
         move_box(&mut app, 20.0, 0.0);
         commit(&mut app);
@@ -1865,7 +1879,8 @@ fn free_transform_a_copy_of_a_targeted_mask_on_a_linked_layer_still_copies() {
     app.session.execute("layer.select", json!({"layer": a.0})).unwrap();
     app.ui.mask_target = true;
     let layers = app.session.active().unwrap().doc.layers.len();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransformCopy", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransformCopy", json!({})).unwrap();
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1, "the layer is copied");
     assert_eq!(open(&app).made, Some(MadeLayer::Copy));
     cancel(&mut app);
@@ -1875,7 +1890,7 @@ fn free_transform_a_copy_of_a_targeted_mask_on_a_linked_layer_still_copies() {
 fn linked_mask_target_transforms_the_layer() {
     let mut app = masked_app(true);
     app.ui.mask_target = true;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     begin(&mut app, &ctx).unwrap();
     assert_eq!(open(&app).target, None);
     assert_eq!(rect_of(open(&app)), [8.0, 8.0, 24.0, 24.0]);
@@ -1885,8 +1900,8 @@ fn linked_mask_target_transforms_the_layer() {
 /// undoable step; it works on the Background too.
 #[test]
 fn free_transform_moves_the_selected_path_not_pixels() {
-    let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = app.ctx().clone();
     app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
     app.sync_views();
     app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"closed": true, "knots": [[10, 10], [30, 10], [30, 20], [10, 20]]}]}})).unwrap();
@@ -1943,7 +1958,7 @@ fn warp_on_type_takes_a_style_and_keeps_the_type_editable() {
     app.session.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
     app.sync_views();
     app.run("type.create", json!({"x": 10, "y": 60, "text": "Hello"})).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let past = |app: &PhotocraftApp| app.session.active().unwrap().history.past_len();
     let before = past(&app);
     crate::menus::invoke(&mut app, &ctx, "edit.transform.warp", json!({})).unwrap();
@@ -1986,8 +2001,8 @@ fn cylinder_start(bounds: [f64; 4]) -> Warp {
 /// dragged values, and Warp mode shows it again as a cylinder, whose untouched commit is no step.
 #[test]
 fn warp_mode_drags_a_cylinders_handles_and_commits_it_as_a_cylinder() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
+    let ctx = app.ctx().clone();
     app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
     begin_warp(&mut app, &ctx).unwrap();
     let b = rect_of(open(&app));
@@ -2054,8 +2069,8 @@ fn warp_mode_drags_a_cylinders_handles_and_commits_it_as_a_cylinder() {
 /// arc's bulge; warping them again put the picture well inside the lines.
 #[test]
 fn warp_mode_previews_a_stored_smart_warp_from_the_unwarped_source() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
+    let ctx = app.ctx().clone();
     app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
     app.run("layer.smartObjects.warp", json!({"style": "cylinder", "values": [8, 32, 32, 8, 0.5, 0.5, 0.85], "rect": [8, 8, 32, 32]})).unwrap();
     // The warped render reaches below the box.
@@ -2078,8 +2093,8 @@ fn warp_mode_previews_a_stored_smart_warp_from_the_unwarped_source() {
 /// again (the texels the box opened with), and re-entering shows the source without it (#9798).
 #[test]
 fn leaving_warp_mode_restores_the_stored_warps_render() {
-    let ctx = egui::Context::default();
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
+    let ctx = app.ctx().clone();
     app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
     app.run("layer.smartObjects.warp", json!({"style": "cylinder", "values": [8, 32, 32, 8, 0.5, 0.5, 0.85], "rect": [8, 8, 32, 32]})).unwrap();
     begin(&mut app, &ctx).unwrap();
@@ -2111,7 +2126,8 @@ fn leaving_warp_mode_restores_the_stored_warps_render() {
 #[test]
 fn a_cylinder_commits_the_wrapped_pixels() {
     let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
-    begin_warp(&mut app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    begin_warp(&mut app, &app_ctx).unwrap();
     let b = rect_of(open(&app));
     // Silhouettes pulled in to x 12..28: the square's outer columns go round the back.
     let w = Warp::cylinder(&[12.0, 29.0, 28.0, 8.0, 0.25, 0.25, 0.5], b).unwrap();

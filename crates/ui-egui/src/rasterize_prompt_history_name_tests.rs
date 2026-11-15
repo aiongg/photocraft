@@ -70,10 +70,11 @@ fn ok_adds_one_rasterize_state_named_for_its_trigger() {
 #[test]
 fn layer_rasterize_type_keeps_its_step_name() {
     let mut app = app_with(Kind::Type);
-    crate::menus::invoke(&mut app, &egui::Context::default(), "layer.rasterize.type", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "layer.rasterize.type", json!({})).unwrap();
     assert_eq!(step_name(&app).as_deref(), Some("Rasterize Type"), "the menu");
 
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for (method, params) in [("ui.menu.invoke", json!({"id": "layer.rasterize.type"})), ("engine.execute", json!({"command": "layer.rasterize.type"}))] {
         let mut app = app_with(Kind::Type);
         let (req, _rx) = crate::control::ControlRequest::new(method, params);

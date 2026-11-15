@@ -156,8 +156,8 @@ fn selection_bounds(app: &PhotocraftApp) -> (i32, i32, u32, u32) {
 #[test]
 fn lock_column_converts_the_background_and_unlocks_in_one_click() {
     use crate::canvas::{ToolEvent, tool_event};
-    let ctx = egui::Context::default();
     let mut app = app_of(Session::new());
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 120, "height": 80})).unwrap();
     app.run("tools.setColors", json!({"background": "#ff0000"})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0}})).unwrap();
@@ -369,7 +369,7 @@ fn thumb_clicks_pick_commands_and_targets() {
     for (case, setup, events, after) in cases {
         let (s, a, b) = setup();
         let mut app = app_of(s);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         send(&mut app, &ctx, events(a, b));
         eprintln!("{case}");
         after(&app, a, b);
@@ -521,7 +521,7 @@ fn footer_and_drop_events_follow_the_targets() {
 fn menu_pick_values_run_their_rules() {
     let (s, masked, _) = session();
     let mut app = app_of(s);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let on = Some(LayerRowKey::Layer(LayerId(masked)));
     let pick = |app: &mut PhotocraftApp, row: &Option<LayerRowKey<LayerId>>, command: &str| {
         let mut actions = Vec::new();
@@ -571,10 +571,10 @@ fn menu_pick_values_run_their_rules() {
 #[test]
 fn activate_and_fx_events_open_the_right_editor() {
     use crate::canvas::ToolEvent;
-    let ctx = egui::Context::default();
     let top = |app: &PhotocraftApp| app.framework.dialogs.open_dialogs().pop().expect("a dialog opened");
     let (s, a, _, c) = smart_session();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
     assert_eq!(active(&app), Some(LayerId(c)));
 
     // Blending Options opens the blending dialog and picks the smart object.
@@ -636,10 +636,10 @@ fn activate_and_fx_events_open_the_right_editor() {
 /// #5584: a select commits an open text edit first, whether it picks the layer being edited or another.
 #[test]
 fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
-    let ctx = egui::Context::default();
     for same in [true, false] {
         for thumbnail in [true, false] {
             let mut app = app_of(Session::new());
+    let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
             let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
             let other = LayerId(app.run("layer.new.layer", json!({"name": "Other pixels"})).unwrap()["layer"].as_u64().unwrap());

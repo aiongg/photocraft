@@ -52,7 +52,7 @@ mod tests {
             ..Default::default()
         };
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         // Every Help-menu link id reaches the service with its URL.
         for (id, url) in COMMANDS {
             crate::menus::invoke(&mut app, &ctx, id, json!({})).unwrap();

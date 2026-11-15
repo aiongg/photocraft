@@ -238,8 +238,8 @@ mod tests {
     #[test]
     /// Relisting and toggling Check All Layers keep the original single-layer receiver, including the absent-layer case.
     fn spelling_refresh_and_all_layers_toggles_keep_the_opening_layer() {
-        let ctx = egui::Context::default();
         let mut app = app_with_text("Teh cat");
+        let ctx = app.ctx().clone();
         let original = app.session.active().unwrap().active_layer.unwrap();
         app.run("type.create", json!({"x":10,"y":90,"text":"Teh dog"})).unwrap();
         let other = app.session.active().unwrap().active_layer.unwrap();
@@ -268,8 +268,8 @@ mod tests {
 
     #[test]
     fn recording_the_dialog_records_one_step_with_its_dialog_on() {
-        let ctx = egui::Context::default();
         let mut app = app_with_text("Teh cat");
+        let ctx = app.ctx().clone();
         app.run("actions.record", json!({"name": "Spell"})).unwrap();
         open_spelling(&mut app, true).unwrap();
         let item = items(&app).remove(0);

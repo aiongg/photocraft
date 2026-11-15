@@ -59,7 +59,8 @@ fn bounds(app: &PhotocraftApp, id: LayerId) -> Rect {
 }
 
 fn free_transform(app: &mut PhotocraftApp) {
-    crate::menus::invoke(app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
 }
 
 #[test]

@@ -17,7 +17,7 @@ const HELP_BUTTON: &str = "Displays pop-up help for the fill methods";
 fn app() -> App {
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 320.0)).with_max_steps(64).with_accessibility_check(false).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
         app.run("file.new", json!({"name": "crop bar", "width": 800, "height": 600})).expect("new document");
         app.ui.tool_options.crop.shield.classic_mode = true;

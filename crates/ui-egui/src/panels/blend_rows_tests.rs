@@ -93,7 +93,7 @@ fn blend_rows_edits_become_previews_and_history_steps() {
         let top = LayerId(s.execute("layer.new.layer", json!({"name": "top"})).unwrap()["layer"].as_u64().unwrap());
         s.execute("edit.fill", json!({"color": "#cc3366"})).unwrap();
         let mut app = PhotocraftApp::new(s, crate::Services::default());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let steps = app.session.active().unwrap().history.past_len();
         for event in events {
             super::layers_events::apply_layers_events(&mut app, &ctx, vec![event]);
@@ -109,7 +109,7 @@ fn blend_rows_edits_become_previews_and_history_steps() {
 fn harness(width: u32, height: u32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": width, "height": height})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.ui.tool = Tool::Move;

@@ -230,7 +230,7 @@ fn smart_filter_double_click_edits_the_stored_camera_raw_filter_in_its_own_dialo
 #[test]
 fn distant_sparse_pixels_cannot_trigger_an_unbounded_proxy_scan() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width":64,"height":48})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     let layer = app.session.active().unwrap().active_layer.unwrap();
@@ -244,7 +244,7 @@ fn distant_sparse_pixels_cannot_trigger_an_unbounded_proxy_scan() {
 #[test]
 fn dialog_drives_the_engine() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#808080"})).unwrap();
@@ -620,7 +620,7 @@ fn a_raw_whose_background_develop_fails_comes_back_to_the_filmstrip() {
 #[test]
 fn auto_tone_of_a_never_shown_raw_matches_the_dialogs() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"path": "rawDefaults.applyAutoTone", "value": true})).unwrap();
     app.run("file.new", json!({"width": 1800, "height": 1200})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();

@@ -123,7 +123,7 @@ fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) {
 
 fn dialog_harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftApp> {
     // Real frame times: a double-click's two clicks must land within the double-click time.
-    let h = Harness::builder().with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(size).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h
 }
@@ -214,7 +214,7 @@ fn dialogs_preview_cancel_and_commit() {
 #[test]
 fn curves_pencil_drag_draws_the_map_and_confirm_applies_it() {
     let mut app = app_with_image();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let steps = app.session.active().unwrap().history.past_len();
     let id = open(&mut app, "image.adjustments.curves").unwrap();
     let mut map: Vec<f64> = (0..256).map(f64::from).collect();
@@ -238,7 +238,7 @@ fn curves_pencil_drag_draws_the_map_and_confirm_applies_it() {
 fn curves_pointer_drag_previews_until_confirm_and_cancel_preserves_document() {
     for confirm in [false, true] {
         let mut app = app_with_image();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let original = app.session.active().unwrap().doc.clone();
         let steps = app.session.active().unwrap().history.past_len();
         let id = open(&mut app, "image.adjustments.curves").unwrap();
@@ -370,7 +370,7 @@ fn curve_levels(pts: &[[f64; 2]]) -> Vec<f32> {
 #[test]
 fn command_click_on_the_image_adds_a_point_on_the_composite_curve() {
     let mut app = app_with_image();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let original = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.past_len();
     let id = open(&mut app, "image.adjustments.curves").unwrap();
@@ -433,7 +433,6 @@ fn command_click_adds_nothing_without_the_modifier_on_a_full_curve_or_with_an_ey
 /// A recorded `pixels` target still takes it.
 #[test]
 fn command_click_adds_nothing_in_lab_or_on_a_targeted_mask() {
-    let ctx = egui::Context::default();
     let mut lab = app_in_mode("lab");
     lab.run("edit.fill", json!({"color": "#b04020"})).unwrap();
     let id = open(&mut lab, "image.adjustments.curves").unwrap();
@@ -451,6 +450,7 @@ fn command_click_adds_nothing_in_lab_or_on_a_targeted_mask() {
 
     // The dialog's explicit target wins over the Channels panel's.
     let mut app = app_with_image();
+    let ctx = app.ctx().clone();
     app.run("channel.new", json!({"name": "Saved sky", "fill": "white"})).unwrap();
     app.run("channel.target", json!({"channel": {"color": 0}})).unwrap();
     let id = open_with_params(&mut app, "image.adjustments.curves", &json!({"target": {"channel": 0}})).unwrap();
@@ -568,7 +568,7 @@ fn popup_channels(h: &mut Harness<'static, PhotocraftApp>) -> Vec<String> {
 fn lab_subset_recall_preserves_combined_record_beside_native_lightness() {
     for kind in ["levels", "curves"] {
         let mut app = app_with_image();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.run("file.new", json!({"width":32,"height":24,"mode":"lab","depth":16})).unwrap();
         app.run("channel.target", json!({"colors":[0,2]})).unwrap();
         let command = format!("image.adjustments.{kind}");
@@ -587,7 +587,7 @@ fn lab_subset_recall_preserves_combined_record_beside_native_lightness() {
 #[test]
 fn levels_recall_on_a_viewed_mask_keeps_its_settings_beside_a_lab_colour_set() {
     let mut app = app_with_image();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width":32,"height":24,"mode":"lab","depth":16})).unwrap();
     app.run("layer.layerMask.revealAll", json!({})).unwrap();
     app.run("channel.target", json!({"colors":[0,2]})).unwrap();
@@ -681,7 +681,7 @@ fn curves_on_a_targeted_filter_mask_is_a_gray_plane() {
 #[test]
 fn photo_filter_keeps_only_preserve_luminosity_from_its_last_ok() {
     let mut app = app_with_image();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let cmd = "image.adjustments.photoFilter";
     let first = open(&mut app, cmd).unwrap();
     let neutral = params(&mut app, first);
@@ -786,7 +786,7 @@ fn tone_dialog_explicit_colour_sets_and_pixels_override_gray_panel_state() {
             app.run("channel.new", json!({"name":"Saved sky"})).unwrap();
             app.run("channel.target", json!({"channel":0})).unwrap();
             let command = format!("image.adjustments.{kind}");
-            let ctx = egui::Context::default();
+            let ctx = app.ctx().clone();
             let id = open_with_params(&mut app, &command, &json!({"target":{"colors":[0,2]}})).unwrap();
             let fields = params(&mut app, id);
             let fields = fields.as_object().unwrap();
@@ -893,7 +893,7 @@ fn rabbit_levels_live_mask_preview_matches_commit() {
                 session.execute("edit.fill", json!({"target":target,"contents":"color","color":"#404040"})).unwrap();
                 let mut app = PhotocraftApp::new(session, Default::default());
                 app.background_jobs = false;
-                let ctx = egui::Context::default();
+                let ctx = app.ctx().clone();
                 let id = open(&mut app, "image.adjustments.levels").unwrap();
                 set_field(&mut app, id, "gamma", json!(2));
                 let before = app.session.active().unwrap().doc.clone();
@@ -937,7 +937,7 @@ fn pixel(app: &PhotocraftApp, x: usize, y: usize) -> [f32; 4] {
 #[test]
 fn selective_color_dialog_ok_applies_every_colour_in_one_step() {
     let mut app = selective_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let id = open(&mut app, SELECTIVE).unwrap();
     let (before_red, before_blue) = (pixel(&app, 8, 8), pixel(&app, 56, 8));
     let steps = app.session.active().unwrap().history.past_len();
@@ -967,7 +967,7 @@ fn selective_color_ok_on_malformed_params_reports_and_commits_nothing() {
     ];
     for case in cases {
         let mut app = selective_app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let doc = app.session.active().unwrap().doc.clone();
         let steps = app.session.active().unwrap().history.past_len();
         let journal = app.session.journal.len();
@@ -985,7 +985,7 @@ fn selective_color_ok_on_malformed_params_reports_and_commits_nothing() {
 #[test]
 fn selective_color_dialog_folds_the_single_colour_form_into_the_rows() {
     let mut app = selective_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let id = open_with_params(&mut app, SELECTIVE, &json!({"colors": "blues", "cyan": 30})).unwrap();
     let shown = params(&mut app, id);
     for key in ["cyan", "magenta", "yellow", "black"] {

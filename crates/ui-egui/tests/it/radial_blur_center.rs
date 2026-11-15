@@ -18,7 +18,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.run("paint.stroke", json!({"points": [[8, 8, 1]], "size": 4, "color": "#ff8000"})).unwrap();
-    let h = Harness::builder().with_size(vec2(1000.0, 800.0)).build_ui_state(
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 800.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let _language = i18n::language_scope(i18n::Lang::EN);
             dialogs::run(app, ui);

@@ -144,7 +144,7 @@ mod swatch_type_tests {
         let fg = app.session.tools.foreground;
         app.ui.tool = Tool::Type;
         app.ui.text_edit = Some(crate::state::TextEdit { layer: id, document: None, caret: 0, anchor: 5, session: "s".into(), created: false, mask: false });
-        let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::panels::color::panel(app, ui), app);
+        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::panels::color::panel(app, ui), app);
         h.run_steps(4);
         assert_eq!(h.state().session.tools.foreground, fg);
         let st = h.state().session.active().unwrap();

@@ -22,7 +22,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     s.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
     h.run_steps(6);
     h

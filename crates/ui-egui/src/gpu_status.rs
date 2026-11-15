@@ -335,7 +335,8 @@ mod tests {
         let english = crate::i18n::with_language(crate::i18n::Lang::EN, || system_info(&app));
         crate::i18n::with_language(crate::i18n::Lang::from_code("cs").unwrap(), || {
             assert_eq!(system_info(&app), english, "clipboard diagnostics include English monitor profiles too");
-            let result = crate::menus::invoke(&mut app, &egui::Context::default(), "help.systemInfo", json!({})).unwrap();
+            let app_ctx = app.ctx().clone();
+            let result = crate::menus::invoke(&mut app, &app_ctx, "help.systemInfo", json!({})).unwrap();
             assert_eq!(result["info"]["lines"], json!(english));
             assert_eq!(crate::i18n::current().code(), "cs", "diagnostics restore the drawing language");
             let screen = system_info_ui(&app);
@@ -423,7 +424,7 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.set_wgpu(rs);
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let oom = || photocraft_gpu::Fault::Error("Out of Memory".into());
         for n in 1..=OOM_AUTO_RETRIES {
             app.gpu_health().unwrap().mark(oom());
@@ -464,7 +465,7 @@ mod tests {
         let mut app = launch(&std::sync::Arc::new(craft::settings::testing::MemoryFiles::new()));
         app.set_wgpu(rs);
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         // An error on a live device (one not retried by itself, see #6564): Retry GPU rebuilds
         // the canvas now.
         app.gpu_health().unwrap().mark(photocraft_gpu::Fault::Error("Validation Error".into()));

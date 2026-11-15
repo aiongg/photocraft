@@ -13,7 +13,8 @@ fn app() -> PhotocraftApp {
 
 /// Edit › Undo or Redo as the menu, the shortcut and the control channel run it.
 fn menu(app: &mut PhotocraftApp, id: &str) {
-    crate::menus::invoke(app, &egui::Context::default(), id, json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, id, json!({})).unwrap();
 }
 
 /// A click of the current tool at the document point `(x, y)`.
@@ -265,8 +266,8 @@ fn undo_after_switching_tools_gives_the_path_back_to_the_pen() {
 
 #[test]
 fn a_free_transform_box_keeps_its_own_undo_and_redo_over_a_finished_pen_path() {
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("select.rect", json!({"x": 50, "y": 50, "width": 60, "height": 60})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
@@ -304,8 +305,8 @@ fn a_free_transform_box_keeps_its_own_undo_and_redo_over_a_finished_pen_path() {
 
 #[test]
 fn redo_does_not_put_a_finished_path_beside_its_edited_draft() {
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     app.ui.tool = Tool::Pen;
     three_anchors(&mut app);
     press(&mut app, egui::Key::Enter, egui::Modifiers::NONE);

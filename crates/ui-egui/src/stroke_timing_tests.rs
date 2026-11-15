@@ -13,7 +13,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     app.run("file.new", json!({"width": 200, "height": 100, "background": "white"})).unwrap();
     app.sync_views();
     app.ui.tool = Tool::Brush;
-    let mut h = Harness::builder().with_size(vec2(900.0, 600.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -367,7 +367,7 @@ fn the_stroke_trace_times_each_frame_of_a_stroke_and_ends_on_release() {
     app.sync_views();
     app.ui.tool = Tool::Brush;
     app.stroke_trace.output = crate::stroke_trace::Output::Stderr;
-    let mut h = Harness::builder().with_size(vec2(900.0, 600.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

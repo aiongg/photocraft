@@ -24,7 +24,7 @@ const INSIDE: [f64; 2] = [150.0, 100.0];
 fn app() -> Harness {
     let mut h = Harness::builder().with_size(egui::vec2(1000.0, 700.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
         app.run("file.new", json!({"width": 400, "height": 300})).expect("new document");
         app

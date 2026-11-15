@@ -21,7 +21,7 @@ const PICKED_RGB: [f32; 3] = [0x33 as f32 / 255.0, 0x66 as f32 / 255.0, 0x99 as 
 fn harness(setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 1800.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, crate::theme::AppTheme::pro());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 200, "height": 120})).unwrap();
         setup(&mut app);
         app

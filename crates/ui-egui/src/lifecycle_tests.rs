@@ -42,8 +42,8 @@ fn host_input(viewport: egui::ViewportId) -> RawInput {
 #[test]
 fn queued_input_is_withdrawn_only_when_the_active_document_changes() {
     for (command, params, withdrawn) in [("file.new", json!({"width": 16, "height": 16}), true), ("layer.new.layer", json!({"name": "queued"}), false)] {
-        let ctx = Context::default();
         let mut app = app_with_doc();
+        let ctx = app.ctx().clone();
         let reply = queue_key(&mut app, &ctx);
         app.run(command, params).expect(command);
         app.withdraw_stale_input(&ctx);
@@ -71,8 +71,8 @@ fn a_logic_tick_requests_a_hidden_paint_for_waiting_captures_and_queued_input() 
     };
     let mut frame = eframe::Frame::_new_kittest();
 
-    let ctx = Context::default();
     let mut app = app_with_doc();
+    let ctx = app.ctx().clone();
     let (tx, _rx) = std::sync::mpsc::channel();
     let document = app.document_identity();
     let (_transport, requests) = std::sync::mpsc::channel();
@@ -82,7 +82,7 @@ fn a_logic_tick_requests_a_hidden_paint_for_waiting_captures_and_queued_input() 
     let out = ctx.run_logic(&host_input(egui::ViewportId::ROOT), |ctx| app.logic(ctx, &mut frame));
     assert!(paints(&out), "a capture waiting for geometry keeps the hidden window painting");
 
-    let ctx = Context::default();
+    let ctx = app.ctx().clone();
     let mut app = app_with_doc();
     let _reply = queue_key(&mut app, &ctx);
     let out = ctx.run_logic(&host_input(egui::ViewportId::ROOT), |ctx| app.logic(ctx, &mut frame));
@@ -100,7 +100,7 @@ pub(crate) fn app_harness(
     let services = std::cell::Cell::new(Some(services));
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(Session::new(), services.take().expect("one app"));
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), Session::new(), services.take().expect("one app"));
         for _ in 0..documents {
             app.run("file.new", json!({"width": 32, "height": 32})).expect("a document");
         }

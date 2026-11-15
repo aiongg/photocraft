@@ -16,7 +16,7 @@ type H = Harness<'static, PhotocraftApp>;
 fn harness(s: Session) -> H {
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
     let ctx = h.ctx.clone();
     let (r, _) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color", "properties", "history", "navigator"]}}));
@@ -351,7 +351,7 @@ fn framed_pixels() -> Session {
 #[test]
 fn edit_type_command_rejects_missing_or_non_type_layers_without_changes() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for has_document in [false, true] {
         if has_document {
             app.run("file.new", json!({"width": 32, "height": 24})).unwrap();

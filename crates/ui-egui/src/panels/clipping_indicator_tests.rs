@@ -20,7 +20,7 @@ fn adjustment_harness(kind: &str, depth: u32) -> Harness<'static, PhotocraftApp>
     session.execute("select.deselect", json!({})).unwrap();
     let app = PhotocraftApp::new(session, Default::default());
     let mut properties = false;
-    let mut h = Harness::builder().with_size(vec2(320.0, 640.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 640.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|fonts| fonts.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;

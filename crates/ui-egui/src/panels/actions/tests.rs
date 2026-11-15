@@ -55,7 +55,7 @@ fn selected_layer_name_is_visible_during_recording_and_after_stop() {
         assert_eq!(host.step_label(&pending[0]), "Select Layer (Background)");
         assert_eq!(host.step_label(&step("layer.select", json!({"layer":26}))), "Select Layer (ID 26)");
     }
-    let mut h = Harness::builder().with_size(egui::vec2(400.0, 260.0)).build_ui_state(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(400.0, 260.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(4);
     h.get_by_label("Select Layer (Background)");
     h.state_mut().run("actions.stop", json!({})).unwrap();
@@ -83,7 +83,7 @@ fn a_function_key_with_shift_and_command_plays_its_action() {
     let key = photocraft_engine::atn_cmds::function_key_name(2, true, true);
     assert_eq!(key, "Cmd+Shift+F2");
     assign_shortcut(&mut app, "Action 1", &key).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let press = |app: &mut PhotocraftApp, modifiers| {
         ctx.begin_pass(egui::RawInput {
             events: vec![
@@ -183,7 +183,7 @@ fn set_folders_group_actions_and_collapse() {
     push(&mut app, "Loose", None, vec![]);
     push(&mut app, "Sharpen", Some("Retouch"), vec![step("filter.sharpen.sharpen", json!({}))]);
     push(&mut app, "Also loose", None, vec![]);
-    let mut h = Harness::builder().with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
     let folder = h.get_by_label("Retouch").rect();
     assert!(h.get_by_label("Loose").rect().top() < folder.top());
@@ -297,7 +297,7 @@ fn recording_into_a_collapsed_set_expands_it() {
     assert!(app.ui.actions.panel.settings.collapsed_sets.is_empty());
     assert_eq!(app.ui.actions.panel.selected, Some(ActionSelection::Action(0)));
     assert!(app.ui.actions.panel.expanded.contains("Sharpen"));
-    let mut h = Harness::builder().with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
     assert!(h.query_by_label("Sharpen").is_some(), "the set shows its action");
     h.state_mut().run("actions.stop", json!({})).unwrap();

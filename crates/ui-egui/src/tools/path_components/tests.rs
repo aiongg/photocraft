@@ -99,8 +99,8 @@ fn a_selected_component_takes_the_picked_operation() {
 /// otherwise steps the blend mode; with the Move tool it still does.
 #[test]
 fn plus_and_minus_pick_combine_and_subtract() {
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     square(&mut app, 20.0, 20.0, 120.0);
     app.ui.tool_options.pen_path_op = "combine".into();
     square(&mut app, 60.0, 60.0, 40.0);
@@ -181,8 +181,8 @@ fn a_stale_selection_changes_nothing() {
 /// another, only the other takes the operation.
 #[test]
 fn the_first_component_keeps_combining() {
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     square(&mut app, 20.0, 20.0, 120.0);
     app.ui.tool_options.pen_path_op = "combine".into();
     square(&mut app, 60.0, 60.0, 40.0);
@@ -206,8 +206,8 @@ fn the_first_component_keeps_combining() {
 /// menu set the next path's operation and leave the components alone (feedback on #7648).
 #[test]
 fn the_pen_does_not_edit_a_hidden_component_selection() {
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     square(&mut app, 20.0, 20.0, 120.0);
     app.ui.tool_options.pen_path_op = "combine".into();
     square(&mut app, 60.0, 60.0, 40.0);

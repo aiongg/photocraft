@@ -112,7 +112,7 @@ fn app_switches_to_the_cpu_canvas_and_keeps_the_documents() {
     let started = std::rc::Rc::new(std::cell::Cell::new(false));
     let flag = started.clone();
     app.on_started(move |_| flag.set(true));
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 700.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1000.0, 700.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -159,7 +159,7 @@ fn started_hook_runs_once_after_the_first_frames() {
     let runs = std::rc::Rc::new(std::cell::Cell::new(0));
     let r = runs.clone();
     app.on_started(move |_| r.set(r.get() + 1));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for frame in 1..=2 {
         app.frame = frame;
         app.check_gpu(&ctx);
@@ -248,7 +248,7 @@ fn a_lost_window_device_saves_unsaved_work_for_recovery_and_closes() {
                 })),
                 ..Default::default()
             };
-            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+            let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), services);
             if let Some(rs) = cc.wgpu_render_state.as_ref() {
                 *window.lock().unwrap() = Some(rs.clone());
                 app.set_wgpu(rs.clone());
@@ -322,7 +322,7 @@ fn a_lost_window_device_closes_only_once_unsaved_work_is_saved() {
                 })),
                 ..Default::default()
             };
-            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+            let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), services);
             if let Some(rs) = cc.wgpu_render_state.as_ref() {
                 app.set_wgpu(rs.clone());
             }

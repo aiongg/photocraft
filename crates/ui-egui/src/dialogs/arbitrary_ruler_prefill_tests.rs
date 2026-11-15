@@ -31,7 +31,7 @@ fn shown(app: &PhotocraftApp, id: DialogId) -> (f64, String) {
 
 /// OK answered with no pass in between: the angle the command receives.
 fn confirmed_angle(app: &mut PhotocraftApp, id: DialogId) -> Option<f64> {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "OK files its answer");
     match app.framework.dialogs.take_by_id::<HostedParamDialog>(id) {
         Some(DialogResult::Ok(result)) => result.fields.number("angle"),
@@ -62,7 +62,7 @@ fn the_ruler_angle_is_rounded_before_the_first_frame() {
     assert_eq!(confirmed_angle(&mut app, id), Some(32.12), "undrawn, OK sends the rounded angle");
 
     let (app, id) = open_ruler([143, 127]);
-    let mut h = Harness::builder()
+    let mut h = Harness::builder().with_context(app.ctx().clone())
         .with_size(egui::vec2(900.0, 700.0))
         .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());

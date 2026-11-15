@@ -192,8 +192,8 @@ fn shown(theme: AppTheme) -> (ThemeId, bool) {
 
 #[test]
 fn breeze_themes_are_chosen_by_preference_and_fix_the_matching_mode() {
-    let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = app.ctx().clone();
     for (id, kind, mode) in [
         ("breezeLight", AppTheme::breeze_light(), AppearanceMode::Light),
         ("breezeDark", AppTheme::breeze_dark(), AppearanceMode::Dark),
@@ -225,8 +225,8 @@ fn auto_uses_native_system_theme_when_egui_does_not_report_one() {
 
 #[test]
 fn appearance_button_cycles_modes_without_losing_theme_choices() {
-    let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"values": {"interface.darkTheme": "studio", "interface.lightTheme": "classic"}})).unwrap();
     for (mode, visible) in
         [(AppearanceMode::Auto, AppTheme::studio()), (AppearanceMode::Light, AppTheme::classic()), (AppearanceMode::Dark, AppTheme::studio())]
@@ -241,8 +241,8 @@ fn appearance_button_cycles_modes_without_losing_theme_choices() {
 
 #[test]
 fn darken_and_lighten_interface_step_through_photoshops_brightnesses_and_stop_at_the_ends() {
-    let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = app.ctx().clone();
     sync_appearance(&mut app, &ctx);
     assert_eq!(app.ui.theme, AppTheme::pro_medium(), "Photoshop's default brightness");
     let press = |app: &mut PhotocraftApp, id: &str| crate::menus::invoke(app, &ctx, id, json!({})).unwrap();
@@ -686,7 +686,7 @@ fn run_cases(cases: Vec<Case>) {
             seed(&files, seed_value, Some(<prefs::SavedPrefs as Settings>::SCHEMA_VERSION));
         }
         let mut app = app_on(&files);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         tick(&mut app, &ctx);
         (case.set)(&mut app, &ctx);
         tick(&mut app, &ctx);
@@ -1442,7 +1442,7 @@ fn autosave_runs_for_dirty_documents() {
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     tick(&mut app, &ctx);
     autosave_now(&mut app);
@@ -1497,7 +1497,7 @@ fn recovered_documents_adopt_their_entries_until_saved_or_closed() {
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     tick(&mut app, &ctx);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     while app.session.has_jobs() && std::time::Instant::now() < deadline {

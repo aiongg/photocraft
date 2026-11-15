@@ -55,7 +55,7 @@ fn assert_released(app: &mut PhotocraftApp) {
 fn step_by_step_plays_every_step_from_one_play_with_a_frame_between() {
     for single in [true, false] {
         let mut app = app_with("step", 1, single);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let past = app.session.active().unwrap().history.past_len();
         let v = play(&mut app, &json!({"action": "Three"})).unwrap();
         assert_eq!(v["ran"], 1, "{v}");
@@ -87,7 +87,7 @@ fn step_by_step_plays_every_step_from_one_play_with_a_frame_between() {
 #[test]
 fn pause_for_waits_its_seconds_after_each_step_but_the_last() {
     let mut app = app_with("pause", 5, true);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     play(&mut app, &json!({"action": "Three"})).unwrap();
     assert_eq!(names(&app), ["A"], "no wait before the first step");
     let due = app.paused_playbacks.timer.unwrap().due.saturating_duration_since(Instant::now());
@@ -118,7 +118,7 @@ fn accelerated_and_agents_play_at_once() {
 fn esc_or_stop_ends_the_playback_and_keeps_the_steps_applied() {
     for how in ["esc", "stop button", "list edited", "new play"] {
         let mut app = app_with("pause", 3, true);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let past = app.session.active().unwrap().history.past_len();
         play(&mut app, &json!({"action": "Three"})).unwrap();
         next_step(&mut app, &ctx);
@@ -155,7 +155,7 @@ fn esc_or_stop_ends_the_playback_and_keeps_the_steps_applied() {
 #[test]
 fn esc_in_a_frame_of_two_passes_ends_the_wait_once() {
     let mut app = app_with("pause", 3, true);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     play(&mut app, &json!({"action": "Three"})).unwrap();
     next_step(&mut app, &ctx);
     assert_eq!(names(&app), ["A", "B"]);
@@ -175,7 +175,7 @@ fn esc_in_a_frame_of_two_passes_ends_the_wait_once() {
 #[test]
 fn an_edit_between_steps_ends_the_playback_without_joining_it() {
     let mut app = app_with("step", 1, true);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     play(&mut app, &json!({"action": "Three"})).unwrap();
     app.run("layer.new.layer", json!({"name": "Mine"})).unwrap();
     next_step(&mut app, &ctx);
@@ -189,7 +189,7 @@ fn an_edit_between_steps_ends_the_playback_without_joining_it() {
 #[test]
 fn nested_and_set_playback_stay_one_play() {
     let mut app = app_with("step", 1, true);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.session
         .actions
         .list

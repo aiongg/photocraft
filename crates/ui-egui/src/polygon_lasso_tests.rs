@@ -17,7 +17,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     app.ui.extras.rulers = false;
     app.ui.tool = Tool::PolygonLasso;
     // 60 fps, so a double-click's two clicks fall inside egui's 0.3 s window.
-    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

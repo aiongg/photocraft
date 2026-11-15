@@ -13,7 +13,7 @@ fn app_with(params: Value) -> PhotocraftApp {
 /// One panel frame through a minimal egui pass.
 // PLAN: `show` now builds the framework's `ScopePanel`, which reads `Env::of(ui)`; this bare context has no host installed. If it panics, the frame needs `Fixture::host`.
 fn frame(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     ctx.begin_pass(Default::default());
     let mut ui =
         egui::Ui::new(ctx.clone(), egui::Id::unique("hist-test"), egui::UiBuilder::new().max_rect(Rect::from_min_size(egui::Pos2::ZERO, vec2(300.0, 900.0))));
@@ -156,7 +156,7 @@ fn a_dead_histogram_worker_clears_the_job() {
     let (tx, rx) = std::sync::mpsc::channel();
     drop(tx);
     app.hist_job = Some((key, rx));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     update(&mut app, &ctx);
     assert!(app.doc_hist.is_none(), "nothing landed from the dead worker");
     // …and the next count was scheduled in its place.
@@ -205,7 +205,7 @@ fn adjustment_preview_is_counted_over_the_original() {
 fn views_keep_the_channel_and_the_menu_toggles_options() {
     let mut app = app_with(json!({"width": 16, "height": 16}));
     app.ui.histogram.settings.channel = HistChannel::Green.key().into();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let fire = |app: &mut PhotocraftApp, command: ScopeCommand| assert!(run_fired(app, &ctx, &CommandRef::from(command)));
     fire(&mut app, ScopeCommand::AllChannelsView);
     assert_eq!(app.ui.histogram.settings.view, ScopeView::AllChannels);
@@ -233,7 +233,7 @@ fn views_keep_the_channel_and_the_menu_toggles_options() {
 #[test]
 fn ui_set_drives_the_panel() {
     let mut app = app_with(json!({"width": 16, "height": 16}));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let r = ui_set(
         &mut app,
         &ctx,
@@ -326,7 +326,7 @@ fn inspect_current_follows_the_source_not_only_the_revision() {
     app.ui.histogram.settings.view = ScopeView::Expanded;
     settle(&mut app);
     assert_eq!(inspect(&app)["current"], true);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let r = ui_set(&mut app, &ctx, json!({"histogramPanel": {"source": "selectedLayer"}}));
     assert_eq!(r["ok"], true, "{r}");
     assert_eq!(inspect(&app)["current"], false, "the entire image's histogram is not the selected layer's");
@@ -387,7 +387,7 @@ fn a_result_computed_before_a_selection_change_is_not_cached() {
     let stale = Arc::new((*before.hist).clone());
     let _ = tx.send((before.key, 1.0, stale.clone()));
     app.hist_job = Some((before.key, rx));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     update(&mut app, &ctx);
     assert!(app.hist_job.is_none(), "the stale job was consumed, not kept");
     let after = app.doc_hist.clone().expect("the previous entry stands");
@@ -409,7 +409,7 @@ fn a_result_one_revision_behind_still_lands() {
     let newer = Arc::new((*before.hist).clone());
     let _ = tx.send((before.key, 1.0, newer.clone()));
     app.hist_job = Some((before.key, rx));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     update(&mut app, &ctx);
     assert!(app.hist_job.is_none(), "the job was consumed");
     let landed = app.doc_hist.clone().expect("the one-revision-old result lands");

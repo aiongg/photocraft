@@ -19,7 +19,7 @@ fn new_app() -> PhotocraftApp {
 
 /// The Color tab of `kind` for `app`, alone in a 300 x 400 pt group that it fills.
 fn color_tab_of(kind: AppTheme, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(300.0, 400.0)).with_step_dt(1.0 / 60.0).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::panels::panel_docking::probe::body(app, ui, "color");
@@ -40,7 +40,7 @@ fn bytes(c: [f32; 4]) -> [u8; 3] {
 #[test]
 fn control_sets_the_mode_ramp_and_web_safe_ramp() {
     let mut app = new_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let call = |app: &mut PhotocraftApp, params: serde_json::Value| {
         let (req, _rx) = crate::control::ControlRequest::new("ui.set", params);
         match crate::control::handle(app, &ctx, &req) {

@@ -51,7 +51,7 @@ fn app_on_two_displays() -> PhotocraftApp {
 #[test]
 fn closed_documents_release_navigator_and_canvas_records() {
     let mut app = app_on_two_displays();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let first = app.session.active().unwrap().doc.clone();
     composite_revision(&mut app, &ctx, 0, Some(1));
     // The same handle ownership as navigator_texture, without requiring a GPU adapter.
@@ -325,7 +325,7 @@ fn fills_on_an_adjustment_layer_edit_its_mask_when_the_icon_is_targeted() {
 fn paste_into_refreshes_only_the_pasted_area() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.background_jobs = false;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 800, "height": 600})).unwrap();
     app.run("select.rect", json!({"x": 40, "y": 40, "width": 100, "height": 100})).unwrap();
     app.run("edit.copy", json!({})).unwrap();
@@ -344,7 +344,7 @@ fn paste_into_refreshes_only_the_pasted_area() {
 fn auto_select_move_is_still_bounded() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.background_jobs = false;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 800, "height": 600})).unwrap();
     for (x, color) in [(100, "#ff0000"), (500, "#0000ff")] {
         app.run("layer.new.layer", json!({})).unwrap();
@@ -635,7 +635,7 @@ fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
         app.run("edit.fill", json!({"color": "#0000ff"})).unwrap();
         app.run("select.deselect", json!({})).unwrap();
         app.sync_views();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let dx = if placed {
             crate::transform_tool::begin_placed(&mut app, &ctx).unwrap();
             0
@@ -696,13 +696,16 @@ fn arrange_layout_only_includes_docked_documents() {
         app.run("file.new", json!({"width": 80, "height": 60, "name": name})).unwrap();
     }
     app.ui.view.arrange = "threeUpStacked".into();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 1})).unwrap();
     let rect = Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
     let shown: Vec<_> = arranged_cells(&app, rect).unwrap().into_iter().map(|(doc, _)| doc).collect();
     assert_eq!(shown, vec![0, 2]);
 
-    crate::menus::invoke(&mut app, &egui::Context::default(), "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "window.arrange.floatInWindow", json!({"document": 2})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 2})).unwrap();
     assert!(arranged_cells(&app, rect).is_none(), "the main canvas should be blank when every document is floating");
 }
 
@@ -714,7 +717,7 @@ fn torn_off_document_is_not_drawn_again_in_the_main_window() {
         app.run("file.new", json!({"width": 80, "height": 60, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 80, "height": 60, "name": "docked"})).unwrap();
         app.sync_views();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
         assert!(app.ui.windows[0].floating);
         assert_eq!(app.session.active_index(), Some(0), "{kind:?}: the floated page remains active");
@@ -752,7 +755,7 @@ fn float_all_keeps_one_window_per_floating_document() {
     app.run("file.new", json!({"width": 400, "height": 300, "name": "one"})).unwrap();
     app.run("file.new", json!({"width": 400, "height": 300, "name": "two"})).unwrap();
     app.sync_views();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let first = crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap()["window"].as_u64();
     for _ in 0..2 {
         let all = crate::menus::invoke(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
@@ -771,7 +774,7 @@ fn consolidating_keeps_the_zoom_set_while_floating() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
     app.sync_views();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
     type_zoom(&mut app.ui.views[0], 200.0);
     crate::menus::invoke(&mut app, &ctx, "window.arrange.consolidateAllToTabs", json!({})).unwrap();
@@ -786,7 +789,8 @@ fn a_new_window_for_document_keeps_its_own_view() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300, "name": "doc"})).unwrap();
     app.sync_views();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "window.arrange.newWindowForDocument", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.newWindowForDocument", json!({})).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
         |ui, (app, ready): &mut (PhotocraftApp, bool)| {
             if *ready {
@@ -823,7 +827,8 @@ fn a_tiled_document_follows_navigator_and_status_bar_zoom() {
             app.run("file.new", json!({"width": 400, "height": 300, "name": name})).unwrap();
         }
         app.sync_views();
-        crate::menus::invoke(&mut app, &egui::Context::default(), &format!("window.arrange.{layout}"), json!({})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &app_ctx, &format!("window.arrange.{layout}"), json!({})).unwrap();
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
             |ui, (app, ready): &mut (PhotocraftApp, bool)| {
                 if *ready {
@@ -854,10 +859,11 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     use egui_kittest::kittest::{NodeT, Queryable};
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 400, "height": 300, "name": "docked"})).unwrap();
-        crate::menus::invoke(&mut app, &egui::Context::default(), "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &app_ctx, "window.arrange.floatInWindow", json!({"document": 0})).unwrap();
         app
     });
     h.run_steps(6);
@@ -906,7 +912,8 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
         })
         .unwrap();
     let rev = app.session.documents()[0].revision;
-    crate::transform_tool::begin(&mut app, &egui::Context::default()).expect("the box opens");
+    let app_ctx = app.ctx().clone();
+    crate::transform_tool::begin(&mut app, &app_ctx).expect("the box opens");
     let (_, key) = display_doc(&mut app, 0);
     assert_eq!(key, crate::transform_tool::preview_key(app.transform_preview.as_ref().unwrap().session));
     let dk = canvas_display(&app, &app.session.documents()[0].doc, None).1;

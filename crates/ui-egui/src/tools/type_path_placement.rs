@@ -784,7 +784,7 @@ mod tests {
     #[test]
     fn overflow_cache_invalidates_on_replacement_arc_with_same_id_and_revision() {
         let mut app = app(Tool::PathSelection);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let text = active_text(&app).unwrap().clone();
         let initial = overflows(&app, &ctx, &text);
         assert!(!initial, "short text should not overflow range [20, 100]");

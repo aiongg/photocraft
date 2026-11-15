@@ -51,7 +51,7 @@ fn brush_and_pencil_select_behind_in_one_command() {
         app.ui.tool_options.brush_clear = true;
         app.ui.tool_options.pencil_clear = true;
         app.session.tools.brush.mode = BlendMode::Multiply;
-        let ctx = Context::default();
+        let ctx = app.ctx().clone();
         PhotocraftApp::setup_context(&ctx, Default::default());
         assert!(brush_mode_menu::enabled(&app, Item::Behind));
         let (id, params) = brush_mode_menu::engine_call(&app, tool, Item::Behind).unwrap();

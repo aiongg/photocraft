@@ -54,7 +54,7 @@ fn new_document_psd_and_subsequent_save_as_adopt_the_written_file_name() {
         }));
         let id = app.session.active().unwrap().doc.id;
         let revision = app.session.active().unwrap().revision;
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         menus::invoke(&mut app, &ctx, "file.saveAs", json!({"path": "作品/My image.PSD"})).unwrap();
         assert_eq!(identity(&app), ("My image.PSD".into(), Some("作品/My image.PSD".into()), revision, revision));
         assert_eq!(app.session.active().unwrap().doc.id, id);
@@ -128,10 +128,10 @@ fn web_download_and_automation_saves_use_the_same_identity_completion() {
 /// layered original and the edits stay unsaved (#2550).
 #[test]
 fn save_as_flat_keeps_the_layered_original() {
-    let ctx = egui::Context::default();
     // A layered document, and a one-layer one (the issue's case: the dialog offered a JPEG).
     for layered in [true, false] {
         let mut app = app();
+    let ctx = app.ctx().clone();
         if !layered {
             app.run("file.new", json!({"width": 4, "height": 4, "name": "Untitled-2"})).unwrap();
         }
@@ -213,7 +213,7 @@ fn full_composite_preference_reaches_the_exporter() {
         log.borrow_mut().push(settings.io_options().pcraft_full_composite);
         Ok((b"out".to_vec(), Vec::new()))
     }));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for value in [true, false] {
         app.run("prefs.set", json!({"path": "fileHandling.pcraftFullComposite", "value": value})).unwrap();
         seen.borrow_mut().clear();

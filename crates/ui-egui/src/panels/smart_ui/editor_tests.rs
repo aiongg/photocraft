@@ -91,7 +91,7 @@ fn stored_after_confirming_unedited(mode: &str, command: &str, recorded: &serde_
     let sm = smart(&app, layer).clone();
     let index = sm.smart_filters.len() - 1;
     assert_eq!(sm.smart_filters[index].command, command);
-    let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, layer.0, &sm, index);
@@ -296,7 +296,7 @@ fn tone_filter_editor_ignores_current_channel_target() {
                 app.ui.filter_mask_target = (view == 5).then_some(layer.0);
                 let before = app.session.active().unwrap().doc.clone();
                 let filters = smart(&app, layer).clone();
-                let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+                let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
                 PhotocraftApp::setup_context(&h.ctx, Default::default());
                 let ctx = h.ctx.clone();
                 super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
@@ -382,7 +382,7 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         app.run("file.new", json!({"width":32,"height":24,"mode":"lab"})).unwrap();
         let other = app.session.active().unwrap().doc.clone();
         assert!(app.session.set_active(0));
-        let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, Default::default());
         let ctx = h.ctx.clone();
         super::open_editor(h.state_mut(), &ctx, layer.0, &filters, 2);
@@ -484,7 +484,7 @@ fn recorded(app: &PhotocraftApp, id: u64) -> photocraft_doc::SmartObject {
 /// The app in a harness with the editor of the layer's first smart filter open.
 fn edit_first_filter(app: PhotocraftApp, id: u64) -> Harness<'static, PhotocraftApp> {
     let sm = recorded(&app, id);
-    let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     let ctx = h.ctx.clone();
     super::open_editor(h.state_mut(), &ctx, id, &sm, 0);

@@ -187,7 +187,7 @@ mod tests {
         s.execute("layer.select", json!({"layer": bg})).unwrap();
         let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            PhotocraftApp::new(s, crate::Services::default())
+            PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
         });
         crate::panel_docking::show_panel(h.state_mut(), "properties", Some(true)).unwrap();
         h.run_steps(8);

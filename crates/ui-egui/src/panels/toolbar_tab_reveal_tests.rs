@@ -9,7 +9,7 @@ fn short_toolbar_harness() -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     // The supported shortcut preference clears the canvas Tab binding, so Tab is the focus key.
     app.session.prefs.edit(|prefs| prefs.shortcuts.insert("window.togglePanels".into(), String::new()));
-    let mut harness = egui_kittest::Harness::builder().with_size(vec2(400.0, HEIGHT)).build_ui_state(
+    let mut harness = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, HEIGHT)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 egui_extras::install_image_loaders(ui.ctx());

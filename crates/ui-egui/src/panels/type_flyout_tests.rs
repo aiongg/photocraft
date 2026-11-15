@@ -7,7 +7,7 @@ use egui_kittest::kittest::Queryable;
 /// A harness that draws the toolbar in a window tall enough for every slot. The first pass installs the theme and fonts.
 fn toolbar_harness(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let mut ready = false;
-    let mut harness = egui_kittest::Harness::builder().with_size(vec2(400.0, 1800.0)).build_ui_state(
+    let mut harness = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, 1800.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ready {
                 egui_extras::install_image_loaders(ui.ctx());

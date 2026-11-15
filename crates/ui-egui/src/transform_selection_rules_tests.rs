@@ -39,7 +39,8 @@ fn select(app: &mut PhotocraftApp, id: LayerId, mode: &str) {
 }
 
 fn invoke(app: &mut PhotocraftApp, id: &str) -> Result<(), String> {
-    crate::menus::invoke(app, &egui::Context::default(), id, json!({})).map(|_| ())
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, id, json!({})).map(|_| ())
 }
 
 /// How many alerts are open.

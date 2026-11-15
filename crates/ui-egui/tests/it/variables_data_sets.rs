@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 type H = Harness<'static, PhotocraftApp>;
 
 fn harness(app: PhotocraftApp) -> H {
-    let mut h = Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(900.0, 700.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

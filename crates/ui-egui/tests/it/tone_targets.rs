@@ -69,7 +69,7 @@ fn value(app: &PhotocraftApp, target: ChannelTarget) -> f32 {
 
 /// Render real modal controls with accessibility enabled for input-driven assertions.
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| dialogs::run(app, ui), app);
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h
 }

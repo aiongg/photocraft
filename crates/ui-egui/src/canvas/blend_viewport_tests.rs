@@ -39,7 +39,7 @@ fn blend_hover_pattern_tiles_and_multiple_views_reuse_current_pixels() {
     app.run("file.new", json!({"width":1024,"height":768,"background":"#336699"})).unwrap();
     let layer = app.run("layer.new.layer", json!({})).unwrap()["layer"].as_u64().unwrap();
     app.run("edit.fill", json!({"color":"#cc8844"})).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let a = DRect::new(724, 200, 1324, 500);
     let b = DRect::new(0, 200, 300, 500);
     assert!(ensure_gpu(&mut app, &ctx, 0, a));
@@ -85,7 +85,7 @@ fn blend_hover_during_background_redraw_restores_committed_pixels() {
     let layer = app.run("layer.new.layer", json!({})).unwrap()["layer"].as_u64().unwrap();
     app.run("edit.fill", json!({"color":"#cc8844"})).unwrap();
     app.run("layer.layerStyle.blendingOptions", json!({"knockout":"shallow"})).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let visible = DRect::new(256, 256, 512, 512);
     assert!(ensure_gpu(&mut app, &ctx, 0, visible));
     assert!(!app.redraws.is_empty(), "fixture must start a deferred full redraw");
@@ -149,7 +149,7 @@ fn check_blend_viewport(cpu_fallback: bool, multiple_layers: bool) {
         app.run("layer.setProps", json!({"layer": other, "opacity": 0.5})).unwrap();
         layers.push(photocraft_doc::LayerId(other));
     }
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let visible = DRect::new(256, 256, 512, 512);
     assert!(ensure_gpu(&mut app, &ctx, 0, visible));
     assert!(app.redraws.is_empty(), "small fixture must finish synchronously");

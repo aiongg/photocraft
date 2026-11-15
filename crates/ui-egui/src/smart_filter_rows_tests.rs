@@ -30,7 +30,7 @@ fn panel() -> (egui_kittest::Harness<'static, PhotocraftApp>, u64, u64, u64) {
     // 60 fps steps, so a double-click's two clicks fall inside egui's 0.3 s window.
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 900.0)).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
     h.run_steps(4);
     (h, a, b, c)

@@ -16,7 +16,7 @@ fn app() -> PhotocraftApp {
 }
 
 fn press(app: &mut PhotocraftApp, key: Key, modifiers: Modifiers) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let raw = egui::RawInput {
         events: vec![egui::Event::ModifiersChanged(modifiers), egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }],
         ..Default::default()

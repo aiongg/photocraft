@@ -101,7 +101,8 @@ mod tests {
     }
 
     fn fire(app: &mut PhotocraftApp, id: &str) {
-        assert!(run_fired(app, &egui::Context::default(), &CommandRef::new(id)), "{id} is an item of the menu");
+        let app_ctx = app.ctx().clone();
+        assert!(run_fired(app, &app_ctx, &CommandRef::new(id)), "{id} is an item of the menu");
     }
 
     fn states(app: &PhotocraftApp) -> (usize, usize) {
@@ -116,7 +117,8 @@ mod tests {
         for id in ["history.stepBackward", "history.newSnapshot", "history.deleteState", "history.clear", "history.newDocument"] {
             assert!(on(&app, id), "{id} before the transform");
         }
-        crate::transform_tool::begin(&mut app, &egui::Context::default()).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::transform_tool::begin(&mut app, &app_ctx).unwrap();
         for id in ["history.stepBackward", "history.newSnapshot", "history.deleteState", "history.clear", "history.newDocument"] {
             assert!(!on(&app, id), "{id}");
         }

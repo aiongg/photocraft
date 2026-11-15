@@ -15,7 +15,7 @@ const DT: f32 = 1.0 / 60.0;
 fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_step_dt(DT).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
         app.sync_views();
         app.ui.extras.rulers = false;

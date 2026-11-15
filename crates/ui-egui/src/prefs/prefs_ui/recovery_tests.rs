@@ -91,7 +91,7 @@ fn recovery_keeps_frames_and_editing_live_and_adopts_the_admitted_document() {
     let (pending, started, release, finished) = gated(doc);
     let (services, log) = services(vec![pending]);
     let mut app = PhotocraftApp::new(Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert!(app.session.documents().is_empty());
     frame(&mut app, &ctx);
     started.recv_timeout(Duration::from_secs(10)).unwrap();
@@ -145,7 +145,7 @@ fn cancelling_recovery_skips_the_queue_and_never_adopts_a_late_result() {
     };
     let (services, log) = services(vec![pending, second]);
     let mut app = PhotocraftApp::new(Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     frame(&mut app, &ctx);
     started.recv_timeout(Duration::from_secs(10)).unwrap();
     let job = app.session.jobs()[0].id;
@@ -168,7 +168,7 @@ fn failed_recovery_reports_the_error_and_continues_to_the_next_entry() {
     let broken = Recoverable { key: "broken".into(), name: "Broken".into(), path: None, load: Box::new(|| Err("corrupt tile".into())) };
     let (services, log) = services(vec![broken, entry("good", document("Good"))]);
     let mut app = PhotocraftApp::new(Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     settle(&mut app, &ctx);
     assert_eq!(app.session.documents().len(), 1);
     assert!(app.ui.chrome.home.is_none(), "the first recovered document should be visible");
@@ -192,7 +192,7 @@ fn disabled_recovery_never_discovers_or_decodes_entries() {
             ..Default::default()
         },
     );
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     for _ in 0..3 {
         frame(&mut app, &ctx);
     }

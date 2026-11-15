@@ -22,7 +22,7 @@ fn capslock_harness() -> Harness<'static, PhotocraftApp> {
     app.sync_views();
     app.ui.extras.rulers = false;
     app.ui.tool = Tool::Brush;
-    let mut h = Harness::builder().with_size(egui::vec2(900.0, 600.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(900.0, 600.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

@@ -31,7 +31,7 @@ const CANVAS: [f64; 4] = [0.0, 0.0, W, H];
 fn app(frame_rect: [f64; 4]) -> Harness {
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
         app.run("file.new", json!({"width": W, "height": H, "background": "white"})).expect("new");
         app.ui.extras.snap = false;

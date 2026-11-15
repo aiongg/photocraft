@@ -307,7 +307,7 @@ mod tests {
                     Some((app.session.tools.foreground, app.session.tools.background)),
                 )
                 .unwrap();
-                let ctx = egui::Context::default();
+                let ctx = app.ctx().clone();
                 let texture = upload(&ctx, &app, "alpha-preview", &preview);
                 let mut delta = ctx.tex_manager().write().take_delta();
                 let egui::ImageData::Color(image) = &delta.set.get(&texture.id()).unwrap()[0].image;

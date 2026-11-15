@@ -119,7 +119,7 @@ mod tests {
     fn harness(a: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         let mut a = a;
         a.sync_views();
-        let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).build_ui_state(
+        let mut h = Harness::builder().with_context(a.ctx().clone()).with_size(vec2(1000.0, 700.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let ctx = ui.ctx().clone();
                 if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

@@ -432,7 +432,7 @@ mod screen_integration_tests {
         let id = session.execute("type.create", json!({"text":"Hello world","color":"#000000","size":24,"x":10,"y":60})).unwrap()["layer"].as_u64().unwrap();
         let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            let mut app = PhotocraftApp::new(session, Default::default());
+            let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, Default::default());
             app.ui.tool = crate::state::Tool::Type;
             // PLAN: assumed dialogs-w39's capture source is set with `screen_picker::set_capture(app, Box<dyn ..>)`.
             crate::screen_picker::set_capture(&mut app, Box::new(StillCapture::color(Srgba::rgb(1.0, 136.0 / 255.0, 0.0))));

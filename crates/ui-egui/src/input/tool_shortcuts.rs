@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn every_toolbar_tool_has_a_unique_live_shortcut_row() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let rows = crate::shortcut_dispatch::command_rows(&app);
         let mut ids = std::collections::HashSet::new();
         for t in Tool::ALL {

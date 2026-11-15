@@ -342,11 +342,11 @@ fn only_the_main_canvas_draws_the_display() {
 /// and goes away with the dialog.
 #[test]
 fn paint_shows_the_target_clipping_for_the_view() {
-    let ctx = egui::Context::default();
     for (mode, depth) in
         [(ColorMode::Rgb, SampleType::U8), (ColorMode::Rgb, SampleType::U16), (ColorMode::Rgb, SampleType::F32), (ColorMode::Grayscale, SampleType::U8)]
     {
         let mut app = ramp_app(mode, depth);
+    let ctx = app.ctx().clone();
         let id = open_levels(&mut app, json!({"inBlack": 100, "inWhite": 200}), Some(LevelsClip::Shadows));
         let px = paint_view(&mut app, &ctx, &view(10.0)).unwrap_or_else(|| panic!("{mode:?} {depth:?}"));
         assert_eq!(app.levels_clipping.as_ref().unwrap().stats.size, [16, 8]);
@@ -417,8 +417,8 @@ fn ineligible_documents_show_no_display() {
 fn a_running_job_holds_the_display() {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
-    let ctx = egui::Context::default();
     let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    let ctx = app.ctx().clone();
     open_levels(&mut app, json!({"inBlack": 100}), Some(LevelsClip::Shadows));
     let gate = Arc::new(AtomicBool::new(false));
     let open = gate.clone();
@@ -452,8 +452,8 @@ fn a_running_job_holds_the_display() {
 /// Closing the last document drops the display's cache: no canvas is left to paint it away.
 #[test]
 fn closing_the_last_document_drops_the_cache() {
-    let ctx = egui::Context::default();
     let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    let ctx = app.ctx().clone();
     open_levels(&mut app, json!({"inBlack": 100}), Some(LevelsClip::Shadows));
     assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some());
     app.run("file.close", json!({})).unwrap();
@@ -465,8 +465,8 @@ fn closing_the_last_document_drops_the_cache() {
 /// cache goes as if no Levels dialog were open, even over a pixel layer.
 #[test]
 fn smart_filter_levels_show_no_display() {
-    let ctx = egui::Context::default();
     let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    let ctx = app.ctx().clone();
     let id = open_levels(&mut app, json!({"inBlack": 100}), Some(LevelsClip::Shadows));
     assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some(), "a plain Levels dialog shows it");
     let layer = app.session.active().and_then(|s| s.active_layer).unwrap();
@@ -480,7 +480,7 @@ fn smart_filter_levels_show_no_display() {
 }
 
 fn dialog_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h
 }

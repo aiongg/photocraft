@@ -36,7 +36,8 @@ fn enabled(app: &PhotocraftApp, id: &str) -> bool {
 }
 
 fn choose(app: &mut PhotocraftApp, id: &str) -> Result<serde_json::Value, String> {
-    crate::menus::invoke(app, &egui::Context::default(), id, json!({}))
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, id, json!({}))
 }
 
 fn warped_smart_object(app: &mut PhotocraftApp) {

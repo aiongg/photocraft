@@ -34,7 +34,7 @@ fn field_json(app: &PhotocraftApp, id: DialogId, key: &str) -> Value {
 }
 
 fn try_set(app: &mut PhotocraftApp, id: DialogId, key: &str, value: Value) -> Result<(), String> {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.set_json_field(&ctx, id, key, value)
 }
 
@@ -55,14 +55,14 @@ fn is_open(app: &PhotocraftApp, id: DialogId) -> bool {
 
 /// OK, then the passes in which the family runs (or refuses, for a held OK). True when the dialog closed.
 fn ok(app: &mut PhotocraftApp, id: DialogId) -> bool {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.confirm_by_id(&ctx, id);
     passes(app, 3);
     !is_open(app, id)
 }
 
 fn cancel(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.cancel_by_id(&ctx, id);
     passes(app, 2);
 }
@@ -73,7 +73,7 @@ fn history(app: &PhotocraftApp) -> usize {
 
 /// The app drawn through `dialogs::run`, as the window shows its dialogs.
 fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_size(size).build_ui_state(
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(size).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::dialogs::run(app, ui);
@@ -313,7 +313,7 @@ fn global_light_dialog_reflects_active_document_light() {
 #[test]
 fn proof_setup_dialog_reflects_active_document_proof_condition() {
     let mut app = new_app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
     let doc1_id = app.session.active().unwrap().doc.id;
 

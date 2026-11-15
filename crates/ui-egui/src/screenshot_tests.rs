@@ -73,7 +73,7 @@ fn actual_callback_fixture() -> ActualCallbackFixture {
     };
     let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), services).with_control(std::sync::mpsc::channel().1);
     app.run("file.new", serde_json::json!({"width": 32, "height": 32})).unwrap();
-    let ctx = Context::default();
+    let ctx = app.ctx().clone();
     // `raw_input_hook` hands the craft runtime its frame input, as on the app's context.
     crate::PhotocraftApp::setup_context(&ctx, Default::default());
     for _ in 0..4 {
@@ -193,7 +193,7 @@ fn a_launch_and_capture_request_waits_for_the_first_ui_pass() {
     let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default()).with_control(rx);
     let (request, reply) = crate::control::ControlRequest::new("ui.screenshot", json!({"focus": false}));
     tx.send(request).unwrap();
-    let ctx = Context::default();
+    let ctx = app.ctx().clone();
     crate::PhotocraftApp::setup_context(&ctx, Default::default());
     // The settle delay runs on the wall clock.
     let give_up = Instant::now() + Duration::from_secs(5);
@@ -227,7 +227,7 @@ fn a_capture_in_flight_follows_the_app_document_identity() {
         let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
-        let ctx = Context::default();
+        let ctx = app.ctx().clone();
         let now = motion::now();
         let geometry = |document: Option<DocumentId>| {
             let mut g = CaptureGeometry::new([600.0, 400.0], 8192);

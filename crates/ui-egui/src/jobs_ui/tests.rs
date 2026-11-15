@@ -29,7 +29,7 @@ fn app_harness_with(services: crate::Services) -> Harness<'static, PhotocraftApp
         s.execute("file.new", json!({"width": 320, "height": 240})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         s.execute("edit.fill", json!({"color": "#3366cc"})).unwrap();
-        let mut app = PhotocraftApp::new(s, services);
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), s, services);
         app.background_jobs = true;
         app
     });

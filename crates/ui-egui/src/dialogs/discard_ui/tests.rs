@@ -27,7 +27,7 @@ fn doc_id(app: &PhotocraftApp, i: usize) -> DocId {
 fn a_save_document_script_that_edits_the_document_keeps_the_prompt_up() {
     use photocraft_engine::automate_cmds::ScriptBinding;
     let mut app = app_with_docs(1);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 0);
     app.session.active_mut().unwrap().path = Some("/pics/kept.psd".into());
     app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
@@ -52,7 +52,7 @@ fn a_save_document_script_that_edits_the_document_keeps_the_prompt_up() {
 #[test]
 fn clean_documents_close_without_asking() {
     let mut app = app_with_docs(2);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
     assert!(app.discard.is_none());
     assert_eq!(app.session.documents().len(), 1);
@@ -61,7 +61,7 @@ fn clean_documents_close_without_asking() {
 #[test]
 fn closing_a_dirty_document_waits_for_an_answer() {
     let mut app = app_with_docs(2);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 1);
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({"document": 1})).unwrap();
     assert_eq!(app.session.documents().len(), 2, "nothing closes before the user answers");
@@ -86,7 +86,7 @@ fn only_documents_that_would_be_discarded_are_asked_about() {
 #[test]
 fn close_all_asks_per_dirty_document_then_runs() {
     let mut app = app_with_docs(3);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 2);
     crate::menus::invoke(&mut app, &ctx, "file.closeAll", json!({})).unwrap();
@@ -101,7 +101,7 @@ fn close_all_asks_per_dirty_document_then_runs() {
 fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() {
     for command in ["file.closeAll", EXIT] {
         let mut app = app_with_docs(2);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         make_dirty(&mut app, 0);
         let late = doc_id(&app, 1);
         crate::menus::invoke(&mut app, &ctx, command, json!({})).unwrap();
@@ -115,7 +115,7 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
     }
     // Close Others asks about the others too, but still not about the document it keeps.
     let mut app = app_with_docs(3);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 0);
     let (late, kept) = (doc_id(&app, 1), doc_id(&app, 2));
     crate::menus::invoke(&mut app, &ctx, "file.closeOthers", json!({"document": 2})).unwrap();
@@ -131,7 +131,7 @@ fn a_document_dirtied_during_the_prompt_is_asked_about_before_the_final_close() 
 #[test]
 fn close_others_closes_each_answered_document_and_keeps_its_target() {
     let mut app = app_with_docs(3);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     (0..3).for_each(|i| make_dirty(&mut app, i));
     let kept = doc_id(&app, 1);
     crate::menus::invoke(&mut app, &ctx, "file.closeOthers", json!({"document": 1})).unwrap();
@@ -147,7 +147,7 @@ fn close_others_closes_each_answered_document_and_keeps_its_target() {
 #[test]
 fn the_parked_close_still_hits_its_document_after_tabs_move() {
     let mut app = app_with_docs(3);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 2);
     let doomed = doc_id(&app, 2);
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({"document": 2})).unwrap();
@@ -178,7 +178,7 @@ fn quitting_replaces_a_pending_close_but_other_requests_are_refused() {
 #[test]
 fn exit_is_held_back_until_confirmed() {
     let mut app = app_with_docs(1);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     make_dirty(&mut app, 0);
     assert!(intercept(&mut app, EXIT, &Value::Null));
     assert!(!app.allow_close);
@@ -191,7 +191,7 @@ type Prompted = egui_kittest::Harness<'static, PhotocraftApp>;
 /// The unsaved-changes prompt for `command` over `app`'s dirty documents, as `os` draws it (with
 /// the file dialogs answered at the end of each frame, as the app does).
 fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) -> Prompted {
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             crate::dialogs::run(app, ui);
             app.poll_file_dialog();
@@ -328,7 +328,7 @@ fn a_second_pass_in_one_frame_applies_an_answer_once() {
     let mut app = app_with_docs(2);
     make_dirty(&mut app, 0);
     make_dirty(&mut app, 1);
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             crate::dialogs::run(app, ui);
             crate::dialogs::run(app, ui);
@@ -470,7 +470,7 @@ fn command_d_answers_the_prompt_rather_than_deselecting() {
     make_dirty(&mut app, 1);
     app.run("select.all", json!({})).unwrap();
     let selected = app.session.active().map(|st| st.doc.id).unwrap();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             crate::shortcuts::handle(app, ui.ctx());
             crate::dialogs::run(app, ui);
@@ -544,7 +544,7 @@ fn saving_from_the_prompt_waits_for_a_background_save_then_closes() {
         w.lock().unwrap().push(path.to_string());
         Ok(Vec::new())
     }));
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(800.0, 600.0)).build_ui_state(
         |ui, app| {
             crate::jobs_ui::tick(app, ui.ctx());
             crate::dialogs::run(app, ui);

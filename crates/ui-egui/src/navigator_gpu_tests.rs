@@ -16,7 +16,7 @@ fn harness() -> Option<Harness> {
             .wgpu_setup(crate::gpu_canvas::wgpu_setup())
             .build_eframe(|cc| {
                 PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+                let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
                 if let Some(rs) = cc.wgpu_render_state.as_ref() {
                     app.set_wgpu(rs.clone());
                 }

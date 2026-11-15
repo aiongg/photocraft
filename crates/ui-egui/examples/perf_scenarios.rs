@@ -1263,7 +1263,7 @@ fn full_refresh_frame_scenario(b: &mut Bench, name: &str, w: u32, h: u32) {
     };
     let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(4).build_eframe(move |cc| {
         photocraft_ui_egui::PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        photocraft_ui_egui::PhotocraftApp::new(s, photocraft_ui_egui::Services::default())
+        photocraft_ui_egui::PhotocraftApp::with_context(cc.egui_ctx.clone(), s, photocraft_ui_egui::Services::default())
     });
     harness.run_steps(6);
     b.current = Some(name.to_string());
@@ -1300,7 +1300,7 @@ fn frame_scenario(b: &mut Bench, name: &str, w: u32, h: u32) {
     let doc = std::mem::take(&mut s);
     let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(4).build_eframe(move |cc| {
         photocraft_ui_egui::PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = photocraft_ui_egui::PhotocraftApp::new(doc, photocraft_ui_egui::Services::default());
+        let mut app = photocraft_ui_egui::PhotocraftApp::with_context(cc.egui_ctx.clone(), doc, photocraft_ui_egui::Services::default());
         app.background_jobs = true;
         app
     });
@@ -1771,7 +1771,7 @@ fn paste_into_frame_scenario(b: &mut Bench, name: &str, w: u32, h: u32) {
     let doc = std::mem::take(&mut s);
     let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(4).build_eframe(move |cc| {
         photocraft_ui_egui::PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        photocraft_ui_egui::PhotocraftApp::new(doc, photocraft_ui_egui::Services::default())
+        photocraft_ui_egui::PhotocraftApp::with_context(cc.egui_ctx.clone(), doc, photocraft_ui_egui::Services::default())
     });
     // Warm up: first frames build the canvas cache of the 24 MP document.
     harness.run_steps(6);

@@ -721,7 +721,7 @@ fn layered_preview_runs_outside_the_ui_frame() {
     let doc = app.session.active().unwrap().doc.clone();
     assert!(background_preview_needed(&doc));
     let fields = Map::from_iter([("format".into(), json!("png")), ("scale".into(), json!(100))]);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let key = egui::Id::unique("layered-preview-test");
     let mut result = None;
     let mut output = ctx.run_ui(Default::default(), |ctx| {
@@ -959,7 +959,7 @@ fn preview_workers_keep_the_captured_source_profile() {
     let fields = json!({"format": "png", "profile": "srgb", "transparency": true}).as_object().unwrap().clone();
     let expected = preview_sync(&app, &doc, &fields, &profile).unwrap();
     let expected_size = super::exact_estimate(&doc, &fields, &profile).unwrap();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let key = egui::Id::unique("captured-profile-worker");
     let mut preview = None;
     let mut size = None;

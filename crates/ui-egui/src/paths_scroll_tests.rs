@@ -9,7 +9,7 @@ use crate::PhotocraftApp;
 fn harness(paths: usize, size: egui::Vec2, ppp: f32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(size).with_pixels_per_point(ppp).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
         for i in 0..paths {
             let x = (i % 8) as i32 * 40;

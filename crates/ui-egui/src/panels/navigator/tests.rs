@@ -14,7 +14,7 @@ fn whole_app(animated_zoom: bool) -> Harness<'static, PhotocraftApp> {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut session = photocraft_engine::Session::new();
         session.edit_prefs(|p| p.general.auto_show_home_screen = false);
-        let mut app = PhotocraftApp::new(session, crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, crate::Services::default());
         app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
         app.run("prefs.set", json!({"values": {"general.animatedZoom": animated_zoom}})).unwrap();
         crate::panel_docking::show_panel(&mut app, "navigator", Some(true)).unwrap();

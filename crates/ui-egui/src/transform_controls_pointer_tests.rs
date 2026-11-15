@@ -631,7 +631,8 @@ fn corner_guides(menu: &str) -> PhotocraftApp {
     let mut app = snap_box();
     app.run("view.newGuide", json!({"orientation": "vertical", "position": 110})).unwrap();
     app.run("view.newGuide", json!({"orientation": "horizontal", "position": 30})).unwrap();
-    crate::menus::invoke(&mut app, &egui::Context::default(), menu, json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, menu, json!({})).unwrap();
     app
 }
 
@@ -645,7 +646,8 @@ fn move_corner(app: &mut PhotocraftApp, index: usize, offset: [f64; 2], end: [f6
 
 fn free_transform(app: &mut PhotocraftApp, reference_point: bool) {
     app.ui.tool_options.transform.show_reference_point = reference_point;
-    crate::menus::invoke(app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
 }
 
 /// Press at `from`, drag to `to`, release; returns the reference point.
@@ -752,7 +754,8 @@ fn skew_control_corner_on_editable_type_slides_the_whole_edge() {
         let mut app = snap_box();
         app.run("type.create", json!({"x": 40, "y": 60, "text": "Hello"})).unwrap();
         app.run("prefs.set", json!({"path": "general.useLegacyFreeTransform", "value": legacy})).unwrap();
-        crate::menus::invoke(&mut app, &egui::Context::default(), "edit.transform.skew", json!({})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &app_ctx, "edit.transform.skew", json!({})).unwrap();
         let before = quad(&app);
         let end = [before[1][0] + 18.0, before[1][1] - 8.0];
         let doc = app.session.active().unwrap().doc.clone();
@@ -810,7 +813,8 @@ fn a_snapped_distort_commits_one_undoable_transform() {
 #[test]
 fn free_transform_drags_and_handles_snap() {
     let mut app = snap_box();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
     assert!(app.ui.transform.is_some());
     let m = Modifiers::NONE;
     // Drag from inside the box (40..90 × 40..80) so its left edge lands 2 px from x = 300.
@@ -851,7 +855,8 @@ fn free_transform_of_a_shape_keeps_whole_pixels() {
         move_to(&mut app, [300.0, 700.0], m);
         release(&mut app, [481.0, 1000.0], m);
         app.ui.tool = Tool::Move;
-        crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
         let whole = |q: [[f64; 2]; 4]| q.iter().flatten().all(|v| v.fract() == 0.0);
         // The left edge handle, grabbed 1.3 px inside, dropped away from any snap target.
         let q = quad(&app);

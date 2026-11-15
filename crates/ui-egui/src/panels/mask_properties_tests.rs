@@ -44,7 +44,7 @@ fn harness_of(session: photocraft_engine::Session, mask_target: bool, vector_tar
     app.ui.mask_target = mask_target;
     app.ui.vector_mask_target = vector_target;
     // PLAN: assumed fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui)
-    let mut h = Harness::builder()
+    let mut h = Harness::builder().with_context(app.ctx().clone())
         .with_size(vec2(800.0, 1600.0))
         .with_step_dt(1.0 / 60.0)
         .build_ui_state(|ui, app: &mut PhotocraftApp| super::properties::panel(app, ui), app);

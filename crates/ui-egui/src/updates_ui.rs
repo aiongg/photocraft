@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn update_window_is_drivable_and_bad_state_changes_are_atomic() {
         let mut app = app();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let call = |app: &mut PhotocraftApp, method: &str, params: Value| {
             let (req, _) = crate::control::ControlRequest::new(method, params);
             match crate::control::handle(app, &ctx, &req) {

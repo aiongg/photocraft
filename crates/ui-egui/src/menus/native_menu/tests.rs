@@ -40,7 +40,7 @@ fn harness(doc: bool) -> (Harness<'static, PhotocraftApp>, Synced, Events) {
     let backend = Fake { synced: synced.clone(), events: events.clone() };
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         if doc {
             app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
             app.sync_views();

@@ -24,7 +24,8 @@ fn app(mode: &str, depth: u32) -> PhotocraftApp {
 }
 
 fn begin(app: &mut PhotocraftApp) {
-    crate::transform_tool::begin(app, &egui::Context::default()).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::transform_tool::begin(app, &app_ctx).unwrap();
 }
 
 /// What the box draws for the styled layer at `zoom`: `None` when it draws the bare pixels.

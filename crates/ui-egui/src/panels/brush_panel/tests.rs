@@ -251,7 +251,7 @@ fn section_locks_round_trip_and_survive_preset_picks() {
 fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.tool = tool;
-    let mut h = Harness::builder().with_size(vec2(1400.0, 60.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 60.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -381,7 +381,7 @@ fn mixer_brush_clean_brush_and_the_automatic_load_keep_the_foreground_out() {
 fn harness(panel: &'static str, section: usize) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.brush_section = section;
-    let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 900.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -593,7 +593,7 @@ fn app_harness() -> Harness<'static, PhotocraftApp> {
 fn app_harness_with_language(lang: crate::i18n::Lang) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.tool = crate::state::Tool::Brush;
-    let mut h = Harness::builder().with_size(vec2(1400.0, 900.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 900.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -749,7 +749,7 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
     let o = &mut app.ui.tool_options;
     (o.marquee_style, o.marquee_width, o.marquee_height) = ("fixedSize".into(), 100.0, 50.0);
     assert_eq!(o.marquee_unit, "pixels");
-    let mut h = Harness::builder().with_size(vec2(1400.0, 360.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1400.0, 360.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::panels::options_bar(app, ui);
@@ -801,12 +801,12 @@ fn fixed_size_shows_and_takes_the_unit_picked_on_its_fields() {
 
 #[test]
 fn brush_settings_hamburger_menu_actions() {
-    let ctx = egui::Context::default();
     let command = |c: BrushSettingsCommand| CommandRef::from(c);
     let state = |app: &PhotocraftApp, c: BrushSettingsCommand| command_states(app).into_iter().find(|(r, _)| *r == command(c)).map(|(_, s)| s).unwrap();
 
     // 1. The menu offers Photoshop's four actions in order.
     let mut app = app();
+    let ctx = app.ctx().clone();
     let offered: Vec<BrushSettingsCommand> =
         panel_rows(&app).iter().filter_map(|row| if let PanelRow::Command(c) = row { BrushSettingsCommand::from_ref(c) } else { None }).collect();
     assert_eq!(

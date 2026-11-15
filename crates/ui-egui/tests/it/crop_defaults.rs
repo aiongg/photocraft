@@ -14,7 +14,7 @@ type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
 fn harness() -> Harness {
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
         app.ui.tool_options.crop.shield.classic_mode = true;

@@ -20,7 +20,7 @@ fn the_setting_is_saved_inspected_and_reset() {
     app.session.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
     app.sync_views();
     app.ui.tool = Tool::Pen;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let inspect = |app: &mut PhotocraftApp| {
         let (req, _rx) = ControlRequest::new("ui.inspect", json!({}));
         match handle(app, &ctx, &req) {

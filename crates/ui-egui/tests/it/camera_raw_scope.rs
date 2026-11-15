@@ -19,7 +19,7 @@ fn harness(theme: AppTheme, prepare: impl FnOnce(&mut PhotocraftApp) + 'static) 
     let shown = theme.clone();
     let mut h = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 800.0)).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.set_theme(&cc.egui_ctx, shown);
         prepare(&mut app);
         camera_raw_ui::open(&mut app, &cc.egui_ctx).unwrap();

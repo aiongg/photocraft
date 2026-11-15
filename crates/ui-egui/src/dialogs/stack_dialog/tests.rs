@@ -32,7 +32,7 @@ fn harness(answers: Vec<Picked>) -> Harness<'static, PhotocraftApp> {
     Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
 
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: Some(files), ..Default::default() })
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services { files: Some(files), ..Default::default() })
     })
 }
 

@@ -25,14 +25,14 @@ fn set(app: &mut PhotocraftApp, id: DialogId, color: &str) {
 }
 
 fn confirm_picker(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert!(app.framework.dialogs.confirm_by_id(&ctx, id));
     let result = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id).unwrap();
     answered(app, result);
 }
 
 fn cancel_picker(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.cancel_by_id(&ctx, id);
     let result = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id).unwrap();
     answered(app, result);

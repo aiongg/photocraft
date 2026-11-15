@@ -89,8 +89,8 @@ fn cmyk_channel_thumbs_upload_the_document_inks() {
 /// Each event runs its engine command; a reorder is one history step and counts alpha channels only.
 #[test]
 fn channel_events_run_their_commands() {
-    let ctx = egui::Context::default();
     let mut app = masked_app();
+    let ctx = app.ctx().clone();
     app.run("channel.new", json!({"name": "Alpha 2"})).unwrap();
     app.run("channel.new", json!({"name": "Alpha 3"})).unwrap();
 
@@ -173,8 +173,8 @@ fn recording_a_colour_row_click_saves_as_photoshop_select() {
 /// target loads its own reference.
 #[test]
 fn channel_footer_follows_the_shown_target() {
-    let ctx = egui::Context::default();
     let mut app = masked_app();
+    let ctx = app.ctx().clone();
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 32, "height": 48})).unwrap();
     app.run("layer.layerMask.hideAll", json!({})).unwrap();
     app.run("layer.layerMask.revealSelection", json!({})).unwrap();
@@ -228,11 +228,11 @@ fn recorded_colour_clicks_save_as_component_selects() {
 /// The commands' states and what they run follow the targeted row.
 #[test]
 fn channel_commands_follow_the_target() {
-    let ctx = egui::Context::default();
     use ChannelsCommands::{ChannelOptions, Delete, Duplicate, MergeSpot};
 
     // A targeted spot channel: duplicate, options, merge and delete are all there.
     let mut app = app_with("rgb");
+    let ctx = app.ctx().clone();
     app.run("channel.newSpot", json!({"name": "Ink", "fromSelection": false})).unwrap();
     app.run("channel.target", json!({"channel": 0})).unwrap();
     for command in [Duplicate, Delete, MergeSpot, ChannelOptions] {
@@ -307,8 +307,8 @@ fn channel_commands_follow_the_target() {
 /// half turns those pixels blue and leaves the rest white.
 #[test]
 fn panel_menu_merges_the_targeted_spot_channel() {
-    let ctx = egui::Context::default();
     let mut app = app_with("rgb");
+    let ctx = app.ctx().clone();
     app.run("channel.new", json!({"name": "Alpha 1"})).unwrap();
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 16, "height": 24})).unwrap();
     app.run("channel.newSpot", json!({"name": "Ink", "color": "#0000ff", "solidity": 100})).unwrap();
@@ -331,8 +331,8 @@ fn panel_menu_merges_the_targeted_spot_channel() {
 /// merges until OK. With params the command runs directly.
 #[test]
 fn panel_menu_merge_channels_opens_its_dialog() {
-    let ctx = egui::Context::default();
     let mut app = app_with("grayscale");
+    let ctx = app.ctx().clone();
     for _ in 0..2 {
         app.run("file.new", json!({"width": 32, "height": 24, "mode": "grayscale"})).unwrap();
     }
@@ -359,8 +359,8 @@ fn panel_menu_merge_channels_opens_its_dialog() {
 /// the dialog; a third one enables it.
 #[test]
 fn merge_channels_waits_for_three_grayscale_documents() {
-    let ctx = egui::Context::default();
     let mut app = app_with("grayscale");
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 32, "height": 24, "mode": "grayscale"})).unwrap();
     let why = crate::menus::invoke(&mut app, &ctx, "channel.merge", json!({})).unwrap_err();
     assert!(why.contains("three") && !app.dialog_open(), "{why}");

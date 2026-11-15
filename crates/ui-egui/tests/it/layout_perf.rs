@@ -23,7 +23,7 @@ fn app() -> (H, layout_doc::Handles) {
     let (doc, handles) = layout_doc::build(layout_doc::Spec::small());
     let h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_pixels_per_point(1.0).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Services::default());
         app.session.open_document(doc, None);
         app.sync_views();
         app

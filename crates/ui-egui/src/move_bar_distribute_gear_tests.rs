@@ -51,7 +51,7 @@ fn app() -> (PhotocraftApp, [LayerId; 3]) {
 /// The Move tool's align controls and gear, on the app's own context so command states reach them
 /// as in the running app.
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(vec2(700.0, 200.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(700.0, 200.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -156,7 +156,7 @@ fn closed_group_doc(tool: Tool, on: bool) -> (PhotocraftApp, LayerId, LayerId, e
     app.ui.tool = tool;
     app.ui.tool_options.move_expand_group_on_click = on;
     app.ui.tool_options.move_target = "layer".into();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(crate::layer_reveal::track(&mut app, &ctx), None);
     (app, inner, group, ctx)
 }

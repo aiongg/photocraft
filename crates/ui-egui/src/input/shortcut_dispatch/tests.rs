@@ -738,7 +738,7 @@ fn keyboard_zoom_works_with_a_dialog_open() {
 #[test]
 fn a_second_pass_in_one_frame_runs_no_command_twice() {
     let app = PhotocraftApp::new(realistic(), services());
-    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             crate::app::framework::keys_pass(app, ui, |_| {});
             crate::app::framework::keys_pass(app, ui, |_| {});

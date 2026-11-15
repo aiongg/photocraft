@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn partial_colour_sets_cannot_start_content_aware_or_mesh_transform_previews() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.run("file.new", json!({"width":32,"height":24})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("edit.fill", json!({"color":"#336699"})).unwrap();
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn menu_opens_a_scale_box_and_enter_commits_one_step() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("select.rect", json!({"x": 8, "y": 8, "width": 40, "height": 24})).unwrap();
@@ -332,7 +332,7 @@ mod tests {
     fn on_the_background_the_preview_vacates_to_the_background_colour() {
         for depth in [8, 16] {
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-            let ctx = egui::Context::default();
+            let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 64, "height": 48, "depth": depth, "background": "white"})).unwrap();
             app.session.tools.background = [0.0, 0.0, 1.0, 1.0];
             app.run("select.rect", json!({"x": 8, "y": 8, "width": 40, "height": 24})).unwrap();

@@ -288,8 +288,8 @@ fn the_type_path_of_type_on_a_path_is_drawn_with_the_pen() {
 fn show_target_path_and_extras_hide_the_path_outlines() {
     // #1119: View › Show › Target Path only flipped its checkmark; the canvas kept drawing the
     // work path and the active shape's path.
-    let ctx = egui::Context::default();
     let mut app = app();
+    let ctx = app.ctx().clone();
     let path = json!({"subpaths": [{"closed": true, "knots": [
         {"anchor": [10, 10], "in": [10, 10], "out": [10, 10]},
         {"anchor": [80, 10], "in": [80, 10], "out": [80, 10]},
@@ -1054,7 +1054,7 @@ fn shape_bar_harness(tool: Tool) -> egui_kittest::Harness<'static, PhotocraftApp
     let mut app = app();
     app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     shape_drag(&mut app, Tool::Rectangle, [20.0, 20.0], [120.0, 100.0]);
-    let mut h = egui_kittest::Harness::builder().with_size(vec2(1100.0, 48.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1100.0, 48.0)).build_ui_state(
         move |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 ui.horizontal_centered(|ui| options_bar(app, ui, tool));

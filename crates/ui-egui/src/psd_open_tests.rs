@@ -35,7 +35,8 @@ fn app() -> PhotocraftApp {
 /// Runs an agent-facing control command synchronously and returns its JSON result.
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let (req, _rx) = control::ControlRequest::new(method, params);
-    match control::handle(app, &egui::Context::default(), &req) {
+    let app_ctx = app.ctx().clone();
+    match control::handle(app, &app_ctx, &req) {
         control::Reply::Done(v) => v,
         _ => panic!("{method}: expected an immediate reply"),
     }
@@ -124,7 +125,8 @@ fn accepted_psd_keeps_its_source_path_and_uses_the_normal_save_writer() {
 
     for _ in 0..2 {
         app.run("layer.new.layer", json!({})).unwrap();
-        crate::menus::invoke(&mut app, &egui::Context::default(), "file.save", json!({})).unwrap();
+        let app_ctx = app.ctx().clone();
+        crate::menus::invoke(&mut app, &app_ctx, "file.save", json!({})).unwrap();
         assert_eq!(app.session.active().unwrap().path.as_deref(), Some(path));
         assert!(!app.session.active().unwrap().is_dirty());
         assert!(photocraft_io::import(path, &stored.borrow()).is_ok());
@@ -212,7 +214,8 @@ fn background_damage_only_open_does_not_create_a_spurious_profile_question() {
     for id in jobs {
         app.session.wait_job(id).unwrap();
     }
-    crate::jobs_ui::tick(&mut app, &egui::Context::default());
+    let app_ctx = app.ctx().clone();
+    crate::jobs_ui::tick(&mut app, &app_ctx);
     assert!(app.session.documents().is_empty());
     let id = damage_dialog(&mut app);
     assert_eq!(call(&mut app, "ui.dialog.confirm", json!({"dialog": id}))["ok"], true);
@@ -317,7 +320,8 @@ fn memory_confirmation_resume_background_success() {
             for id in jobs {
                 app.session.wait_job(id).unwrap();
             }
-            crate::jobs_ui::tick(&mut app, &egui::Context::default());
+            let app_ctx = app.ctx().clone();
+            crate::jobs_ui::tick(&mut app, &app_ctx);
             assert!(app.session.documents().is_empty(), "the file waits for approval");
             assert_eq!(app.held_memory_prompts.len(), 1);
             let dlg_id = memory_dialog(&mut app);
@@ -334,7 +338,8 @@ fn memory_confirmation_resume_background_success() {
             for id in jobs {
                 app.session.wait_job(id).unwrap();
             }
-            crate::jobs_ui::tick(&mut app, &egui::Context::default());
+            let app_ctx = app.ctx().clone();
+            crate::jobs_ui::tick(&mut app, &app_ctx);
             assert_eq!(app.session.documents().len(), 1, "document opened via background resume");
             assert_eq!(app.session.documents()[0].doc.name, "bg_resume.psd");
             assert_eq!(app.session.documents()[0].path.as_deref(), Some("/test/bg_resume.psd"));
@@ -451,7 +456,8 @@ fn memory_confirmation_refuses_when_source_changed_async() {
     for id in jobs {
         let _ = app.session.wait_job(id);
     }
-    crate::jobs_ui::tick(&mut app, &egui::Context::default());
+    let app_ctx = app.ctx().clone();
+    crate::jobs_ui::tick(&mut app, &app_ctx);
 
     assert!(app.session.documents().is_empty(), "no document opened on changed file failure");
     assert!(app.jobs.opens.is_empty(), "opens cleared on job failure");

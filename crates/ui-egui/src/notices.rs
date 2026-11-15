@@ -280,8 +280,8 @@ mod tests {
             xwayland_command: Some(command.to_string()),
             ..Default::default()
         };
-        let ctx = egui::Context::default();
         let mut app = PhotocraftApp::new(Session::new(), services(true));
+        let ctx = app.ctx().clone();
         for _ in 0..2 {
             let r = crate::menus::invoke(&mut app, &ctx, "edit.paste", serde_json::json!({})).unwrap();
             assert_eq!(r["pasted"], serde_json::json!(false));

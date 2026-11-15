@@ -32,7 +32,7 @@ fn main() {
             screen_capture: Some(Arc::new(|| -> Box<dyn CaptureSource> { Box::new(StillCapture::color(Srgba::rgb(1.0, 136.0 / 255.0, 0.0))) })),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(session, services);
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services);
         app.ui.tool = photocraft_ui_egui::state::Tool::Type;
         app
     });
@@ -54,7 +54,7 @@ fn main() {
         };
         let mut session = photocraft_engine::Session::new();
         session.execute("file.new", json!({"width":400,"height":300,"background":"white"})).unwrap();
-        PhotocraftApp::new(session, services)
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services)
     });
     loupe.run_steps(8);
     color_picker_ui::open(loupe.state_mut(), "foreground");

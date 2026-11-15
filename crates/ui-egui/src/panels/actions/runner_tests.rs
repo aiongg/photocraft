@@ -1278,7 +1278,7 @@ fn a_suspended_call_is_recorded_into_its_action_after_the_list_changes() {
 #[test]
 fn escape_on_a_step_dialog_ends_the_recorded_call_once() {
     let app = recording_with_dialog_child();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     pause_child(h.state_mut());

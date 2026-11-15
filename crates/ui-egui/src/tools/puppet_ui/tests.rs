@@ -216,8 +216,8 @@ fn command_z_steps_the_session_not_the_document() {
 
 #[test]
 fn mode_and_density_commit_through_the_engine() {
-    let ctx = egui::Context::default();
     let mut app = paint_app(100, 80, Rect::new(20, 30, 80, 50));
+    let ctx = app.ctx().clone();
     crate::distort_ui::menu(&mut app, &ctx, "edit.puppetWarp", &json!({})).unwrap().unwrap();
     add_pin(&mut app, [25.0, 40.0], [25.0, 40.0]);
     add_pin(&mut app, [75.0, 40.0], [75.0, 20.0]);

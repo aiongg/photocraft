@@ -300,7 +300,8 @@ mod tests {
             other => panic!("expected a smart object, got {other:?}"),
         };
         assert_eq!(sm.smart_filters.len(), 1);
-        open_editor(&mut app, &egui::Context::default(), id, &sm, 0);
+        let app_ctx = app.ctx().clone();
+        open_editor(&mut app, &app_ctx, id, &sm, 0);
         let d = app.framework.dialogs.open_dialogs().pop().expect("the adjustment editor opened");
         let fields = d.fields.expect("the editor's fields");
         assert_eq!(fields["brightness"].as_f64(), Some(40.0), "the recorded settings");
@@ -335,7 +336,7 @@ mod tests {
         };
         let sm = recorded(&app);
         assert_eq!(sm.smart_filters[0].params.get("cyan").and_then(Value::as_f64), Some(30.0), "recorded in the old form");
-        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+        let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         let ctx = h.ctx.clone();
         // The open dialog's fields, whatever its type.
@@ -391,7 +392,7 @@ mod tests {
             other => panic!("expected a smart object, got {other:?} ({})", app.ui.status),
         };
         let sm = smart(&app, &app.session.active().unwrap().doc);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         open_editor(&mut app, &ctx, id, &sm, 0);
         let open = app.framework.dialogs.open_dialogs().pop().expect("the filter's dialog opened");
         let (dialog, key) = (open.id, open.key.unwrap_or_default());

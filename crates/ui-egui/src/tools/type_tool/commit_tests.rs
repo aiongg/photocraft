@@ -152,7 +152,7 @@ fn tool_shortcuts_work_after_another_layer_is_selected() {
     s.execute("file.new", json!({"width": 400, "height": 300})).unwrap();
     let mut h = Harness::builder().with_size(egui::vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(s, crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
     h.run_steps(8);
     let app = h.state_mut();

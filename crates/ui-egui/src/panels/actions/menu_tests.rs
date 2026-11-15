@@ -35,13 +35,15 @@ fn enabled(app: &PhotocraftApp, command: C) -> bool {
 
 /// Fires the row of `command` as the menu does.
 fn fire(app: &mut PhotocraftApp, command: C) {
-    assert!(menu::run_fired(app, &egui::Context::default(), &CommandRef::from(command)));
+    let app_ctx = app.ctx().clone();
+    assert!(menu::run_fired(app, &app_ctx, &CommandRef::from(command)));
 }
 
 /// One control request through the app's public channel.
 fn control(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     let (request, _reply) = crate::control::ControlRequest::new(method, params);
-    match crate::control::handle(app, &egui::Context::default(), &request) {
+    let app_ctx = app.ctx().clone();
+    match crate::control::handle(app, &app_ctx, &request) {
         crate::control::Reply::Done(v) => v,
         _ => panic!("{method} answers at once"),
     }
@@ -59,7 +61,8 @@ fn set(app: &mut PhotocraftApp, id: DialogId, field: &str, value: Value) {
 }
 
 fn ok(app: &mut PhotocraftApp, id: DialogId) {
-    crate::dialogs::confirm(app, &egui::Context::default(), id).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::dialogs::confirm(app, &app_ctx, id).unwrap();
 }
 
 #[test]
@@ -167,6 +170,7 @@ fn insert_stop_adds_a_stop_after_the_selected_step() {
     // Cancel inserts nothing.
     fire(&mut app, C::InsertStop);
     let id = top_dialog(&app);
-    crate::dialogs::cancel(&mut app, &egui::Context::default(), id).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::dialogs::cancel(&mut app, &app_ctx, id).unwrap();
     assert_eq!(app.session.actions.list.action(0).unwrap().steps.len(), 4);
 }

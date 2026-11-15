@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn thumbnail_contents_is_clip_thumbnails_to_layer_bounds() {
         let mut app = app_with_document();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         assert_eq!(thumbnail_contents(&app), ThumbContents::EntireDocument);
         assert!(run_fired(&mut app, &ctx, &fired(LayersPanelCommands::ClipThumbnails)));
         assert!(app.session.prefs().interface.clip_thumbnails_to_layer_bounds);
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn collapse_all_groups_closes_every_group_and_it_is_saved() {
         let mut app = PhotocraftApp::new(nested(), crate::Services::default());
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         assert!(groups_open(&app.session).iter().all(|o| *o));
         assert!(run_fired(&mut app, &ctx, &fired(LayersPanelCommands::CollapseAll)));
         let open = groups_open(&app.session);
@@ -431,7 +431,8 @@ mod tests {
         for command in [crate::new_group_ui::NEW_GROUP, crate::new_group_ui::FROM_LAYERS] {
             assert!(at(command) < collapse, "{command} comes before Collapse All Groups");
             let mut app = PhotocraftApp::new(nested(), crate::Services::default());
-            crate::menus::invoke(&mut app, &egui::Context::default(), command, json!({})).unwrap();
+            let app_ctx = app.ctx().clone();
+            crate::menus::invoke(&mut app, &app_ctx, command, json!({})).unwrap();
             assert!(app.dialog_open(), "{command} opens the New Group dialog");
         }
     }

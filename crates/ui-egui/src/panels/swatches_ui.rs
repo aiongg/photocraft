@@ -400,7 +400,7 @@ mod tests {
     fn import_and_export_through_the_services() {
         let mut app = app();
         let aco = craft_psd::aco::write(&[craft_psd::aco::AcoSwatch { name: "Teal".into(), color: craft_psd::aco::AcoColor::Rgb([0, 32768, 32768]) }]).unwrap();
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         // PLAN: assumed top-w28 `Files` fake: it answers a pick with the queued file and records every write.
         let files = crate::Files::fake();
         app.services.files = files.service();

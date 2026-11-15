@@ -16,7 +16,7 @@ pub(super) fn harness_with(session: photocraft_engine::Session) -> Harness<'stat
     let mut session = Some(session);
     Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(session.take().expect("one app"), crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), session.take().expect("one app"), crate::Services::default())
     })
 }
 

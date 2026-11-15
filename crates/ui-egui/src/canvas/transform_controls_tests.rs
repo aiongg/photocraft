@@ -196,7 +196,7 @@ fn several_selected_layers_share_one_frame_that_transforms_them_all() {
     app.session.execute("layer.select", json!({"layer": bg.0, "mode": "toggle"})).unwrap();
     assert_eq!(frame_layers(&app).len(), 2);
     assert_eq!(frame(&app), Some(both));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(begin_controls(&mut app, &ctx), ControlsPress::Started);
     let t = app.ui.transform.as_ref().expect("the shared frame's handle starts Free Transform");
     assert_eq!(corners(t.session.rect()), [20.0, 30.0, 150.0, 150.0]);
@@ -212,7 +212,7 @@ fn move_transform_controls_start_free_transform_for_vector_shapes() {
     app.ui.tool = Tool::Move;
     app.ui.tool_options.move_show_transform = true;
     assert!(frame(&app).is_some(), "shape layers have transform bounds");
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(begin_controls(&mut app, &ctx), ControlsPress::Started);
     let t = app.ui.transform.as_ref().expect("control press starts Free Transform");
     assert_eq!(corners(t.session.rect()), [20.0, 30.0, 100.0, 70.0]);
@@ -229,7 +229,7 @@ fn move_transform_controls_follow_floating_selected_pixels() {
     app.ui.tool_options.move_show_transform = true;
     assert!(crate::move_ui::float_selected(&mut app, false, 100.0, 50.0));
     assert_eq!(corners(frame(&app).unwrap()), [200.0, 150.0, 300.0, 210.0]);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(begin_controls(&mut app, &ctx), ControlsPress::Started);
     assert_eq!(corners(app.ui.transform.as_ref().unwrap().session.rect()), [200.0, 150.0, 300.0, 210.0]);
 }
@@ -247,7 +247,7 @@ fn move_transform_controls_frame_the_selection() {
     app.ui.tool = Tool::Move;
     app.ui.tool_options.move_show_transform = true;
     assert_eq!(corners(frame(&app).unwrap()), [60.0, 80.0, 160.0, 200.0]);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(begin_controls(&mut app, &ctx), ControlsPress::Started);
     assert_eq!(corners(app.ui.transform.as_ref().unwrap().session.rect()), [60.0, 80.0, 160.0, 200.0]);
 }
@@ -268,7 +268,7 @@ fn free_transform_on_a_locked_layer_is_refused_up_front() {
         .unwrap();
     app.sync_views();
     let messages = alerts;
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     // ⌘T.
     let r = crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({}));
     assert_eq!(r, Err(crate::transform_tool::LOCKED.to_string()));
@@ -301,7 +301,7 @@ fn the_background_among_several_joins_the_frame_and_its_handles_refuse() {
     app.ui.tool_options.move_show_transform = true;
     assert_eq!(corners(frame(&app).expect("the box frames them all")), [0.0, 0.0, 200.0, 200.0], "the Background included");
     let before = app.session.active().unwrap().doc.clone();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(begin_controls(&mut app, &ctx), ControlsPress::Refused, "the press is taken, not a move");
     assert!(app.ui.transform.is_none(), "no box opens");
     let messages = alerts(&app);

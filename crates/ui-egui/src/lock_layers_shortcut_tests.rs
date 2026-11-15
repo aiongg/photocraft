@@ -14,7 +14,7 @@ fn app() -> PhotocraftApp {
 }
 
 fn press(app: &mut PhotocraftApp, key: Key, modifiers: Modifiers) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let raw = egui::RawInput {
         events: vec![egui::Event::ModifiersChanged(modifiers), egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }],
         ..Default::default()
@@ -35,7 +35,7 @@ fn set_shortcut(app: &mut PhotocraftApp, value: &str) {
 
 /// OK in the open Lock Layers dialog.
 fn confirm_dialog(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let id = app.framework.dialogs.stack().top().expect("the Lock Layers dialog is open");
     crate::dialogs::confirm(app, &ctx, id).unwrap();
 }

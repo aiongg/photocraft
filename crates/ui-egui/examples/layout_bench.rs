@@ -209,7 +209,7 @@ fn main() {
     let builder = egui_kittest::Harness::builder().with_size(egui::vec2(1600.0, 1000.0)).with_pixels_per_point(ppp);
     let mut h: H = builder.wgpu_setup(photocraft_ui_egui::gpu_canvas::wgpu_setup()).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Services::default());
         if let Some(rs) = cc.wgpu_render_state.as_ref() {
             rs.device.set_device_lost_callback(|r, m| eprintln!("GPU device lost ({r:?}): {m}"));
             app.set_wgpu(rs.clone());

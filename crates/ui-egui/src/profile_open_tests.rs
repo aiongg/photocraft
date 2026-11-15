@@ -27,7 +27,7 @@ fn adobe_png() -> Vec<u8> {
 fn harness(background: bool) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), 
             Session::new(),
             Services {
                 import: Some(Box::new(|name, bytes, opts| {

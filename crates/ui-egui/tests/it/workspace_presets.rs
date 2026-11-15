@@ -199,7 +199,7 @@ fn titlebar_picker_displays_every_selected_preset() {
     for (suffix, name, _, _) in PRESETS {
         let mut app = app();
         select(&mut app, suffix);
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         PhotocraftApp::setup_context(&ctx, Default::default());
         let mut texts = Vec::new();
         for _ in 0..3 {

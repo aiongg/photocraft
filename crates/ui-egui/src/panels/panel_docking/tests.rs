@@ -16,7 +16,8 @@ fn app() -> PhotocraftApp {
 
 /// Runs `id` as the menus and the control protocol do.
 fn invoke(app: &mut PhotocraftApp, id: &str, params: Value) -> Result<Value, String> {
-    crate::menus::invoke(app, &egui::Context::default(), id, params)
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(app, &app_ctx, id, params)
 }
 
 /// The workspace as saved JSON: equal values mean an unchanged workspace.
@@ -200,7 +201,7 @@ fn saved_workspace_restores_the_custom_tree_and_hidden_panel_placement() {
 #[test]
 fn a_theme_switch_keeps_a_customised_workspace() {
     let mut app = app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     apply(&mut app, vec![Action::move_beside("color".to_owned(), "layers".to_owned(), DockPlacement::tab(None))]).unwrap();
     let before = saved(&app);
     app.set_theme(&ctx, crate::theme::AppTheme::studio());
@@ -246,7 +247,7 @@ fn a_pre_docking_save_migrates_once() {
 #[test]
 fn ui_set_dock_fields_map_onto_the_workspace_atomically() {
     let mut app = app();
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let ok = |app: &mut PhotocraftApp, params: Value| control_set(app, &ctx, params)["ok"] == true;
 
     assert!(ok(&mut app, json!({"dockTabs": {"layers": 1}})));

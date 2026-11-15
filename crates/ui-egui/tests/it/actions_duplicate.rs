@@ -31,7 +31,7 @@ fn duplicate_menu_selects_the_new_action_and_then_the_new_step() {
     app.session.actions.list.push(a).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Action(0));
     app.ui.actions.panel.expanded.insert("Source".into());
-    let mut h = Harness::builder().with_size(egui::vec2(360.0, 460.0)).build_ui_state(|ui, app| dialogs::run(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 460.0)).build_ui_state(|ui, app| dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(3);
     let ctx = h.ctx.clone();
@@ -68,7 +68,8 @@ fn duplicate_cannot_shift_the_owner_of_a_suspended_recording() {
     let error = app.run("actions.duplicate", json!({"action": "Menu"})).unwrap_err();
     assert!(error.contains("Confirm or cancel"), "{error}");
     assert_eq!(app.session.actions.list, list);
-    let cancelled = control(&mut app, &egui::Context::default(), "ui.dialog.cancel", json!({"dialog": dialog}));
+    let app_ctx = app.ctx().clone();
+    let cancelled = control(&mut app, &app_ctx, "ui.dialog.cancel", json!({"dialog": dialog}));
     assert_eq!(cancelled["ok"], true, "{cancelled}");
     assert_eq!(app.session.actions.recording.map(|(_, i)| i), Some(1));
     app.run("actions.stop", json!({})).unwrap();

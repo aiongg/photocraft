@@ -28,7 +28,7 @@ fn app_of(session: photocraft_engine::Session) -> PhotocraftApp {
 fn harness(session: photocraft_engine::Session, ppp: f32, dock_width: f32) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 1000.0)).with_pixels_per_point(ppp).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(session, crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), session, crate::Services::default())
     });
     let ctx = h.ctx.clone();
     let (req, _rx) = crate::control::ControlRequest::new("ui.set", json!({"theme": "promedium", "dockWidth": dock_width}));
@@ -74,9 +74,9 @@ fn click_row(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64, part: Option
 
 #[test]
 fn the_chain_toggles_linking_and_it_survives_psd() {
-    let ctx = egui::Context::default();
     let (s, masked, _) = session();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
     for part in [LayerPart::LayerMask, LayerPart::VectorMask] {
         apply_layers_events(&mut app, &ctx, vec![LayersEvent::mask_link(LayerId(masked), part, false)]);
     }
@@ -148,9 +148,9 @@ fn panels_never_panic_on_odd_documents() {
 /// Pen adds a subpath to it, and the other thumbnails take the target back.
 #[test]
 fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
-    let ctx = egui::Context::default();
     let (s, masked, _) = session();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
     click_row(&mut app, &ctx, masked, Some(LayerPart::VectorMask));
     assert!(app.ui.vector_mask_target && !app.ui.mask_target);
     assert_eq!(app.ui.selected_path.as_deref(), Some("layer"), "the Paths panel selects its path");
@@ -181,9 +181,9 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
 
 #[test]
 fn a_targeted_vector_mask_flips_its_path_not_the_layer_pixels() {
-    let ctx = egui::Context::default();
     let (s, masked, _) = session();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
     click_row(&mut app, &ctx, masked, Some(LayerPart::VectorMask));
     assert!(app.ui.vector_mask_target);
     let before = layer(&app, masked);
@@ -201,9 +201,9 @@ fn a_targeted_vector_mask_flips_its_path_not_the_layer_pixels() {
 /// engine routes those), and an explicit target in the params always wins.
 #[test]
 fn a_targeted_vector_mask_yields_to_alpha_quick_mask_and_explicit_targets() {
-    let ctx = egui::Context::default();
     let (s, masked, _) = session();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
     click_row(&mut app, &ctx, masked, Some(LayerPart::VectorMask));
     assert!(app.ui.vector_mask_target && app.vector_mask_targeted());
     let target = |app: &PhotocraftApp, p: serde_json::Value| app.with_mask_target("edit.transform.flipHorizontal", p);
@@ -295,10 +295,10 @@ fn selecting_mask_thumbnail_toggles_swatches_to_mask_colors_and_back() {
     const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
     const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
-    let ctx = egui::Context::default();
     let (mut s, masked, _) = dotted();
     s.execute("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     let mut app = app_of(s);
+    let ctx = app.ctx().clone();
 
     // Initial state: layer pixels targeted, red foreground, blue background.
     assert!(!app.ui.mask_target);
@@ -344,12 +344,12 @@ fn selecting_mask_thumbnail_toggles_swatches_to_mask_colors_and_back() {
 /// the mask thumbnail is clicked, as in Photoshop.
 #[test]
 fn a_new_adjustment_or_fill_layer_shows_its_settings_until_the_mask_thumbnail_is_clicked() {
-    let ctx = egui::Context::default();
     for command in ["layer.newAdjustmentLayer.curves", "layer.newFillLayer.solidColor"] {
         let mut s = photocraft_engine::Session::new();
         s.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         let mut app = app_of(s);
+    let ctx = app.ctx().clone();
         app.run(command, json!({})).unwrap();
         let id = app.session.active().unwrap().active_layer.unwrap().0;
         assert!(app.ui.mask_target, "{command}: the new mask is targeted");

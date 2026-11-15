@@ -17,7 +17,7 @@ fn integrated_app(setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'
         PhotocraftApp::setup_window(&cc.egui_ctx, Default::default(), decision);
         let mut session = photocraft_engine::Session::new();
         session.edit_prefs(|p| p.general.auto_show_home_screen = false);
-        let mut app = PhotocraftApp::new(session, crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, crate::Services::default());
         if let Some(setup) = setup.take() {
             setup(&mut app);
         }

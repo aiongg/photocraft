@@ -137,7 +137,8 @@ fn rulers_open_as_last_set_after_a_restart() {
     };
     for on in [true, false] {
         let mut app = launch(&files);
-        assert_eq!(crate::menus::invoke(&mut app, &egui::Context::default(), "view.rulers", json!({})).unwrap(), json!(on));
+        let app_ctx = app.ctx().clone();
+        assert_eq!(crate::menus::invoke(&mut app, &app_ctx, "view.rulers", json!({})).unwrap(), json!(on));
         crate::prefs_ui::save_preferences(&mut app).unwrap();
         let mut next = launch(&files);
         next.session.execute("file.new", json!({"width": 20, "height": 10})).unwrap();

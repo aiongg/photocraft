@@ -31,7 +31,7 @@ fn square(app: &mut PhotocraftApp, x: f64, y: f64, side: f64) {
 
 /// The options bar of the Pen in a harness `width` wide.
 fn options_harness(app: PhotocraftApp, width: f32) -> egui_kittest::Harness<'static, PhotocraftApp> {
-    let mut h = egui_kittest::Harness::builder().with_size(vec2(width, 400.0)).build_ui_state(
+    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(width, 400.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 ui.horizontal(|ui| super::options_bar(app, ui, Tool::Pen));

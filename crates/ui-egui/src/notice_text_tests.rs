@@ -24,7 +24,7 @@ fn app_harness() -> Harness<'static, PhotocraftApp> {
         s.execute("file.new", json!({"width": 2000, "height": 1500})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         s.execute("edit.fill", json!({"color": "#3366cc"})).unwrap();
-        let mut app = PhotocraftApp::new(s, crate::Services::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default());
         app.ui.tool = Tool::Move;
         app
     });

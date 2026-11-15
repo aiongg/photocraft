@@ -587,7 +587,7 @@ impl SectionStore for PrefSections {
 /// path with PhotoCraft's decision, as `logic` does.
 #[cfg(test)]
 pub(crate) fn close_path_frame(app: &mut PhotocraftApp, input: egui::RawInput) -> egui::FullOutput {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     install(&ctx, &UiFonts::new(&craft::ui::fonts::I18nScripts), None);
     ctx.run_ui(input, |ui| embed::logic(ui.ctx(), || crate::discard_ui::close_decision(app)))
 }

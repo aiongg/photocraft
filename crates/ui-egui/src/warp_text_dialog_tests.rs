@@ -42,7 +42,7 @@ fn steps(app: &PhotocraftApp) -> usize {
 
 /// The open dialogs drawn over `app`, as the window shows them.
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_size(vec2(900.0, 700.0)).build_ui_state(
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 700.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 crate::dialogs::run(app, ui);
@@ -57,7 +57,7 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 }
 
 fn set(app: &mut PhotocraftApp, id: DialogId, key: &str, value: Value) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.framework.dialogs.set_json_field(&ctx, id, key, value).unwrap_or_else(|e| panic!("{key}: {e}"));
 }
 
@@ -81,7 +81,7 @@ fn open(app: &mut PhotocraftApp) -> (DialogId, DialogFields) {
 
 /// OK as the button files it, then the passes in which the family runs the command.
 fn confirm(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     PhotocraftApp::setup_context(&ctx, Default::default());
     app.framework.dialogs.confirm_by_id(&ctx, id);
     for _ in 0..3 {

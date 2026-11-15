@@ -23,7 +23,7 @@ fn harness(command: Option<&str>, rotation: f32) -> Harness<'static, PhotocraftA
     app.sync_views();
     app.ui.extras.rulers = false;
     app.ui.tool = Tool::Brush;
-    let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

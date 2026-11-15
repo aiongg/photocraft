@@ -229,7 +229,7 @@ fn the_eraser_in_block_mode_erases_a_16_screen_px_square() {
 fn b_cycles_brush_pencil_color_replacement_and_mixer_brush() {
     let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 200, "height": 120})).unwrap();
         app
     });

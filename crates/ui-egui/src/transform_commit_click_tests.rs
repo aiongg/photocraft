@@ -30,7 +30,8 @@ fn app() -> PhotocraftApp {
     app.run("select.rect", json!({"x": 20, "y": 20, "width": 40, "height": 40})).unwrap();
     app.run("edit.fill", json!({"contents": "color", "color": "#ff0000"})).unwrap();
     app.run("select.deselect", json!({})).unwrap();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
     shift_right(&mut app);
     app
 }
@@ -85,7 +86,8 @@ fn a_click_on_another_layers_pixels_commits_and_keeps_the_selection() {
         app.run("select.deselect", json!({})).unwrap();
     }
     let paint = app.session.active().unwrap().active_layer.unwrap();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
     shift_right(&mut app);
     let before = steps(&app);
     click(&mut app, [140.0, 140.0]);
@@ -114,7 +116,8 @@ fn a_click_on_a_layer_linked_after_the_box_opened_keeps_it_open() {
         app.run("select.deselect", json!({})).unwrap();
         ids.push(LayerId(id));
     }
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
     shift_right(&mut app);
     app.session
         .edit("Link Layers", |doc, _| {
@@ -154,7 +157,8 @@ fn a_click_on_a_grouped_layer_covering_another_layer_keeps_the_box_open() {
     assert!(doc.layers.iter().all(|l| l.id.0 != ids[2]), "Cover is grouped");
     assert!(doc.layers.iter().any(|l| l.id.0 == ids[1]), "Other is top-level");
     app.run("layer.select", json!({"layer": ids[0]})).unwrap();
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.freeTransform", json!({})).unwrap();
+    let app_ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
     shift_right(&mut app);
     let before = steps(&app);
     click(&mut app, [140.0, 140.0]);

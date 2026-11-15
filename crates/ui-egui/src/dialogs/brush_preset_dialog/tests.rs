@@ -11,7 +11,7 @@ use crate::new_layer_ui::testing::{fields, set};
 fn harness() -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default())
     });
     h.state_mut().run("file.new", json!({"width": 400, "height": 300})).unwrap();
     h.state_mut().ui.tool = crate::state::Tool::Brush;

@@ -58,7 +58,7 @@ fn free_transform_with_a_selection_frames_and_moves_the_whole_type_layer() {
     let mut app = app();
     let whole = type_bounds(&app);
     select_left_half(&mut app);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
     let r = app.ui.transform.as_ref().unwrap().session.rect();
     assert_eq!([r.x0, r.y0, r.x1, r.y1], [whole.x0 as f64, whole.y0 as f64, whole.x1 as f64, whole.y1 as f64], "the box frames the whole text");

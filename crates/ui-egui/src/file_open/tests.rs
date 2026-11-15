@@ -186,8 +186,8 @@ fn the_web_opens_every_selected_file() {
 /// dropped on the canvas are placed from their bytes, presets and drops elsewhere are opened.
 #[test]
 fn web_drops_onto_the_canvas_are_placed_from_their_bytes() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let names = vec!["photo.png".to_string(), "brushes.abr".to_string()];
     // No pointer known: nothing is placed.
     assert_eq!(app.dropped_on_canvas(&ctx, &names), [false, false]);
@@ -608,8 +608,8 @@ fn files_dropped_onto_the_canvas_are_placed_in_free_transform_one_by_one() {
     let svg = dir.join("logo.svg");
     std::fs::write(&svg, b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\"><rect width=\"20\" height=\"10\" fill=\"red\"/></svg>")
         .unwrap();
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(
         &ctx,
@@ -663,8 +663,8 @@ fn files_dropped_onto_the_canvas_are_placed_in_free_transform_one_by_one() {
 /// Transform applies that box and is placed at once, instead of waiting unseen for ↩.
 #[test]
 fn a_separate_drop_applies_the_open_transform_and_places_at_once() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
@@ -696,8 +696,8 @@ fn tick_until(app: &mut PhotocraftApp, ctx: &egui::Context, done: impl Fn(&Photo
 /// the layer has landed, and the next file is started only after that transform is applied.
 #[test]
 fn background_drops_are_placed_by_a_job_one_after_another() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.background_jobs = true;
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
@@ -737,8 +737,8 @@ fn background_drops_are_placed_by_a_job_one_after_another() {
 /// layer has landed, and the next file waits for it.
 #[test]
 fn a_dropped_file_is_placed_over_several_frames_without_background_jobs() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     assert!(!app.background_jobs);
     app.session.set_cooperative_jobs(true);
     // One unit of work per frame, so the number of frames does not depend on the machine.
@@ -788,8 +788,8 @@ fn stepped_places_from_a_path_fail_and_cancel_like_background_ones() {
     std::fs::create_dir_all(&dir).unwrap();
     let good = dir.join("good.png");
     std::fs::write(&good, png_bytes(30, 30)).unwrap();
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.session.set_cooperative_jobs(true);
     app.session.set_job_step_budget(std::time::Duration::ZERO);
     let (layers, steps) = (layer_count(&app), history_steps(&app));
@@ -824,8 +824,8 @@ fn a_cooperative_drop_from_a_path_completes_in_slices() {
     std::fs::create_dir_all(&dir).unwrap();
     let good = dir.join("good.png");
     std::fs::write(&good, png_bytes(30, 30)).unwrap();
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.session.set_cooperative_jobs(true);
     app.session.set_job_step_budget(std::time::Duration::ZERO);
     let layers = layer_count(&app);
@@ -841,8 +841,8 @@ fn a_cooperative_drop_from_a_path_completes_in_slices() {
 /// A file that can't be decoded is reported by name and the files dropped after it go on.
 #[test]
 fn a_background_place_that_fails_reports_it_and_the_queue_continues() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.background_jobs = true;
     let layers = layer_count(&app);
     app.open_dropped(&ctx, vec![dropped("bad.png", Ok(b"bad".to_vec())), dropped("good.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
@@ -860,8 +860,8 @@ fn a_background_place_that_fails_reports_it_and_the_queue_continues() {
 /// Cancelling the place says so, places nothing and goes on with the queue.
 #[test]
 fn cancelling_a_background_place_continues_the_queue() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.background_jobs = true;
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
@@ -885,8 +885,8 @@ fn cancelling_a_background_place_continues_the_queue() {
 /// as the previous one has landed, without waiting for ↩.
 #[test]
 fn skip_transform_when_placing_places_background_drops_without_free_transform() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.background_jobs = true;
     app.session.execute("prefs.set", json!({"path": "general.skipTransformWhenPlacing", "value": true})).unwrap();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
@@ -911,8 +911,8 @@ fn skip_transform_when_placing_places_background_drops_without_free_transform() 
 /// without Free Transform, a file that can't be placed reported on the way.
 #[test]
 fn skip_transform_when_placing_places_inline_drops_without_free_transform() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.session.execute("prefs.set", json!({"path": "general.skipTransformWhenPlacing", "value": true})).unwrap();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(
@@ -972,8 +972,8 @@ fn two_drops_then_switch(app: &mut PhotocraftApp, ctx: &egui::Context) -> (photo
 /// and goes on in A when A is back in view.
 #[test]
 fn background_drops_stay_with_their_document_when_the_tab_changes() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let (a, layers) = two_drops_then_switch(&mut app, &ctx);
     let (b_layers, b_steps) = (layer_count(&app), history_steps(&app));
     tick_until(&mut app, &ctx, |app| app.jobs.place.is_none());
@@ -997,8 +997,8 @@ fn background_drops_stay_with_their_document_when_the_tab_changes() {
 /// Cancelling A's place while B is in view doesn't hand A's next file to B.
 #[test]
 fn cancelling_a_background_place_from_another_tab_keeps_the_queue_in_its_document() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let (a, layers) = two_drops_then_switch(&mut app, &ctx);
     let (b_layers, b_steps) = (layer_count(&app), history_steps(&app));
     let first = app.jobs.place.clone().unwrap();
@@ -1017,8 +1017,8 @@ fn cancelling_a_background_place_from_another_tab_keeps_the_queue_in_its_documen
 /// Closing A drops its waiting files with a message; none goes into B.
 #[test]
 fn closing_the_document_discards_its_dropped_files() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     two_drops_then_switch(&mut app, &ctx);
     tick_until(&mut app, &ctx, |app| app.jobs.place.is_none());
     app.run("file.close", json!({"document": 0})).unwrap();
@@ -1036,8 +1036,8 @@ fn closing_the_document_discards_its_dropped_files() {
 /// doesn't wait for the next input event.
 #[test]
 fn the_closed_document_notice_stays_when_the_next_queued_file_starts() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let a = app.session.active().unwrap().doc.id;
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     let b = app.session.active().unwrap().doc.id;
@@ -1081,8 +1081,8 @@ fn the_drop_queue_is_bounded() {
 /// them: dropping 40 files on the canvas queues all of them, and a browser drop after them still fits.
 #[test]
 fn many_path_drops_all_queue() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let doc = app.session.active().unwrap().doc.id;
     // More than the browser drops' cap; none is read while it waits.
     let n = crate::file_open::MAX_QUEUED_DROPS + 8;
@@ -1107,8 +1107,8 @@ fn the_place_inbox_has_the_drop_queues_limits() {
 /// Closing A while its file is being placed: nothing lands anywhere, and A's next file is dropped.
 #[test]
 fn closing_the_document_while_its_file_is_placed_places_nothing_elsewhere() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     two_drops_then_switch(&mut app, &ctx);
     let (b_layers, b_steps) = (layer_count(&app), history_steps(&app));
     app.run("file.close", json!({"document": 0})).unwrap();
@@ -1123,8 +1123,8 @@ fn closing_the_document_while_its_file_is_placed_places_nothing_elsewhere() {
 /// next file waits for A instead of going into B.
 #[test]
 fn inline_drops_stay_with_their_document_when_the_tab_changes() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let layers = layer_count(&app);
     app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
@@ -1149,8 +1149,8 @@ fn inline_drops_stay_with_their_document_when_the_tab_changes() {
 /// has read the files.
 #[test]
 fn web_drops_go_to_the_document_they_were_dropped_on() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let layers = layer_count(&app);
     let inbox: crate::PlaceInbox = Default::default();
     app.services.place_inbox = Some(inbox.clone());
@@ -1172,8 +1172,8 @@ fn web_drops_go_to_the_document_they_were_dropped_on() {
 
 #[test]
 fn overlapping_web_drop_deliveries_keep_each_target() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let a = app.session.active().unwrap().doc.id;
     let a_layers = layer_count(&app);
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -1202,8 +1202,8 @@ fn a_background_drop_from_a_path_is_tracked_and_later_drops_queue() {
     std::fs::create_dir_all(&dir).unwrap();
     let abs = dir.join("photo.png");
     std::fs::write(&abs, png_bytes(40, 20)).unwrap();
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.background_jobs = true;
     let layers = layer_count(&app);
     app.open_dropped(&ctx, vec![dropped(abs, Err("egui's reader must not be used".into()))], DropTo::Canvas { at: None });
@@ -1225,8 +1225,8 @@ fn a_background_drop_from_a_path_is_tracked_and_later_drops_queue() {
 /// #1099: switching tabs after an actual canvas drop cancels the place in its source document.
 #[test]
 fn switching_documents_after_a_canvas_drop_undoes_only_the_place() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let original = app.session.active().unwrap().doc.clone();
     let steps = history_steps(&app);
     app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
@@ -1253,8 +1253,8 @@ fn switching_documents_after_a_canvas_drop_undoes_only_the_place() {
 /// Moving a placed file in its Free Transform and committing makes one Place Embedded step.
 #[test]
 fn a_transformed_place_is_one_history_step() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
@@ -1272,8 +1272,8 @@ fn a_transformed_place_is_one_history_step() {
 
 #[test]
 fn files_dropped_on_the_tabs_open_at_that_slot() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.ui.views[0].zoom = 3.0;
     let files = vec![dropped("first.png", Ok(b"x".to_vec())), dropped("bad.png", Ok(b"bad".to_vec())), dropped("second.png", Ok(b"x".to_vec()))];
     app.open_dropped(&ctx, files, DropTo::Slot(0));
@@ -1297,7 +1297,7 @@ fn a_drop_brings_the_window_to_the_front() {
     std::fs::write(&file, png_bytes(8, 8)).unwrap();
     let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).with_max_steps(8).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(photocraft_engine::Session::new(), Services::default())
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Services::default())
     });
     h.run_steps(2);
     let focus = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
@@ -1327,7 +1327,7 @@ fn drag_and_drop_in_the_running_app() {
             s.execute("file.new", json!({"width": 320, "height": 240, "background": "white"})).unwrap();
         }
         let services = Services { cursor_pos: Some(Box::new(move |_: &egui::Context| Some(reported.get()))), ..Default::default() };
-        let mut app = PhotocraftApp::new(s, services);
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), s, services);
         app.background_jobs = true;
         app
     });
@@ -1580,7 +1580,7 @@ fn export_as_is_recorded_and_replayed() {
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 40, "height": 20})).unwrap();
     app.run("actions.record", json!({})).unwrap();
     let id = menus::invoke(&mut app, &ctx, "file.export.exportAs", json!({})).unwrap()["dialog"].clone();
@@ -1874,8 +1874,8 @@ fn a_dropped_file_that_is_not_an_image_reports_why() {
 /// them goes to its library instead.
 #[test]
 fn several_files_dropped_on_the_canvas_are_queued_in_order() {
-    let ctx = egui::Context::default();
     let mut app = app_with_canvas();
+    let ctx = app.ctx().clone();
     app.open_dropped(
         &ctx,
         vec![dropped("/pics/one.png", Err("unused".into())), dropped("/pics/set.abr", Err("unused".into())), dropped("/pics/two.jpg", Err("unused".into()))],
@@ -1903,12 +1903,14 @@ fn queued_drop_waits_for_an_external_document_job() {
     app.session.start_job("test.external", json!({}), "External job", true, |_| Ok(()), |_, ()| Ok(json!(null))).unwrap();
     let job = app.session.active_job().unwrap().id;
     app.drop_places.push_back((doc, crate::file_open::DropPlace::Bytes("queued.png".into(), png_bytes(4, 3))));
-    app.place_next_dropped(&egui::Context::default());
+    let app_ctx = app.ctx().clone();
+    app.place_next_dropped(&app_ctx);
     assert_eq!(app.drop_places.len(), 1, "busy document retains its drop");
     assert!(app.jobs.place.is_none());
     let layers = layer_count(&app);
     app.session.wait_job(job).unwrap();
-    app.place_next_dropped(&egui::Context::default());
+    let app_ctx = app.ctx().clone();
+    app.place_next_dropped(&app_ctx);
     assert_eq!(layer_count(&app), layers + 1);
     assert_eq!(app.ui.transform.as_ref().and_then(|t| t.made), Some(crate::state::MadeLayer::Place));
     assert!(app.drop_places.is_empty());

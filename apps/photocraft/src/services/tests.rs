@@ -173,7 +173,7 @@ const GREEN: [f32; 4] = [0.0, 1.0, 0.0, 1.0];
 /// already queued finish, nothing else runs).
 fn launch(dir: &Path) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(Session::new(), recovery_services(Some(dir.to_path_buf())));
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     prefs_ui::tick(&mut app, &ctx, std::time::Instant::now());
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     while app.session.has_jobs() && std::time::Instant::now() < deadline {
@@ -207,10 +207,10 @@ fn autosave(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn recovered_documents_survive_a_second_crash_until_saved_or_closed() {
     let dir = std::env::temp_dir().join(format!("photocraft-recovery-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let ctx = egui::Context::default();
     // Launch 1: two unsaved documents are autosaved, then the app crashes.
     {
         let mut app = launch(&dir);
+    let ctx = app.ctx().clone();
         new_doc(&mut app, "#ff0000");
         new_doc(&mut app, "#0000ff");
         autosave(&mut app, &ctx);
@@ -265,8 +265,8 @@ fn failed_background_autosave_is_reported_and_retried_without_another_edit() {
     let recovery = dir.join("Recovery");
     // A regular file prevents creation of the recovery bundle directory.
     std::fs::write(&recovery, b"blocked").unwrap();
-    let ctx = egui::Context::default();
     let mut app = launch(&recovery);
+    let ctx = app.ctx().clone();
     app.run("prefs.set", json!({"path": "fileHandling.autosaveMinutes", "value": 5})).unwrap();
     new_doc(&mut app, "#ff0000");
     let revision = app.session.active().unwrap().revision;
@@ -619,7 +619,7 @@ fn paste_turns_svg_text_on_the_clipboard_into_a_layer() {
         ..Default::default()
     };
     let mut app = PhotocraftApp::new(Session::new(), services);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 300, "height": 200})).unwrap();
     let layers = app.session.active().unwrap().doc.layers.len();
     let r = photocraft_ui_egui::menus::invoke(&mut app, &ctx, "edit.paste", json!({})).unwrap();

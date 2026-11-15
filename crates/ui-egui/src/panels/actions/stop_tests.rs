@@ -80,7 +80,7 @@ fn prompts_open(app: &PhotocraftApp) -> usize {
 
 /// Answers dialog `id` through the host: Continue (the default button, `proceed`) or the dialog's Cancel.
 pub(super) fn answer(app: &mut PhotocraftApp, id: DialogId, proceed: bool) -> Result<(), String> {
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     if proceed { crate::dialogs::confirm(app, &ctx, id) } else { crate::dialogs::cancel(app, &ctx, id) }
 }
 

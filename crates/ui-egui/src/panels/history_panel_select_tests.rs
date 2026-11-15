@@ -110,7 +110,8 @@ fn history_rows_wait_for_an_open_transform() {
         app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
         app.run("select.deselect", json!({})).unwrap();
         if transforming {
-            crate::transform_tool::begin(&mut app, &egui::Context::default()).unwrap();
+            let app_ctx = app.ctx().clone();
+            crate::transform_tool::begin(&mut app, &app_ctx).unwrap();
         }
         let before = steps(&app);
         apply(&mut app, HistoryEvent::Select(state_key(&app, 0)));

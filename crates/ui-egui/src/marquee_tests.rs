@@ -20,7 +20,7 @@ fn harness_with_step_dt(tool: Tool, step_dt: f32) -> Harness<'static, Photocraft
     app.sync_views();
     app.ui.extras.rulers = false;
     app.ui.tool = tool;
-    let mut h = Harness::builder().with_size(vec2(1000.0, 700.0)).with_step_dt(step_dt).build_ui_state(
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(step_dt).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
