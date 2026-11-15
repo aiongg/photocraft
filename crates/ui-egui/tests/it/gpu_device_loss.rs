@@ -136,7 +136,9 @@ fn app_switches_to_the_cpu_canvas_and_keeps_the_documents() {
     assert_eq!(app.ui.status, gpu_status::LOST_MESSAGE);
     assert!(app.ui.status_error);
     assert!(app.ui.gpu_fallback_notice.as_deref().unwrap_or("").contains("killed by the OS"));
-    assert!(app.ui.notices.is_empty(), "one recovery warning, no duplicate notice");
+    // UI passes drain the outbox into toasts, so the window's cards are checked as well.
+    let cards = craft::ui::runtime::toast::cards(&h.ctx, &craft::ui::runtime::env::WindowKey::main());
+    assert!(app.ui.notices.is_empty() && cards.is_empty(), "one recovery warning, no duplicate notice");
     assert!(app.perf.gpu_info.lost.as_deref().unwrap_or("").contains("killed by the OS"));
     assert_eq!(app.perf.gpu_info.canvas, "cpu");
     // The CPU path draws the document: a refresh after the loss is a CPU one.
@@ -405,13 +407,11 @@ fn tiled_canvas_keeps_tiles_in_place() {
                 zoom: 1.0,
                 center: [W as f32 / 2.0, H as f32 / 2.0],
                 rotation: 0.0,
-                shadow: false,
-                pixel_grid: false,
+
                 view_key: 1,
                 display: 0,
                 output: 0,
-                hdr: None,
-                offset: [0.0; 2],
+
             },
         }
     });
