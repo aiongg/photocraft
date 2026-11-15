@@ -16,7 +16,7 @@ pub(crate) fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Valu
 }
 
 /// `call` that asserts the reply is ok.
-pub(crate) fn accepted(app: &mut PhotocraftApp, _ctx: &egui::Context, method: &str, params: Value) {
+pub(crate) fn accepted(app: &mut PhotocraftApp, method: &str, params: Value) {
     let reply = call(app, method, params);
     assert_eq!(reply["ok"], true, "{method}: {reply}");
 }
@@ -37,7 +37,7 @@ fn fixture() -> (PhotocraftApp, egui::Context, [LayerId; 2]) {
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;
     let ctx = crate::canvas::testing::ctx(&mut app);
-    accepted(&mut app, &ctx, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [500, 350]}));
+    accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [500, 350]}));
     (app, ctx, [layers[0], layers[1]])
 }
 
@@ -46,8 +46,8 @@ fn bounds(app: &PhotocraftApp, id: LayerId) -> Rect {
     photocraft_engine::transform_cmds::transform_bounds(&state.doc, state.doc.layer(id).unwrap())
 }
 
-fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, kind: &str, at: [f64; 2]) {
-    accepted(app, ctx, "ui.pointer", json!({"events": [{"kind": kind, "x": at[0], "y": at[1]}]}));
+fn pointer(app: &mut PhotocraftApp, _ctx: &egui::Context, kind: &str, at: [f64; 2]) {
+    accepted(app, "ui.pointer", json!({"events": [{"kind": kind, "x": at[0], "y": at[1]}]}));
 }
 
 fn enter(app: &mut PhotocraftApp) {
@@ -116,7 +116,7 @@ fn move_controls_press_zones_start_the_matching_gesture() {
         (1.0, [500, 350], [200.0, 150.0], [220.0, 160.0], Opens::Move),
     ] {
         let (mut app, ctx, layers) = fixture();
-        accepted(&mut app, &ctx, "ui.set", json!({"zoom": zoom, "center": center}));
+        accepted(&mut app, "ui.set", json!({"zoom": zoom, "center": center}));
         let before = app.session.active().unwrap().doc.clone();
         let old = layers.map(|id| bounds(&app, id));
         let steps = app.session.active().unwrap().history.past_len();
@@ -201,7 +201,7 @@ fn move_controls_press_zones_start_the_matching_gesture() {
 fn disabled_hidden_and_missed_controls_do_not_open_a_transform() {
     for (enabled, extras, at) in [(false, true, [800.0, 500.0]), (true, false, [800.0, 500.0]), (true, true, [900.0, 600.0])] {
         let (mut app, ctx, _) = fixture();
-        accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": enabled}));
+        accepted(&mut app, "ui.set", json!({"moveShowTransform": enabled}));
         app.ui.view.extras = extras;
         pointer(&mut app, &ctx, "down", at);
         assert!(app.ui.transform.is_none(), "enabled={enabled}, Extras={extras}, at={at:?}");
@@ -214,10 +214,10 @@ fn disabled_hidden_and_missed_controls_do_not_open_a_transform() {
 #[test]
 fn nonprimary_and_space_presses_do_not_take_over_move_controls() {
     for params in [json!({"button": "right"}), json!({"button": "middle"}), json!({"space": true})] {
-        let (mut app, ctx, _) = fixture();
+        let (mut app, _, _) = fixture();
         let mut params = params;
         params["events"] = json!([{"kind": "down", "x": 800, "y": 500}]);
-        accepted(&mut app, &ctx, "ui.pointer", params);
+        accepted(&mut app, "ui.pointer", params);
         assert!(app.ui.transform.is_none());
     }
 }
@@ -226,7 +226,7 @@ fn nonprimary_and_space_presses_do_not_take_over_move_controls() {
 #[test]
 fn explicit_free_transform_still_works_with_move_controls_disabled() {
     let (mut app, ctx, _) = fixture();
-    accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": false}));
+    accepted(&mut app, "ui.set", json!({"moveShowTransform": false}));
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
     let steps = app.session.active().unwrap().history.past_len();
     pointer(&mut app, &ctx, "down", [800.0, 500.0]);
@@ -240,8 +240,8 @@ fn explicit_free_transform_still_works_with_move_controls_disabled() {
 #[test]
 fn invalid_move_show_transform_is_atomic_with_other_ui_fields() {
     for invalid in [json!("true"), json!(1), json!(null), json!([]), json!({})] {
-        let (mut app, ctx, _) = fixture();
-        accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": false}));
+        let (mut app, _, _) = fixture();
+        accepted(&mut app, "ui.set", json!({"moveShowTransform": false}));
         let before = serde_json::to_value(&app.ui).unwrap();
         let doc = app.session.active().unwrap().doc.clone();
         let steps = app.session.active().unwrap().history.past_len();
@@ -257,13 +257,13 @@ fn invalid_move_show_transform_is_atomic_with_other_ui_fields() {
 /// Omission retains the setting, and later validation failure cannot partially apply a new value.
 #[test]
 fn move_show_transform_is_retained_when_omitted_and_waits_for_all_validation() {
-    let (mut app, ctx, _) = fixture();
-    accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": false}));
+    let (mut app, _, _) = fixture();
+    accepted(&mut app, "ui.set", json!({"moveShowTransform": false}));
     let reply = call(&mut app, "ui.set", json!({"moveShowTransform": true, "zoom": "bad"}));
     assert_eq!(reply["ok"], false);
     assert!(!app.ui.tool_options.move_show_transform);
-    accepted(&mut app, &ctx, "ui.set", json!({"moveShowTransform": true}));
-    accepted(&mut app, &ctx, "ui.set", json!({"tool": "Brush"}));
+    accepted(&mut app, "ui.set", json!({"moveShowTransform": true}));
+    accepted(&mut app, "ui.set", json!({"tool": "Brush"}));
     assert_eq!(app.ui.tool, Tool::Brush);
     assert!(app.ui.tool_options.move_show_transform);
 }
@@ -271,7 +271,7 @@ fn move_show_transform_is_retained_when_omitted_and_waits_for_all_validation() {
 /// A malformed later sample must be rejected before the first valid Down can open a session.
 #[test]
 fn invalid_later_pointer_event_does_not_begin_a_transform() {
-    let (mut app, ctx, _) = fixture();
+    let (mut app, _, _) = fixture();
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.past_len();
     let reply = call(
@@ -330,7 +330,7 @@ fn ordinary_move_gesture_can_finish_after_a_dialog_opens() {
     let steps = app.session.active().unwrap().history.past_len();
     pointer(&mut app, &ctx, "down", [200.0, 150.0]);
     assert!(crate::canvas::testing::in_gesture(&app));
-    accepted(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about"}));
+    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
     let dialog = top_dialog(&app);
     pointer(&mut app, &ctx, "down", [250.0, 175.0]);
     assert!(crate::canvas::testing::in_gesture(&app), "the modal rejects a replacement Down");
@@ -362,7 +362,7 @@ fn transform_handle_gesture_can_finish_after_a_dialog_opens() {
     pointer(&mut app, &ctx, "down", [800.0, 500.0]);
     assert!(app.ui.transform.is_some(), "the handle starts Free Transform");
     let initial = quad(&app);
-    accepted(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about"}));
+    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
     let dialog = top_dialog(&app);
     pointer(&mut app, &ctx, "down", [200.0, 150.0]);
     assert_eq!(quad(&app), initial, "the modal cannot move the preview on Down");
@@ -437,7 +437,7 @@ fn move_pointer_still_reaches_the_liquify_workspace() {
     app.run("layer.new.layer", json!({})).unwrap();
     app.sync_views();
     let ctx = crate::canvas::testing::ctx(&mut app);
-    accepted(&mut app, &ctx, "ui.set", json!({"tool": "Move", "moveShowTransform": true}));
+    accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true}));
     crate::menus::invoke(&mut app, &ctx, "filter.liquify", json!({})).unwrap();
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.past_len();
@@ -464,7 +464,7 @@ fn color_picker_release_ends_an_existing_transform_handle_drag() {
     pointer(&mut app, &ctx, "move", [700.0, 440.0]);
     let preview = quad(&app);
     assert_ne!(preview, initial);
-    accepted(&mut app, &ctx, "ui.dialog.open", json!({"kind": "colorPicker"}));
+    accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     let dialog = crate::color_picker_ui::top(&app).expect("the Color Picker is open");
     pointer(&mut app, &ctx, "down", [200.0, 150.0]);
     pointer(&mut app, &ctx, "move", [220.0, 160.0]);
@@ -490,13 +490,13 @@ fn color_picker_release_ends_an_existing_transform_handle_drag() {
 #[test]
 fn modal_dialogs_block_a_command_held_move_from_another_tool() {
     let (mut app, ctx, _) = fixture();
-    accepted(&mut app, &ctx, "ui.set", json!({"tool": "Brush"}));
+    accepted(&mut app, "ui.set", json!({"tool": "Brush"}));
     crate::menus::invoke(&mut app, &ctx, "file.new", json!({})).unwrap();
     assert_eq!(dialog_count(&app), 1);
     let before = app.session.active().unwrap().doc.clone();
     let steps = app.session.active().unwrap().history.past_len();
     for (kind, at) in [("down", [200.0, 150.0]), ("move", [220.0, 160.0]), ("up", [220.0, 160.0])] {
-        accepted(&mut app, &ctx, "ui.pointer", json!({"command": true, "events": [{"kind": kind, "x": at[0], "y": at[1]}]}));
+        accepted(&mut app, "ui.pointer", json!({"command": true, "events": [{"kind": kind, "x": at[0], "y": at[1]}]}));
         assert!(!crate::canvas::testing::in_gesture(&app), "{kind}: the modal owns the ⌘ Move press");
     }
     assert_eq!(app.session.active().unwrap().doc, before);
@@ -520,7 +520,7 @@ fn color_picker_release_clears_the_handle_drags_snap_lines() {
     // 2 px from the document's centre (500, 350): the corner snaps there and the guides show.
     pointer(&mut app, &ctx, "move", [502.0, 352.0]);
     assert!(guide_lines(&app) > 0, "a snapped handle drag reports guide lines");
-    accepted(&mut app, &ctx, "ui.dialog.open", json!({"kind": "colorPicker"}));
+    accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     pointer(&mut app, &ctx, "up", [999.0, 690.0]);
     assert_eq!(guide_lines(&app), 0, "the released drag reports no alignment lines");
 }
@@ -566,7 +566,7 @@ fn color_picker_release_ends_an_ordinary_move_drag() {
     pointer(&mut app, &ctx, "down", [200.0, 150.0]);
     pointer(&mut app, &ctx, "move", [220.0, 160.0]);
     assert!(crate::canvas::testing::in_gesture(&app));
-    accepted(&mut app, &ctx, "ui.dialog.open", json!({"kind": "colorPicker"}));
+    accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     let dialog = crate::color_picker_ui::top(&app).expect("the Color Picker is open");
     pointer(&mut app, &ctx, "up", [999.0, 690.0]);
     assert!(!crate::canvas::testing::in_gesture(&app), "the picker's release ends the drag");

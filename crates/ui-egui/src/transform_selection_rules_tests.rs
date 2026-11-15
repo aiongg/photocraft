@@ -269,13 +269,11 @@ fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
     select(&mut app, bg, "add");
     app.sync_views();
     app.ui.tool_options.move_auto_select = true;
-    let ctx = crate::canvas::testing::ctx(&mut app);
-    accepted(&mut app, &ctx, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [100, 100]}));
+    accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [100, 100]}));
     let before = app.session.active().unwrap().doc.clone();
     let selected = app.session.active().unwrap().selected_layers();
     accepted(
         &mut app,
-        &ctx,
         "ui.pointer",
         json!({"events": [{"kind": "down", "x": 196, "y": 196}, {"kind": "move", "x": 180, "y": 180}, {"kind": "up", "x": 180, "y": 180}]}),
     );

@@ -279,7 +279,7 @@ mod tests {
         dialog.set_json_field(&ctx, "allLayers", json!(false)).unwrap();
         take(&mut app, &ctx);
         let id = app.framework.dialogs.get::<CheckSpellingDialog>().unwrap().id();
-        assert!(app.framework.dialogs.confirm_by_id(&ctx, id));
+        crate::dialogs::confirm(&mut app, &ctx, id).expect("Done is accepted");
         take(&mut app, &ctx);
         app.run("actions.stop", json!({})).unwrap();
         assert!(app.ui.type_panels.spell.is_none());
