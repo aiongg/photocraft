@@ -1,27 +1,29 @@
-//! Window › Brush Settings (F5) and Window › Brushes: Photoshop's floating brush panel.
+//! Window › Brush Settings (F5) and Window › Brushes: Photoshop's brush panels, drawn by the dock.
 //!
 //! Brush Settings: the section list with enable boxes on the left (clicking a controls section
 //! shows and enables it; the last five rows only toggle), the selected section's controls on the right (see [`crate::brush_sections`]),
 //! and a live stroke preview strip below, rendered with the real brush engine and cached on the
-//! settings (it re-renders only when they change). Brushes: the presets in collapsible groups with
-//! tip thumbnails and stroke previews, a size slider and a search field.
+//! settings (it re-renders only when they change). Brushes ([`brushes`]): the presets in
+//! collapsible groups with tip thumbnails and stroke previews, a size field and a search field.
 //!
-//! The panel never writes the session brush itself: each frame's edits become one
+//! The panels never write the session brush themselves: each frame's edits become one
 //! `tools.setBrush` call carrying only the changed fields (Rule 1), so the journal, the control
 //! channel and the MCP server see exactly what the panel did and can do the same. A drag's calls
-//! share a `coalesce` key, so a whole gesture is one journal entry ([`commit_gesture`]).
+//! share a `coalesce` key, so a whole gesture is one journal entry ([`commit_keyed`]).
 //!
 //! The lock beside a section name keeps that section's settings when another preset is picked
-//! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
+//! (`locks` in the brush, applied by the engine).
 
-use egui::{CornerRadius, Stroke};
+use craft::ui::contract::CommandSet;
+use craft::ui::menu::PanelRow;
+use craft::ui::runtime::commands::{CommandRef, CommandSet as _, CommandState};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::PhotocraftApp;
+
+pub(crate) mod brushes;
 
 pub use crate::brush_preview::{preview_pixels, preview_sig};
 pub use crate::brush_sections::section_body;
@@ -49,75 +51,6 @@ pub(super) const CHECKBOX_ONLY_START: usize = 8;
 
 /// Panel width.
 pub(crate) const WIDTH: f32 = 540.0;
-
-/// How the Brushes tab lists presets.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum BrushesView {
-    /// Rows: tip, size, stroke preview, name.
-    #[default]
-    List,
-    /// Tip thumbnails with their sizes.
-    Grid,
-}
-
-/// A rename in progress in the Brushes tab (a preset, or a group when `group` is set).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct Renaming {
-    pub group: bool,
-    /// The preset (or group) being renamed.
-    pub name: String,
-    /// With `group`: the nested folder of group `name` being renamed (empty = the group itself).
-    pub folder: Vec<String>,
-    /// The text typed so far.
-    pub text: String,
-}
-
-/// Brushes panel view state (serde, so the control channel can read and drive it).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct BrushesPanelState {
-    /// Collapsed groups and folders: a group's label, or for a nested folder the group's label and
-    /// the folder path joined with `/` ([`crate::brushes_tab::folder_view_key`]).
-    pub collapsed: Vec<String>,
-    /// Case-insensitive name filter.
-    pub filter: String,
-    pub view: BrushesView,
-    pub renaming: Option<Renaming>,
-    /// The Brush Preset picker's cards: show the preset's name. At least one of the three parts
-    /// is always on, and the picker's cards never go empty (see [`crate::brush_picker`]).
-    pub show_name: bool,
-    /// The Brush Preset picker's cards: show the stroke preview.
-    pub show_stroke: bool,
-    /// The Brush Preset picker's cards: show the tip thumbnail.
-    pub show_tip: bool,
-    /// The Brush Preset picker's search field (its gear menu's Show Search Bar).
-    pub show_search: bool,
-    /// The Brush Preset picker's cards and the Brushes tab's grid cells and list rows: their size
-    /// scale, from the picker's footer slider (`crate::brush_picker::body`) or the tab's preview-size
-    /// slider. 1 is the standard size; the cards' width, height and
-    /// insides multiply by it (`crate::brushes_tab`) — the height down to a 0.50 floor, the
-    /// width all the way — the text holds its 1.0 size, and at or below the compact threshold
-    /// the tips drop the size number under them and take their cell whole.
-    pub scale: f32,
-}
-
-impl Default for BrushesPanelState {
-    fn default() -> Self {
-        Self {
-            collapsed: Vec::new(),
-            filter: String::new(),
-            view: BrushesView::default(),
-            renaming: None,
-            show_name: true,
-            show_stroke: true,
-            show_tip: true,
-            show_search: true,
-            scale: 1.0,
-        }
-    }
-}
 
 /// The enable flag behind section `i` (None for Brush Tip Shape).
 pub fn section_flag(b: &mut BrushSettings, i: usize) -> Option<&mut bool> {
@@ -163,6 +96,13 @@ pub fn commit(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSett
     send(app, before, after, None);
 }
 
+/// [`commit`] as part of an edit gesture: every call of one gesture carries the same `coalesce`
+/// `key` (from `crate::history_keys::coalesce` of the edit event; `None` for a step of its own), so
+/// the engine journals the gesture as a single `tools.setBrush` (Rule 1: one command per gesture).
+pub(crate) fn commit_keyed(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSettings, key: Option<String>) {
+    send(app, before, after, key);
+}
+
 fn send(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSettings, key: Option<String>) -> bool {
     if before == after {
         return false;
@@ -181,48 +121,8 @@ fn send(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSettings, 
     true
 }
 
-const GESTURE: &str = "brush-set-gesture";
-
-/// The current brush-edit gesture number. A pointer press starts a new gesture (once per frame);
-/// [`commit_gesture`] ends one after an edit made with the pointer up (a click, a typed value).
-fn gesture(ctx: &egui::Context) -> u64 {
-    let frame = ctx.cumulative_pass_nr();
-    let pressed = ctx.input(|i| i.pointer.any_pressed());
-    ctx.data_mut(|d| {
-        let g = d.get_temp_mut_or_default::<(u64, u64)>(egui::Id::unique(GESTURE));
-        if pressed && g.1 != frame {
-            g.0 += 1;
-            g.1 = frame;
-        }
-        g.0
-    })
-}
-
-/// [`commit`] as part of a gesture: every call of one drag carries the same `coalesce` key, so
-/// the engine journals the drag as a single `tools.setBrush` (Rule 1: one command per gesture).
-/// Call it every frame (it tracks presses even when nothing changed).
-pub fn commit_gesture(app: &mut PhotocraftApp, ctx: &egui::Context, before: &BrushSettings, after: &BrushSettings) {
-    let g = gesture(ctx);
-    if send(app, before, after, Some(format!("brush-ui:{g}"))) && !ctx.input(|i| i.pointer.any_down()) {
-        ctx.data_mut(|d| d.get_temp_mut_or_default::<(u64, u64)>(egui::Id::unique(GESTURE)).0 += 1);
-    }
-}
-
 /// Group label for presets saved without a group.
 pub const UNGROUPED: &str = photocraft_engine::brush_key_cmds::UNGROUPED;
-
-/// Preset indices in panel order: groups in order of first appearance.
-pub fn grouped_presets(presets: &[paint::BrushPreset]) -> Vec<(String, Vec<usize>)> {
-    let mut out: Vec<(String, Vec<usize>)> = Vec::new();
-    for (i, p) in presets.iter().enumerate() {
-        let g = if p.group.is_empty() { UNGROUPED } else { p.group.as_str() };
-        match out.iter_mut().find(|(n, _)| n == g) {
-            Some((_, v)) => v.push(i),
-            None => out.push((g.to_string(), vec![i])),
-        }
-    }
-    out
-}
 
 /// A fresh "Brush N" name.
 pub(crate) fn new_preset_name(presets: &[paint::BrushPreset]) -> String {
@@ -233,10 +133,6 @@ pub(crate) fn run_or_status(app: &mut PhotocraftApp, id: &str, p: Value) {
     if let Err(e) = app.run(id, p) {
         app.ui.status = e;
     }
-}
-
-pub(crate) fn full_uv() -> egui::Rect {
-    egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0))
 }
 
 /// Clear brush controls: turns off every section except Smoothing and resets their options
@@ -292,101 +188,68 @@ pub fn copy_texture_to_other_tools(app: &mut PhotocraftApp) {
     }
 }
 
-/// The Brush Settings panel menu actions (hamburger menu).
-pub fn panel_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    if ui.button(tl!("New Brush Preset…")).clicked() {
-        let name = new_preset_name(&app.session.tools.presets);
-        run_or_status(app, "brush.presets.save", json!({ "name": name }));
-        if app.session.tools.presets.iter().any(|p| p.name == name) {
-            app.ui.brushes_panel.renaming = Some(Renaming { group: false, name: name.clone(), folder: Vec::new(), text: String::new() });
-            app.ui.brush_picker_list.renaming = Some(Renaming { group: false, name, folder: Vec::new(), text: String::new() });
-        }
-        ui.close();
-    }
-    ui.separator();
-    if ui.button(tl!("Clear Brush Controls")).clicked() {
-        let before = app.session.tools.brush.clone();
-        let cleared = clear_brush_controls(&before);
-        commit(app, &before, &cleared);
-        ui.close();
-    }
-    let has_locks = app.session.tools.brush.locks != photocraft_paint::brush::SectionLocks::default();
-    if ui.add_enabled(has_locks, egui::Button::new(tl!("Reset All Locked Settings"))).clicked() {
-        let before = app.session.tools.brush.clone();
-        let mut after = before.clone();
-        after.locks = photocraft_paint::brush::SectionLocks::default();
-        commit(app, &before, &after);
-        ui.close();
-    }
-    let has_texture = app.session.tools.brush.texture.enabled;
-    if ui.add_enabled(has_texture, egui::Button::new(tl!("Copy Texture to Other Tools"))).clicked() {
-        copy_texture_to_other_tools(app);
-        ui.close();
-    }
+/// The rows of the Brush Settings panel menu that are the panel's own; the dock adds Close and
+/// the group rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, CommandSet)]
+#[command(prefix = "brushSettingsPanel", scope = "app")]
+pub(crate) enum BrushSettingsCommand {
+    /// Open the New Brush Preset dialog.
+    #[command(label = "New Brush Preset…")]
+    NewPreset,
+    /// Turn off every unlocked section except Smoothing and reset its options.
+    #[command(label = "Clear Brush Controls")]
+    ClearControls,
+    /// Unlock every section.
+    #[command(label = "Reset All Locked Settings")]
+    ResetLocks,
+    /// Copy the Texture settings to the other tools that have Texture on.
+    #[command(label = "Copy Texture to Other Tools")]
+    CopyTexture,
 }
 
-pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if !app.ui.panels.brush_settings {
-        return;
+/// The Brush Settings panel menu's rows (pn.PC12), in production's order.
+pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
+    let row = |command: BrushSettingsCommand| PanelRow::Command(CommandRef::from(command));
+    vec![
+        row(BrushSettingsCommand::NewPreset),
+        PanelRow::Separator,
+        row(BrushSettingsCommand::ClearControls),
+        row(BrushSettingsCommand::ResetLocks),
+        row(BrushSettingsCommand::CopyTexture),
+    ]
+}
+
+/// What the menu's commands may do now: Reset needs a lock, Copy Texture needs Texture on.
+pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
+    let brush = &app.session.tools.brush;
+    vec![
+        (CommandRef::from(BrushSettingsCommand::ResetLocks), CommandState::new().enabled(brush.locks != photocraft_paint::brush::SectionLocks::default())),
+        (CommandRef::from(BrushSettingsCommand::CopyTexture), CommandState::new().enabled(brush.texture.enabled)),
+    ]
+}
+
+/// Runs a fired menu command; false for a command this panel does not own.
+pub(crate) fn run_fired(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &CommandRef) -> bool {
+    let Some(command) = BrushSettingsCommand::from_ref(command) else { return false };
+    match command {
+        // Every way of making a preset opens the dialog, which names it and says what it captures.
+        BrushSettingsCommand::NewPreset => {
+            let _ = crate::brush_preset_dialog::open(app, None);
+        }
+        BrushSettingsCommand::ClearControls => {
+            let before = app.session.tools.brush.clone();
+            let cleared = clear_brush_controls(&before);
+            commit(app, &before, &cleared);
+        }
+        BrushSettingsCommand::ResetLocks => {
+            let before = app.session.tools.brush.clone();
+            let mut after = before.clone();
+            after.locks = photocraft_paint::brush::SectionLocks::default();
+            commit(app, &before, &after);
+        }
+        BrushSettingsCommand::CopyTexture => copy_texture_to_other_tools(app),
     }
-    let t = Tokens::get(ctx);
-    let frame = egui::Frame::NONE
-        .fill(t.card)
-        .stroke(Stroke::new(1.0, t.card_border))
-        .corner_radius(CornerRadius::same(t.radius_lg as u8))
-        .shadow(egui::Shadow { offset: [0, 10], blur: 30, spread: 0, color: t.shadow })
-        .inner_margin(egui::Margin::same(10));
-    let canvas = app.last_canvas_rect;
-    let mut open = true;
-    egui::Window::new(tl!("Brush Settings"))
-        .id(egui::Id::unique("brush-settings"))
-        .title_bar(false)
-        .resizable(false)
-        .frame(frame)
-        .default_pos(egui::pos2((canvas.right() - WIDTH - 30.0).max(canvas.left() + 8.0), canvas.top() + 24.0))
-        .show(ctx, |ui| {
-            ui.set_width(WIDTH);
-            ui.horizontal(|ui| {
-                let mut tab = app.ui.brush_tab;
-                for (i, name) in [tl!("Brush Settings"), tl!("Brushes")].iter().enumerate() {
-                    if widgets::pill_tab(ui, name, tab == i).clicked() {
-                        tab = i;
-                    }
-                }
-                app.ui.brush_tab = tab;
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 20.0, false, tl!("Close")).clicked() {
-                        open = false;
-                    }
-                    let menu_btn = widgets::panel_menu_button(ui);
-                    egui::Popup::menu(&menu_btn).show(|ui| {
-                        widgets::style_spectrum_popup_menu(ui);
-                        ui.set_min_width(180.0);
-                        panel_menu(app, ui);
-                        ui.separator();
-                        if ui.button(tl!("Close")).clicked() {
-                            open = false;
-                            ui.close();
-                        }
-                        if ui.button(tl!("Close Tab Group")).clicked() {
-                            open = false;
-                            ui.close();
-                        }
-                    });
-                });
-            });
-            ui.add_space(6.0);
-            widgets::hairline(ui);
-            ui.add_space(6.0);
-            if app.ui.brush_tab == 1 {
-                crate::brushes_tab::show(app, ui);
-            } else {
-                super::brush_settings::brush_settings(app, ui);
-            }
-        });
-    if !open {
-        app.ui.panels.brush_settings = false;
-    }
+    true
 }
 
 #[cfg(test)]
