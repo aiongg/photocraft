@@ -164,6 +164,21 @@ fn field_name(h: &Harness<'static, PhotocraftApp>, role: egui::accesskit::Role, 
     if h.query_by_role_and_label(role, label).is_some() { label.to_owned() } else { format!("Set {}", label.to_lowercase()) }
 }
 
+/// Scrolls the open popup list until the row `label` is shown: lists draw only the rows in view, so a row near the end
+/// of a long one is not in the access tree until the wheel has brought it into view.
+pub(super) fn reveal(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
+    for _ in 0..40 {
+        if h.query_by_label(label).is_some() {
+            return;
+        }
+        let list = h.query_all_by_role(egui::accesskit::Role::ListBox).last().expect("an open list").rect();
+        h.hover_at(list.center());
+        h.event(egui::Event::MouseWheel { source: egui::MouseWheelSource::Unknown, unit: egui::MouseWheelUnit::Line, delta: vec2(0.0, -3.0), phase: egui::TouchPhase::Move, modifiers: Modifiers::NONE });
+        h.run();
+    }
+    panic!("the row {label} never came into view");
+}
+
 fn panel_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     // Wait for the font scan: while it runs the panels repaint every 100 ms and `Harness::run` gives up.
     let _ = photocraft_text::shared();
@@ -206,7 +221,7 @@ mod panel_defaults {
         let mut h = panel_harness(app);
         open_presets(&h, "Font size presets");
         h.run();
-        h.get_by_label("72 pt").scroll_to_me();
+        reveal(&mut h, "72 pt");
         h.run();
         h.get_by_label("72 pt").click();
         h.run();
@@ -1480,8 +1495,7 @@ mod multi_layer_formatting {
     }
 
     fn preset(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
-        // Presets near the end of the popup can be below its scroll viewport.
-        h.get_by_label(label).scroll_to_me();
+        reveal(h, label);
         h.run();
         h.get_by_label(label).click();
         h.run();

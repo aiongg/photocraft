@@ -45,7 +45,7 @@ fn pick(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
     h.run();
     h.key_press_modifiers(Modifiers::ALT, egui::Key::ArrowDown);
     h.run();
-    h.get_by_label(label).scroll_to_me();
+    crate::tools::type_tool::canvas_tests::reveal(h, label);
     h.run();
     h.get_by_label(label).click();
     h.run();
