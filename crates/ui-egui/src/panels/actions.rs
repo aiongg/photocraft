@@ -2013,13 +2013,12 @@ fn action_context_menu(app: &mut PhotocraftApp, response: &egui::Response, index
                 ui.close();
             }
         }
-        ui.add_enabled_ui(key > 0, |ui| {
-            let command_label = if cfg!(target_os = "macos") { tl!("Command") } else { tl!("Ctrl") };
-            let toggled = ui.checkbox(&mut shift, tl!("Shift")).changed() | ui.checkbox(&mut command, command_label).changed();
-            if toggled {
-                let _ = assign_shortcut(app, name, &photocraft_engine::atn_cmds::function_key_name(key, shift, command));
-            }
-        });
+        let command_label = if cfg!(target_os = "macos") { tl!("Command") } else { tl!("Ctrl") };
+        let toggled = ui.add_enabled(key > 0, egui::Checkbox::new(&mut shift, tl!("Shift"))).changed()
+            | ui.add_enabled(key > 0, egui::Checkbox::new(&mut command, command_label)).changed();
+        if toggled {
+            let _ = assign_shortcut(app, name, &photocraft_engine::atn_cmds::function_key_name(key, shift, command));
+        }
         ui.separator();
         ui.menu_button(tl!("Color"), |ui| {
             for (id, label) in [
@@ -2293,7 +2292,10 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let can_delete = app.ui.actions.selected.is_some() && (!recording_now || app.ui.actions.selected_step.is_some());
         // While recording only a step may be deleted, by the button or by a drop.
         let can_drop = dragged.is_some_and(|row| !recording_now || row.step.is_some());
-        ui.add_enabled_ui(can_delete || can_drop, |ui| {
+        ui.scope(|ui| {
+            if !(can_delete || can_drop) {
+                ui.disable();
+            }
             let response = crate::icons::button(ui, "trash", 24.0, false, tl!("Delete"));
             response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, can_delete || can_drop, tl!("Delete")));
             if response.clicked() {
@@ -2425,9 +2427,14 @@ fn draw_step_controls(ui: &mut egui::Ui, rect: Rect, step: usize, label: &str, c
 pub(crate) mod menu_item;
 pub(crate) mod playback;
 pub(crate) mod record_again;
+// PLAN: runner.rs is not in the module tree yet, and actions.rs still holds the old playback code it replaces (play_targets, dialog finish); the old code is deleted when panels-w29's `ActionList` session type lands.
+pub(crate) mod runner;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod runner_tests;
 
 #[cfg(test)]
 mod stop_tests;
