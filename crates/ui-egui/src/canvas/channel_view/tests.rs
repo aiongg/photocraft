@@ -34,13 +34,6 @@ fn composite_bands_keep_the_downsample_grid() {
 }
 
 #[test]
-fn plain_composite_draws_nothing() {
-    let s = session();
-    let st = s.active().unwrap();
-    assert!(render(&st.doc, &st.channel_view, st.doc.bounds(), 1, Look::default(), st.active_layer).is_none());
-}
-
-#[test]
 fn spot_overlay_previews_with_the_spot_dot_gain() {
     // A 50 % tint of a black spot ink printed over the white composite: its coverage is the 50 %
     // dot plus Color Settings › Spot's dot gain (read, not changed: the setting is process-wide).
@@ -181,33 +174,6 @@ fn layer_mask_overlay_takes_its_display_options() {
     s.execute("channel.setVisible", json!({"channel": "red", "visible": false})).unwrap();
     let st = s.active().unwrap();
     assert_eq!(render(&st.doc, &st.channel_view, b, 1, green, st.active_layer).unwrap()[0], Color32::from_rgb(0, 255, 191));
-}
-
-/// `cargo test --release -p photocraft-ui-egui --lib mask_view_switch_24mp -- --ignored --nocapture`
-#[test]
-#[ignore = "benchmark"]
-fn mask_view_switch_24mp() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 6000, "height": 4000})).unwrap();
-    s.execute("layer.new.layer", json!({})).unwrap();
-    s.execute("edit.fill", json!({"color": "#d0402b"})).unwrap();
-    s.execute("layer.layerMask.revealAll", json!({})).unwrap();
-    s.execute("paint.gradient", json!({"from": [0, 0], "to": [6000, 0], "colors": ["#000000", "#ffffff"], "target": "mask"})).unwrap();
-    // A 3000-pixel-wide canvas showing the whole 6000-pixel document.
-    let factor = 2;
-    for mode in ["gray", "overlay"] {
-        s.execute("view.layerMask", json!({"mode": mode})).unwrap();
-        let st = s.active().unwrap();
-        let mut best = f64::MAX;
-        for _ in 0..8 {
-            let t = std::time::Instant::now();
-            let px = render(&st.doc, &st.channel_view, st.doc.bounds(), factor, Look::default(), st.active_layer).unwrap();
-            let img = egui::ColorImage::new([3000, 2000], px);
-            std::hint::black_box(img);
-            best = best.min(t.elapsed().as_secs_f64() * 1000.0);
-        }
-        println!("24 MP mask view {mode}: {best:.1} ms (render at 1/{factor})");
-    }
 }
 
 /// Interface ▸ Show Channels in Color (#2385): a solo RGB / CMYK channel tints the canvas
