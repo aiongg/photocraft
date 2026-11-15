@@ -19,20 +19,15 @@ pub(crate) struct Preview {
     document: DocId,
     revision: u64,
     dialog: DialogId,
+    /// Which open of the picker the preview belongs to (`DialogHost::open_serial`).
+    open: u64,
     layer: LayerId,
     color: Color,
     shown: Arc<Document>,
     key: u64,
 }
 
-thread_local! {
-    /// How many Solid Color pickers this thread has opened. A picker's dialog id is the same at every open, so the
-    /// preview key takes this count to tell one open from the next.
-    static OPENS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
-}
-
 pub(crate) fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
-    OPENS.with(|opens| opens.set(opens.get() + 1));
     let st = app.session.active()?;
     let layer = st.active_layer?;
     let LayerContent::Fill(Fill::Solid(color)) = st.doc.layer(layer)?.content else { return None };
@@ -46,7 +41,6 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
 /// Creating a Solid Color fill is transactional: the document is unchanged until OK.
 /// The picker is seeded with the foreground colour, matching the engine's default.
 pub(crate) fn open_new(app: &mut PhotocraftApp) -> Option<DialogId> {
-    OPENS.with(|opens| opens.set(opens.get() + 1));
     let document = app.session.active()?.doc.id;
     let foreground = app.session.tools.foreground;
     let rgb = [foreground[0], foreground[1], foreground[2]];
@@ -129,11 +123,13 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     }
     let LayerContent::Fill(Fill::Solid(original)) = st.doc.layer(layer)?.content else { return None };
     let current = app.framework.dialogs.get_by_id::<ColorPickerDialog>(dialog)?.current()?;
+    let open = app.framework.dialogs.open_serial(dialog)?;
     let color = picked_color(&current, original, st.doc.mode)?;
     if let Some(p) = &app.solid_fill_preview
         && p.document == st.doc.id
         && p.revision == st.revision
         && p.dialog == dialog
+        && p.open == open
         && p.layer == layer
         && p.color == color
     {
@@ -144,14 +140,14 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     // Include the dialog identity and the open it belongs to: cancelling and reopening at the same document revision
     // must not reuse an old preview's pixels in the canvas caches.
     let mut hash = std::collections::hash_map::DefaultHasher::new();
-    (st.doc.id.0, st.revision, dialog, OPENS.with(std::cell::Cell::get), layer.0).hash(&mut hash);
+    (st.doc.id.0, st.revision, dialog, open, layer.0).hash(&mut hash);
     color.mode.hash(&mut hash);
     for component in color.c.into_iter().chain([color.alpha]) {
         component.to_bits().hash(&mut hash);
     }
     let key = (1 << 36) | (hash.finish() & ((1 << 36) - 1));
     let shown = Arc::new(photocraft_engine::mode_cmds::display_document(&doc).unwrap_or(doc));
-    app.solid_fill_preview = Some(Preview { document: st.doc.id, revision: st.revision, dialog, layer, color, shown: shown.clone(), key });
+    app.solid_fill_preview = Some(Preview { document: st.doc.id, revision: st.revision, dialog, open, layer, color, shown: shown.clone(), key });
     Some((shown, key))
 }
 
