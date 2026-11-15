@@ -918,9 +918,11 @@ fn preset_browsers_param(app: &PhotocraftApp, p: &Value) -> std::result::Result<
     Ok(writes)
 }
 
-fn histogram_range_param(p: &Value) -> std::result::Result<Option<Option<[u8; 2]>>, String> {
+fn histogram_range_param(p: &Value) -> std::result::Result<Option<Option<craft::imaging::ui::histogram::LevelRange>>, String> {
     let Some(v) = p.get("histogramRange") else { return Ok(None) };
-    serde_json::from_value::<Option<[u8; 2]>>(v.clone()).map(Some).map_err(|_| "histogramRange must be [from, to] levels 0..255, or null".to_string())
+    serde_json::from_value::<Option<[u8; 2]>>(v.clone())
+        .map(|range| Some(range.map(|[from, to]| craft::imaging::ui::histogram::LevelRange::new(f32::from(from), f32::from(to)))))
+        .map_err(|_| "histogramRange must be [from, to] levels 0..255, or null".to_string())
 }
 
 /// Target the active smart object's filter mask (FILE-215-3): it needs smart filters.
