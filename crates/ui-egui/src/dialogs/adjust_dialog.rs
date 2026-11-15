@@ -14,7 +14,7 @@
 use std::sync::{Arc, Mutex};
 
 use craft::theme::Srgba;
-use craft::imaging::ui::adjust::{AdjustDialogCx, CurvesPanel, HostedAdjustDialog as FrameworkDialog, TonePicker};
+use craft::imaging::ui::adjust::{AdjustDialogCx, CurvesPanel, HostedAdjustDialog as FrameworkDialog, ToneChannels, TonePicker};
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::runtime::memory::{SaveKey, saved_value, set_saved_value};
 use photocraft_doc::ColorMode;
@@ -457,8 +457,8 @@ fn gray_context(app: &PhotocraftApp, kind: &str, target: &ToneTarget) -> bool {
 
 /// What the kind's editor reads, built from the app once per opening and again when the target changes: the
 /// histograms of the target's pixels (a mask or saved channel's curve edits that plane's own levels, so its histogram
-/// describes it, not the colour layers beneath, #5335), the tone channels, swatches and gradient presets.
-fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: ColorMode) -> EditorSetup {
+/// describes it, not the colour layers beneath, #5335), the tone channels (none for an `unresolved` target), swatches and gradient presets.
+fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: ColorMode, unresolved: bool) -> EditorSetup {
     let space = photocraft_engine::adjust_params::default_space(mode);
     let gray_plane = if matches!(kind, "levels" | "curves") { target.channel.as_ref().and_then(|c| c.gray) } else { None };
     let gray = gray_context(app, kind, target);
@@ -479,7 +479,12 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
     let rgb = mode == ColorMode::Rgb;
     let pickers_unavailable = ![TonePicker::Black, TonePicker::Gray, TonePicker::White].iter().any(|picker| picker.supported(rgb, adjust_editors::is_gray(mode)));
     EditorSetup {
-        channels: values::tone_channels(space, gray, target.channel.as_ref()),
+        // An unresolved Action target has no channels to show: the panel draws no Channel select.
+        channels: if unresolved && matches!(kind, "levels" | "curves") {
+            ToneChannels::listed(Vec::new())
+        } else {
+            values::tone_channels(space, gray, target.channel.as_ref())
+        },
         histograms,
         pickers_unavailable,
         gradients: if kind == "gradientMap" { adjust_editors::gradient_presets(app) } else { Vec::new() },
@@ -531,7 +536,7 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     {
         crate::actions::abandoned(app, token);
     }
-    let setup = Arc::new(Mutex::new(build_setup(app, &kind, &seeded.target, seeded.mode)));
+    let setup = Arc::new(Mutex::new(build_setup(app, &kind, &seeded.target, seeded.mode, seeded.unresolved)));
     let gray = gray_context(app, &kind, &seeded.target);
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let mut dialog = HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), seeded.value, shared_editor(kind.clone(), setup.clone()))
@@ -715,7 +720,7 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
         }
         let Some(seeded) = seed(app, &open.kind, &open.recorded, open.smart_filter.as_ref(), open.normalized.as_ref()) else { return };
         let kind = open.kind.clone();
-        let setup = build_setup(app, &kind, &seeded.target, seeded.mode);
+        let setup = build_setup(app, &kind, &seeded.target, seeded.mode, false);
         let Some(open) = app.adjust_open.as_mut() else { return };
         if let Ok(mut shared) = open.setup.lock() {
             *shared = setup;
@@ -731,7 +736,7 @@ fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
         return;
     }
     let (kind, smart_mode) = (open.kind.clone(), curve_mode(app, &open.kind, &target));
-    let setup = build_setup(app, &kind, &target, smart_mode);
+    let setup = build_setup(app, &kind, &target, smart_mode, false);
     let Some(open) = app.adjust_open.as_mut() else { return };
     if let Ok(mut shared) = open.setup.lock() {
         *shared = setup;

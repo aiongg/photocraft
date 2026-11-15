@@ -681,10 +681,11 @@ pub fn begin_selection(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Result<
 
 /// Reports `warp` to the open session: it enters the Warp phase as one undo step with the box. The session reads
 /// `now` only for a box nudge, so the app's latest frame time is the one clock.
-fn report_warp(app: &mut PhotocraftApp, warp: Warp, on_type: bool) {
+fn report_warp(app: &mut PhotocraftApp, warp: Warp, on_type: bool, stored: bool) {
     let now = app.nudge_bundle.now;
     if let Some(t) = app.ui.transform.as_mut() {
-        t.session.apply(TransformEdit::Warp(SessionWarp::new(warp, on_type)), now);
+        let warp = SessionWarp::new(warp, on_type);
+        t.session.apply(TransformEdit::Warp(if stored { warp.stored() } else { warp }), now);
     }
 }
 
@@ -731,7 +732,7 @@ pub fn enter_warp(app: &mut PhotocraftApp, ctx: &egui::Context) {
         if let Some(pv) = app.transform_preview.as_mut() {
             swap_mode_texels(pv);
         }
-        report_warp(app, w.clone(), false);
+        report_warp(app, w.clone(), false, true);
         return;
     }
     // The stored warp is edited only when the source can be previewed without it: the texels
@@ -740,7 +741,7 @@ pub fn enter_warp(app: &mut PhotocraftApp, ctx: &egui::Context) {
         && let Some(w) = existing
         && preview_without_smart_warp(app, ctx, w.bounds)
     {
-        report_warp(app, w, false);
+        report_warp(app, w, false, true);
         return;
     }
     let Some(t) = app.ui.transform.as_ref() else { return };
@@ -750,7 +751,7 @@ pub fn enter_warp(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let (x, y) = h.apply(p[0], p[1]);
         [x, y]
     });
-    report_warp(app, Warp::custom(mesh, rect), false);
+    report_warp(app, Warp::custom(mesh, rect), false, false);
 }
 
 /// Whether the active layer is warped: a Warp box is open on it, or it is a smart object with a
@@ -853,7 +854,7 @@ fn enter_type_warp(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
     // PLAN: the session's frame stays the box's; the warp's bounds carry the frame without the old Warp Text, and
     // the preview and the commit read `warp.bounds`.
-    report_warp(app, warp, true);
+    report_warp(app, warp, true, false);
 }
 
 /// Leave Warp mode (back to the box; warp edits are dropped, like Photoshop's mode toggle on an

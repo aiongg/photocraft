@@ -88,8 +88,8 @@ fn over_a_marker_is_the_clicks_own_hit_test() {
         app.ui.tool = Tool::Count;
         app.run("count.add", json!({"x": 50, "y": 50})).unwrap();
         let at = [50.0 + dx, 50.0];
-        // The tool's reach of 7 screen points, as the press and the cursor pass it to `count_marker_at`.
-        let hit = super::canvas::count_marker_at(&app, at, 7.0 / f64::from(app.point_zoom().max(0.01)));
+        // The tool's reach, as the press and the cursor pass it to `count_marker_at`.
+        let hit = super::canvas::count_marker_at(&app, at, app.tool_reach());
         down(&mut app, at[0], at[1], egui::Modifiers::NONE);
         up(&mut app, at[0], at[1] + 10.0);
         let pts = app.session.active().unwrap().doc.measurement.count_groups[0].points.clone();
