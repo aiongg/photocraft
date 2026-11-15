@@ -177,6 +177,7 @@ impl PhotocraftApp {
             distort: Default::default(),
             gradient: Default::default(),
             raw: None,
+            raw_reply: None,
             raw_shelf: Vec::new(),
             raw_redevelop: Vec::new(),
             wide_angle: None,

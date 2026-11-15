@@ -541,6 +541,9 @@ pub struct PhotocraftApp {
     pub(crate) gradient: gradient_ui::LiveGradient,
     /// The Camera Raw session that is open: the open-time dialog or the Filter (`camera_raw_ui`).
     pub(crate) raw: Option<crate::dialogs::camera_raw_ui::RawSession>,
+    /// The reply of the Camera Raw finish or cancel the result pump ran last, for the menu request that confirmed it:
+    /// the request clears it when it starts and takes it when it ends (`camera_raw_ui::menu`).
+    pub(crate) raw_reply: Option<Result<serde_json::Value, String>>,
     /// Raws just opened interactively, waiting in the open-time Camera Raw dialog (shown on the
     /// next frame, which has the egui context); several share it in a filmstrip.
     pub(crate) raw_shelf: Vec<camera_raw_ui::HeldRaw>,

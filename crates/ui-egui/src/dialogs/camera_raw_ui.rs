@@ -528,9 +528,12 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
 
 /// The result pump (a `TAKERS` row): answers the workspace's events, files a held OK, and ends a cancelled session.
 /// Each call acts on what the workspace reported since the last call, whatever number of passes the frame ran: the host keeps
-/// every pass's events and a held OK is taken once.
+/// every pass's events and a held OK is taken once. A finish or cancel leaves its reply for the menu request that
+/// caused it (`app.raw_reply`).
 pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let _ = take_with(app, ctx);
+    if let Some(reply) = take_with(app, ctx) {
+        app.raw_reply = Some(reply);
+    }
 }
 
 /// [`take`], with the reply of a finish that landed in this call: the command's result, an error, or `{"cancelled": true}`.
