@@ -5,9 +5,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use craft::host::files::ScriptedFiles;
 use egui_kittest::kittest::Queryable;
-use photocraft_ui_egui::{FileDialogAnswer, FileDialogRequest, PhotocraftApp, Services, menus};
-use serde_json::json;
+use photocraft_ui_egui::control::{ControlRequest, Reply};
+use photocraft_ui_egui::{PhotocraftApp, Services, menus};
+use serde_json::{Value, json};
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
 type Writes = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
@@ -21,13 +23,7 @@ fn harness() -> Option<(Harness, Writes)> {
                 PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
                 let services = Services {
                     // Save dialogs answer with the suggested name.
-                    file_dialog: Some(Box::new(|request, _parent, reply| {
-                        reply.send(match request {
-                            FileDialogRequest::Save { suggested } => Some(FileDialogAnswer::SaveTo(suggested)),
-                            FileDialogRequest::Folder { .. } => None,
-                            FileDialogRequest::Open { .. } => None,
-                        })
-                    })),
+                    files: Some(Arc::new(ScriptedFiles::new().saving_suggested())),
                     export: Some(Box::new(|doc, path, settings| {
                         let opts = photocraft_io::ExportOptions {
                             xmp: if settings.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None },
@@ -41,7 +37,7 @@ fn harness() -> Option<(Harness, Writes)> {
                     })),
                     ..Default::default()
                 };
-                let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+                let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), services);
                 app.session.prefs.edit(|p| p.interface.language = "en".into());
                 if let Some(rs) = cc.wgpu_render_state.as_ref() {
                     app.set_wgpu(rs.clone());
@@ -58,6 +54,43 @@ fn harness() -> Option<(Harness, Writes)> {
             None
         }
     }
+}
+
+/// One control request, as a transport sends it.
+fn control(h: &mut Harness, method: &str, params: Value) -> Value {
+    let (request, _) = ControlRequest::new(method, params);
+    let ctx = h.ctx.clone();
+    match photocraft_ui_egui::control::handle(h.state_mut(), &ctx, &request) {
+        Reply::Done(value) => value,
+        _ => panic!("{method} did not answer at once"),
+    }
+}
+
+/// Opens Export As and returns its dialog id.
+fn open_export_as(h: &mut Harness) -> String {
+    let ctx = h.ctx.clone();
+    let reply = menus::invoke(h.state_mut(), &ctx, "file.export.exportAs", json!({})).expect("open Export As");
+    h.run_steps(6);
+    reply["dialog"].as_str().expect("the menu opens a dialog").to_string()
+}
+
+fn set_field(h: &mut Harness, id: &str, field: &str, value: Value) {
+    let reply = control(h, "ui.dialog.set", json!({"dialog": id, "field": field, "value": value}));
+    assert!(reply.get("error").is_none() && reply["ok"] != json!(false), "{field}: {reply}");
+    h.run_steps(3);
+}
+
+/// The open dialog's fields, as `ui.inspect` lists them.
+fn dialog_fields(h: &mut Harness, id: &str) -> Value {
+    let listed = control(h, "ui.inspect", json!({}));
+    // PLAN: assumed the `ui.inspect` entry of a hosted dialog keeps its values under `fields`, as in `variables_data_sets.rs`.
+    listed["result"]["dialogs"].as_array().into_iter().flatten().find(|d| d["id"] == json!(id)).map(|d| d["fields"].clone()).expect("the dialog is listed")
+}
+
+/// Presses Export… and lets the answered save dialog finish the export.
+fn export(h: &mut Harness) {
+    h.get_by_label("Export…").click();
+    h.run_steps(8);
 }
 
 fn evidence(h: &mut Harness, depth: u8, stage: &str) {
@@ -87,24 +120,12 @@ fn export_as_scales_a_narrow_image_without_editing_the_source() {
         let history = st.history.entries();
         let revision = st.revision;
 
-        let ctx = h.ctx.clone();
-        menus::invoke(h.state_mut(), &ctx, "file.export.exportAs", json!({})).expect("open Export As");
-        h.run_steps(6);
-        // The caption is a separate Label node with the same text; the accessible SpinButton
-        // name identifies the actual field.
-        h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Scale").click();
-        h.run_steps(2);
-        // Clicking a numeric field selects its current value; type through egui's text input.
-        h.event(egui::Event::Text("50".into()));
-        h.run_steps(3);
-        // Click away to commit the field without Enter confirming the dialog.
-        h.get_by_label("Image Size").click();
-        h.run_steps(3);
+        let id = open_export_as(&mut h);
+        set_field(&mut h, &id, "size", json!({"Scale": 50.0}));
         assert!(h.query_by_label("1 × 50 px").is_some(), "{depth}-bit: dialog shows the requested output size");
         evidence(&mut h, depth, "dialog");
 
-        h.get_by_label("Export").click();
-        h.run_steps(6);
+        export(&mut h);
         evidence(&mut h, depth, "result");
         let written = writes.borrow();
         assert_eq!(written.len(), 1, "{depth}-bit: Export writes one file");
@@ -153,26 +174,17 @@ fn export_as_resample_menu_writes_nearest_neighbor_blocks() {
         app.sync_views();
     }
     let source = h.state().session.active().expect("document").doc.clone();
-    let ctx = h.ctx.clone();
-    menus::invoke(h.state_mut(), &ctx, "file.export.exportAs", json!({})).expect("open Export As");
-    h.run_steps(6);
-
+    let id = open_export_as(&mut h);
+    // The dialog's own Resample list, as a user picks from it.
     h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Resample").click();
     h.run_steps(3);
     h.get_by_label("Nearest Neighbor").click();
     h.run_steps(3);
-
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Scale").click();
-    h.run_steps(2);
-    h.event(egui::Event::Text("200".into()));
-    h.run_steps(3);
-    h.get_by_label("Image Size").click();
-    h.run_steps(3);
+    set_field(&mut h, &id, "size", json!({"Scale": 200.0}));
     assert!(h.query_by_label("8 × 6 px").is_some(), "dialog shows the requested output size");
     evidence(&mut h, 8, "resample-dialog");
 
-    h.get_by_label("Export").click();
-    h.run_steps(6);
+    export(&mut h);
     let written = writes.borrow();
     assert_eq!(written.len(), 1, "Export writes one file");
     let png = photocraft_io::import("out.png", &written[0].1).expect("decode the written PNG").document;
@@ -186,5 +198,7 @@ fn export_as_resample_menu_writes_nearest_neighbor_blocks() {
     }
     let st = h.state().session.active().expect("source remains open");
     assert!(Arc::ptr_eq(&st.doc, &source), "the source document is unchanged");
-    assert_eq!(h.state().session.prefs().dialogs["file.export.exportAs"]["resample"], "nearest", "the choice is remembered");
+    drop(written);
+    let again = open_export_as(&mut h);
+    assert_eq!(dialog_fields(&mut h, &again)["resample"], "nearestNeighbor", "the choice is remembered");
 }
