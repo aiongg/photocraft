@@ -865,7 +865,7 @@ pub(super) fn path_alignment_menu(_app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(tl!("Align To:"));
             let text = if canvas { tl!("Canvas") } else { tl!("Selection") };
-            craft_ui::ComboBox::from_id_salt("path-align-to-box").selected_text(text).show_ui(ui, |ui| {
+            craft::ui::ComboBox::from_id_salt("path-align-to-box").selected_text(text).show_ui(ui, |ui| {
                 ui.selectable_value(&mut canvas, false, tl!("Selection"));
                 ui.selectable_value(&mut canvas, true, tl!("Canvas"));
             });

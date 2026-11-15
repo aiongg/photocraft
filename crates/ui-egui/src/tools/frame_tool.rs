@@ -621,7 +621,7 @@ fn stroke_controls(ui: &mut egui::Ui, value: &mut Option<photocraft_doc::ShapeSt
             s.paint = photocraft_doc::Fill::Solid(photocraft_doc::Color::rgba(rgba[0], rgba[1], rgba[2], rgba[3]));
         }
         crate::widgets::value_field_named(ui, tl!("Stroke:"), &mut s.width, 0.0..=1000.0, "px", 58.0);
-        craft_ui::ComboBox::from_id_salt("frame-stroke-align")
+        craft::ui::ComboBox::from_id_salt("frame-stroke-align")
             .selected_text(match s.align {
                 photocraft_doc::StrokeAlign::Inside => tl!("Inside"),
                 photocraft_doc::StrokeAlign::Outside => tl!("Outside"),

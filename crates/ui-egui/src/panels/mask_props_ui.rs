@@ -1,13 +1,13 @@
 //! Non-destructive layer-mask controls (pixel and vector), shown in the Properties panel.
 
 use craft::keymap::CommandRef;
-use craft_ui::bars::{Bar, BarKind};
-use craft_ui::buttons::Button;
-use craft_ui::contract::{Bind, Show, ShowContainer};
-use craft_ui::form::SliderField;
-use craft_ui::runtime::env::UnitKind;
-use craft_ui::sections::Section;
-use craft_ui::value_drag::SliderScale;
+use craft::ui::bars::{Bar, BarKind};
+use craft::ui::buttons::Button;
+use craft::ui::contract::{Bind, Show, ShowContainer};
+use craft::ui::form::SliderField;
+use craft::ui::runtime::env::UnitKind;
+use craft::ui::sections::Section;
+use craft::ui::value_drag::SliderScale;
 use photocraft_doc::{Layer, LayerContent};
 use serde_json::{Value, json};
 

@@ -6,8 +6,8 @@
 
 use std::sync::OnceLock;
 
-use craft_ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
-use craft_ui::icons::{SvgIconSet, SvgStyle};
+use craft::ui::buttons::{ButtonVisuals, IconButton, IconButtonStyle};
+use craft::ui::icons::{SvgIconSet, SvgStyle};
 use egui::{Color32, Rect, Response, Sense, Vec2};
 
 use crate::icon_data::ICONS;

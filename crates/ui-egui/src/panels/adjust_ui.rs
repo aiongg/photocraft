@@ -10,8 +10,8 @@ use craft::behavior::EditEvent;
 // PLAN: `craft::cms` needs the umbrella's `cms` feature in crates/ui-egui/Cargo.toml (not in this set).
 use craft::cms::lutfile::{LutError, LutFile, write_cube};
 use craft::color::ui::{LutChoice, LutPicker};
-use craft_ui::choice::{Radio, RadioGroup, Switch};
-use craft_ui::contract::{Bind, Show, ShowContainer};
+use craft::ui::choice::{Radio, RadioGroup, Switch};
+use craft::ui::contract::{Bind, Show, ShowContainer};
 use photocraft_doc::{Adjustment, LayerId};
 use serde_json::{Value, json};
 

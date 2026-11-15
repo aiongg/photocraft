@@ -4,14 +4,14 @@
 
 use craft::behavior::Mixed;
 use craft::keymap::CommandRef;
-use craft_ui::buttons::{Button, ToggleButton};
-use craft_ui::contract::{Bind, Entry, Show, ShowContainer};
-use craft_ui::display::Text;
-use craft_ui::form::Field;
-use craft_ui::pickers::Select;
-use craft_ui::runtime::env::{LengthUnits, UnitKind};
-use craft_ui::sections::Section;
-use craft_ui::text::{LinkedFields, NumberField};
+use craft::ui::buttons::{Button, ToggleButton};
+use craft::ui::contract::{Bind, Entry, Show, ShowContainer};
+use craft::ui::display::Text;
+use craft::ui::form::Field;
+use craft::ui::pickers::Select;
+use craft::ui::runtime::env::{LengthUnits, UnitKind};
+use craft::ui::sections::Section;
+use craft::ui::text::{LinkedFields, NumberField};
 use photocraft_doc::{ColorMode, Document, Layer, LayerId, SampleType};
 use serde_json::{Value, json};
 

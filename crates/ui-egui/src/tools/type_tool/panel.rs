@@ -166,7 +166,7 @@ fn metric_field(
             chosen = Some(MetricChoice::Typed(v));
         }
         let (press, close) = crate::press_menu::PressCombo::before(ui, menu);
-        let combo = craft_ui::ComboBox::from_id_salt(menu)
+        let combo = craft::ui::ComboBox::from_id_salt(menu)
             .selected_text("")
             .width(combo_w)
             .height(420.0)
