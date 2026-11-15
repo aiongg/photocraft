@@ -383,7 +383,7 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
         }
     }
     if let Some(edges) = super::transform_controls::layer_edges(app, idx) {
-        SelectionOutline::solid(label.to_owned(), &edges).show_at(ui, rect);
+        SelectionOutline::solid(label.to_owned(), std::slice::from_ref(&edges)).show_at(ui, rect);
     }
     if app.ui.view.shows(app.ui.view.show.pixel_grid) {
         let composite = super::display_doc(app, idx).0;
