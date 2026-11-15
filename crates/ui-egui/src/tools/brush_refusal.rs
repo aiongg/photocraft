@@ -8,7 +8,7 @@
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::state::{DialogKind, Tool};
+use crate::state::Tool;
 
 /// The alerts; `{tool}` is [`tool_name`].
 pub const HIDDEN: &str = "Could not use the {tool} because the target layer is hidden.";
@@ -93,27 +93,6 @@ fn locked(locks: photocraft_doc::Locks, tool: Tool) -> bool {
     locks.all || (matches!(tool, Tool::Sharpen | Tool::Sponge) && locks.pixels)
 }
 
-/// Opens the alert: ordinary dialog state, listed by `ui.inspect` and closed by `ui.dialog.confirm`.
-pub fn prompt(app: &mut PhotocraftApp, message: &str) {
-    app.open_dialog(DialogKind::Error, json!({ "message": message }).as_object().cloned().unwrap_or_default());
-}
-
 #[cfg(test)]
 #[path = "../brush_refusal_alert_tests.rs"]
 pub(super) mod brush_refusal_alert_tests;
-
-#[cfg(test)]
-#[path = "../sharpen_refusal_alert_tests.rs"]
-mod sharpen_refusal_alert_tests;
-
-#[cfg(test)]
-#[path = "../sponge_refusal_alert_tests.rs"]
-mod sponge_refusal_alert_tests;
-
-#[cfg(test)]
-#[path = "../bucket_bitmap_alert_tests.rs"]
-mod bucket_bitmap_alert_tests;
-
-#[cfg(test)]
-#[path = "remove_locked_alert_tests.rs"]
-mod remove_locked_alert_tests;

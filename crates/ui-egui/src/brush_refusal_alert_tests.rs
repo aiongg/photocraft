@@ -1,9 +1,9 @@
-//! #11898: when the Brush can't paint (hidden target layer, Lock All, a group's pixels), a press
-//! opens the reference application's alert with OK and paints nothing; other tools keep today's
-//! status-bar message, a group's targeted mask paints and Lock transparent pixels paints.
+//! The refusal table: which press gets which alert (#11898, #12017, #12536, #12552, #12952, #13030),
+//! which keeps today's status line, and which still paints. The alert is opened once through
+//! `dialogs::alerts::alert`, so a second press while it is open adds none.
 
 use egui::Modifiers;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::*;
 use crate::canvas::{ToolEvent, tool_event};
@@ -35,8 +35,14 @@ pub(in crate::tools) fn stroke(app: &mut PhotocraftApp) {
     tool_event(app, ToolEvent::Up { x: 44.0, y: 32.0 }, Modifiers::NONE);
 }
 
+/// The messages of the open framework alerts.
 pub(in crate::tools) fn alerts(app: &PhotocraftApp) -> Vec<String> {
-    app.ui.dialogs.iter().filter(|d| d.kind == DialogKind::Error).filter_map(|d| d.fields.get("message").and_then(Value::as_str).map(str::to_string)).collect()
+    app.framework
+        .dialogs
+        .open_dialogs()
+        .iter()
+        .filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string))
+        .collect()
 }
 
 pub(in crate::tools) fn refused(app: &mut PhotocraftApp, want: &str) {
@@ -44,63 +50,149 @@ pub(in crate::tools) fn refused(app: &mut PhotocraftApp, want: &str) {
     stroke(app);
     assert_eq!(alerts(app), [want], "the alert, once");
     assert_eq!(steps(app), before, "nothing painted, no History step");
-    // Over the control channel it is an ordinary dialog: `ui.dialog.confirm` closes it.
-    let id = app.ui.dialogs.iter().find(|d| d.kind == DialogKind::Error).map(|d| d.id).unwrap();
-    crate::dialogs::confirm(app, id).unwrap();
-    assert!(alerts(app).is_empty());
+    let id = app.framework.dialogs.open_dialogs().first().map(|d| d.id).unwrap();
+    let ctx = app.ctx().clone();
+    crate::dialogs::confirm(app, &ctx, id).unwrap();
+    assert!(alerts(app).is_empty(), "OK closes the alert");
 }
 
-#[test]
-fn a_hidden_target_layer() {
-    let mut app = app(Tool::Brush);
-    let id = active(&app);
+/// What a press ends in.
+enum Expect {
+    /// An alert from a layer template, worded with `tool_name`.
+    Layer(&'static str),
+    /// An alert from a colour-mode template, worded with `mode_tool_name`.
+    Mode(&'static str),
+    /// An alert with exactly this text.
+    Text(&'static str),
+    /// One History step and no alert.
+    Paints,
+    /// No alert and today's hidden-target status line.
+    Status,
+    /// No alert.
+    Silent,
+}
+
+fn hide(app: &mut PhotocraftApp) {
+    let id = active(app);
     app.run("layer.setProps", json!({"layer": id, "visible": false})).unwrap();
-    refused(&mut app, "Could not use the brush tool because the target layer is hidden.");
-    assert!(app.ui.status.is_empty() || !app.ui.status_error, "no status-bar error as well: {:?}", app.ui.status);
 }
-
-#[test]
-fn lock_all() {
-    let mut app = app(Tool::Brush);
+fn lock_all(app: &mut PhotocraftApp) {
     app.run("layer.lockLayers", json!({"all": true})).unwrap();
-    refused(&mut app, "Could not use the brush tool because the layer is locked.");
 }
-
-#[test]
-fn a_group_is_active() {
-    let mut app = app(Tool::Brush);
+fn lock_pixels(app: &mut PhotocraftApp) {
+    app.run("layer.lockLayers", json!({"pixels": true})).unwrap();
+}
+fn lock_transparency(app: &mut PhotocraftApp) {
+    app.run("layer.lockLayers", json!({"transparency": true})).unwrap();
+}
+fn group(app: &mut PhotocraftApp) {
     app.run("layer.new.group", json!({})).unwrap();
-    assert!(app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(active(&app))).unwrap().is_group());
-    refused(&mut app, "Could not use the brush tool because the pixels in a group cannot be edited without merging the group.");
+    assert!(app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(active(app))).unwrap().is_group());
 }
-
-#[test]
-fn a_groups_targeted_mask_and_lock_transparency_still_paint() {
-    let mut app = app(Tool::Brush);
+fn group_mask(app: &mut PhotocraftApp) {
     app.run("layer.new.group", json!({})).unwrap();
     app.run("layer.layerMask.revealAll", json!({})).unwrap();
-    assert_eq!(crate::canvas::paint_target(&app), json!("mask"), "the new mask is the target");
-    let before = steps(&app);
-    stroke(&mut app);
-    assert!(alerts(&app).is_empty(), "no alert on the mask");
-    assert_eq!(steps(&app), before + 1, "the mask was painted");
-    let mut app = self::app(Tool::Brush);
-    app.run("layer.lockLayers", json!({"transparency": true})).unwrap();
-    let before = steps(&app);
-    stroke(&mut app);
-    assert!(alerts(&app).is_empty());
-    assert_eq!(steps(&app), before + 1, "paints on the existing pixels");
+    assert_eq!(crate::canvas::paint_target(app), json!("mask"));
+}
+fn bitmap(app: &mut PhotocraftApp) {
+    app.run("image.mode.grayscale", json!({})).unwrap();
+    app.run("image.mode.bitmap", json!({})).unwrap();
+}
+fn classic(app: &mut PhotocraftApp) {
+    app.ui.tool_options.gradient_classic = true;
+}
+fn classic_hidden(app: &mut PhotocraftApp) {
+    classic(app);
+    hide(app);
+}
+fn classic_locked(app: &mut PhotocraftApp) {
+    classic(app);
+    lock_all(app);
+}
+fn classic_group(app: &mut PhotocraftApp) {
+    classic(app);
+    group(app);
+}
+fn classic_transparency(app: &mut PhotocraftApp) {
+    classic(app);
+    lock_transparency(app);
 }
 
 #[test]
-fn other_tools_keep_the_status_bar() {
-    // Wording not measured for them: today's message, no dialog.
-    let mut app = app(Tool::Pencil);
-    let id = active(&app);
-    app.run("layer.setProps", json!({"layer": id, "visible": false})).unwrap();
-    stroke(&mut app);
-    assert!(alerts(&app).is_empty());
-    assert_eq!(app.ui.status, photocraft_engine::hidden_target::HIDDEN);
-    assert_eq!(tool_name(&app, Tool::Pencil), None);
-    assert_eq!(tool_name(&app, Tool::Brush), Some("brush tool"), "the one place that names the tool");
+fn a_refused_press_alerts_or_reports_by_case() {
+    use Expect::*;
+    type Setup = fn(&mut PhotocraftApp);
+    let rows: [(&str, Tool, Setup, Expect); 31] = [
+        ("brush hidden", Tool::Brush, hide, Layer(HIDDEN)),
+        ("brush lock all", Tool::Brush, lock_all, Layer(LOCKED)),
+        ("brush group", Tool::Brush, group, Layer(GROUP)),
+        ("brush group mask", Tool::Brush, group_mask, Paints),
+        ("brush lock transparency", Tool::Brush, lock_transparency, Paints),
+        ("brush lock pixels keeps today", Tool::Brush, lock_pixels, Silent),
+        ("pencil hidden", Tool::Pencil, hide, Status),
+        ("sharpen hidden", Tool::Sharpen, hide, Layer(HIDDEN)),
+        ("sharpen lock all", Tool::Sharpen, lock_all, Layer(LOCKED)),
+        ("sharpen lock pixels", Tool::Sharpen, lock_pixels, Layer(LOCKED)),
+        ("sharpen group", Tool::Sharpen, group, Layer(GROUP)),
+        ("sharpen lock transparency", Tool::Sharpen, lock_transparency, Paints),
+        ("sharpen bitmap before layer", Tool::Sharpen, |a| {
+            bitmap(a);
+            hide(a);
+        }, Mode(BITMAP)),
+        ("dodge keeps today", Tool::Dodge, lock_all, Silent),
+        ("sponge hidden", Tool::Sponge, hide, Layer(HIDDEN)),
+        ("sponge lock all", Tool::Sponge, lock_all, Layer(LOCKED)),
+        ("sponge lock pixels", Tool::Sponge, lock_pixels, Layer(LOCKED)),
+        ("sponge group", Tool::Sponge, group, Layer(GROUP)),
+        ("paint bucket bitmap", Tool::PaintBucket, bitmap, Text(photocraft_engine::paint_cmds::BITMAP_REFUSAL)),
+        ("paint bucket rgb fills", Tool::PaintBucket, |_| {}, Paints),
+        ("remove lock all", Tool::Remove, lock_all, Text(REMOVE_LOCKED)),
+        ("classic gradient hidden", Tool::Gradient, classic_hidden, Layer(HIDDEN)),
+        ("classic gradient lock all", Tool::Gradient, classic_locked, Layer(LOCKED)),
+        ("classic gradient group", Tool::Gradient, classic_group, Layer(GROUP)),
+        ("classic gradient lock transparency", Tool::Gradient, classic_transparency, Paints),
+        ("live gradient hidden", Tool::Gradient, hide, Silent),
+        ("brush lock all, again", Tool::Brush, lock_all, Layer(LOCKED)),
+        ("sponge lock position paints", Tool::Sponge, |a| {
+            a.run("layer.lockLayers", json!({"position": true})).unwrap();
+        }, Paints),
+        ("sharpen hidden, again", Tool::Sharpen, hide, Layer(HIDDEN)),
+        ("sponge hidden, again", Tool::Sponge, hide, Layer(HIDDEN)),
+        ("brush group, again", Tool::Brush, group, Layer(GROUP)),
+    ];
+    for (name, tool, setup, expect) in rows {
+        let mut app = app(tool);
+        setup(&mut app);
+        match expect {
+            Layer(template) | Mode(template) => {
+                let tool_name = if matches!(expect, Layer(_)) { tool_name(&app, tool) } else { mode_tool_name(tool) }.expect(name);
+                let want = crate::i18n::fmt(tl!(template), &[("tool", tool_name)]);
+                // A second press while the alert is open adds none.
+                stroke(&mut app);
+                refused(&mut app, &want);
+                assert!(app.ui.status.is_empty() || !app.ui.status_error, "{name}: no status-bar error as well");
+            }
+            Text(text) => {
+                stroke(&mut app);
+                refused(&mut app, tl!(text));
+            }
+            Paints => {
+                let before = steps(&app);
+                stroke(&mut app);
+                assert!(alerts(&app).is_empty(), "{name}: no alert");
+                assert_eq!(steps(&app), before + 1, "{name}: painted");
+            }
+            Status => {
+                stroke(&mut app);
+                assert!(alerts(&app).is_empty(), "{name}: no alert");
+                assert_eq!(app.ui.status, photocraft_engine::hidden_target::HIDDEN, "{name}");
+                assert_eq!(tool_name(&app, tool), None, "{name}: its wording was not measured");
+            }
+            Silent => {
+                stroke(&mut app);
+                assert!(alerts(&app).is_empty(), "{name}: no alert");
+            }
+        }
+    }
 }
+
