@@ -10,6 +10,8 @@ use crate::canvas::testing::{ToolEvent, tool_event};
 /// A document whose active layer is a `kind` layer over a white Background.
 pub(super) fn app_with(kind: Kind) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    // Strokes and filters finish in the pass that asks for them, so the history counts are settled at once.
+    app.background_jobs = false;
     app.run("file.new", json!({"width": 120, "height": 80})).unwrap();
     match kind {
         Kind::Type => app.run("type.create", json!({"x": 10, "y": 40, "text": "Hello"})).map(|_| ()),
@@ -143,7 +145,7 @@ fn only_pixel_painting_asks() {
         assert!(prompt(&app).is_none(), "{tool:?} must not ask");
         app.ui.text_edit = None;
     }
-    for tool in [Tool::Eraser, Tool::CloneStamp, Tool::PaintBucket, Tool::Smudge] {
+    for tool in [Tool::Eraser, Tool::PaintBucket, Tool::Smudge] {
         app.ui.tool = tool;
         click(&mut app, 30.0, 20.0);
         let id = prompt(&app).unwrap_or_else(|| panic!("{tool:?} asks"));
@@ -152,7 +154,12 @@ fn only_pixel_painting_asks() {
     // ⌥-click with the Clone Stamp sets the source.
     app.ui.tool = Tool::CloneStamp;
     tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 20.0, pressure: 1.0 }, Modifiers::ALT);
+    tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 20.0 }, Modifiers::ALT);
     assert!(prompt(&app).is_none());
+    // With a source set, a plain click paints, so it asks.
+    click(&mut app, 30.0, 20.0);
+    let id = prompt(&app).expect("the Clone Stamp with a source asks");
+    assert!(app.framework.dialogs.cancel_by_id(&ctx, id));
     // Painting the layer's mask needs no rasterizing.
     app.run("layer.layerMask.revealAll", json!({})).unwrap();
     app.ui.mask_target = true;
@@ -181,6 +188,8 @@ fn the_control_channel_sees_and_confirms_the_prompt() {
     let mut app = app_with(Kind::Shape);
     let ctx = crate::canvas::testing::ctx(&mut app);
     app.ui.tool = Tool::Pencil;
+    // The canvas shows once before a pointer event can be mapped onto the document.
+    crate::canvas::testing::frame(&mut app);
     let call = |app: &mut PhotocraftApp, method: &str, params: serde_json::Value| {
         let (req, _rx) = crate::control::ControlRequest::new(method, params);
         match crate::control::handle(app, &ctx, &req) {
