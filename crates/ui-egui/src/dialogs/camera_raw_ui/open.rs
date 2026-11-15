@@ -1,11 +1,11 @@
-use super::convert::{apply_raw_conversions, open_pixels, output_sharpening, raw_conversions};
+use super::convert::{RawStart, apply_raw_conversions, open_pixels, open_raw_pixels, output_sharpening, raw_conversions};
 use super::sidecar::{read_sidecar, write_sidecar};
 use super::{CameraRaw, LayerId, PhotocraftApp, Rect, Value, json};
 
 /// Opens the dialog on the active layer.
 /// Where OK writes: a new filter on the layer, or an existing smart filter (by index).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Target {
+pub(crate) enum Target {
     NewFilter,
     SmartFilter(usize),
     /// The open-time dialog of a raw file just opened (File › Open): OK is **Open**, Cancel
@@ -96,12 +96,7 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
     app.session.set_active(index);
     let (layer, surf, _) = crate::distort_ui::active_pixels(app)?;
     if let Some((params, original)) = kept {
-        open_pixels(app, ctx, layer, surf, params, Coverage::None, Target::OpenRaw)?;
-        if let Some(d) = app.camera_raw.as_mut() {
-            d.original = original;
-        }
-        attach_raw(app, raw);
-        return Ok(());
+        return open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: Some(original), auto_tone: false });
     }
     // The file's sidecar (`IMG_0001.xmp` beside it) fills the dialog, as Camera Raw's does; the
     // status bar names what it could not apply.
@@ -121,35 +116,9 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
         };
         app.ui.status_error = false;
     }
-    open_pixels(app, ctx, layer, surf, params, Coverage::None, Target::OpenRaw)?;
     // Camera Raw Defaults › Apply auto tone: a file without its own settings opens with Auto.
-    if !from_sidecar
-        && app.session.prefs().raw_defaults.apply_auto_tone
-        && let Some(d) = app.camera_raw.as_mut()
-    {
-        photocraft_algo::camera_raw::auto_tone(&d.proxy, &mut d.params);
-        d.dirty = true;
-    }
-    attach_raw(app, raw);
-    Ok(())
-}
-
-/// Gives the open dialog its raw: the file name, and the camera tone curve it was developed with.
-fn attach_raw(app: &mut PhotocraftApp, raw: RawOpen) {
-    let curve = match (&raw.bytes, &raw.path) {
-        (Some(b), _) => Some(photocraft_io::raw::tone_curve(b)),
-        #[cfg(not(target_arch = "wasm32"))]
-        (None, Some(p)) => std::fs::read(p).ok().map(|b| photocraft_io::raw::tone_curve(&b)),
-        _ => None,
-    };
-    if let Some(d) = app.camera_raw.as_mut() {
-        d.layer_name = raw.name.clone();
-        // The full-size preview retones the whole frame with it, as Open will.
-        let curve = curve.map(std::sync::Arc::new);
-        d.detail.raw_curve = curve.clone();
-        d.raw_curve = curve;
-        d.raw_open = Some(raw);
-    }
+    let auto_tone = !from_sidecar && app.session.prefs().raw_defaults.apply_auto_tone;
+    open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: None, auto_tone })
 }
 
 pub(super) fn document_index(app: &PhotocraftApp, id: photocraft_doc::DocId) -> Option<usize> {
@@ -163,7 +132,7 @@ pub(super) fn non_defaults(p: &CameraRaw) -> Value {
     let mut out = serde_json::Map::new();
     if let (Value::Object(f), Value::Object(d)) = (full, def) {
         for (k, v) in f {
-            if k != "pixelScale" && d.get(&k) != Some(&v) {
+            if d.get(&k) != Some(&v) {
                 out.insert(k, v);
             }
         }
@@ -509,7 +478,7 @@ pub fn on_redevelop_event(app: &mut PhotocraftApp, e: &photocraft_engine::jobs::
 /// Cancel: closes the dialog; for the open-time dialog also the documents it was opening (every
 /// raw in its filmstrip).
 pub(super) fn cancel(app: &mut PhotocraftApp) {
-    let Some(d) = app.camera_raw.take() else { return };
+    let Some(d) = app.raw.take() else { return };
     if let (Target::OpenRaw, Some(raw)) = (d.target, &d.raw_open) {
         let mut opening: Vec<_> = std::mem::take(&mut app.raw_shelf).into_iter().map(|h| h.raw.document).collect();
         opening.push(raw.document);
