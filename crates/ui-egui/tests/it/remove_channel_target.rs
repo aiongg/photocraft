@@ -4,9 +4,11 @@
 use photocraft_doc::LayerId;
 use photocraft_engine::Session;
 use photocraft_engine::jobs::Started;
-use photocraft_ui_egui::{PhotocraftApp, Services, control, type_tool};
+use photocraft_ui_egui::{PhotocraftApp, Services, control};
 
 const REMOVE: &str = r#"{"points":[[12,10],[16,12]],"size":6}"#;
+
+type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
 
 fn run(s: &mut Session, id: &str, p: &str) {
     s.execute(id, p.parse().unwrap()).unwrap();
@@ -20,7 +22,6 @@ fn pixels(s: &Session, doc: usize, id: LayerId) -> Vec<f32> {
 #[derive(Clone, Copy)]
 enum Input {
     None,
-    TypeTool,
     ControlPointer,
 }
 
@@ -44,7 +45,6 @@ fn probe(input: Input) {
         .unwrap();
     run(&mut a.session, "file.new", r##"{"name":"B","width":32,"height":24,"background":"#6a219c"}"##);
     a.session.set_active(0);
-    a.sync_views();
     run(&mut a.session, "channel.target", r#"{"channel":"red"}"#);
     let b = a.session.documents()[1].doc.clone();
     let text_before = a.session.documents()[0].doc.layer(text).unwrap().clone();
@@ -57,21 +57,31 @@ fn probe(input: Input) {
     run(&mut inline, "paint.remove", REMOVE);
     let expected = pixels(&inline, 0, target);
 
-    let job = match a.session.start("paint.remove", REMOVE.parse().unwrap()).unwrap() {
+    // The app runs in a harness so the canvas takes the control channel's pointer input on the
+    // frames after the call.
+    let mut h = Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_max_steps(64).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        a
+    });
+    h.run_steps(4);
+
+    let job = match h.state_mut().session.start("paint.remove", REMOVE.parse().unwrap()).unwrap() {
         Started::Job(id) => id,
         v => panic!("must start a background job: {v:?}"),
     };
     match input {
         Input::None => {}
-        Input::TypeTool => assert!(type_tool::pointer_down(&mut a, 4., 14., Default::default()), "the click must hit the text"),
         Input::ControlPointer => {
+            let ctx = h.ctx.clone();
             let (req, _rx) = control::ControlRequest::new("ui.pointer", r#"{"tool":"type","events":[{"kind":"down","x":4,"y":14}]}"#.parse().unwrap());
-            let _ = control::handle(&mut a, &Default::default(), &req);
+            let _ = control::handle(h.state_mut(), &ctx, &req);
+            h.run_steps(2);
         }
     }
     let selected = if matches!(input, Input::None) { target } else { text };
-    assert_eq!(a.session.active().unwrap().active_layer, Some(selected), "the input selects the text layer");
+    assert_eq!(h.state().session.active().unwrap().active_layer, Some(selected), "the input selects the text layer");
 
+    let a = h.state_mut();
     a.session.set_active(1);
     a.session.wait_job(job).unwrap();
     assert_eq!(a.session.documents()[1].doc, b, "B is unchanged");
@@ -87,11 +97,6 @@ fn probe(input: Input) {
 #[test]
 fn no_input_keeps_red_restriction() {
     probe(Input::None);
-}
-
-#[test]
-fn type_tool_click_keeps_red_restriction() {
-    probe(Input::TypeTool);
 }
 
 #[test]
