@@ -103,7 +103,7 @@ fn bridge_of(command: &CommandRef) -> Option<(&'static str, Bridged)> {
 }
 
 /// Whether the runtime defines command `id` (a row of [`RUNTIME_COMMANDS`]).
-fn is_bridged(id: &str) -> bool {
+pub(crate) fn is_bridged(id: &str) -> bool {
     RUNTIME_COMMANDS.iter().any(|(bridged, _)| *bridged == id)
 }
 

@@ -85,8 +85,8 @@ fn choose(h: &mut H, font: &str, accept: &str) {
     h.run();
     match accept {
         "enter" => h.key_press(Key::Enter),
-        "click" => h.get_by_label(font).click(),
-        "hover" => h.get_by_label(font).hover(),
+        "click" => h.get_by_role_and_label(egui::accesskit::Role::TreeItem, font).click(),
+        "hover" => h.get_by_role_and_label(egui::accesskit::Role::TreeItem, font).hover(),
         _ => panic!("unknown acceptance"),
     }
     h.run();
@@ -94,8 +94,7 @@ fn choose(h: &mut H, font: &str, accept: &str) {
 
 /// Commits the edit through the bar's check mark.
 fn checkmark(h: &mut H) {
-    let label = crate::i18n::fmt("Commit any current edits ({key})", &[("key", &crate::shortcuts::pretty("Cmd+Enter"))]);
-    h.get_by_role_and_label(egui::accesskit::Role::Button, &label).click();
+    h.get_by_role_and_label(egui::accesskit::Role::Button, "Commit any current edits").click();
     h.run();
 }
 

@@ -47,8 +47,21 @@ fn harness_of(session: photocraft_engine::Session, mask_target: bool, vector_tar
         .with_size(vec2(800.0, 1600.0))
         .with_step_dt(1.0 / 60.0)
         .build_ui_state(|ui, app: &mut PhotocraftApp| super::properties::panel(app, ui), app);
-    h.run_steps(4);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
+    frames(&mut h, 4);
     h
+}
+
+/// `n` frames as the app's frame runs them: the command states and catalog are published before the input (a command
+/// button's label and enablement), and the commands the frame fired run after it.
+fn frames(h: &mut Harness<'_, PhotocraftApp>, n: usize) {
+    for _ in 0..n {
+        let ctx = h.ctx.clone();
+        h.state_mut().framework_before_input(&ctx);
+        h.step();
+        h.state_mut().framework_before_input(&ctx);
+        crate::shortcuts::handle(h.state_mut(), &ctx);
+    }
 }
 
 fn harness(target: Target) -> Harness<'static, PhotocraftApp> {
@@ -87,7 +100,7 @@ fn pixel_mask_properties_follow_target_for_raster_and_adjustment() {
             assert!(h.query_all_by_label(label).next().is_some(), "adjustment={adjustment}: no {label}");
         }
         h.state_mut().ui.mask_target = false;
-        h.run_steps(4);
+        frames(&mut h, 4);
         assert!(h.query_all_by_label("Density").next().is_none());
         assert!(h.query_all_by_label("Select and Mask…").next().is_none(), "the Refine row belongs to the mask target");
         if adjustment {
@@ -95,7 +108,7 @@ fn pixel_mask_properties_follow_target_for_raster_and_adjustment() {
         }
         h.state_mut().ui.mask_target = true;
         h.state_mut().ui.vector_mask_target = true;
-        h.run_steps(4);
+        frames(&mut h, 4);
         assert!(h.query_all_by_label("Density").next().is_none(), "a vector target must not edit the pixel mask");
     }
 }
@@ -115,16 +128,16 @@ fn drag_with(h: &mut Harness<'_, PhotocraftApp>, label: &str, fractions: &[f32],
     let pos = |f: f32| pos2(r.left() + 7.0 + (r.width() - 14.0) * f, r.center().y);
     let start = pos(fractions[0]);
     h.hover_at(start);
-    h.run_steps(1);
+    frames(&mut h, 1);
     h.event(egui::Event::PointerButton { pos: start, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
-    h.run_steps(1);
+    frames(&mut h, 1);
     for &f in &fractions[1..] {
         h.hover_at(pos(f));
-        h.run_steps(1);
+        frames(&mut h, 1);
     }
     if escape {
         h.key_press(egui::Key::Escape);
-        h.run_steps(1);
+        frames(&mut h, 1);
     }
     h.event(egui::Event::PointerButton {
         pos: pos(*fractions.last().unwrap()),
@@ -132,7 +145,7 @@ fn drag_with(h: &mut Harness<'_, PhotocraftApp>, label: &str, fractions: &[f32],
         pressed: false,
         modifiers: egui::Modifiers::NONE,
     });
-    h.run_steps(3);
+    frames(&mut h, 3);
 }
 
 #[test]
@@ -151,7 +164,7 @@ fn mask_slider_drags_preview_live_and_undo_as_separate_gestures() {
     assert_eq!(mask(&h).density, 1.0);
     h.state_mut().run("edit.redo", json!({})).unwrap();
     assert!((mask(&h).density - 0.5).abs() < 0.01);
-    h.run_steps(3);
+    frames(&mut h, 3);
     // #6545: Feather's track is curved like Photoshop's, so a fifth of the way is 8 px, not 200.
     drag(&mut h, "Feather", &[0.0, 0.1, 0.2]);
     assert!((mask(&h).feather - 8.0).abs() < 0.3, "feather {}", mask(&h).feather);
@@ -190,13 +203,12 @@ fn refine_invert_inverts_the_mask_and_leaves_the_layer_alone() {
     // Pixels and mask both vary, so inverting the wrong surface shows up either way (#1137).
     h.state_mut().session.execute("paint.gradient", gradient("pixels")).unwrap();
     h.state_mut().session.execute("paint.gradient", gradient("mask")).unwrap();
-    h.run_steps(3);
+    frames(&mut h, 3);
     let (mask_before, pixels_before) = (row(&h, true), row(&h, false));
     assert!(mask_before[8] < mask_before[56], "the mask must vary across the document");
     let steps = history(&h);
-    // PLAN: the tree has no drain of fired non-Color-panel commands yet (cx.P1); the click needs it to run Invert.
     h.get_by_label("Invert").click();
-    h.run_steps(3);
+    frames(&mut h, 3);
     for (x, (before, after)) in mask_before.iter().zip(row(&h, true)).enumerate() {
         assert!((1.0 - before - after).abs() < 0.01, "mask at x={x}: {before} should invert to {}, got {after}", 1.0 - before);
     }

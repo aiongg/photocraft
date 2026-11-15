@@ -486,6 +486,7 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
         swatches: adjust_editors::swatches(app),
         tone: None,
         stale: false,
+        reported_clipping: Default::default(),
     }
 }
 
@@ -794,6 +795,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
             if let Some(open) = app.adjust_open.take()
                 && let Err(error) = confirm(app, ctx, &open, &value)
             {
+                app.adjust_refusal = Some(error.clone());
                 crate::notices::error(app, error);
             }
         }

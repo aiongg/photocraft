@@ -24,12 +24,20 @@ fn set_fields(app: &mut PhotocraftApp, id: DialogId, values: Value) {
 }
 
 fn app() -> (PhotocraftApp, DialogId) {
+    app_remembering(None)
+}
+
+/// The Print dialog opened after a print that kept `paper` as its paper (what `file.print` remembers).
+fn app_remembering(paper: Option<Value>) -> (PhotocraftApp, DialogId) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     // Print lists this printer and does not ask the spooler.
     app.session.printer_source = Some(std::sync::Arc::new(|| {
         vec![craft::print::Printer { name: "Test native printer".into(), default: true, two_sided: None, description: String::new() }]
     }));
     app.run("file.new", json!({"width": 120, "height": 80, "name": "Custom paper"})).unwrap();
+    if let Some(paper) = paper {
+        app.session.file_menu.last_print = Some(json!({ "paper": paper }));
+    }
     let id = photocraft_engine::print_cmds::with_spooler(|| open_print(&mut app));
     assert_no_system_listing();
     // Every UI path in these fixtures is safe even if an unexpected Enter confirms the dialog.
@@ -238,8 +246,7 @@ fn japanese_postcard_preset_is_chosen_from_the_paper_menu() {
 
 #[test]
 fn remembered_custom_paper_is_shown_without_becoming_a_preset() {
-    let (mut app, id) = app();
-    set_fields(&mut app, id, json!({"paper": [432.0, 576.0]}));
+    let (app, id) = app_remembering(Some(json!([432.0, 576.0])));
     let h = harness(app);
     assert!(shown(&h, "Custom"), "an array paper size must not display as letter");
     assert!(h.query_by_role_and_label(egui::accesskit::Role::SpinButton, "Paper Width").is_some());
@@ -251,8 +258,7 @@ fn remembered_custom_paper_is_shown_without_becoming_a_preset() {
 /// must select the canonical preset an alias names instead of leaving the Paper control unmatched.
 #[test]
 fn remembered_paper_alias_selects_the_canonical_preset() {
-    let (mut app, id) = app();
-    set_fields(&mut app, id, json!({"paper": "はがき"}));
+    let (app, id) = app_remembering(Some(json!("はがき")));
     let h = harness(app);
     assert!(shown(&h, "はがき (100 × 148 mm)"), "a remembered alias must show the paper it names");
     let layout = photocraft_engine::print_cmds::layout(&h.state().session.active().unwrap().doc, &Value::Object(fields(&h, id)), "file.print").unwrap();

@@ -17,7 +17,8 @@ type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
 
 /// An app inside a window, run frame by frame as the desktop app is.
 fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness {
-    egui_kittest::Harness::builder().with_size(size).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |cc| {
+    // The harness runs on the app's own context, so what the app set up on it (the runtime, the command catalog) is there.
+    egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(size).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         app
     })
@@ -380,7 +381,9 @@ fn image_processor_document_sources_wait_for_the_transform() {
                 let history = app.session.active().unwrap().history.past_len();
                 let params = json!({"source": source, "output": output.path(), "format": "png"});
                 let result: Result<(), String> = if through_dialog {
-                    let id = crate::dialogs::open_command_dialog(&mut app, "file.scripts.imageProcessor", "Image Processor").unwrap();
+                    // The menu's own dialog holds the Source row; the bare command dialog has only the engine's fields.
+                    let reply = crate::menus::invoke(&mut app, &ctx, "file.scripts.imageProcessor", json!({})).unwrap();
+                    let id: craft::ui::dialog::DialogId = serde_json::from_value(reply["dialog"].clone()).expect("the menu opened the dialog");
                     app.framework.dialogs.set_json_field(&ctx, id, "source", json!(source)).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "output", json!(output.path())).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "format", json!("png")).unwrap();

@@ -465,12 +465,12 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     let mut h = prefs_harness(&files, "interface", vec2(1280.0, 800.0), |_| {});
     h.get_by_label("Classic").hover();
     h.run_steps(2);
-    h.get_by_label("Add to favorites: Classic").click();
+    h.get_by_label("Add to Favorites: Classic").click();
     h.run_steps(2);
     h.get_by_label("Apply").click();
     h.run_steps(2);
     assert_eq!(h.state().session.prefs().interface.favorite_themes, vec!["craft.classic"]);
-    assert!(h.query_by_label("Remove from favorites: Classic").is_some());
+    assert!(h.query_by_label("Remove from Favorites: Classic").is_some());
     let nodes = theme_menu(h.state()).favorite_items(&ThemeLabels::default(), CommandRef::new("edit.preferences.interface"));
     let listed: Vec<_> = nodes.iter().filter_map(|node| if let Node::Item(item) = node { Some(item.command.clone()) } else { None }).collect();
     let classic = ThemeChoice::Theme { id: ThemeId::parse("craft.classic").unwrap(), dark: false };

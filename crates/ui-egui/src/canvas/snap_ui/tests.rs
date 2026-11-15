@@ -66,12 +66,12 @@ fn move_tool_snaps_to_other_layer_edges_with_smart_guides() {
     app.ui.tool = Tool::Move;
     app.ui.view.show.smart_guides = true;
     app.ui.tool_options.move_auto_select = false;
-    let lines = move_drag(&mut app, [323.0, 100.0], egui::Modifiers::NONE);
-    assert!(lines.iter().any(|l| l.position == 300.0 && l.kind.is_smart()), "{lines:?}");
-    assert_eq!(mover_bounds(&app).x0, 300);
     let mover = app.session.active().unwrap().active_layer.unwrap();
     assert!(near(&app, &[mover], Axis::Y, 40.0).is_none(), "the moving layer's own edge is no target");
     assert_eq!(near(&app, &[], Axis::Y, 40.0), Some((SnapKind::LayerEdge, 40.0)));
+    let lines = move_drag(&mut app, [323.0, 100.0], egui::Modifiers::NONE);
+    assert!(lines.iter().any(|l| l.position == 300.0 && l.kind.is_smart()), "{lines:?}");
+    assert_eq!(mover_bounds(&app).x0, 300);
 }
 
 /// The auto-selected layer is the moving set; an empty layer gives no box and no snap.
@@ -140,7 +140,7 @@ fn grid_snapping_uses_preferences() {
     app.ui.extras.grid = true;
     assert!(snap(&app, 0).options().grid);
     let before = grid(&app, app.session.active().unwrap()).1;
-    app.run("prefs.set", json!({"path": "guidesGridAndSlices.subdivisions", "value": 4})).unwrap();
+    app.run("prefs.set", json!({"path": "guidesGridAndSlices.subdivisions", "value": 8})).unwrap();
     let after = grid(&app, app.session.active().unwrap()).1;
     assert!(after.x < before.x, "more subdivisions, a finer grid: {before:?} {after:?}");
 }
@@ -162,7 +162,8 @@ fn snap_targets_follow_the_document() {
     assert_eq!(near(&app, &[], Axis::Y, 321.0), Some((SnapKind::Guide, 321.0)));
     app.ui.view.snap_to.guides = false;
     assert!(near(&app, &[], Axis::Y, 321.0).is_none());
-    // The selection's edges.
+    // The selection's edges: not a target while the Move tool would carry its pixels (#6290).
+    app.ui.tool = Tool::RectMarquee;
     app.run("select.rect", json!({"x": 120, "y": 100, "width": 60, "height": 50})).unwrap();
     assert_eq!(near(&app, &[], Axis::Y, 120.0), Some((SnapKind::Selection, 120.0)));
     app.run("select.deselect", json!({})).unwrap();

@@ -168,6 +168,10 @@ fn invoke_early_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str,
     if let Some(r) = crate::analysis::menu(app, id, params) {
         return Some(r);
     }
+    // Workspace Select, Modifier Keys, custom pixel aspect, Extras/32-bit options.
+    if let Some(r) = crate::workspace_ui::menu(app, id, params) {
+        return Some(r);
+    }
     // Character/Paragraph Styles, Glyphs, Edit › Check Spelling dialog.
     if let Some(r) = crate::type_panels_ui::menu(app, id, params) {
         return Some(r);

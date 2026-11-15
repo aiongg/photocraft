@@ -110,7 +110,7 @@ fn a_color_row_opens_the_color_picker_as_a_child_and_its_ok_answers_the_row() {
 
     // The dialog's value moves on while the picker is open; the picker's OK answers the row with the colour it was opened with.
     let ctx = h.ctx.clone();
-    h.state_mut().framework.dialogs.set_json_field(&ctx, parent, "tint", json!("#00ff00")).unwrap();
+    h.state_mut().framework.dialogs.set_json_field(&ctx, parent, "tint", serde_json::to_value(FieldValue::Color([0.0, 1.0, 0.0])).unwrap()).unwrap();
     testing::confirm(h.state_mut(), picker).unwrap();
     h.run_steps(4);
     let dialog = h.state().framework.dialogs.get_by_id::<HostedParamDialog>(parent).expect("the dialog stays open");
@@ -185,7 +185,9 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     let rows: &[PromptRow] = &[row_b, row_a];
     let hits = || HITS.lock().unwrap().clone();
 
+    // A dialog can be answered once a pass has shown it.
     let first = app.framework.dialogs.open(StandardPrompt::custom("A").tag(MarkA));
+    testing::show(&mut app);
     assert!(app.framework.dialogs.confirm_by_id(&ctx, first));
     take_prompts_from(&mut app, &ctx, rows);
     take_prompts_from(&mut app, &ctx, rows);
@@ -194,6 +196,7 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     // A prompt opened over another of its type replaces it: the replaced one's host Cancel acts on nothing.
     app.framework.dialogs.open(StandardPrompt::custom("A again").tag(MarkA));
     let second = app.framework.dialogs.open(StandardPrompt::custom("B").tag(MarkB));
+    testing::show(&mut app);
     take_prompts_from(&mut app, &ctx, rows);
     assert_eq!(hits().len(), 1, "a host Cancel reaches no row");
     assert!(app.framework.dialogs.confirm_by_id(&ctx, second));
@@ -203,6 +206,7 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     // A prompt's own Cancel button answers `Ok` with `Cancel`, and its row acts on it.
     let third = app.framework.dialogs.open(StandardPrompt::custom("B").tag(MarkB));
     app.framework.dialogs.get_mut_by_id::<StandardPrompt>(third).unwrap().set_choice(PromptChoice::Cancel);
+    testing::show(&mut app);
     assert!(app.framework.dialogs.confirm_by_id(&ctx, third));
     take_prompts_from(&mut app, &ctx, rows);
     assert_eq!(hits().last(), Some(&("b", PromptChoice::Cancel)));

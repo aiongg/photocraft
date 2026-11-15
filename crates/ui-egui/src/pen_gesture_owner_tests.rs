@@ -84,7 +84,7 @@ fn frame_cancellation_consumes_old_events_after_switching_tools() {
     let mut app = app(Tool::FreeformPen);
     down(&mut app);
     app.ui.tool = Tool::PolygonLasso;
-    app.sync_views();
+    crate::canvas::testing::frame(&mut app);
     assert!(!in_gesture(&app), "the tool switch cancels the Freeform Pen's gesture");
     let modifiers = Modifiers { alt: true, ..Modifiers::NONE };
     tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 100.0, pressure: 1.0 }, modifiers);

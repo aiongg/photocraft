@@ -9,13 +9,6 @@ const COLOR_LOOKUP: &str = "image.adjustments.colorLookup";
 const LENS_BLUR: &str = "filter.blur.lensBlur";
 const REPLACE_COLOR: &str = "image.adjustments.replaceColor";
 
-/// A context that has the app's fonts and theme, for passes that draw dialogs.
-fn dctx() -> egui::Context {
-    let ctx = egui::Context::default();
-    PhotocraftApp::setup_context(&ctx, Default::default());
-    ctx
-}
-
 fn new_app() -> PhotocraftApp {
     PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
 }
@@ -43,9 +36,9 @@ fn set(app: &mut PhotocraftApp, id: DialogId, key: &str, value: Value) {
 }
 
 fn passes(app: &mut PhotocraftApp, n: usize) {
-    let ctx = dctx();
+    let ctx = app.ctx().clone();
     for _ in 0..n {
-        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(app, ui)).textures_delta.clear();
+        crate::testing::run_ui(&ctx, Default::default(), |ui| crate::dialogs::run(app, ui));
     }
 }
 
@@ -56,7 +49,8 @@ fn is_open(app: &PhotocraftApp, id: DialogId) -> bool {
 /// OK, then the passes in which the family runs (or refuses, for a held OK). True when the dialog closed.
 fn ok(app: &mut PhotocraftApp, id: DialogId) -> bool {
     let ctx = app.ctx().clone();
-    app.framework.dialogs.confirm_by_id(&ctx, id);
+    // A refusal comes back as the Err; the dialog staying open is what the callers read.
+    let _ = crate::dialogs::confirm(app, &ctx, id);
     passes(app, 3);
     !is_open(app, id)
 }
@@ -478,7 +472,7 @@ fn preview_runs_engine_command_on_proxy() {
     set(&mut app, id, "radius", json!(4.0));
     // The Preview box is on from the dialog's first drawn pass.
     passes(&mut app, 2);
-    let ctx = dctx();
+    let ctx = app.ctx().clone();
     crate::canvas::ensure_filter_preview(&mut app, 0, &ctx);
     let shown = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the live preview ran");
     let p = shown.layers[0].surface().unwrap().pixel(32, 32);
@@ -675,7 +669,7 @@ fn match_color_refuses_a_changed_destination_without_closing() {
     app.run("layer.new.layer", json!({"name": "Other"})).unwrap();
     let other = app.session.active().unwrap().active_layer.unwrap();
     app.session.select_layer(original).unwrap();
-    let ctx = dctx();
+    let ctx = app.ctx().clone();
     let id = open(&mut app, MATCH_COLOR).unwrap();
     let steps: Vec<_> = app.session.documents().iter().map(|st| st.history.past_len()).collect();
     let forged = json!((app.session.documents()[0].doc.id, app.session.documents()[0].active_layer));
@@ -709,7 +703,7 @@ fn match_color_explicit_unavailable_source_layer_is_refused_with_or_without_a_fr
         for _ in 0..2 {
             app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         }
-        let ctx = dctx();
+        let ctx = app.ctx().clone();
         let id = open(&mut app, MATCH_COLOR).unwrap();
         let missing = u64::MAX;
         // PLAN: assumed the `sourceLayer` row accepts any layer id; the held OK checks it exists.
@@ -754,7 +748,7 @@ fn match_color_after_source_change(change: &str) {
     session.add_document(target, None);
     let mut app = PhotocraftApp::new(session, Default::default());
     app.sync_views();
-    let ctx = dctx();
+    let ctx = app.ctx().clone();
     let root = open(&mut app, "image.adjustments.matchColor").unwrap();
     if !change.starts_with("select-") {
         set(&mut app, root, "source", json!("1"));
@@ -1771,7 +1765,7 @@ fn match_color_preview_refreshes_when_a_source_job_lands() {
         app.background_jobs = false;
         let target = app.session.active().unwrap().doc.clone();
         let revision = app.session.active().unwrap().revision;
-        let ctx = dctx();
+        let ctx = app.ctx().clone();
         let id = open(&mut app, "image.adjustments.matchColor").unwrap();
         set(&mut app, id, "source", json!("0"));
         // The Preview box is on from the dialog's first drawn pass.

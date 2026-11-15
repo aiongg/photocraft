@@ -77,7 +77,10 @@ fn filter_dialog_colours_open_the_color_picker() {
         let id = h.state().framework.dialogs.stack().top().expect("the filter dialog opens");
         pick(&mut h, label, &title_for(label));
         let d = open_dialog(h.state(), id);
-        assert_eq!(d.fields.as_ref().and_then(|f| f.get(key)), Some(&json!(PICKED)), "{cmd}: {key}");
+        // A form reads a colour as its channels; `PICKED` is the hex the picker was given.
+        let shown: Option<Vec<f32>> = d.fields.as_ref().and_then(|f| f.get(key)).and_then(|v| serde_json::from_value(v.clone()).ok());
+        let want = PICKED_RGB;
+        assert!(shown.is_some_and(|c| c.len() == 3 && close([c[0], c[1], c[2]], want)), "{cmd}: {key}");
     }
 }
 

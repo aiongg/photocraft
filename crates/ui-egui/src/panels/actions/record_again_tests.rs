@@ -2,7 +2,8 @@
 //! host (`app.framework`), so they live in the crate.
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use craft::automation::ui::actions::ActionSelection;
+use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
+use craft::ui::runtime::commands::CommandRef;
 use craft::ui::contract::Bind;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog, ParamKind};
@@ -45,8 +46,9 @@ fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value)
 
 /// Open by firing the panel menu's Record Again row, preserving its selected-step and enablement checks.
 fn open(h: &mut Harness<'static, PhotocraftApp>) -> DialogId {
-    let reply = control(h, "ui.menu.invoke", json!({"id": "actions.recordAgain"}));
-    assert_eq!(reply["ok"], true, "{reply}");
+    let ctx = h.ctx.clone();
+    assert!(super::menu::run_fired(h.state_mut(), &ctx, &CommandRef::from(ActionsPanelCommands::RecordAgain)), "the Actions panel owns the row");
+    h.run_steps(3);
     h.state().framework.dialogs.stack().top().expect("the editor opened")
 }
 

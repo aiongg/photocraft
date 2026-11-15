@@ -144,10 +144,8 @@ fn agents_click_set_and_confirm_over_the_control_channel() {
             _ => panic!("deferred"),
         }
     };
-    call(&mut app, "ui.pointer", json!({"tool": "rectangle", "events": [{"kind": "down", "x": 40, "y": 50}, {"kind": "up", "x": 40, "y": 50}]}));
-    // The pointer events act in the frames after the call.
-    testing::frame(&mut app);
-    testing::frame(&mut app);
+    // The canvas shows first, so the request maps the points through its view, and the frames after it deliver the events.
+    testing::control(&mut app, "ui.pointer", json!({"tool": "rectangle", "events": [{"kind": "down", "x": 40, "y": 50}, {"kind": "up", "x": 40, "y": 50}]}));
     let id = only_dialog(&app);
     for (field, value) in [("width", json!(64)), ("height", json!(32))] {
         call(&mut app, "ui.dialog.set", json!({"dialog": id.value(), "field": field, "value": value}));

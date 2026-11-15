@@ -519,7 +519,12 @@ fn write_curves(out: &mut Map<String, Value>, entries: &[(ToneChannel, usize)], 
         }
         out.insert(if key.is_empty() { "points".into() } else { key.to_owned() }, written);
     }
-    out.insert("pencil".into(), json!(pencil));
+    // Like the engine's own record, a freehand curve says so and a point curve says nothing.
+    if pencil {
+        out.insert("pencil".into(), json!(true));
+    } else {
+        out.remove("pencil");
+    }
     if cx.colour_set() && space == ToneSpace::Lab {
         out.insert("__combinedLab".into(), json!(true));
     }

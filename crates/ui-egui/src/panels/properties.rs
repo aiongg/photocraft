@@ -185,7 +185,9 @@ mod tests {
         s.execute("select.deselect", json!({})).unwrap();
         // Background alone: the Document properties only.
         s.execute("layer.select", json!({"layer": bg})).unwrap();
-        let app = PhotocraftApp::new(s, crate::Services::default());
+        let mut app = PhotocraftApp::new(s, crate::Services::default());
+        // The Move tool's options bar has its own Align buttons: a tool without them leaves the Properties panel's the only ones.
+        app.ui.tool = crate::state::Tool::Brush;
         let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |_cc| app);
         crate::panel_docking::show_panel(h.state_mut(), "properties", Some(true)).unwrap();
         h.run_steps(8);

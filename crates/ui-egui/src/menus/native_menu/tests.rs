@@ -135,7 +135,10 @@ fn an_imported_kys_set_owns_the_system_keys_it_binds() {
 #[test]
 fn themes_move_to_the_app_menus_appearance() {
     let mut a = app(false);
-    a.ui.theme = crate::theme::AppTheme::classic();
+    // The menu's checked row is the saved choice, which picking a theme sets.
+    let ctx = a.ctx().clone();
+    let classic = crate::theme::AppTheme::classic().command();
+    crate::menus::invoke(&mut a, &ctx, &classic.id, classic.params.clone()).unwrap();
     let layout = laid(&mut a);
     let app_menu = layout.bar.menu(MenuRole::App).unwrap();
     let appearance = app_menu.children.iter().find(|n| matches!(n, Node::Submenu { role: Some(ItemRole::Appearance), .. }));

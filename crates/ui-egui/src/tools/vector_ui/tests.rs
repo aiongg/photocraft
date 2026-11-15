@@ -1076,17 +1076,19 @@ fn active_shape_paint(app: &PhotocraftApp) -> (Option<photocraft_doc::Fill>, Opt
     }
 }
 
+/// Clicks the options bar's Fill check box.
 fn click_bar_fill(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
+    use egui::accesskit::Role;
     use egui_kittest::kittest::Queryable;
-    let label = h.query_all(egui_kittest::kittest::by().label("Fill:").include_labels()).next().expect("the Fill label").rect();
-    let at = egui::pos2(label.right() + h.ctx.global_style().spacing.item_spacing.x + 7.0, label.center().y);
-    h.hover_at(at);
-    h.step();
-    for pressed in [true, false] {
-        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
-        h.step();
-    }
+    h.get_by_role_and_label(Role::CheckBox, "Fill").click();
     h.run_steps(2);
+}
+
+/// Whether the options bar shows its Fill check box.
+fn bar_shows_fill(h: &egui_kittest::Harness<'_, PhotocraftApp>) -> bool {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    h.query_by_role_and_label(Role::CheckBox, "Fill").is_some()
 }
 
 fn type_stroke_width(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
@@ -1123,7 +1125,6 @@ fn shape_options_bar_edits_the_selected_shape() {
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     let history = h.state().session.active().unwrap().history.past_len();
     h.run_steps(2);
-    let _ = h.query_all(egui_kittest::kittest::by().label("Fill:").include_labels()).next();
     click_bar_fill(&mut h);
     assert_eq!(h.state().session.active().unwrap().history.past_len(), history);
 }
@@ -1148,7 +1149,7 @@ fn path_selection_options_bar_edits_the_selected_shape() {
     // No shape selected: renders hint text instead.
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     h.run_steps(2);
-    assert!(h.query_all(egui_kittest::kittest::by().label("Fill:").include_labels()).next().is_none());
+    assert!(!bar_shows_fill(&h));
 }
 
 /// #6553: a Paths row dropped on the footer's trash is deleted, whichever row is selected,

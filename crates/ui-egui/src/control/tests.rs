@@ -468,8 +468,9 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
     crate::dialogs::take_results(&mut app, &ctx);
     let d = prompt(&mut app).expect("the prompt is listed");
-    assert_eq!(d["fields"]["command"], "file.close");
-    assert_eq!(d["fields"]["choices"], json!(["save", "dontSave", "cancel"]));
+    assert!(app.framework.dialogs.is_open::<craft::ui::dialog::UnsavedChangesDialog>(), "the prompt asks about the close");
+    assert_eq!(d["fields"]["choice"], "save", "the default answer is Save");
+    assert!(d["fields"].get("applyToAll").is_none(), "one document asks no Apply to All");
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "maybe"}))["ok"], false);
     assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": "top", "field": "x", "value": 1}))["ok"], false);
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": "top"}))["ok"], true);
@@ -486,9 +487,9 @@ fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
     assert!(crate::discard_ui::intercept(&mut app, "file.exit", &Value::Null));
     crate::dialogs::take_results(&mut app, &ctx);
     let d = prompt(&mut app).expect("the quit prompt is listed");
-    assert_eq!((d["fields"]["command"].as_str(), d["fields"]["remaining"].as_u64()), (Some("file.exit"), Some(2)));
+    assert_eq!(d["fields"]["applyToAll"], false, "two documents are left to ask about, so Apply to All is offered");
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["result"]["open"], true);
-    assert_eq!(prompt(&mut app).unwrap()["fields"]["remaining"], 1);
+    assert!(prompt(&mut app).unwrap()["fields"].get("applyToAll").is_none(), "the last document asks no Apply to All");
     assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["result"]["open"], false);
     assert!(app.allow_close && app.session.documents().is_empty());
 }
@@ -606,7 +607,7 @@ fn shell_dialogs_are_listed_and_driven_through_ui_dialog() {
     // Listed, then cancelled.
     crate::menus::invoke(&mut app, &ctx, "window.workspace.newWorkspace", json!({})).unwrap();
     let d = top_dialog(&mut app, &ctx);
-    assert_eq!((d["kind"].as_str(), d["title"].as_str()), (Some("newWorkspace"), Some("New Workspace")));
+    assert_eq!(d["key"].as_str(), Some("workspace.new"));
     let id = d["id"].clone();
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": id}))["ok"], true);
     assert!(dialogs(&mut app, &ctx).is_empty());
@@ -2495,10 +2496,10 @@ fn shift_right_menu_choose_rejects_bad_choices_and_sets_the_tool() {
     let menu = inspect(&app, &ctx)["brushModeMenu"].clone();
     assert_eq!(menu["tool"], json!("Brush"));
     assert_eq!(menu["mode"], json!("Normal"));
-    assert_eq!(menu["items"][0], json!({"label": "Edit Brush…", "enabled": true, "checked": false}));
+    assert_eq!(menu["items"][0], json!({"label": "Edit Brush…", "id": "Edit Brush…", "enabled": true, "checked": false}));
     assert_eq!(menu["items"][1], json!({"separator": true}));
     // The Background has no transparency: Behind and Clear are greyed.
-    assert!(menu["items"].as_array().unwrap().iter().any(|i| *i == json!({"label": "Clear", "enabled": false, "checked": false})));
+    assert!(menu["items"].as_array().unwrap().iter().any(|i| *i == json!({"label": "Clear", "id": "Clear", "enabled": false, "checked": false})));
     let journal = app.session.journal.len();
     for bad in [json!({"id": "Bogus"}), json!({"id": "Clear"}), json!({"id": "Behind"}), json!({"id": 3}), json!({}), json!({"id": "Desaturate"})] {
         let reply = call(&mut app, &ctx, "ui.context.choose", bad.clone());

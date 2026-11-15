@@ -148,7 +148,7 @@ fn the_lasso_edits_the_fill_area_and_the_window_follows() {
     assert_eq!(d["fillArea"], json!(800));
     assert!(d["error"].as_str().is_some_and(|e| e.contains("empty")), "{d}");
     // The reset button goes back to the selection.
-    ui(&mut app, json!({"reset": "lasso"})).unwrap();
+    ui(&mut app, json!({"reset": "fillArea"})).unwrap();
     assert_eq!(facts(&app)["fillArea"], json!(400));
 }
 
@@ -180,7 +180,8 @@ fn a_failed_ok_keeps_the_workspace_open() {
     let steps = app.session.active().unwrap().history.past_len();
     app.session.execute("layer.setProps", json!({"locks": {"pixels": true}})).unwrap();
     let steps = app.session.active().unwrap().history.past_len().max(steps);
-    ui(&mut app, json!({"commit": true})).unwrap();
+    let refusal = ui(&mut app, json!({"commit": true})).unwrap_err();
+    assert!(refusal.contains("locked"), "the refused OK replies with the engine's reason: {refusal}");
     assert!(app.caf.is_some(), "OK keeps the workspace open when the fill fails");
     assert!(facts(&app)["error"].as_str().is_some_and(|e| e.contains("locked")), "{}", facts(&app));
     assert!(app.ui.status_error);
@@ -201,11 +202,11 @@ fn undo_and_redo_of_a_stroke_clear_a_failed_oks_error() {
     open(&mut app).unwrap();
     ui(&mut app, json!({"stroke": {"points": [[20.0, 20.0], [60.0, 20.0]], "size": 10}})).unwrap();
     app.session.execute("layer.setProps", json!({"locks": {"pixels": true}})).unwrap();
-    ui(&mut app, json!({"commit": true})).unwrap();
+    assert!(ui(&mut app, json!({"commit": true})).is_err(), "the engine refuses the locked layer");
     assert!(facts(&app)["error"].is_string(), "the failed OK reports in the panel");
     ui(&mut app, json!({"undo": true})).unwrap();
     assert!(facts(&app)["error"].is_null(), "Undo of the stroke clears it");
-    ui(&mut app, json!({"commit": true})).unwrap();
+    assert!(ui(&mut app, json!({"commit": true})).is_err(), "the engine refuses the locked layer again");
     assert!(facts(&app)["error"].is_string());
     ui(&mut app, json!({"redo": true})).unwrap();
     assert!(facts(&app)["error"].is_null(), "Redo of the stroke clears it too");
@@ -260,7 +261,7 @@ fn settings_are_remembered_and_the_menu_opens_the_workspace() {
     assert!(app.dialog_open());
     ui(
         &mut app,
-        json!({"opacity": 30, "color": [200, 40, 40], "excluded": true, "colorAdaptation": "high", "rotationAdaptation": "low", "mirror": true, "output": "duplicate"}),
+        json!({"opacity": 30, "color": [200, 40, 40], "excluded": true, "colorAdaptation": "high", "rotation": "low", "mirror": true, "output": "duplicate"}),
     )
     .unwrap();
     // Bad values are errors.
@@ -435,7 +436,9 @@ fn keys_wait_while_the_overlay_colour_picker_is_open() {
         app,
     );
     h.run_steps(4);
-    // PLAN: assumed the overlay swatch is named "Color" (fw fill/panel.rs words)
+    // The Sampling Area Overlay section starts closed; its swatch is named "Color".
+    h.get_by_label("Sampling Area Overlay").click();
+    h.run_steps(4);
     h.get_by_label("Color").click();
     h.run_steps(4);
     assert!(crate::color_picker_ui::top(h.state()).is_some(), "the swatch opened the colour picker over the workspace");

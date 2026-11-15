@@ -140,8 +140,11 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut VectorTools, _response:
     // The destination is the one in effect when the trace began: this pass, as the trace's press ran in it.
     if state.freeform.owner.is_none() && (state.freeform.draft.is_open() || state.freeform.closed.is_some()) {
         state.freeform.owner = capture_pen_owner(app);
+        state.freeform.target = VectorOwner::capture(app);
     }
-    if let Some((points, straight, owner)) = state.freeform.take_finished() {
+    if let Some((points, straight, owner, target)) = state.freeform.take_finished()
+        && target.is_none_or(|t| t.valid(app))
+    {
         pen::freeform_finish_owned(app, &points, &straight, owner);
     }
     // PLAN: assumed `PathSelectionTool::owned_by(&mut self, owner: Option<VectorOwner>)` (tools-w35, R94).

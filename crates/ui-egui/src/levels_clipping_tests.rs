@@ -300,8 +300,10 @@ fn main_view(app: &mut PhotocraftApp) -> crate::state::View {
 
 /// The shapes of one 160×80 canvas frame of document 0 in `view`.
 fn canvas_frame(ctx: &egui::Context, app: &mut PhotocraftApp, view: &crate::state::View, primary: bool) -> Vec<egui::epaint::ClippedShape> {
+    // An extra document window is its own canvas (a window id in its host), so the framework keeps its paint apart from the main one's.
+    let host = CanvasHost { window: (!primary).then_some(1), ..CanvasHost::main(0) };
     let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-        crate::canvas::canvas_view(app, ui, CanvasHost::main(0), egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 80.0)), view.clone(), primary);
+        crate::canvas::canvas_view(app, ui, host, egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 80.0)), view.clone(), primary);
     });
     out.textures_delta.clear();
     out.shapes
@@ -470,7 +472,7 @@ fn smart_filter_levels_show_no_display() {
     assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some(), "a plain Levels dialog shows it");
     let layer = app.session.active().and_then(|s| s.active_layer).unwrap();
     app.framework.dialogs.cancel_by_id(&ctx, id);
-    let smart = crate::adjust_dialog::open_smart_filter(&mut app, "image.adjustments.levels", &json!({"inBlack": 100}), json!({"layer": layer.0}))
+    let smart = crate::adjust_dialog::open_smart_filter(&mut app, "image.adjustments.levels", &json!({"inBlack": 100}), json!({"layer": layer.0, "index": 0}))
         .expect("the Smart Filter's dialog opens");
     hosted(&mut app, smart).set_clipping(Some(LevelsClip::Shadows));
     assert!(request(&app, 0).is_none());

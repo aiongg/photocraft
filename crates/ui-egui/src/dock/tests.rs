@@ -91,7 +91,7 @@ fn reset_workspace_restores_the_default_layout_and_new_workspaces_keep_theirs() 
 fn an_unreadable_docking_layout_is_dropped_and_the_rest_applies() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut saved = snapshot(&app);
-    saved["docking"] = json!({"root": "not-a-dock-node"});
+    saved["docking"] = json!({"layout": "not-a-dock-layout"});
     saved["panels"]["status_bar"] = json!(false);
     app.run("window.panel.close", json!({"panel": "layers"})).unwrap();
     let default = registry::default_workspace();

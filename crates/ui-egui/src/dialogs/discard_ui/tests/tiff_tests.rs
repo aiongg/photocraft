@@ -94,7 +94,8 @@ fn cancelling_failing_or_copying_a_tiff_keeps_the_original_unsaved() {
             _ => {}
         }
         h.key_press(if outcome == "cancel" { Key::Escape } else { Key::Enter });
-        h.run_steps(3);
+        // The options dialog closes, the question opens again, is drawn, then shows in the access tree.
+        h.run_steps(6);
         if outcome == "cancel" {
             capture(&mut h, "03-cancelled");
         }

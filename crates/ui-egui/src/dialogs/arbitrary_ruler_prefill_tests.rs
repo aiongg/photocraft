@@ -2,7 +2,7 @@
 //! precision the reference application shows. A ruler from 100,100 to 400,300 opens the Rotate
 //! Canvas dialog at 33.69°, Counter clockwise; the angle keeps hundredths.
 
-use craft::ui::dialog::{DialogId, DialogResult};
+use craft::ui::dialog::{DialogId, HeldOk};
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -29,14 +29,13 @@ fn shown(app: &PhotocraftApp, id: DialogId) -> (f64, String) {
     (f.number("angle").expect("angle"), f.text("direction").expect("direction").to_string())
 }
 
-/// OK answered with no pass in between: the angle the command receives.
+/// OK answered with no pass in between: the angle the dialog files for the command. The dialog holds its OK
+/// for the app to answer, so the filed answer is read from its values.
 fn confirmed_angle(app: &mut PhotocraftApp, id: DialogId) -> Option<f64> {
     let ctx = app.ctx().clone();
-    assert!(app.framework.dialogs.confirm_by_id(&ctx, id), "OK files its answer");
-    match app.framework.dialogs.take_by_id::<HostedParamDialog>(id) {
-        Some(DialogResult::Ok(result)) => result.fields.number("angle"),
-        _ => panic!("OK gave no result"),
-    }
+    app.framework.dialogs.confirm_by_id(&ctx, id);
+    assert_eq!(app.framework.dialogs.held_state(id), Some(HeldOk::Waiting), "OK files its answer");
+    app.framework.dialogs.get_by_id::<HostedParamDialog>(id).expect("the dialog stays open until the app answers").fields().number("angle")
 }
 
 /// A ruler falling to the right straightens counter-clockwise at the measured two decimals; a

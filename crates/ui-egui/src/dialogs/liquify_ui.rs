@@ -12,13 +12,13 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use craft::behavior::PixelSize;
 use craft::behavior::kurbo::Point;
 use craft::imaging::ui::liquify::{
-    LiquifyBrush, LiquifyDone, LiquifyEvent, LiquifyGlobal, LiquifyMesh, LiquifyOpen, LiquifySource, LiquifyStep, LiquifyStroke as StepStroke,
+    BackdropUse, LiquifyBrush, LiquifyDone, LiquifyEvent, LiquifyGlobal, LiquifyMesh, LiquifyOpen, LiquifySettings, LiquifySource, LiquifyStep, LiquifyStroke as StepStroke,
     LiquifyTool as StepTool, LiquifyWorkspace, MeshSize, StrokeEvent,
 };
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::dialog::{DialogId, HostedWorkspace};
 use craft::ui::primitives::Revision;
-use craft::ui::runtime::memory::SaveKey;
+use craft::ui::runtime::memory::{SaveKey, saved_value, set_saved_value};
 use egui::{Color32, ColorImage};
 use photocraft_algo::liquify::{LiquifyField, LiquifyStroke, LiquifyTool, ProxyImage, auto_cell};
 use photocraft_doc::{DocId, Document, LayerId};
@@ -771,6 +771,15 @@ fn open_on(
     };
     // Show Backdrop › Use: All Layers or one layer, bottom to top as Photoshop lists them.
     let layers: Vec<(u64, String)> = st.doc.walk().into_iter().map(|(_, _, l)| (l.id.0, l.name.clone())).collect();
+    // A remembered Use that names a layer this document lacks (another document's) opens on All Layers.
+    let ctx = app.ctx().clone();
+    if let Some(mut stored) = saved_value::<Option<LiquifySettings>>(&ctx, &REMEMBERED)
+        && let BackdropUse::Layer(id) = stored.backdrop
+        && !layers.iter().any(|(layer, _)| *layer == id)
+    {
+        stored.backdrop = BackdropUse::AllLayers;
+        set_saved_value(&ctx, &REMEMBERED, Some(stored));
+    }
     let document = st.doc.id;
     let steps: Vec<LiquifyStep> = strokes.iter().filter_map(step_of).collect();
     let size = [canvas.width(), canvas.height()];
@@ -923,7 +932,8 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
         "strokes": strokes,
         "redo": redo,
         "meshSize": e.cell,
-        "preview": e.preview,
+        // The workspace's own checkbox: the engine's follows at the next pass.
+        "preview": app.framework.dialogs.get_by_id::<Hosted>(l.id).map_or(e.preview, |h| h.workspace().preview()),
         "maxDisplacement": e.field.max_displacement(),
         "proxy": [e.proxy.w, e.proxy.h],
         "smartFilter": l.smart_filter,

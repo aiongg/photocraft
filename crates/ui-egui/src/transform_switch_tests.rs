@@ -37,7 +37,8 @@ fn transform_and_move(h: &mut Harness<'static, PhotocraftApp>) {
 /// Clicks the toolbar's Eyedropper Tool: a tool that stays in view at 900 pt, where the tool
 /// column scrolls and its last tools (Hand, Zoom) lie past its end.
 fn pick_another_tool(h: &Harness<'static, PhotocraftApp>) {
-    h.query_by_label_contains("Eyedropper Tool").expect("the toolbar's Eyedropper Tool").click();
+    // The framework names a toolbar button on its node and on its child: the first node is the button itself.
+    h.get_all_by_label_contains("Eyedropper Tool").next().expect("the toolbar's Eyedropper Tool").click();
 }
 
 fn red_bounds(h: &Harness<'static, PhotocraftApp>) -> photocraft_geom::Rect {

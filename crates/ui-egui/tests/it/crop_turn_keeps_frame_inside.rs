@@ -25,11 +25,12 @@ const H: f64 = 500.0;
 const CANVAS: [f64; 4] = [0.0, 0.0, W, H];
 
 /// An 800 × 500 white document, the Crop tool in the default mode with Auto Center Preview off,
-/// and `frame_rect` as the pending crop frame: the default frame when it is the whole canvas, else
+/// and `frame_rect` as the pending crop frame (the window is wide enough that the canvas, beside the docks, shows 500 px
+/// right of the frame's centre, where `turn` presses): the default frame when it is the whole canvas, else
 /// drawn from its bottom-right corner to its top-left one (a press on the default frame's corner
 /// handle would resize it).
 fn app(frame_rect: [f64; 4]) -> Harness {
-    let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(|cc| {
+    let mut h = Harness::builder().with_size(egui::vec2(1800.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
