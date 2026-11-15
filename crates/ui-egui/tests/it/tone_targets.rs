@@ -1307,7 +1307,7 @@ fn record_again_uses_recorded_alpha_settings_and_matches_its_preview() {
             let original = app.session.active().unwrap().doc.clone();
             let mut h = harness(app);
             h.run_steps(3);
-            let reply = control(&mut h, "ui.menu.invoke", json!({"id": "actions.recordAgain"}));
+            let reply = control(&mut h, "ui.menu.invoke", json!({"id": craft::ui::runtime::commands::CommandRef::from(craft::automation::ui::actions::ActionsPanelCommands::RecordAgain).id}));
             assert_eq!(reply["ok"], true, "{reply}");
             assert_eq!(names(&h), ["Saved sky"], "{mode:?} {kind}");
             let values = params(&h);
