@@ -185,6 +185,10 @@ pub fn canvas_view(
 ) -> (View, craft::ui::canvas::CanvasOutput) {
     let ctx = ui.ctx().clone();
     let idx = host.idx;
+    // The primary canvas keeps its view in `app.ui.views`: the pass starts from the stored view and stores the one it
+    // ends with, unless something stored another view while the pass ran (a tool's commit asking for a fit), which then
+    // stands.
+    let stored = primary.then(|| app.ui.views.get(idx).cloned()).flatten();
     // `View::zoom` is device pixels per document pixel; this canvas's geometry is in its own viewport's egui points. A
     // document window can sit on another display with a different scale, so only the primary canvas records `app.ppp`
     // for the frame's shared helpers (`point_zoom`, the navigator, control-channel coordinate mapping).
@@ -222,6 +226,11 @@ pub fn canvas_view(
     // A press on the canvas while a tool letter is held makes that tool temporary (#2672).
     if active && !app.dialog_open() && matches!(shown.output.press.phase, PressPhase::Down { .. }) {
         crate::spring_tools::note_canvas_press(app);
+    }
+    if let Some(stored) = stored
+        && app.ui.views.get(idx) == Some(&stored)
+    {
+        app.ui.views[idx] = view.clone();
     }
     (view, shown.output)
 }

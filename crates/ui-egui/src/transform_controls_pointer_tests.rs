@@ -539,7 +539,7 @@ fn other_samplers_releases_end_an_existing_transform_handle_drag() {
         let dialog = match sampler {
             "curves" => {
                 let id = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").expect("the Curves dialog opens");
-                app.framework.dialogs.set_json_field(&ctx, id, "__curvePicker", json!("black")).unwrap();
+                crate::adjust_dialog::hosted_mut(&mut app, id).set_picker(Some(craft::imaging::ui::adjust::TonePicker::Black));
                 assert!(crate::dialogs::canvas_input::armed(&app).is_some(), "{sampler}");
                 id
             }
