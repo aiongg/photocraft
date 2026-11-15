@@ -1,6 +1,7 @@
 use super::*;
-use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
 use crate::{Services, menus};
+use craft::host::{Picked, ScriptedFiles};
+use std::sync::Arc;
 use craft::ui::runtime::drag::OsFile;
 use photocraft_color::{ColorMode, SampleType};
 use photocraft_doc::Document;
@@ -14,8 +15,9 @@ type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
 
 /// An app whose importer names the document after the file (like `photocraft-io`) and reports a
 /// warning for names containing "warn", and fails for bytes "bad"; the exporter warns for ".png"
-/// and the writer records what it wrote. Its file dialogs answer with `answers`, in order.
-fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) {
+/// and the writer records what it wrote. Its file picks answer with `answers`, in order; a pick past the
+/// last answer is cancelled.
+fn app_with(answers: Vec<Picked>) -> (PhotocraftApp, Written) {
     let written: Written = Rc::default();
     let w = written.clone();
     let services = Services {
@@ -30,8 +32,7 @@ fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) 
             let warnings = if path.ends_with(".png") { vec!["Layers were flattened".to_string()] } else { Vec::new() };
             Ok((b"out".to_vec(), warnings))
         })),
-        // PLAN: assumed top-w28's test `Files` fake: `crate::files::fake(answers) -> (Box<dyn Files>, Rc<RefCell<Vec<FileDialogRequest>>>)` and `Services::files`
-        files: Some(crate::files::fake(answers).0),
+        files: Some(Arc::new(ScriptedFiles::answering(answers))),
         write: Some(Box::new(move |p: &str, b: &[u8]| {
             w.borrow_mut().push((p.to_string(), b.to_vec()));
             Ok(())
@@ -44,6 +45,11 @@ fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) 
 /// The end of a frame: the dialog asked for is shown, and its answer acted on.
 fn answer(app: &mut PhotocraftApp) {
     app.poll_file_dialog();
+}
+
+/// The pick answered with the files at `paths`.
+fn chosen(paths: &[String]) -> Picked {
+    Picked::Paths(paths.iter().map(std::path::PathBuf::from).collect())
 }
 
 /// Files named `names` (holding `bytes`) in a fresh directory for `tag`: (directory, paths).
@@ -86,7 +92,7 @@ fn open_file_sets_name_path_and_recent() {
 fn affinity_preview_does_not_acquire_the_source_path_even_when_renamed() {
     for automation in [false, true] {
         for path in ["/pics/source.af", "/pics/renamed.psd"] {
-            let (mut app, written) = app_with(vec![None]);
+            let (mut app, written) = app_with(vec![Picked::Cancelled]);
             // The fake importer supplies the preview; its source signature controls path policy.
             if automation {
                 app.open_automation_bytes(&display_name(path), b"\x00\xffKA").unwrap();
@@ -110,7 +116,7 @@ fn affinity_preview_does_not_acquire_the_source_path_even_when_renamed() {
 fn file_open_dialog_sets_path_so_save_writes_in_place() {
     // The dialog returns a full path: the document is named after the file, not the path.
     let (dir, paths) = files("in-place", &["cat.psd"], b"x");
-    let (mut app, written) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, written) = app_with(vec![chosen(&paths)]);
     let ctx = app.ctx().clone();
     assert_eq!(menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap(), json!({"fileDialog": "open"}));
     answer(&mut app);
@@ -129,7 +135,7 @@ fn file_open_dialog_sets_path_so_save_writes_in_place() {
 #[test]
 fn file_open_dialog_opens_every_selected_path() {
     let (dir, paths) = files("issue-595", &["one.psd", "two.png"], b"x");
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, _) = app_with(vec![chosen(&paths)]);
 
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
@@ -145,7 +151,7 @@ fn file_open_dialog_opens_every_selected_path() {
 
 #[test]
 fn cancelling_file_open_opens_nothing() {
-    let (mut app, _) = app_with(vec![None]);
+    let (mut app, _) = app_with(vec![Picked::Cancelled]);
 
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
@@ -157,7 +163,7 @@ fn cancelling_file_open_opens_nothing() {
 
 #[test]
 fn the_web_hands_over_contents_rather_than_paths() {
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Contents("cat.png".into(), b"x".to_vec()))]);
+    let (mut app, _) = app_with(vec![Picked::Contents(vec![("cat.png".into(), b"x".to_vec())])]);
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
     let st = app.session.active().unwrap();
@@ -167,7 +173,7 @@ fn the_web_hands_over_contents_rather_than_paths() {
 #[test]
 fn the_web_opens_every_selected_file() {
     let files = vec![("one.png".into(), b"x".to_vec()), ("broken.png".into(), b"bad".to_vec()), ("two.jpg".into(), b"x".to_vec())];
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::ContentsMany(files))]);
+    let (mut app, _) = app_with(vec![Picked::Contents(files)]);
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();
     answer(&mut app);
     // Each good file is its own tab; the broken one is reported without stopping the rest.
@@ -208,7 +214,7 @@ fn web_drops_onto_the_canvas_are_placed_from_their_bytes() {
 
 #[test]
 fn pcraft_documents_save_in_place_but_flat_files_ask() {
-    let (mut app, written) = app_with(vec![None]);
+    let (mut app, written) = app_with(vec![Picked::Cancelled]);
     let ctx = egui::Context::default();
     app.open_file("/pics/work.pcraft", b"x").unwrap();
     let r = menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
@@ -227,7 +233,7 @@ fn pcraft_documents_save_in_place_but_flat_files_ask() {
 /// transparency a JPEG can't keep) Save goes through Save As.
 #[test]
 fn a_flat_file_that_keeps_the_document_saves_in_place() {
-    let (mut app, written) = app_with(vec![None, None]);
+    let (mut app, written) = app_with(vec![Picked::Cancelled; 2]);
     let ctx = egui::Context::default();
     app.open_file("/pics/flat.png", b"x").unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -252,7 +258,7 @@ fn a_flat_file_that_keeps_the_document_saves_in_place() {
 /// quantises (GIF), nor a Grayscale document into a format that stores only colour.
 #[test]
 fn save_in_place_skips_files_it_would_write_back_with_less() {
-    let (mut app, written) = app_with(vec![None, None, None]);
+    let (mut app, written) = app_with(vec![Picked::Cancelled; 3]);
     app.services.import = Some(Box::new(|name: &str, bytes: &[u8], _opts: &photocraft_io::ImportOptions| {
         photocraft_io::import(name, bytes).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
     }));
@@ -284,7 +290,7 @@ fn save_in_place_skips_files_it_would_write_back_with_less() {
 /// a gray layer's transparency in DPX, an embedded colour profile in BMP, or a clipped layer.
 #[test]
 fn save_in_place_skips_alpha_profiles_and_layer_state_the_file_would_drop() {
-    let (mut app, written) = app_with(vec![None, None, None]);
+    let (mut app, written) = app_with(vec![Picked::Cancelled; 3]);
     let ctx = egui::Context::default();
     let edit = |app: &mut PhotocraftApp, f: &dyn Fn(&mut Document)| f(std::sync::Arc::make_mut(&mut app.session.active_mut().unwrap().doc));
     // An RGB layer with transparency: DPX keeps its alpha, so it is written back.
@@ -351,12 +357,12 @@ fn templates_open_as_new_untitled_documents() {
     assert!(app.session.documents().iter().all(|d| d.path.is_none()));
     assert_eq!(app.ui.recent_files.first().map(String::as_str), Some("/pics/card.psdt"));
     // File › Save asks for a new name (cancelled here) rather than suggesting the template.
-    // PLAN: assumed top-w28's test `Files` fake, as in `app_with`
-    let (show, asked) = crate::files::fake(vec![None]);
-    app.services.files = Some(show);
+    let files = Arc::new(ScriptedFiles::answering([Picked::Cancelled]));
+    app.services.files = Some(files.clone());
     menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     answer(&mut app);
-    assert_eq!(*asked.borrow(), [FileDialogRequest::Save { suggested: "Untitled-2.psd".into() }]);
+    let asked: Vec<_> = files.requests().into_iter().map(|r| r.file_name).collect();
+    assert_eq!(asked, [Some("Untitled-2.psd".to_string())]);
     assert!(written.borrow().is_empty());
 }
 
@@ -397,7 +403,7 @@ fn export_warnings_reach_status_notice_and_control_response() {
 #[test]
 fn open_failures_are_errors_and_leave_no_document() {
     let (dir, paths) = files("broken", &["broken.psd"], b"bad");
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths))]);
+    let (mut app, _) = app_with(vec![chosen(&paths)]);
     let ctx = egui::Context::default();
     menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap();
     answer(&mut app);
@@ -412,8 +418,8 @@ fn open_failures_are_errors_and_leave_no_document() {
 #[test]
 fn a_picked_file_that_cannot_be_read_is_reported_like_any_open_failure() {
     let missing = std::env::temp_dir().join("photocraft-missing-dir").join("big.psb").to_string_lossy().into_owned();
-    let picked = || Some(FileDialogAnswer::Paths(vec![missing.clone()]));
-    let (mut app, _) = app_with(vec![picked(), picked(), None]);
+    let picked = || chosen(&[missing.clone()]);
+    let (mut app, _) = app_with(vec![picked(), picked(), Picked::Cancelled]);
     app.open_dialog_file().unwrap();
     answer(&mut app);
     assert!(app.session.documents().is_empty());
@@ -1252,10 +1258,11 @@ fn a_transformed_place_is_one_history_step() {
     let (layers, steps) = (layer_count(&app), history_steps(&app));
     app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
-    // PLAN: assumed tools-w27: the open session is `app.ui.transform.session` with `box_state()` and `apply(edit, now)`
     let t = app.ui.transform.as_mut().expect("in Free Transform");
-    let moved = t.session.box_state().moved(craft::behavior::kurbo::Vec2::new(-1.0, -1.0));
-    t.session.apply(craft::draw::ui::transform::TransformEdit::Box(craft::behavior::EditEvent::set(moved)), 0.0);
+    let before = t.session.state().clone();
+    let moved = before.moved(craft::behavior::kurbo::Vec2::new(-1.0, -1.0));
+    let event = craft::behavior::EditEvent::set(craft::behavior::Mixed::Same(before), moved, "Move".into(), None);
+    t.session.apply(craft::draw::ui::transform::TransformEdit::Box(event), 0.0);
     crate::transform_tool::commit(&mut app);
     assert_eq!((layer_count(&app), history_steps(&app)), (layers + 1, steps + 1));
     assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Place Embedded"));
@@ -1533,7 +1540,7 @@ fn a_set_of_background_opens_keeps_its_order_however_they_finish() {
 /// the document keeps its own file and unsaved changes.
 #[test]
 fn save_a_copy_is_recorded_and_replayed_as_a_copy() {
-    let (mut app, written) = app_with(vec![Some(FileDialogAnswer::SaveTo("/pics/copy.png".into()))]);
+    let (mut app, written) = app_with(vec![chosen(&["/pics/copy.png".into()])]);
     let ctx = egui::Context::default();
     app.open_file("/pics/work.pcraft", b"x").unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
@@ -1568,8 +1575,7 @@ fn export_as_is_recorded_and_replayed() {
             e.borrow_mut().push((path.to_string(), doc.size.width, doc.size.height, s.jpeg_quality));
             Ok((b"out".to_vec(), Vec::new()))
         })),
-        // PLAN: assumed top-w28's test `Files` fake, as in `app_with`
-        files: Some(crate::files::fake(vec![Some(FileDialogAnswer::SaveTo("/pics/out.jpg".into()))]).0),
+        files: Some(Arc::new(ScriptedFiles::answering([chosen(&["/pics/out.jpg".into()])]))),
         write: Some(Box::new(|_: &str, _: &[u8]| Ok(()))),
         ..Default::default()
     };
@@ -1604,7 +1610,7 @@ fn export_as_is_recorded_and_replayed() {
 /// as opening it is; a Save a Copy isn't, since the document doesn't live there.
 #[test]
 fn saving_a_new_document_lists_it_in_recent_files() {
-    let (mut app, _written) = app_with(vec![Some(FileDialogAnswer::SaveTo("/pics/new.psd".into())), Some(FileDialogAnswer::SaveTo("/pics/copy.png".into()))]);
+    let (mut app, _written) = app_with(vec![chosen(&["/pics/new.psd".into()]), chosen(&["/pics/copy.png".into()])]);
     let ctx = egui::Context::default();
     app.run("file.new", json!({"width": 4, "height": 4})).unwrap();
     assert!(app.ui.recent_files.is_empty());
@@ -1914,7 +1920,7 @@ fn queued_drop_waits_for_an_external_document_job() {
 fn open_as_smart_object_dialog_opens_one_document_per_selected_file() {
     let (dir, paths) = files("open-as-so", &["one.png", "two.png", "bad.png"], &png_bytes(8, 6));
     std::fs::write(&paths[2], b"not an image").unwrap();
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, _) = app_with(vec![chosen(&paths)]);
 
     menus::invoke(&mut app, &egui::Context::default(), "file.openAsSmartObject", json!({})).unwrap();
     assert!(app.file_dialog_open(), "the menu item asks for files first");
@@ -1933,7 +1939,7 @@ fn open_as_smart_object_opens_in_the_background_in_name_order() {
     let ctx = egui::Context::default();
     let (dir, paths) = files("open-as-so-bg", &["two.png", "one.png", "bad.png"], &png_bytes(8, 6));
     std::fs::write(&paths[2], b"not an image").unwrap();
-    let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
+    let (mut app, _) = app_with(vec![chosen(&paths)]);
     app.background_jobs = true;
 
     menus::invoke(&mut app, &ctx, "file.openAsSmartObject", json!({})).unwrap();
