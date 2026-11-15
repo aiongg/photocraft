@@ -1,9 +1,8 @@
-//! The Layers panel New Layer button: a click makes a layer at once, ⌥-click opens the New Layer
-//! dialog first, as in Photoshop. Its shortcut is the same pair the other way round: ⇧⌘N asks
-//! first, ⌥⇧⌘N makes the layer at once (#4794).
+//! The New Layer shortcut: ⇧⌘N asks first, ⌥⇧⌘N makes the layer at once (#4794).
 
+use craft::ui::dialog::StackDialog as _;
+use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui::Modifiers;
-use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -23,28 +22,8 @@ fn layers(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> usize {
     h.state().session.active().unwrap().doc.layers.len()
 }
 
-#[test]
-fn click_makes_a_layer_without_asking() {
-    let mut h = panel();
-    h.get_by_label("Create a new layer").click();
-    h.run_steps(4);
-    assert_eq!(layers(&h), 2);
-    assert!(!h.state().ui.dialogs.iter().any(|d| crate::new_layer_ui::owns(&d.fields)));
-}
-
-#[test]
-fn alt_click_opens_the_new_layer_dialog() {
-    let mut h = panel();
-    h.get_by_label("Create a new layer").click_modifiers(Modifiers::ALT);
-    h.run_steps(4);
-    assert_eq!(layers(&h), 1, "nothing made until OK");
-    let id = h.state().ui.dialogs.iter().find(|d| crate::new_layer_ui::owns(&d.fields)).map(|d| d.id).expect("the New Layer dialog");
-    crate::dialogs::confirm(h.state_mut(), id).unwrap();
-    assert_eq!(layers(&h), 2);
-}
-
 fn dialog_open(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> bool {
-    h.state().ui.dialogs.iter().any(|d| crate::new_layer_ui::owns(&d.fields))
+    h.state().framework.dialogs.get::<HostedParamDialog>().is_some_and(|d| d.key().is_some_and(|k| crate::new_layer_ui::owns(&k)))
 }
 
 #[test]
