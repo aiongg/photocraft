@@ -85,13 +85,15 @@ pub(super) fn preview_style(app: &PhotocraftApp) -> Option<LayerStyle> {
 /// Once per pass: while the picker is open nothing is written (the preview reads it); when it is
 /// gone, OK sets the draft's colour and Cancel leaves it.
 pub(super) fn answered(app: &mut PhotocraftApp, parent: DialogId) {
-    let Some(Child::Picker { id, .. }) = child_of(app, parent) else { return };
-    let id = *id;
+    let Some(Child::Picker { id, opening, .. }) = child_of(app, parent) else { return };
+    let (id, opening) = (*id, *opening);
     if app.framework.dialogs.get_by_id::<ColorPickerDialog>(id).is_some() {
         return;
     }
     take_child(app, parent);
+    // An OK with the colour it opened with writes nothing: a parameter the effect lacks stays missing.
     if let Some(DialogResult::Ok(ColorPickerResult { key, picked, .. })) = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id)
+        && picked.color != opening
         && let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedLayerStyle>(parent)
     {
         dialog.set_color(&key, picked.color);

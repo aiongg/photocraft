@@ -299,10 +299,14 @@ fn curves_picker_samples_document_coordinates_through_the_view_transform() {
     let view = &mut h.state_mut().ui.views[0];
     (view.zoom, view.center, view.fit_pending) = (4.0, [200.0, 150.0], false);
     h.state_mut().ui.view.flip_horizontal = true;
-    // PLAN: `adjust_dialog::open` returns `Result<DialogId, String>` (dialogs-w19 table) or `Option<DialogId>` (note 9); `unwrap` serves both
     let dialog = crate::adjust_dialog::open(h.state_mut(), "image.adjustments.curves").unwrap();
-    let ctx = h.ctx.clone();
-    h.state_mut().framework.dialogs.set_json_field(&ctx, dialog, "__curvePicker", json!("black")).unwrap();
+    // Arms the black-point eyedropper, as its button in the dialog does.
+    h.state_mut()
+        .framework
+        .dialogs
+        .get_mut_by_id::<crate::adjust_dialog::HostedAdjustDialog>(dialog)
+        .expect("the Curves dialog is open")
+        .set_picker(Some(craft::imaging::ui::adjust::TonePicker::Black));
     h.run_steps(3);
     let canvas = h.state().last_canvas_rect;
     let left = pos2(canvas.left() + 60.0, canvas.center().y);

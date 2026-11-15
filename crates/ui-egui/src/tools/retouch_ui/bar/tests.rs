@@ -56,9 +56,9 @@ fn a_live_transform_box_disables_the_content_aware_move_cells() {
 
     let mut h = bar(app);
     for (role, label) in [
-        (Role::ComboBox, "Mode:"),
-        (Role::SpinButton, "Structure:"),
-        (Role::SpinButton, "Color:"),
+        (Role::ComboBox, "Mode"),
+        (Role::SpinButton, "Structure"),
+        (Role::SpinButton, "Color"),
         (Role::CheckBox, "Sample All Layers"),
         (Role::CheckBox, "Transform On Drop"),
     ] {

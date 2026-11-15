@@ -102,7 +102,7 @@ fn a_color_row_opens_the_color_picker_as_a_child_and_its_ok_answers_the_row() {
     h.run_steps(4);
 
     // The row's colour button asks for a colour: the picker opens over the dialog.
-    h.get_by_label("Tint").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ColorWell, "Tint").click();
     h.run_steps(4);
     let picker = h.state().framework.dialogs.stack().top().expect("a dialog is open");
     assert_ne!(picker, parent, "the Color Picker is a dialog of its own");
@@ -213,7 +213,9 @@ fn command_z_steps_a_parameter_dialog_not_the_document() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 120, "height": 80})).unwrap();
     let steps = app.session.active().unwrap().history.past_len();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| run(app, ui), app);
+    // The whole app: its frame hook hands the keys to the framework, which steps the dialog's own history.
+    let ctx = app.ctx().clone();
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).with_context(ctx).with_max_steps(64).build_eframe(move |_cc| app);
     let id = open_command_dialog(h.state_mut(), "filter.lensCorrection", "Lens Correction").unwrap();
     h.run_steps(4);
     let ctx = h.ctx.clone();

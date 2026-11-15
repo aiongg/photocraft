@@ -137,6 +137,8 @@ fn window_panel_ids_drive_the_workspace() {
     assert_eq!(app.ui.docking.layout, before, "the panel is back where it was");
 
     invoke(&mut app, "window.panel.float", json!({"panel": "paths"})).unwrap();
+    // History is closed in the default workspace: a closed panel is not in the layout, so it opens first.
+    invoke(&mut app, "window.panel.history", json!({"show": true})).unwrap();
     invoke(&mut app, "window.panel.move", json!({"panel": "history", "anchor": "paths"})).unwrap();
     assert!(app.ui.docking.layout.floating.iter().any(|w| w.contains("paths") && w.contains("history")));
     invoke(&mut app, "window.panel.dock", json!({"panel": "paths", "group": true})).unwrap();

@@ -120,9 +120,9 @@ fn invalidated_targets_never_redirect() {
             4 => {
                 panel_docking::show_panel(&mut app, "characterStyles", Some(false)).unwrap();
             }
-            _ => {
-                panel_docking::show_panel(&mut app, "paragraphStyles", Some(true)).unwrap();
-            }
+            // Another style open in Style Options: each styles panel is its own window, so showing the other one
+            // leaves this one in front.
+            _ => app.ui.type_panels.options = Some((false, id + 1)),
         }
         let doc = app.session.active().unwrap().doc.clone();
         check(&mut app, &ctx);

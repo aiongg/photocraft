@@ -129,6 +129,8 @@ fn new_set_names_the_first_free_set_and_new_action_records_into_it() {
     app.run("actions.newSet", json!({"name": "Set 1"})).unwrap();
     fire(&mut app, C::NewSet);
     let id = top_dialog(&app);
+    // The dialog seeds its fields with its first drawn pass.
+    crate::smart_filter_dialog::tests::pass(&mut app);
     assert_eq!(app.framework.dialogs.get_by_id::<HostedParamDialog>(id).and_then(|d| d.fields().text("name").map(str::to_owned)).as_deref(), Some("Set 2"));
     set(&mut app, id, "name", json!("Web"));
     ok(&mut app, id);
