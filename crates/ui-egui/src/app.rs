@@ -18,7 +18,7 @@ pub(crate) mod framework;
 mod gpu;
 mod prefs;
 mod targets;
-mod thumbs;
+pub(crate) mod thumbs;
 mod view;
 
 pub(crate) use targets::adjustment_layer_active;

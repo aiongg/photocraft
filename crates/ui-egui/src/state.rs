@@ -426,6 +426,9 @@ pub struct UiState {
     /// stood when it was clicked (`history::selected_snapshot`).
     #[serde(skip)]
     pub history_snapshot: Option<(DocId, u64, crate::panels::history::HistorySpot)>,
+    /// The History row to scroll into view on the next pass (`history::reveal`).
+    #[serde(skip)]
+    pub history_reveal: Option<craft::ui::patterns::panels::HistoryKey>,
     /// The toolbar's Edit Toolbar drawer is open.
     #[serde(skip)]
     pub toolbar_drawer: bool,
@@ -555,6 +558,7 @@ impl Default for UiState {
             swatches: SwatchesState::default(),
             histogram: ScopePanelState::default(),
             history_snapshot: None,
+            history_reveal: None,
             toolbar_drawer: false,
             properties_linked: true,
             brush_section: 0,
