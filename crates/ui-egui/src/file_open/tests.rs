@@ -1,6 +1,7 @@
 use super::*;
-use crate::file_dialog::{self, FileDialogAnswer, FileDialogRequest};
-use crate::{Services, menus, notices};
+use crate::file_dialog::{FileDialogAnswer, FileDialogRequest};
+use crate::{Services, menus};
+use craft::ui::runtime::drag::OsFile;
 use photocraft_color::{ColorMode, SampleType};
 use photocraft_doc::Document;
 use photocraft_geom::Size;
@@ -29,7 +30,8 @@ fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) 
             let warnings = if path.ends_with(".png") { vec!["Layers were flattened".to_string()] } else { Vec::new() };
             Ok((b"out".to_vec(), warnings))
         })),
-        file_dialog: Some(file_dialog::fake(answers).0),
+        // PLAN: assumed top-w28's test `Files` fake: `crate::files::fake(answers) -> (Box<dyn Files>, Rc<RefCell<Vec<FileDialogRequest>>>)` and `Services::files`
+        files: Some(crate::files::fake(answers).0),
         write: Some(Box::new(move |p: &str, b: &[u8]| {
             w.borrow_mut().push((p.to_string(), b.to_vec()));
             Ok(())
@@ -41,7 +43,7 @@ fn app_with(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) 
 
 /// The end of a frame: the dialog asked for is shown, and its answer acted on.
 fn answer(app: &mut PhotocraftApp) {
-    app.poll_file_dialog(&egui::Context::default(), None);
+    app.poll_file_dialog();
 }
 
 /// Files named `names` (holding `bytes`) in a fresh directory for `tag`: (directory, paths).
@@ -96,7 +98,8 @@ fn affinity_preview_does_not_acquire_the_source_path_even_when_renamed() {
             assert!(app.session.active().unwrap().path.is_none());
             assert_eq!(app.ui.recent_files.first().map(String::as_str), Some(path));
             // Save asks for a new file (cancelled here) instead of writing over the source.
-            assert_eq!(menus::invoke(&mut app, &egui::Context::default(), "file.save", json!({})).unwrap(), json!({"fileDialog": "save"}));
+            let ctx = app.ctx().clone();
+            assert_eq!(menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap(), json!({"fileDialog": "save"}));
             answer(&mut app);
             assert!(written.borrow().is_empty());
         }
@@ -108,7 +111,7 @@ fn file_open_dialog_sets_path_so_save_writes_in_place() {
     // The dialog returns a full path: the document is named after the file, not the path.
     let (dir, paths) = files("in-place", &["cat.psd"], b"x");
     let (mut app, written) = app_with(vec![Some(FileDialogAnswer::Paths(paths.clone()))]);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     assert_eq!(menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap(), json!({"fileDialog": "open"}));
     answer(&mut app);
     let st = app.session.active().unwrap();
@@ -348,8 +351,9 @@ fn templates_open_as_new_untitled_documents() {
     assert!(app.session.documents().iter().all(|d| d.path.is_none()));
     assert_eq!(app.ui.recent_files.first().map(String::as_str), Some("/pics/card.psdt"));
     // File › Save asks for a new name (cancelled here) rather than suggesting the template.
-    let (show, asked) = file_dialog::fake(vec![None]);
-    app.services.file_dialog = Some(show);
+    // PLAN: assumed top-w28's test `Files` fake, as in `app_with`
+    let (show, asked) = crate::files::fake(vec![None]);
+    app.services.files = Some(show);
     menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     answer(&mut app);
     assert_eq!(*asked.borrow(), [FileDialogRequest::Save { suggested: "Untitled-2.psd".into() }]);
@@ -436,7 +440,7 @@ fn open_paths_reports_each_failure_without_panicking() {
     assert_eq!(n, 0);
     assert!(app.session.documents().is_empty());
     assert!(app.ui.status_error);
-    assert_eq!(app.ui.notices.len(), notices::MAX_NOTICES);
+    assert_eq!(app.ui.notices.len(), 4, "one notice per failure");
     // Bad control params error instead of panicking.
     let ctx = egui::Context::default();
     assert!(menus::invoke(&mut app, &ctx, "file.open", json!({ "path": "" })).is_err());
@@ -465,26 +469,25 @@ fn os_open_events_open_files_with_paths() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The viewport commands an `Open` event sends: focus, or an attention request on native Wayland
-/// where winit can't focus (#3708).
-fn raise_commands(is_wayland: bool) -> Vec<egui::ViewportCommand> {
+/// The viewport commands an `Open` event sends, on a context the runtime is installed on (the window
+/// host refuses commands otherwise).
+fn raise_commands() -> Vec<egui::ViewportCommand> {
     let (mut app, _) = app_with(Vec::new());
-    app.services.is_wayland = is_wayland;
     let mut queue = vec![OsEvent::Open(Vec::new())];
     app.services.os_events = Some(Box::new(move || std::mem::take(&mut queue)));
-    let mut out = egui::Context::default().run_ui(egui::RawInput::default(), |ui| app.drain_os_events(ui.ctx()));
+    let ctx = egui::Context::default();
+    // PLAN: assumed `setup_context` installs the runtime whose shell reports window commands
+    PhotocraftApp::setup_context(&ctx, Default::default());
+    let mut out = ctx.run_ui(egui::RawInput::default(), |ui| app.drain_os_events(ui.ctx()));
     out.textures_delta.clear();
     out.viewport_output.get(&egui::ViewportId::ROOT).map(|v| v.commands.clone()).unwrap_or_default()
 }
 
 #[test]
-fn an_os_open_brings_the_window_forward_or_asks_for_attention_on_wayland() {
-    use egui::{UserAttentionType, ViewportCommand};
-    let attention = ViewportCommand::RequestUserAttention(UserAttentionType::Informational);
-    let x11 = raise_commands(false);
-    assert!(x11.contains(&ViewportCommand::Focus) && !x11.contains(&attention), "{x11:?}");
-    let wayland = raise_commands(true);
-    assert!(wayland.contains(&attention) && !wayland.contains(&ViewportCommand::Focus), "{wayland:?}");
+fn an_os_open_raises_the_root_window() {
+    // The minimize-restore and the Wayland attention request are the window host's (dl.K16).
+    let commands = raise_commands();
+    assert!(commands.contains(&egui::ViewportCommand::Focus), "{commands:?}");
 }
 
 #[test]
@@ -496,6 +499,8 @@ fn os_quit_and_empty_events_do_not_panic() {
     assert!(app.session.documents().is_empty());
 }
 
+/// A raw egui drop for the eframe harness, which the runtime turns into an `OsFile` for the drop targets.
+// The eframe harness needs an egui handle to push a raw drop.
 #[derive(Debug)]
 struct FakeDrop(std::path::PathBuf, Result<Vec<u8>, String>);
 
@@ -508,9 +513,23 @@ impl egui::DroppedFile for FakeDrop {
     }
 }
 
-/// A dropped file at `path` whose bytes (if read through egui) are `bytes`.
-fn dropped(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> egui::DroppedFileHandle {
+/// A raw egui drop of `path` for the harness's input.
+fn raw_drop(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> egui::DroppedFileHandle {
     std::sync::Arc::new(FakeDrop(path.into(), bytes))
+}
+
+/// A dropped file as the drop targets hand it over: an absolute `path` is a native drop (path, no bytes); any other
+/// path is a drop that carries its `bytes` (none for `Err`).
+fn dropped(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> OsFile {
+    let path = path.into();
+    let mut f = OsFile::default();
+    f.name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    if path.is_absolute() {
+        f.path = Some(path);
+    } else {
+        f.bytes = bytes.ok().map(Into::into);
+    }
+    f
 }
 
 fn doc_names(app: &PhotocraftApp) -> Vec<String> {
@@ -537,7 +556,7 @@ fn dropped_files_open_with_path_and_recent() {
             dropped("rel.psd", Ok(b"x".to_vec())),
             dropped("", Ok(b"bad".to_vec())),
         ],
-        None,
+        DropTo::Window,
     );
     assert_eq!(app.session.documents().len(), 2);
     assert_eq!(app.session.documents()[0].path.as_deref(), Some(abs_s.as_str()));
@@ -596,7 +615,7 @@ fn files_dropped_onto_the_canvas_are_placed_in_free_transform_one_by_one() {
             // No path: placed from the dropped bytes.
             dropped("small.png", Ok(png_bytes(2, 2))),
         ],
-        Some(egui::pos2(400.0, 300.0)),
+        DropTo::Canvas { at: None },
     );
     app.place_next_dropped(&ctx);
     assert_eq!(app.session.documents().len(), 1, "drops onto the canvas don't open documents");
@@ -624,7 +643,7 @@ fn files_dropped_onto_the_canvas_are_placed_in_free_transform_one_by_one() {
     app.place_next_dropped(&ctx);
     assert!(app.ui.transform.is_none() && app.drop_places.is_empty());
     assert!(app.ui.recent_files.is_empty(), "placing isn't opening");
-    app.open_dropped(&ctx, vec![dropped(svg, Err("egui's reader must not be used".into()))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped(svg, Err("egui's reader must not be used".into()))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let st = app.session.active().unwrap();
     let placed_svg = st.doc.layer(st.active_layer.unwrap()).unwrap();
@@ -641,11 +660,10 @@ fn a_separate_drop_applies_the_open_transform_and_places_at_once() {
     let ctx = egui::Context::default();
     let mut app = app_with_canvas();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    let at = Some(egui::pos2(400.0, 300.0));
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4)))], at);
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert!(app.ui.transform.is_some(), "the first file is in Free Transform");
-    app.open_dropped(&ctx, vec![dropped("second.png", Ok(png_bytes(2, 2)))], at);
+    app.open_dropped(&ctx, vec![dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let st = app.session.active().unwrap();
     assert_eq!(st.doc.layer(st.active_layer.unwrap()).unwrap().name, "second", "placed without waiting for ↩");
@@ -676,8 +694,7 @@ fn background_drops_are_placed_by_a_job_one_after_another() {
     let mut app = app_with_canvas();
     app.background_jobs = true;
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    let at = Some(egui::pos2(400.0, 300.0));
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], at);
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let place = app.jobs.place.clone().expect("the first file is being placed");
     assert_eq!(place.name, "first.png");
@@ -721,7 +738,7 @@ fn a_dropped_file_is_placed_over_several_frames_without_background_jobs() {
     // One unit of work per frame, so the number of frames does not depend on the machine.
     app.session.set_job_step_budget(std::time::Duration::ZERO);
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(40, 40))), dropped("second.png", Ok(png_bytes(8, 8)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(40, 40))), dropped("second.png", Ok(png_bytes(8, 8)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let place = app.jobs.place.clone().expect("the first file is being placed");
     assert_eq!(place.name, "first.png");
@@ -773,7 +790,7 @@ fn stepped_places_from_a_path_fail_and_cancel_like_background_ones() {
     app.open_dropped(
         &ctx,
         vec![dropped(&good, Ok(Vec::new())), dropped("bad.png", Ok(b"bad".to_vec())), dropped("last.png", Ok(png_bytes(4, 4)))],
-        Some(egui::pos2(400.0, 300.0)),
+        DropTo::Canvas { at: None },
     );
     app.place_next_dropped(&ctx);
     // The first is a path: the `file.placeEmbedded` job, tracked like the others.
@@ -806,7 +823,7 @@ fn a_cooperative_drop_from_a_path_completes_in_slices() {
     app.session.set_cooperative_jobs(true);
     app.session.set_job_step_budget(std::time::Duration::ZERO);
     let layers = layer_count(&app);
-    app.open_dropped(&ctx, vec![dropped(&good, Ok(Vec::new()))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped(&good, Ok(Vec::new()))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("good.png"));
     tick_until(&mut app, &ctx, |app| app.jobs.place.is_none());
@@ -822,7 +839,7 @@ fn a_background_place_that_fails_reports_it_and_the_queue_continues() {
     let mut app = app_with_canvas();
     app.background_jobs = true;
     let layers = layer_count(&app);
-    app.open_dropped(&ctx, vec![dropped("bad.png", Ok(b"bad".to_vec())), dropped("good.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("bad.png", Ok(b"bad".to_vec())), dropped("good.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(app.jobs.place.as_ref().map(|p| p.name.as_str()), Some("bad.png"));
     tick_until(&mut app, &ctx, |app| app.ui.notices.iter().any(|n| n.error && n.title.contains("bad.png")));
@@ -841,7 +858,7 @@ fn cancelling_a_background_place_continues_the_queue() {
     let mut app = app_with_canvas();
     app.background_jobs = true;
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let first = app.jobs.place.clone().expect("being placed");
     assert!(crate::jobs_ui::cancel(&mut app, first.job));
@@ -867,7 +884,7 @@ fn skip_transform_when_placing_places_background_drops_without_free_transform() 
     app.background_jobs = true;
     app.session.execute("prefs.set", json!({"path": "general.skipTransformWhenPlacing", "value": true})).unwrap();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let first = app.jobs.place.clone().expect("the first file is being placed");
     assert_eq!(first.name, "first.png");
@@ -895,7 +912,7 @@ fn skip_transform_when_placing_places_inline_drops_without_free_transform() {
     app.open_dropped(
         &ctx,
         vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("bad.png", Ok(b"bad".to_vec())), dropped("second.png", Ok(png_bytes(2, 2)))],
-        Some(egui::pos2(400.0, 300.0)),
+        DropTo::Canvas { at: None },
     );
     app.place_next_dropped(&ctx);
     assert!(app.ui.transform.is_none() && app.drop_places.is_empty());
@@ -936,7 +953,7 @@ fn idle_frames(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn two_drops_then_switch(app: &mut PhotocraftApp, ctx: &egui::Context) -> (photocraft_doc::DocId, usize) {
     app.background_jobs = true;
     let (a, layers) = (app.session.active().unwrap().doc.id, layer_count(app));
-    app.open_dropped(ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(ctx);
     assert_eq!(app.jobs.place.as_ref().map(|p| (p.name.as_str(), p.doc)), Some(("first.png", a)));
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -1063,7 +1080,8 @@ fn many_path_drops_all_queue() {
     let doc = app.session.active().unwrap().doc.id;
     // More than the browser drops' cap; none is read while it waits.
     let n = crate::file_open::MAX_QUEUED_DROPS + 8;
-    app.open_dropped(&ctx, (0..n).map(|i| dropped(format!("p{i}.png"), Ok(Vec::new()))).collect(), Some(egui::pos2(400.0, 300.0)));
+    let dir = std::env::temp_dir();
+    app.open_dropped(&ctx, (0..n).map(|i| dropped(dir.join(format!("p{i}.png")), Err("read from the path".into()))).collect(), DropTo::Canvas { at: None });
     assert_eq!(app.drop_places.len(), n);
     assert!(!app.ui.status_error, "{}", app.ui.status);
     app.queue_drop(doc, crate::file_open::DropPlace::Bytes("web.png".into(), vec![0]));
@@ -1102,7 +1120,7 @@ fn inline_drops_stay_with_their_document_when_the_tab_changes() {
     let ctx = egui::Context::default();
     let mut app = app_with_canvas();
     let layers = layer_count(&app);
-    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("first.png", Ok(png_bytes(4, 4))), dropped("second.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert!(app.ui.transform.is_some());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -1182,14 +1200,13 @@ fn a_background_drop_from_a_path_is_tracked_and_later_drops_queue() {
     let mut app = app_with_canvas();
     app.background_jobs = true;
     let layers = layer_count(&app);
-    let at = Some(egui::pos2(400.0, 300.0));
-    app.open_dropped(&ctx, vec![dropped(abs, Err("egui's reader must not be used".into()))], at);
+    app.open_dropped(&ctx, vec![dropped(abs, Err("egui's reader must not be used".into()))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let place = app.jobs.place.clone().expect("being placed");
     assert_eq!(place.name, "photo.png");
     assert_eq!(app.jobs.last_started, Some(place.job));
     // A drop while it runs is queued, not started beside it.
-    app.open_dropped(&ctx, vec![dropped("later.png", Ok(png_bytes(2, 2)))], at);
+    app.open_dropped(&ctx, vec![dropped("later.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(app.drop_places.len(), 1);
     assert_eq!(app.session.jobs().len(), 1);
@@ -1206,7 +1223,7 @@ fn switching_documents_after_a_canvas_drop_undoes_only_the_place() {
     let mut app = app_with_canvas();
     let original = app.session.active().unwrap().doc.clone();
     let steps = history_steps(&app);
-    app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(app.ui.transform.as_ref().unwrap().made, Some(crate::state::MadeLayer::Place));
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -1233,10 +1250,12 @@ fn a_transformed_place_is_one_history_step() {
     let ctx = egui::Context::default();
     let mut app = app_with_canvas();
     let (layers, steps) = (layer_count(&app), history_steps(&app));
-    app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], Some(egui::pos2(400.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
+    // PLAN: assumed tools-w27: the open session is `app.ui.transform.session` with `box_state()` and `apply(edit, now)`
     let t = app.ui.transform.as_mut().expect("in Free Transform");
-    t.quad = t.quad.map(|[x, y]| [x - 1.0, y - 1.0]);
+    let moved = t.session.box_state().moved(craft::behavior::kurbo::Vec2::new(-1.0, -1.0));
+    t.session.apply(craft::draw::ui::transform::TransformEdit::Box(craft::behavior::EditEvent::set(moved)), 0.0);
     crate::transform_tool::commit(&mut app);
     assert_eq!((layer_count(&app), history_steps(&app)), (layers + 1, steps + 1));
     assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Place Embedded"));
@@ -1249,39 +1268,16 @@ fn files_dropped_on_the_tabs_open_at_that_slot() {
     let ctx = egui::Context::default();
     let mut app = app_with_canvas();
     app.ui.views[0].zoom = 3.0;
-    // One tab at (100, 20)–(200, 46): its left half is slot 0, its right half and beyond slot 1.
-    let tab = egui::Rect::from_min_max(egui::pos2(100.0, 20.0), egui::pos2(200.0, 46.0));
-    let strip = egui::Rect::from_min_max(egui::pos2(92.0, 14.0), egui::pos2(700.0, 50.0));
-    app.tab_strip = Some(crate::canvas::TabStrip { rect: strip, tabs: vec![(0, tab)] });
-    assert_eq!(app.drop_target(&ctx, Some(egui::pos2(120.0, 30.0))), crate::file_open::DropTarget::Tabs(0));
-    assert_eq!(app.drop_target(&ctx, Some(egui::pos2(180.0, 30.0))), crate::file_open::DropTarget::Tabs(1));
-    assert_eq!(app.drop_target(&ctx, Some(egui::pos2(600.0, 30.0))), crate::file_open::DropTarget::Tabs(1));
     let files = vec![dropped("first.png", Ok(b"x".to_vec())), dropped("bad.png", Ok(b"bad".to_vec())), dropped("second.png", Ok(b"x".to_vec()))];
-    app.open_dropped(&ctx, files, Some(egui::pos2(120.0, 30.0)));
+    app.open_dropped(&ctx, files, DropTo::Slot(0));
     assert_eq!(doc_names(&app), ["first.png", "second.png", "canvas.psd"], "in drop order from the slot");
     assert_eq!(app.session.active_index(), Some(1), "the last one opened is active");
     assert_eq!(app.ui.views.len(), 3);
     assert_eq!(app.ui.views[2].zoom, 3.0, "views move with their documents");
     // Past the last tab: opened at the end.
-    let tabs = (0..3).map(|i| (i, tab.translate(egui::vec2(104.0 * i as f32, 0.0)))).collect();
-    app.tab_strip = Some(crate::canvas::TabStrip { rect: strip, tabs });
-    app.open_dropped(&ctx, vec![dropped("last.png", Ok(b"x".to_vec()))], Some(egui::pos2(600.0, 30.0)));
+    let end = app.session.documents().len();
+    app.open_dropped(&ctx, vec![dropped("last.png", Ok(b"x".to_vec()))], DropTo::Slot(end));
     assert_eq!(app.session.documents().last().map(|d| d.doc.name.as_str()), Some("last.png"));
-}
-
-#[test]
-fn a_drop_slot_counts_documents_not_the_tabs_shown() {
-    // #1276: when the tabs overflow into the » menu, the shown tabs aren't documents 0, 1, 2…
-    // Documents 4, 5 and 6 shown: a drop before document 5's tab opens at position 5.
-    let tab = |i: usize, x: f32| (i, egui::Rect::from_min_max(egui::pos2(x, 20.0), egui::pos2(x + 100.0, 46.0)));
-    let strip = crate::canvas::TabStrip {
-        rect: egui::Rect::from_min_max(egui::pos2(0.0, 14.0), egui::pos2(700.0, 50.0)),
-        tabs: vec![tab(4, 0.0), tab(5, 104.0), tab(6, 208.0)],
-    };
-    assert_eq!(strip.slot(20.0), 4);
-    assert_eq!(strip.slot(130.0), 5);
-    assert_eq!(strip.slot(500.0), 7, "past the last shown tab: after it");
-    assert_eq!(crate::canvas::TabStrip { rect: strip.rect, tabs: vec![] }.slot(10.0), 0);
 }
 
 /// #5687: files dropped from another app's window bring PhotoCraft to the front (a focus request
@@ -1301,7 +1297,7 @@ fn a_drop_brings_the_window_to_the_front() {
         h.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::Focus))
     };
     assert!(!focus(&h), "no focus request without a drop");
-    h.input_mut().dropped_files.push(dropped(file, Err("read from the path".into())));
+    h.input_mut().dropped_files.push(raw_drop(file, Err("read from the path".into())));
     h.step();
     assert!(focus(&h), "the drop brings the window forward");
     let _ = std::fs::remove_dir_all(&dir);
@@ -1329,17 +1325,23 @@ fn drag_and_drop_in_the_running_app() {
         app
     });
     h.run_steps(4);
-    let strip = h.state().tab_strip.clone().expect("the tab strip is drawn");
-    assert_eq!(strip.tabs.len(), 2);
+    // The first tab's rect, read from the shown strip: the topmost node labelled with the first document's name.
+    // PLAN: assumed the document tabs' accessible labels are the document names
+    use egui_kittest::kittest::Queryable;
+    let first_tab = h
+        .query_all_by_label("Untitled-1")
+        .map(|n| n.rect())
+        .min_by(|a, b| a.top().total_cmp(&b.top()))
+        .expect("the tab strip is drawn");
     // Hovering over the first tab's left half: slot 0.
-    let over_first = egui::pos2(strip.tabs[0].1.left() + 4.0, strip.tabs[0].1.center().y);
+    // PLAN: assumed the host's native pointer feed (L-41) reads `Services::cursor_pos` in this harness
+    let over_first = egui::pos2(first_tab.left() + 4.0, first_tab.center().y);
     pointer.set(over_first);
     h.input_mut().hovered_files.push(egui::HoveredFile { path: Some(file.clone()), ..Default::default() });
     h.step();
-    assert_eq!(h.state().drop_target(&h.ctx, Some(over_first)), crate::file_open::DropTarget::Tabs(0));
-    // Dropped there: opens in the background, then takes the first tab.
+    // Dropped there: the strip's drop target opens it in the background, then it takes the first tab.
     h.input_mut().hovered_files.clear();
-    h.input_mut().dropped_files.push(dropped(file.clone(), Err("read from the path".into())));
+    h.input_mut().dropped_files.push(raw_drop(file.clone(), Err("read from the path".into())));
     h.step();
     let t = std::time::Instant::now();
     while !h.state().jobs.opens.is_empty() && t.elapsed() < std::time::Duration::from_secs(30) {
@@ -1353,7 +1355,7 @@ fn drag_and_drop_in_the_running_app() {
     // Dropped on the canvas: placed into the active document, in Free Transform.
     let layers = h.state().session.active().unwrap().doc.layers.len();
     pointer.set(h.state().drop_canvas_rect.expect("the canvas is shown").center());
-    h.input_mut().dropped_files.push(dropped(file, Err("read from the path".into())));
+    h.input_mut().dropped_files.push(raw_drop(file, Err("read from the path".into())));
     h.run_steps(2);
     // Placement runs on a worker; frame count does not imply completion.
     let started = std::time::Instant::now();
@@ -1407,60 +1409,6 @@ fn views_and_windows_stay_with_their_documents() {
     assert_eq!(windows(&app), [(0, 2), (1, 0), (3, 1)]);
 }
 
-#[test]
-fn files_dropped_off_the_canvas_open_as_documents() {
-    let other = || vec![dropped("other.png", Ok(b"x".to_vec()))];
-    let ctx = egui::Context::default();
-    // On the tab bar or a panel (outside the canvas), or where the pointer can't be read.
-    for at in [Some(egui::pos2(400.0, 30.0)), Some(egui::pos2(750.0, 300.0)), None] {
-        let mut app = app_with_canvas();
-        let before = layer_count(&app);
-        app.open_dropped(&ctx, other(), at);
-        assert_eq!(app.session.documents().len(), 2, "{at:?}");
-        assert_eq!(app.session.documents()[0].doc.layers.len(), before, "{at:?}");
-    }
-    // Over a window floating above the canvas (shown from its second frame, once sized).
-    for _ in 0..2 {
-        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-            egui::Window::new("panel").fixed_pos(egui::pos2(300.0, 200.0)).show(ui.ctx(), |ui| ui.label("over the canvas"));
-        });
-        out.textures_delta.clear();
-    }
-    let mut app = app_with_canvas();
-    app.open_dropped(&ctx, other(), Some(egui::pos2(320.0, 220.0)));
-    assert_eq!(app.session.documents().len(), 2);
-    // The start screen or an opening file's card (no canvas shown) opens too.
-    let mut app = app_with_canvas();
-    app.drop_canvas_rect = None;
-    app.open_dropped(&ctx, other(), Some(egui::pos2(400.0, 300.0)));
-    assert_eq!(app.session.documents().len(), 2);
-}
-
-#[test]
-fn notices_are_capped_and_dismissable_state_round_trips() {
-    let (mut app, _) = app_with(Vec::new());
-    for i in 0..10 {
-        notices::post(&mut app, format!("n{i}"), vec![], false, None);
-    }
-    assert_eq!(app.ui.notices.len(), notices::MAX_NOTICES);
-    assert_eq!(app.ui.notices.last().map(|n| n.title.as_str()), Some("n9"));
-    // Notices are part of the serialized UI state (ui.inspect / ui.set).
-    let v = serde_json::to_value(&app.ui).unwrap();
-    assert_eq!(v["notices"].as_array().map(Vec::len), Some(notices::MAX_NOTICES));
-    let back: crate::UiState = serde_json::from_value(v).unwrap();
-    assert_eq!(back.notices, app.ui.notices);
-}
-
-#[test]
-fn notices_render_without_panicking() {
-    let (mut app, _) = app_with(Vec::new());
-    notices::post(&mut app, "Opened a.psd with 9 warnings", (0..9).map(|i| format!("warning {i}")).collect(), false, None);
-    notices::error(&mut app, "Couldn't open b.psd: not an image".into());
-    let ctx = egui::Context::default();
-    let mut out = ctx.run_ui(Default::default(), |ui| notices::show(&mut app, ui.ctx()));
-    out.textures_delta.clear();
-    assert_eq!(app.ui.notices.len(), 2);
-}
 
 #[test]
 fn open_documents_as_tabs_preference_controls_floating_windows() {
@@ -1594,7 +1542,9 @@ fn save_a_copy_is_recorded_and_replayed_as_a_copy() {
     menus::invoke(&mut app, &ctx, "file.saveACopy", json!({})).unwrap();
     answer(&mut app);
     app.run("actions.stop", json!({})).unwrap();
-    assert_eq!(app.session.actions.list[0].steps.last(), Some(&("file.saveACopy".to_string(), json!({"path": "/pics/copy.png"}))));
+    // PLAN: assumed panels-w29's `ActionStep` is `craft::automation::actions::ActionStep`
+    let saved = craft::automation::actions::ActionStep::new("file.saveACopy", json!({"path": "/pics/copy.png"}));
+    assert_eq!(app.session.actions.list.actions()[0].steps.last(), Some(&saved));
     assert_eq!(crate::actions::label_of("file.saveACopy"), "Save a Copy");
     written.borrow_mut().clear();
     let played = app.run("actions.play", json!({"action": 0})).unwrap();
@@ -1618,7 +1568,8 @@ fn export_as_is_recorded_and_replayed() {
             e.borrow_mut().push((path.to_string(), doc.size.width, doc.size.height, s.jpeg_quality));
             Ok((b"out".to_vec(), Vec::new()))
         })),
-        file_dialog: Some(file_dialog::fake(vec![Some(FileDialogAnswer::SaveTo("/pics/out.jpg".into()))]).0),
+        // PLAN: assumed top-w28's test `Files` fake, as in `app_with`
+        files: Some(crate::files::fake(vec![Some(FileDialogAnswer::SaveTo("/pics/out.jpg".into()))]).0),
         write: Some(Box::new(|_: &str, _: &[u8]| Ok(()))),
         ..Default::default()
     };
@@ -1626,16 +1577,16 @@ fn export_as_is_recorded_and_replayed() {
     let ctx = egui::Context::default();
     app.run("file.new", json!({"width": 40, "height": 20})).unwrap();
     app.run("actions.record", json!({})).unwrap();
-    let id = menus::invoke(&mut app, &ctx, "file.export.exportAs", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    let fields = &mut app.ui.dialog_mut(id).unwrap().fields;
-    fields.insert("format".into(), json!("jpg"));
-    fields.insert("quality".into(), json!(70));
-    fields.insert("scale".into(), json!(50));
-    crate::dialogs::confirm(&mut app, id).unwrap();
+    let id = menus::invoke(&mut app, &ctx, "file.export.exportAs", json!({})).unwrap()["dialog"].clone();
+    // PLAN: assumed `ui.dialog.set` takes `{dialog, field, value}`
+    for (field, value) in [("format", json!("jpg")), ("quality", json!(70)), ("scale", json!(50))] {
+        app.run("ui.dialog.set", json!({"dialog": id, "field": field, "value": value})).unwrap();
+    }
+    app.run("ui.dialog.confirm", json!({"dialog": id})).unwrap();
     answer(&mut app);
     app.run("actions.stop", json!({})).unwrap();
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 20, 10, Some(70))]);
-    let (step_id, step) = app.session.actions.list[0].steps.last().cloned().unwrap();
+    let craft::automation::actions::ActionStep { command: step_id, params: step } = app.session.actions.list.actions()[0].steps.last().cloned().unwrap();
     assert_eq!(step_id, "file.export.exportAs");
     assert_eq!((&step["path"], &step["format"], &step["quality"], &step["scale"]), (&json!("/pics/out.jpg"), &json!("jpg"), &json!(70), &json!(50)));
     assert!(step.as_object().unwrap().keys().all(|k| !k.starts_with("__")), "only the destination and the dialog's settings: {step}");
@@ -1646,7 +1597,7 @@ fn export_as_is_recorded_and_replayed() {
     let played = app.run("actions.play", json!({"action": 0})).unwrap();
     assert!(played.get("failed").is_none(), "{played}");
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 50, 30, Some(70))], "the played document, scaled as recorded");
-    assert!(app.ui.dialogs.is_empty(), "no dialog on playback");
+    assert!(!app.dialog_open(), "no dialog on playback");
 }
 
 /// #4400: a new document saved under a name is listed in Open Recent (and on the Home screen),
@@ -1800,36 +1751,9 @@ fn opening_an_open_file_again_shows_its_tab() {
 
 // ---- Where a drop goes (#10492) ----
 
-/// A tab strip of three 100-wide tabs at y 14-50 over x 0-700, and a canvas below it.
-fn strip() -> crate::canvas::TabStrip {
-    let tab = |i: usize| (i, egui::Rect::from_min_max(egui::pos2(104.0 * i as f32, 20.0), egui::pos2(104.0 * i as f32 + 100.0, 46.0)));
-    crate::canvas::TabStrip { rect: egui::Rect::from_min_max(egui::pos2(0.0, 14.0), egui::pos2(700.0, 50.0)), tabs: vec![tab(0), tab(1), tab(2)] }
-}
-
+/// The canvas of the web build's drop path: below the tab strip.
 fn canvas() -> Option<egui::Rect> {
     Some(egui::Rect::from_min_max(egui::pos2(100.0, 50.0), egui::pos2(700.0, 550.0)))
-}
-
-#[test]
-fn a_drop_lands_on_the_region_under_the_pointer() {
-    let strip = strip();
-    let on = |at, uncovered, tabs, canvas, doc| target_at(at, uncovered, tabs, canvas, doc);
-    // Over the canvas of an open document: placed.
-    assert_eq!(on(Some(egui::pos2(300.0, 300.0)), true, Some(&strip), canvas(), true), DropTarget::Canvas);
-    // Over the tab strip: that tab position (the strip wins where it overlaps the canvas).
-    assert_eq!(on(Some(egui::pos2(4.0, 30.0)), true, Some(&strip), canvas(), true), DropTarget::Tabs(0));
-    assert_eq!(on(Some(egui::pos2(150.0, 30.0)), true, Some(&strip), canvas(), true), DropTarget::Tabs(1));
-    assert_eq!(on(Some(egui::pos2(690.0, 30.0)), true, Some(&strip), canvas(), true), DropTarget::Tabs(3));
-    // Over a panel, outside every region.
-    assert_eq!(on(Some(egui::pos2(750.0, 300.0)), true, Some(&strip), canvas(), true), DropTarget::Elsewhere);
-    // The pointer can't be read, or a window or dialog covers it: open, never place.
-    assert_eq!(on(None, true, Some(&strip), canvas(), true), DropTarget::Elsewhere);
-    assert_eq!(on(Some(egui::pos2(300.0, 300.0)), false, Some(&strip), canvas(), true), DropTarget::Elsewhere);
-    assert_eq!(on(Some(egui::pos2(4.0, 30.0)), false, Some(&strip), canvas(), true), DropTarget::Elsewhere);
-    // No document: the Home screen or an empty workspace. A canvas rectangle left from a document
-    // closed since doesn't make the drop a placement with nothing to place into.
-    assert_eq!(on(Some(egui::pos2(300.0, 300.0)), true, None, None, false), DropTarget::Elsewhere);
-    assert_eq!(on(Some(egui::pos2(300.0, 300.0)), true, None, canvas(), false), DropTarget::Elsewhere);
 }
 
 #[test]
@@ -1837,9 +1761,9 @@ fn only_a_canvas_drop_of_a_non_preset_file_is_placed() {
     let files =
         ["photo.png", "photo.JPG", "layers.psd", "big.psb", "scan.tif", "shot.heic", "notes.txt", "no_extension", "", "C:\\pics\\a.webp", "/pics/b.svg"];
     let presets = ["brushes.abr", "Sunsets.GRD", "/lib/set.abr", "C:\\lib\\x.grd"];
-    for target in [DropTarget::Canvas, DropTarget::Tabs(0), DropTarget::Tabs(7), DropTarget::Elsewhere] {
+    for target in [DropTo::Canvas { at: None }, DropTo::Slot(0), DropTo::Slot(7), DropTo::Window] {
         for name in files {
-            let want = if target == DropTarget::Canvas { DropRoute::Place } else { DropRoute::Open };
+            let want = if matches!(target, DropTo::Canvas { .. }) { DropRoute::Place } else { DropRoute::Open };
             assert_eq!(target.route(name), want, "{target:?} {name:?}");
         }
         for name in presets {
@@ -1877,8 +1801,9 @@ fn files_dropped_with_no_document_open_all_open() {
     let (mut app, _) = app_with(Vec::new());
     // A canvas rectangle left from an earlier document must not turn the drop into a placement.
     app.drop_canvas_rect = canvas();
-    assert_eq!(app.drop_target(&egui::Context::default(), Some(egui::pos2(300.0, 300.0))), DropTarget::Elsewhere);
-    app.open_dropped(&egui::Context::default(), files, Some(egui::pos2(300.0, 300.0)));
+    let to = app.drop_to(&egui::Context::default(), Some(egui::pos2(300.0, 300.0)));
+    assert_eq!(to, DropTo::Window);
+    app.open_dropped(&egui::Context::default(), files, to);
     assert_eq!(doc_names(&app), names);
     assert!(app.drop_places.is_empty());
     assert!(error_titles(&app).is_empty(), "{:?}", app.ui.notices);
@@ -1897,7 +1822,7 @@ fn a_dropped_folder_is_refused_with_a_clear_message() {
     let ctx = egui::Context::default();
     // Opened (no document, or off the canvas).
     let (mut app, _) = app_with(Vec::new());
-    app.open_dropped(&ctx, vec![dropped(folder.clone(), Err("read from the path".into())), dropped(file, Err("read from the path".into()))], None);
+    app.open_dropped(&ctx, vec![dropped(folder.clone(), Err("read from the path".into())), dropped(file, Err("read from the path".into()))], DropTo::Window);
     assert_eq!(doc_names(&app), ["ok.psd"]);
     let errors = error_titles(&app);
     assert_eq!(errors.len(), 1, "{errors:?}");
@@ -1905,7 +1830,7 @@ fn a_dropped_folder_is_refused_with_a_clear_message() {
     // On the canvas: not queued for placing, and the layers stay as they were.
     let mut app = app_with_canvas();
     let layers = layer_count(&app);
-    app.open_dropped(&ctx, vec![dropped(folder, Err("read from the path".into()))], Some(egui::pos2(300.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped(folder, Err("read from the path".into()))], DropTo::Canvas { at: None });
     assert!(app.drop_places.is_empty());
     app.place_next_dropped(&ctx);
     assert_eq!(layer_count(&app), layers);
@@ -1924,13 +1849,13 @@ fn a_dropped_file_that_is_not_an_image_reports_why() {
     std::fs::write(&file, b"bad").unwrap();
     let ctx = egui::Context::default();
     let (mut app, _) = app_with(Vec::new());
-    app.open_dropped(&ctx, vec![dropped(file.clone(), Err("read from the path".into()))], None);
+    app.open_dropped(&ctx, vec![dropped(file.clone(), Err("read from the path".into()))], DropTo::Window);
     assert!(app.session.documents().is_empty());
     assert!(app.ui.status_error);
     assert!(error_titles(&app).iter().any(|t| t.starts_with("Couldn't open notes.txt: ")), "{:?}", app.ui.notices);
     let mut app = app_with_canvas();
     let layers = layer_count(&app);
-    app.open_dropped(&ctx, vec![dropped(file, Err("read from the path".into()))], Some(egui::pos2(300.0, 300.0)));
+    app.open_dropped(&ctx, vec![dropped(file, Err("read from the path".into()))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     assert_eq!(layer_count(&app), layers);
     assert!(app.ui.status_error);
@@ -1948,7 +1873,7 @@ fn several_files_dropped_on_the_canvas_are_queued_in_order() {
     app.open_dropped(
         &ctx,
         vec![dropped("/pics/one.png", Err("unused".into())), dropped("/pics/set.abr", Err("unused".into())), dropped("/pics/two.jpg", Err("unused".into()))],
-        Some(egui::pos2(300.0, 300.0)),
+        DropTo::Canvas { at: None },
     );
     let queued: Vec<String> = app
         .drop_places

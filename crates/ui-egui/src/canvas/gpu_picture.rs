@@ -6,10 +6,9 @@ use std::sync::Arc;
 use craft::behavior::CanvasView;
 use craft::ui::canvas::AppPaint;
 
-use super::display::{hdr_preview, sync_display_lut};
+use super::display::{LiveProposal, hdr_preview, sync_display_lut};
 use super::filter_preview::{ensure_adjust_proxy, ensure_filter_preview, ensure_proxy_preview, filter_preview_display_doc};
 use super::textures::{ensure_gpu, preview_bounds, redraw_focus};
-use super::view_xform::ViewXform;
 use super::{DRect, Document, PhotocraftApp, viewport_pages};
 use crate::gpu_canvas::ViewParams;
 
@@ -24,8 +23,10 @@ pub(crate) struct GpuRequest<'a> {
     /// The display the canvas is on (`None`: the main window's).
     pub output: Option<u32>,
     /// The view on screen and the one it is animating to: redraws start with the blocks either shows.
-    pub xf: &'a ViewXform,
-    pub target: &'a ViewXform,
+    pub view: &'a CanvasView,
+    pub target: &'a CanvasView,
+    /// The gradient a tool proposes this pass, shown over the document.
+    pub live: LiveProposal<'a>,
     /// Physical pixels per document pixel on screen, and the zoom live previews are reduced for.
     pub zoom: f32,
     pub render_zoom: f32,
@@ -95,14 +96,14 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
         return Some(GpuPicture { params, shows: Shows::Preview, k, growth, bounds });
     }
     let plain = |params: ViewParams, shows: Shows| GpuPicture { params, shows, k: 1, growth: [0.0, 0.0], bounds: doc.bounds() };
-    if viewport_pages::show(app, ctx, idx, req.xf, req.zoom) {
+    if viewport_pages::show(app, ctx, idx, req.view, req.zoom, req.live) {
         app.perf.gpu = true;
         let key = viewport_pages::stream_key(doc.id.0);
         let view_key = egui::Id::unique(("pc-canvas-pages", ctx.viewport_id(), doc.id.0)).value();
         let display = sync_display_lut(app, doc, key, output);
         return Some(plain(base(key, doc_size, view_key, display, hdr_preview(app, doc)), Shows::Pages));
     }
-    if ensure_gpu(app, ctx, idx, redraw_focus(req.target, req.xf)) {
+    if ensure_gpu(app, ctx, idx, redraw_focus(req.target, req.view), req.live) {
         app.perf.gpu = true;
         let view_key = egui::Id::unique(("pc-canvas", ctx.viewport_id(), idx)).value();
         let display = sync_display_lut(app, doc, doc.id.0, output);

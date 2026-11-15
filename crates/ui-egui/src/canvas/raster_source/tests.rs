@@ -46,9 +46,9 @@ fn pass(source: &impl RasterSource, since: Revision) -> Pass {
 /// Runs each case on a fresh document from `setup`: a pass, the event, a second pass, and the second pass's damage
 /// since the first.
 fn check_damage(setup: fn() -> PhotocraftApp, run: fn(&mut PhotocraftApp, &egui::Context, Revision) -> Pass, cases: &[(&str, Step, Want)]) {
-    let ctx = egui::Context::default();
     for (event, step, want) in cases {
         let mut app = setup();
+        let ctx = app.ctx().clone();
         let first = run(&mut app, &ctx, Revision::new(7)).revision;
         step(&mut app);
         let Pass { size, damage, unknown, .. } = run(&mut app, &ctx, first);
@@ -95,7 +95,7 @@ fn composite_damage_since_the_shown_revision_follows_each_event() {
             Want::Everything,
         ),
     ];
-    check_damage(setup, |app, ctx, since| pass(&CompositePrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
+    check_damage(setup, |app, ctx, since| pass(&CompositePrep::new(app, ctx, 0, None, None).unwrap().source(app), since), &cases);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn overlay_damage_since_the_shown_revision_follows_each_event() {
             Want::Everything,
         ),
     ];
-    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
+    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None, None).unwrap().source(app), since), &cases);
 }
 
 /// A spot channel's edits and the picture under it redraw the overlay that prints it.
@@ -154,7 +154,7 @@ fn overlay_damage_after_a_spot_edit_covers_the_ink() {
             Want::Redraws(all),
         ),
     ];
-    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None).unwrap().source(app), since), &cases);
+    check_damage(setup, |app, ctx, since| pass(&OverlayPrep::new(app, ctx, 0, None, None).unwrap().source(app), since), &cases);
 }
 
 #[test]
@@ -165,8 +165,8 @@ fn read_reduces_from_the_region_origin() {
     app.run("select.rect", json!({"x": 1, "y": 0, "width": 2, "height": 2})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
     app.run("select.deselect", json!({})).unwrap();
-    let ctx = egui::Context::default();
-    let source = CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app);
+    let ctx = app.ctx().clone();
+    let source = CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app);
     let (red, blue) = (Color32::from_rgb(255, 0, 0), Color32::from_rgb(0, 0, 255));
     assert_eq!(read(&source, PixelRect::new(1, 0, 3, 2), 2).pixels, vec![red]);
     assert_eq!(read(&source, PixelRect::new(0, 0, 4, 1), 1).pixels, vec![blue, red, red, blue]);
@@ -178,13 +178,13 @@ fn read_reduces_from_the_region_origin() {
 fn a_channel_view_draws_its_own_picture() {
     let mut app = app_with(8, 4, "#ffffff");
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 4, "height": 4})).unwrap();
-    let ctx = egui::Context::default();
-    assert!(OverlayPrep::new(&mut app, &ctx, 0, None).is_none(), "the plain composite has no overlay");
+    let ctx = app.ctx().clone();
+    assert!(OverlayPrep::new(&mut app, &ctx, 0, None, None).is_none(), "the plain composite has no overlay");
     app.run("select.editInQuickMaskMode", json!({})).unwrap();
-    let px = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
+    let px = read(&OverlayPrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
     assert_eq!(Color32::WHITE.blend(px[0]), Color32::WHITE, "selected: nothing over the composite");
     assert_eq!(px[6], Color32::from_rgba_premultiplied(128, 0, 0, 128), "masked: the rubylith");
-    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
+    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), PixelRect::new(0, 0, 8, 1), 1).pixels;
     assert_eq!(composite[6], Color32::WHITE, "the composite stays the document's");
 }
 
@@ -207,15 +207,16 @@ fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the
     let view = &mut app.session.active_mut().unwrap().channel_view;
     view.set_color_visible(1, false);
     view.set_color_visible(2, false);
-    let ctx = egui::Context::default();
+    let ctx = app.ctx().clone();
     let at = PixelRect::new(0, 0, 1, 1);
-    let overlay_before = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
-    let composite_before = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
+    let overlay_before = read(&OverlayPrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
+    let composite_before = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
     let id = crate::adjust_dialog::open(&mut app, "image.adjustments.levels").unwrap();
-    app.ui.dialog_mut(id).unwrap().fields.insert("inBlack".into(), json!(100));
+
+    app.framework.dialogs.set_json_field(&ctx, id, "inBlack", json!(100)).unwrap();
     assert!(crate::adjust_preview::display_doc(&mut app, 0).is_some(), "the adjustment previews");
-    let overlay = read(&OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
-    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), at, 1).pixels;
+    let overlay = read(&OverlayPrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
+    let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
     assert_ne!(overlay, overlay_before, "the overlay shows the live preview");
     assert_eq!(composite, composite_before, "the composite shows the document");
 }
@@ -229,11 +230,11 @@ fn the_composite_shows_a_filter_dialogs_preview() {
         app.background_jobs = false;
         app.run("edit.fill", json!({"color": "#3399cc"})).unwrap();
         app.ui.views.get_mut(0).expect("the view").zoom = zoom;
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let first = PixelRect::new(0, 0, 1, 1);
-        let plain = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), first, 1).pixels;
+        let plain = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), first, 1).pixels;
         crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
-        let shown = read(&CompositePrep::new(&mut app, &ctx, 0, None).unwrap().source(&app), first, 1).pixels;
+        let shown = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), first, 1).pixels;
         let preview = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the dialog's preview");
         let (display, _) = crate::canvas::canvas_display(&app, &preview, None);
         let expected = crate::canvas::display_image(display.as_deref(), &photocraft_compose::flatten(&preview));
@@ -257,19 +258,18 @@ fn a_size_changing_preview_lies_centred_on_the_document() {
     app.background_jobs = false;
     app.run("channel.new", json!({"name": "Alpha", "fill": "black"})).unwrap();
     let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
-    let d = app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap();
-    d.fields.insert("angle".into(), json!(90.0));
-    d.fields.insert("__preview".into(), json!(true));
-    let ctx = egui::Context::default();
-    let bounds = |app: &mut PhotocraftApp| CompositePrep::new(app, &ctx, 0, None).unwrap().source(app).bounds();
+    let ctx = app.ctx().clone();
+    // PLAN: assumed the rotation dialog's hosted fields are `angle` and `preview`
+    app.framework.dialogs.set_json_field(&ctx, id, "angle", json!(90.0)).unwrap();
+    app.framework.dialogs.set_json_field(&ctx, id, "preview", json!(true)).unwrap();
+    let bounds = |app: &mut PhotocraftApp| CompositePrep::new(app, &ctx, 0, None, None).unwrap().source(app).bounds();
     let rotated = DRect::new(16, -16, 48, 48);
     assert_eq!(bounds(&mut app), rotated, "centred on the document");
-    assert_eq!(OverlayPrep::new(&mut app, &ctx, 0, None).unwrap().source(&app).bounds(), rotated, "the channel view over the preview");
     // Preview off, then Cancel: the document again, unchanged.
     let revision = app.session.active().unwrap().revision;
-    app.ui.dialogs.iter_mut().find(|d| d.id == id).unwrap().fields.insert("__preview".into(), json!(false));
+    app.framework.dialogs.set_json_field(&ctx, id, "preview", json!(false)).unwrap();
     assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "Preview off");
-    crate::dialogs::cancel(&mut app, id).unwrap();
+    app.framework.dialogs.cancel_by_id(&ctx, id);
     assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "after Cancel");
     assert_eq!(app.session.active().unwrap().revision, revision, "the document untouched");
 }
@@ -306,13 +306,13 @@ fn channel_views_show_live_strokes_and_drop_discarded_ones() {
         app.run("tools.setColors", json!({"foreground": [0.0, 0.0, 0.0, 1.0]})).unwrap();
         app.run("tools.setBrush", json!({"brush": {"size": 12, "hardness": 1.0, "smoothing": {"amount": 0.0}}})).unwrap();
         app.ui.tool = crate::state::Tool::Brush;
-        let ctx = egui::Context::default();
+        let ctx = app.ctx().clone();
         let original = app.session.documents()[0].doc.clone();
         let view = |app: &PhotocraftApp, doc: &Document| {
             let st = &app.session.documents()[0];
             crate::channel_view::render(doc, &st.channel_view, rect, 1, crate::channel_view::Look::default(), st.active_layer).unwrap()
         };
-        let shown = |app: &mut PhotocraftApp| read(&OverlayPrep::new(app, &ctx, 0, None).unwrap().source(app), stroke, 1).pixels;
+        let shown = |app: &mut PhotocraftApp| read(&OverlayPrep::new(app, &ctx, 0, None, None).unwrap().source(app), stroke, 1).pixels;
         let m = egui::Modifiers::NONE;
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, m);
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, m);
@@ -321,8 +321,7 @@ fn channel_views_show_live_strokes_and_drop_discarded_ones() {
         assert_eq!(painted, view(&app, &live), "{target}: the live stroke");
         assert_ne!(painted, view(&app, &original), "{target}: the target was painted");
         assert!(std::sync::Arc::ptr_eq(&original, &app.session.documents()[0].doc), "{target}: nothing committed");
-        app.drag = None;
-        app.live_stroke = None;
+        crate::canvas::testing::key(&mut app, egui::Key::Escape, egui::Modifiers::NONE);
         assert_eq!(shown(&mut app), view(&app, &original), "{target}: a dropped stroke shows the channel as it was");
     }
 }

@@ -1,9 +1,10 @@
-use super::display::{GPU_OUTPUT, canvas_display, display_doc, texture_key};
+use craft::behavior::CanvasView;
+
+use super::display::{GPU_OUTPUT, LiveProposal, canvas_display, display_doc_live, texture_key};
 use super::filter_preview::filter_channel_preview;
 use super::navigator::navigator_waits_for_drag;
 use super::strokes::live_stroke;
-use super::view_xform::ViewXform;
-use super::{DRect, Document, LayerContent, PhotocraftApp, TextureOptions, pos2};
+use super::{DRect, Document, LayerContent, PhotocraftApp, TextureOptions};
 
 /// Largest texture side we upload; bigger pictures are uploaded downsampled.
 pub const MAX_TEXTURE: u32 = 4096;
@@ -80,14 +81,22 @@ pub(crate) enum ProxyPreview {
 }
 
 /// [`CanvasPicture`] of document `idx` on `output`, showing `proxy` during a proxy adjustment preview; `None` when
-/// no such document is open.
-pub(crate) fn canvas_picture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>, proxy: ProxyPreview) -> Option<CanvasPicture> {
+/// no such document is open. `live` is the gradient a tool proposes this pass: the picture shows it as the GPU canvas
+/// does.
+pub(crate) fn canvas_picture(
+    app: &mut PhotocraftApp,
+    ctx: &egui::Context,
+    idx: usize,
+    output: Option<u32>,
+    proxy: ProxyPreview,
+    live: LiveProposal<'_>,
+) -> Option<CanvasPicture> {
     let (revision, last_damage, id, committed) = {
         let st = app.session.documents().get(idx)?;
         let reach = |r: DRect| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) };
         (st.revision, (st.damage_from(), st.last_damage.map(reach)), st.doc.id, st.doc.bounds())
     };
-    let (mut doc, mut preview_key) = display_doc(app, idx);
+    let (mut doc, mut preview_key) = display_doc_live(app, idx, live);
     // A filter dialog's live preview: the GPU canvas draws it from its own texture, but the CPU canvas (no usable
     // GPU, a flipped or pixel-aspect-corrected view, a GPU fallback) and the raster sources draw its result, as the
     // channel views draw it. A preview reduced for a zoomed-out view (a proxy, factor `k`) covers the whole document
@@ -191,13 +200,6 @@ pub(crate) fn damage_since(
     {
         return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
     }
-    // Between Vanishing Point stamp previews (and the document): the areas the strokes painted.
-    if seen.0 == now.0
-        && let Some(st) = app.session.documents().get(idx)
-        && let Some(r) = crate::vp_ui::damage(app, st.doc.id, now.0, seen.1 ^ display_key, now.1)
-    {
-        return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
-    }
     // Between hovered blend modes (and the document): where the layer's blending shows.
     if seen.0 == now.0
         && let Some(st) = app.session.documents().get(idx)
@@ -277,8 +279,8 @@ pub(crate) fn effect_reach(layers: &[photocraft_doc::Layer]) -> i32 {
 
 /// GPU path: make sure document `idx` is current in the GPU canvas. Edits draw their damage;
 /// unchanged lower-stack composites can be reused by the compositor inside that region.
-/// Returns false if there is no GPU canvas.
-pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, visible: DRect) -> bool {
+/// Returns false if there is no GPU canvas. `live` is the gradient a tool proposes this pass.
+pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, visible: DRect, live: LiveProposal<'_>) -> bool {
     let Some(gpu) = app.gpu.clone() else { return false };
     let Some((revision, last_damage, id)) =
         app.session.documents().get(idx).map(|st| {
@@ -287,7 +289,7 @@ pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
     else {
         return false;
     };
-    let (doc, raw_key) = display_doc(app, idx);
+    let (doc, raw_key) = display_doc_live(app, idx, live);
     let (display, _) = canvas_display(app, &doc, None);
     // Repeated pattern tiles sample the same texture, including pixels outside the unwrapped
     // viewport. Refresh the affected document region while Pattern Preview is enabled.
@@ -447,26 +449,15 @@ fn budget_allowance(app: &PhotocraftApp) -> (u64, u64) {
 
 /// The document pixels a view shows, with a margin for filtering. Uses all four canvas corners
 /// so a rotated camera still covers the visible tiles.
-pub(crate) fn visible_doc_rect(xf: &ViewXform) -> DRect {
-    let r = xf.rect;
-    let docs = [xf.to_doc(r.min), xf.to_doc(pos2(r.max.x, r.min.y)), xf.to_doc(r.max), xf.to_doc(pos2(r.min.x, r.max.y))];
-    let mut x0 = docs[0][0];
-    let mut y0 = docs[0][1];
-    let mut x1 = x0;
-    let mut y1 = y0;
-    for d in docs {
-        x0 = x0.min(d[0]);
-        y0 = y0.min(d[1]);
-        x1 = x1.max(d[0]);
-        y1 = y1.max(d[1]);
-    }
+pub(crate) fn visible_doc_rect(view: &CanvasView) -> DRect {
+    let r = view.visible();
     let c = |v: f64| v.clamp(-1e9, 1e9) as i32;
-    DRect::new(c(x0.floor()) - 2, c(y0.floor()) - 2, c(x1.ceil()) + 2, c(y1.ceil()) + 2)
+    DRect::new(c(r.x0.floor()) - 2, c(r.y0.floor()) - 2, c(r.x1.ceil()) + 2, c(r.y1.ceil()) + 2)
 }
 
 /// Prioritize deferred redraw blocks visible at either the target or the animated display camera.
 /// The displayed camera may still show old texture contents outside the target's visible area.
-pub(super) fn redraw_focus(target: &ViewXform, displayed: &ViewXform) -> DRect {
+pub(super) fn redraw_focus(target: &CanvasView, displayed: &CanvasView) -> DRect {
     visible_doc_rect(target).union(&visible_doc_rect(displayed))
 }
 

@@ -12,7 +12,7 @@ use egui::{Color32, ColorImage};
 use photocraft_engine::display_color::CanvasDisplay;
 
 use super::channel_view::Overlay;
-use super::display::{cache_key, display_image};
+use super::display::{LiveProposal, cache_key, display_image};
 use super::textures::{CanvasPicture, ProxyPreview, canvas_picture, damage_since};
 use super::{DRect, Document, PhotocraftApp};
 
@@ -196,8 +196,9 @@ pub(crate) struct CompositePrep {
 
 impl CompositePrep {
     /// Document `idx`'s picture on `output` (`None`: the main window's display); `None` when no such document is open.
-    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
-        let mut p = canvas_picture(app, ctx, idx, output, ProxyPreview::Document)?;
+    /// `live` is the gradient a tool proposes this pass.
+    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>, live: LiveProposal<'_>) -> Option<Self> {
+        let mut p = canvas_picture(app, ctx, idx, output, ProxyPreview::Document, live)?;
         let display = p.display.take();
         let shown = Shown::of(&p, p.display_key);
         let revision = shown.revision(p.id, 0);
@@ -270,9 +271,9 @@ pub(crate) struct OverlayPrep {
 
 impl OverlayPrep {
     /// Document `idx`'s view on `output` (`None`: the main window's display); `None` when no such document is open or
-    /// it shows the plain composite.
-    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>) -> Option<Self> {
-        let p = canvas_picture(app, ctx, idx, output, ProxyPreview::Preview)?;
+    /// it shows the plain composite. `live` is the gradient a tool proposes this pass.
+    pub(crate) fn new(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, output: Option<u32>, live: LiveProposal<'_>) -> Option<Self> {
+        let p = canvas_picture(app, ctx, idx, output, ProxyPreview::Preview, live)?;
         let overlay = Overlay::of(app, idx, &p.doc, output)?;
         let shown = OverlayShown { picture: Shown::of(&p, 0), view: overlay.key };
         let revision = shown.picture.revision(p.id, overlay.key);
@@ -288,13 +289,6 @@ impl OverlayPrep {
     }
 }
 
-impl<'a> ChannelOverlay<'a> {
-    /// Where the view lies in the document: where the canvas picture under it lies ([`PhotoComposite::bounds`]; an
-    /// adjustment preview keeps the document's size).
-    pub(crate) fn bounds(&self) -> DRect {
-        self.picture.shown.bounds
-    }
-}
 
 impl RasterSource for ChannelOverlay<'_> {
     fn size(&self) -> PixelSize {
