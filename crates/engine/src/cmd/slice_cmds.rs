@@ -442,7 +442,9 @@ impl Cut {
             // Products can exceed i32 even when every interpolated edge fits the rect.
             Cut::Count(n) => (0..=i64::from(n)).map(|k| (from + len * k / i64::from(n)) as i32).collect(),
             Cut::Size(size) => {
-                let parts = len.div_ceil(i64::from(size));
+                // Sizes and lengths are positive; signed div_ceil is unstable.
+                let size_l = i64::from(size);
+                let parts = (len + size_l - 1) / size_l;
                 (0..parts).map(|k| (from + i64::from(size) * k) as i32).chain(std::iter::once((from + len) as i32)).collect()
             }
         }

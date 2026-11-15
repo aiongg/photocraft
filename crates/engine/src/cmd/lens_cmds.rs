@@ -190,8 +190,7 @@ pub fn camera_raw_surface(surf: &Surface, area: Rect, p: &CameraRaw) -> Surface 
     let fmt = surf.format();
     let (w, h) = (area.width() as usize, area.height() as usize);
     let mut px = rgba_region(surf, area, len);
-    // PLAN: assumed `DevelopInputs::default()` for `develop(.., &DevelopInputs)` (dialogs-w50)
-    camera_raw::develop(&mut px, w, h, p, fmt.sample == SampleType::F32, &camera_raw::DevelopInputs::default());
+    camera_raw::develop(&mut px, w, h, p, &camera_raw::DevelopInputs::default(), fmt.sample == SampleType::F32);
     let n = fmt.channels();
     let orig = surf.read_region(area);
     let mut data = vec![0.0f32; w * h * n];
