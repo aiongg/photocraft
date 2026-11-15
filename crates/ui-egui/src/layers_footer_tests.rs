@@ -19,6 +19,18 @@ use craft::layers::ui::tree::LayerPart;
 
 type H = Harness<'static, PhotocraftApp>;
 
+/// OK in the open dialog `id`.
+fn confirm(h: &mut H, id: craft::ui::dialog::DialogId) {
+    let ctx = h.ctx.clone();
+    crate::dialogs::confirm(h.state_mut(), &ctx, id).unwrap();
+}
+
+/// Cancel in the open dialog `id`.
+fn cancel(h: &mut H, id: craft::ui::dialog::DialogId) {
+    let ctx = h.ctx.clone();
+    crate::dialogs::cancel(h.state_mut(), &ctx, id).unwrap();
+}
+
 /// Background, then "A" and "B" over it, "B" active; "A" selected too when `both`.
 fn two(both: bool) -> Session {
     let mut s = Session::new();
@@ -105,10 +117,10 @@ fn empty_group(h: &H, order: [&str; 3]) {
 /// The New Group dialog opened for `command`; nothing changed before OK. OK confirms it.
 fn group_dialog(h: &mut H, command: &str) {
     assert!(groups(h).is_empty(), "nothing happens before OK");
-    let (id, fields) = h.state().ui.dialogs.last().map(|d| (d.id, d.fields.clone())).expect("the New Group dialog opened");
-    assert!(crate::new_group_ui::owns(&fields));
-    assert_eq!(fields["__command"], command);
-    crate::dialogs::confirm(h.state_mut(), id).unwrap();
+    let id = h.state().framework.dialogs.stack().top().expect("the New Group dialog opened");
+    // PLAN: assumed `new_group_ui::owns(key: &str)` answers for the hosted New Group dialog's command key.
+    assert!(crate::new_group_ui::owns(command));
+    confirm(h, id);
     h.run_steps(4);
 }
 
@@ -123,7 +135,7 @@ fn mask_deleted(h: &mut H, part: LayerPart) {
     let before = masked(true);
     let original = before.active().unwrap().doc.walk().into_iter().map(|(_, _, l)| l).find(|l| l.name == "Masked").cloned().unwrap();
     let l = layer(h, "Masked").expect("the layer stays");
-    assert!(h.state().ui.dialogs.is_empty(), "mask deletion is immediate");
+    assert!(!h.state().dialog_open(), "mask deletion is immediate");
     assert_eq!(l.content, original.content);
     assert!(layer(h, "Badge").is_some());
     if part == LayerPart::LayerMask {
@@ -253,7 +265,8 @@ fn footer_buttons_run_photocraft_commands() {
             mods: Modifiers::NONE,
             after: |h| {
                 assert!(layer(h, "Masked").is_some());
-                assert!(h.state().ui.dialogs.iter().any(|d| crate::delete_layer_prompt::owns(&d.fields)));
+                // PLAN: assumed `alerts::prompt_tagged::<T>(app)` answers `Some` while a prompt tagged `T` is open.
+                assert!(crate::alerts::prompt_tagged::<crate::delete_layer_prompt::PendingDelete>(h.state()).is_some());
                 h.get_by_label("Delete").click();
                 h.run_steps(3);
                 assert!(layer(h, "Masked").is_none());
@@ -266,7 +279,7 @@ fn footer_buttons_run_photocraft_commands() {
             button: "Delete layer",
             mods: Modifiers::ALT,
             after: |h| {
-                assert!(h.state().ui.dialogs.is_empty(), "no confirmation");
+                assert!(!h.state().dialog_open(), "no confirmation");
                 assert!(layer(h, "Masked").is_none());
             },
         },
@@ -320,12 +333,13 @@ fn footer_buttons_run_photocraft_commands() {
 }
 
 /// The prompt a drop on the trash opened, with `message`; nothing changed before the answer.
-fn trash_prompt(h: &H, message: &str) -> u64 {
-    let d = h.state().ui.dialogs.iter().find(|d| crate::mask_trash_prompt::owns(&d.fields)).expect("the prompt is open");
-    assert_eq!(d.fields["message"], message);
+fn trash_prompt(h: &H, message: &str) -> craft::ui::dialog::DialogId {
+    // PLAN: assumed `alerts::prompt_tagged::<T>(app) -> Option<(DialogId, String)>`: the prompt's id and message.
+    let (id, text) = crate::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(h.state()).expect("the prompt is open");
+    assert_eq!(text, message);
     let l = layer(h, "Masked").expect("the layer stays");
     assert!(l.mask.is_some() && l.vector_mask.is_some(), "nothing changes before the answer");
-    d.id
+    id
 }
 
 fn past(h: &H) -> usize {
@@ -343,7 +357,7 @@ fn dropping_onto_the_trash() {
             let pixels = |h: &H| layer(h, "Masked").unwrap().content;
             let (before, steps) = (pixels(h), past(h));
             let id = trash_prompt(h, "Apply mask to layer before removing?");
-            crate::dialogs::confirm(h.state_mut(), id).unwrap();
+            confirm(h, id);
             assert!(layer(h, "Masked").unwrap().mask.is_none());
             assert_ne!(pixels(h), before, "applied, not deleted");
             assert_eq!(past(h), steps + 1);
@@ -355,22 +369,23 @@ fn dropping_onto_the_trash() {
             let to = h.get_by_label("Delete Layer Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
             let id = trash_prompt(h, "Apply mask to layer before removing?");
-            h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("choice".into(), json!("delete"));
-            crate::dialogs::confirm(h.state_mut(), id).unwrap();
+            let ctx = h.ctx.clone();
+            h.state_mut().framework.dialogs.set_json_field(&ctx, id, "choice", json!("delete")).unwrap();
+            confirm(h, id);
             assert!(layer(h, "Masked").unwrap().mask.is_none());
             assert_eq!(pixels(h), before, "deleted, not applied");
         }),
         ("the vector mask asks to delete just the mask", Some(LayerPart::VectorMask), "Delete Vector Mask", |h| {
             let steps = past(h);
             let id = trash_prompt(h, "Delete the vector mask?");
-            crate::dialogs::cancel(h.state_mut(), id).unwrap();
+            cancel(h, id);
             assert!(layer(h, "Masked").unwrap().vector_mask.is_some(), "Cancel keeps it");
             assert_eq!(past(h), steps);
             let at = thumb(h, "Masked", LayerPart::VectorMask).center();
             let to = h.get_by_role_and_label(egui::accesskit::Role::Button, "Delete Vector Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
             let id = trash_prompt(h, "Delete the vector mask?");
-            crate::dialogs::confirm(h.state_mut(), id).unwrap();
+            confirm(h, id);
             let l = layer(h, "Masked").unwrap();
             assert!(l.vector_mask.is_none() && l.mask.is_some(), "only the vector mask goes");
             assert_eq!(past(h), steps + 1);

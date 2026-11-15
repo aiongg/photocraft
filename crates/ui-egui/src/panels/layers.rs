@@ -1,24 +1,6 @@
-use super::{BlendMode, Layer, LayerId, PhotocraftApp, Rect, Sense, Tokens, Value, empty, icons, json, vec2};
+use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, empty, icons, vec2};
 
 // ----------------------------------------------------------------------------- layers
-
-/// The simple themes' single lock button. On the Background it converts the layer to a normal
-/// one, as clicking the Background's lock does in Photoshop. Elsewhere it clears every lock when
-/// any is set, and locks all otherwise. Toggling only "lock all" would leave the Background's
-/// transparency lock (still showing as locked), and a second click would lock its pixels,
-/// shutting out the Eraser and every other paint tool (#76).
-/// The Basic layout's lock toggle: the active layer's state decides, and every target follows it
-/// (`targets`: `{"layer": id}` or `{"layers": [ids]}`).
-pub(super) fn simple_lock_toggle(background: bool, l: &Layer, targets: &Value) -> (String, Value) {
-    if background {
-        return ("layer.new.layerFromBackground".into(), json!({}));
-    }
-    let locks =
-        if l.locks.any() { json!({"transparency": false, "pixels": false, "position": false, "artboard": false, "all": false}) } else { json!({"all": true}) };
-    let mut p = targets.clone();
-    p["locks"] = locks;
-    ("layer.setProps".into(), p)
-}
 
 /// The Layers panel's blend modes: Photoshop's, plus the layer's own Paint.NET mode when it has one
 /// (an imported `.pdn`), so the menu matches Photoshop's for every other layer.
@@ -43,21 +25,24 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let layers: Vec<LayerId> = drag.layers().into_iter().copied().collect();
         crate::layer_transfer::begin_from_panel(app, &ctx, &layers);
     }
+    // Thumbnail Contents is the clip preference alone, so the panel reads it each pass.
+    app.ui.layers_settings.options.thumbnail_contents = crate::layers_panel_ui::thumbnail_contents(app);
     let Some(st) = app.session.active() else {
         empty(ui, tl!("No document"));
         return;
     };
     // While the drag shows another document, its rows take no drop.
     let foreign = crate::layer_transfer::source(&ctx).is_some_and(|source| source != st.doc.id);
-    let settings = layers_tree::settings(app);
-    let mut filter = layers_tree::filter_of(&app.ui);
+    let settings = &app.ui.layers_settings;
+    // The tree borrows the app for the pass, so the filter is bound through a copy and stored back after it.
+    let mut filter = app.ui.layer_filter.clone();
     let before = filter.clone();
     let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
     let tree = PhotoLayers::new(app, st, &filter, foreign, picked);
     let thumbs = Thumbnails::<LayerThumb<LayerId>>::in_context(&ctx, "photocraft-layer-thumbs", ThumbnailOptions::new());
     let source = PhotoThumbs::new(app, &st.doc);
     let mut panel = LayersPanel::new(&tree)
-        .settings(&settings)
+        .settings(settings)
         .thumbnails(&thumbs, &source)
         .filter(Bind::bound(&mut filter))
         .row_menu(|target| layers_tree::row_menu(&tree, target))
@@ -79,13 +64,13 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     app.find_layers_focus = false;
     app.layers_rename = None;
     if filter != before {
-        layers_tree::store_filter(&mut app.ui, &filter);
+        app.ui.layer_filter = filter;
     }
     if out.hovered.is_some() {
         app.hover_layer = out.hovered;
     }
     // Preview on Canvas When Reordering Layers: the move the release would make.
-    match out.drop_preview.as_ref().filter(|_| app.ui.layers_panel_options.preview_on_canvas_when_reordering_layers) {
+    match out.drop_preview.as_ref().filter(|_| app.ui.layers_settings.options.preview_on_canvas_when_reordering) {
         Some(mv) => crate::layers_panel_ui::preview_reorder(app, &super::layers_events::move_params(mv)),
         None => app.reorder_preview = None,
     }

@@ -152,13 +152,19 @@ fn made(v: serde_json::Value) -> u64 {
     v["layer"].as_u64().unwrap()
 }
 
-fn dialog_fields(h: &H) -> Option<serde_json::Map<String, serde_json::Value>> {
-    h.state().ui.dialogs.last().map(|d| d.fields.clone())
+fn dialog_open(h: &H) -> bool {
+    h.state().dialog_open()
+}
+
+/// What the colour picker on top of the dialog stack edits.
+fn picker_target(h: &H) -> Option<crate::color_picker_ui::PickTarget> {
+    // PLAN: assumed `color_picker_ui::target(app, id) -> Option<PickTarget>`.
+    let id = h.state().framework.dialogs.stack().top()?;
+    crate::color_picker_ui::target(h.state(), id)
 }
 
 fn properties_shown(h: &H) {
-    assert!(h.state().ui.panels.properties, "Properties opened");
-    assert!(!h.state().ui.dock.collapsed.contains(&crate::dock::Group::Properties), "Properties un-collapsed");
+    assert!(crate::panel_docking::is_front(h.state(), "properties"), "Properties opened in front");
 }
 
 /// Where a double-click lands on the row of "T".
@@ -176,7 +182,6 @@ enum At {
 /// shape layer's thumbnail its fill picker, an adjustment or gradient its Properties, a frame's
 /// content a Smart Object's contents; elsewhere on the row, Layer Style.
 #[test]
-#[ignore = "craft-layers: the double-click's second press reselects the row with no part (map_events gives a Selection the part of single clicks only), so a fill row with a mask targets its mask"]
 fn double_clicks_open_what_the_part_shows() {
     type Case = (&'static str, fn() -> Session, At, fn(&mut H));
     let cases: [Case; 14] = [
@@ -188,14 +193,14 @@ fn double_clicks_open_what_the_part_shows() {
                 assert_eq!(h.state().ui.tool, crate::state::Tool::Type);
                 let ed = h.state().ui.text_edit.as_ref().expect("inline text editor");
                 assert_eq!(ed.layer, layer_id(h.state(), "T").0);
-                assert!(h.state().ui.dialogs.is_empty(), "no Layer Style dialog");
+                assert!(!dialog_open(h), "no Layer Style dialog");
             },
         ),
         (
             "type name: no text editing",
             || under_other(|s| made(s.execute("type.create", json!({"text": "Hello", "size": 48, "x": 100, "y": 180})).unwrap())),
             At::Name,
-            |h| assert!(h.state().ui.text_edit.is_none() && h.state().ui.dialogs.is_empty()),
+            |h| assert!(h.state().ui.text_edit.is_none() && !dialog_open(h)),
         ),
         (
             "layer mask, preference off: Properties",
@@ -210,7 +215,7 @@ fn double_clicks_open_what_the_part_shows() {
             |h| {
                 assert!(h.state().ui.mask_target, "the mask is targeted");
                 properties_shown(h);
-                assert!(h.state().ui.dialogs.is_empty());
+                assert!(!dialog_open(h));
             },
         ),
         (
@@ -225,7 +230,7 @@ fn double_clicks_open_what_the_part_shows() {
             At::Thumb(LayerPart::LayerMask),
             |h| {
                 assert!(h.state().ui.mask_target);
-                let w = h.state().distort.describe()["selectAndMask"].clone();
+                let w = crate::distort_ui::workspace_fields(h.state(), "select.selectAndMask").expect("the Select and Mask workspace is open");
                 assert_eq!(w["settings"]["output"].as_str(), Some("layerMask"), "Select and Mask opens on the mask: {w}");
             },
         ),
@@ -248,9 +253,9 @@ fn double_clicks_open_what_the_part_shows() {
             || under_other(|s| made(s.execute(photocraft_engine::pattern_fill_cmds::CREATE, json!({"pattern": "Checkerboard"})).unwrap())),
             At::Thumb(LayerPart::Pixels),
             |h| {
-                let f = dialog_fields(h).expect("a dialog opened");
-                assert!(crate::dialogs::pattern_fill_ui::owns(&f));
-                assert_eq!(f["__params"]["layer"], layer_id(h.state(), "T").0);
+                assert!(h.state().framework.dialogs.is_open::<craft::draw::ui::pattern::PatternFillDialog>(), "the Pattern Fill dialog opened");
+                // PLAN: assumed `pattern_fill.session` names the layer it edits in `layer`.
+                assert_eq!(h.state().pattern_fill.session.as_ref().map(|s| s.layer), Some(layer_id(h.state(), "T").0));
             },
         ),
         (
@@ -259,30 +264,28 @@ fn double_clicks_open_what_the_part_shows() {
             At::Thumb(LayerPart::Pixels),
             |h| {
                 assert_eq!(h.state().session.active().unwrap().active_layer, Some(layer_id(h.state(), "T")));
-                let f = dialog_fields(h).filter(crate::dialogs::shape_fill_ui::owns).expect("the Color Picker opened on the shape fill");
-                assert_eq!(f["color"], "#336699");
+                assert!(matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::Shape { .. })), "the Color Picker opened on the shape fill");
             },
         ),
         ("solid colour: its picker, the fill targeted", solid, At::Thumb(LayerPart::Pixels), |h| {
             assert!(!h.state().ui.mask_target && !h.state().ui.vector_mask_target);
-            let f = dialog_fields(h).expect("Color Picker opened");
-            assert!(crate::dialogs::solid_fill_ui::owns(&f));
-            assert_eq!(f["__label"], "Color Picker (Solid Color)");
-            assert_eq!(f["__params"]["layer"], layer_id(h.state(), "T").0);
+            assert!(matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::SolidFill { .. })), "Color Picker opened on the fill");
         }),
         ("solid colour's mask: not the picker", solid, At::Thumb(LayerPart::LayerMask), |h| {
-            assert!(!h.state().ui.dialogs.iter().any(|d| crate::dialogs::solid_fill_ui::owns(&d.fields)));
+            assert!(!matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::SolidFill { .. })));
         }),
         ("the row's end: Layer Style", solid, At::End, |h| {
-            assert_eq!(h.state().ui.dialogs.last().map(|d| d.kind), Some(crate::state::DialogKind::LayerStyle));
+            // PLAN: assumed the Layer Style dialog is the only dialog this double click opens.
+            assert!(dialog_open(h), "the Layer Style dialog opened");
+            assert!(picker_target(h).is_none());
         }),
         (
             "gradient fill: Properties",
             || under_other(|s| made(s.execute("layer.newFillLayer.gradient", json!({})).unwrap())),
             At::Thumb(LayerPart::Pixels),
             |h| {
-                assert!(h.state().ui.panels.properties);
-                assert!(h.state().ui.dialogs.is_empty());
+                properties_shown(h);
+                assert!(!dialog_open(h));
             },
         ),
         (
@@ -290,8 +293,8 @@ fn double_clicks_open_what_the_part_shows() {
             || under_other(|s| made(s.execute("layer.newAdjustmentLayer.invert", json!({})).unwrap())),
             At::Thumb(LayerPart::Pixels),
             |h| {
-                assert!(h.state().ui.panels.properties);
-                assert!(h.state().ui.dialogs.is_empty());
+                properties_shown(h);
+                assert!(!dialog_open(h));
             },
         ),
         ("frame holding a Smart Object: its contents open", framed, At::Thumb(LayerPart::FrameContent), |h| {

@@ -16,6 +16,9 @@ use crate::mask_thumbs_ui::MaskKind;
 
 type Action = (String, Value);
 
+#[cfg(test)]
+pub(crate) mod tests;
+
 fn egui_mods(m: Mods) -> egui::Modifiers {
     egui::Modifiers { alt: m.alt, ctrl: m.ctrl, shift: m.shift, mac_cmd: false, command: m.cmd || m.ctrl }
 }
@@ -77,9 +80,8 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
     let active = st.active_layer;
     let selection = st.selected_layers();
     let picked = crate::smart_ui::selected(&app.smart_filter_picks, &doc, active);
-    let filter = layers_tree::filter_of(&app.ui);
     let (targets, picked) = {
-        let tree = PhotoLayers::new(app, st, &filter, false, picked);
+        let tree = PhotoLayers::new(app, st, &app.ui.layer_filter, false, picked);
         (tree.targets(), tree.selected_filter())
     };
     let layer = |id: &LayerId| doc.layer(*id);
@@ -103,7 +105,8 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
             target_on_click(app, l, active == Some(id), select.part, actions);
         }
         LayersEvent::Toggle(toggle) => {
-            let gesture = toggle.edit.id().map(|g| g.0);
+            // One sweep down the eye column is one gesture, so its steps share a key and are one undo step.
+            let coalesce = crate::history_keys::coalesce("layer-eye-sweep", &toggle.edit);
             let value = match toggle.edit {
                 EditEvent::Set { after, .. } | EditEvent::Update { value: after, .. } | EditEvent::Commit { after, .. } => Some(after),
                 EditEvent::Cancel { before: Some(Mixed::Same(v)), .. } => Some(v),
@@ -115,8 +118,8 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                     (LayerColumn::Visibility, LayerRowKey::Layer(id)) => {
                         if layer(id).is_some_and(|l| l.visible != on) {
                             let mut p = json!({"layer": id.0, "visible": on});
-                            if let Some(g) = gesture {
-                                p["coalesce"] = json!(format!("layer-eye-sweep:{g}"));
+                            if let Some(key) = &coalesce {
+                                p["coalesce"] = json!(key);
                             }
                             actions.push(("layer.setProps".into(), p));
                         }
@@ -141,8 +144,17 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
                         }
                     }
                     (LayerColumn::Lock, LayerRowKey::Layer(id)) => {
-                        if let Some(l) = layer(id) {
-                            actions.push(super::layers::simple_lock_toggle(doc.is_background(*id), l, &json!({"layer": id.0})));
+                        // The panel's lock indicator reports only an unlock: the Background becomes a normal
+                        // layer, any other layer loses every lock.
+                        if layer(id).is_some() {
+                            actions.push(if doc.is_background(*id) {
+                                ("layer.new.layerFromBackground".into(), json!({}))
+                            } else {
+                                (
+                                    "layer.setProps".into(),
+                                    json!({"layer": id.0, "locks": {"transparency": false, "pixels": false, "position": false, "artboard": false, "all": false}}),
+                                )
+                            });
                         }
                     }
                     _ => {}
@@ -173,12 +185,12 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
         LayersEvent::ThumbClick { layer: id, part, mods, .. } => {
             let Some(l) = layer(&id) else { return };
             let m = egui_mods(mods);
-            if m.command {
+            if mods.cmd || mods.ctrl {
                 let params = match part {
-                    LayerPart::LayerMask | LayerPart::VectorMask => mask_kind(part).map(|k| crate::mask_thumbs_ui::load_params(l, k, m)),
-                    LayerPart::FrameShape if l.frame.is_some() => Some(crate::mask_thumbs_ui::load_params(l, MaskKind::Vector, m)),
+                    LayerPart::LayerMask | LayerPart::VectorMask => mask_kind(part).map(|k| crate::mask_thumbs_ui::load_params(l, k, mods)),
+                    LayerPart::FrameShape if l.frame.is_some() => Some(crate::mask_thumbs_ui::load_params(l, MaskKind::Vector, mods)),
                     LayerPart::Pixels | LayerPart::FrameShape if !doc.is_background(id) => {
-                        Some(json!({"channel": "transparency", "layer": id.0, "operation": crate::channels_panel::load_operation(m)}))
+                        Some(json!({"channel": "transparency", "layer": id.0, "operation": craft::behavior::SelectionOperation::from_mods(mods).name()}))
                     }
                     _ => None,
                 };
@@ -429,16 +441,16 @@ fn properties(app: &mut PhotocraftApp, targets: &[LayerId], edit: LayerPropertyE
         },
         LayerPropertyEdit::Opacity(e) | LayerPropertyEdit::Fill(e) => {
             let key = if is_opacity { "opacity" } else { "fill" };
-            // A scrub or slider drag is one undo step: its gesture id coalesces its steps.
-            let step = match e {
-                EditEvent::Update { id, value, .. } => Some((value, Some(id.0))),
-                EditEvent::Commit { id, after, .. } => Some((after, Some(id.0))),
-                EditEvent::Set { after, .. } => Some((after, None)),
-                EditEvent::Cancel { id, before: Some(Mixed::Same(v)), .. } => Some((v, Some(id.0))),
+            // A scrub or slider drag is one undo step: its gesture coalesces its steps.
+            let coalesce = crate::history_keys::coalesce(&format!("layer-{key}-slider"), &e);
+            let value = match e {
+                EditEvent::Update { value, .. } => Some(value),
+                EditEvent::Commit { after, .. } | EditEvent::Set { after, .. } => Some(after),
+                EditEvent::Cancel { before: Some(Mixed::Same(v)), .. } => Some(v),
                 _ => None,
             };
-            if let Some((value, gesture)) = step {
-                actions.push(super::options_bar::pct_action(&p, key, value as f32, gesture));
+            if let Some(value) = value {
+                actions.push(super::options_bar::pct_action(&p, key, value as f32, coalesce));
             }
         }
         LayerPropertyEdit::Lock { kind, on, .. } => {
@@ -529,8 +541,8 @@ fn menu_pick(app: &mut PhotocraftApp, ctx: &egui::Context, row: &Option<LayerRow
         return;
     }
     if let Some(size) = command.strip_prefix(layers_tree::THUMB_SIZE) {
-        if let Ok(size) = serde_json::from_value(json!(size)) {
-            app.ui.layers_panel_options.thumbnail_size = size;
+        if let Some(size) = crate::layers_panel_ui::size_of_key(size) {
+            app.ui.layers_settings.options.thumbnail_size = size;
             crate::layers_panel_ui::persist_options(app);
         }
         return;
@@ -612,9 +624,10 @@ pub(crate) fn run_actions(app: &mut PhotocraftApp, ctx: &egui::Context, actions:
         }
         // Double-clicking a mask thumbnail opens its settings: show Properties.
         if id == "ui.properties" {
-            app.ui.panels.properties = true;
-            app.ui.dock_tabs.properties = 0;
-            app.ui.dock.collapsed.retain(|g| *g != crate::dock::Group::Properties);
+            if let Err(e) = crate::panel_docking::show_panel(app, "properties", Some(true)) {
+                app.ui.status = e;
+                app.ui.status_error = true;
+            }
             continue;
         }
         if p.is_null() || id == "layer.newFillLayer.solidColor" || id == photocraft_engine::pattern_fill_cmds::CREATE {
