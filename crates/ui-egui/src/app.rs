@@ -212,6 +212,8 @@ impl PhotocraftApp {
             held_insert_menu: None,
             allow_close: false,
             framework,
+            file_dialog: None,
+            tiff_remembered: Default::default(),
             brush_tip: None,
             snap_cache: Default::default(),
             workspaces: Default::default(),

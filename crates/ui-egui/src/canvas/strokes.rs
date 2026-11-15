@@ -361,7 +361,7 @@ impl CommittedStroke {
 
 /// The live stroke on document `idx`, while it is current. The paint tool drops `app.live_stroke`
 /// with its stroke, so a live stroke that exists belongs to a running gesture.
-pub(super) fn live_stroke(app: &PhotocraftApp, idx: usize) -> Option<&LiveStroke> {
+pub(crate) fn live_stroke(app: &PhotocraftApp, idx: usize) -> Option<&LiveStroke> {
     let st = app.session.documents().get(idx)?;
     app.live_stroke.as_ref().filter(|l| l.doc == st.doc.id && l.revision == st.revision)
 }

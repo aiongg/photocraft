@@ -246,6 +246,12 @@ impl Framework {
         }
     }
 
+    /// The host's file service. The web has no host `Files` until FW-264 and reads its own dialog path.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn files(&self) -> &dyn Files {
+        self.host.files()
+    }
+
     /// Moves the dialogs' last-used values the preferences still hold into the framework's saved
     /// memory, once, before the first frame. Nothing is left to move after the first run.
     pub(crate) fn move_memories(&mut self, session: &mut Session) {
@@ -392,8 +398,7 @@ impl Framework {
         AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
-    /// The suite, for tests that put themes in its library.
-    #[cfg(test)]
+    /// The suite client: the theme library and its watcher.
     pub(crate) fn suite(&self) -> &SuiteClient {
         &self.suite
     }

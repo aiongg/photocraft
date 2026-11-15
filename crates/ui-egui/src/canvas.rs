@@ -57,7 +57,7 @@ pub mod scroll_all_windows;
 pub mod select_mask_view;
 pub mod snap_ui;
 mod start_screen;
-mod strokes;
+pub(crate) mod strokes;
 pub(crate) use strokes::ClonePreviewCache;
 pub(crate) mod tabs;
 #[cfg(test)]

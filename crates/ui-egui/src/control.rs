@@ -50,7 +50,7 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
-mod dialogs;
+pub(crate) mod dialogs;
 mod dispatch;
 mod inspect;
 mod params;

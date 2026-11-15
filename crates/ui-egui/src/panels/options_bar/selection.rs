@@ -189,10 +189,9 @@ fn lasso(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
     }
     select_and_mask(ui);
     let enter = crate::shortcuts::pretty("Enter");
-    // PLAN: `outline_open` (canvas-widgets-w18) and `magnetic_lasso_ui::drawing` (tools-w64) are called as the sheet
-    // names them; the framework's selection tools own the open outline the hints follow.
+    // The framework's selection tools own the open outline the hints follow.
     if tool == Tool::MagneticLasso {
-        if crate::magnetic_lasso_ui::drawing(app) {
+        if app.canvas_tools.selection.outline_open() {
             let del = crate::shortcuts::pretty("Backspace");
             hint(
                 ui,

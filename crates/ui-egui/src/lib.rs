@@ -663,6 +663,10 @@ pub struct PhotocraftApp {
     pub(crate) allow_close: bool,
     /// The craft framework's host and the framework dialogs open in it (`app/framework.rs`).
     pub(crate) framework: app::framework::Framework,
+    /// The file dialog in progress (see `file_dialog`).
+    pub(crate) file_dialog: Option<file_dialog::Pending>,
+    /// What the last TIFF Options answer chose; it outlives a prompt.
+    pub(crate) tiff_remembered: tiff_options_ui::Remembered,
     /// Pen pressure/tilt from the platform (see `stylus`).
     pub stylus: stylus::Stylus,
     /// Run long commands and file opens as background jobs with progress and Cancel (#210; see

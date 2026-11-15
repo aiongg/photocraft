@@ -895,7 +895,7 @@ pub(crate) fn mode_checked(app: &PhotocraftApp, menu: &CanvasToolMenu, command: 
         MenuKind::Guide => command == "view.lockGuides" && app.ui.extras.lock_guides,
         MenuKind::Pasteboard => pasteboard_choice(command) == Some(app.session.prefs().interface.canvas_color),
         MenuKind::TypeEdit { .. } | MenuKind::TypeLayer { .. } => type_checked(app, command),
-        _ if is_eyedropper(menu) => eyedropper_size(command).is_some_and(|n| app.ui.tool_options.eyedropper.size == crate::tool_options::SampleSize::from_pixels(n)), // PLAN: assumed path of `SampleSize` (tools-w71)
+        _ if is_eyedropper(menu) => eyedropper_size(command).is_some_and(|n| app.ui.tool_options.eyedropper.size.pixels() == n),
         _ => false,
     }
 }
@@ -1147,7 +1147,7 @@ pub fn entry_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) 
     let saved = menu.path_name.as_deref().is_some_and(|n| n != "work" && n != "layer");
     let has_path = menu.has_path;
     let pending = pen_pending(app);
-    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
+    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target);
     match command {
         "layer.vectorMask.fromPath" => has_path && can_mask && !pending_layer,
         "path.delete" => has_path && !pending_layer && (pending || menu.path_name.as_deref() != Some("layer")),
@@ -1364,8 +1364,8 @@ pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
 /// Color row puts the colour read at the right-click on the clipboard, as the Color panel's menu
 /// does. Neither touches the foreground colour or the history.
 fn choose_eyedropper(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
-    if let Some(size) = eyedropper_size(command) {
-        app.ui.tool_options.eyedropper.size = crate::tool_options::SampleSize::from_pixels(size); // PLAN: assumed path of `SampleSize` (tools-w71)
+    if let Some(size) = eyedropper_size(command).and_then(craft::color::ui::SampleSize::from_pixels) {
+        app.ui.tool_options.eyedropper.size = size;
         return Ok(());
     }
     let rgb = menu.color.ok_or("No colour under the pointer")?;
@@ -1425,7 +1425,7 @@ fn choose_pen(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, com
         return Ok(());
     }
     let pending = pen_pending(app);
-    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target); // PLAN: assumed `VectorMode::Shape` (tools-w71)
+    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || app.ui.vector_mask_target);
     if pending && !crate::vector_ui::pen_commit(app, false) {
         return Err(app.ui.status.clone());
     }

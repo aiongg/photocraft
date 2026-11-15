@@ -175,7 +175,7 @@ fn open_step_editor(app: &mut PhotocraftApp, command: &str, values: &Value) -> R
     {
         crate::dialogs::open_command_dialog(app, command, &label_of(command))
     } else {
-        crate::filter_dialog::open(app, command).ok_or_else(|| tl!("The step has no command editor.").into())
+        crate::filter_dialog::open(app, command)
     }
 }
 

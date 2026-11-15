@@ -74,8 +74,7 @@ fn mode_menu_at(h: &Harness<'static, PhotocraftApp>) -> Option<Pos2> {
 
 /// Where the Brush Preset picker is open, if it is.
 fn picker_at(h: &Harness<'static, PhotocraftApp>) -> Option<Pos2> {
-    // PLAN: assumed `brush_picker::open_at(&PhotocraftApp) -> Option<Pos2>` (tools-w60's reader).
-    crate::brush_picker::open_at(h.state())
+    crate::brush_picker::opened_at(h.state())
 }
 
 fn mode_right_click(h: &mut Harness<'static, PhotocraftApp>, mods: Modifiers) {

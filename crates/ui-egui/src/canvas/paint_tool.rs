@@ -8,11 +8,6 @@
 //! The tool holds the [`ToolScope`] and reaches the app one call at a time (`with_app`), never two
 //! at once. `PaintResize` lives in `app.brush_resize`: each call that needs the app too takes it out
 //! with `std::mem::take` first.
-//
-// PLAN: the signatures of `brush_resize::PaintResize` (tools-w62) have no contract row. This file
-// codes against `takes(tool, button, mods) -> bool`, `press(&mut self, app, tool, &ToolPointer,
-// doc) -> bool`, `drag(&mut self, app, &ToolPointer, doc)`, `release(&mut self, app, &ToolPointer,
-// doc)`, `cancel(&mut self, app)` and `active(&self) -> bool`, as the sheet lists the names.
 
 use std::time::Duration;
 
@@ -202,11 +197,11 @@ fn with_resize<R>(app: &mut PhotocraftApp, f: impl FnOnce(&mut crate::brush_resi
 
 /// A press the paint tool takes: the resize chord, the HUD Color Picker, a Mixer Brush load (a click
 /// that is done at once), or a stroke.
-fn begin(app: &mut PhotocraftApp, state: &mut PaintState, pointer: &ToolPointer, at: [f64; 2]) -> ToolAction {
+fn begin(app: &mut PhotocraftApp, state: &mut PaintState, pointer: &ToolPointer, at: [f64; 2], cx: &mut ToolContext<'_>) -> ToolAction {
     let tool = app.ui.tool;
     let (mods, button) = (pointer.mods, pointer.button);
     app.stylus.record_pointer(pointer.time * 1000.0, Some(pointer.sample));
-    if with_resize(app, |r, app| r.press(app, tool, pointer, at)) {
+    if with_resize(app, |r, app| r.press(app, pointer, cx)) {
         return ToolAction::Claimed;
     }
     let secondary = if button == PointerButton::Secondary { secondary_takes(app, tool, mods) } else { SecondaryUse::None };
@@ -298,6 +293,8 @@ impl CanvasTool for PaintTool<'_> {
         let now_ms = cx.time * 1000.0;
         scope.with_app(|app| {
             crate::brush_cursor::sync_tip(app);
+            // The readout request lasts one pass: a pass without pointer input repeats it.
+            app.brush_resize.hud(cx);
             let Some(stroke) = state.stroke.as_ref() else { return };
             let stale_mixer = stroke.tool == Tool::MixerBrush
                 && app.live_stroke.is_some()
@@ -318,22 +315,22 @@ impl CanvasTool for PaintTool<'_> {
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let Some(at) = doc_point(cx, pointer.pos) else { return ToolAction::Ignored };
         let Self { scope, state } = self;
-        scope.with_app(|app| begin(app, state, pointer, at))
+        scope.with_app(|app| begin(app, state, pointer, at, cx))
     }
 
     fn drag(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
-        let Some(at) = doc_point(cx, pointer.pos) else { return };
         let Self { scope, state } = self;
         scope.with_app(|app| {
             if with_resize(app, |r, app| {
                 let active = r.active();
                 if active {
-                    r.drag(app, pointer, at);
+                    r.drag(app, pointer, cx);
                 }
                 active
             }) {
                 return;
             }
+            let Some(at) = doc_point(cx, pointer.pos) else { return };
             let Some(stroke) = state.stroke.as_mut() else { return };
             let now_ms = pointer.time * 1000.0;
             app.stylus.record_pointer(now_ms, Some(pointer.sample));
@@ -354,15 +351,13 @@ impl CanvasTool for PaintTool<'_> {
         let at = doc_point(cx, pointer.pos);
         let Self { scope, state } = self;
         scope.with_app(|app| {
-            if let Some(at) = at
-                && with_resize(app, |r, app| {
-                    let active = r.active();
-                    if active {
-                        r.release(app, pointer, at);
-                    }
-                    active
-                })
-            {
+            if with_resize(app, |r, app| {
+                let active = r.active();
+                if active {
+                    r.release(app, pointer, cx);
+                }
+                active
+            }) {
                 return;
             }
             let Some(mut stroke) = state.stroke.take() else {
@@ -392,11 +387,11 @@ impl CanvasTool for PaintTool<'_> {
         });
     }
 
-    fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {
+    fn cancel(&mut self, _reason: CancelReason, cx: &mut ToolContext<'_>) {
         let Self { scope, state } = self;
         scope.with_app(|app| {
             drop_stroke(app, state);
-            with_resize(app, |r, app| r.cancel(app));
+            with_resize(app, |r, app| r.cancel(app, cx));
             crate::color_hud::release(&mut app.ui);
         });
     }

@@ -34,7 +34,7 @@ fn u64_param(p: &Value, key: &str) -> Option<u64> {
     p.get(key).and_then(Value::as_u64)
 }
 
-fn wait_param(p: &Value) -> bool {
+pub(super) fn wait_param(p: &Value) -> bool {
     p.get("wait").and_then(Value::as_bool).unwrap_or(true)
 }
 

@@ -41,9 +41,8 @@ fn stroke_points(app: &PhotocraftApp) -> Vec<photocraft_paint::StrokePoint> {
 }
 
 /// The live trail's coverage reader.
-fn trail(app: &PhotocraftApp) -> Option<&crate::tools::stroke_trail::StrokeTrail> {
-    // PLAN: assumed `stroke_trail::live(&PhotocraftApp) -> Option<&StrokeTrail>` (tools-w61's state reader).
-    crate::tools::stroke_trail::live(app)
+fn trail(app: &PhotocraftApp) -> Option<&crate::tools::stroke_trail::Trail> {
+    app.trail.as_ref()
 }
 
 /// A whole-document canvas at 100 % in a harness, for tests that feed several moves in one pass.

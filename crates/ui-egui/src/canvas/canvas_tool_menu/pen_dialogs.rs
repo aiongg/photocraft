@@ -228,7 +228,7 @@ pub(crate) fn make_selection(app: &mut PhotocraftApp) -> Result<(), String> {
     // Where `pen_commit` puts the path being drawn: a shape layer or the targeted vector mask,
     // else the Paths panel path it adds to (a selected saved path, or the Work Path), which it
     // selects so it is the active path.
-    let pending_layer = pending && (app.ui.tool_options.vector_mode == crate::state::VectorMode::Shape || crate::vector_ui::targeted_vector_mask(app).is_some()); // PLAN: assumed `VectorMode::Shape` (tools-w71)
+    let pending_layer = pending && (app.ui.tool_options.vector_mode == craft::draw::ui::VectorMode::Shape || crate::vector_ui::targeted_vector_mask(app).is_some());
     if pending && !crate::vector_ui::pen_commit(app, false) {
         return Err(app.ui.status.clone());
     }
