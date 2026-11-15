@@ -341,7 +341,7 @@ impl PhotocraftApp {
             && id != old_id
             && self.view_docs.contains(id)
         {
-            self.ui.tool_options.crop.fill = crate::state::CropFill::Background;
+            self.ui.tool_options.crop.fill = craft::draw::ui::crop::CropFill::Background;
         }
         let same_document = match (&self.path_document, &document) {
             (Some((old_id, old_revision, old_source)), Some((id, revision, source))) => old_id == id && (revision > old_revision || old_source.ptr_eq(source)),
@@ -357,7 +357,6 @@ impl PhotocraftApp {
         type_transform::cancel_stale(self);
         crate::cam_transform::cancel_stale(self);
         crate::distort_ui::cancel_stale(self);
-        crate::perspective_crop_ui::cancel_stale(self);
         // A pen path under construction belongs to the document it was started on too.
         vector_ui::cancel_stale(self);
         let ids: Vec<DocId> = self.session.documents().iter().map(|d| d.doc.id).collect();

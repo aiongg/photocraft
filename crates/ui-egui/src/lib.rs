@@ -716,6 +716,28 @@ mod lifecycle_tests;
 #[cfg(test)]
 mod screenshot_tests;
 
+/// Helpers shared by the tests of more than one module.
+#[cfg(test)]
+pub(crate) mod testing {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use craft::settings::testing::MemoryFiles;
+    use craft::settings::{Location, OpenOptions, SettingsStore};
+
+    use crate::Services;
+
+    /// The folder of the scratch settings store; its file lives in `files`.
+    const DIR: &str = "/memory/photocraft";
+
+    /// Services whose preferences store reads and writes `files`, so a second app over the same files reads what the
+    /// first one stored. A zero debounce makes the first frame after a change write it.
+    pub(crate) fn services_over(files: &Arc<MemoryFiles>) -> Services {
+        let options = OpenOptions::new(Location::Dir(DIR.into())).debounce(Duration::ZERO).files(files.clone());
+        Services { settings: Some(SettingsStore::<photocraft_engine::prefs::SavedPrefs>::open_with(options)), ..Default::default() }
+    }
+}
+
 #[cfg(test)]
 mod navigator_gpu_tests;
 

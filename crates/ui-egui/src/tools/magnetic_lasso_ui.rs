@@ -91,8 +91,6 @@ pub(crate) fn commit(app: &mut PhotocraftApp, points: &[Point], mode: &str) {
 /// The border in progress for `ui.inspect`: `path`, `anchors` (indices into `path`), `live` and the
 /// selection `mode`; empty and `""` when no border is open.
 pub(crate) fn inspect(app: &PhotocraftApp) -> Value {
-    // PLAN: assumed MagneticLassoTool::outline() -> Option<MagneticOutlineView<'_>> with pub fields
-    // `path: &[Point]`, `anchors: &[usize]`, `live: &[Point]`, `operation: SelectionOperation`, `freehand: bool`
     let Some(o) = app.canvas_tools.selection.magnetic.outline() else {
         return json!({"path": [], "anchors": [], "live": [], "mode": ""});
     };

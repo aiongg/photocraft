@@ -337,8 +337,15 @@ pub(crate) fn params(app: &PhotocraftApp, command: &str, spec: &str) -> Vec<Para
     if command == "image.mode.colorTable" {
         list.extend(crate::color_table_ui::rows(app));
     }
-    // PLAN: Color Settings' monitor line (`.below(monitor_status::note_cell(app))`, dialogs-w22) has no `Param` setter in the framework; the line is not attached here.
     rows::custom_rows(app, command, &mut list);
+    if command == "edit.colorSettings" {
+        // The monitor line under the rows: the cell holds the text each frame refreshes, which the build closure cannot read from the app.
+        let note = crate::monitor_status::note_cell(app);
+        list.push(craft::ui::patterns::form_dialogs::Param::custom("monitorNote", craft::ui::runtime::env::Label::Empty, move |ui, _, _| {
+            let text = note.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone();
+            ui.label(text)
+        }));
+    }
     list
 }
 

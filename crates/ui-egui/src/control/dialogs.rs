@@ -428,8 +428,9 @@ fn workspace_reply(app: &PhotocraftApp, key: &str, id: DialogId) -> Value {
 /// Runs the preview jobs of the open workspace to completion, then one pass of results, so the request's reply
 /// shows the finished preview.
 fn wait_preview(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    // PLAN: assumed `Framework::preview_queue(&self) -> &JobQueue<..>`, the queue the workspaces' previews run on; the app holds none at the base.
-    app.framework.preview_queue().run_inline(usize::MAX);
+    /// How long a request waits for the jobs on the framework's lanes.
+    const WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+    craft::ui::runtime::pending::finish_jobs(ctx, WAIT);
     crate::dialogs::take_results(app, ctx);
 }
 

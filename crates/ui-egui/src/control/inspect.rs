@@ -33,7 +33,7 @@ fn brush_mode_menu(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Value {
     })
 }
 
-/// The last pass's rect of each canvas, hosted dialog and the task bar, as `[x0, y0, x1, y1]` in screen points. An id
+/// The last pass's rect of each canvas and hosted dialog, as `[x0, y0, x1, y1]` in screen points. An id
 /// the framework reports no rect for (absent, behind the modal, no area) is left out.
 fn rects(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     use craft::ui::runtime::access::bounds;
@@ -48,9 +48,6 @@ fn rects(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         if let Some(r) = rect(dialog.id) {
             out.insert(dialog.id.value().to_string(), r);
         }
-    }
-    if let Some(r) = rect(crate::crop_task_bar::bar_id()) {
-        out.insert("taskBar".into(), r);
     }
     Value::Object(out)
 }

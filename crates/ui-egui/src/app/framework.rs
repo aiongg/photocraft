@@ -404,7 +404,7 @@ impl Framework {
         AppTheme::resolved(Arc::new(def), dark, &resolved)
     }
 
-    /// The suite, for tests that put themes in its library.
+    /// The suite: the Preferences window's theme rows read it, and tests put themes in its library.
     pub(crate) fn suite(&self) -> &SuiteClient {
         &self.suite
     }

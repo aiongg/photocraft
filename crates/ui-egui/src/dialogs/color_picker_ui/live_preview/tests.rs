@@ -72,9 +72,11 @@ fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {
     r
 }
 
-// PLAN: the framework gives no public read of the colour a hosted dialog's row previews (`HostRequests::previewed_colors`
-// is not reachable from `HostedParamDialog`), so these trials assert what the app owns: `sync` reports a change when the
-// shown colour changes, the parent's values are never written, and the live record ends with the picker.
+/// The colour the dialog `id` previews on its row `key`, as `"#rrggbb"`.
+fn previewed(app: &PhotocraftApp, id: DialogId, key: &str) -> Option<String> {
+    let dialog = app.framework.dialogs.get_by_id::<HostedParamDialog>(id)?;
+    dialog.previewed_colors().iter().find(|(row, _)| row == key).map(|(_, color)| hex(*color))
+}
 
 /// #9886: the Fill dialog's colour row follows the picker before OK, Cancel puts back what it showed, and nothing
 /// reaches the document's History or the dialog's values.
@@ -87,6 +89,7 @@ fn a_dialog_colour_follows_the_picker_and_cancel_restores_it() {
         testing::set_color(&mut app, picker, color);
         assert!(sync(&mut app), "{color}: the row shows the new colour");
         assert!(!sync(&mut app), "{color}: nothing new on a second pass");
+        assert_eq!(previewed(&app, fill, &key).as_deref(), Some(color), "{color}: the row previews the picker's colour");
         assert_eq!(values(&app, fill), before, "the row's values are never written while previewing");
     }
     assert_eq!(previewed_dialogs(&app), vec![fill]);

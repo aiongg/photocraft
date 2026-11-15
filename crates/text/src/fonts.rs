@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use craft::font_catalog::{Catalog, Limits, Source};
+use craft::font_manager::axes::{FontAxis, NamedInstance, read_axes, read_named_instances};
 use parley::FontContext;
 use parley::fontique::{Blob, Collection, CollectionOptions, FontInfoOverride, FontStyle, FontWeight, FontWidth, GenericFamily, SourceCache};
 use skrifa::raw::{FileRef, TableProvider, types::Tag};
@@ -177,6 +178,10 @@ pub struct FaceInfo {
     pub italic: bool,
     /// Variation axes: (tag, min, default, max).
     pub axes: Vec<(String, f32, f32, f32)>,
+    /// The same axes as the Character controls take them (tag, name, range, hidden); empty for a static face.
+    pub font_axes: Vec<FontAxis>,
+    /// The named instances of a variable face, in font order.
+    pub instances: Vec<NamedInstance>,
 }
 
 /// Result of a PostScript-name lookup.
@@ -507,6 +512,8 @@ impl FontDb {
                     weight: f.weight().value(),
                     italic,
                     axes: f.axes().iter().map(|a| (a.tag.to_string(), a.min, a.default, a.max)).collect(),
+                    font_axes: blob.as_ref().map_or_else(Vec::new, |b| read_axes(b.as_ref(), f.index())),
+                    instances: blob.as_ref().map_or_else(Vec::new, |b| read_named_instances(b.as_ref(), f.index())),
                 }
             })
             .collect();

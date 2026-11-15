@@ -44,7 +44,6 @@ use preview::{Base, compute_preview, plan_params};
 /// Longest side of the document proxy shown in the view (px).
 const PROXY_SIDE: usize = 1600;
 /// The saved slot of the workspace's settings.
-// PLAN: assumed `ContentAwareFillWorkspace::remember(self, key: SaveKey) -> Self` (dl.K57)
 const REMEMBERED: SaveKey = SaveKey::new("photocraft.edit.contentAwareFill.workspace");
 const CMD: &str = "edit.contentAwareFill";
 /// What a preview job that was superseded answers.

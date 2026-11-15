@@ -61,7 +61,7 @@ pub(crate) mod params {
     pub(crate) const PARAM_FAMILIES: &[ParamFamily] = &[
         ParamFamily { check: Some(fill_ui::check), ..ParamFamily::new(fill_ui::owns, fill_ui::run) },
         ParamFamily { check: Some(stroke_ui::check), ..ParamFamily::new(stroke_ui::owns, stroke_ui::run) },
-        ParamFamily { check: Some(smart_filter_dialog::check), ..ParamFamily::new(smart_filter_dialog::owns, smart_filter_dialog::run) },
+        ParamFamily { check: Some(smart_filter_dialog::check), document: Some(smart_filter_dialog::document), ..ParamFamily::new(smart_filter_dialog::owns, smart_filter_dialog::run) },
         ParamFamily::new(new_layer_ui::owns, new_layer_ui::run),
         ParamFamily::new(new_group_ui::owns, new_group_ui::run),
         ParamFamily { check: Some(duplicate_layer_ui::check), ..ParamFamily::new(duplicate_layer_ui::owns, duplicate_layer_ui::run) },

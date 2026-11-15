@@ -188,7 +188,6 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
             _ => None,
         };
         // One dialog of each type is open at a time, so its key names the dialog a paused playback holds.
-        // PLAN: assumed public `HostedImageSize::KEY` (R105: the sizing dialog keys as public consts).
         finish(app, dialog_id(HostedImageSize::KEY), IMAGE_COMMAND, params);
     }
     if let Some(result) = app.framework.dialogs.take::<HostedCanvasSize>() {
@@ -196,7 +195,6 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
             DialogResult::Ok(r) => Some(canvas_params(&r)),
             _ => None,
         };
-        // PLAN: assumed public `HostedCanvasSize::KEY` (R105).
         finish(app, dialog_id(HostedCanvasSize::KEY), CANVAS_COMMAND, params);
     }
 }

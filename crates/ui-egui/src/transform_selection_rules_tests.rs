@@ -8,6 +8,7 @@ use photocraft_geom::Rect;
 use serde_json::json;
 
 use crate::PhotocraftApp;
+use crate::dialogs::alerts::alerts;
 use crate::transform_tool::LOCKED;
 
 /// A 200 × 200 document on a white Background: "A" with a red block at x 10..50, y 10..30, and
@@ -43,11 +44,6 @@ fn invoke(app: &mut PhotocraftApp, id: &str) -> Result<(), String> {
     crate::menus::invoke(app, &app_ctx, id, json!({})).map(|_| ())
 }
 
-/// How many alerts are open.
-fn alerts(app: &PhotocraftApp) -> usize {
-    app.framework.dialogs.open_dialogs().iter().filter(|dialog| dialog.key.as_deref() == Some("alert")).count()
-}
-
 /// Drag the open box `dx` px right, with nearest neighbour so the blocks keep their edges.
 fn nudge(app: &mut PhotocraftApp, dx: f64) {
     let t = app.ui.transform.as_mut().expect("a box is open");
@@ -64,7 +60,7 @@ fn the_background_among_several_layers_shows_the_locked_alert_and_opens_no_box()
         let before = app.session.active().unwrap().doc.clone();
         assert_eq!(invoke(&mut app, id), Err(LOCKED.into()), "{id}");
         assert!(app.ui.transform.is_none(), "{id}: no box opens");
-        assert_eq!(alerts(&app), 1, "{id}: the same alert as a position-locked layer");
+        assert_eq!(alerts(&app).len(), 1, "{id}: the same alert as a position-locked layer");
         assert!(app.session.active().unwrap().doc == before, "{id}: nothing moved");
     }
 }
@@ -100,7 +96,7 @@ fn several_layers_without_the_background_still_open_one_box() {
     invoke(&mut app, "edit.freeTransform").unwrap();
     let t = app.ui.transform.as_ref().unwrap();
     assert_eq!(t.layers, [a.0, b.0]);
-    assert_eq!(alerts(&app), 0);
+    assert!(alerts(&app).is_empty());
 }
 
 #[test]
@@ -163,7 +159,7 @@ fn the_background_alone_keeps_todays_box() {
     select(&mut app, bg, "replace");
     let r = invoke(&mut app, "edit.freeTransform");
     assert_ne!(r, Err(LOCKED.into()), "not the several-layers alert");
-    assert_eq!(alerts(&app), 0);
+    assert!(alerts(&app).is_empty());
 }
 
 #[test]
@@ -256,7 +252,7 @@ fn a_refused_handle_press_on_the_canvas_reaches_no_move_tool() {
         release(&mut app, end, Modifiers::NONE);
         frame(&mut app);
         assert!(app.ui.transform.is_none(), "drag {drag}: no box opens");
-        assert_eq!(alerts(&app), 1, "drag {drag}: the locked-layer alert");
+        assert_eq!(alerts(&app).len(), 1, "drag {drag}: the locked-layer alert");
         let st = app.session.active().unwrap();
         assert_eq!(st.selected_layers(), selected, "drag {drag}: the selection is unchanged");
         assert!(st.doc == before, "drag {drag}: the document is unchanged");
@@ -285,7 +281,7 @@ fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
         json!({"events": [{"kind": "down", "x": 196, "y": 196}, {"kind": "move", "x": 180, "y": 180}, {"kind": "up", "x": 180, "y": 180}]}),
     );
     assert!(app.ui.transform.is_none(), "no box opens");
-    assert_eq!(alerts(&app), 1, "the locked-layer alert");
+    assert_eq!(alerts(&app).len(), 1, "the locked-layer alert");
     let st = app.session.active().unwrap();
     assert_eq!(st.selected_layers(), selected, "the selection is unchanged");
     assert!(st.doc == before, "the document is unchanged");

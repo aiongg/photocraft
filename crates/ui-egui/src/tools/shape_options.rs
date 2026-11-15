@@ -192,7 +192,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
             .fallbacks(srgba(fg), srgba(bg))
             .sampled(sampled)
             .stroke_open(Bind::bound(&mut app.ui.shape_stroke_open))
-            .chips(|which, chip| {
+            .chips(|which, chip, chip_ui| {
                 let (slot, current) = match which {
                     ShapePaint::Fill => (0, fill.as_ref()),
                     ShapePaint::Stroke => (1, stroke.as_ref().map(|s| &s.paint)),
@@ -212,6 +212,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
                         edited[slot] = Some(picked);
                         Some(preview)
                     })
+                    .show(chip_ui)
             });
         bar.show(ui)
     };

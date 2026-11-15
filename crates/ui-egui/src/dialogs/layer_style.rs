@@ -771,9 +771,14 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
             LayerStyleAsk::ApplyStyle(name) => apply_style_preset(app, id, &name),
             LayerStyleAsk::NewStyle => save_new_style(app, id, layer),
             LayerStyleAsk::MakeDefault(kind, params) => {
-                // The stored defaults reach new instances from the next open.
-                if let Err(error) = app.run("layer.layerStyle.makeDefault", json!({"kind": kind.key(), "params": style_params_json(&params)})) {
-                    fail(app, error);
+                // The stored defaults reach new instances from the next open and, through `set_defaults`, the open dialog.
+                match app.run("layer.layerStyle.makeDefault", json!({"kind": kind.key(), "params": style_params_json(&params)})) {
+                    Ok(_) => {
+                        if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedLayerStyle>(id) {
+                            dialog.set_defaults(kind, params);
+                        }
+                    }
+                    Err(error) => fail(app, error),
                 }
             }
             LayerStyleAsk::ResetToDefault(instance) => reset_to_default(app, id, instance),

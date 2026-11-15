@@ -200,7 +200,7 @@ fn backdrop_use_and_mode() {
     let mut remembered = LiquifySettings::default();
     remembered.backdrop = BackdropUse::Layer(42);
     remembered.backdrop_mode = BackdropMode::Blend;
-    set_saved_value(&ctx, &REMEMBERED, remembered);
+    set_saved_value(&ctx, &REMEMBERED, Some(remembered));
     open(&mut app, &ctx).unwrap();
     let s = ws(&mut app).settings();
     assert!(matches!(s.backdrop, BackdropUse::AllLayers), "the layer is not kept");
@@ -230,7 +230,7 @@ fn brush_settings_are_remembered_between_uses() {
     assert_eq!(ws(&mut app).settings().brush.density, 90.0);
     ctl(&mut app, json!({"density": 70})).unwrap();
     ctl(&mut app, json!({"cancel": true})).unwrap();
-    assert_eq!(saved_value::<LiquifySettings>(&ctx, &REMEMBERED).brush.density, 70.0);
+    assert_eq!(saved_value::<Option<LiquifySettings>>(&ctx, &REMEMBERED).expect("stored").brush.density, 70.0);
 }
 
 /// Follow-up to #1494 / #1484: a reversed twirl replays the same after undo and redo.

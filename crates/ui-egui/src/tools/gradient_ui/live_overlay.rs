@@ -53,7 +53,6 @@ fn fill_of(layer: &Layer) -> Option<&Fill> {
 /// committed (the document then holds the value). `at` is the canvas body rect, as the canvas's other controls take
 /// it. A pass applies only its own events, so a second pass in one frame,
 /// which carries none of the first pass's input, runs no command twice.
-// PLAN: the caller `document_display.rs:424` (canvas-widgets-w14) passes the body rect: `live_overlay::show(app, ui, rect)`.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut Ui, at: Rect) -> Option<(LayerId, Fill)> {
     if !live_mode(app) {
         return None;

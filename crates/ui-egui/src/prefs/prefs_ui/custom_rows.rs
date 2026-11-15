@@ -46,8 +46,6 @@ pub(super) struct PrefsCustom<'a> {
 impl<'a> PrefsCustom<'a> {
     /// The rows for one pass. `picker_open` is this pass's answer from the dialog host: whether a Color Picker opened
     /// from the window is open.
-    // PLAN: the contract row says `new(app, picker_open)`; the suite is a separate argument so the caller can borrow
-    // `app.prefs_rt` mutably beside it (`Framework::suite()` must lose its `#[cfg(test)]`, hub-w1).
     pub(super) fn new(app: &PhotocraftApp, suite: &'a SuiteClient, picker_open: bool) -> Self {
         let mut gpu_info = app.perf.gpu_info.lines();
         gpu_info.extend(gpu_memory_lines(app));

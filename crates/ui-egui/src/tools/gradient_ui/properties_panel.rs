@@ -5,7 +5,6 @@ use craft::behavior::EditEvent;
 use craft::draw::ui::gradient::{GradientFill, GradientFillEditor, GradientRef};
 use craft::ui::contract::{Bind, ShowContainer as _};
 use craft::ui::patterns::presets::PresetState;
-// PLAN: the sheet names `craft::ui::Section`; the facade has it at `craft::ui::sections::Section`.
 use craft::ui::sections::Section;
 use photocraft_doc::Layer;
 use serde_json::json;
@@ -28,8 +27,9 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
         None => committed.clone(),
     };
 
-    // PLAN: `GradientFillEditorOutput` names no stop for a screen pick, so the pick is held for the first colour stop.
-    let owner = ("gradient-fill", layer.id.0, 0usize);
+    // The editor applies a sampled colour to the stop it has selected (`GradientFillEditorOutput::selected`), so the
+    // pick is owned by the layer's fill alone.
+    let owner = ("gradient-fill", layer.id.0);
     let sampled = crate::screen_picker::take(app, owner);
     let document = app.session.active().map(|s| s.doc.id);
     let mut events: Vec<EditEvent<GradientFill>> = Vec::new();

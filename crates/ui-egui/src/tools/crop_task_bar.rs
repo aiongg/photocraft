@@ -23,12 +23,6 @@ use crate::PhotocraftApp;
 use crate::crop_ui;
 use crate::state::Tool;
 
-/// The bar's widget id: `ui.inspect` reads the bar's place under it.
-// PLAN: the id is the bar layer's `id_salt("task-bar")`; the framework exposes no accessor for it.
-pub(crate) fn bar_id() -> egui::Id {
-    egui::Id::new("task-bar")
-}
-
 /// The bar shows: the Crop tool with a frame, the Window toggle on, no dialog over the canvas.
 fn wanted(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && app.ui.panels.context_task_bar && !app.dialog_open() && app.session.active().is_some()

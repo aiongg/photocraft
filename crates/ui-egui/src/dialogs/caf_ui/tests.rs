@@ -268,7 +268,7 @@ fn settings_are_remembered_and_the_menu_opens_the_workspace() {
     assert!(workspace_ui(&mut app, &ctx, CMD, &json!({"tool": "pencil"})).is_err());
     ui(&mut app, json!({"cancel": true})).unwrap();
     close_all(&mut app);
-    let saved: FillSettings = saved_value(&ctx, &REMEMBERED);
+    let saved = saved_value::<Option<FillSettings>>(&ctx, &REMEMBERED).expect("the workspace stored its settings");
     assert_eq!((saved.opacity, saved.color, saved.excluded, saved.mirror), (30.0, [200, 40, 40], true, true));
     assert_eq!((saved.color_adaptation, saved.rotation), (ColorAdaptation::High, RotationAdaptation::Low));
     // The next opening starts with them.

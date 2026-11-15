@@ -55,9 +55,13 @@ pub fn cancel(app: &mut PhotocraftApp) {
 /// Shows the running pick's capture windows, once per pass after the app's UI, and puts a capture
 /// failure in the status bar.
 pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    // `set_monitor` is not called: the app keeps its monitor profile as a setting name
-    // (`session.color.settings.monitor_profile`), not as a `craft_cms::Profile`, so a held drag
-    // inside the app samples its frame as sRGB until the framework exposes the profile.
+    // A frame sampled during a held drag converts from the monitor's profile to sRGB. The engine's profile is its own
+    // type, so the picker gets its ICC bytes read as the framework's; only a running pick needs it.
+    if app.screen_pick.busy()
+        && let Ok(monitor) = craft::cms::Profile::parse(&app.session.color.monitor().to_bytes())
+    {
+        app.screen_pick.set_monitor(&monitor);
+    }
     ScreenColorPicker::new(&mut app.screen_pick, "PhotoCraft").show(ui);
     // The status is taken here rather than in `tick`: the words come from the Env, which needs a
     // `Ui`, and `show` runs after every settle of the pass (tick's and the windows').

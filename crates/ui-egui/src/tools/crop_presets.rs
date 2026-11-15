@@ -224,7 +224,7 @@ mod tests {
     use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
     use photocraft_engine::presets::tools::ToolPreset;
 
-    fn app_over(files: &craft::settings::testing::MemoryFiles) -> PhotocraftApp {
+    fn app_over(files: &std::sync::Arc<craft::settings::testing::MemoryFiles>) -> PhotocraftApp {
         let mut doc = Document::with_background("crop", Size::new(400, 300), ColorMode::Rgb, SampleType::U8, Color::WHITE);
         doc.resolution_dpi = 72.0;
         let mut s = photocraft_engine::Session::new();
@@ -249,7 +249,7 @@ mod tests {
     /// an old-format preset still lists and applies; junk options are refused; Delete removes it.
     #[test]
     fn save_reload_select_and_delete() {
-        let files = craft::settings::testing::MemoryFiles::new();
+        let files = std::sync::Arc::new(craft::settings::testing::MemoryFiles::new());
         let mut app = app_over(&files);
         let ctx = app.ctx().clone();
         // Nothing to save and nothing saved: neither dialog opens.
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn control_channel_opens_the_dialogs() {
         use crate::control::{ControlRequest, Reply, handle};
-        let files = craft::settings::testing::MemoryFiles::new();
+        let files = std::sync::Arc::new(craft::settings::testing::MemoryFiles::new());
         let mut app = app_over(&files);
         let ctx = app.ctx().clone();
         let call = |app: &mut PhotocraftApp, m: &str, p: Value| {

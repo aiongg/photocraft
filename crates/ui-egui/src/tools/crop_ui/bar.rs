@@ -19,7 +19,6 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let tool = &app.canvas_tools.crop.tool;
         (tool.straighten_armed(), tool.frame().map(|f| f.angle), tool.modified(), tool.shows_selection_entry(&settings))
     };
-    // PLAN: assumed `CropBarWords::{fill_help, fill_help_title, fill_help_message}` (R104, tools-w14's words file)
     let words = words(app);
     let out = CropBar::new(&mut settings, &document)
         .user_presets(&users)
@@ -51,7 +50,14 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         reset(app);
     }
     if out.help {
-        let alert = Alert::new(words.fill_help_title.clone(), words.fill_help_message.clone());
+        let message = format!(
+            "{} {}\n{} {}",
+            words.fill_help_background.as_str(),
+            words.fill_help_background_text.as_str(),
+            words.fill_help_content_aware.as_str(),
+            words.fill_help_content_aware_text.as_str()
+        );
+        let alert = Alert::new(words.fill_help_title.clone(), message);
         let _ = app.framework.dialogs.open_unless_open(HostedAlert::new(alert));
     }
     if let Some(range) = out.out_of_range {

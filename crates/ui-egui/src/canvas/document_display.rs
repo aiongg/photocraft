@@ -378,7 +378,7 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
             let overlay = SelectionOverlay::new(label.to_owned(), &mask)
                 .visible(ants.is_some())
                 .offset(ants.map_or([0, 0], |(x, y)| [x, y]))
-                .mapped(crate::transform_tool::selection_map(app, &doc));
+                .mapped(crate::transform_tool::selection_map(app, doc.id));
             overlay.show_at(ui, rect);
         }
     }
@@ -405,8 +405,9 @@ fn canvas_controls(
     let now = ui.input(|i| i.time);
     crate::distort_ui::show_in_canvas(app, ui, rect);
     crate::blur_pins::overlay(app, ui, rect);
-    if let Some(shown) = crate::vector_ui::overlay::show_paths(app, ui, rect) {
-        let mods = ui.input(|i| i.modifiers);
+    let doc = app.session.documents()[host.idx].doc.id;
+    if let Some(shown) = crate::vector_ui::overlay::show_paths(app, ui, rect, doc) {
+        let mods = craft::ui::runtime::pointer::frame(ui.ctx()).mods;
         crate::direct_select::edits::apply(app, &shown.output, &shown.refs, app.ui.tool, mods);
     }
     crate::type_tool::canvas_controls(app, ui, rect);
@@ -422,7 +423,7 @@ fn canvas_controls(
     crate::artboard_tool::show_overlay(app, ui, rect);
     crate::frame_tool::show(app, ui, rect);
     crate::shape_controls::show(app, ui);
-    let live = crate::gradient_ui::live_overlay::show(app, ui);
+    let live = crate::gradient_ui::live_overlay::show(app, ui, rect);
     crate::slice_ui::canvas_controls(app, ui, rect);
     crate::symmetry_ui::canvas_controls(ui, app, rect);
     crate::perspective_crop_ui::body(app, ui, rect);
@@ -430,7 +431,7 @@ fn canvas_controls(
     crate::crop_task_bar::show(app, ui, rect);
     crate::frame_tool::task_bar::show(ui, app, rect);
     crate::crop_ui::each_pass(app);
-    crate::vector_ui::shapes::show_preview(app, ui, rect);
+    crate::vector_ui::shapes::show_preview(app, ui, rect, &space.view);
     // PLAN: `brush_feedback` is tools-w61's file in `crate::tools` (re-exported at the crate root like `move_hover`), not a canvas::tools module.
     crate::brush_feedback::show(ui, app, rect, pointer);
     // The scroll bars (Standard Screen Mode only) and the rotation compass change the view they are bound to.

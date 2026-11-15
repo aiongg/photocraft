@@ -13,14 +13,12 @@
 //! document it was drawn on, like the Crop tool's frame.
 
 use craft::behavior::CancelReason;
-use craft::behavior::EditEvent;
 use craft::behavior::kurbo::Size;
 use craft::draw::ui::crop::{CropDocKey, CropDocument, PerspectiveCropBar, PerspectiveCropEvent, PerspectiveCropTool, PerspectiveInput};
 use craft::ui::bars::BarOutput;
 use craft::ui::canvas::{CropShield, ToolHostResponse};
 use craft::ui::contract::Bind;
 use craft::ui::runtime::edit::cancel_all;
-use craft::ui::runtime::env::{Env, Units};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -33,17 +31,11 @@ use crate::state::Tool;
 pub struct PerspectiveCrop {
     /// The framework tool: the quad, the clicked corners and the press.
     pub(crate) tool: PerspectiveCropTool,
-    /// The document the pending quad belongs to.
-    doc: Option<photocraft_doc::DocId>,
-    /// The session's first press has run its Deselect (or had no selection to drop).
-    deselected: bool,
 }
 
 /// A quad or corners clicked: what the options bar's Commit and Cancel end.
 pub fn pending(app: &PhotocraftApp) -> bool {
-    let tool = &app.canvas_tools.perspective.tool;
-    // PLAN: `PerspectiveCropTool` has no accessor for a press in progress; a box drag counts once it has area (its quad).
-    tool.quad().is_some() || tool.placing() > 0
+    app.canvas_tools.perspective.tool.pending()
 }
 
 /// The pending quad's corners (TL, TR, BR, BL; document px), for the control route.
@@ -57,58 +49,41 @@ pub fn cancel(app: &mut PhotocraftApp) {
     app.canvas_tools.perspective.tool.clear();
 }
 
-/// Another document became active: its pending quad is dropped (also from `sync_views`, so it is never drawn on the
-/// other document).
-pub(crate) fn cancel_stale(app: &mut PhotocraftApp) {
-    let doc = app.session.active().map(|st| st.doc.id);
-    let owner = app.canvas_tools.perspective.doc;
-    if pending(app) && owner.is_some() && owner != doc {
-        cancel(app);
-    }
-    app.canvas_tools.perspective.doc = doc;
-}
-
 /// The Perspective Crop tool for one pass: the framework's pass over the family's state, with the options bar's Show
 /// Grid and the Perspective Crop shield. Its idle cursor, box and corner rules, clicks and preview are the pass's.
 pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut PerspectiveCrop, _host: CanvasHost) -> FamilyTool<'a> {
-    Box::new(state.tool.pass(input(scope.with_app(|app| app.ui.tool_options.perspective_crop_grid))))
+    Box::new(state.tool.pass(scope.with_app(input)))
 }
 
-/// What the pass is given each frame.
-fn input<'a>(show_grid: bool) -> PerspectiveInput<'a> {
+/// What the pass is given each frame: the active document, whose pending quad the pass keeps and drops when another
+/// document becomes active, and the options bar's Show Grid.
+fn input<'a>(app: &PhotocraftApp) -> PerspectiveInput<'a> {
     let mut input = PerspectiveInput::default();
-    input.show_grid = show_grid;
+    input.document = app.session.active().map(|st| CropDocKey(st.doc.id.0));
+    input.show_grid = app.ui.tool_options.perspective_crop_grid;
     input.shield = Some(&CropShield::PERSPECTIVE);
     input
 }
 
 /// What the app does with a finished pass: a new quad's first press drops an active selection as its own "Deselect"
-/// step, as in Photoshop (#11975), so it is gone after the commit and after Esc too. The pass reports a new quad as a
-/// `Begin` (a box drag) or `Set` event, or as its first clicked corner; refused (a job locks the document, the reason
-/// in the status bar), the press is cancelled and the tool cleared, so it starts no quad.
+/// step, as in Photoshop (#11975), so it is gone after the commit and after Esc too. The pass reports the session's
+/// first press as `Started`; refused (a job locks the document, the reason in the status bar), the press is cancelled
+/// and the tool cleared, so it starts no quad.
 ///
-/// A second pass of a frame has no events of the first (they are taken here) and its own state is already marked as
-/// deselected, so it runs no second Deselect.
+/// A second pass of a frame has no events of the first (they are taken here), so it runs no second Deselect.
 pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut PerspectiveCrop, _response: &ToolHostResponse) {
     let events = state.tool.take_events();
     if app.ui.tool != Tool::PerspectiveCrop {
         return;
     }
-    let started = events.iter().any(|event| matches!(event, PerspectiveCropEvent::Edit(EditEvent::Begin { .. } | EditEvent::Set { .. })));
-    let in_session = started || state.tool.quad().is_some() || state.tool.placing() > 0;
-    if !in_session {
-        state.deselected = false;
+    // The pass reports a session's first press once, so the Deselect runs once per session.
+    if !events.iter().any(|event| matches!(event, PerspectiveCropEvent::Started)) {
         return;
     }
-    if state.deselected {
-        return;
-    }
-    state.deselected = true;
     let selected = app.session.active().is_some_and(|st| st.doc.selection.is_some());
     if selected && app.run("select.deselect", json!({})).is_err() {
         cancel_all(app.ctx(), CancelReason::HostChanged);
         state.tool.clear();
-        state.deselected = false;
     }
 }
 
@@ -120,8 +95,8 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
     if app.ui.tool != Tool::PerspectiveCrop || app.session.active().is_none() {
         return;
     }
-    let show_grid = app.ui.tool_options.perspective_crop_grid;
-    let out = app.canvas_tools.perspective.tool.pass(input(show_grid)).show_quad(ui, rect);
+    let input = input(app);
+    let out = app.canvas_tools.perspective.tool.pass(input).show_quad(ui, rect);
     if out.apply {
         apply(app);
     } else if out.discard {
@@ -136,20 +111,13 @@ fn document(app: &PhotocraftApp) -> Option<CropDocument> {
     Some(CropDocument::new(CropDocKey(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)))
 }
 
-/// The unit settings the size fields convert with.
-fn units(app: &PhotocraftApp) -> Units {
-    // PLAN: `apply` and `committed` run from the key route and the bar's answer with no `Ui` at hand, so the root env's units are read.
-    Env::of_root(app.ctx()).units()
-}
-
 /// ↵: crops to the pending quad. W and H come from the options fields (inches at the typed resolution; an empty side
 /// takes the perspective size), each at least 1 px. An invalid quad stays for fixing, with the engine's reason.
 pub fn apply(app: &mut PhotocraftApp) {
-    cancel_stale(app);
     let Some(corners) = quad(app) else { return };
     let mut params = json!({"corners": corners});
     if let Some(document) = document(app) {
-        let target = app.ui.tool_options.perspective_crop.target(&document, &units(app));
+        let target = app.ui.tool_options.perspective_crop.target(&document, &crate::crop_ui::units(app));
         let side = |px: Option<f64>| px.map(|v| v.round().max(1.0));
         if let Some(width) = side(target.width) {
             params["width"] = json!(width);
@@ -186,7 +154,6 @@ pub fn committed(app: &mut PhotocraftApp, out: &BarOutput) {
 
 /// Options bar: W, ⇄, H, the resolution, Front Image, Clear and Show Grid. A value typed out of range raises the
 /// range alert once.
-// PLAN: the sheet gives `options(app, ui) -> bool`, but the options bar's match arm (panels-w20) takes `()`; it returns nothing.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let document = document(app).unwrap_or_else(|| CropDocument::new(CropDocKey(0), Size::ZERO, 72.0));
     let options = &mut app.ui.tool_options;

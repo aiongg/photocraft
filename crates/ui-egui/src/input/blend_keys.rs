@@ -248,7 +248,6 @@ pub(crate) fn fired(app: &mut PhotocraftApp, f: &Fired) -> bool {
 }
 
 /// A key-press `Fired` for `command`, for the trials of the modules that read fired commands.
-// PLAN: assumed `Fired::new(command, source, phase)`, the framework's constructor (R105).
 #[cfg(test)]
 pub(crate) fn test_fired(command: craft::ui::runtime::commands::CommandRef) -> Fired {
     use craft::ui::runtime::commands::{FirePhase, FireSource};

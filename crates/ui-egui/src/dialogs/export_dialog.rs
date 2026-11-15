@@ -260,11 +260,10 @@ fn open_sized(app: &mut PhotocraftApp, stem: String, title: Option<String>, sour
     defaults.jpeg_quality = u8::try_from(prefs.jpeg_quality.clamp(1, 100)).unwrap_or(85);
     defaults.webp_quality = u8::try_from(prefs.webp_quality.clamp(1, 100)).unwrap_or(85);
     defaults.webp_lossless = prefs.webp_lossless;
-    // PLAN: assumed `HostedExportAs::resamples(Vec<Resample>)` and `HostedExportAs::title(impl Into<Label>)` (R100/R105, framework agent).
     let mut dialog = HostedExportAs::new(stem, source, options)
         .formats(dialog_formats())
         .defaults(defaults)
-        .resamples(RESAMPLE_CHOICES.to_vec())
+        .methods(RESAMPLE_CHOICES.to_vec())
         .presets(preset_library(app))
         .remember(REMEMBER);
     if let Some(title) = title {

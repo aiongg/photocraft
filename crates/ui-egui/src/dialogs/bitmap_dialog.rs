@@ -80,8 +80,8 @@ pub(crate) fn params(app: &PhotocraftApp) -> Vec<Param> {
             1.0,
             3,
             vec![
-                NumberUnit::new("lpi", UnitKind::PixelsPerInch, tl!("Lines/Inch"), 1.0),
-                NumberUnit::new("lpcm", UnitKind::PixelsPerCentimetre, tl!("Lines/Centimeter"), CM),
+                NumberUnit::new("lpi", UnitKind::LinesPerInch, tl!("Lines/Inch"), 1.0),
+                NumberUnit::new("lpcm", UnitKind::LinesPerCentimetre, tl!("Lines/Centimeter"), CM),
             ],
         )
         .bounds(Some(FREQUENCY.0), Some(FREQUENCY.1))
