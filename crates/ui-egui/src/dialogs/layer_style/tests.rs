@@ -499,7 +499,8 @@ fn unchanged_global_light_angle_is_not_applied() {
     let bevel = d.add_instance(EffectKind::BevelEmboss, &defaults(EffectKind::BevelEmboss));
     assert!(d.style.effect(bevel).is_some());
     let mut commands = Vec::new();
-    apply(&d.style, id, None, |cmd, _| {
+    // The dialog opened with the angle the draft still holds.
+    apply(&d.style, id, Some(f64::from(d.style.global_light)), |cmd, _| {
         commands.push(cmd.to_string());
         Ok(Value::Null)
     })
@@ -640,11 +641,8 @@ fn new_style_saves_pending_state_and_a_swatch_apply_restores_it() {
     let mut h = harness(app);
     h.get_by_role_and_label(egui::accesskit::Role::Button, "New Style…").click();
     h.run_steps(3);
-    // The name prompt is the top dialog; its default name is "Style".
-    let prompt = h.state().framework.dialogs.stack().top().expect("a dialog is open");
-    assert_ne!(prompt, id, "New Style… asks for the name");
-    ok(h.state_mut(), prompt);
-    h.run_steps(3);
+    // The preset is saved at once under the default name "Style".
+    assert_eq!(h.state().framework.dialogs.stack().top(), Some(id), "New Style… opens no other dialog");
     let preset = h
         .state()
         .session

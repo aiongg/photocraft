@@ -70,6 +70,8 @@ fn smart_session() -> (Session, u64, u64, u64) {
 fn app_of(s: Session) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(s, crate::Services::default());
     app.background_jobs = false;
+    // The app's first frame binds the Paths panel selection to the open document.
+    app.sync_views();
     app
 }
 
