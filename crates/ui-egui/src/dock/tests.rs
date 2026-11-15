@@ -21,7 +21,7 @@ fn app_with_layers() -> (PhotocraftApp, photocraft_doc::LayerId, photocraft_doc:
 }
 
 /// A new app that starts from `prefs`, with Remember Workspace Changes `remember`.
-fn app_from_prefs(prefs: &serde_json::Value, remember: bool) -> PhotocraftApp {
+fn app_from_prefs(prefs: &str, remember: bool) -> PhotocraftApp {
     let mut session = photocraft_engine::Session::new();
     session.load_prefs_json(prefs).unwrap();
     session.prefs.edit(|p| p.workspace.remember_workspace_changes = remember);

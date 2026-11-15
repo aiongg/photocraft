@@ -230,8 +230,7 @@ fn a_menu_key_typed_in_a_panel_windows_text_field_goes_to_the_field() {
     let layers = |desktop: &Desktop| desktop.h.state().session.active().unwrap().doc.layers.len();
     let before = layers(&desktop);
     let paste = Chord::parse("Cmd+V").unwrap();
-    // PLAN: top-w13 names the `NativeMenu` constructor; this call keeps the base's shape.
-    desktop.h.state_mut().services.native_menu = Some(crate::native_menu::NativeMenu::new(Box::new(MenuKey(vec![MenuEvent::Key(paste)]))));
+    desktop.h.state_mut().services.native_menu = Some(craft::menu::NativeMenu::new(Box::new(MenuKey(vec![MenuEvent::Key(paste)]))));
     desktop.steps(1);
     let main = desktop.h.output().viewport_output.get(&ViewportId::ROOT).map(|output| output.commands.clone()).unwrap_or_default();
     assert!(!main.contains(&egui::ViewportCommand::RequestPaste), "the main window asks for no paste: {main:?}");
