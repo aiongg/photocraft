@@ -118,29 +118,29 @@ fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value)
     reply
 }
 
-/// The fields of the top dialog as `ui.inspect` lists them.
-// PLAN: the sheet reads the open value through `values::to_params`; the decision for this file reads the fields the host lists (`open_dialogs`),
-// which are assumed to carry the engine parameter keys beside `preview`, `picker`, `channel` and `clipping` (dl.K46).
+/// The fields of the top dialog as `ui.inspect` lists them: the typed value beside `preview`, `picker`, `channel` and `clipping`.
 fn fields(h: &Harness<'static, PhotocraftApp>) -> Value {
     let inspected = photocraft_ui_egui::control::inspect(h.state(), &h.ctx);
     inspected["dialogs"].as_array().and_then(|dialogs| dialogs.last()).map(|dialog| dialog["fields"].clone()).unwrap_or(Value::Null)
 }
 
-/// Extract only the public command parameters from the top modal.
+/// The engine command parameters of the top modal: its value over the parameters it opened with.
 fn params(h: &Harness<'static, PhotocraftApp>) -> Value {
-    let mut shown = fields(h);
-    if let Some(object) = shown.as_object_mut() {
-        for key in DIALOG_STATE {
-            object.remove(key);
-        }
-    }
-    shown
+    adjust_dialog::command_params(h.state(), top(h))
 }
 
-/// Sets one field of dialog `id` as `ui.dialog.set` does.
+/// Sets one field of dialog `id`: the dialog's own state (`preview`, `picker`, `channel`, `clipping`) as `ui.dialog.set` does, and any other
+/// key as an engine command parameter laid over the dialog's current parameters.
 fn set(h: &mut Harness<'static, PhotocraftApp>, id: DialogId, field: &str, value: Value) {
-    let reply = control(h, "ui.dialog.set", json!({"dialog": id, "field": field, "value": value}));
-    assert_eq!(reply["ok"], true, "{field}: {reply}");
+    if DIALOG_STATE.contains(&field) {
+        let reply = control(h, "ui.dialog.set", json!({"dialog": id, "field": field, "value": value}));
+        assert_eq!(reply["ok"], true, "{field}: {reply}");
+        return;
+    }
+    let mut shown = adjust_dialog::command_params(h.state(), id);
+    shown[field] = value;
+    assert!(adjust_dialog::apply_params(h.state_mut(), id, &shown), "{field}: the dialog takes the parameter");
+    h.run_steps(4);
 }
 
 /// OK on dialog `id` through the host.
@@ -1304,7 +1304,7 @@ fn record_again_uses_recorded_alpha_settings_and_matches_its_preview() {
             let original = app.session.active().unwrap().doc.clone();
             let mut h = harness(app);
             h.run_steps(3);
-            let reply = control(&mut h, "ui.menu.invoke", json!({"id": "actionsPanel.recordAgain"}));
+            let reply = control(&mut h, "ui.menu.invoke", json!({"id": "actions.recordAgain"}));
             assert_eq!(reply["ok"], true, "{reply}");
             assert_eq!(names(&h), ["Saved sky"], "{mode:?} {kind}");
             let values = params(&h);

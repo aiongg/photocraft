@@ -9,9 +9,8 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 fn harness(files: Arc<ScriptedFiles>) -> Harness<'static, PhotocraftApp> {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    // PLAN: assumed top-w28's test file service: `Services::files: Option<Arc<dyn Files>>`
-    app.services.files = Some(files);
+    // The framework builds its host's file service from the services the app is made with.
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { files: Some(files), ..Default::default() });
     let h = Harness::builder()
         .with_size(egui::vec2(1440.0, 900.0))
         .with_max_steps(64)

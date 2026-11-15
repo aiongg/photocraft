@@ -29,11 +29,14 @@ fn open(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     h
 }
 
-/// Sets workspace fields as `ui.dialog.set` would, then runs the passes that report and paint them.
+/// Sets workspace fields as `ui.dialog.set` would, then runs the passes that report them and waits for the preview job the
+/// revision schedules (the stamp preview is painted by that job, as `ui.waitPreview` waits for it).
 fn set(h: &mut Harness<'static, PhotocraftApp>, ui: Value) {
     let ctx = h.ctx.clone();
     crate::control::dialogs::workspace_ui(h.state_mut(), &ctx, VP, &ui).unwrap();
     h.run_steps(4);
+    crate::control::dialogs::workspace_ui(h.state_mut(), &ctx, VP, &json!({"waitPreview": true})).unwrap();
+    h.run_steps(2);
 }
 
 fn source(h: &Harness<'static, PhotocraftApp>) -> Arc<PcVanishingSource> {
@@ -55,7 +58,8 @@ fn close(a: [u8; 4], b: [f32; 4]) -> bool {
 
 /// OK through the automation surface, with the passes that answer it and close the workspace.
 fn ok(h: &mut Harness<'static, PhotocraftApp>) {
-    set(h, json!({"commit": true}));
+    let ctx = h.ctx.clone();
+    crate::control::dialogs::workspace_ui(h.state_mut(), &ctx, VP, &json!({"commit": true})).unwrap();
     h.run_steps(4);
     assert!(h.state().vanishing.is_none(), "OK closed the workspace");
 }

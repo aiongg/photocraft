@@ -71,7 +71,7 @@ fn value_cx(mode: ColorMode, isolated: Option<photocraft_engine::channel_cmds::I
 
 /// The command parameters of the open adjustment dialog `id`: its value over the parameters it opened with, or `null`
 /// when `id` is not the open adjustment dialog.
-pub(crate) fn command_params(app: &PhotocraftApp, id: DialogId) -> Value {
+pub fn command_params(app: &PhotocraftApp, id: DialogId) -> Value {
     open_value(app).filter(|open| open.id == id).and_then(|_| open_params(app)).unwrap_or(Value::Null)
 }
 
@@ -147,9 +147,25 @@ fn eyedropper_of(picker: TonePicker) -> Option<(photocraft_engine::adjust_params
     }
 }
 
-/// Sets the open dialog's value from engine parameters. Refused parameters leave the value as it is.
-pub(crate) fn apply_params(app: &mut PhotocraftApp, id: DialogId, params: &Value) -> bool {
-    let Some(open) = app.adjust_open.as_ref().filter(|open| open.id == id) else { return false };
+/// Sets the open dialog from engine parameters: the addressing keys (`target`, `layer`, `document`) retarget it, the rest
+/// become its value. An unresolved dialog that is retargeted seeds again from the new address when it resolves. Refused
+/// parameters leave the value as it is.
+pub fn apply_params(app: &mut PhotocraftApp, id: DialogId, params: &Value) -> bool {
+    let Some(open) = app.adjust_open.as_mut().filter(|open| open.id == id) else { return false };
+    let mut retargeted = false;
+    for (key, address) in addressing(params) {
+        if open.cx.base.get(&key) != Some(&address) {
+            retargeted = true;
+            for held in [&mut open.cx.base, &mut open.recorded] {
+                if let Some(object) = held.as_object_mut() {
+                    object.insert(key.clone(), address.clone());
+                }
+            }
+        }
+    }
+    if retargeted && open.unresolved {
+        return true;
+    }
     let Ok(value) = values::from_params(&open.kind, params, &open.cx) else { return false };
     let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedAdjustDialog>(id) else { return false };
     *dialog.value_mut() = value;
@@ -469,6 +485,7 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
         gradients: if kind == "gradientMap" { adjust_editors::gradient_presets(app) } else { Vec::new() },
         swatches: adjust_editors::swatches(app),
         tone: None,
+        stale: false,
     }
 }
 
@@ -476,6 +493,10 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
 fn shared_editor(kind: String, setup: Arc<Mutex<EditorSetup>>) -> impl for<'b> Fn(&mut egui::Ui, &mut AdjustValue, &mut AdjustDialogCx<'b>) -> Option<AdjustAsk> + Send + 'static {
     move |ui, value, cx| {
         let setup = setup.lock().ok()?.clone();
+        if setup.stale {
+            ui.label(tl!("The adjustment target is missing or unavailable."));
+            return None;
+        }
         adjust_editors::dialog_editor(&kind, setup)(ui, value, cx)
     }
 }
@@ -680,6 +701,13 @@ fn answer_asks(app: &mut PhotocraftApp, id: DialogId) {
 fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
     let Some(open) = app.adjust_open.as_ref().filter(|open| open.id == id) else { return };
     let resolved = target_context(app, open.smart_filter.as_ref(), &open.recorded);
+    // A Smart Filter dialog whose target another document took the front from shows no controls until it returns.
+    let stale = open.smart_filter.is_some() && resolved.is_err();
+    if let Ok(mut shared) = open.setup.lock()
+        && shared.stale != stale
+    {
+        shared.stale = stale;
+    }
     if open.unresolved {
         if resolved.is_err() {
             return;
