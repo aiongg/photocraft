@@ -297,7 +297,7 @@ fn failed_pen_and_curvature_commits_keep_the_exact_draft_and_do_not_retry_each_f
     for tool in [Tool::Pen, Tool::CurvaturePen] {
         let mut app = app(tool);
         click(&mut app, 30.0, 60.0);
-        click(&mut app, 1e40, 60.0);
+        click(&mut app, 1e7, 60.0);
         let (before, original, n) = (app.session.active().unwrap().doc.clone(), app.ui.pen.clone().unwrap(), steps(&app));
         vector_ui::pen_commit(&mut app, false);
         let failed = app.ui.pen.as_ref().expect("invalid geometry leaves an editable draft");

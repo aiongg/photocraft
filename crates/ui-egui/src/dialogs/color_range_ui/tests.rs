@@ -206,7 +206,7 @@ fn control_pointer_drag_samples_and_never_paints_under_the_dialog() {
     let mut app = app_with_doc();
     open(&mut app).unwrap();
     // The first frame shows the canvas the injected input reaches.
-    crate::canvas::testing::to_screen(&mut app, [0.0, 0.0]);
+    crate::canvas::testing::frame(&mut app);
     let doc = app.session.active().unwrap();
     let (before, history) = (doc.revision, doc.history.past_len());
     let ctx = app.ctx().clone();

@@ -1695,7 +1695,9 @@ fn every_save_dialog_leads_with_its_own_extension() {
     };
     let dialog = |app: &mut PhotocraftApp, id: &str, fields: Value| {
         let r = invoke(app, id).unwrap();
-        let dialog: DialogId = serde_json::from_value(r["dialog"].clone()).expect("the command opened a dialog");
+        // The reply names the dialog by the decimal string `ui.inspect` lists.
+        let number: u64 = r["dialog"].as_str().and_then(|id| id.parse().ok()).expect("the command opened a dialog");
+        let dialog: DialogId = serde_json::from_value(json!(number)).expect("a dialog id");
         for (k, v) in fields.as_object().unwrap() {
             app.framework.dialogs.set_json_field(&ctx, dialog, k, v.clone()).unwrap();
         }

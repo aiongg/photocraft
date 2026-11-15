@@ -169,6 +169,15 @@ fn is_color_picker(app: &PhotocraftApp, id: DialogId) -> bool {
     host(app).get_by_id::<craft::color::ui::ColorPickerDialog>(id).is_some()
 }
 
+fn is_export_as(app: &PhotocraftApp, id: DialogId) -> bool {
+    host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedExportAs>(id).is_some()
+}
+
+/// Export As's `scale` (percent) is the dialog's `size`, as the scale variant of its serde form.
+fn export_scale(_: &Value, v: &Value) -> Vec<(String, Value)> {
+    vec![pair("size", json!({"Scale": v}))]
+}
+
 /// The mask-trash prompt of a vector mask (the layer-mask prompt has the same tag type, other answers).
 fn is_vector_trash(app: &PhotocraftApp, id: DialogId) -> bool {
     host(app).get_by_id::<craft::ui::dialog::StandardPrompt>(id).is_some_and(|prompt| matches!(prompt.kind(), craft::ui::dialog::PromptKind::TrashVectorMask))
@@ -278,6 +287,7 @@ pub(crate) const FIELD_KEYS: &[FieldKey] = &[
     FieldKey { which: Which::Key("slice.divide"), from: "horizontal", to: "rows", values: &[], with: None },
     FieldKey { which: Which::Key("slice.divide"), from: "vertical", to: "columns", values: &[], with: None },
     FieldKey { which: Which::Key("slice.divide"), from: "number", to: "", values: &[], with: Some(dropped) },
+    FieldKey { which: Which::Is(is_export_as), from: "scale", to: "", values: &[], with: Some(export_scale) },
     FieldKey { which: Which::Key("filter.liquify"), from: "backdropUse", to: "backdrop", values: &[], with: Some(liquify_backdrop) },
 ];
 
@@ -388,6 +398,9 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) ->
 }
 
 fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) -> Reply {
+    if host(app).open_dialogs().iter().any(|d| d.parent == Some(id)) {
+        return err("confirm or cancel the color picker first");
+    }
     let choice = p.get("choice").and_then(Value::as_str);
     if let Some(choice) = choice {
         for (field, value) in map_request(app, id, "choice", json!(choice)) {
