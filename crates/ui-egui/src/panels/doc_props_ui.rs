@@ -2,8 +2,6 @@
 //! selected. Canvas size and orientation, resolution, colour mode and bit depth, and the
 //! Rulers & Grids and Guides controls. Every edit dispatches an engine or view command, so the panel stays thin.
 
-use crate::app::framework::BuildApp;
-
 use craft::behavior::Mixed;
 use craft::keymap::CommandRef;
 use craft::ui::buttons::{Button, ToggleButton};
@@ -220,7 +218,7 @@ mod tests {
         app.run("file.new", json!({"width": 1, "height": 1, "resolution": 300, "background": "white"})).unwrap();
         app.session.prefs.edit(|p| p.units_and_rulers.rulers = photocraft_engine::prefs::Unit::Inches);
         let undo = app.session.active().unwrap().history.entries().len();
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 600.0)).build_app(|ui, app: &mut PhotocraftApp| properties(app, ui), app);
+        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 600.0)).build_ui_state(|ui, app: &mut PhotocraftApp| properties(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(3);
         let st = h.state().session.active().unwrap();

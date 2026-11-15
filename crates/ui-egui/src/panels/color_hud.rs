@@ -10,8 +10,6 @@
 //! The framework's `ColorHud` draws the HUD in a popover and maps the pass pointer to a colour; this
 //! module owns the gesture's state ([`Hud`]) and writes each picked colour to the foreground.
 
-use crate::app::framework::BuildApp;
-
 use craft::behavior::EditEvent;
 use craft::color::ui::ColorHud;
 use craft::theme::Srgba;
@@ -121,7 +119,7 @@ mod tests {
         app.run("tools.setColors", json!({"foreground": "#0000ff"})).unwrap();
         app.ui.tool = Tool::Brush;
         app.sync_views();
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_app(
+        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let ctx = ui.ctx().clone();
                 if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {

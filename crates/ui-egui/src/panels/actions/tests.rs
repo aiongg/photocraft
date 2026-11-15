@@ -1,4 +1,3 @@
-use crate::app::framework::BuildApp;
 use super::*;
 use craft::automation::actions::ActionStep;
 use craft::automation::ui::actions::ActionsHost as _;
@@ -56,7 +55,7 @@ fn selected_layer_name_is_visible_during_recording_and_after_stop() {
         assert_eq!(host.step_label(&pending[0]), "Select Layer (Background)");
         assert_eq!(host.step_label(&step("layer.select", json!({"layer":26}))), "Select Layer (ID 26)");
     }
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(400.0, 260.0)).build_app(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(400.0, 260.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(4);
     h.get_by_role_and_label(egui::accesskit::Role::TreeItem, "Select Layer (Background)");
     h.state_mut().run("actions.stop", json!({})).unwrap();
@@ -172,7 +171,7 @@ fn set_folders_group_actions_and_collapse() {
     push(&mut app, "Loose", None, vec![]);
     push(&mut app, "Sharpen", Some("Retouch"), vec![step("filter.sharpen.sharpen", json!({}))]);
     push(&mut app, "Also loose", None, vec![]);
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_app(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
     let first = |h: &Harness<'_, PhotocraftApp>, label: &str| h.get_all_by_label(label).next().expect(label).rect();
     let folder = first(&h, "Retouch");
@@ -287,7 +286,7 @@ fn recording_into_a_collapsed_set_expands_it() {
     assert!(app.ui.actions.panel.settings.collapsed_sets.is_empty());
     assert_eq!(app.ui.actions.panel.selected, Some(ActionSelection::Action(0)));
     assert!(app.ui.actions.panel.expanded.contains("Sharpen"));
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_app(|ui, app| panel(app, ui), app);
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(360.0, 400.0)).build_ui_state(|ui, app| panel(app, ui), app);
     h.run_steps(3);
     assert!(h.query_all_by_label("Sharpen").next().is_some(), "the set shows its action");
     h.state_mut().run("actions.stop", json!({})).unwrap();
