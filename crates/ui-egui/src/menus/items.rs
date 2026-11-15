@@ -25,6 +25,7 @@ pub fn is_live(id: &str) -> bool {
         || id == "view.proofSetup.custom"
         || crate::view_cmds::handles(id)
         || crate::analysis::handles(id)
+        || crate::shortcut_dispatch::is_bridged(id)
         || crate::workspace_ui::handles(id)
         || id.starts_with(super::DOCUMENT_ITEM)
 }

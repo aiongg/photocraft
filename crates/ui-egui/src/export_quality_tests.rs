@@ -134,7 +134,7 @@ fn export_to_files_quality_leaves_png_and_webp_as_they_were() {
         for format in ["png", "jpg"] {
             set(&mut app, &ctx, dialog, "format", json!(format));
         }
-        assert_eq!(fields(&app, dialog)["quality"], json!(4), "{id}: the round trip keeps the quality");
+        assert_eq!(fields(&app, dialog)["quality"].as_f64(), Some(4.0), "{id}: the round trip keeps the quality");
         crate::dialogs::cancel(&mut app, &ctx, dialog).unwrap();
     }
 }
