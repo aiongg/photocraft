@@ -18,6 +18,12 @@ fn fields(app: &PhotocraftApp) -> Map<String, Value> {
     fields
 }
 
+/// Opens the dialog of `command` and shows it once: a hosted form loads its values when it first shows.
+fn open_filter(app: &mut PhotocraftApp, command: &str) {
+    crate::filter_dialog::open(app, command).unwrap_or_else(|error| panic!("{command} has a dialog: {error:?}"));
+    crate::dialogs::testing::show(app);
+}
+
 /// Sets `name` of the open dialog through the host, as a script or a click on its row does.
 fn set_field(app: &mut PhotocraftApp, ctx: &egui::Context, name: &str, value: Value) {
     let id = top_dialog(app);
@@ -39,7 +45,7 @@ fn inline_filter_preview_is_composited_and_recorded_once() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.background_jobs = false;
     app.run("file.new", json!({"width": 320, "height": 240})).unwrap();
-    crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
+    open_filter(&mut app, "filter.stylize.solarize");
     app.perf.stage = Default::default();
     let ctx = app.ctx().clone();
     let (_, _, size) = ensure_filter_preview(&mut app, 0, &ctx).expect("a preview");
@@ -62,7 +68,7 @@ fn filter_preview_at_100_percent_is_full_resolution() {
     app.background_jobs = false;
     app.run("file.new", json!({"width": 2400, "height": 2200})).unwrap();
     assert_eq!(crate::proxy::preview_factor(&app.session.active().unwrap().doc, true), 2, "big enough for a proxy");
-    crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
+    open_filter(&mut app, "filter.stylize.solarize");
     let ctx = app.ctx().clone();
     let preview_at = |app: &mut PhotocraftApp, zoom: f32| {
         app.ui.views.get_mut(0).expect("the new document's view").zoom = zoom;
@@ -85,7 +91,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
     let wait_for = |app: &mut PhotocraftApp, radius: f64| {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
@@ -224,7 +230,7 @@ fn a_held_preview_frame_stays_on_the_canvas_when_the_proxy_factor_changes() {
     app.run("file.new", json!({"width": 2400, "height": 2200})).unwrap();
     app.background_jobs = true;
     app.ui.views.get_mut(0).expect("the new document's view").zoom = 0.25;
-    crate::filter_dialog::open(&mut app, "filter.other.maximum").unwrap();
+    open_filter(&mut app, "filter.other.maximum");
     let ctx = app.ctx().clone();
     set_field(&mut app, &ctx, "radius", json!(6.0));
     drive_until(&mut app, &ctx, "the first frame", |a| a.filter_preview.as_ref().is_some_and(|p| p.result.is_some()));
@@ -263,7 +269,7 @@ fn indexed_matte_preview_matches_commit_and_refreshes_tool_colors_inline_and_on_
                     .unwrap();
                 let source = app.session.active().unwrap().doc.clone();
                 let params = json!({"palette": "exact", "forced": "none", "dither": "none", "matte": matte});
-                crate::filter_dialog::open(&mut app, "image.mode.indexedColor").unwrap();
+                open_filter(&mut app, "image.mode.indexedColor");
                 let ctx = app.ctx().clone();
                 set_fields(&mut app, &ctx, &params);
                 let mut previous = None;
@@ -322,7 +328,7 @@ fn cross_scale_indexed_matte_preview_rejects_old_tool_colors_from_cached_and_wor
         .unwrap();
     app.ui.views.get_mut(0).expect("the new document's view").zoom = 0.25;
     let params = json!({"palette": "exact", "forced": "none", "dither": "none", "matte": "foreground"});
-    crate::filter_dialog::open(&mut app, "image.mode.indexedColor").unwrap();
+    open_filter(&mut app, "image.mode.indexedColor");
     let ctx = app.ctx().clone();
     set_fields(&mut app, &ctx, &params);
     app.session.execute("tools.setColors", json!({"foreground": "#3366cc", "background": "#cc6633"})).unwrap();
@@ -418,9 +424,9 @@ fn match_color_preview_rejects_cached_and_late_frames_from_an_old_source_layer_o
         let blue = app.session.active().unwrap().active_layer.unwrap();
         app.run("edit.fill", json!({"contents": "color", "color": "#2266cc"})).unwrap();
         assert!(app.session.set_active(0));
-        crate::filter_dialog::open(&mut app, command).unwrap();
+        open_filter(&mut app, command);
         let ctx = app.ctx().clone();
-        set_fields(&mut app, &ctx, &json!({"source": 1, "sourceLayer": red}));
+        set_fields(&mut app, &ctx, &json!({"source": "1", "sourceLayer": red}));
         assert!(ensure_filter_preview(&mut app, 0, &ctx).is_some(), "the first source preview reaches the canvas");
         let preview = app.filter_preview.as_ref().unwrap();
         let old = preview.key.clone();
@@ -472,7 +478,7 @@ fn a_preview_computed_mid_drag_reaches_the_canvas_and_then_converges() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
     let (release, first) = gated_blur_preview(&mut app, &ctx);
 
@@ -508,7 +514,7 @@ fn a_mid_drag_frame_does_not_replace_a_frame_that_is_already_exact() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
 
     // A frame for the radius the dialog holds right now reaches the canvas. This also proves
@@ -547,7 +553,7 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
 
     let (release, first) = gated_blur_preview(&mut app, &ctx);
@@ -601,7 +607,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     app.background_jobs = true;
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
     let first_dialog = top_dialog(&app);
     let (release, _) = gated_blur_preview(&mut app, &ctx);
@@ -609,7 +615,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     // Close that dialog and open another one for the same layer and the same command. Only the
     // dialog id differs, which is exactly what the preview session has to notice.
     assert!(app.framework.dialogs.cancel_by_id(&ctx, first_dialog), "the first dialog closes");
-    crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
+    open_filter(&mut app, "filter.blur.gaussianBlur");
     let second_dialog = top_dialog(&app);
     assert_ne!(second_dialog, first_dialog, "a reopened dialog gets a new id");
     release.send(()).expect("released");
@@ -640,7 +646,7 @@ fn fade_dialog_previews_the_faded_layer_and_cancel_keeps_the_document() {
         let ctx = app.ctx().clone();
         let st = app.session.active().unwrap();
         let (layer, steps, revision) = (st.active_layer.unwrap(), st.history.past_len(), st.revision);
-        crate::filter_dialog::open(&mut app, "edit.fade").expect("Fade has a dialog");
+        open_filter(&mut app, "edit.fade");
         let id = top_dialog(&app);
         assert!(hosted(&app).is_previewing(), "a Preview checkbox, on");
         set_field(&mut app, &ctx, "opacity", json!(25));
@@ -667,7 +673,7 @@ fn fade_dialog_previews_the_faded_layer_and_cancel_keeps_the_document() {
         assert!(app.session.is_enabled("edit.fade"), "background jobs {background}: Fade is still available");
 
         // OK applies the faded layer as one step.
-        crate::filter_dialog::open(&mut app, "edit.fade").unwrap();
+        open_filter(&mut app, "edit.fade");
         let id = top_dialog(&app);
         set_field(&mut app, &ctx, "opacity", json!(25));
         crate::dialogs::confirm(&mut app, &ctx, id).unwrap();

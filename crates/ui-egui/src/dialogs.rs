@@ -71,13 +71,13 @@ pub(crate) mod params {
         ParamFamily { check: Some(equalize_ui::check), ..ParamFamily::new(equalize_ui::owns, equalize_ui::run) },
         ParamFamily::new(channel_options_ui::owns, channel_options_ui::run),
         ParamFamily { check: Some(merge_channels_ui::check), ..ParamFamily::new(merge_channels_ui::owns, merge_channels_ui::run) },
-        ParamFamily { check: Some(filter_dialog::check), footer: Some(color_table_ui::footer_action), ..ParamFamily::new(|key| key == "image.mode.colorTable", filter_dialog::run) },
-        ParamFamily::new(file_forms::owns, filter_dialog::run),
+        ParamFamily { check: Some(filter_dialog::check), footer: Some(color_table_ui::footer_action), cancel: Some(filter_dialog::cancel), ..ParamFamily::new(|key| key == "image.mode.colorTable", filter_dialog::run) },
+        ParamFamily { cancel: Some(filter_dialog::cancel), ..ParamFamily::new(file_forms::owns, filter_dialog::run) },
         ParamFamily { listing: Some(stack_dialog::listing), ..ParamFamily::new(stack_dialog::owns, stack_dialog::run) },
         ParamFamily { check: Some(crate::canvas_tool_menu::pen_dialogs::check), ..ParamFamily::new(crate::canvas_tool_menu::pen_dialogs::owns, crate::canvas_tool_menu::pen_dialogs::run) },
         ParamFamily::new(crate::analysis::dialogs::owns, crate::analysis::dialogs::run),
         ParamFamily::new(crate::layers_panel_ui::owns, crate::layers_panel_ui::run),
-        ParamFamily::new(crate::view_cmds::dialogs::is_form, filter_dialog::run),
+        ParamFamily { cancel: Some(filter_dialog::cancel), ..ParamFamily::new(crate::view_cmds::dialogs::is_form, filter_dialog::run) },
         crate::prefs_ui::PRESETS_FAMILY,
         ParamFamily { check: Some(crate::crop_presets::check), ..ParamFamily::new(crate::crop_presets::owns, crate::crop_presets::run) },
         crate::actions::dialogs::NEW_SET_FAMILY,
@@ -85,7 +85,7 @@ pub(crate) mod params {
         crate::actions::playback::FAMILY,
         crate::actions::menu_item::FAMILY,
         crate::smart_svg_ui::family(),
-        ParamFamily { check: Some(filter_dialog::check), ..ParamFamily::new(filter_dialog::owns, filter_dialog::run) },
+        ParamFamily { check: Some(filter_dialog::check), cancel: Some(filter_dialog::cancel), ..ParamFamily::new(filter_dialog::owns, filter_dialog::run) },
     ];
 
     /// The family that owns the dialog `key`.
@@ -458,6 +458,14 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
     if app.framework.dialogs.get_dyn(id).is_none() {
         return Err(format!("no dialog {}", id.value()));
     }
+    // Automation confirming a dialog that stands for a command is judged as that command, whichever way the answer
+    // arrives (a control request or synthetic input).
+    if app.automation_input
+        && let Some(authorize) = app.services.automation_command.as_ref()
+        && let Some((command, params)) = crate::control::dialogs::hosted_command(app, id)
+    {
+        authorize(&command, &params)?;
+    }
     let mut answer = Ok(());
     if !app.framework.dialogs.confirm_by_id(ctx, id) {
         answer = match params::answer_held(app, ctx) {
@@ -694,5 +702,14 @@ pub(crate) mod testing {
     pub(crate) fn cancel(app: &mut PhotocraftApp, id: DialogId) -> Result<(), String> {
         let ctx = app.ctx().clone();
         super::cancel(app, &ctx, id)
+    }
+
+    /// Runs one pass of the dialog host, as a frame does. A hosted parameter form loads its remembered values and
+    /// defaults when it first shows, so its fields read empty until a pass has run.
+    pub(crate) fn show(app: &mut PhotocraftApp) {
+        let ctx = app.ctx().clone();
+        let mut output = ctx.run_ui(Default::default(), |ui| super::run(app, ui));
+        // No renderer takes the pass's texture uploads.
+        output.textures_delta.clear();
     }
 }
