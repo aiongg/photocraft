@@ -213,7 +213,7 @@ fn during_a_proxy_adjustment_the_overlay_reads_the_preview_and_the_composite_the
     let composite_before = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
     let id = crate::adjust_dialog::open(&mut app, "image.adjustments.levels").unwrap();
 
-    app.framework.dialogs.set_json_field(&ctx, id, "inBlack", json!(100)).unwrap();
+    assert!(crate::adjust_dialog::apply_params(&mut app, id, &json!({"inBlack": 100})), "the dialog takes the black point");
     assert!(crate::adjust_preview::display_doc(&mut app, 0).is_some(), "the adjustment previews");
     let overlay = read(&OverlayPrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
     let composite = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), at, 1).pixels;
@@ -234,6 +234,10 @@ fn the_composite_shows_a_filter_dialogs_preview() {
         let first = PixelRect::new(0, 0, 1, 1);
         let plain = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), first, 1).pixels;
         crate::filter_dialog::open(&mut app, "filter.stylize.solarize").unwrap();
+        // The Preview box is on from the dialog's first drawn pass.
+        for _ in 0..2 {
+            crate::smart_filter_dialog::tests::pass(&mut app);
+        }
         let shown = read(&CompositePrep::new(&mut app, &ctx, 0, None, None).unwrap().source(&app), first, 1).pixels;
         let preview = app.filter_preview.as_ref().and_then(|p| p.result.clone()).expect("the dialog's preview");
         let (display, _) = crate::canvas::canvas_display(&app, &preview, None);
@@ -259,18 +263,28 @@ fn a_size_changing_preview_lies_centred_on_the_document() {
     app.run("channel.new", json!({"name": "Alpha", "fill": "black"})).unwrap();
     let id = crate::filter_dialog::open(&mut app, "image.rotation.arbitrary").unwrap();
     let ctx = app.ctx().clone();
-    // PLAN: assumed the rotation dialog's hosted fields are `angle` and `preview`
     app.framework.dialogs.set_json_field(&ctx, id, "angle", json!(90.0)).unwrap();
-    app.framework.dialogs.set_json_field(&ctx, id, "preview", json!(true)).unwrap();
+    // The Preview box is on from the dialog's first drawn pass.
+    for _ in 0..2 {
+        crate::smart_filter_dialog::tests::pass(&mut app);
+    }
     let bounds = |app: &mut PhotocraftApp| CompositePrep::new(app, &ctx, 0, None, None).unwrap().source(app).bounds();
     let rotated = DRect::new(16, -16, 48, 48);
     assert_eq!(bounds(&mut app), rotated, "centred on the document");
     // Preview off, then Cancel: the document again, unchanged.
     let revision = app.session.active().unwrap().revision;
-    app.framework.dialogs.set_json_field(&ctx, id, "preview", json!(false)).unwrap();
-    assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "Preview off");
+    use egui_kittest::kittest::Queryable;
+    let mut h = egui_kittest::Harness::builder()
+        .with_size(egui::vec2(1200.0, 900.0))
+        .with_context(ctx.clone())
+        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
+    h.run_steps(2);
+    h.get_by_label("Preview").click();
+    h.run_steps(2);
+    let app = h.state_mut();
+    assert_eq!(bounds(app), DRect::new(0, 0, 64, 32), "Preview off");
     app.framework.dialogs.cancel_by_id(&ctx, id);
-    assert_eq!(bounds(&mut app), DRect::new(0, 0, 64, 32), "after Cancel");
+    assert_eq!(bounds(app), DRect::new(0, 0, 64, 32), "after Cancel");
     assert_eq!(app.session.active().unwrap().revision, revision, "the document untouched");
 }
 

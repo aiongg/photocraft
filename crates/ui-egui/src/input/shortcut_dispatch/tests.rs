@@ -42,10 +42,8 @@ fn services() -> crate::Services {
 /// The whole app around `app`, run until it has settled. The runtime takes a frame's keys and the app runs the
 /// commands they fired in the next frame, so a key needs two frames ([`press`], [`tap`]).
 pub(crate) fn app_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
+    let ctx = app.ctx().clone();
+    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_context(ctx).with_max_steps(64).build_eframe(move |_cc| app);
     h.run_steps(8);
     h
 }

@@ -30,6 +30,8 @@ fn app() -> PhotocraftApp {
 fn drag(app: &mut PhotocraftApp, points: &[[f64; 2]]) {
     let at = |p: [f64; 2]| (p[0], p[1]);
     let (x, y) = at(points[0]);
+    // The frame's handles take presses from the pass that drew them: a frame set since the last pass is shown first.
+    frame(app);
     tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, NONE);
     for p in &points[1..] {
         let (x, y) = at(*p);
@@ -56,8 +58,8 @@ fn turn_the_view(app: &mut PhotocraftApp) {
 fn with_a_turned_second_document(app: &mut PhotocraftApp) {
     app.run("file.new", json!({"width": 300, "height": 150})).unwrap();
     app.sync_views();
-    // PLAN: assumed `view.rotateView` takes {"angle": degrees} and turns the active document's view.
-    app.run("view.rotateView", json!({"angle": 15.0})).unwrap();
+    let ctx = app.ctx().clone();
+    crate::menus::invoke(app, &ctx, "view.rotateView", json!({"angle": 15.0})).unwrap();
     assert!(app.session.set_active(0));
     app.sync_views();
 }
