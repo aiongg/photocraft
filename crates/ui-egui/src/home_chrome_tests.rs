@@ -81,8 +81,10 @@ fn toggling_home_swaps_the_chrome_and_keeps_the_panel_prefs() {
 fn tab_in_full_screen_does_not_bring_the_chrome_back_over_home() {
     let mut h = app(AppTheme::pro(), true, true);
     click_home(&mut h);
-    h.state_mut().ui.view.screen_mode = "fullScreen".into();
-    h.state_mut().ui.panels.full_screen_chrome = true;
+    h.state_mut().ui.view.screen_mode = craft::ui::shell::ScreenMode::FullScreen;
+    h.run_steps(2);
+    // Tab reveals the chrome in full screen; under Home the shell still draws none of it.
+    h.key_press(egui::Key::Tab);
     h.run_steps(6);
     assert!(h.query_by_label("New file").is_some(), "Home content");
     assert!(!chrome_shown(&h, "Tab-revealed chrome on Home"), "no tool strip or dock");

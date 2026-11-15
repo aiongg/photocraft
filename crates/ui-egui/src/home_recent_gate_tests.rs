@@ -18,6 +18,7 @@ fn deny_file(id: &str, _: &Value) -> photocraft_engine::Result<()> {
 }
 
 /// The Home screen with `path` as its one recent file, under the desktop's automation policy.
+/// The framework start screen is drawn through `canvas::document_area`, as in the app.
 fn home(path: &str) -> Harness<'static, (PhotocraftApp, bool)> {
     let services = Services {
         automation_authorize: Some(deny_file),
@@ -44,7 +45,8 @@ fn home(path: &str) -> Harness<'static, (PhotocraftApp, bool)> {
     h
 }
 
-/// Click the row, as synthetic input when `automation` is set.
+/// Click the row, as synthetic input when `automation` is set. The framework start screen names
+/// a recent row by its file name, so that name is the access label the click finds.
 fn click(h: &mut Harness<'static, (PhotocraftApp, bool)>, automation: bool) {
     h.get_by_label("outsideroot.png").click();
     h.state_mut().0.automation_input = automation;
