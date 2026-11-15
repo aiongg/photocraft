@@ -397,7 +397,7 @@ fn a_store_directory_that_does_not_exist_yet_opens_without_warnings() {
     assert!(!dir.exists());
     let opened = open_dir(&dir);
     assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
-    assert!(opened.actions.is_empty());
+    assert!(opened.actions.actions().is_empty());
     let err = DirBackend::new(&dir).read(ACTIONS_FILE, MAX_ACTIONS_BYTES).unwrap_err();
     assert!(missing_file(&err), "{err}");
 }

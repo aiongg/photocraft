@@ -173,7 +173,11 @@ fn action_vector_paste_reads_the_current_svg_source() {
     let services = Services { clipboard_get_svg: Some(Box::new(|| Ok(Some(CLIP_SVG.as_bytes().to_vec())))), ..Default::default() };
     let mut app = PhotocraftApp::new(Session::new(), services);
     app.run("file.new", json!({"width": 24, "height": 20})).unwrap();
-    app.session.actions.list.push(photocraft_engine::actions_cmds::Action::new("SVG", vec![("edit.paste".into(), json!({"as": "shape"}))]));
+    app.session
+        .actions
+        .list
+        .push(photocraft_engine::actions_cmds::Action::new("SVG", vec![photocraft_engine::actions_cmds::ActionStep::new("edit.paste", json!({"as": "shape"}))]))
+        .unwrap();
     let result = app.run("actions.play", json!({"action": "SVG"})).unwrap();
     assert!(result.get("failed").is_none(), "{result}");
     let state = app.session.active().unwrap();
@@ -214,7 +218,8 @@ fn failed_clipboard_reads_preserve_editable_contents_until_retry() {
         assert_eq!(app.os_clip_sig, signature);
         assert!(app.session.clipboard.as_ref().unwrap().layers.is_some());
         // The New dialog also reads the clipboard; a failed preset probe must preserve it.
-        app.new_document_fields();
+        // PLAN: `new_doc_ui::open` is the hosted New dialog's opener (sheet, panels-w30); the dialog's owner set writes it.
+        crate::new_doc_ui::open(&mut app);
         assert_eq!(app.os_clip_sig, signature);
         assert!(app.session.clipboard.as_ref().unwrap().layers.is_some());
         // An automation error must not leave script events disabled by the dispatch guard.
@@ -254,7 +259,10 @@ fn internal_only_clipboard_remains_usable_when_native_access_fails() {
             app.run("file.new", serde_json::json!({"width": 80, "height": 60})).unwrap();
             assert!(app.os_clip_sig.is_none() && !app.clip_external);
             let bounds = app.session.clipboard.as_ref().unwrap().bounds;
-            assert_eq!(app.new_document_fields()["__preset"], "Clipboard");
+            // PLAN: reads the hosted New dialog (decisions.md): `HostedNewDocument::options().size` against the clipboard bounds; the dialog's owner set provides the type and `new_doc_ui::open`.
+            let dialog = crate::new_doc_ui::open(&mut app);
+            let hosted = app.framework.dialogs.get_by_id::<HostedNewDocument>(dialog).unwrap();
+            assert_eq!((hosted.options().size.width, hosted.options().size.height), (bounds.width(), bounds.height()), "the dialog offers the clipboard size");
             crate::menus::invoke(&mut app, &egui::Context::default(), id, serde_json::json!({})).unwrap();
             assert!(app.session.clipboard.as_ref().unwrap().layers.is_some());
             assert!(!app.ui.status_error);
@@ -431,6 +439,7 @@ fn os_clipboard_image_becomes_a_new_document() {
     let mut app = PhotocraftApp::new(Session::new(), Services { clipboard_get_image: Some(Box::new(get)), ..Default::default() });
     let ctx = egui::Context::default();
     // Listed right after File › New…, enabled without reading the clipboard.
+    // PLAN: the sheet reads this menu through `menu_rows` (top-w11); that set replaces `menu_items` here.
     let items = crate::menus::menu_items(&app);
     let at = items.iter().position(|i| i.id == "file.new").unwrap();
     assert_eq!(items[at + 1].id, "file.newFromClipboard");
