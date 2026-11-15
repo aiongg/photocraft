@@ -4,7 +4,6 @@
 //! `cargo run --release -p photocraft-algo --example bench_photo [case-substring]`
 use std::time::Instant;
 
-// PLAN: assumed `DevelopInputs::default()` for `develop(.., &DevelopInputs)` (dialogs-w50)
 use photocraft_algo::camera_raw::{CameraRaw, DevelopInputs, Wheel, develop};
 use photocraft_algo::hdr::{self, MergeOptions, ToneMethod};
 use photocraft_algo::lens::{self, LensCorrection};
@@ -24,6 +23,13 @@ fn pattern(w: usize, h: usize) -> Vec<[f32; 4]> {
             [(x % 256) as f32 / 255.0 * 0.6 + 0.2 * t, ((x * 3 + y) / 11 % 256) as f32 / 255.0, ((x ^ y) % 256) as f32 / 255.0, 1.0]
         })
         .collect()
+}
+
+/// Default settings with some fields assigned (`CameraRaw` is `#[non_exhaustive]`).
+fn cr(set: impl FnOnce(&mut CameraRaw)) -> CameraRaw {
+    let mut p = CameraRaw::default();
+    set(&mut p);
+    p
 }
 
 fn time<T>(name: &str, only: &Option<String>, f: impl FnOnce() -> T) -> Option<T> {
@@ -51,24 +57,27 @@ fn main() {
             &mut a,
             w,
             h,
-            &CameraRaw {
-                temperature: 20.0,
-                exposure: 0.3,
-                contrast: 20.0,
-                highlights: -40.0,
-                shadows: 40.0,
-                whites: 10.0,
-                blacks: -10.0,
-                vibrance: 20.0,
-                ..Default::default()
-            },
-            false,
+            &cr(|p| {
+                p.temperature = 20.0;
+                p.exposure = 0.3;
+                p.contrast = 20.0;
+                p.highlights = -40.0;
+                p.shadows = 40.0;
+                p.whites = 10.0;
+                p.blacks = -10.0;
+                p.vibrance = 20.0;
+            }),
             &DevelopInputs::default(),
+            false,
         );
     });
     time("camera raw: clarity + texture + dehaze", &only, || {
         let mut a = px.clone();
-        develop(&mut a, w, h, &CameraRaw { clarity: 30.0, texture: 20.0, dehaze: 25.0, ..Default::default() }, false, &DevelopInputs::default());
+        develop(&mut a, w, h, &cr(|p| {
+            p.clarity = 30.0;
+            p.texture = 20.0;
+            p.dehaze = 25.0;
+        }), &DevelopInputs::default(), false);
     });
     time("camera raw: hsl + grading + curve", &only, || {
         let mut a = px.clone();
@@ -78,14 +87,13 @@ fn main() {
             &mut a,
             w,
             h,
-            &CameraRaw {
-                hsl_sat: hs,
-                grade_shadows: Wheel { hue: 220.0, sat: 30.0, lum: 0.0 },
-                point_curve: vec![[0.0, 10.0], [128.0, 140.0], [255.0, 250.0]],
-                ..Default::default()
-            },
-            false,
+            &cr(|p| {
+                p.hsl_sat = hs;
+                p.grade_shadows = Wheel { hue: 220.0, sat: 30.0, lum: 0.0 };
+                p.point_curve = vec![[0.0, 10.0], [128.0, 140.0], [255.0, 250.0]];
+            }),
             &DevelopInputs::default(),
+            false,
         );
     });
     time("camera raw: sharpen + NR + grain + vignette", &only, || {
@@ -94,9 +102,15 @@ fn main() {
             &mut a,
             w,
             h,
-            &CameraRaw { sharpen_amount: 40.0, noise_luminance: 30.0, noise_color: 25.0, grain_amount: 20.0, vignette_amount: -30.0, ..Default::default() },
-            false,
+            &cr(|p| {
+                p.sharpen_amount = 40.0;
+                p.noise_luminance = 30.0;
+                p.noise_color = 25.0;
+                p.grain_amount = 20.0;
+                p.vignette_amount = -30.0;
+            }),
             &DevelopInputs::default(),
+            false,
         );
     });
     time("lens correction (distortion, CA, vignette, persp)", &only, || {
