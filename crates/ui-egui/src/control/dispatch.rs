@@ -1211,6 +1211,14 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
         "middle" => PointerButton::Middle,
         _ => PointerButton::Primary,
     };
+    // A document point far enough out lands on the screen at a point that is not finite: refused here, before the
+    // first event is queued, as the framework's own requests refuse one.
+    if let Some(i) = parsed.events.iter().position(|step| {
+        let at = view.to_screen(Point::new(step.x, step.y));
+        !(at.x.is_finite() && at.y.is_finite())
+    }) {
+        return err(format!("events[{i}] is too far off the canvas: the point must be finite"));
+    }
     let mods = tool_mods(modifiers_from(&parsed.modifiers));
     // Space held: the Crop tool moves the frame being drawn, a marquee, lasso or shape being drawn moves
     // instead of growing. Like a modifier flag, it may be top-level or grouped under "modifiers"; it is a held key
