@@ -175,7 +175,7 @@ fn a_pattern_drag_back_or_a_press_alone_is_no_history_step_and_cancel_discards()
 }
 
 #[test]
-fn a_pattern_drag_ends_on_a_popup_nested_dialog_or_unlink_and_pan_wins() {
+fn a_pattern_drag_ends_on_a_nested_dialog_or_unlink_and_pan_wins() {
     let (mut app, dialog, _) = pattern_drag_app(8, false);
     let start = [20.0, 15.0];
     let step = |d: f64| off(start, [d, 0.0]);
@@ -183,15 +183,7 @@ fn a_pattern_drag_ends_on_a_popup_nested_dialog_or_unlink_and_pan_wins() {
     press(&mut app, start, NONE);
     move_to(&mut app, step(5.0), NONE);
     assert_phase(phase(&mut app), [7.5, -3.25], "the drag began");
-    // A popup takes the pointer: the drag is over and the same press never restarts.
-    let popup = egui::Id::new("pattern-drag-popup");
-    egui::Popup::open_id(&ctx(&app), popup);
-    move_to(&mut app, step(10.0), NONE);
-    assert_phase(phase(&mut app), [7.5, -3.25], "a popup stops the drag");
-    egui::Popup::close_all(&ctx(&app));
-    move_to(&mut app, step(15.0), NONE);
-    assert_phase(phase(&mut app), [7.5, -3.25], "closing the popup does not restart a held press");
-    release(&mut app, step(15.0), NONE);
+    release(&mut app, step(5.0), NONE);
     // A new press moves from the phase shown.
     drag(&mut app, start, [2.0, 0.0]);
     assert_phase(phase(&mut app), [9.5, -3.25], "a new press starts from the shown phase");

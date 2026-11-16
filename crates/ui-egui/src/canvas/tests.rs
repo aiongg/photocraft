@@ -721,8 +721,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
     // The moving pixels: the mesh that spans the layer's box.
     let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
-    // The guide: a vertical line at x = 150.
-    let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01)));
+    // The guide: a vertical line at x = 150, which the framework's rule puts on a pixel centre (within a pixel).
+    let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() <= 0.5)));
     // The box: the closed four-point outline round the layer.
     let frame = position(&|s| matches!(s, egui::Shape::Path(p) if p.closed && p.points.len() == 4 && near(Rect::from_points(&p.points))));
     let (Some(preview), Some(guide), Some(frame)) = (preview, guide, frame) else {

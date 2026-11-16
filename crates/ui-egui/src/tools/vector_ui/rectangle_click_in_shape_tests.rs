@@ -83,13 +83,15 @@ fn a_pixel_layer_or_non_rectangle_shape_leaves_the_dialog_available() {
 #[test]
 fn rounded_corners_use_the_outline() {
     let mut app = app();
-    shape(&mut app, "roundedRect", 30.0);
+    // Radius 50 on the 200 x 100 box: a pill. The point below is inside the box but outside the outline, and well clear of
+    // the live shape's corner handle, which would take a press at the box corner itself.
+    shape(&mut app, "roundedRect", 50.0);
     let before = state(&app);
     let center = [500.0, 350.0];
     gesture(&mut app, center, center);
     assert!(app.framework.dialogs.is_empty());
     assert_eq!(state(&app), before);
-    let corner = [401.0, 301.0];
+    let corner = [410.0, 310.0];
     gesture(&mut app, corner, corner);
     assert_create_rectangle(&app);
 }

@@ -100,6 +100,10 @@ fn canvas_right_click_while_drawing_opens_no_menu_and_enter_still_closes_the_bor
     click(&mut h, None, CORNERS[0], "left", false);
     click(&mut h, None, CORNERS[1], "left", true);
     click(&mut h, None, CORNERS[2], "left", true);
+    // The pointer is already over the click point: moving it there extends the live border (the lasso fastens points
+    // along the pointer's path), which the right-click itself must not do.
+    let hover = json!({"events": [{"kind": "move", "x": INSIDE[0], "y": INSIDE[1]}]});
+    call(&mut h, "ui.pointer", hover);
     let (before, _) = inspect(&mut h);
     assert!(border_live(&before), "a border is in progress: {before}");
 

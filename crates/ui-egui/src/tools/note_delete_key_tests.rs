@@ -31,19 +31,31 @@ fn prompt(app: &PhotocraftApp) -> Option<egui::Id> {
     crate::dialogs::alerts::prompt_tagged::<NoteQuestion>(app)
 }
 
+/// The app on its own context, driven by the canvas test driver: a key reaches the canvas through the window host, and
+/// the Delete the Note tool claimed is run by the key route in the pass after its claim.
+fn driven() -> PhotocraftApp {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({"width": 80, "height": 60})).unwrap();
+    app.run("layer.new.layer", json!({"name": "Ink"})).unwrap();
+    app.run("notes.add", json!({"x": 10, "y": 12, "text": "fix this"})).unwrap();
+    app.ui.tool = Tool::Note;
+    app.ui.analysis.note_selected = Some(0);
+    app.sync_views();
+    crate::canvas::testing::frame(&mut app);
+    app
+}
+
 #[test]
 fn delete_with_a_note_selected_asks_and_deletes_the_note_not_the_layer() {
     for key in [egui::Key::Delete, egui::Key::Backspace] {
-        let mut h = harness();
-        let steps = h.state().session.active().unwrap().history.past_len();
-        h.key_press(key);
-        h.run_steps(3);
-        let id = prompt(h.state()).unwrap_or_else(|| panic!("{key:?}: the alert"));
-        assert_eq!((layers(h.state()), notes(h.state())), (2, 1), "{key:?}: nothing changes before the answer");
-        let ctx = h.ctx.clone();
-        crate::dialogs::confirm(h.state_mut(), &ctx, id).unwrap();
-        let app = h.state();
-        assert_eq!((layers(app), notes(app)), (2, 0), "{key:?}: the note goes, the layers stay");
+        let mut app = driven();
+        let steps = app.session.active().unwrap().history.past_len();
+        crate::canvas::testing::key(&mut app, key, egui::Modifiers::NONE);
+        let id = prompt(&app).unwrap_or_else(|| panic!("{key:?}: the alert"));
+        assert_eq!((layers(&app), notes(&app)), (2, 1), "{key:?}: nothing changes before the answer");
+        let ctx = app.ctx().clone();
+        crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
+        assert_eq!((layers(&app), notes(&app)), (2, 0), "{key:?}: the note goes, the layers stay");
         let st = app.session.active().unwrap();
         assert_eq!(st.history.past_len(), steps + 1);
         assert_eq!(st.history.undo_label(), Some("Delete Note"));

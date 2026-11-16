@@ -204,9 +204,17 @@ fn click_tool(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> bool {
                 "contents": contents,
                 "target": paint_target(app),
             });
-            if let Err(e) = app.run("paint.bucket", params) {
-                app.ui.status = e;
-                app.ui.status_error = true;
+            match app.run("paint.bucket", params) {
+                // A Bitmap document answers with the reference's alert (#12536), once however many clicks arrive
+                // while it is open; no status-bar error as well.
+                Err(e) if e == photocraft_engine::paint_cmds::BITMAP_REFUSAL => {
+                    let _ = crate::dialogs::alerts::alert(app, tl!(photocraft_engine::paint_cmds::BITMAP_REFUSAL));
+                }
+                Err(e) => {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                }
+                Ok(_) => {}
             }
             true
         }
