@@ -74,11 +74,10 @@ pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers
 /// pressure (a test's own reading, with its tilt and pen end); a mouse (pressure 1) feeds no pen.
 fn pen(app: &PhotocraftApp, pressure: f32) {
     let feed = &app.stylus.feed;
-    if pressure == 1.0 {
-        feed.set(None);
-    } else if feed.get().map(|s| s.pressure) != Some(pressure) {
-        feed.set(Some(PenSample { pressure, ..PenSample::default() }));
+    if feed.get().map(|s| s.pressure) == Some(pressure) {
+        return;
     }
+    feed.set((pressure != 1.0).then(|| PenSample { pressure, ..PenSample::default() }));
 }
 
 /// The context the canvas pass runs in: the app's own, which its code outside the pass reads too.
@@ -251,6 +250,13 @@ pub(crate) fn modifiers(app: &mut PhotocraftApp, mods: Modifiers) {
 /// One pass with no input: what a tool change cancels, a document switch drops.
 pub(crate) fn frame(app: &mut PhotocraftApp) {
     run_frame(app);
+}
+
+/// Keeps the frames' clock still: a frame leaves the time where it is, so a held pen repeats no point (and no
+/// other timed behaviour fires) until the test advances `Frames`' clock.
+pub(crate) fn still_clock(app: &mut PhotocraftApp) {
+    let ctx = ctx(app);
+    app.canvas_tools.frames.get_or_insert_with(|| Frames::over(ctx)).still_clock();
 }
 
 /// The window the following frames run in is `size` points (at least 800 × 600); the document area and its canvas

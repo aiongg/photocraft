@@ -85,6 +85,7 @@ fn smoothing_preview_redraws_the_tail_each_step() {
     // The tail drawn at one step must not linger once the brush moves on: a sharp turn would
     // leave a stale tail behind if it weren't restored.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width": 200, "height": 120, "background": "transparent"})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 10, "hardness": 1.0, "smoothing": {"amount": 0.6}}})).unwrap();
     app.ui.tool = Tool::Brush;
@@ -174,6 +175,7 @@ fn spot_healing_trail_is_the_coverage_the_heal_uses() {
 #[test]
 fn mixer_drag_shows_actual_mixed_paint_before_release_and_alt_never_paints() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width":120,"height":60,"background":"#00ff00"})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("tools.setColors", json!({"foreground":"#ff0000"})).unwrap();
@@ -240,7 +242,7 @@ fn mixer_release_includes_a_new_endpoint_and_deferred_frame_samples() {
         let id = app.session.active().unwrap().active_layer.unwrap();
         assert!(doc.layer(id).unwrap().surface().unwrap().rgba(92, 30)[3] > 0.0, "failed {failed}: the release point is painted");
         let params = app.session.journal.iter().rev().find(|(name, _)| name == "paint.mixerBrush").unwrap().1.clone();
-        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q[0].as_f64().unwrap()).collect();
+        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().expect("a point is an object with x")).collect();
         for x in [35.0, 50.0, 65.0, 95.0] {
             assert!(xs.iter().any(|v| (v - x).abs() < 1.0), "failed {failed}: the point at {x} is in the commit: {xs:?}");
         }
@@ -398,6 +400,7 @@ fn live_stroke_uses_pen_tilt_and_redraws_partially() {
 fn drag_frames(smoothing: f32, xs: &[f64]) -> (std::sync::Arc<Document>, std::sync::Arc<Document>, bool, PhotocraftApp) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = app.ctx().clone();
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width": 200, "height": 80, "background": "transparent"})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 16, "hardness": 0.5}})).unwrap();
     // What the options bar's Smoothing field writes.

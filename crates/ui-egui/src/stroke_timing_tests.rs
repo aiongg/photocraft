@@ -392,6 +392,8 @@ fn releasing_a_clone_stamp_stroke_commits_what_a_replay_paints() {
     let mut h = harness();
     // Picked first, so the brush set above is the Clone Stamp's own.
     h.state_mut().ui.tool = Tool::CloneStamp;
+    // The harness draws no app frame, which is where the tool's own brush takes over the session's.
+    crate::paint_mouse::sync_tool_brush(h.state_mut());
     h.run_steps(1);
     setup(&mut |id, p| {
         h.state_mut().run(id, p).unwrap();
@@ -440,6 +442,7 @@ fn releasing_a_sequential_dab_stroke_commits_what_a_replay_paints() {
             h.state_mut().run(id, p).unwrap();
         });
         h.state_mut().ui.tool = tool;
+        crate::paint_mouse::sync_tool_brush(h.state_mut());
         h.run_steps(1);
         // A tool with its own starting tip (Dodge, #12684) paints with that, not the setup's
         // brush: give it the setup's tip, as the replay below has.
@@ -478,6 +481,7 @@ fn a_shift_click_dodge_line_commits_its_live_pixels_unsmoothed() {
     let mut h = harness();
     h.state_mut().run("paint.stroke", json!({"points": [[10, 20], [190, 80]], "size": 30, "color": "#2060c0"})).unwrap();
     h.state_mut().ui.tool = Tool::Dodge;
+    crate::paint_mouse::sync_tool_brush(h.state_mut());
     h.run_steps(1);
     h.state_mut().run("tools.setBrush", json!({"brush": {"size": 12, "smoothing": {"amount": 0.6, "catchUpOnEnd": false}}})).unwrap();
     move_to(&mut h, 40.0, 30.0);

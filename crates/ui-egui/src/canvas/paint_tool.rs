@@ -193,6 +193,7 @@ fn click_tool(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> bool {
         Tool::PaintBucket => {
             let o = app.ui.tool_options.clone();
             let contents = if o.bucket_fill_pattern { "pattern" } else { "foreground" };
+            let mode = if o.bucket_clear { "clear" } else { o.bucket_blend_mode.label() };
             let params = json!({
                 "x": at[0].floor(),
                 "y": at[1].floor(),
@@ -202,6 +203,7 @@ fn click_tool(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> bool {
                 "sampleAllLayers": o.sample_all.paint_bucket,
                 "opacity": o.fill_opacity,
                 "contents": contents,
+                "mode": mode,
                 "target": paint_target(app),
             });
             if let Err(e) = app.run("paint.bucket", params) {
@@ -410,7 +412,8 @@ impl CanvasTool for PaintTool<'_> {
         scope.with_app(|app| {
             drop_stroke(app, state);
             with_resize(app, |r, app| r.cancel(app, cx));
-            crate::color_hud::release(&mut app.ui);
+            // A cancelled right-press (Escape) ends the HUD whoever opened it; the held button's release is then no gesture.
+            crate::color_hud::close(&mut app.ui);
         });
     }
 

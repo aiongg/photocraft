@@ -30,19 +30,18 @@ pub(super) fn mode_dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
     h.query_all_by_role(Role::ComboBox).filter(|n| n.value().as_deref() == Some("Normal")).map(|n| n.rect()).min_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
 }
 
-/// `lines` wheel lines at `at` in one turn through the window host (a line is 40 points): negative is down.
+/// `lines` wheel lines over `at` in one turn: negative is down.
 pub(super) fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
-    use craft::keymap::Mods;
-    use craft::ui::runtime::windows::WindowHost;
-    let host = WindowHost::of(&h.ctx);
-    host.inject_wheel(egui::ViewportId::ROOT, at, vec2(0.0, lines * 40.0), Mods { cmd: false, ctrl: false, alt: false, shift: false });
-    for _ in 0..16 {
-        h.run_steps(1);
-        if host.injected_idle() {
-            break;
-        }
-    }
-    h.run_steps(2);
+    h.hover_at(at);
+    h.run_steps(1);
+    h.event(egui::Event::MouseWheel {
+        source: egui::MouseWheelSource::Unknown,
+        unit: egui::MouseWheelUnit::Line,
+        delta: vec2(0.0, lines),
+        phase: egui::TouchPhase::Move,
+        modifiers: egui::Modifiers::NONE,
+    });
+    h.run_steps(6);
 }
 
 pub(super) fn brush_mode(h: &Harness<'_, PhotocraftApp>) -> BlendMode {

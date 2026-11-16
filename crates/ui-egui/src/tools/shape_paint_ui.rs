@@ -60,10 +60,10 @@ pub(crate) enum PaintChange {
 
 /// The chip's preview of a gradient fill: its stops by position, ascending.
 pub(crate) fn gradient_preview(fill: &photocraft_doc::Fill) -> GradientPreview {
-    let photocraft_doc::Fill::Gradient { stops, .. } = fill else { return GradientPreview::new(Vec::new()) };
+    let photocraft_doc::Fill::Gradient { stops, reverse, .. } = fill else { return GradientPreview::new(Vec::new()) };
     let mut ramp: Vec<(f32, Srgba)> = stops.iter().map(|(p, c)| (p.clamp(0.0, 1.0), srgba(rgba_of(c)))).collect();
     ramp.sort_by(|a, b| a.0.total_cmp(&b.0));
-    GradientPreview::new(ramp)
+    GradientPreview::new(ramp).reversed(*reverse)
 }
 
 /// The paint a chip shows for `fill` (`None` is No Color). A pattern shows as No Color: shapes
@@ -77,8 +77,8 @@ pub(crate) fn paint_of(fill: Option<&photocraft_doc::Fill>) -> Paint {
 }
 
 /// The gradient a chip's `preview` stands for over `base` (the chip's [`ChipLibrary::gradient`]): `base` itself when
-/// the preview shows its stops, so the stops keep their colour models; otherwise `base` with the preview's stops, its
-/// angle, style and the other fields kept.
+/// the preview shows its stops and direction, so the stops keep their colour models; otherwise `base` with the
+/// preview's stops and direction, its angle, style and the other fields kept.
 pub(crate) fn gradient_fill(preview: &GradientPreview, base: &photocraft_doc::Fill) -> photocraft_doc::Fill {
     if gradient_preview(base) == *preview {
         return base.clone();
@@ -87,12 +87,13 @@ pub(crate) fn gradient_fill(preview: &GradientPreview, base: &photocraft_doc::Fi
     match base {
         photocraft_doc::Fill::Gradient { .. } => {
             let mut merged = base.clone();
-            if let photocraft_doc::Fill::Gradient { stops: kept, .. } = &mut merged {
+            if let photocraft_doc::Fill::Gradient { stops: kept, reverse, .. } = &mut merged {
                 *kept = stops;
+                *reverse = preview.reverse;
             }
             merged
         }
-        _ => photocraft_doc::Fill::gradient(stops, 90.0, 1.0, photocraft_doc::GradientStyle::Linear, false),
+        _ => photocraft_doc::Fill::gradient(stops, 90.0, 1.0, photocraft_doc::GradientStyle::Linear, preview.reverse),
     }
 }
 
