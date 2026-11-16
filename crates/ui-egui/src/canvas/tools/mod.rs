@@ -504,8 +504,13 @@ fn with_rig<R>(
     // Tools that own state the app lends nobody are built before the scope takes the app.
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
-    // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
-    let free_transform = app.ui.transform.take();
+    let in_gesture = ToolHost::in_gesture(ctx, host.canvas_id());
+    // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the
+    // app. A gesture another pick began leaves it in the app, where that tool edits it: the Frame tool's press on an
+    // image handle opens the session and its drag moves the box.
+    let transform_open = app.ui.transform.is_some();
+    let lends_transform = !in_gesture || tools.gesture_pick == GesturePick::Transform;
+    let free_transform = if lends_transform { app.ui.transform.take() } else { None };
     let BodyShown { crop: crop_shown, transform_snapped } = shown;
     let mut transform = free_transform.as_ref().map(|session| crate::transform_tool::canvas_tool(session, transform_snapped));
     // The symmetry session moves into the pass the same way.
@@ -515,8 +520,8 @@ fn with_rig<R>(
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx, crop_shown)),
         _ => None,
     };
-    let command_wanted = stand_ins && transform.is_none() && takes_command_stand_in(tool);
-    let alt_wanted = stand_ins && transform.is_none() && super::cursor_policy::alt_eyedropper(tool);
+    let command_wanted = stand_ins && !transform_open && takes_command_stand_in(tool);
+    let alt_wanted = stand_ins && !transform_open && super::cursor_policy::alt_eyedropper(tool);
     let source_wanted = stand_ins && matches!(tool, Tool::CloneStamp | Tool::Healing);
 
     let CanvasTools {
@@ -542,7 +547,6 @@ fn with_rig<R>(
         ..
     } = tools;
     let outline_open = selection.outline_open();
-    let in_gesture = ToolHost::in_gesture(ctx, host.canvas_id());
     let result = {
         let scope = ToolScope::new(app, ctx.clone(), host);
         let mut boxed: Option<FamilyTool<'_>> = None;
@@ -635,7 +639,10 @@ fn with_rig<R>(
     };
     let transform_keys = transform.as_mut().map(|t| t.take_keys());
     drop(transform);
-    app.ui.transform = free_transform;
+    // A session a tool opened in the pass (no session was lent) stays.
+    if free_transform.is_some() {
+        app.ui.transform = free_transform;
+    }
     if let Some(keys) = transform_keys {
         crate::transform_tool::tool_keys(app, keys);
     }
