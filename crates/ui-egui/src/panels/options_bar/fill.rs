@@ -3,6 +3,7 @@
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, blend_entries};
 use craft::ui::pickers::Select;
+use photocraft_doc::BlendMode;
 
 use super::paint::PaintMode;
 use super::{check, labelled, number_field};
@@ -19,9 +20,10 @@ fn label_of(mode: PaintMode) -> String {
 }
 
 /// The Mode list of `tool` in Photoshop's order, with a rule above each blend group and none first. Behind (Pattern
-/// Stamp) is listed always and enabled by `behind_enabled` (it is greyed on the Background). Empty for a tool without a
-/// blend mode control.
-pub(crate) fn mode_entries(tool: Tool, behind_enabled: bool) -> Vec<Entry<PaintMode>> {
+/// Stamp) is listed always and enabled by `behind_enabled` (it is greyed on the Background). `threshold` names Normal
+/// "Threshold", as the reference does for the stamps in an Indexed Color document. Empty for a tool without a blend
+/// mode control.
+pub(crate) fn mode_entries(tool: Tool, behind_enabled: bool, threshold: bool) -> Vec<Entry<PaintMode>> {
     let keyed: Vec<BlendKeyEntry<PaintMode>> = if tool == Tool::PatternStamp {
         crate::brush_mode_menu::pattern_stamp_choices()
             .into_iter()
@@ -41,10 +43,13 @@ pub(crate) fn mode_entries(tool: Tool, behind_enabled: bool) -> Vec<Entry<PaintM
             })
             .collect()
     };
-    blend_entries(&keyed, |entry| label_of(entry.key).into())
-        .into_iter()
-        .map(|entry| if entry.value() == Some(&PaintMode::Behind) { entry.enabled(behind_enabled) } else { entry })
-        .collect()
+    blend_entries(&keyed, |entry| match entry.key {
+        PaintMode::Blend(BlendMode::Normal) if threshold => tl!("Threshold").to_owned().into(),
+        key => label_of(key).into(),
+    })
+    .into_iter()
+    .map(|entry| if entry.value() == Some(&PaintMode::Behind) { entry.enabled(behind_enabled) } else { entry })
+    .collect()
 }
 
 /// The Mode select over `entries` (from [`mode_entries`]) and the bound `mode`.
@@ -57,7 +62,7 @@ pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if app.ui.tool != Tool::PaintBucket {
         return;
     }
-    let entries = mode_entries(Tool::PaintBucket, true);
+    let entries = mode_entries(Tool::PaintBucket, true, false);
     let sources = [Entry::new(false, tl!("Foreground").to_owned()), Entry::new(true, tl!("Pattern").to_owned())];
     let o = &mut app.ui.tool_options;
     labelled(ui, tl!("Fill"), |ui| Select::new(tl!("Source").to_owned(), Bind::bound(&mut o.bucket_fill_pattern), &sources).show(ui));

@@ -137,66 +137,47 @@ fn clone_dab_coverage(
     Some((window, cropped))
 }
 
-<<<<<<< HEAD
 /// The transient source image beneath the brush outline at document point `at`; never part of the
 /// document render. The Clone Source panel drives the Clone Stamp and the Healing Brush alike, so
 /// both show it. `None` when the overlay is off, hidden by Auto Hide during a stroke, or there is
 /// nothing to show; the pixels are rebuilt only when the key (document, revision, hover point,
-/// source mapping, overlay settings) changes.
+/// source mapping and document, overlay settings) changes.
 ///
 /// PLAN: the contract's `(app, at)` has no display argument, so the overlay is drawn for the main
 /// display's colour management; a second window on another monitor shows it through the main one's.
 pub(crate) fn clone_source(app: &mut PhotocraftApp, at: [f64; 2]) -> Option<CloneSource> {
-    use photocraft_engine::presets::clone_source::{Mapping, overlay_blend, transform_matrix};
-=======
-/// A transient source image beneath the brush outline; never part of the document render. The
-/// Clone Source panel drives the Clone Stamp and the Healing Brush alike, so both show it.
-pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, at: [f64; 2], output: Option<u32>) {
     use photocraft_engine::presets::clone_source::overlay_blend;
->>>>>>> upstream/main
     let overlay = app.session.presets.clone.overlay.clone();
     let tool = app.ui.tool;
     if !matches!(tool, Tool::CloneStamp | Tool::Healing) || !overlay.show || (overlay.auto_hide && super::paint_tool::stroking(app).is_some()) {
         return None;
     }
     let slot = app.session.presets.clone.active().clone();
-<<<<<<< HEAD
-    let source = slot.source?;
-=======
-    let Some(map) = crate::preset_panels::clone_mapping_at(app, Some(at)) else { return };
->>>>>>> upstream/main
+    let map = crate::preset_panels::clone_mapping_at(app, Some(at))?;
     let radius = f64::from(app.session.tools.brush.size) / 2.0;
     if !radius.is_finite() || radius <= 0.0 || radius > 500.0 || !at.iter().all(|v| v.is_finite() && v.abs() < 1_000_000.0) {
         return None;
     }
-<<<<<<< HEAD
-    // View › Pattern Preview repeats the source for the Clone Stamp only (`paint.cloneStamp`'s
-    // `wrap`); the Healing Brush samples it as it is.
-    let wrap = tool == Tool::CloneStamp && app.ui.view.pattern_preview;
-    let stroke_start = super::paint_tool::stroking(app).map(|s| s.start);
-    let anchor = if app.ui.tool_options.clone_aligned { slot.anchor.or(stroke_start) } else { stroke_start }.unwrap_or(at);
-    let map =
-        Mapping { source: (source[0], source[1]), anchor: (anchor[0], anchor[1]), m: transform_matrix(slot.scale, slot.rotation, slot.flip_h, slot.flip_v) };
-    let st = app.session.active()?;
-    let (display, display_key) = canvas_display(app, &st.doc, None);
-    let key = format!(
-        "{:?}:{}:{:?}:{:?}:{map:?}:{}:{}:{}:{}:{}:{wrap}:{}:{}",
-=======
     // Both tools repeat source reads in Pattern Preview; this also refreshes a stationary hover.
     let wrap = app.ui.view.pattern_preview;
-    let Some(st) = app.session.active() else { return };
+    let st = app.session.active()?;
     let target = paint_target(app);
     if slot.document.is_some_and(|id| id != st.doc.id) && photocraft_engine::channel_cmds::gray_target(&json!({"target": target})).is_some() {
         // Strokes reject these cross-document targets, including a mask selected only in the UI.
-        return;
+        return None;
     }
     let source_revision =
         slot.document.and_then(|id| app.session.documents().iter().find(|st| st.doc.id == id)).map(|st| (st.doc.id, st.revision, st.active_layer));
-    let source_document = slot.document.and_then(|id| app.session.documents().iter().find(|st| st.doc.id == id)).map(|st| std::sync::Arc::downgrade(&st.doc));
-    let (display, display_key) = canvas_display(app, &st.doc, output);
+    let source_document = slot.document.and_then(|id| app.session.documents().iter().find(|st| st.doc.id == id)).map(|st| Arc::downgrade(&st.doc));
+    let (display, display_key) = canvas_display(app, &st.doc, None);
+    // Clone Stamp sends its opacity/flow with every stroke; Healing Brush uses full strength.
+    let brush_alpha = if tool == Tool::CloneStamp {
+        app.session.tools.brush.opacity.clamp(0.0, 1.0) * if overlay.clipped { 1.0 } else { app.session.tools.brush.flow.clamp(0.0, 1.0) }
+    } else {
+        1.0
+    };
     let key = format!(
-        "{tool:?}:{source_revision:?}:{:?}:{}:{:?}:{:?}:{map:?}:{:?}:{}:{}:{}:{}:{wrap}:{}:{}",
->>>>>>> upstream/main
+        "{tool:?}:{source_revision:?}:{:?}:{}:{:?}:{:?}:{map:?}:{:?}:{}:{}:{}:{}:{wrap}:{}:{}:{}:{}",
         st.doc.id,
         st.revision,
         st.active_layer,
@@ -208,7 +189,8 @@ pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painte
         overlay.blend,
         overlay.clipped,
         overlay.opacity.to_bits(),
-        radius.to_bits()
+        radius.to_bits(),
+        brush_alpha.to_bits()
     );
     let brush = overlay.clipped.then_some(&app.session.tools.brush);
     if app.clone_preview.as_ref().is_none_or(|c| {
@@ -223,12 +205,8 @@ pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painte
         // soft and a shaped tip keeps its outline. Unclipped: the brush's whole square.
         let (rect, coverage) = match brush {
             Some(b) => {
-<<<<<<< HEAD
-                let (rect, coverage) = clone_dab_coverage(b, at, &map)?;
-=======
                 let flow = if tool == Tool::CloneStamp { b.flow } else { 1.0 };
-                let Some((rect, coverage)) = clone_dab_coverage(b, at, &map, flow) else { return };
->>>>>>> upstream/main
+                let (rect, coverage) = clone_dab_coverage(b, at, &map, flow)?;
                 (rect, Some(coverage))
             }
             None => (
@@ -236,18 +214,12 @@ pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painte
                 None,
             ),
         };
-<<<<<<< HEAD
-        let mut buf = photocraft_engine::retouch_cmds::clone_preview_periodic(&app.session, rect, &map, &app.ui.tool_options.clone_sample, wrap).ok()?;
-=======
-        let preview = if tool == Tool::Healing {
+        let mut buf = if tool == Tool::Healing {
             photocraft_engine::retouch_cmds::healing_preview_periodic(&app.session, rect, &map, &app.ui.tool_options.clone_sample, wrap)
         } else {
             photocraft_engine::retouch_cmds::clone_preview_periodic(&app.session, rect, &map, &app.ui.tool_options.clone_sample, wrap)
-        };
-        let Ok(mut buf) = preview else {
-            return;
-        };
->>>>>>> upstream/main
+        }
+        .ok()?;
         if overlay.invert {
             for px in &mut buf.px {
                 for c in px.iter_mut().take(3) {
@@ -258,14 +230,7 @@ pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painte
         // Darken, Lighten and Difference mix the source with the image under the brush (the
         // composite, whatever Sample reads), so Difference turns black where they line up.
         if overlay.blend != "normal" {
-<<<<<<< HEAD
-            let here = Mapping { source: (0.0, 0.0), anchor: (0.0, 0.0), m: [1.0, 0.0, 0.0, 1.0] };
-            let under = photocraft_engine::retouch_cmds::clone_preview_periodic(&app.session, rect, &here, "all", wrap).ok()?;
-=======
-            let Ok(under) = photocraft_engine::retouch_cmds::clone_destination_preview(&app.session, rect, wrap) else {
-                return;
-            };
->>>>>>> upstream/main
+            let under = photocraft_engine::retouch_cmds::clone_destination_preview(&app.session, rect, wrap).ok()?;
             for (px, d) in buf.px.iter_mut().zip(&under.px) {
                 *px = overlay_blend(&overlay.blend, *px, *d);
             }
@@ -275,57 +240,21 @@ pub(super) fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painte
                 px[3] *= c.clamp(0.0, 1.0);
             }
         }
-<<<<<<< HEAD
         let mut image = display_image(display.as_deref(), &buf);
-        // The overlay's opacity, in the pixels: the display that shows them applies none.
-        let alpha = f32::from((overlay.opacity.clamp(0.0, 100.0) * 2.55).round() as u8) / 255.0;
+        // The overlay's opacity and the Clone Stamp's strength, in the pixels: the display that
+        // shows them applies none.
+        let alpha = f32::from((overlay.opacity.clamp(0.0, 100.0) * brush_alpha * 2.55).round() as u8) / 255.0;
         for px in &mut image.pixels {
             *px = px.gamma_multiply(alpha);
-=======
-        let image = display_image(display.as_deref(), &buf);
-        let brush = brush.cloned();
-        match app.clone_preview.as_mut() {
-            Some(cache) => {
-                cache.texture.set(image, canvas_texture_options(1));
-                cache.key = key;
-                cache.source_document = source_document;
-                cache.brush = brush;
-                cache.rect = rect;
-            }
-            None => {
-                let texture = painter.ctx().load_texture("clone-preview", image, canvas_texture_options(1));
-                app.clone_preview = Some(ClonePreviewCache { key, source_document, brush, rect, texture });
-            }
->>>>>>> upstream/main
         }
         let brush = brush.cloned();
         let revision = app.clone_preview.as_ref().map_or(0, |c| c.revision + 1);
-        app.clone_preview = Some(ClonePreviewCache { key, brush, rect, pixels: Arc::new(image), revision });
+        app.clone_preview = Some(ClonePreviewCache { key, source_document, brush, rect, pixels: Arc::new(image), revision });
     }
-<<<<<<< HEAD
     let cache = app.clone_preview.as_ref()?;
     let r = cache.rect;
     let (x0, y0, x1, y1) = (f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1));
     Some(CloneSource { corners: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], pixels: Arc::clone(&cache.pixels), revision: Revision::of(&cache.revision) })
-=======
-    let Some(cache) = &app.clone_preview else { return };
-    let rect = cache.rect;
-    // Clone Stamp sends its opacity/flow with every stroke; Healing Brush uses full strength.
-    let brush_alpha = if tool == Tool::CloneStamp {
-        app.session.tools.brush.opacity.clamp(0.0, 1.0) * if overlay.clipped { 1.0 } else { app.session.tools.brush.flow.clamp(0.0, 1.0) }
-    } else {
-        1.0
-    };
-    let tint = Color32::from_white_alpha((overlay.opacity.clamp(0.0, 100.0) * brush_alpha * 2.55).round() as u8);
-    // A textured quad over the covered area: its texels carry the clip, in mirrored and rotated
-    // canvas views too.
-    let mut mesh = egui::Mesh::with_texture(cache.texture.id());
-    for (x, y, u, v) in [(rect.x0, rect.y0, 0.0, 0.0), (rect.x1, rect.y0, 1.0, 0.0), (rect.x1, rect.y1, 1.0, 1.0), (rect.x0, rect.y1, 0.0, 1.0)] {
-        mesh.vertices.push(egui::epaint::Vertex { pos: xf.to_screen(x as f32, y as f32), uv: pos2(u, v), color: tint });
-    }
-    mesh.indices.extend_from_slice(&[0, 1, 2, 0, 2, 3]);
-    painter.add(egui::Shape::mesh(mesh));
->>>>>>> upstream/main
 }
 
 /// The engine's live stroke of a tool: the Brush, Pencil and Eraser paint dabs; the Clone Stamp,

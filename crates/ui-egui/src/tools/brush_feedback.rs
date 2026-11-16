@@ -21,6 +21,13 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp, rect: egui::Rect,
     crate::stroke_trail::show(ui, app);
     show_source_marker(ui, app);
     let at = pointer.filter(|p| rect.contains(*p)).and_then(|p| crate::canvas::document_display::doc_point_at(app, p));
+    // The Clone Source panel's X/Y read the pairing at the last hover point (#13124): a new point
+    // repaints so the panel shows it.
+    if let Some(at) = at
+        && crate::preset_panels::remember_clone_cursor(app, [at.x, at.y])
+    {
+        ui.ctx().request_repaint();
+    }
     show_clone_overlay(ui, app, at);
     show_smoothing_string(ui, app);
     crate::object_finder::show(ui, app, at);

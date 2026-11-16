@@ -4,9 +4,9 @@
 use std::cell::RefCell;
 
 use craft::behavior::PointerButton;
-use craft::behavior::cursor::{Cursor, PaintedCursor};
+use craft::behavior::cursor::{Cursor, CursorIcon, PaintedCursor};
 use craft::behavior::value::CancelReason;
-use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectionShape};
+use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectPhase, SelectionShape};
 use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};
 use craft::ui::primitives::Draw;
@@ -16,6 +16,7 @@ use super::selection::PcSelection;
 use super::{FamilyTool, ToolScope};
 use crate::PhotocraftApp;
 use crate::canvas::document_display::CanvasHost;
+use crate::canvas::tool_feedback;
 use crate::retouch_ui::{self, PatchPress};
 use crate::state::Tool;
 
@@ -30,6 +31,9 @@ pub(crate) struct RetouchTools {
     shift: bool,
     /// The outline a Patch or Content-Aware Move press outside the selection draws.
     lasso: LassoTool,
+    /// The press that began the open outline: the outline keeps the operation it latched there, and
+    /// so does the cursor's badge.
+    outline_press: Option<PatchPress>,
 }
 
 impl RetouchTools {
@@ -146,7 +150,12 @@ impl CanvasTool for RetouchTool<'_> {
             return ToolAction::Claimed;
         }
         if self.lassos() {
-            return state.lasso.pass(&self.probe).press(pointer, cx);
+            let begins = matches!(state.lasso.phase(), SelectPhase::Idle);
+            let action = state.lasso.pass(&self.probe).press(pointer, cx);
+            if begins {
+                state.outline_press = Some(PatchPress::new(tool, at, mods));
+            }
+            return action;
         }
         ToolAction::Ignored
     }
@@ -175,7 +184,8 @@ impl CanvasTool for RetouchTool<'_> {
         state.last = end;
         state.shift = mods.shift;
         self.scope.with_app(|app| match tool {
-            Tool::ObjectSelection => retouch_ui::finish_object_selection(app, start, end, mods),
+            // The rectangle combines as its press decided, as the cursor's badge showed.
+            Tool::ObjectSelection => retouch_ui::finish_object_selection(app, start, end, press.modifiers),
             // A click with no drag moves nothing.
             _ if end == start => {}
             Tool::Patch => {
@@ -208,8 +218,23 @@ impl CanvasTool for RetouchTool<'_> {
         }
     }
 
-    fn cursor(&self, _cx: &ToolContext<'_>) -> Cursor {
-        Cursor::Painted(PaintedCursor::Crosshair)
+    /// The crosshair with the badge of what the gesture does: Object Selection's operation
+    /// (`tool_feedback::selection_op`), and for Patch and Content-Aware Move the patch drag or the
+    /// outline's operation (`tool_feedback::patch_badge`). A gesture keeps what its press decided.
+    fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
+        let state = self.state.borrow();
+        let outline = state.outline_press.as_ref().filter(|_| matches!(state.lasso.phase(), SelectPhase::Outline { .. }));
+        let press = state.press.as_ref().or(outline).map(|p| (p.start, p.modifiers));
+        let at = cx.pointer.as_ref().map(|pointer| doc_point(pointer, cx));
+        let badge = self.scope.with_app(|app| match self.tool {
+            Tool::ObjectSelection => {
+                let mods = press.map_or(cx.mods, |(_, mods)| mods);
+                tool_feedback::selection_op(Tool::ObjectSelection, app.ui.selection_mode, mods, tool_feedback::has_selection(app)).badge()
+            }
+            Tool::Patch | Tool::ContentAwareMove => at.and_then(|at| tool_feedback::patch_badge(app, at, press, cx.mods)),
+            _ => None,
+        });
+        badge.map_or(Cursor::Painted(PaintedCursor::Crosshair), |badge| PaintedCursor::badged(CursorIcon::Crosshair, badge).into())
     }
 
     fn command_form(&self) -> ToolPath {

@@ -32,7 +32,8 @@ pub(crate) fn source_caption(app: &PhotocraftApp) -> SourceCaption {
         HistorySource::State(idx) => {
             let entries = st.history.entries();
             let name = if idx < entries.len() { entries.get(idx).cloned() } else { st.history.redo_labels().nth(idx - entries.len()).map(str::to_string) }?;
-            Some(if idx == 0 && name == "Open" { SourceCaption::Opening } else { SourceCaption::Named(name) })
+            // The opening state is "Open" for a file and "New" for a new document (#14029).
+            Some(if idx == 0 && matches!(name.as_str(), "Open" | "New") { SourceCaption::Opening } else { SourceCaption::Named(name) })
         }
     };
     named().unwrap_or(SourceCaption::Deleted)

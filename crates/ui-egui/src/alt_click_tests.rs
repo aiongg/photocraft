@@ -230,24 +230,6 @@ fn mixer_raw_drag_commits_live_pixels_before_a_spring_tool_returns() {
     }
 }
 
-#[test]
-<<<<<<< HEAD
-=======
-fn alt_click_sets_the_clone_source_and_a_drag_paints_it() {
-    let mut h = harness(two_colours());
-    h.state_mut().ui.tool = Tool::CloneStamp;
-    h.state_mut().ui.tool_options.clone_sample = "all".into();
-    h.state_mut().run("tools.setBrush", json!({"brush": {"size": 10, "hardness": 1.0}})).unwrap();
-    click(&mut h, 150.0, 50.0, Modifiers::ALT);
-    assert!(h.state().session.presets.clone.active().source.is_some(), "⌥-click set the source");
-    let rev = h.state().session.active().unwrap().revision;
-    drag(&mut h, [30.0, 50.0], [70.0, 50.0], Modifiers::NONE);
-    let st = h.state().session.active().unwrap();
-    assert!(st.revision > rev, "the clone stroke was committed");
-    let px = st.doc.layers[0].surface().unwrap().rgba(50, 50);
-    assert!(px[1] > 0.9 && px[0] < 0.1, "green cloned over red: {px:?}");
-}
-
 /// ⌥-click in one open document, then paint in another: the stroke clones from the first, as in
 /// Photoshop, rather than from the same point of the document being painted.
 #[test]
@@ -277,7 +259,6 @@ fn alt_click_in_one_document_clones_into_another() {
 }
 
 #[test]
->>>>>>> upstream/main
 fn clone_stamp_paints_an_empty_layer_from_the_layers_below() {
     // The reported setup: a new empty layer on top, Sample: All Layers (or Current & Below).
     for sample in ["all", "currentAndBelow"] {
