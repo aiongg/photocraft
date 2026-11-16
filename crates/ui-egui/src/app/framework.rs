@@ -201,9 +201,12 @@ fn defaults() -> AppDefaults {
         theme: ThemePair { light: theme(DEFAULT_LIGHT), dark: theme(DEFAULT_DARK) },
         mode: ModeChoice::Dark,
         size: Size::default(),
-        sizes: AppSizes::default(),
+        sizes: AppSizes::parse_or_default(SIZES),
     }
 }
+
+/// PhotoCraft's size overrides: Photoshop's panel dock width.
+const SIZES: &[u8] = include_bytes!("sizes.json");
 
 /// The root values PhotoCraft gives the runtime before the theme, mode, scale and direction: the
 /// contrast, size and sizes a theme's tokens resolve under.
@@ -673,5 +676,13 @@ mod tests {
             assert!(builtins.iter().any(|t| t.id == *theme.id()), "{} is no built-in theme", theme.id().as_str());
         }
         assert_eq!(crate::theme::AppTheme::pro_medium().id().as_str(), "craft.artcraft");
+    }
+
+    /// The size overrides PhotoCraft ships read without an error, so none is dropped at startup.
+    #[test]
+    fn the_size_overrides_parse() {
+        if let Err(errors) = craft::theme::AppSizes::parse(super::SIZES) {
+            panic!("sizes.json: {errors:?}");
+        }
     }
 }

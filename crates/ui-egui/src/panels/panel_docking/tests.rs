@@ -261,6 +261,8 @@ fn ui_set_dock_fields_map_onto_the_workspace_atomically() {
     assert!(minimized(&app, "color") && !minimized(&app, "properties"));
     assert!(ok(&mut app, json!({"dock": {"hiddenTabs": {"color": ["Swatches"]}}})));
     assert!(!is_shown(&app, "swatches"));
+    assert!(ok(&mut app, json!({"panels": {"layers": false}})) && ok(&mut app, json!({"panels": {"layers": true}})));
+    assert!(is_front(&app, "layers"), "a group the old words open shows its first tab");
 
     // The end dock's total after a `dockWidth` request.
     assert!(ok(&mut app, json!({"dockWidth": 400.0})));

@@ -178,19 +178,12 @@ impl DockPanels<String> for Panels<'_> {
     }
 }
 
-/// Draws panel `id`'s body in `ui`: in a vertical scroll area, unless the panel lays out its own scrolling list or
-/// sizes itself to the group.
+/// Draws panel `id`'s body in `ui`, the group's body room. Each body fills that room and scrolls itself.
 pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     let Some(entry) = registry::entry(id) else { return };
     #[cfg(test)]
     probe::record(ui.ctx(), id, ui.max_rect(), false);
-    if entry.scrolls_itself {
-        (entry.body)(app, ui);
-    } else {
-        // No scroll fade: it darkens real colours, swatches and previews at the edge (#2726).
-        ui.spacing_mut().scroll.fade.strength = 0.0;
-        egui::ScrollArea::vertical().id_salt(("panel body", id)).auto_shrink([false, false]).show(ui, |ui| (entry.body)(app, ui));
-    }
+    (entry.body)(app, ui);
 }
 
 /// Draws the workspace, the canvas included, in the room `ui` has left.
@@ -782,9 +775,11 @@ fn legacy_on(layout: &Layout<String>, panels: Option<&Value>, dock_tabs: Option<
     let flag = |key: &str| panels.and_then(|panels| panels.get(key)).and_then(Value::as_bool);
     for ((key, members), (_, first)) in LEGACY_GROUPS.iter().zip(shown.iter_mut()) {
         match flag(key) {
-            // A shown group stays as it is; a hidden one shows all of its panels at their places.
+            // A shown group stays as it is; a hidden one shows all of its panels at their places, with its first tab in
+            // front. Each open shows the panel it opens, so the first is shown again after the others.
             Some(true) if first.is_none() => {
                 actions.extend(members.iter().map(|panel| Action::open((*panel).to_owned(), None)));
+                actions.extend(members.first().map(|panel| Action::activate((*panel).to_owned())));
                 *first = members.first().map(|panel| (*panel).to_owned());
             }
             Some(false) => {
