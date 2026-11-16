@@ -113,9 +113,9 @@ fn float_offset(app: &PhotocraftApp) -> Option<(i32, i32)> {
     photocraft_engine::float_cmds::floating(app.session.active().unwrap()).map(|f| f.offset)
 }
 
-/// #7538: a selection tool's press on a floating piece's ants drags its outline (#11368), a ⌘
-/// press the piece; one in the margin its cut left of the loose marquee draws a new selection, as
-/// the ants say.
+/// #7538: a selection tool's press on a floating piece's ants drops the piece and drags its outline (#11368), a
+/// ⌘ press drags the piece; one in the margin its cut left of the loose marquee draws a new selection, as the ants
+/// say.
 #[test]
 fn a_press_in_the_margin_of_a_floating_piece_starts_a_new_selection() {
     let none = egui::Modifiers::NONE;
@@ -129,8 +129,11 @@ fn a_press_in_the_margin_of_a_floating_piece_starts_a_new_selection() {
         app.ui.tool = tool;
         app.ui.extras.snap = false;
         app.ui.view.show.smart_guides = false;
+        let bounds = |app: &PhotocraftApp| app.session.active().unwrap().doc.selection.as_ref().map(|s| s.content_bounds());
+        let outline = bounds(&app).expect("the piece's outline");
         drag(&mut app, [70.0, 60.0], [80.0, 60.0], none);
-        assert_eq!(float_offset(&app), Some((10, 5)), "{tool:?}: on the square drags its outline, the piece stays");
+        assert_eq!(float_offset(&app), None, "{tool:?}: on the square the press drops the piece (#11368)");
+        assert_eq!(bounds(&app), Some(outline.translate(10, 0)), "{tool:?}: and drags its outline");
 
         let mut app = floating_square();
         app.ui.tool = tool;

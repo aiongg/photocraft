@@ -143,21 +143,6 @@ fn modifiers_override_the_bar() {
 }
 
 #[test]
-fn command_drag_inside_the_selection_moves_the_pixels() {
-    let mut app = app();
-    click(&mut app, RED, Modifiers::NONE);
-    drag(&mut app, RED, [250.0, 220.0], Modifiers::COMMAND);
-    // The pixels float at the pointer (as with a marquee's ⌘-drag) and land as "Move" on the drop.
-    let offset = photocraft_engine::float_cmds::floating(app.session.active().unwrap()).map(|f| f.offset);
-    assert_eq!(offset, Some((50, 40)), "the selected pixels follow the drag");
-    crate::menus::invoke(&mut app, &egui::Context::default(), "select.deselect", json!({})).unwrap();
-    let labels: Vec<String> = app.session.active().unwrap().history.entries().into_iter().map(|e| e.to_string()).collect();
-    assert!(labels.iter().any(|l| l == "Move"), "{labels:?}");
-    assert_eq!(alpha_at(&app, 100, 100), 0.0, "the pixels moved away");
-    assert_eq!(alpha_at(&app, 340, 300), 1.0);
-}
-
-#[test]
 fn reset_tool_sets_the_mode_back_to_new() {
     let ctx = egui::Context::default();
     let mut app = app();

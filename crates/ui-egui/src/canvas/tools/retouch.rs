@@ -173,6 +173,11 @@ impl CanvasTool for RetouchTool<'_> {
         if self.drags_outline(at, mods) {
             return state.drag.press(&self.probe, pointer, cx);
         }
+        // ⌘ with Object Selection is the Move stand-in's: answered `Ignored`, the press goes to it and drags the
+        // selected pixels.
+        if tool == Tool::ObjectSelection && mods.cmd {
+            return ToolAction::Ignored;
+        }
         // A press of another document never reaches here: the canvas pass ends it (`end_foreign_gesture`), which
         // cancels this tool and drops its press.
         let drags = self.scope.with_app(|app| tool == Tool::ObjectSelection || retouch_ui::patch_drags_selection(app, at, mods));
