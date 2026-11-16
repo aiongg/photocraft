@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use craft::behavior::geometry::TransformMode;
+use craft::behavior::geometry::{SnapLine, TransformMode};
 use craft::draw::ui::transform::{Interpolation, TransformPreset, TransformSettings, TransformTool};
 use craft::imaging::ui::transform_preview::{PreviewPixels, PreviewTextures, StyledPreview};
 use craft::imaging::ui::warp::WarpSplit;
@@ -38,7 +38,7 @@ pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_from_frame, begin_place
 pub(crate) use commit::{SAVE_FOR_WEB, committing};
 pub use commit::{apply_click, auto_commit, cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event};
 pub(crate) use draw::{carries_selection_of, moves_selection, selection_map};
-pub use draw::show_in_canvas;
+pub use draw::{SessionShown, show_in_canvas};
 #[cfg(test)]
 pub(crate) use draw::styled_composite;
 pub use options_bar::{options_bar, reset_warp};
@@ -333,10 +333,10 @@ pub(crate) fn settings(app: &PhotocraftApp) -> TransformSettings {
     settings
 }
 
-/// The canvas tool of an open session (Enter and Escape in the Warp phase). The canvas pass holds the session while it
-/// runs, so the tool borrows it, not the app.
-pub fn canvas_tool(session: &FreeTransform) -> TransformTool<'_, SessionWarp> {
-    TransformTool::new(&session.session)
+/// The canvas tool of an open session (Enter and Escape in the Warp phase), with the box's snap lines of this frame's
+/// body ([`show_in_canvas`]). The canvas pass holds the session while it runs, so the tool borrows it, not the app.
+pub fn canvas_tool(session: &FreeTransform, snapped: Vec<SnapLine>) -> TransformTool<'_, SessionWarp> {
+    TransformTool::new(&session.session, snapped)
 }
 
 /// Applies what the tool's keys asked for: `(apply, discard)` from `TransformTool::take_keys`.

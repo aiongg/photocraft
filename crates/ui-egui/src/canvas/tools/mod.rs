@@ -16,6 +16,7 @@ pub(crate) mod selection;
 
 use std::cell::RefCell;
 
+use craft::behavior::geometry::SnapLine;
 use craft::behavior::kurbo::Size;
 use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
 use craft::draw::ui::{CropShown, CropToolPass};
@@ -429,6 +430,15 @@ impl Preflight<'_, '_> {
     }
 }
 
+/// What the canvas body's controls reported for the host's pass of the same frame.
+#[derive(Default)]
+pub(crate) struct BodyShown {
+    /// The Crop tool's frame.
+    pub(crate) crop: Option<CropShown>,
+    /// The snap lines of the open Free Transform's box, which its canvas tool hands to the host.
+    pub(crate) transform_snapped: Vec<SnapLine>,
+}
+
 /// Borrows a family tool as the host's `dyn`.
 fn dynamic<'x>(tool: &'x mut FamilyTool<'_>) -> DynTool<'x> {
     &mut **tool
@@ -444,7 +454,7 @@ fn with_rig<R>(
     host: CanvasHost,
     tools: &mut CanvasTools,
     stand_ins: bool,
-    crop_shown: Option<CropShown>,
+    shown: BodyShown,
     f: impl FnOnce(&mut dyn CanvasTool, ToolHost<'_>) -> R,
 ) -> R {
     let tool = app.ui.tool;
@@ -454,7 +464,8 @@ fn with_rig<R>(
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
     // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
     let free_transform = app.ui.transform.take();
-    let mut transform = free_transform.as_ref().map(crate::transform_tool::canvas_tool);
+    let BodyShown { crop: crop_shown, transform_snapped } = shown;
+    let mut transform = free_transform.as_ref().map(|session| crate::transform_tool::canvas_tool(session, transform_snapped));
     // The symmetry session moves into the pass the same way.
     let symmetry_transform = if fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
     let mut symmetry = symmetry_transform.as_ref().and_then(|t| crate::symmetry_ui::session_tool(app, t));
@@ -578,7 +589,7 @@ fn with_rig<R>(
 /// Runs the tool host for the canvas `host` on the canvas's output `out`, and applies what it reports: the view a
 /// tool or the autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain.
 /// Tools are active in the main window only.
-pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput, crop_shown: Option<CropShown>) -> ToolHostResponse {
+pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput, shown: BodyShown) -> ToolHostResponse {
     let ctx = ui.ctx().clone();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
     let mut tools = std::mem::take(&mut app.canvas_tools);
@@ -593,7 +604,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
     let precise = app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise;
     let smart = super::snap_ui::smart_guide_color(app);
-    let mut response = with_rig(app, &ctx, host, &mut tools, primary, crop_shown, |selected, tool_host| {
+    let mut response = with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| {
         tool_host.enabled(primary).smart_guide_color(smart).precise_cursors(precise).run(ui, out, selected)
     });
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
@@ -666,7 +677,7 @@ pub(crate) fn tool_changed(app: &mut PhotocraftApp, ctx: &egui::Context, host: C
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let id = host.canvas_id();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
-    with_rig(app, ctx, host, &mut tools, primary, None, |selected, tool_host| {
+    with_rig(app, ctx, host, &mut tools, primary, BodyShown::default(), |selected, tool_host| {
         tool_host.cancel(ctx, id, selected, CancelReason::HostChanged);
     });
     app.canvas_tools = tools;

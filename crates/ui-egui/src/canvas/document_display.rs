@@ -6,7 +6,6 @@ use craft::behavior::geometry::crop::normalized_angle;
 use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::{Point, Rect as Rect64, Size};
 use craft::behavior::{CanvasView, PixelSize};
-use craft::draw::ui::CropShown;
 use craft::ui::canvas::{
     Canvas, CanvasOutput, CanvasScrollbars, CanvasSpace, Extent, NavigationOptions, PageBorder, PageFrame, Pasteboard, PasteboardColor, PixelRect, RasterDisplay, RasterSource,
     RotateView, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view,
@@ -270,8 +269,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let mut turned = None;
     // What the CPU display read from the composite this pass, and how long its pass took.
     let mut cpu_read: Option<(PixelRect, f64)> = None;
-    // What the Crop tool's frame reported in the body, for the host's pass of the same frame.
-    let mut crop_shown = None;
+    // What the body's controls reported for the host's pass of the same frame.
+    let mut body_shown = tools::BodyShown::default();
     let shown = canvas.show_at(ui, rect, |ui, body| {
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
@@ -296,7 +295,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         if app.ui.view.tile_grid {
             super::tile_overlay::show(ui, app, idx);
         }
-        let live = canvas_controls(app, ui, body.rect, host, &space, &mut turned, &mut crop_shown);
+        let live = canvas_controls(app, ui, body.rect, host, &space, &mut turned, &mut body_shown);
         // The picture is prepared after the controls, so a gradient's live proposal shows in the pass that made it.
         let picture = gpu_ok
             .then(|| {
@@ -371,7 +370,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let active = !app.dialog_open();
         crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), canvas_output.response.rect, tool, active);
     }
-    let response = tools::run(app, ui, host, &canvas_output, crop_shown);
+    let response = tools::run(app, ui, host, &canvas_output, body_shown);
     // A view a tool set (the Crop tool's slide) is the one the app keeps; the canvas's own otherwise.
     if let Some(next) = response.view.as_ref() {
         view.set_from(next, ppp);
@@ -425,7 +424,7 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
 
 /// The controls the tools show over the document, in the order that decides who takes a press: a control shown later
 /// is above the earlier ones. Returns the gradient's live proposal, which the picture of the same pass shows, and puts
-/// what the Crop tool's frame reported in `crop`, for the host's pass.
+/// what the Crop tool's frame and the Free Transform box reported in `shown`, for the host's pass.
 fn canvas_controls(
     app: &mut PhotocraftApp,
     ui: &mut egui::Ui,
@@ -433,7 +432,7 @@ fn canvas_controls(
     host: CanvasHost,
     space: &CanvasSpace,
     turned: &mut Option<CanvasView>,
-    crop: &mut Option<CropShown>,
+    shown: &mut tools::BodyShown,
 ) -> Option<(photocraft_doc::LayerId, photocraft_doc::Fill)> {
     let pointer = ui.input(|i| i.pointer.hover_pos());
     let now = ui.input(|i| i.time);
@@ -460,7 +459,9 @@ fn canvas_controls(
     }
     crate::type_tool::canvas_controls(app, ui, rect);
     crate::type_path_placement::show(app, ui, rect);
-    let session_box_shown = crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    let session = crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    let session_box_shown = session.shown;
+    shown.transform_snapped = session.snapped;
     crate::cam_transform::show(app, ui, rect);
     super::transform_controls::show(app, ui, rect, session_box_shown);
     crate::move_box::show(app, ui, rect);
@@ -475,7 +476,7 @@ fn canvas_controls(
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
     if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
-        *crop = super::tools::crop::show_frame(app, ui, rect);
+        shown.crop = super::tools::crop::show_frame(app, ui, rect);
     }
     crate::crop_task_bar::show(app, ui, rect);
     crate::frame_tool::task_bar::show(ui, app, rect);
