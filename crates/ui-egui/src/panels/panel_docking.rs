@@ -793,8 +793,9 @@ fn legacy_on(layout: &Layout<String>, panels: Option<&Value>, dock_tabs: Option<
     for (key, names) in hidden_tabs.into_iter().flatten() {
         let Some((_, members)) = LEGACY_GROUPS.iter().find(|(group, _)| *group == key.as_str()) else { continue };
         for name in names.as_array().into_iter().flatten().filter_map(Value::as_str) {
+            // A tab of a group this request opens above is closed again.
             if let Some(panel) = registry::normalize(name).filter(|panel| members.contains(panel)).map(str::to_owned)
-                && layout.contains(&panel)
+                && (layout.contains(&panel) || actions.contains(&Action::open(panel.clone(), None)))
                 && !actions.contains(&Action::close(panel.clone()))
             {
                 actions.push(Action::close(panel));
