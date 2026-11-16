@@ -5,7 +5,6 @@
 use egui::Modifiers;
 use serde_json::{Value, json};
 
-use super::{finish_shape, shape_geometry};
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
@@ -16,6 +15,14 @@ fn app(w: u32, h: u32) -> PhotocraftApp {
     app.sync_views();
     app.ui.tool = Tool::Triangle;
     app
+}
+
+/// A canvas drag from `from` to `to` with `mods` held from the first move, as the canvas sends it.
+fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], mods: Modifiers) {
+    tool_event(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, Modifiers::NONE);
+    tool_event(app, ToolEvent::Move { x: (from[0] + to[0]) / 2.0, y: (from[1] + to[1]) / 2.0, pressure: 1.0 }, mods);
+    tool_event(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, mods);
+    tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, mods);
 }
 
 fn steps(app: &PhotocraftApp) -> usize {
@@ -45,7 +52,7 @@ fn a_drag_fills_its_box_in_either_direction() {
     for (from, to) in [([400.0, 300.0], [600.0, 400.0]), ([600.0, 400.0], [400.0, 300.0])] {
         let mut app = app(800, 600);
         let n = steps(&app);
-        finish_shape(&mut app, Tool::Triangle, from, to, Modifiers::NONE);
+        drag(&mut app, from, to, Modifiers::NONE);
         let v = info(&mut app);
         assert_eq!(anchors(&v), [(500.0, 300.0), (600.0, 400.0), (400.0, 400.0)]);
         assert_eq!(v["live"]["kind"], "triangle");
@@ -56,23 +63,20 @@ fn a_drag_fills_its_box_in_either_direction() {
 #[test]
 fn alt_after_the_start_draws_from_the_centre() {
     let mut app = app(800, 600);
-    finish_shape(&mut app, Tool::Triangle, [400.0, 300.0], [500.0, 350.0], Modifiers::ALT);
+    drag(&mut app, [400.0, 300.0], [500.0, 350.0], Modifiers::ALT);
     assert_eq!(anchors(&info(&mut app)), [(400.0, 250.0), (500.0, 350.0), (300.0, 350.0)]);
 }
 
 #[test]
 fn the_dialog_and_the_drag_send_the_same_triangle() {
-    let app = app(800, 600);
-    let fields = json!({"__createShape": "triangle", "__at": [400.0, 300.0], "width": 100.0, "height": 100.0, "fromCenter": false});
-    let Value::Object(fields) = fields else { panic!("an object") };
-    let mut dialog = crate::shape_dialog::geometry(&fields).unwrap();
-    // The drag adds its History name in finish_shape, outside the geometry.
-    dialog.as_object_mut().map(|o| o.remove("historyName"));
-    let drag = shape_geometry(&app.ui.tool_options, Tool::Triangle, [400.0, 300.0], [500.0, 400.0], Modifiers::NONE).unwrap();
-    assert_eq!(dialog, drag);
-    let path = photocraft_engine::vector_cmds::shape_path(&dialog).unwrap();
-    let got: Vec<(f64, f64)> = path.subpaths[0].knots.iter().map(|k| (k.anchor.x, k.anchor.y)).collect();
-    assert_eq!(got, [(450.0, 300.0), (500.0, 400.0), (400.0, 400.0)]);
+    let mut dialog = app(800, 600);
+    let id = crate::dialogs::shape_dialog::open(&mut dialog, craft::draw::ui::shape_drag::ShapeKind::Triangle, craft::behavior::kurbo::Point::new(400.0, 300.0)).unwrap();
+    crate::dialogs::testing::confirm(&mut dialog, id).unwrap();
+    let mut dragged = app(800, 600);
+    drag(&mut dragged, [400.0, 300.0], [500.0, 400.0], Modifiers::NONE);
+    let (a, b) = (info(&mut dialog), info(&mut dragged));
+    assert_eq!(a["live"], b["live"]);
+    assert_eq!(anchors(&a), [(450.0, 300.0), (500.0, 400.0), (400.0, 400.0)]);
 }
 
 #[test]
@@ -80,10 +84,9 @@ fn shift_still_draws_the_equilateral_triangle_of_the_squares_circle() {
     for mods in [Modifiers::SHIFT, Modifiers::SHIFT | Modifiers::ALT] {
         let mut app = app(800, 600);
         let (start, end) = ([400.0, 300.0], [600.0, 400.0]);
-        // The square the Rectangle tool gets for the same drag, whichever side sizes it.
-        let sq = shape_geometry(&app.ui.tool_options, Tool::Rectangle, start, end, mods).unwrap();
-        let [x, y, m, _]: [f64; 4] = serde_json::from_value(sq["rect"].clone()).unwrap();
-        finish_shape(&mut app, Tool::Triangle, start, end, mods);
+        // The square of the drag's shorter side (100), drawn from the press, or from the centre with Alt.
+        let (x, y, m) = if mods.alt { (300.0, 200.0, 200.0) } else { (400.0, 300.0, 100.0) };
+        drag(&mut app, start, end, mods);
         let v = info(&mut app);
         assert_eq!(v["live"]["kind"], "triangle");
         let s60 = 60f64.to_radians().sin();

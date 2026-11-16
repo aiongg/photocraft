@@ -205,31 +205,10 @@ pub fn option_keys(tool: Tool) -> &'static [&'static str] {
         Tool::MagneticLasso => reset!(feather, anti_alias, magnetic),
         Tool::MagicWand => reset!(tolerance, anti_alias, contiguous),
         Tool::QuickSelection => reset!(enhance_edge),
-<<<<<<< HEAD
-        Tool::ObjectSelection => reset!(enhance_edge, object_finder),
+        Tool::ObjectSelection => reset!(enhance_edge, object_finder, object_hard_edge),
         Tool::Crop => reset!(crop),
         Tool::PerspectiveCrop => reset!(perspective_crop, perspective_crop_grid),
         Tool::Eyedropper => reset!(eyedropper),
-=======
-        Tool::ObjectSelection => reset!(enhance_edge, object_finder, object_hard_edge),
-        Tool::Crop => reset!(
-            crop_ratio,
-            crop_delete,
-            crop_content_aware,
-            crop_width,
-            crop_height,
-            crop_resolution,
-            crop_resolution_unit,
-            crop_overlay,
-            crop_overlay_show,
-            crop_overlay_orientation,
-            crop_shield,
-            crop_custom_ratio_width,
-            crop_custom_ratio_height,
-        ),
-        Tool::PerspectiveCrop => reset!(crop_width, crop_height, crop_resolution, crop_resolution_unit, perspective_crop_grid),
-        Tool::Eyedropper => reset!(eyedropper_size, eyedropper_sample, eyedropper_ring),
->>>>>>> upstream/main
         Tool::Brush => reset!(brush_clear),
         Tool::Pencil => reset!(pencil_auto_erase, pencil_clear),
         Tool::Eraser => reset!(eraser_mode, erase_to_history),
@@ -403,7 +382,6 @@ mod tests {
         }
     }
 
-<<<<<<< HEAD
     /// Reset Tool on Move puts back what production reset (reference point, relative position,
     /// interpolation) and leaves Free Transform's Legacy choice, W/H link and unit, which share
     /// the `transform` section.
@@ -417,7 +395,8 @@ mod tests {
         reset_options(&mut o, Tool::Move);
         assert!(!o.transform.show_reference_point && !o.transform.relative_position);
         assert!(o.transform.legacy && !o.transform.aspect_linked);
-=======
+    }
+
     /// Object Selection › Hard Edge (#12855) is on by default, Reset Tool turns it back on, and
     /// both gestures hand it to `select.object`.
     #[test]
@@ -429,9 +408,9 @@ mod tests {
         let last = |app: &PhotocraftApp| app.session.journal.last().filter(|(id, _)| id == "select.object").map(|(_, p)| p["hardEdge"].clone());
         for hard in [false, true] {
             app.ui.tool_options.object_hard_edge = hard;
-            crate::retouch_ui::finish_object_selection(&mut app, [4.0, 4.0], [4.0, 4.0], egui::Modifiers::NONE);
+            crate::retouch_ui::finish_object_selection(&mut app, [4.0, 4.0], [4.0, 4.0], craft::keymap::Mods::default());
             assert_eq!(last(&app), Some(json!(hard)), "a click");
-            crate::retouch_ui::finish_object_selection(&mut app, [1.0, 1.0], [7.0, 7.0], egui::Modifiers::NONE);
+            crate::retouch_ui::finish_object_selection(&mut app, [1.0, 1.0], [7.0, 7.0], craft::keymap::Mods::default());
             assert_eq!(last(&app), Some(json!(hard)), "a dragged rectangle");
         }
         app.ui.tool_options.object_hard_edge = false;
@@ -445,7 +424,6 @@ mod tests {
         let mut old = serde_json::to_value(ToolOptions::default()).unwrap();
         old.as_object_mut().unwrap().remove("object_hard_edge");
         assert!(serde_json::from_value::<ToolOptions>(old).unwrap().object_hard_edge);
->>>>>>> upstream/main
     }
 
     /// Sample All Layers is per tool (#5524): resetting Blur turns off only Blur's.
