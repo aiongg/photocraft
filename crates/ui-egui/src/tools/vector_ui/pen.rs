@@ -279,6 +279,17 @@ pub(super) fn ends(app: &PhotocraftApp) -> Vec<(u64, KnotRef, Point)> {
     ends
 }
 
+/// The open end Direct Selection has selected, for `PenTool::carry_on`: with it selected the Curvature Pen's next press
+/// carries that subpath on from there (#10726). `None` unless the end is in the path a Pen path carries on
+/// ([`resume_target`]): one in another path starts a new one.
+pub(super) fn carry_on(app: &PhotocraftApp) -> Option<(u64, KnotRef, EditSubpath)> {
+    let (target, subpath, knot) = crate::direct_select::selected_open_end(app)?;
+    let (name, layer, _) = resume_target(app)?;
+    let at = target_ref(app, &name, layer).filter(|r| *r == target)?;
+    let resumed = resume_end(app, subpath, knot)?;
+    Some((at.key(), KnotRef::new(subpath, knot), resumed.draft))
+}
+
 /// The open subpath `subpath` of the path a Pen path carries on ([`resume_target`]), as a Pen path to carry on drawing
 /// from its end `knot`: the first or last anchor (#6593). `None` for another knot, or a closed subpath.
 fn resume_end(app: &PhotocraftApp, subpath: usize, knot: usize) -> Option<PenPath> {

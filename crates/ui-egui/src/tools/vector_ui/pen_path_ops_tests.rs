@@ -208,10 +208,11 @@ fn path_mode_adds_subpaths_with_the_operation() {
     assert_eq!(saved.subpaths.last().map(|s| s.op), Some(PathOp::Exclude));
     // A targeted vector mask.
     let id = app.session.active().unwrap().active_layer.unwrap().0;
-    app.run("layer.vectorMask.add", json!({"layer": id, "path": {"subpaths": [{"closed": true, "knots": [[0, 0], [100, 0], [100, 100], [0, 100]]}]}})).unwrap();
+    app.run("layer.vectorMask.add", json!({"layer": id, "path": {"subpaths": [{"closed": true, "knots": [[0, 0], [190, 0], [190, 190], [0, 190]]}]}})).unwrap();
     app.ui.vector_mask_target = true;
     app.ui.tool_options.pen_path_op = "subtract".into();
-    square(&mut app, 20.0, 20.0, 30.0);
+    // Clear of the Work Path's segments and the mask's, which Auto Add/Delete would edit.
+    square(&mut app, 155.0, 155.0, 30.0);
     let vm = app.session.active().unwrap().doc.layer(LayerId(id)).unwrap().vector_mask.clone().unwrap();
     assert_eq!(vm.path.subpaths.iter().map(|s| s.op).collect::<Vec<_>>(), [PathOp::Combine, PathOp::Subtract]);
 }

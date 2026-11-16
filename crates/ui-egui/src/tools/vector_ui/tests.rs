@@ -755,6 +755,8 @@ fn failed_stale_pen_commit_preserves_the_draft_until_retry() {
         draft.as_mut().unwrap().commit_failed = true;
         let owner = app.ui.pen_doc;
         app.session.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
+        // The new document is the one the Paths panel selection belongs to once a pass has seen it.
+        app.sync_views();
         app.ui.tool_options.vector_mode = VectorMode::Shape;
         app.ui.selected_path = Some("foreign named path".into());
         app.session.authorize = Some(|_, _| Err(photocraft_engine::EngineError::Other("test rejection".into())));
