@@ -630,6 +630,10 @@ pub(crate) fn run_actions(app: &mut PhotocraftApp, ctx: &egui::Context, actions:
             }
             continue;
         }
+        // A command the runtime carries out (Fit Layer(s) on Screen after an Alt-click) fires there; the canvas runs it.
+        if crate::shortcut_dispatch::fire_bridged(ctx, &id).is_some() {
+            continue;
+        }
         if p.is_null() || id == "layer.newFillLayer.solidColor" || id == photocraft_engine::pattern_fill_cmds::CREATE {
             let params = if p.is_null() { json!({}) } else { p };
             if let Err(e) = crate::menus::invoke(app, ctx, &id, params) {

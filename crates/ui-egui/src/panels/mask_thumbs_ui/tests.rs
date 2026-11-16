@@ -22,6 +22,7 @@ use crate::PhotocraftApp;
 fn app_of(session: photocraft_engine::Session) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(session, crate::Services::default());
     app.background_jobs = false;
+    app.sync_views();
     app
 }
 
@@ -295,8 +296,8 @@ fn selecting_mask_thumbnail_toggles_swatches_to_mask_colors_and_back() {
     const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
     let (mut s, masked, _) = dotted();
-    s.execute("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     let mut app = app_of(s);
+    app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     let ctx = app.ctx().clone();
 
     // Initial state: layer pixels targeted, red foreground, blue background.

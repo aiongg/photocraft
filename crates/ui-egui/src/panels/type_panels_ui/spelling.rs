@@ -101,7 +101,13 @@ pub fn open_spelling(app: &mut PhotocraftApp, all_layers: bool) -> Result<Value,
     let raw = list(app, all_layers, layer, &[]);
     app.ui.type_panels.spell = Some(SpellDialog { all_layers, layer, resume });
     let items = to_items(app, &raw);
+    // Opening over an open dialog replaces it and leaves the replaced one's Cancel as a result; that Cancel is not
+    // the new dialog's, so it is dropped.
+    let replaced = app.framework.dialogs.is_open::<CheckSpellingDialog>();
     app.framework.dialogs.open(CheckSpellingDialog::new(items).all_layers(all_layers));
+    if replaced {
+        let _ = app.framework.dialogs.take::<CheckSpellingDialog>();
+    }
     Ok(json!({ "dialog": SPELLING, "misspellings": raw }))
 }
 
