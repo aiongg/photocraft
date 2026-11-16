@@ -7,7 +7,7 @@
 
 use craft::behavior::EditEvent;
 use craft::draw::geometry::ShapeGeometry;
-use craft::draw::ui::pen::{AnchorTool, PenEvent, PenTool};
+use craft::draw::ui::pen::{AnchorTool, PenDraft, PenEvent, PenTool};
 use craft::draw::ui::{EditSubpath, KnotRef, PathTool, PenEnd, PenMode, ShapeDragEvent, ShapeDragOptions, ShapeDragTool, ShapeKind};
 use craft::keymap::Mods;
 use craft::ui::canvas::ToolHostResponse;
@@ -104,13 +104,12 @@ fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
                 .pen
                 .mode(if curvature { PenMode::Curvature } else { PenMode::Pen })
                 .sensing(sensing)
-                // A draft the selected tool did not draw (a refused one kept after a tool switch) leaves Delete and
-                // Backspace to that tool, as it leaves Undo (`PenPath::owns_undo`).
-                .deletes(pen.is_none_or(|p| p.owns_undo(tool)))
                 .auto_add_delete(!curvature && o.pen_auto_add_delete)
                 .path_options(o.path_options.clone())
                 .ends(&if pen.is_none_or(|p| p.draft.knots.is_empty()) { pen::ends(app) } else { Vec::new() })
-                .draft(pen.map(|p| &p.draft))
+                // A draft the selected tool did not draw (a refused one kept after a tool switch) is foreign: Delete,
+                // Backspace and Undo leave its anchors to that tool (`PenPath::owns_undo`).
+                .draft(pen.map(|p| if p.owns_undo(tool) { PenDraft::Own(&p.draft) } else { PenDraft::Foreign(&p.draft) }))
                 .kept(pen.map_or(0, |p| p.kept));
             anchors.map_or(Which::Pen, Which::Anchors)
         }
