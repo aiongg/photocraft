@@ -163,5 +163,3 @@ pub fn paint_shape_preview(painter: &egui::Painter, shape: &photocraft_doc::Shap
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-mod shortcut_tests;

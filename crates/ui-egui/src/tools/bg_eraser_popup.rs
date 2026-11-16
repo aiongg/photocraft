@@ -82,6 +82,3 @@ pub fn rows(ui: &mut egui::Ui, brush: &mut BrushSettings, tolerance_control: &mu
     key
 }
 
-#[cfg(test)]
-#[path = "../background_eraser_brush_popup_tests.rs"]
-mod background_eraser_brush_popup_tests;

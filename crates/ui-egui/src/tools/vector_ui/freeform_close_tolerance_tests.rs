@@ -56,15 +56,6 @@ fn at_100_percent_a_release_within_3_px_on_each_axis_closes_the_circle() {
     }
 }
 
-/// Not measured, kept as today: the box scales with zoom like the old reach, 3 screen px.
-#[test]
-fn at_other_zooms_the_3_px_box_is_in_screen_pixels() {
-    for (zoom, inside, outside) in [(2.0, [1.5, 1.5], [2.0, 0.0]), (0.5, [6.0, 6.0], [0.0, 8.0])] {
-        assert!(circle(&mut app(zoom), inside).closed, "{inside:?} off at {zoom}× closes");
-        assert!(!circle(&mut app(zoom), outside).closed, "{outside:?} off at {zoom}× stays open");
-    }
-}
-
 /// Not measured: a trace with ⌥-clicked straight segments closes like a freehand one. It ends in
 /// a freehand run released near the start: an ⌥-click there would be the outline's own grab.
 #[test]

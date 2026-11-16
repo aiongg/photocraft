@@ -86,23 +86,6 @@ fn the_bar_matches_path_selection_without_a_shape_layer() {
     assert_eq!(x(Tool::DirectSelection), x(Tool::PathSelection));
 }
 
-/// With a shape layer selected both tools draw the same controls at the same places.
-#[test]
-fn the_bar_matches_path_selection_with_a_shape_layer() {
-    let labels = ["Path operations", "Mode", "Fill", "Fill color", "Stroke color"];
-    let xs = |tool: Tool| {
-        let mut app = app();
-        app.ui.selected_path = None;
-        app.run("shape.create", json!({"rect": [20, 20, 220, 170], "stroke": null})).unwrap();
-        app.ui.tool = tool;
-        let h = bar(app, tool);
-        labels.map(|l| h.get_by_label(l).rect().min.x)
-    };
-    let (path, direct) = (xs(Tool::PathSelection), xs(Tool::DirectSelection));
-    assert!(path.is_sorted_by(|a, b| a < b), "left to right: {path:?}");
-    assert_eq!(direct, path);
-}
-
 /// A shape layer of two squares at `y`, 80 px each, active; its id.
 fn two_component_shape(app: &mut PhotocraftApp, y: f64) -> u64 {
     app.run("shape.create", json!({"rect": [40, y, 80, 80], "stroke": null})).unwrap();

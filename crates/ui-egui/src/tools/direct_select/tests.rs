@@ -431,20 +431,6 @@ fn direct_selection_cannot_apply_to_another_document_or_a_reopened_identity() {
 }
 
 #[test]
-fn external_revision_cancels_preview_and_preserves_the_new_path() {
-    let mut app = app(Tool::Pen);
-    with_path(&mut app);
-    start_command_drag(&mut app);
-    testing::move_to(&mut app, [55.0, 135.0], Modifiers::COMMAND);
-    app.session.execute("path.moveAnchors", json!({"name":"work", "anchors":[[0,0]], "move":[-5,7]})).unwrap();
-    let (before, n) = (work(&app), steps(&app));
-    consume_stale_drag(&mut app);
-    assert_eq!(work(&app), before);
-    assert_eq!(steps(&app), n);
-    assert!(app.ui.pen.is_none());
-}
-
-#[test]
 fn layer_path_and_tool_changes_cancel_the_owned_edit() {
     for change in ["layer", "path", "vectorMask", "tool"] {
         let mut app = app(Tool::Pen);

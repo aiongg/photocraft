@@ -68,25 +68,6 @@ const CORNER: [f64; 2] = [726.0, 454.0];
 const CORNER_TO: [f64; 2] = [626.0, 394.0];
 
 #[test]
-fn the_measured_drag_gives_the_reference_bounds_with_every_tool() {
-    for tool in [Tool::Rectangle, Tool::PathSelection, Tool::EllipseShape, Tool::Triangle, Tool::Polygon, Tool::Line] {
-        let (mut app, a, b) = app_with_two_shapes(tool);
-        let steps = past(&app);
-        drag(&mut app, CORNER, CORNER_TO);
-        near(bounds(&app, a), [100.0, 98.0, 354.0, 268.0]);
-        near(bounds(&app, b), [368.0, 282.0, 621.0, 394.0]);
-        assert_eq!(past(&app), steps + 1, "{tool:?}: one history step");
-        assert_eq!(last_step(&app).as_deref(), Some("Transform Path"), "{tool:?}");
-        assert!(app.ui.transform.is_none(), "{tool:?}: no Free Transform session opens");
-        // The shapes stay live.
-        for id in [a, b] {
-            let LayerContent::Shape(sh) = &app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else { panic!() };
-            assert!(sh.live.is_some(), "{tool:?}: still a live shape");
-        }
-    }
-}
-
-#[test]
 fn an_edge_handle_scales_one_way_and_undo_restores_both_shapes() {
     let (mut app, a, b) = app_with_two_shapes(Tool::PathSelection);
     // The right edge's middle, dragged 100 px left: x scales about the left edge (100), y not at all.

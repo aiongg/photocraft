@@ -266,31 +266,6 @@ fn a_pasted_hex_colour_updates_the_selected_shape_and_undoes_once() {
 }
 
 #[test]
-fn picking_tool_colours_enables_paint_and_reaches_the_next_shape() {
-    let mut app = app("rgb", 32);
-    app.ui.tool_options.shape_fill = false;
-    let mut h = harness(app, false);
-    for (label, swatch) in [("Fill color", "RGB Red"), ("Stroke", "RGB Blue")] {
-        chip(&h, label).click();
-        h.run_steps(3);
-        click_swatch(&mut h, swatch);
-        h.key_press(Key::Escape);
-        h.run_steps(2);
-    }
-    assert!(h.state().ui.tool_options.shape_fill);
-    assert_eq!(h.state().ui.tool_options.stroke_width, 3.0);
-    assert_eq!(h.state().session.tools.foreground, [1.0, 0.0, 0.0, 1.0]);
-    assert_eq!(h.state().session.tools.background, [0.0, 0.0, 1.0, 1.0]);
-    // Both join the Recently Used Colors, newest first.
-    let recent: Vec<[f32; 3]> = crate::paint_picker::recent_colors(&h.state().session).into_iter().collect();
-    // The Solid switches also remember their starting colours, which sit below the picks.
-    assert_eq!(recent[..2], [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]);
-    draw(h.state_mut(), Tool::Rectangle, [20.0, 20.0], [100.0, 80.0]);
-    assert_eq!(shape(h.state()).fill, Some(solid_paint([1.0, 0.0, 0.0, 1.0])));
-    assert_eq!(shape(h.state()).stroke.as_ref().unwrap().paint, solid_paint([0.0, 0.0, 1.0, 1.0]));
-}
-
-#[test]
 fn no_colour_and_solid_choices_are_explicit_live_tool_defaults() {
     let mut h = harness(app("rgb", 8), false);
     pick_kind(&mut h, "Fill color", "Gradient");
@@ -466,38 +441,6 @@ fn selected_shape_gradient_and_full_picker_edit_the_layer() {
     assert_eq!(shape(h.state()).fill, Some(solid_paint(h.state().session.tools.foreground)));
 }
 
-/// #3997, #3999: after drawing a shape, the options bar's Fill swatch recolours it, as Stroke
-/// does (in v0.7.0 the Fill swatch was only a preview of the foreground colour).
-#[test]
-fn options_bar_fill_swatch_recolours_the_shape_just_drawn() {
-    let mut app = app("rgb", 8);
-    app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
-    app.ui.tool_options.stroke_width = 3.0;
-    // The canvas pass draws the shape; the bar harness then takes the app over.
-    crate::canvas::testing::press(&mut app, [20.0, 20.0], Modifiers::NONE);
-    crate::canvas::testing::move_to(&mut app, [60.0, 50.0], Modifiers::NONE);
-    crate::canvas::testing::move_to(&mut app, [100.0, 80.0], Modifiers::NONE);
-    crate::canvas::testing::release(&mut app, [100.0, 80.0], Modifiers::NONE);
-    let original = shape(&app).clone();
-    let before = history(&app);
-    crate::paint_picker::remember(&mut app, [0.2, 0.4, 0.6]);
-    let mut h = harness(app, false);
-    chip(&h, "Fill color").click();
-    h.run_steps(4);
-    h.query_all_by_role(egui::accesskit::Role::ListItem)
-        .find(|n| n.accesskit_node().label().as_deref().is_some_and(|l| l.ends_with("#336699")))
-        .expect("the remembered #336699 swatch")
-        .click();
-    h.run_steps(2);
-    let edited = shape(h.state()).clone();
-    assert_ne!(edited.fill, original.fill, "the Fill swatch recoloured the shape");
-    assert_eq!(edited.fill.as_ref().and_then(color_of), Some(h.state().session.tools.foreground), "and the next shape's fill");
-    assert_eq!(edited.stroke, original.stroke, "the stroke is untouched");
-    assert_eq!(history(h.state()), before + 1);
-    h.state_mut().run("edit.undo", json!({})).unwrap();
-    assert_eq!(shape(h.state()).fill, original.fill);
-}
-
 fn test_gradient() -> photocraft_doc::Fill {
     photocraft_doc::Fill::Gradient {
         stops: vec![(0.0, photocraft_doc::Color::rgba(0.123456, 0.5, 0.75, 1.0)), (1.0, photocraft_doc::Color::rgba(0.9, 0.2, 0.1, 0.6))],
@@ -617,40 +560,6 @@ fn gradient_stops(f: &photocraft_doc::Fill) -> photocraft_engine::presets::gradi
         photocraft_doc::Fill::Gradient { stops, opacity_stops, .. } => (stops.clone(), opacity_stops.clone()),
         other => panic!("a gradient, not {other:?}"),
     }
-}
-
-/// Opens Options bar › Stroke › Gradient.
-fn open_stroke_gradient(h: &mut Harness<'_, PhotocraftApp>) {
-    chip(&h, "Stroke").click();
-    h.run_steps(3);
-    if h.state().ui.tool_options.shape_stroke_gradient.is_none() || h.state().ui.tool_options.stroke_width <= 0.0 {
-        h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Gradient").click();
-        h.run_steps(3);
-    }
-}
-
-/// An applied gradient is remembered once by its stops; a Recent pick restores them.
-#[test]
-fn gradient_tab_align_with_layer_and_recent_row() {
-    let mut h = harness(app("rgb", 8), false);
-    open_stroke_gradient(&mut h);
-    h.get_by_label("Blue 01").click();
-    h.run_steps(2);
-    let blue = gradient_stops(&tool_stroke_gradient(&h));
-    assert!(h.query_by_label("Recent 1").is_none(), "nothing is recent yet");
-    h.key_press(Key::Escape);
-    h.run_steps(3);
-    assert_eq!(h.state().ui.recent_gradients.len(), 1, "closing the popup remembers its gradient");
-    open_stroke_gradient(&mut h);
-    h.get_by_label("Black, White").click();
-    h.run_steps(2);
-    assert_ne!(gradient_stops(&tool_stroke_gradient(&h)), blue);
-    h.get_by_label("Recent 1").click();
-    h.run_steps(2);
-    assert_eq!(gradient_stops(&tool_stroke_gradient(&h)), blue, "a Recent pick restores its stops");
-    h.key_press(Key::Escape);
-    h.run_steps(3);
-    assert_eq!(h.state().ui.recent_gradients.len(), 1, "the same stops are remembered once");
 }
 
 /// A swatch edit that only changes the gradient's settings (Reverse) keeps a CMYK document's

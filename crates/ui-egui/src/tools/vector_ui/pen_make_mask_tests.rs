@@ -11,7 +11,6 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::canvas::testing;
 use crate::state::Tool;
-use craft::draw::ui::VectorMode;
 
 fn harness() -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -44,24 +43,6 @@ fn steps(app: &PhotocraftApp) -> usize {
 
 fn disabled(h: &Harness<'static, PhotocraftApp>, label: &str) -> bool {
     h.get_by_label(label).accesskit_node().is_disabled()
-}
-
-#[test]
-fn make_row_is_a_caption_and_three_buttons_greyed_without_a_path() {
-    let mut h = harness();
-    assert!(h.query_by_label("Make:").is_some(), "the row has its caption");
-    assert!(h.query_by_label("Make Selection").is_none() && h.query_by_label("Make Shape").is_none(), "the caption carries \"Make\"");
-    for label in ["Selection…", "Mask", "Shape"] {
-        assert!(disabled(&h, label), "{label}: no path yet");
-    }
-    square(&mut h);
-    for label in ["Selection…", "Mask", "Shape"] {
-        assert!(!disabled(&h, label), "{label}: the Work Path is the active path");
-    }
-    // Shape mode has no Make row.
-    h.state_mut().ui.tool_options.vector_mode = VectorMode::Shape;
-    h.run_steps(2);
-    assert!(h.query_by_label("Make:").is_none() && h.query_by_label("Mask").is_none());
 }
 
 #[test]

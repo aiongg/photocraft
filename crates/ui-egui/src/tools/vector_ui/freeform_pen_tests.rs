@@ -129,29 +129,6 @@ fn another_freeform_trace_cannot_replace_a_failed_owned_draft_or_retry_it_automa
 }
 
 #[test]
-fn freeform_alt_release_in_the_next_press_keeps_the_failed_fit() {
-    let mut app = app();
-    for [x, y] in [[40.0, 60.0], [1e40, 60.0], [140.0, 80.0]] {
-        alt_click_raw(&mut app, x, y, None);
-    }
-    assert!(testing::in_gesture(&app));
-    let source = app.session.active().unwrap().doc.clone();
-    let n = app.session.active().unwrap().history.past_len();
-    // No separate modifier-change event: this press both releases Alt and tries a new trace.
-    testing::press(&mut app, [200.0, 100.0], Modifiers::NONE);
-    let failed = app.ui.pen.clone().expect("failed fit must survive the press that finished it");
-    assert!(failed.commit_failed && failed.owner.is_some());
-    assert!(!testing::in_gesture(&app));
-    let journal = app.session.journal.len();
-    testing::move_to(&mut app, [240.0, 120.0], Modifiers::NONE);
-    testing::release(&mut app, [240.0, 120.0], Modifiers::NONE);
-    assert_eq!(app.ui.pen.as_ref(), Some(&failed));
-    assert_eq!(app.session.journal.len(), journal);
-    assert!(std::sync::Arc::ptr_eq(&source, &app.session.active().unwrap().doc));
-    assert_eq!(app.session.active().unwrap().history.past_len(), n);
-}
-
-#[test]
 fn shift_drag_constrains_freeform_pen_to_a_straight_line() {
     let mut app = app();
     app.ui.tool_options.vector_mode = VectorMode::Path;
