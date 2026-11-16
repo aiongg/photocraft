@@ -728,6 +728,9 @@ mod pencil_pressure_toggles_tests;
 mod lifecycle_tests;
 
 #[cfg(test)]
+mod stroke_frames_tests;
+
+#[cfg(test)]
 mod screenshot_tests;
 
 /// Helpers shared by the tests of more than one module.

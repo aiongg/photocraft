@@ -136,8 +136,8 @@ impl Trail {
     }
 
     /// Shows the footprint as `tone` over the canvas.
-    fn show_as(&mut self, ui: &mut egui::Ui, label: &'static str, tone: TrailTone) {
-        StrokeTrail::new(label, &mut self.mask).tone(tone).show(ui);
+    fn show_as(&mut self, ui: &mut egui::Ui, rect: egui::Rect, label: &'static str, tone: TrailTone) {
+        StrokeTrail::new(label, &mut self.mask).tone(tone).show_at(ui, rect);
     }
 }
 
@@ -176,14 +176,14 @@ pub(crate) fn feed(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]]) {
 
 /// Shows the live stroke's trail and, while Remove strokes wait for Enter, their tint. A part
 /// with no trail does nothing.
-pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
+pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp, rect: egui::Rect) {
     if let Some(trail) = app.trail.as_mut() {
         let tone = trail.tone;
-        trail.show_as(ui, tl!("Stroke footprint"), tone);
+        trail.show_as(ui, rect, tl!("Stroke footprint"), tone);
     }
     if app.remove_trail.is_some() && crate::retouch_ui::remove_pending_live(app) {
         if let Some(trail) = app.remove_trail.as_mut() {
-            trail.show_as(ui, tl!("Waiting removals"), TrailTone::Danger);
+            trail.show_as(ui, rect, tl!("Waiting removals"), TrailTone::Danger);
         }
     }
 }
