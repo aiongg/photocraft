@@ -329,6 +329,11 @@ pub(crate) fn selection(app: &PhotocraftApp, bezier: BezierTool) -> PathSelectio
 pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPath>, Vec<PathRef>) {
     let draft_shown = matches!(bezier, BezierTool::Direct | BezierTool::Convert | BezierTool::AddAnchor | BezierTool::DeleteAnchor);
     let mut front: Vec<(PathRef, Path)> = match bezier {
+        // ⌘/Ctrl on a Pen path being drawn edits only that path in place; a press anywhere else is a press off it,
+        // which ends it (`edits::apply`, #4022).
+        BezierTool::Direct if app.ui.tool != Tool::DirectSelection && drafted(app).is_some() => {
+            candidates(app).into_iter().filter(|(r, _)| *r == PathRef::Pen).collect()
+        }
         BezierTool::Direct => candidates(app),
         BezierTool::Convert => {
             // The tool's targets, and the Work Path behind them.
