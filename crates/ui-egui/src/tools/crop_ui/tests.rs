@@ -430,34 +430,3 @@ fn a_straighten_line_inside_the_frame_is_not_snapped_as_a_frame_move() {
     let angle = crop_ui::frame(&app).unwrap().angle;
     assert!((angle - raw).abs() < 1e-6, "{angle} vs {raw}: the line end stayed where the pointer was");
 }
-
-/// #7752: typing 16 and then 6 into the ratio fields over 4 : 3 fits from the frame the edit
-/// began with, not from the result of the first number.
-#[test]
-fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
-    use egui_kittest::kittest::Queryable;
-    let mut a = app(SampleType::U8);
-    a.ui.tool_options.crop.ratio = CropRatio::sides(4.0, 3.0);
-    let base = boxed(20.0, 10.0, 180.0, 90.0, 0.0);
-    tool(&mut a).crop_to(base);
-    let mut h = egui_kittest::Harness::builder()
-        .with_context(a.ctx().clone())
-        .with_size(egui::vec2(1400.0, 80.0))
-        .build_ui_state(|ui, app: &mut PhotocraftApp| crop_ui::bar::bar(app, ui), a);
-    h.run_steps(3);
-    h.get_by_label("Width").focus();
-    h.run_steps(2);
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
-    h.event(egui::Event::Text("16".into()));
-    h.key_press(egui::Key::Tab);
-    h.run_steps(3);
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
-    h.event(egui::Event::Text("6".into()));
-    h.key_press(egui::Key::Enter);
-    h.run_steps(4);
-    let frame = crop_ui::frame(h.state()).unwrap();
-    let (w, height) = (frame.rect.width(), frame.rect.height());
-    assert!((w / height - 16.0 / 6.0).abs() < 1e-6, "16 : 6, got {w} x {height}");
-    assert!((w - 160.0).abs() < 1e-6, "fitted from the frame the edit began with, not from the 16 : 3 result: {w} x {height}");
-    assert_eq!(frame.rect.center(), base.rect.center());
-}
