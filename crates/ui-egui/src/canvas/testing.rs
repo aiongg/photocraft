@@ -183,7 +183,6 @@ fn shown(app: &mut PhotocraftApp) {
 pub(crate) fn press(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
     shown(app);
     let pos = to_screen(app, at);
-    eprintln!("T4D harness press at={at:?} pos={pos:?} view={:?}", view(app));
     WindowHost::of(&ctx(app)).inject_click(egui::ViewportId::ROOT, pos, PointerButton::Primary, 1, held(mods), true);
     settle(app);
 }
@@ -192,7 +191,6 @@ pub(crate) fn press(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
 pub(crate) fn move_to(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
     shown(app);
     let pos = to_screen(app, at);
-    eprintln!("T4D harness move_to at={at:?} pos={pos:?} view={:?}", view(app));
     WindowHost::of(&ctx(app)).inject_move(egui::ViewportId::ROOT, pos, held(mods), 0.0);
     settle(app);
 }
@@ -201,7 +199,6 @@ pub(crate) fn move_to(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
 pub(crate) fn release(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
     shown(app);
     let pos = to_screen(app, at);
-    eprintln!("T4D harness release at={at:?} pos={pos:?} view={:?}", view(app));
     let host = WindowHost::of(&ctx(app));
     host.inject_move(egui::ViewportId::ROOT, pos, held(mods), 0.0);
     host.inject_release(egui::ViewportId::ROOT, Some(pos), Released::Button(PointerButton::Primary));
