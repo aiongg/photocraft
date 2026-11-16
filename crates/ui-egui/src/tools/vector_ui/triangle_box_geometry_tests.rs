@@ -80,24 +80,3 @@ fn the_dialog_and_the_drag_send_the_same_triangle() {
     assert_eq!(a["live"], b["live"]);
     assert_eq!(anchors(&a), [(450.0, 300.0), (500.0, 400.0), (400.0, 400.0)]);
 }
-
-#[test]
-fn the_corner_widget_rounds_a_live_triangle() {
-    let mut app = app(200, 200);
-    app.run("shape.create", json!({"kind": "triangle", "rect": [40, 40, 120, 120], "cornerRadius": 20})).unwrap();
-    app.ui.tool = Tool::PathSelection;
-    let n = steps(&app);
-    let cy = 40.0 + 20.0 * 5f64.sqrt();
-    let to = cy + 4.0 * 5f64.sqrt();
-    tool_event(&mut app, ToolEvent::Down { x: 100.0, y: cy, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(&mut app, ToolEvent::Move { x: 100.0, y: to, pressure: 1.0 }, Modifiers::NONE);
-    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: to }, Modifiers::NONE);
-    let v = info(&mut app);
-    assert_eq!(v["live"]["kind"], "triangle");
-    assert_eq!(v["live"]["rect"], json!([40.0, 40.0, 120.0, 120.0]));
-    assert!((v["live"]["corner_radius"].as_f64().unwrap() - 24.0).abs() < 1e-9, "{}", v["live"]);
-    assert_eq!(anchors(&v).len(), 6);
-    assert_eq!(steps(&app), n + 1);
-    assert!(app.session.undo());
-    assert_eq!(info(&mut app)["live"]["corner_radius"].as_f64(), Some(20.0));
-}

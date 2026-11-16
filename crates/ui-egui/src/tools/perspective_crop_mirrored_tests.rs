@@ -74,7 +74,10 @@ fn a_box_turned_180_degrees_commits_upside_down() {
     let mut app = app();
     drag(&mut app, [450.0, 300.0], [550.0, 400.0], Modifiers::NONE);
     drag(&mut app, [550.0, 400.0], [350.0, 200.0], Modifiers::ALT);
-    assert_eq!(quad(&app), Some([[450.0, 300.0], [350.0, 300.0], [350.0, 200.0], [450.0, 200.0]]));
+    // The drag maps through the view, which leaves the corners a fraction of a pixel off the whole numbers.
+    let turned = quad(&app).expect("the box is up");
+    let expected = [[450.0, 300.0], [350.0, 300.0], [350.0, 200.0], [450.0, 200.0]];
+    assert!(turned.iter().flatten().zip(expected.iter().flatten()).all(|(got, want)| (got - want).abs() < 1e-3), "{turned:?}");
     apply(&mut app);
     assert_eq!(corners(&app), ((100, 100), [YELLOW, BLUE, GREEN, RED]));
 }
