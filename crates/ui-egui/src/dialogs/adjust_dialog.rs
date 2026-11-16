@@ -465,6 +465,10 @@ fn seed(app: &PhotocraftApp, kind: &str, recorded: &Value, smart: Option<&(usize
             supplied.remove("gray");
             supplied.remove("smooth"); // Already applied by parsing; never smooth a second time.
             supplied.extend(canonical);
+            // A Lab set's canonical parameters carry the true combined record, which the editor reads only when flagged.
+            if color_set.is_some() && mode == ColorMode::Lab {
+                supplied.insert("__combinedLab".into(), json!(true));
+            }
         }
     }
     let mut params = Map::new();

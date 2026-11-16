@@ -4,6 +4,7 @@
 //! the tool or making a history step. Only the press counts: a drag after it leaves the window
 //! where the press put it, as in the reference application.
 
+use craft::behavior::{Cursor, PaintedCursor};
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use egui::{Modifiers, PointerButton, Pos2, pos2, vec2};
@@ -121,9 +122,10 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     let a_doc = [70.0, 230.0];
     let a = screen(&h, a_doc);
     move_to(&mut h, a);
-    assert_eq!(h.output().platform_output.cursor_icon, egui::CursorIcon::None, "the locator replaces the pointer");
+    let locator = Some(Cursor::Painted(PaintedCursor::Locator));
+    assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), locator, "the locator replaces the pointer");
     move_to(&mut h, pos2(600.0, 400.0));
-    assert_ne!(h.output().platform_output.cursor_icon, egui::CursorIcon::None, "over the dialog it is the normal pointer");
+    assert_ne!(craft::ui::runtime::cursor::current(&h.ctx), locator, "over the dialog it is the normal pointer");
 
     // A click centres the preview on the document point under it, through the canvas transform.
     click(&mut h, a);

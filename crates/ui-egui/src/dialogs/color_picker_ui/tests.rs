@@ -96,8 +96,12 @@ fn frames(app: &mut PhotocraftApp) {
     }
 }
 
-/// A press on the canvas at document point `(x, y)`.
+/// A press on the canvas at document point `(x, y). The dialog opens centred over the canvas and takes the presses
+/// that land on it, so the view first shows a point the press can reach.
 fn sample_at(app: &mut PhotocraftApp, x: f64, y: f64) {
+    if x.abs() < 1e6 && y.abs() < 1e6 {
+        crate::canvas::testing::clear_of_dialogs(app, [x, y]);
+    }
     crate::canvas::testing::click(app, [x, y], egui::Modifiers::NONE);
 }
 
@@ -127,6 +131,7 @@ fn the_top_picker_samples_the_image() {
     app.ui.tool = crate::state::Tool::Brush;
     let rev = app.session.active().unwrap().revision;
     let ctx = app.ctx().clone();
+    crate::canvas::testing::clear_of_dialogs(&mut app, [5.0, 5.0]);
     let events = json!([{"kind": "down", "x": 5, "y": 5}, {"kind": "up", "x": 5, "y": 5}]);
     let (req, _rx) = crate::control::ControlRequest::new("ui.pointer", json!({"events": events}));
     let _ = crate::control::handle(&mut app, &ctx, &req);

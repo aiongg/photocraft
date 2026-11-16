@@ -64,7 +64,8 @@ impl CanvasTool for DialogTool<'_> {
         let (took, click) = self.scope.with_app(|app| match pick {
             DialogPick::TonePicker(_) => (canvas_input::pick_tone(app, at), true),
             DialogPick::CurvesPoint => (canvas_input::add_curve_point(app, at, mods.shift), true),
-            DialogPick::Color => (canvas_input::pick_color(app, at), true),
+            // The pipette keeps sampling while the button is held.
+            DialogPick::Color => (canvas_input::pick_color(app, at), false),
             DialogPick::ParamDropper => (canvas_input::pick_dropper(app, at, mods), true),
             DialogPick::ColorRange => (canvas_input::pick_color_range(app, at, mods), true),
             // A drag after the locator's press does nothing (#9648).
@@ -102,6 +103,9 @@ impl CanvasTool for DialogTool<'_> {
             }
             DialogPick::GradientDrag => {
                 canvas_input::drag_gradient(app, start, total);
+            }
+            DialogPick::Color => {
+                canvas_input::pick_color(app, at);
             }
             DialogPick::PatternPhase => {
                 // `false`: a pick change, an unlink or an outside phase change ended the gesture.

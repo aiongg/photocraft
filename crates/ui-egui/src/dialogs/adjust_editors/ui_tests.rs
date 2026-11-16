@@ -71,6 +71,10 @@ fn app_harness_with(kind: &str, mode: &str, depth: u32, step_dt: f32, services: 
         crate::panel_docking::apply(&mut app, vec![Action::resize_group("properties".to_owned(), Some(560.0))]).unwrap();
         app
     });
+    // The Color panel above Properties has sliders of its own; these tests drive the Properties editor's.
+    let ctx = h.ctx.clone();
+    let (request, _) = crate::control::ControlRequest::new("ui.set", json!({"dock": {"collapsed": ["color"]}}));
+    crate::control::handle(h.state_mut(), &ctx, &request);
     h.run_steps(8);
     h
 }
@@ -193,7 +197,8 @@ fn color_lookup_picker_cycles_luts_with_the_mouse_wheel() {
     }
     assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "cycling remains a preview");
     assert!(h.state().live_adjust.is_some(), "the selected LUT is previewed");
-    h.run_steps(4);
+    // The wheel run commits when the wheel gap passes without a notch (the harness steps 1/60 s).
+    h.run_steps((craft::behavior::GESTURE_GAP * 60.0).ceil() as usize + 4);
     let (_, after) = layer(&h);
     let Adjustment::ColorLookup { name: after_name, .. } = after else { panic!("Color Lookup layer") };
     assert_ne!(after_name, before_name, "wheel browsing selects a different LUT");

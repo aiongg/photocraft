@@ -77,6 +77,17 @@ pub(super) fn stops_to_json(stops: &GradientStops) -> (Value, Value) {
     (Value::Array(color), Value::Array(opacity))
 }
 
+/// Whether `a` and `b` hold the same stops up to the rounding a colour picks up through the command grammar.
+pub(super) fn same(a: &GradientStops, b: &GradientStops) -> bool {
+    let near = |x: f32, y: f32| (x - y).abs() < 1e-5;
+    a.color.len() == b.color.len()
+        && a.opacity.len() == b.opacity.len()
+        && a.color.iter().zip(&b.color).all(|(x, y)| {
+            near(x.location, y.location) && near(x.color.r, y.color.r) && near(x.color.g, y.color.g) && near(x.color.b, y.color.b) && near(x.color.a, y.color.a)
+        })
+        && a.opacity.iter().zip(&b.opacity).all(|(x, y)| near(x.location, y.location) && near(x.opacity, y.opacity))
+}
+
 /// The framework's gradient for a document gradient's colour and transparency stops.
 pub(super) fn stops_of_doc(stops: &[(f32, Color)], opacity: &[(f32, f32)]) -> GradientStops {
     let color = stops

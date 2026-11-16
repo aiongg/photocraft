@@ -157,8 +157,10 @@ impl PcGallerySource {
 
     /// The command params for `effects`: what OK runs and what the preview renders.
     pub(crate) fn command_params(&self, effects: &[EffectLayer]) -> Value {
+        let mut effects = serde_json::to_value(effects).unwrap_or(Value::Null);
+        map_glow_colors(&mut effects, egui::ecolor::linear_from_gamma);
         let p = json!({
-            "effects": serde_json::to_value(effects).unwrap_or(Value::Null),
+            "effects": effects,
             "foreground": self.foreground,
             "background": self.background,
         });
@@ -416,8 +418,10 @@ pub(crate) fn image(surf: &Surface, w: usize, h: usize) -> egui::ColorImage {
 /// The effect layers of a `filter.filterGallery` params object: unknown filters are skipped and
 /// every effect starts from its filter's defaults under the recorded values.
 fn effects_from(p: &Value, catalog: &PcCatalog) -> Vec<EffectLayer> {
-    p.get("effects")
-        .and_then(Value::as_array)
+    let mut effects = p.get("effects").cloned().unwrap_or(Value::Null);
+    map_glow_colors(&mut effects, egui::ecolor::gamma_from_linear);
+    effects
+        .as_array()
         .into_iter()
         .flatten()
         .filter_map(|e| {
@@ -433,6 +437,19 @@ fn effects_from(p: &Value, catalog: &PcCatalog) -> Vec<EffectLayer> {
             Some(layer)
         })
         .collect()
+}
+
+/// Applies `convert` to the red, green and blue of every effect's `glowColor`. The command records it as
+/// linear RGB; the dialog's swatch row holds encoded sRGB.
+fn map_glow_colors(effects: &mut Value, convert: fn(f32) -> f32) {
+    let colors = effects.as_array_mut().into_iter().flatten().filter_map(|e| e.get_mut("params")?.get_mut("glowColor")?.as_array_mut());
+    for color in colors {
+        for channel in color.iter_mut().take(3) {
+            if let Some(v) = channel.as_f64() {
+                *channel = json!(f64::from(convert(v as f32)));
+            }
+        }
+    }
 }
 
 /// A recorded `[r, g, b, a]` colour param.

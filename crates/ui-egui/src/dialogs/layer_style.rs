@@ -633,6 +633,20 @@ fn effect_entry(fx: Option<&Value>, kind: &str, mut params: Value, initial_light
                     }
                 }
             }
+            if kind == "gradientOverlay"
+                && let Ok(original) = serde_json::from_value::<Effect>(fx.clone())
+                && let Some(edits) = params.as_object_mut()
+            {
+                // Unedited stops must not rebuild a baked curve from their rounded copy.
+                let shown = values_of(&original, initial_light_angle.unwrap_or(120.0) as f32);
+                let unchanged = gradient_field::stops_from_json(&Value::Object(edits.clone()))
+                    .zip(gradient_field::stops_from_json(&shown))
+                    .is_some_and(|(edited, opened)| gradient_field::same(&edited, &opened));
+                if unchanged {
+                    edits.remove(gradient_field::KEY);
+                    edits.remove(gradient_field::OPACITY_KEY);
+                }
+            }
             json!({"kind": kind, "fx": fx, "params": params})
         }
         // A new instance: the page shows the factory defaults merged with the edits, and the engine
