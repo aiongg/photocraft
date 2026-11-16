@@ -113,6 +113,13 @@ pub struct DirectSelection {
     /// only while they still hold.
     #[serde(skip)]
     pub(crate) editing: Option<Owner>,
+    /// The modifiers held when the running gesture began: the tool a gesture resolves to, and so the
+    /// name of its History step, is the one its press chose, not the one the release's modifiers pick.
+    #[serde(skip)]
+    pub(crate) editing_mods: Mods,
+    /// The overlay whose press runs the `editing` gesture: `cancel_stale` ends that press with the gesture.
+    #[serde(skip)]
+    pub(crate) editing_overlay: Option<egui::Id>,
     #[serde(skip)]
     pub(crate) owner: Option<Owner>,
     /// The saved path whose anchors the first Escape hid (#13072): the next Escape deactivates it,
@@ -268,6 +275,9 @@ pub(crate) fn cancel_stale(app: &mut PhotocraftApp) -> bool {
         return false;
     }
     let was_editing = ds.editing.is_some();
+    if let Some(overlay) = ds.editing_overlay.filter(|_| was_editing) {
+        craft::ui::primitives::cancel_press_of(app.ctx(), overlay);
+    }
     app.ui.direct_selection = DirectSelection::default();
     was_editing
 }
@@ -325,6 +335,11 @@ pub(crate) fn selection(app: &PhotocraftApp, bezier: BezierTool) -> PathSelectio
 pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPath>, Vec<PathRef>) {
     let draft_shown = matches!(bezier, BezierTool::Direct | BezierTool::Convert | BezierTool::AddAnchor | BezierTool::DeleteAnchor);
     let mut front: Vec<(PathRef, Path)> = match bezier {
+        // ⌘/Ctrl on a Pen path being drawn edits only that path in place; a press anywhere else is a press off it,
+        // which ends it (`edits::apply`, #4022).
+        BezierTool::Direct if app.ui.tool != Tool::DirectSelection && drafted(app).is_some() => {
+            candidates(app).into_iter().filter(|(r, _)| *r == PathRef::Pen).collect()
+        }
         BezierTool::Direct => candidates(app),
         BezierTool::Convert => {
             // The tool's targets, and the Work Path behind them.
@@ -531,8 +546,9 @@ mod freeform_command_tests {
 
             press(&mut app, [20.0, 20.0], command);
             assert_eq!(app.ui.direct_selection.target, Some(PathRef::Saved(0)));
-            assert!(editing(&app), "{tool:?}: the press starts the gesture");
+            assert!(!editing(&app), "{tool:?}: the gesture begins with the drag");
             move_to(&mut app, [30.0, 40.0], Modifiers::NONE);
+            assert!(editing(&app), "{tool:?}: the press's drag goes on under its own tool after the modifier is released");
             release(&mut app, [30.0, 40.0], Modifiers::NONE);
             let st = app.session.active().unwrap();
             assert_eq!(st.doc.work_path, original.work_path, "{tool:?}: the Work Path stays");

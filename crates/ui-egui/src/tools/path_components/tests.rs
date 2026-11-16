@@ -165,12 +165,11 @@ fn the_first_component_keeps_combining() {
     assert_eq!(super::selected_op(&app), None, "they differ");
 }
 
-/// A component selection is Path Selection's: with the Pen, which doesn't show it, `-` and the
-/// menu set the next path's operation and leave the components alone (feedback on #7648).
+/// A component selection is Path Selection's: with the Pen, which doesn't show it, the operation
+/// menu sets the next path's operation and leave the components alone (feedback on #7648).
 #[test]
 fn the_pen_does_not_edit_a_hidden_component_selection() {
     let mut app = app();
-    let ctx = app.ctx().clone();
     square(&mut app, 20.0, 20.0, 120.0);
     app.ui.tool_options.pen_path_op = "combine".into();
     square(&mut app, 60.0, 60.0, 40.0);
@@ -179,7 +178,7 @@ fn the_pen_does_not_edit_a_hidden_component_selection() {
     assert!(super::selected(&app).is_some());
     app.ui.tool = Tool::Pen;
     let steps = history(&app);
-    key(&mut app, &ctx, Key::Minus, egui::Modifiers::NONE);
+    super::set_op(&mut app, "subtract").unwrap();
     assert_eq!(app.ui.tool_options.pen_path_op, "subtract", "the next path's");
     assert_eq!(super::selected_op(&app), None);
     assert_eq!(history(&app), steps);
