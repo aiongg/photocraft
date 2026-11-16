@@ -16,7 +16,7 @@ use craft::ui::patterns::form_dialogs::{
     PreviewRequest, PreviewState, Resample, SizeEstimate,
 };
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
-use photocraft_cms::Profile;
+use craft::cms::Profile;
 use photocraft_doc::{ColorMode, Document, LayerId};
 =======
 use craft_cms::Profile;
