@@ -97,14 +97,6 @@ fn has(h: &Harness, label: &str) -> bool {
     h.query_by_label(label).is_some()
 }
 
-/// Opens the bar's ⋯ menu and picks `entry`.
-fn menu(h: &mut Harness, entry: &str) {
-    let more = widget(h, "More options");
-    click_at(h, more);
-    let at = widget(h, entry);
-    click_at(h, at);
-}
-
 /// Drags the bar by its grip by `d` screen points.
 fn drag_grip(h: &mut Harness, d: Vec2) {
     let from = widget(h, "Move bar");
