@@ -112,8 +112,9 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
     session.color.settings.working_rgb = "display-p3".into();
     session.execute("file.new", json!({"width": 2, "height": 2, "background": "transparent"})).unwrap();
     session.execute("edit.assignProfile", json!({"profile": "adobe-rgb-compat"})).unwrap();
-    session.execute("tools.setColors", json!({"foreground": "#3366cc", "background": "#cc6633"})).unwrap();
-    let app = PhotocraftApp::new(session, crate::Services::default());
+    let mut app = PhotocraftApp::new(session, crate::Services::default());
+    // The app holds the tool colours as a preferences section: they are set after it starts.
+    app.run("tools.setColors", json!({"foreground": "#3366cc", "background": "#cc6633"})).unwrap();
     let colors = rows::indexed_matte_defaults(&app);
 
     let doc = app.session.active().unwrap().doc.clone();
@@ -771,9 +772,19 @@ fn match_color_after_source_change(change: &str) {
         match_color_control(&mut app, &ctx, "ui.window.open", json!({"document": 1}));
         assert_eq!(app.session.active_index(), Some(1), "{change}");
     }
-    let child = open(&mut app, command).unwrap_or_else(|e| panic!("{change}: {command} opens over Match Color: {e}"));
-    set(&mut app, child, field, value.clone());
-    assert!(ok(&mut app, child), "{change}: the nested command is confirmed");
+    if change == "delete-layer" {
+        // Deleting a layer from a panel asks first: the Delete prompt opens over Match Color and its Delete answer runs
+        // the command.
+        let prompt = crate::dialogs::delete_layer_prompt::intercept(&mut app, command, &json!({"layer": reference_id, "__trash": true}))
+            .unwrap_or_else(|| panic!("{change}: {command} asks first"))
+            .unwrap();
+        let child = app.framework.dialogs.open_dialogs().into_iter().map(|dialog| dialog.id).find(|id| prompt["dialog"].as_u64() == Some(id.value())).expect("the Delete prompt is open");
+        assert!(ok(&mut app, child), "{change}: the nested command is confirmed");
+    } else {
+        let child = open(&mut app, command).unwrap_or_else(|e| panic!("{change}: {command} opens over Match Color: {e}"));
+        set(&mut app, child, field, value.clone());
+        assert!(ok(&mut app, child), "{change}: the nested command is confirmed");
+    }
     let target_index = app.session.documents().iter().position(|st| st.doc.id == target_id).unwrap();
     match_color_control(&mut app, &ctx, "ui.window.open", json!({"document": target_index}));
     assert_eq!(app.session.active().unwrap().doc.id, target_id, "{change}");
@@ -1601,7 +1612,10 @@ fn replace_color_eyedropper_samples_the_image() {
 
 /// A press at the document point `(x, y)` with the dialog's eyedropper armed, as the canvas's pick takes it.
 fn color_eyedropper_sample(app: &mut PhotocraftApp, x: f64, y: f64, mods: egui::Modifiers) -> bool {
-    crate::dialogs::canvas_input::pick_dropper(app, [x, y], craft::keymap::Mods::from_egui(&mods, craft::keymap::Platform::current()))
+    let consumed = crate::dialogs::canvas_input::pick_dropper(app, [x, y], craft::keymap::Mods::from_egui(&mods, craft::keymap::Platform::current()));
+    // The host applies the sampled colour on the next pass, as the frame after the press does.
+    passes(app, 1);
+    consumed
 }
 
 /// The app's samples follow the framework's Alt reset: after it, the next samples carry an

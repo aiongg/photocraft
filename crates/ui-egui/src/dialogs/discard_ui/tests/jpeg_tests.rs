@@ -85,7 +85,7 @@ fn save_as_to_a_jpeg_asks_for_jpeg_options() {
     h.run_steps(2);
     assert_eq!(parked(&h), Some(("p.jpg".to_string(), false)));
     assert_eq!(shown(&h), (10, "baseline".to_string()));
-    assert!(h.query_by_label("JPEG Options").is_some());
+    assert!(h.query_all_by_label("JPEG Options").next().is_some());
     assert!(writes.borrow().is_empty(), "nothing is written before the answer");
     assert!(h.state_mut().save_as(Some("other.jpg".into())).is_err(), "one save at a time");
     h.key_press(Key::Enter);

@@ -131,7 +131,15 @@ fn restore_colors(app: &mut PhotocraftApp) {
     let saved = &app.session.prefs().tool_colors;
     let mut pairs = colors(app);
     let [[foreground, background], [mask_foreground, mask_background]] = &mut pairs;
-    for (key, color) in [("foreground", foreground), ("background", background), ("maskForeground", mask_foreground), ("maskBackground", mask_background)] {
+    // Each colour under its preference path (Preferences › Tool Colors).
+    let paths = [
+        ("toolColors.foreground", foreground),
+        ("toolColors.background", background),
+        ("toolColors.maskForeground", mask_foreground),
+        ("toolColors.maskBackground", mask_background),
+    ];
+    for (path, color) in paths {
+        let key = path.strip_prefix("toolColors.").unwrap_or(path);
         if let Some(v) = saved.get(key) {
             match serde_json::from_value::<[f32; 4]>(v.clone()) {
                 Ok(c) if c.iter().all(|x| x.is_finite()) => *color = c,

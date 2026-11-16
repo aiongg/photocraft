@@ -624,7 +624,22 @@ pub(crate) fn validate_match_color_destination(app: &PhotocraftApp, command: &st
 /// The held-OK check of Match Color: the destination captured at open still holds.
 pub(crate) fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), Label> {
     let destination = crate::dialogs::params::captured(app, &result.key);
-    validate_match_color_destination(app, &result.key, &destination, &fields_map(&result.fields)).map_err(Label::from)
+    let fields = fields_map(&result.fields);
+    validate_match_color_destination(app, &result.key, &destination, &fields).map_err(Label::from)?;
+    validate_match_color_source_layer(app, &result.key, &fields).map_err(Label::from)
+}
+
+/// An explicit source layer must be in the chosen source document: a missing one refuses OK instead of falling back
+/// to Merged.
+fn validate_match_color_source_layer(app: &PhotocraftApp, command: &str, fields: &Map<String, Value>) -> Result<(), String> {
+    if command != MATCH_COLOR {
+        return Ok(());
+    }
+    let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
+    let source = fields.get("source").and_then(|source| source.as_u64().or_else(|| source.as_str()?.parse().ok())).and_then(|i| usize::try_from(i).ok());
+    let Some(source) = source.and_then(|i| app.session.documents().get(i)) else { return Ok(()) };
+    let listed = source.doc.walk().into_iter().any(|(_, _, l)| layer.as_u64() == Some(l.id.0) || layer.as_i64().is_some_and(|v| i64::try_from(l.id.0) == Ok(v)));
+    if listed { Ok(()) } else { Err("the Match Color source layer is not in the source document".into()) }
 }
 
 /// A filter dialog was cancelled: its preview goes, and the playing action it paused ends.
