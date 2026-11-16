@@ -60,6 +60,10 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     if let Some((hit, at)) = &output.context {
         context(app, hit, *at, tool, mods);
     }
+    // With ⌘ the press is Direct Selection's marquee, which hides nothing.
+    if output.pressed_empty && tool == Tool::DeleteAnchorPoint && !mods.cmd {
+        hide_anchors(app);
+    }
     if output.pressed_empty && mods.cmd && app.ui.pen.is_some() {
         // A ⌘-press off the path being drawn ends it, which becomes editable, as in Photoshop; a
         // refused commit keeps the draft and says why.
@@ -131,6 +135,15 @@ pub(crate) fn delete_anchors(app: &mut PhotocraftApp, path: PathRef, anchors: &[
             },
             None => DirectSelection { target: Some(path), ..Default::default() },
         };
+    }
+}
+
+/// A Delete Anchor click on empty canvas hides the anchors of the selected saved path: its outline stays and it
+/// stays targeted (#12769).
+fn hide_anchors(app: &mut PhotocraftApp) {
+    if let Some((index, _)) = crate::vector_ui::selected_saved_path_index(app) {
+        let owner = Owner::current(app);
+        app.ui.direct_selection = DirectSelection { target: Some(PathRef::Saved(index)), shown: Some(Vec::new()), owner, ..Default::default() };
     }
 }
 
