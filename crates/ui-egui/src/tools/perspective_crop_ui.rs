@@ -1,31 +1,17 @@
 //! The Perspective Crop tool (C, in the Crop flyout), as in Photoshop:
 //!
-<<<<<<< HEAD
 //! - drag a box, or click four corners, to make a quad (the framework's `PerspectiveCropTool`: TL, TR, BR, BL in
 //!   document px, clicked corners put in that order);
 //! - drag a corner to move it alone, or drag inside the quad to move it (the framework's quad control);
-//! - the quad shows its perspective grid (Show Grid) and turns red while it isn't a convex quad wound like its box,
-//!   which can't be applied;
+//! - the quad shows its perspective grid (Show Grid) and turns red while it isn't a convex quad, which can't be
+//!   applied; one flipped on one axis (wound the other way) applies mirrored (#12489);
 //! - ↵ (or ✓) applies: `image.perspectiveCrop` maps the quad onto an upright rectangle, the whole document in one
 //!   undo step. Its size comes from the options bar's W × H and resolution (`CropSizeFields`), or with them empty
 //!   from the rectangle the quad shows in perspective. Esc (or ⊘) cancels.
-=======
-//! - drag a box, or click four corners, to make a quad (`UiState::perspective_crop`, TL, TR, BR,
-//!   BL in document px; clicked corners are put in that order);
-//! - drag a corner to move it alone, onto an edge of a skewed object (a photographed page, a
-//!   facade); drag inside the quad to move it;
-//! - the quad shows its perspective grid (Show Grid) and turns red while it isn't a convex quad,
-//!   which can't be committed; one flipped on one axis (wound the other way) commits mirrored;
-//! - ↵ (or ✓) commits: `image.perspectiveCrop` maps the quad onto an upright rectangle, the whole
-//!   document in one undo step. Its size comes from the options bar's W x H (and the resolution),
-//!   which are the Crop tool's fields (`crop_size`), or with them empty from the rectangle the
-//!   quad shows in perspective. Esc (or ⊘) cancels.
->>>>>>> upstream/main
 //!
 //! The quad lives in the tool, not in the document: its edits are no history steps. A pending quad belongs to the
 //! document it was drawn on, like the Crop tool's frame.
 
-<<<<<<< HEAD
 use craft::behavior::CancelReason;
 use craft::behavior::kurbo::Size;
 use craft::draw::ui::crop::{CropDocKey, CropDocument, PerspectiveCropBar, PerspectiveCropEvent, PerspectiveCropTool, PerspectiveInput};
@@ -34,12 +20,6 @@ use craft::ui::canvas::{CropShield, ToolHostResponse};
 use craft::ui::contract::Bind;
 use craft::ui::runtime::edit::cancel_all;
 use serde_json::json;
-=======
-use egui::{Color32, Pos2, Stroke};
-use photocraft_algo::transform::{Homography, convex_quad, convex_quad_any_winding};
-use photocraft_engine::prefs::Unit;
-use serde_json::{Value, json};
->>>>>>> upstream/main
 
 use crate::PhotocraftApp;
 use crate::canvas::document_display::CanvasHost;
@@ -96,55 +76,9 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut PerspectiveCrop, _respo
     if app.ui.tool != Tool::PerspectiveCrop {
         return;
     }
-<<<<<<< HEAD
     // The pass reports a session's first press once, so the Deselect runs once per session.
     if !events.iter().any(|event| matches!(event, PerspectiveCropEvent::Started)) {
         return;
-=======
-    let scr = |p: [f64; 2]| xf.to_screen(p[0] as f32, p[1] as f32);
-    let accent = crate::theme::Tokens::get(painter.ctx()).accent;
-    let quad = match app.pcrop.drag {
-        Some(Drag::New { start, cur, square, centred }) => new_box(start, cur, square, centred),
-        _ => app.ui.perspective_crop,
-    };
-    if let Some(q) = quad.filter(|q| q.iter().flatten().all(|v| v.is_finite())) {
-        // A quad flipped on one axis is wound counter-clockwise and commits mirrored (#12489).
-        let ok = convex_quad_any_winding(&q);
-        let color = if ok { accent } else { Color32::from_rgb(0xe5, 0x3e, 0x3e) };
-        // The image outside the quad is dimmed (#11972), following the quad while it is dragged.
-        if ok && let Some(size) = app.session.active().map(|d| d.doc.size) {
-            let (w, h) = (f64::from(size.width), f64::from(size.height));
-            for piece in shield_pieces([[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]], q) {
-                painter.add(egui::Shape::convex_polygon(piece.iter().map(|c| scr(*c)).collect(), SHIELD, Stroke::NONE));
-            }
-        }
-        let pts: Vec<Pos2> = q.iter().map(|c| scr(*c)).collect();
-        if ok
-            && app.ui.tool_options.perspective_crop_grid
-            && let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], q)
-        {
-            let side = pts.iter().zip(pts.iter().skip(1)).map(|(a, b)| a.distance(*b)).fold(0.0, f32::max);
-            let n = grid_steps(side);
-            let thin = Stroke::new(0.75, Color32::from_rgba_unmultiplied(255, 255, 255, 150));
-            let at = |u: f64, v: f64| {
-                let (x, y) = h.apply(u, v);
-                scr([x, y])
-            };
-            for k in 1..n {
-                let t = k as f64 / n as f64;
-                painter.line_segment([at(t, 0.0), at(t, 1.0)], thin);
-                painter.line_segment([at(0.0, t), at(1.0, t)], thin);
-            }
-        }
-        painter.add(egui::Shape::closed_line(pts.clone(), Stroke::new(1.5, color)));
-        if !matches!(app.pcrop.drag, Some(Drag::New { .. })) {
-            for c in pts {
-                let r = egui::Rect::from_center_size(c, egui::vec2(8.0, 8.0));
-                painter.rect_filled(r, 0.0, Color32::WHITE);
-                painter.rect_stroke(r, 0.0, Stroke::new(1.25, color), egui::StrokeKind::Inside);
-            }
-        }
->>>>>>> upstream/main
     }
     let selected = app.session.active().is_some_and(|st| st.doc.selection.is_some());
     if selected && app.run("select.deselect", json!({})).is_err() {

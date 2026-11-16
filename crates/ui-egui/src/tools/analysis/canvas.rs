@@ -182,12 +182,13 @@ fn dist(a: [f64; 2], b: [f64; 2]) -> f64 {
 }
 
 /// The ruler line, the sampler marks, the count markers and the note cards over the document, in the canvas body over
-/// `rect`. The marks show with every tool; the line only with the Ruler.
+/// `rect`. The marks show with every tool; the line with its handles only with the Ruler. View › Extras off hides the
+/// line (View › Show has no Ruler entry, #11987) and the sampler marks, whose points and Info readouts stay (#11741).
 pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect) {
     let view = &app.ui.view;
-    let (show_count, show_notes) = (view.shows(view.show.count), view.shows(view.show.notes));
-    let line = ruler_line(app);
-    let samplers = samplers_of(app).map(|(s, _)| s);
+    let (show_count, show_notes, extras) = (view.shows(view.show.count), view.shows(view.show.notes), view.extras);
+    let line = ruler_line(app).filter(|_| extras);
+    let samplers = samplers_of(app).map(|(s, _)| s).filter(|_| extras);
     let groups: Vec<CountGroupMarks> = if show_count {
         app.session.active().map_or_else(Vec::new, |d| {
             d.doc

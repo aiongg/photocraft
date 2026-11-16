@@ -148,6 +148,10 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     let (mut new_marker, mut new_label) = (marker, label);
     let marker_out = option_cells::number(tl!("Marker Size"), &mut new_marker, MARKER_SIZE).whole().show(ui);
     let label_out = option_cells::number(tl!("Label Size"), &mut new_label, LABEL_SIZE).whole().show(ui);
+    // A typed size out of range takes the closest value and says so once (#13530).
+    for alert in [&marker_out.out_of_range, &label_out.out_of_range].into_iter().flatten() {
+        option_cells::range_alert(app, ui, alert);
+    }
     let Some(gi) = group else { return };
     if new_marker != marker || new_label != label {
         let mut params = count_size_params(new_marker, new_label);

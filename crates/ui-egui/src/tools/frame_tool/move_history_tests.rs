@@ -1,6 +1,6 @@
 //! Moving an empty frame with the Frame tool records "Move" (#13880).
 use super::*;
-use crate::canvas::tool_event;
+use crate::canvas::{ToolEvent, testing, tool_event};
 
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -13,6 +13,8 @@ fn app() -> PhotocraftApp {
 
 fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
     let m = egui::Modifiers::NONE;
+    // The frame's handles take presses from the pass that drew them: the state a test set is shown first.
+    testing::frame(app);
     tool_event(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, m);
     tool_event(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, m);
     tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, m);
