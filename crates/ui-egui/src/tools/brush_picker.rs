@@ -19,7 +19,7 @@ use photocraft_engine::paint::{MAX_BRUSH_SIZE, TipShape};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::brush_panel::brushes::{BrushKey, preset_rows, run_picks};
+use crate::brush_panel::brushes::{BrushKey, preset_rows, run_picks, tip_paint};
 use crate::brush_panel::commit_keyed;
 use crate::state::Tool;
 
@@ -56,6 +56,7 @@ impl PickerInput {
             .import()
             .gear_rows(gear_rows)
             .resizable(SaveKey::new("photocraft.brush_picker"))
+            .tip(std::sync::Arc::new(tip_paint(&self.brush)))
     }
 }
 
