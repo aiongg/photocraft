@@ -9,7 +9,7 @@ use std::sync::Arc;
 use craft::behavior::geometry::quad::{BoxAllow, BoxState};
 use craft::behavior::kurbo;
 use craft::behavior::{CanvasView, GesturePhase};
-use craft::draw::ui::transform::{TransformEdit, TransformOverlay, TransformReach, TransformSession, TransformSettings};
+use craft::draw::ui::transform::{RotateZone, TransformEdit, TransformOverlay, TransformReach, TransformSession, TransformSettings};
 use craft::keymap::Mods;
 use craft::ui::canvas::canvas_space;
 use craft::ui::runtime::env::{Env, Label};
@@ -25,7 +25,10 @@ const PREVIEW_BASE: u64 = 1 << 37;
 /// screen points. Photoshop 2025, measured at 100 %: a drag from 35 pt off the glyphs moved the
 /// text without ending typing, one from 48 pt committed it instead. Kept under 40 pt, so a press
 /// 40 pt outside a paragraph box still commits the text (#7606).
-const MOVE_REACH_PT: f64 = 38.0;
+pub(crate) const MOVE_REACH_PT: f64 = 38.0;
+/// How far outside the text's sides a press with ⌘ held rotates it, in screen points; further out the press does
+/// nothing (production `ROTATE_PX`, type_transform.rs:213-216, 310-318).
+const ROTATE_REACH_PT: f32 = 28.0;
 
 /// Cached rendered preview and bounded damage history. Unchanged pointer positions render nothing.
 pub(crate) struct Preview {
@@ -61,7 +64,7 @@ pub(crate) fn visible(app: &PhotocraftApp, mods: Mods) -> bool {
 /// Whether the whole box takes the pointer, above the editor, rather than only its move reach, below it. A capture
 /// keeps the box it began on to its release, whatever modifiers change during it; otherwise ⌘ held picks the whole
 /// box.
-fn whole_box(app: &PhotocraftApp, mods: Mods) -> bool {
+pub(crate) fn whole_box(app: &PhotocraftApp, mods: Mods) -> bool {
     match &app.ui.type_transform {
         Some(t) => !t.from_reach,
         None => mods.cmd,
@@ -296,6 +299,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rec
     let reach = if drawn { TransformReach::Box } else { TransformReach::MoveOnly { points: MOVE_REACH_PT as f32 } };
     let out = TransformOverlay::new(Label::from(&*tl!("Type transform")), session, &settings)
         .reach(reach)
+        .rotate_zone(RotateZone::border(ROTATE_REACH_PT))
         .mods(Some(pointer.mods))
         .id_salt("type transform")
         .show_at(ui, canvas);

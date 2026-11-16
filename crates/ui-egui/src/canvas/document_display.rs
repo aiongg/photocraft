@@ -259,6 +259,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let fit_layers = move || Some(layer_bounds(&fit_doc, active, &selected));
     let pasteboard = pasteboard_color(app);
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    // Where the tool takes a press over the canvas controls this pass, asked before the canvas shows.
+    let regions = tools::claimed_regions(app, ctx, host);
 
     let mut bound = given;
     let mut canvas = Canvas::new(label.clone())
@@ -270,7 +272,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .pasteboard(pasteboard)
         .navigation(navigation)
         .view_follows_pointer(follows_pointer)
-        .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise);
+        .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise)
+        .tool_regions(regions);
     if let Some((from, anchor)) = ease {
         canvas = canvas.ease_from(from, anchor);
     }
