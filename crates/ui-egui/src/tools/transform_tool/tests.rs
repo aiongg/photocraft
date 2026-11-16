@@ -387,7 +387,8 @@ fn image_processor_document_sources_wait_for_the_transform() {
                         craft::automation::dialogs::dialog_id(&app.framework.dialogs, &json!({"dialog": reply["dialog"]})).expect("the menu opened the dialog");
                     app.framework.dialogs.set_json_field(&ctx, id, "source", json!(source)).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "output", json!(output.path())).unwrap();
-                    app.framework.dialogs.set_json_field(&ctx, id, "format", json!("png")).unwrap();
+                    // The dialog picks its file types by ticking them; OK is refused while none is ticked.
+                    app.framework.dialogs.set_json_field(&ctx, id, "jpeg/enabled", json!(true)).unwrap();
                     crate::dialogs::confirm(&mut app, &ctx, id)
                 } else {
                     app.run("file.scripts.imageProcessor", params.clone()).map(|_| ())

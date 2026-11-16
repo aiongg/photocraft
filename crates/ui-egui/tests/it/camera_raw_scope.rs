@@ -4,7 +4,7 @@
 //! region scope, the persisted scope settings and the hover sample.
 use egui::{Pos2, pos2, vec2};
 use egui_kittest::Harness;
-use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, dialogs, theme::AppTheme};
+use photocraft_ui_egui::{PhotocraftApp, camera_raw_ui, control, theme::AppTheme};
 use serde_json::{Value, json};
 
 fn menu(app: &mut PhotocraftApp, ctx: &egui::Context, p: Value) -> Result<Value, String> {
@@ -16,13 +16,20 @@ fn inspect(h: &Harness<'_, PhotocraftApp>) -> Value {
 
 /// A harness whose document `prepare` sets up before Camera Raw opens on it.
 fn harness(theme: AppTheme, prepare: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
+    app_harness(theme, true, prepare)
+}
+/// [`harness`], with Camera Raw opened at the start or left for the test's first request. A develop is only
+/// delivered when the app's own frame runs, which is what a harness steps.
+fn app_harness(theme: AppTheme, open: bool, prepare: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
     let shown = theme.clone();
     let mut h = Harness::builder().with_step_dt(1.0 / 60.0).with_size(vec2(1200.0, 800.0)).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, shown.clone());
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.set_theme(&cc.egui_ctx, shown);
         prepare(&mut app);
-        camera_raw_ui::open(&mut app, &cc.egui_ctx).unwrap();
+        if open {
+            camera_raw_ui::open(&mut app, &cc.egui_ctx).unwrap();
+        }
         app
     });
     h.run_steps(3);
@@ -31,7 +38,9 @@ fn harness(theme: AppTheme, prepare: impl FnOnce(&mut PhotocraftApp) + 'static) 
     h.state_mut().set_theme(&ctx, theme.clone());
     h.run_steps(3);
     assert_eq!(h.state().ui.theme, theme);
-    settle(&mut h);
+    if open {
+        settle(&mut h);
+    }
     h
 }
 fn fixture(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
@@ -66,36 +75,24 @@ fn settle(h: &mut Harness<'_, PhotocraftApp>) {
     h.run_steps(2);
 }
 
-/// One pass of the hosted dialogs, as the app's frame runs them.
-fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    ctx.run_ui(egui::RawInput::default(), |ui| dialogs::run(app, ui)).textures_delta.clear();
-}
-/// A request on an app without a harness, then frames until the develop it asks for has landed.
-/// The reply describes the open dialog; a request that closed it answers with its own reply.
-fn request(app: &mut PhotocraftApp, ctx: &egui::Context, p: Value) -> Result<Value, String> {
-    let reply = menu(app, ctx, p)?;
-    if control::inspect(app, ctx)["cameraRaw"].is_null() {
+/// A request, then the develop it asks for. The reply describes the open dialog; a request that closed it
+/// answers with its own reply.
+fn request(h: &mut Harness<'_, PhotocraftApp>, p: Value) -> Result<Value, String> {
+    let ctx = h.ctx.clone();
+    let reply = menu(h.state_mut(), &ctx, p)?;
+    if inspect(h).is_null() {
         return Ok(reply);
     }
-    frame(app, ctx);
-    for _ in 0..2000 {
-        craft::ui::runtime::pending::finish_jobs(ctx, std::time::Duration::from_secs(30));
-        frame(app, ctx);
-        let described = control::inspect(app, ctx)["cameraRaw"].clone();
-        if described["previewPending"] == false && !described["histogram"].is_null() {
-            return Ok(described);
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
-    }
-    panic!("the Camera Raw preview never finished");
+    settle(h);
+    Ok(inspect(h))
 }
-fn plain_app(width: u32, height: u32, color: &str) -> (PhotocraftApp, egui::Context) {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width":width,"height":height})).unwrap();
-    app.run("layer.new.layer", json!({})).unwrap();
-    app.run("edit.fill", json!({"color":color})).unwrap();
-    (app, ctx)
+/// A harness on a `width` x `height` document filled with `color`, Camera Raw closed.
+fn plain_app(width: u32, height: u32, color: &'static str) -> Harness<'static, PhotocraftApp> {
+    app_harness(AppTheme::pro(), false, move |app| {
+        app.run("file.new", json!({"width":width,"height":height})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.run("edit.fill", json!({"color":color})).unwrap();
+    })
 }
 
 /// Moves the pointer across the window until it is over the picture, and returns where and the
@@ -217,29 +214,29 @@ fn malformed_curves_fail_in_both_preview_and_engine_without_an_edit() {
 #[test]
 fn exact_clipping_rgb_lab_capped_samplers_and_reversible_tone_controls() {
     for depth in [8, 16, 32] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        let ctx = app.ctx().clone();
-        app.run("file.new", json!({"width":16,"height":8,"mode":"rgb","depth":depth})).unwrap();
-        app.run("layer.new.layer", json!({})).unwrap();
-        app.run("edit.fill", json!({"color":"#80ff00"})).unwrap();
-        let original = app.session.active().unwrap().doc.clone();
-        let history = app.session.active().unwrap().history.past_len();
-        let initial = request(&mut app, &ctx, json!({})).unwrap();
+        let mut h = app_harness(AppTheme::pro(), false, move |app| {
+            app.run("file.new", json!({"width":16,"height":8,"mode":"rgb","depth":depth})).unwrap();
+            app.run("layer.new.layer", json!({})).unwrap();
+            app.run("edit.fill", json!({"color":"#80ff00"})).unwrap();
+        });
+        let original = h.state().session.active().unwrap().doc.clone();
+        let history = h.state().session.active().unwrap().history.past_len();
+        let initial = request(&mut h, json!({})).unwrap();
         let histogram = &initial["histogram"];
         let counts = |key: &str| (0..3).map(|channel| histogram[key][channel].as_u64().unwrap()).collect::<Vec<_>>();
         assert_eq!(counts("shadows"), [0, 0, 128], "depth {depth}: Blue 0 clips every pixel");
         assert_eq!(counts("highlights"), [0, 128, 0], "depth {depth}: Green 255 clips every pixel");
-        let warned = request(&mut app, &ctx, json!({"ui":{"scope":{"labReadouts":true,"shadowWarning":true,"highlightWarning":true}}})).unwrap();
+        let warned = request(&mut h, json!({"ui":{"scope":{"labReadouts":true,"shadowWarning":true,"highlightWarning":true}}})).unwrap();
         assert_eq!(warned["scope"]["shadowWarning"], true);
         assert_eq!(warned["histogram"], initial["histogram"], "the warnings count, they do not change the develop");
         assert_eq!(warned["previewRevision"], initial["previewRevision"], "a scope change starts no develop");
-        assert_eq!(app.session.active().unwrap().history.past_len(), history);
-        request(&mut app, &ctx, json!({"ui":{"cancel":true}})).unwrap();
-        assert!(std::sync::Arc::ptr_eq(&original, &app.session.active().unwrap().doc));
-        request(&mut app, &ctx, json!({"ui":{"set":{"exposure":0.5},"commit":true}})).unwrap();
-        assert_eq!(app.session.active().unwrap().history.past_len(), history + 1);
-        app.run("edit.undo", json!({})).unwrap();
-        assert!(std::sync::Arc::ptr_eq(&original, &app.session.active().unwrap().doc));
+        assert_eq!(h.state().session.active().unwrap().history.past_len(), history);
+        request(&mut h, json!({"ui":{"cancel":true}})).unwrap();
+        assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
+        request(&mut h, json!({"ui":{"set":{"exposure":0.5},"commit":true}})).unwrap();
+        assert_eq!(h.state().session.active().unwrap().history.past_len(), history + 1);
+        h.state_mut().run("edit.undo", json!({})).unwrap();
+        assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
     }
 }
 
@@ -271,14 +268,14 @@ fn lab_readouts_respect_embedded_rgb_profile() {
 /// one left, except that the vectorscope is opt-in each time.
 #[test]
 fn real_shortcuts_triangles_menu_and_scope_preferences_roundtrip() {
-    let (mut app, ctx) = plain_app(16, 16, "#808080");
-    let first = request(&mut app, &ctx, json!({})).unwrap();
+    let mut h = plain_app(16, 16, "#808080");
+    let first = request(&mut h, json!({})).unwrap();
     assert_eq!(first["scope"]["labReadouts"], false);
-    let set = request(&mut app, &ctx, json!({"ui":{"scope":{"labReadouts":true,"vectorscope":true,"shadowWarning":true}}})).unwrap();
+    let set = request(&mut h, json!({"ui":{"scope":{"labReadouts":true,"vectorscope":true,"shadowWarning":true}}})).unwrap();
     assert_eq!((&set["scope"]["labReadouts"], &set["scope"]["vectorscope"], &set["scope"]["shadowWarning"]), (&json!(true), &json!(true), &json!(true)));
     assert_eq!(set["previewRevision"], first["previewRevision"], "scope settings start no develop");
-    request(&mut app, &ctx, json!({"ui":{"cancel":true}})).unwrap();
-    let again = request(&mut app, &ctx, json!({})).unwrap();
+    request(&mut h, json!({"ui":{"cancel":true}})).unwrap();
+    let again = request(&mut h, json!({})).unwrap();
     assert_eq!(again["scope"]["labReadouts"], true, "kept");
     assert_eq!(again["scope"]["shadowWarning"], true, "kept");
     assert_eq!(again["scope"]["vectorscope"], false, "the vectorscope stays opt-in when reopening Camera Raw");
@@ -287,26 +284,26 @@ fn real_shortcuts_triangles_menu_and_scope_preferences_roundtrip() {
 
 #[test]
 fn selected_region_scope_and_preview_share_the_engine_selection_boundary() {
-    let (mut app, ctx) = plain_app(16, 8, "#808080");
-    app.run("select.rect", json!({"x":0,"y":0,"width":8,"height":8})).unwrap();
-    let original = app.session.active().unwrap().doc.clone();
-    request(&mut app, &ctx, json!({})).unwrap();
-    let full = request(&mut app, &ctx, json!({"ui":{"set":{"exposure":1.0},"scope":{"vectorscope":true}}})).unwrap();
+    let mut h = plain_app(16, 8, "#808080");
+    h.state_mut().run("select.rect", json!({"x":0,"y":0,"width":8,"height":8})).unwrap();
+    let original = h.state().session.active().unwrap().doc.clone();
+    request(&mut h, json!({})).unwrap();
+    let full = request(&mut h, json!({"ui":{"set":{"exposure":1.0},"scope":{"vectorscope":true}}})).unwrap();
     assert_eq!(full["hasScopeSelection"], true);
     assert_eq!(full["vectorscope"]["samples"], 128);
-    let selected = request(&mut app, &ctx, json!({"ui":{"scope":{"vectorscope":true,"selectedRegion":true}}})).unwrap();
+    let selected = request(&mut h, json!({"ui":{"scope":{"vectorscope":true,"selectedRegion":true}}})).unwrap();
     assert_eq!(selected["vectorscope"]["samples"], 64, "only the pixels inside the selection");
     assert_eq!(selected["previewRevision"], full["previewRevision"]);
-    let before = request(&mut app, &ctx, json!({"ui":{"before":true}})).unwrap();
+    let before = request(&mut h, json!({"ui":{"before":true}})).unwrap();
     assert_eq!(before["vectorscope"]["before"], true);
-    let after = request(&mut app, &ctx, json!({"ui":{"before":false}})).unwrap();
-    assert!(std::sync::Arc::ptr_eq(&original, &app.session.active().unwrap().doc));
+    let after = request(&mut h, json!({"ui":{"before":false}})).unwrap();
+    assert!(std::sync::Arc::ptr_eq(&original, &h.state().session.active().unwrap().doc));
     // A refused scope leaves the accepted settings as they were.
-    assert!(request(&mut app, &ctx, json!({"ui":{"scope":"zzz"}})).is_err());
-    let unchanged = control::inspect(&app, &ctx)["cameraRaw"].clone();
+    assert!(request(&mut h, json!({"ui":{"scope":"zzz"}})).is_err());
+    let unchanged = inspect(&h);
     assert_eq!(unchanged["params"], after["params"]);
     assert_eq!(unchanged["scope"], after["scope"]);
-    request(&mut app, &ctx, json!({"ui":{"commit":true}})).unwrap();
-    let committed = request(&mut app, &ctx, json!({})).unwrap();
+    request(&mut h, json!({"ui":{"commit":true}})).unwrap();
+    let committed = request(&mut h, json!({})).unwrap();
     assert_eq!(committed["histogram"], after["histogram"]);
 }
