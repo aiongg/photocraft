@@ -1112,8 +1112,8 @@ fn temporary_type_transform_scales_without_reflow_or_leaving_type() {
                 assert!(h.state().ui.transform.is_none());
                 assert!(h.state().ui.type_transform.is_none());
                 assert_eq!(history_len(&h), count + 1);
-                h.event(egui::Event::Text("!".into()));
-                h.run_steps(2);
+                // Typing goes through the window host, as the platform's reaches the focused editor.
+                super::commit_tests::type_keys(h.state_mut(), "!");
                 assert!(text(h.state(), id).text.starts_with("Hel!lo"));
                 h.key_press(if vertical { egui::Key::ArrowUp } else { egui::Key::ArrowLeft });
                 h.run_steps(1);
